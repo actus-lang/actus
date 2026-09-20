@@ -61,3 +61,14 @@ fn build_command_links_an_executable() {
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
 }
+
+#[test]
+fn check_command_rejects_semantically_invalid_source() {
+    let input = std::env::temp_dir().join(format!("actus-cli-check-{}.act", std::process::id()));
+    fs::write(&input, "verb main() { inspect(missing); }\n").expect("write source");
+
+    let result = run_with_args(vec!["check".to_owned(), input.display().to_string()].into_iter());
+
+    assert_eq!(result, 1);
+    let _ = fs::remove_file(input);
+}

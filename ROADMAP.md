@@ -67,6 +67,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 - [x] Add `actus parse <file>`.
 - [x] Add `actus check <file>`.
+- [x] Run semantic analysis from `actus check`.
 - [x] Add deterministic diagnostic rendering.
 - [x] Define stable syntax error codes.
 - [x] Implement the first `actus fmt` command.

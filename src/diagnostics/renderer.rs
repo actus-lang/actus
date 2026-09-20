@@ -1,5 +1,6 @@
 use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind};
+use crate::semantic::{SemanticError, SemanticErrorKind};
 
 pub fn render_lex_error(source: &str, error: &LexError) -> String {
     let (line, column) = line_column(source, error.span.start);
@@ -27,6 +28,15 @@ pub fn render_parse_error(source: &str, error: &ParseError) -> String {
     format!("error[{}] at {line}:{column}: {message}", parse_code(error.code))
 }
 
+pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
+    let (line, column) = line_column(source, error.span.start);
+    format!(
+        "error[{}] at {line}:{column}: {}",
+        semantic_code(&error.kind),
+        semantic_message(&error.kind)
+    )
+}
+
 fn lex_code(error: &LexError) -> u8 {
     match error.kind {
         LexErrorKind::UnexpectedCharacter(_) => 1,
@@ -38,6 +48,80 @@ fn parse_code(code: ParseErrorCode) -> &'static str {
     match code {
         ParseErrorCode::UnexpectedToken => "E0003",
         ParseErrorCode::UnexpectedEndOfInput => "E0004",
+    }
+}
+
+fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
+    match kind {
+        SemanticErrorKind::DuplicateBinding { .. } => "E1001",
+        SemanticErrorKind::ShadowedBinding { .. } => "E1002",
+        SemanticErrorKind::UndeclaredIdentifier { .. } => "E1003",
+        SemanticErrorKind::InvalidBorrowTarget { .. } => "E1004",
+        SemanticErrorKind::UseAfterMove { .. } => "E1005",
+        SemanticErrorKind::UseAfterDrop { .. } => "E1006",
+        SemanticErrorKind::DoubleDrop { .. } => "E1007",
+        SemanticErrorKind::DropBorrow { .. } => "E1008",
+        SemanticErrorKind::DropFrozen { .. } => "E1009",
+        SemanticErrorKind::InvalidDatArgument { .. } => "E1010",
+        SemanticErrorKind::MoveFrozen { .. } => "E1011",
+        SemanticErrorKind::UnknownParameter { .. } => "E1012",
+        SemanticErrorKind::DuplicateArgument { .. } => "E1013",
+        SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
+        SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
+        SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
+        SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",
+        SemanticErrorKind::BorrowedReturn { .. } => "E1018",
+        SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
+        SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
+    }
+}
+
+fn semantic_message(kind: &SemanticErrorKind) -> String {
+    match kind {
+        SemanticErrorKind::DuplicateBinding { name } => format!("duplicate binding `{name}`"),
+        SemanticErrorKind::ShadowedBinding { name } => format!("shadowed binding `{name}`"),
+        SemanticErrorKind::UndeclaredIdentifier { name } => {
+            format!("undeclared identifier `{name}`")
+        }
+        SemanticErrorKind::InvalidBorrowTarget { name } => {
+            format!("invalid borrow target `{name}`")
+        }
+        SemanticErrorKind::UseAfterMove { name } => format!("use of moved binding `{name}`"),
+        SemanticErrorKind::UseAfterDrop { name } => format!("use of dropped binding `{name}`"),
+        SemanticErrorKind::DoubleDrop { name } => format!("binding `{name}` was dropped twice"),
+        SemanticErrorKind::DropBorrow { name } => format!("cannot drop borrow `{name}` directly"),
+        SemanticErrorKind::DropFrozen { name, .. } => {
+            format!("cannot drop frozen binding `{name}`")
+        }
+        SemanticErrorKind::InvalidDatArgument { name } => format!("invalid dat argument `{name}`"),
+        SemanticErrorKind::MoveFrozen { name, .. } => {
+            format!("cannot move frozen binding `{name}`")
+        }
+        SemanticErrorKind::UnknownParameter { callee, name } => {
+            format!("unknown parameter `{name}` in call to `{callee}`")
+        }
+        SemanticErrorKind::DuplicateArgument { name } => format!("duplicate argument `{name}`"),
+        SemanticErrorKind::MixedArgumentModes { callee } => {
+            format!("cannot mix named and positional arguments in `{callee}`")
+        }
+        SemanticErrorKind::WrongArgumentCount { callee } => {
+            format!("wrong argument count in `{callee}`")
+        }
+        SemanticErrorKind::InvalidArgumentRole { callee, parameter } => {
+            format!("argument does not satisfy role of `{parameter}` in `{callee}`")
+        }
+        SemanticErrorKind::AmbiguousPositionalCall { callee } => {
+            format!("positional call to `{callee}` is ambiguous")
+        }
+        SemanticErrorKind::BorrowedReturn { name } => {
+            format!("borrow `{name}` cannot escape its scope")
+        }
+        SemanticErrorKind::InvalidOwnerInitializer { name } => {
+            format!("invalid owner initializer `{name}`")
+        }
+        SemanticErrorKind::LoopControlOutsideLoop { keyword } => {
+            format!("`{keyword}` is only valid inside a loop")
+        }
     }
 }
 

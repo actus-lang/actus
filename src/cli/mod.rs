@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::codegen::{emit_program_object, link_object};
-use crate::diagnostics::{render_lex_error, render_parse_error};
+use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::formatter::format_program;
 use crate::lexer::scan;
 use crate::parser::parse;
@@ -220,10 +220,16 @@ fn parse_file(path: &str, print_ast: bool) -> i32 {
             println!("{program:#?}");
             0
         }
-        Ok(_) => {
-            println!("checked `{path}` successfully");
-            0
-        }
+        Ok(program) => match crate::semantic::analyze(&program) {
+            Ok(_) => {
+                println!("checked `{path}` successfully");
+                0
+            }
+            Err(error) => {
+                eprintln!("{path}: {}", render_semantic_error(&source, &error));
+                1
+            }
+        },
         Err(error) => {
             eprintln!("{path}: {}", render_parse_error(&source, &error));
             1
