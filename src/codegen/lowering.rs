@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{InstBuilder, types};
+use cranelift_codegen::ir::{BlockArg, InstBuilder, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr, Role, Stmt, UnaryOp};
@@ -15,10 +15,11 @@ enum Flow {
     Continue,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct LoopTargets {
     header: cranelift_codegen::ir::Block,
     exit: cranelift_codegen::ir::Block,
+    carried: Vec<String>,
 }
 
 pub(super) fn lower_body(
@@ -47,7 +48,7 @@ fn lower_statements<'source>(
     targets: Option<LoopTargets>,
 ) -> Result<Flow, NativeEmitError> {
     for statement in statements {
-        let flow = lower_statement(function, statement, locals, functions, targets)?;
+        let flow = lower_statement(function, statement, locals, functions, targets.clone())?;
         if !matches!(flow, Flow::Fallthrough) {
             return Ok(flow);
         }
@@ -89,8 +90,8 @@ fn lower_statement<'source>(
             lower_statements(function, &block.statements, &mut nested_locals, functions, targets)
         }
         Stmt::Loop(block) => lower_loop(function, block, locals, functions),
-        Stmt::Break { .. } => emit_loop_jump(function, targets, false),
-        Stmt::Continue { .. } => emit_loop_jump(function, targets, true),
+        Stmt::Break { .. } => emit_loop_jump(function, targets, locals, false),
+        Stmt::Continue { .. } => emit_loop_jump(function, targets, locals, true),
         _ => Err(NativeEmitError(
             "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns"
                 .to_owned(),
@@ -101,6 +102,7 @@ fn lower_statement<'source>(
 fn emit_loop_jump(
     function: &mut FunctionBuilder<'_>,
     targets: Option<LoopTargets>,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     continue_loop: bool,
 ) -> Result<Flow, NativeEmitError> {
     let Some(targets) = targets else {
@@ -108,7 +110,8 @@ fn emit_loop_jump(
         return Err(NativeEmitError(format!("{keyword} has no native loop target")));
     };
     let target = if continue_loop { targets.header } else { targets.exit };
-    function.ins().jump(target, &[]);
+    let values = carried_values(locals, &targets.carried)?;
+    jump_with_values(function, target, values);
     Ok(if continue_loop { Flow::Continue } else { Flow::Break })
 }
 
@@ -118,51 +121,102 @@ fn lower_loop<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
 ) -> Result<Flow, NativeEmitError> {
-    if let Some(name) = assigned_outer_binding(&block.statements, locals) {
-        return Err(NativeEmitError(format!(
-            "native loop assignment to outer binding `{name}` requires SSA lowering"
-        )));
-    }
+    let carried = assigned_outer_bindings(&block.statements, locals);
     let header = function.create_block();
     let body = function.create_block();
     let exit = function.create_block();
-    function.ins().jump(header, &[]);
+    for _ in &carried {
+        function.append_block_param(header, types::I32);
+        function.append_block_param(exit, types::I32);
+    }
+    let initial_values = carried_values(locals, &carried)?;
+    jump_with_values(function, header, initial_values);
     function.switch_to_block(header);
     function.ins().jump(body, &[]);
     function.seal_block(body);
     function.switch_to_block(body);
     let mut loop_locals = locals.clone();
+    let header_values = function.block_params(header).to_vec();
+    for (name, value) in carried.iter().zip(header_values) {
+        let binding = locals.keys().find(|binding| binding.as_str() == name).unwrap();
+        loop_locals.insert(binding, value);
+    }
     let flow = lower_statements(
         function,
         &block.statements,
         &mut loop_locals,
         functions,
-        Some(LoopTargets { header, exit }),
+        Some(LoopTargets { header, exit, carried: carried.clone() }),
     )?;
     if matches!(flow, Flow::Fallthrough) {
-        function.ins().jump(header, &[]);
+        let values = carried_values(&loop_locals, &carried)?;
+        jump_with_values(function, header, values);
     }
     function.seal_block(header);
     if matches!(flow, Flow::Break | Flow::Fallthrough | Flow::Continue) {
         function.switch_to_block(exit);
         function.seal_block(exit);
+        let exit_values = function.block_params(exit).to_vec();
+        for (name, value) in carried.iter().zip(exit_values) {
+            let binding = locals.keys().find(|binding| binding.as_str() == name).unwrap();
+            locals.insert(binding, value);
+        }
         Ok(Flow::Fallthrough)
     } else {
         Ok(flow)
     }
 }
 
-fn assigned_outer_binding(
+fn jump_with_values(
+    function: &mut FunctionBuilder<'_>,
+    target: cranelift_codegen::ir::Block,
+    values: Vec<cranelift_codegen::ir::Value>,
+) {
+    let arguments = values.into_iter().map(BlockArg::Value).collect::<Vec<_>>();
+    function.ins().jump(target, arguments.iter());
+}
+
+fn assigned_outer_bindings(
     statements: &[Stmt],
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-) -> Option<String> {
-    statements.iter().find_map(|statement| match statement {
-        Stmt::Assignment { name, .. } if locals.keys().any(|binding| binding.as_str() == name) => {
-            Some(name.clone())
+) -> Vec<String> {
+    let mut names = Vec::new();
+    for statement in statements {
+        let name = match statement {
+            Stmt::Assignment { name, .. }
+                if locals.keys().any(|binding| binding.as_str() == name) =>
+            {
+                Some(name)
+            }
+            Stmt::Block(block) | Stmt::Loop(block) => {
+                names.extend(assigned_outer_bindings(&block.statements, locals));
+                None
+            }
+            _ => None,
+        };
+        if let Some(name) = name {
+            names.push(name.clone());
         }
-        Stmt::Block(block) | Stmt::Loop(block) => assigned_outer_binding(&block.statements, locals),
-        _ => None,
-    })
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn carried_values(
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    names: &[String],
+) -> Result<Vec<cranelift_codegen::ir::Value>, NativeEmitError> {
+    names
+        .iter()
+        .map(|name| {
+            locals
+                .iter()
+                .find(|(binding, _)| binding.as_str() == name)
+                .map(|(_, value)| *value)
+                .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))
+        })
+        .collect()
 }
 
 fn lower_expression(

@@ -53,17 +53,6 @@ fn lowers_loop_continue_to_a_native_object() {
 }
 
 #[test]
-fn rejects_loop_assignment_to_outer_binding_until_ssa_lowering_exists() {
-    let source = "verb main() -> Int { erg value = 0; loop { value = 1; break; } return value; }";
-    let (tokens, errors) = scan(source);
-    assert!(errors.is_empty());
-    let program = parse(tokens).expect("source should parse");
-    let error =
-        emit_program_object(&program, "main").expect_err("stale loop values must be rejected");
-    assert!(error.to_string().contains("requires SSA lowering"));
-}
-
-#[test]
 fn lowers_scalar_borrow_roles_to_a_native_object() {
     let source = "verb main() -> Int { erg value = 42; abs view = ref value; return inspect(view); } verb inspect(abs view: Int) -> Int { return view + 0; }";
     let (tokens, errors) = scan(source);
