@@ -196,7 +196,10 @@ impl Analyzer {
             BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
             BindingState::Frozen { .. } => {
                 return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen { name: name.clone() },
+                    kind: SemanticErrorKind::MoveFrozen {
+                        name: name.clone(),
+                        borrow_ids: self.blocking_borrow_ids(index),
+                    },
                     span,
                 });
             }

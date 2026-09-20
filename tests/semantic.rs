@@ -71,7 +71,9 @@ fn rejects_move_of_a_frozen_owner() {
         "verb consume(dat packet: Buffer) { drop(packet); } verb caller() { erg buffer = make(); { abs view = ref buffer; consume(packet: buffer); } }",
     )
     .expect_err("a frozen binding must not be moved");
-    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name } if name == "buffer"));
+    assert!(
+        matches!(error.kind, SemanticErrorKind::MoveFrozen { name, borrow_ids } if name == "buffer" && borrow_ids == vec![0])
+    );
 }
 
 #[test]
@@ -161,5 +163,33 @@ fn transfers_ownership_when_initializing_an_erg_binding() {
         "verb broken(erg source: Buffer) { abs view = ref source; erg target = source; }",
     )
     .expect_err("a frozen owner must not initialize another owner");
-    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name } if name == "source"));
+    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name, .. } if name == "source"));
+}
+
+#[test]
+fn rejects_mutation_while_an_owner_is_frozen() {
+    let error = analyze_source(
+        "verb broken(erg buffer: Buffer) { abs view = ref buffer; buffer = make(); }",
+    )
+    .expect_err("frozen owners must not be mutated");
+    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name, .. } if name == "buffer"));
+}
+
+#[test]
+fn passes_shared_borrows_to_known_nested_calls() {
+    analyze_source(
+        "verb inspect_view(abs view: Buffer) { inspect(view); } verb caller(erg buffer: Buffer) { abs view = ref buffer; inspect_view(view); }",
+    )
+    .expect("an active shared borrow should pass to an abs parameter");
+}
+
+#[test]
+fn rejects_borrow_storage_in_a_longer_lived_owner() {
+    let error = analyze_source(
+        "verb broken(erg buffer: Buffer) { abs view = ref buffer; erg stored = view; }",
+    )
+    .expect_err("an abs binding must not initialize a longer-lived owner");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidOwnerInitializer { name } if name == "view")
+    );
 }

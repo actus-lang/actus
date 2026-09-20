@@ -23,7 +23,10 @@ impl Analyzer {
             BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
             BindingState::Frozen { .. } => {
                 return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen { name: name.clone() },
+                    kind: SemanticErrorKind::MoveFrozen {
+                        name: name.clone(),
+                        borrow_ids: self.blocking_borrow_ids(index),
+                    },
                     span,
                 });
             }
@@ -60,7 +63,10 @@ impl Analyzer {
             BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
             BindingState::Frozen { .. } => {
                 return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen { name: name.clone() },
+                    kind: SemanticErrorKind::MoveFrozen {
+                        name: name.clone(),
+                        borrow_ids: self.blocking_borrow_ids(index),
+                    },
                     span: *span,
                 });
             }
@@ -97,7 +103,10 @@ impl Analyzer {
         self.ensure_readable(index, name, span)?;
         if matches!(self.model.bindings[index].state, BindingState::Frozen { .. }) {
             return Err(SemanticError {
-                kind: SemanticErrorKind::MoveFrozen { name: name.to_owned() },
+                kind: SemanticErrorKind::MoveFrozen {
+                    name: name.to_owned(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
                 span,
             });
         }
@@ -121,7 +130,10 @@ impl Analyzer {
             BindingState::Active => self.model.bindings[index].state = BindingState::Dropped,
             BindingState::Frozen { .. } => {
                 return Err(SemanticError {
-                    kind: SemanticErrorKind::DropFrozen { name: name.to_owned() },
+                    kind: SemanticErrorKind::DropFrozen {
+                        name: name.to_owned(),
+                        borrow_ids: self.blocking_borrow_ids(index),
+                    },
                     span,
                 });
             }
@@ -133,6 +145,15 @@ impl Analyzer {
             }
         }
         Ok(())
+    }
+}
+
+impl Analyzer {
+    pub(super) fn blocking_borrow_ids(&self, index: usize) -> Vec<usize> {
+        match &self.model.bindings[index].state {
+            BindingState::Frozen { borrow_ids } => borrow_ids.clone(),
+            BindingState::Active | BindingState::Moved | BindingState::Dropped => Vec::new(),
+        }
     }
 }
 

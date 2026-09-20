@@ -105,15 +105,15 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Implement `abs x = ref owner`.
 - [x] Derive `Frozen` from active borrow records.
 - [x] Restore the owner to `Active` after the last borrow ends.
-- [ ] Reject mutation while an owner is frozen.
+- [x] Reject mutation while an owner is frozen.
 - [x] Reject moving a frozen owner.
 - [x] Reject dropping a frozen owner.
 - [x] Allow shared borrows to be passed to nested calls.
 - [ ] Reject storing borrows in longer-lived structures.
 - [ ] Reject returning borrows from functions.
-- [ ] Reject borrow escape across lexical scope boundaries.
+- [x] Reject borrow escape across lexical scope boundaries.
 - [x] Reject `drop` applied to an `abs` binding.
-- [ ] Produce diagnostics that identify every active blocking borrow.
+- [x] Produce diagnostics that identify every active blocking borrow.
 
 ### Calls and Roles
 
