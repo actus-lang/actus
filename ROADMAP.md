@@ -142,17 +142,29 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add nested-scope cleanup tests.
 - [x] Add move-and-drop interaction tests.
 
-## Phase 7: C99 Backend
+## Phase 7: Native Backend
 
-- [ ] Define the initial C emission model.
-- [ ] Emit valid C99 for the supported Actus subset.
+- [ ] Define the initial native emission model.
+- [ ] Integrate a Rust-native backend such as Cranelift.
+- [ ] Emit object files or native binaries without an intermediate C representation.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.
 - [ ] Reject code generation when semantic analysis fails.
-- [ ] Add generated C golden tests.
-- [ ] Compile generated C in CI.
+- [ ] Add native object and machine-code golden tests.
+- [ ] Link generated objects in CI.
 - [ ] Add a minimal end-to-end Actus-to-native-binary test.
+
+### C Library Interoperability
+
+- [ ] Define the C ABI boundary independently from the native backend.
+- [ ] Support external C function declarations without generating Actus-owned C code.
+- [ ] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
+- [ ] Define ownership and lifetime rules at the C FFI boundary.
+- [ ] Support linking static and shared C libraries.
+- [ ] Define a reproducible header-to-Actus binding workflow.
+- [ ] Mark unchecked raw pointers and foreign resources with explicit unsafe boundaries.
+- [ ] Add C library integration fixtures and native link tests.
 
 ## Phase 8: Test Infrastructure
 
@@ -162,7 +174,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Add diagnostic snapshots.
 - [ ] Add semantic state-transition tests.
 - [ ] Add ownership and borrowing regression tests.
-- [ ] Add golden tests for generated C.
+- [ ] Add golden tests for generated native output.
 - [ ] Make test output deterministic.
 - [ ] Add a command for intentionally updating snapshots.
 - [ ] Add coverage reporting to CI.
@@ -240,10 +252,10 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 
 - [ ] Define struct method syntax and receiver roles.
 - [ ] Validate receiver ownership and borrow behavior.
-- [ ] Emit valid C99 struct declarations.
+- [ ] Emit native struct layouts and declarations for the selected backend.
 - [ ] Emit field access, initialization, assignment, and cleanup.
 - [ ] Define the C ABI contract for public structs.
-- [ ] Add generated C and native execution tests.
+- [ ] Add generated native output and execution tests.
 
 ### Documentation and Compatibility
 
