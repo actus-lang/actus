@@ -2,57 +2,63 @@
 
 Actus is developed in small, verifiable stages. Each item should be checked only after the implementation, tests, and documentation are complete.
 
+## Current focus
+
+**Phase 1 is the active development phase.** Lexer work exists as preserved implementation progress, but no further Phase 2 work may begin until every required Phase 1 item is complete and verified.
+
+Each phase is gated: implementation progress in a later phase may be preserved, but the project must return to the earliest incomplete phase before adding new work.
+
 ## Phase 1: Repository and Project Discipline
 
-- [ ] Protect the `main` branch from direct pushes.
-- [ ] Require pull requests for changes to `main`.
-- [ ] Require successful CI checks before merging.
-- [ ] Require at least one code review for pull requests.
-- [ ] Add a pull request template.
-- [ ] Define and enforce the Conventional Commits format.
-- [ ] Add a commit-message checker.
-- [ ] Add local `pre-commit` checks.
-- [ ] Add local `pre-push` checks.
-- [ ] Add a pinned Rust toolchain with `rust-toolchain.toml`.
-- [ ] Configure `rustfmt` and enforce formatting in CI.
-- [ ] Configure Clippy and treat warnings as errors in CI.
-- [ ] Run `cargo check`, `cargo test`, and `cargo clippy` in GitHub Actions.
-- [ ] Add dependency auditing to CI.
-- [ ] Add dependency and license policy checks.
-- [ ] Add secret scanning to the repository workflow.
+- [x] Protect the `main` branch from direct pushes.
+- [x] Require pull requests for changes to `main`.
+- [x] Require successful CI checks before merging.
+- [ ] Require at least one code review for pull requests. (Deferred until a second maintainer joins.)
+- [x] Add a pull request template.
+- [x] Define and enforce the Conventional Commits format.
+- [x] Add a commit-message checker.
+- [x] Add local `pre-commit` checks.
+- [x] Add local `pre-push` checks.
+- [x] Add a pinned Rust toolchain with `rust-toolchain.toml`.
+- [x] Configure `rustfmt` and enforce formatting in CI.
+- [x] Configure Clippy and treat warnings as errors in CI.
+- [x] Run `cargo check`, `cargo test`, and `cargo clippy` in GitHub Actions.
+- [x] Add dependency auditing to CI.
+- [x] Add dependency and license policy checks.
+- [x] Add secret scanning to the repository workflow.
 
 ## Phase 2: Language Foundation
 
-- [ ] Define the initial token set.
-- [ ] Implement the lexer for Actus source files.
-- [ ] Support braces, semicolons, identifiers, literals, comments, and operators.
-- [ ] Add the `verb`, `erg`, `abs`, `dat`, `ref`, and `drop` keywords.
-- [ ] Track source spans for every token.
-- [ ] Produce structured lexer diagnostics.
-- [ ] Reject unknown characters and malformed literals.
-- [ ] Reject unterminated strings and comments.
-- [ ] Add lexer unit tests.
-- [ ] Add valid lexer fixtures.
-- [ ] Add invalid lexer fixtures.
+- [x] Define the initial token set.
+- [x] Implement the lexer for Actus source files.
+- [x] Support braces, semicolons, identifiers, literals, comments, and operators.
+- [x] Add the `verb`, `erg`, `abs`, `dat`, `ref`, and `drop` keywords.
+- [x] Track source spans for every token.
+- [x] Produce structured lexer diagnostics.
+- [x] Reject unknown characters and malformed literals.
+- [x] Reject unterminated strings and comments.
+- [x] Add lexer unit tests.
+- [x] Add valid lexer fixtures.
+- [x] Add invalid lexer fixtures.
 
 ## Phase 3: Parser and AST
 
-- [ ] Define the initial Actus grammar.
-- [ ] Define the AST for programs, verbs, parameters, roles, types, blocks, statements, and expressions.
-- [ ] Implement parsing for top-level declarations.
-- [ ] Implement parsing for verb declarations and parameters.
-- [ ] Implement parsing for blocks and nested scopes.
-- [ ] Implement parsing for variable declarations.
-- [ ] Implement parsing for borrow declarations using `ref`.
-- [ ] Implement parsing for assignments and calls.
-- [ ] Implement parsing for returns.
+- [x] Define the initial Actus grammar.
+- [x] Define the AST for programs, verbs, parameters, roles, types, blocks, statements, and expressions.
+- [x] Implement parsing for top-level declarations.
+- [x] Implement parsing for verb declarations and parameters.
+- [x] Implement parsing for blocks and nested scopes.
+- [x] Implement parsing for variable declarations.
+- [x] Implement parsing for borrow declarations using `ref`.
+- [x] Implement parsing for assignments and calls.
+- [x] Implement parsing for returns.
 - [ ] Implement parsing for intrinsic `drop` statements.
-- [ ] Track source spans for AST nodes.
+- [x] Track source spans for AST nodes.
 - [ ] Produce stable parser diagnostics with error codes.
-- [ ] Reject missing semicolons.
-- [ ] Reject unclosed blocks and unmatched braces.
-- [ ] Reject invalid roles and malformed declarations.
-- [ ] Reject invalid argument syntax.
+- [x] Reject missing semicolons.
+- [x] Reject unclosed blocks and unmatched braces.
+- [x] Reject invalid roles and malformed declarations.
+- [x] Reject invalid argument syntax.
 - [ ] Add valid parser fixtures.
 - [ ] Add invalid parser fixtures.
 - [ ] Add AST snapshot tests.

@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -eu
+
+echo "Running Clippy..."
+cargo clippy --all-targets --all-features -- -D warnings
+
+echo "Running tests..."
+cargo test --all-targets --all-features
+
+if command -v cargo-deny >/dev/null 2>&1; then
+    echo "Checking dependency and license policy..."
+    cargo deny check advisories licenses bans sources
+else
+    echo "cargo-deny is not installed; install it with: cargo install cargo-deny --locked --version 0.20.2" >&2
+    exit 1
+fi
