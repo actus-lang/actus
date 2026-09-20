@@ -106,6 +106,20 @@ enum EmitKind {
     Executable,
 }
 
+fn validate_entry(
+    program: &crate::ast::Program,
+    symbol: &str,
+    emit: EmitKind,
+) -> Result<(), String> {
+    if matches!(emit, EmitKind::Executable)
+        && let crate::ast::TopLevelDecl::Verb(verb) = &program.declarations[0]
+        && !verb.params.is_empty()
+    {
+        return Err(format!("executable entry verb `{symbol}` cannot have parameters"));
+    }
+    Ok(())
+}
+
 fn build_file(input: &str, output: Option<&Path>, emit: EmitKind) -> i32 {
     let source = match fs::read_to_string(input) {
         Ok(source) => source,
@@ -135,6 +149,10 @@ fn build_file(input: &str, output: Option<&Path>, emit: EmitKind) -> i32 {
             return 1;
         }
     };
+    if let Err(error) = validate_entry(&program, symbol, emit) {
+        eprintln!("error: {error}");
+        return 1;
+    }
     let bytes = match emit_program_object(&program, symbol) {
         Ok(bytes) => bytes,
         Err(error) => {
@@ -143,25 +161,32 @@ fn build_file(input: &str, output: Option<&Path>, emit: EmitKind) -> i32 {
         }
     };
     let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit));
-    let object = if matches!(emit, EmitKind::Executable) {
-        output.with_extension("o")
-    } else {
-        output.clone()
-    };
-    if let Err(error) = fs::write(&object, bytes) {
-        eprintln!("error: cannot write `{}`: {error}", object.display());
+    if let Err(error) = write_artifact(input, &output, bytes, emit) {
+        eprintln!("error: {error}");
         return 1;
-    }
-    if matches!(emit, EmitKind::Executable) {
-        if let Err(error) = link_object(&object, &output) {
-            eprintln!("error: cannot link `{input}`: {error}");
-            let _ = fs::remove_file(&object);
-            return 1;
-        }
-        let _ = fs::remove_file(&object);
     }
     println!("built `{}`", output.display());
     0
+}
+
+fn write_artifact(
+    input: &str,
+    output: &Path,
+    bytes: Vec<u8>,
+    emit: EmitKind,
+) -> Result<(), String> {
+    let object = matches!(emit, EmitKind::Executable).then(|| output.with_extension("o"));
+    let object_path = object.as_deref().unwrap_or(output);
+    fs::write(object_path, bytes)
+        .map_err(|error| format!("cannot write `{}`: {error}", object_path.display()))?;
+    if let Some(object_path) = object {
+        let result = link_object(&object_path, output)
+            .map_err(|error| format!("cannot link `{input}`: {error}"));
+        let _ = fs::remove_file(object_path);
+        result
+    } else {
+        Ok(())
+    }
 }
 
 fn default_output(input: &str, emit: EmitKind) -> PathBuf {

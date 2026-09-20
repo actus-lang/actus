@@ -10,7 +10,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use crate::ast::{BinaryOp, Expr, Program, Role, Stmt, TopLevelDecl, VerbDecl};
 use crate::semantic::analyze;
 
-use super::abi::validate_integer_return;
+use super::abi::validate_integer_signature;
 
 #[derive(Debug)]
 pub struct NativeEmitError(String);
@@ -34,10 +34,7 @@ pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, N
         .declarations
         .first()
         .ok_or_else(|| NativeEmitError("program has no verb declarations".to_owned()))?;
-    if !verb.params.is_empty() {
-        return Err(NativeEmitError("native integer slice does not support parameters".to_owned()));
-    }
-    validate_integer_return(verb).map_err(|error| NativeEmitError(error.to_string()))?;
+    validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     emit_verb_object(symbol, verb)
 }
 
@@ -54,6 +51,7 @@ fn emit_verb_object(symbol: &str, verb: &VerbDecl) -> Result<Vec<u8>, NativeEmit
     let mut module = ObjectModule::new(builder);
     let frontend_config = module.isa().frontend_config();
     let mut signature = module.make_signature();
+    signature.params.extend((0..verb.params.len()).map(|_| AbiParam::new(types::I32)));
     signature.returns.push(AbiParam::new(types::I32));
     let function_id = module
         .declare_function(symbol, Linkage::Export, &signature)
@@ -65,8 +63,14 @@ fn emit_verb_object(symbol: &str, verb: &VerbDecl) -> Result<Vec<u8>, NativeEmit
         let mut function = FunctionBuilder::new(&mut context.func, &mut function_context);
         let block = function.create_block();
         function.switch_to_block(block);
+        function.append_block_params_for_function_params(block);
+        let parameters = function.block_params(block).to_vec();
+        let mut locals = HashMap::new();
+        for (parameter, value) in verb.params.iter().zip(parameters) {
+            locals.insert(&parameter.name, value);
+        }
         function.seal_block(block);
-        let result = lower_body(&mut function, &verb.body.statements)?;
+        let result = lower_body(&mut function, &verb.body.statements, &locals)?;
         function.ins().return_(&[result]);
         function.finalize(frontend_config);
     }
@@ -80,8 +84,9 @@ fn emit_verb_object(symbol: &str, verb: &VerbDecl) -> Result<Vec<u8>, NativeEmit
 fn lower_body(
     function: &mut cranelift_frontend::FunctionBuilder<'_>,
     statements: &[Stmt],
+    initial_locals: &HashMap<&String, cranelift_codegen::ir::Value>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let mut locals = HashMap::new();
+    let mut locals = initial_locals.clone();
     for statement in statements {
         match statement {
             Stmt::OwnerDecl { role: Role::Erg, name, initializer, .. } => {
