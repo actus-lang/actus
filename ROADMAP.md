@@ -150,7 +150,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.
-- [ ] Reject code generation when semantic analysis fails.
+- [x] Reject code generation when semantic analysis fails.
 - [ ] Add native object and machine-code golden tests.
 - [ ] Link generated objects in CI.
 - [ ] Add a minimal end-to-end Actus-to-native-binary test.
