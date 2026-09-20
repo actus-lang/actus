@@ -65,16 +65,16 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 4: Syntax Tooling
 
-- [ ] Add `actus parse <file>`.
-- [ ] Add `actus check <file>`.
-- [ ] Add deterministic diagnostic rendering.
-- [ ] Define stable syntax error codes.
+- [x] Add `actus parse <file>`.
+- [x] Add `actus check <file>`.
+- [x] Add deterministic diagnostic rendering.
+- [x] Define stable syntax error codes.
 - [ ] Implement the first `actus fmt` command.
 - [ ] Define formatting rules for blocks, parameters, calls, and expressions.
 - [ ] Make formatter output deterministic.
 - [ ] Verify formatter idempotence.
 - [ ] Add formatter snapshot tests.
-- [ ] Ensure malformed input produces diagnostics instead of panics.
+- [x] Ensure malformed input produces diagnostics instead of panics.
 
 ## Phase 5: Semantic Analyzer
 

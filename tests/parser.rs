@@ -1,4 +1,5 @@
 use actus::ast::{Expr, Role, Stmt, TopLevelDecl};
+use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
 
@@ -69,4 +70,17 @@ fn matches_transfer_ast_snapshot() {
     let expected = include_str!("fixtures/parser/snapshots/transfer.ast.snap");
 
     assert_eq!(actual.trim_end(), expected.trim_end());
+}
+
+#[test]
+fn renders_parser_errors_with_stable_codes_and_locations() {
+    let source = include_str!("fixtures/parser/invalid/missing_semicolon.act");
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+
+    let error = parse(tokens).expect_err("fixture must fail parsing");
+    assert_eq!(
+        render_parse_error(source, &error),
+        "error[E0003] at 3:1: expected `;`, found RightBrace"
+    );
 }
