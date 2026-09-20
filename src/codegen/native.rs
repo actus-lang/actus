@@ -12,6 +12,7 @@ use crate::semantic::analyze;
 
 use super::abi::validate_integer_signature;
 use super::lowering::lower_body;
+use super::model::validate_cleanup_plans;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub(super) String);
@@ -39,8 +40,10 @@ pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError>
 }
 
 pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
-    analyze(program)
+    let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
+    validate_cleanup_plans(&semantic)
+        .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
     let verbs = program
         .declarations
         .iter()
