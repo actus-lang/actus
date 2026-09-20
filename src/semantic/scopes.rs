@@ -25,6 +25,7 @@ impl Analyzer {
             span,
             state: BindingState::Active,
         });
+        self.scopes.last_mut().expect("binding requires a scope").declaration_indices.push(index);
         self.scopes.last_mut().expect("binding requires a scope").bindings.insert(name, index);
         Ok(())
     }
@@ -42,18 +43,19 @@ impl Analyzer {
         self.scopes.push(ScopeFrame {
             bindings: std::collections::HashMap::new(),
             borrow_ids: Vec::new(),
+            declaration_indices: Vec::new(),
         });
     }
 
     pub(super) fn leave_scope(&mut self) {
         let frame = self.scopes.pop().expect("scope stack cannot be empty");
-        for borrow_id in frame.borrow_ids {
-            let Some(record) = self.model.borrows.iter().find(|record| record.id == borrow_id)
+        for borrow_id in &frame.borrow_ids {
+            let Some(record) = self.model.borrows.iter().find(|record| record.id == *borrow_id)
             else {
                 continue;
             };
             let owner = record.owner.clone();
-            self.active_borrow_ids.remove(&borrow_id);
+            self.active_borrow_ids.remove(borrow_id);
             let still_borrowed =
                 self.model.borrows.iter().any(|other| {
                     other.owner == owner && self.active_borrow_ids.contains(&other.id)
@@ -65,5 +67,11 @@ impl Analyzer {
                 self.model.bindings[index].state = BindingState::Active;
             }
         }
+        self.model.cleanup_plans.push(super::cleanup::plan_scope_cleanup(
+            self.scopes.len(),
+            &frame.declaration_indices,
+            &frame.borrow_ids,
+            &self.model.bindings,
+        ));
     }
 }

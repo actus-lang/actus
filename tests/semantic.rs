@@ -1,7 +1,7 @@
 use actus::ast::Role;
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{BindingState, SemanticErrorKind, analyze};
+use actus::semantic::{BindingState, CleanupAction, SemanticErrorKind, analyze};
 
 fn analyze_source(
     source: &str,
@@ -191,5 +191,34 @@ fn rejects_borrow_storage_in_a_longer_lived_owner() {
     .expect_err("an abs binding must not initialize a longer-lived owner");
     assert!(
         matches!(error.kind, SemanticErrorKind::InvalidOwnerInitializer { name } if name == "view")
+    );
+}
+
+#[test]
+fn plans_lifo_cleanup_and_skips_moved_bindings() {
+    let model = analyze_source(
+        "verb cleanup() { erg first = make(); erg second = make(); erg moved = make(); erg target = moved; drop(second); }",
+    )
+    .expect("cleanup plan should be generated");
+    let actions = &model.cleanup_plans.last().expect("verb cleanup plan").actions;
+    assert_eq!(
+        actions,
+        &[
+            CleanupAction::DropBinding { binding_index: 3 },
+            CleanupAction::DropBinding { binding_index: 0 },
+        ]
+    );
+}
+
+#[test]
+fn plans_borrow_end_before_outer_owner_drop() {
+    let model = analyze_source(
+        "verb cleanup(erg buffer: Buffer) { { abs view = ref buffer; inspect(view); } }",
+    )
+    .expect("nested cleanup plans should be generated");
+    assert_eq!(model.cleanup_plans[0].actions, vec![CleanupAction::EndBorrow { borrow_id: 0 }]);
+    assert_eq!(
+        model.cleanup_plans[1].actions,
+        vec![CleanupAction::DropBinding { binding_index: 0 }]
     );
 }

@@ -128,11 +128,11 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 6: Deterministic Cleanup
 
-- [ ] Implement scope cleanup planning.
-- [ ] Drop active owned bindings in reverse declaration order.
-- [ ] Skip cleanup for moved bindings.
-- [ ] Skip cleanup for already dropped bindings.
-- [ ] End borrows at their lexical scope boundary.
+- [x] Implement scope cleanup planning.
+- [x] Drop active owned bindings in reverse declaration order.
+- [x] Skip cleanup for moved bindings.
+- [x] Skip cleanup for already dropped bindings.
+- [x] End borrows at their lexical scope boundary.
 - [ ] Implement `return` scope unwinding.
 - [ ] Implement `break` scope unwinding.
 - [ ] Implement `continue` scope unwinding.

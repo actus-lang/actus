@@ -8,6 +8,7 @@ use super::model::SemanticModel;
 pub(super) struct ScopeFrame {
     pub(super) bindings: HashMap<String, usize>,
     pub(super) borrow_ids: Vec<usize>,
+    pub(super) declaration_indices: Vec<usize>,
 }
 
 pub(super) struct Analyzer {
@@ -25,7 +26,11 @@ pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
 impl Analyzer {
     fn new() -> Self {
         Self {
-            model: SemanticModel { bindings: Vec::new(), borrows: Vec::new() },
+            model: SemanticModel {
+                bindings: Vec::new(),
+                borrows: Vec::new(),
+                cleanup_plans: Vec::new(),
+            },
             scopes: Vec::new(),
             next_borrow_id: 0,
             active_borrow_ids: HashSet::new(),
