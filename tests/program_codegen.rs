@@ -4,7 +4,7 @@ use actus::parser::parse;
 
 #[test]
 fn lowers_an_integer_returning_verb_to_a_native_object() {
-    let (tokens, errors) = scan("verb main() -> Int { return 42; }");
+    let (tokens, errors) = scan("verb main() -> Int { erg answer = 40; return answer + 2; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("program should emit");

@@ -7,7 +7,8 @@ fn build_command_writes_a_native_object() {
     let root = std::env::temp_dir().join(format!("actus-cli-{}", std::process::id()));
     let input = root.with_extension("act");
     let output = root.with_extension("o");
-    fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(&input, "verb main() -> Int { erg answer = 40; return answer + 2; }\n")
+        .expect("write source");
 
     let result = run_with_args(
         vec![
@@ -32,7 +33,8 @@ fn build_command_links_an_executable() {
     let root = std::env::temp_dir().join(format!("actus-cli-exe-{}", std::process::id()));
     let input = root.with_extension("act");
     let output = root.with_extension("bin");
-    fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(&input, "verb main() -> Int { erg answer = 40; return answer + 2; }\n")
+        .expect("write source");
 
     let result = run_with_args(
         vec![

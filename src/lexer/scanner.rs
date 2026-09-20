@@ -60,9 +60,13 @@ impl<'source> Scanner<'source> {
             ',' => self.push_simple(TokenKind::Comma, start),
             ';' => self.push_simple(TokenKind::Semicolon, start),
             '=' => self.push_simple(TokenKind::Equals, start),
+            '+' => self.push_simple(TokenKind::Plus, start),
             '-' if self.match_character('>') => {
                 self.push_simple(TokenKind::Arrow, start);
             }
+            '-' => self.push_simple(TokenKind::Minus, start),
+            '*' => self.push_simple(TokenKind::Star, start),
+            '/' => self.push_simple(TokenKind::Slash, start),
             '"' => self.scan_string(start),
             character if is_identifier_start(character) => self.scan_identifier(start),
             character if character.is_ascii_digit() => self.scan_integer(start),

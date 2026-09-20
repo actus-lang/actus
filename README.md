@@ -12,7 +12,7 @@ Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot 
 
 ## Project status
 
-The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports parameterless verbs that return an integer literal.
+The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports parameterless verbs with integer locals, arithmetic expressions, and integer returns.
 
 ## Build and run
 

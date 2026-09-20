@@ -46,6 +46,10 @@ pub enum TokenKind {
     Comma,
     Semicolon,
     Equals,
+    Plus,
+    Minus,
+    Star,
+    Slash,
     Arrow,
     Eof,
 }

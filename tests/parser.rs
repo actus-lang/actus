@@ -40,6 +40,17 @@ fn parses_nested_borrow_and_named_call_arguments() {
 }
 
 #[test]
+fn parses_integer_expression_precedence() {
+    let program = parse_source("verb main() -> Int { return 2 + 3 * 4; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0];
+    let Stmt::Return { value: Some(Expr::Binary { right, .. }), .. } = &verb.body.statements[0]
+    else {
+        panic!("expected binary return expression");
+    };
+    assert!(matches!(right.as_ref(), Expr::Binary { .. }));
+}
+
+#[test]
 fn rejects_missing_statement_semicolon() {
     let source = include_str!("fixtures/parser/invalid/missing_semicolon.act");
     let (tokens, errors) = scan(source);

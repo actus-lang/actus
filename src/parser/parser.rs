@@ -348,6 +348,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
         | Expr::StringLiteral { span, .. }
+        | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
         | Expr::Call { span, .. } => *span,
     }

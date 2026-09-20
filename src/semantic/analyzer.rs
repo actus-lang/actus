@@ -115,6 +115,10 @@ impl Analyzer {
                 let index = self.binding(name, *span)?;
                 self.ensure_readable(index, name, *span)
             }
+            Expr::Binary { left, right, .. } => {
+                self.visit_expression(left)?;
+                self.visit_expression(right)
+            }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
             Expr::Integer { .. } | Expr::StringLiteral { .. } => Ok(()),

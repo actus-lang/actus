@@ -126,6 +126,16 @@ impl Formatter {
                 self.output.push_str(value);
                 self.output.push('"');
             }
+            Expr::Binary { left, operator, right, .. } => {
+                self.expression(left);
+                self.output.push_str(match operator {
+                    crate::ast::BinaryOp::Add => " + ",
+                    crate::ast::BinaryOp::Subtract => " - ",
+                    crate::ast::BinaryOp::Multiply => " * ",
+                    crate::ast::BinaryOp::Divide => " / ",
+                });
+                self.expression(right);
+            }
             Expr::Borrow { expression, .. } => {
                 self.output.push_str("ref ");
                 self.expression(expression);
