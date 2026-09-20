@@ -137,10 +137,10 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Implement `break` scope unwinding.
 - [x] Implement `continue` scope unwinding.
 - [x] Ensure returned owners are not dropped during unwinding.
-- [ ] Add LIFO destruction tests.
+- [x] Add LIFO destruction tests.
 - [x] Add early-return cleanup tests.
-- [ ] Add nested-scope cleanup tests.
-- [ ] Add move-and-drop interaction tests.
+- [x] Add nested-scope cleanup tests.
+- [x] Add move-and-drop interaction tests.
 
 ## Phase 7: C99 Backend
 
