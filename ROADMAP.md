@@ -156,6 +156,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Lower scalar `Int` ownership transfers through the native ABI.
 - [x] Lower unary negative and grouped integer expressions.
 - [x] Lower nested scalar scopes and scalar `drop` statements.
+- [x] Lower basic native loop CFG edges for `break` and `continue`.
 - [ ] Lower return, break, and continue unwind plans into the native cleanup model.
 - [x] Verify deterministic native object emission for identical programs.
 - [ ] Emit deterministic cleanup instructions.

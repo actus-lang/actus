@@ -7,6 +7,20 @@ use crate::ast::{BinaryOp, Expr, Role, Stmt, UnaryOp};
 
 use super::native::{FunctionRef, NativeEmitError};
 
+#[derive(Clone, Copy)]
+enum Flow {
+    Fallthrough,
+    Return(cranelift_codegen::ir::Value),
+    Break,
+    Continue,
+}
+
+#[derive(Clone, Copy)]
+struct LoopTargets {
+    header: cranelift_codegen::ir::Block,
+    exit: cranelift_codegen::ir::Block,
+}
+
 pub(super) fn lower_body(
     function: &mut FunctionBuilder<'_>,
     statements: &[Stmt],
@@ -14,8 +28,15 @@ pub(super) fn lower_body(
     functions: &HashMap<String, FunctionRef>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let mut locals = initial_locals.clone();
-    lower_statements(function, statements, &mut locals, functions)?
-        .ok_or_else(|| NativeEmitError("native integer slice requires a return value".to_owned()))
+    match lower_statements(function, statements, &mut locals, functions, None)? {
+        Flow::Return(value) => Ok(value),
+        Flow::Fallthrough => {
+            Err(NativeEmitError("native integer slice requires a return value".to_owned()))
+        }
+        Flow::Break | Flow::Continue => {
+            Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
+        }
+    }
 }
 
 fn lower_statements<'source>(
@@ -23,46 +44,107 @@ fn lower_statements<'source>(
     statements: &'source [Stmt],
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+    targets: Option<LoopTargets>,
+) -> Result<Flow, NativeEmitError> {
     for statement in statements {
-        match statement {
-            Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, initializer, .. } => {
-                let value = lower_expression(function, initializer, locals, functions)?;
-                locals.insert(name, value);
-            }
-            Stmt::Assignment { name, value, .. } => {
-                let value = lower_expression(function, value, locals, functions)?;
-                locals.insert(name, value);
-            }
-            Stmt::Return { value: Some(expression), .. } => {
-                return lower_expression(function, expression, locals, functions).map(Some);
-            }
-            Stmt::Return { value: None, .. } => {
-                return Err(NativeEmitError(
-                    "native integer slice requires a return value".to_owned(),
-                ));
-            }
-            Stmt::Expression { expression, .. } => {
-                lower_expression(function, expression, locals, functions)?;
-            }
-            Stmt::Drop { .. } => {}
-            Stmt::Block(block) => {
-                let mut nested_locals = locals.clone();
-                if let Some(value) =
-                    lower_statements(function, &block.statements, &mut nested_locals, functions)?
-                {
-                    return Ok(Some(value));
-                }
-            }
-            _ => {
-                return Err(NativeEmitError(
-                    "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns"
-                        .to_owned(),
-                ));
-            }
+        let flow = lower_statement(function, statement, locals, functions, targets)?;
+        if !matches!(flow, Flow::Fallthrough) {
+            return Ok(flow);
         }
     }
-    Ok(None)
+    Ok(Flow::Fallthrough)
+}
+
+fn lower_statement<'source>(
+    function: &mut FunctionBuilder<'_>,
+    statement: &'source Stmt,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    functions: &HashMap<String, FunctionRef>,
+    targets: Option<LoopTargets>,
+) -> Result<Flow, NativeEmitError> {
+    match statement {
+        Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, initializer, .. } => {
+            let value = lower_expression(function, initializer, locals, functions)?;
+            locals.insert(name, value);
+            Ok(Flow::Fallthrough)
+        }
+        Stmt::Assignment { name, value, .. } => {
+            let value = lower_expression(function, value, locals, functions)?;
+            locals.insert(name, value);
+            Ok(Flow::Fallthrough)
+        }
+        Stmt::Return { value: Some(expression), .. } => {
+            lower_expression(function, expression, locals, functions).map(Flow::Return)
+        }
+        Stmt::Return { value: None, .. } => Err(NativeEmitError(
+            "native integer slice requires a return value".to_owned(),
+        )),
+        Stmt::Expression { expression, .. } => {
+            lower_expression(function, expression, locals, functions)?;
+            Ok(Flow::Fallthrough)
+        }
+        Stmt::Drop { .. } => Ok(Flow::Fallthrough),
+        Stmt::Block(block) => {
+            let mut nested_locals = locals.clone();
+            lower_statements(function, &block.statements, &mut nested_locals, functions, targets)
+        }
+        Stmt::Loop(block) => lower_loop(function, block, locals, functions),
+        Stmt::Break { .. } => emit_loop_jump(function, targets, false),
+        Stmt::Continue { .. } => emit_loop_jump(function, targets, true),
+        _ => Err(NativeEmitError(
+            "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns"
+                .to_owned(),
+        )),
+    }
+}
+
+fn emit_loop_jump(
+    function: &mut FunctionBuilder<'_>,
+    targets: Option<LoopTargets>,
+    continue_loop: bool,
+) -> Result<Flow, NativeEmitError> {
+    let Some(targets) = targets else {
+        let keyword = if continue_loop { "continue" } else { "break" };
+        return Err(NativeEmitError(format!("{keyword} has no native loop target")));
+    };
+    let target = if continue_loop { targets.header } else { targets.exit };
+    function.ins().jump(target, &[]);
+    Ok(if continue_loop { Flow::Continue } else { Flow::Break })
+}
+
+fn lower_loop<'source>(
+    function: &mut FunctionBuilder<'_>,
+    block: &'source crate::ast::Block,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    functions: &HashMap<String, FunctionRef>,
+) -> Result<Flow, NativeEmitError> {
+    let header = function.create_block();
+    let body = function.create_block();
+    let exit = function.create_block();
+    function.ins().jump(header, &[]);
+    function.switch_to_block(header);
+    function.ins().jump(body, &[]);
+    function.seal_block(body);
+    function.switch_to_block(body);
+    let mut loop_locals = locals.clone();
+    let flow = lower_statements(
+        function,
+        &block.statements,
+        &mut loop_locals,
+        functions,
+        Some(LoopTargets { header, exit }),
+    )?;
+    if matches!(flow, Flow::Fallthrough | Flow::Continue) {
+        function.ins().jump(header, &[]);
+    }
+    function.seal_block(header);
+    if matches!(flow, Flow::Break | Flow::Fallthrough | Flow::Continue) {
+        function.switch_to_block(exit);
+        function.seal_block(exit);
+        Ok(Flow::Fallthrough)
+    } else {
+        Ok(flow)
+    }
 }
 
 fn lower_expression(
