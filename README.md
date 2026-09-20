@@ -12,15 +12,33 @@ Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot 
 
 ## Project status
 
-The language specification and compiler architecture are under active development. The initial compiler is being bootstrapped in Rust, with a planned C99 emission backend. The current repository contains the project foundation and manifesto; language implementation work is the next milestone.
+The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports parameterless verbs that return an integer literal.
 
 ## Build and run
 
+Build the compiler and run the introductory example through the frontend:
+
 ```sh
-cargo run
+cargo run -- check examples/hello.act
 ```
 
-Run the test suite with:
+Emit a native object file:
+
+```sh
+cargo run -- build examples/hello.act -o examples/hello.o
+```
+
+The object can be linked with a system linker such as GCC:
+
+```sh
+gcc examples/hello.o -o examples/hello
+./examples/hello
+echo $?
+```
+
+The example returns `42`. Object files and native executables are local build artifacts and are excluded from version control.
+
+Run the complete test suite with:
 
 ```sh
 cargo test
