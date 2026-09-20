@@ -53,6 +53,16 @@ fn lowers_loop_continue_to_a_native_object() {
 }
 
 #[test]
+fn lowers_multiple_loop_carried_bindings_to_a_native_object() {
+    let source = "verb main() -> Int { erg left = 0; erg right = 0; loop { left = 1; right = 2; break; } return left + right; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let object = emit_program_object(&program, "main").expect("loop-carried values should emit");
+    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+}
+
+#[test]
 fn lowers_scalar_borrow_roles_to_a_native_object() {
     let source = "verb main() -> Int { erg value = 42; abs view = ref value; return inspect(view); } verb inspect(abs view: Int) -> Int { return view + 0; }";
     let (tokens, errors) = scan(source);
