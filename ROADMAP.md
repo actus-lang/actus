@@ -90,11 +90,11 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 ### Ownership
 
 - [ ] Implement `erg` owner bindings.
-- [ ] Implement `dat` ownership transfer at call sites.
-- [ ] Transition moved caller bindings to `Moved`.
-- [ ] Reject use after move.
-- [ ] Reject use after explicit drop.
-- [ ] Reject double drop.
+- [x] Implement `dat` ownership transfer at call sites.
+- [x] Transition moved caller bindings to `Moved`.
+- [x] Reject use after move.
+- [x] Reject use after explicit drop.
+- [x] Reject double drop.
 - [ ] Define ownership transfer for returned values.
 - [ ] Move returned local owners out of their scope.
 - [ ] Reject borrowed returns in Alpha.
@@ -106,8 +106,8 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Derive `Frozen` from active borrow records.
 - [x] Restore the owner to `Active` after the last borrow ends.
 - [ ] Reject mutation while an owner is frozen.
-- [ ] Reject moving a frozen owner.
-- [ ] Reject dropping a frozen owner.
+- [x] Reject moving a frozen owner.
+- [x] Reject dropping a frozen owner.
 - [ ] Allow shared borrows to be passed to nested calls.
 - [ ] Reject storing borrows in longer-lived structures.
 - [ ] Reject returning borrows from functions.
@@ -118,13 +118,13 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 ### Calls and Roles
 
 - [ ] Validate `erg`, `abs`, and `dat` parameter compatibility.
-- [ ] Implement positional argument binding.
-- [ ] Implement named argument binding.
-- [ ] Reject duplicate argument bindings.
-- [ ] Reject unknown parameter names.
-- [ ] Reject invalid mixtures of positional and named arguments.
+- [x] Implement positional argument binding.
+- [x] Implement named argument binding.
+- [x] Reject duplicate argument bindings.
+- [x] Reject unknown parameter names.
+- [x] Reject invalid mixtures of positional and named arguments.
 - [ ] Reject ambiguous positional calls.
-- [ ] Validate argument ownership and borrow requirements.
+- [x] Validate argument ownership and borrow requirements.
 
 ## Phase 6: Deterministic Cleanup
 

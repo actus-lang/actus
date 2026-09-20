@@ -55,3 +55,54 @@ fn rejects_borrowing_non_owner_bindings() {
         matches!(error.kind, SemanticErrorKind::InvalidBorrowTarget { name } if name == "view")
     );
 }
+
+#[test]
+fn moves_dat_arguments_and_rejects_use_after_move() {
+    let error = analyze_source(
+        "verb consume(dat packet: Buffer) { drop(packet); } verb caller() { erg buffer = make(); consume(packet: buffer); inspect(buffer); }",
+    )
+    .expect_err("a moved binding must not be reusable");
+    assert!(matches!(error.kind, SemanticErrorKind::UseAfterMove { name } if name == "buffer"));
+}
+
+#[test]
+fn rejects_move_of_a_frozen_owner() {
+    let error = analyze_source(
+        "verb consume(dat packet: Buffer) { drop(packet); } verb caller() { erg buffer = make(); { abs view = ref buffer; consume(packet: buffer); } }",
+    )
+    .expect_err("a frozen binding must not be moved");
+    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name } if name == "buffer"));
+}
+
+#[test]
+fn tracks_explicit_drop_and_rejects_double_drop_and_borrow_drop() {
+    let double_drop =
+        analyze_source("verb broken() { erg value = make(); drop(value); drop(value); }")
+            .expect_err("double drop must fail");
+    assert!(matches!(double_drop.kind, SemanticErrorKind::DoubleDrop { name } if name == "value"));
+
+    let borrow_drop = analyze_source(
+        "verb broken() { erg value = make(); { abs view = ref value; drop(view); } }",
+    )
+    .expect_err("dropping a borrow must fail");
+    assert!(matches!(borrow_drop.kind, SemanticErrorKind::DropBorrow { name } if name == "view"));
+}
+
+#[test]
+fn validates_named_and_positional_call_arguments() {
+    let unknown = analyze_source(
+        "verb consume(dat packet: Buffer) { drop(packet); } verb caller() { erg value = make(); consume(other: value); }",
+    )
+    .expect_err("unknown parameter names must fail");
+    assert!(
+        matches!(unknown.kind, SemanticErrorKind::UnknownParameter { name, .. } if name == "other")
+    );
+
+    let mixed = analyze_source(
+        "verb consume(dat packet: Buffer, erg target: Buffer) { drop(packet); } verb caller() { erg value = make(); consume(value, target: value); }",
+    )
+    .expect_err("mixed argument modes must fail");
+    assert!(
+        matches!(mixed.kind, SemanticErrorKind::MixedArgumentModes { callee } if callee == "consume")
+    );
+}
