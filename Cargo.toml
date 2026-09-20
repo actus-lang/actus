@@ -5,3 +5,8 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
+cranelift-codegen = "0.135.2"
+cranelift-frontend = "0.135.2"
+cranelift-module = "0.135.2"
+cranelift-native = "0.135.2"
+cranelift-object = "0.135.2"
