@@ -152,6 +152,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Lower integer locals and arithmetic expressions to native instructions.
 - [x] Define and validate the native `Int` parameter and return ABI.
 - [x] Lower calls between native `Int` verbs.
+- [x] Lower scalar `Int` borrow roles through the native ABI.
 - [x] Lower return, break, and continue unwind plans into the native cleanup model.
 - [x] Verify deterministic native object emission for identical programs.
 - [ ] Emit deterministic cleanup instructions.

@@ -16,7 +16,7 @@ pub(super) fn lower_body(
     let mut locals = initial_locals.clone();
     for statement in statements {
         match statement {
-            Stmt::OwnerDecl { role: Role::Erg, name, initializer, .. } => {
+            Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, initializer, .. } => {
                 let value = lower_expression(function, initializer, &locals, functions)?;
                 locals.insert(name, value);
             }
@@ -68,6 +68,9 @@ fn lower_expression(
                 BinaryOp::Divide => function.ins().sdiv(left, right),
             };
             Ok(value)
+        }
+        Expr::Borrow { expression, .. } => {
+            lower_expression(function, expression, locals, functions)
         }
         Expr::Call { callee, arguments, .. } => {
             let target = functions.get(callee).ok_or_else(|| {

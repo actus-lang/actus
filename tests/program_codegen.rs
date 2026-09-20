@@ -32,6 +32,16 @@ fn lowers_integer_function_calls_to_a_native_object() {
 }
 
 #[test]
+fn lowers_scalar_borrow_roles_to_a_native_object() {
+    let source = "verb main() -> Int { erg value = 42; abs view = ref value; return inspect(view); } verb inspect(abs view: Int) -> Int { return view + 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let object = emit_program_object(&program, "main").expect("scalar borrow should emit");
+    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+}
+
+#[test]
 fn emits_identical_objects_for_identical_programs() {
     let source = "verb main() -> Int { erg answer = 40; return answer + 2; }";
     let (tokens, errors) = scan(source);
