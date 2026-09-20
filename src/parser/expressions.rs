@@ -1,4 +1,4 @@
-use crate::ast::{Argument, BinaryOp, Expr};
+use crate::ast::{Argument, BinaryOp, Expr, UnaryOp};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
@@ -25,6 +25,23 @@ impl Parser {
     fn parse_primary_expression(&mut self) -> Result<Expr, ParseError> {
         let token = self.advance_required("expression")?;
         match token.kind {
+            TokenKind::Minus => {
+                let expression = self.parse_primary_expression()?;
+                let span = SourceSpan::new(token.span.start, expression_span(&expression).end);
+                Ok(Expr::Unary {
+                    operator: UnaryOp::Negate,
+                    expression: Box::new(expression),
+                    span,
+                })
+            }
+            TokenKind::LeftParen => {
+                let expression = self.parse_expression()?;
+                let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
+                Ok(Expr::Grouping {
+                    expression: Box::new(expression),
+                    span: SourceSpan::new(token.span.start, end),
+                })
+            }
             TokenKind::Identifier(name) => {
                 if self.match_simple(TokenKind::LeftParen) {
                     let arguments = self.parse_arguments()?;

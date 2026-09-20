@@ -126,6 +126,15 @@ impl Formatter {
                 self.output.push_str(value);
                 self.output.push('"');
             }
+            Expr::Grouping { expression, .. } => {
+                self.output.push('(');
+                self.expression(expression);
+                self.output.push(')');
+            }
+            Expr::Unary { expression, .. } => {
+                self.output.push('-');
+                self.expression(expression);
+            }
             Expr::Binary { left, operator, right, .. } => {
                 self.expression(left);
                 self.output.push_str(match operator {

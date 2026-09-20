@@ -51,6 +51,17 @@ fn parses_integer_expression_precedence() {
 }
 
 #[test]
+fn parses_unary_and_grouped_integer_expressions() {
+    let program = parse_source("verb main() -> Int { return -(2 + 3); }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0];
+    let Stmt::Return { value: Some(Expr::Unary { expression, .. }), .. } = &verb.body.statements[0]
+    else {
+        panic!("expected unary return expression");
+    };
+    assert!(matches!(expression.as_ref(), Expr::Grouping { .. }));
+}
+
+#[test]
 fn rejects_missing_statement_semicolon() {
     let source = include_str!("fixtures/parser/invalid/missing_semicolon.act");
     let (tokens, errors) = scan(source);

@@ -166,6 +166,8 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
         | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
         | Expr::Call { span, .. } => *span,

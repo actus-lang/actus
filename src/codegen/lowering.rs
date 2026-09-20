@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, types};
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{BinaryOp, Expr, Role, Stmt};
+use crate::ast::{BinaryOp, Expr, Role, Stmt, UnaryOp};
 
 use super::native::{FunctionRef, NativeEmitError};
 
@@ -58,6 +58,15 @@ fn lower_expression(
             .get(name)
             .copied()
             .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable"))),
+        Expr::Grouping { expression, .. } => {
+            lower_expression(function, expression, locals, functions)
+        }
+        Expr::Unary { operator, expression, .. } => {
+            let value = lower_expression(function, expression, locals, functions)?;
+            match operator {
+                UnaryOp::Negate => Ok(function.ins().ineg(value)),
+            }
+        }
         Expr::Binary { left, operator, right, .. } => {
             let left = lower_expression(function, left, locals, functions)?;
             let right = lower_expression(function, right, locals, functions)?;

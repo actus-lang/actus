@@ -119,6 +119,9 @@ impl Analyzer {
                 self.visit_expression(left)?;
                 self.visit_expression(right)
             }
+            Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+                self.visit_expression(expression)
+            }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
             Expr::Integer { .. } | Expr::StringLiteral { .. } => Ok(()),
