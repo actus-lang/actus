@@ -1,5 +1,6 @@
 mod abi;
 mod linker;
+mod lowering;
 mod model;
 mod native;
 

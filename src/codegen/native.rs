@@ -1,19 +1,30 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{AbiParam, InstBuilder, types};
+use cranelift_codegen::ir::{AbiParam, FuncRef, InstBuilder, types};
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
-use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_native::builder as native_builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use crate::ast::{BinaryOp, Expr, Program, Role, Stmt, TopLevelDecl, VerbDecl};
+use crate::ast::{Program, TopLevelDecl, VerbDecl};
 use crate::semantic::analyze;
 
 use super::abi::validate_integer_signature;
+use super::lowering::lower_body;
 
 #[derive(Debug)]
-pub struct NativeEmitError(String);
+pub struct NativeEmitError(pub(super) String);
+
+struct FunctionMeta {
+    id: FuncId,
+    parameter_names: Vec<String>,
+}
+
+pub(super) struct FunctionRef {
+    pub(super) reference: FuncRef,
+    pub(super) parameter_names: Vec<String>,
+}
 
 impl std::fmt::Display for NativeEmitError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,15 +41,46 @@ pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError>
 pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
     analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
-    let TopLevelDecl::Verb(verb) = program
+    let verbs = program
         .declarations
-        .first()
-        .ok_or_else(|| NativeEmitError("program has no verb declarations".to_owned()))?;
-    validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
-    emit_verb_object(symbol, verb)
+        .iter()
+        .map(|declaration| match declaration {
+            TopLevelDecl::Verb(verb) => verb,
+        })
+        .collect::<Vec<_>>();
+    if verbs.is_empty() {
+        return Err(NativeEmitError("program has no verb declarations".to_owned()));
+    }
+    for verb in &verbs {
+        validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
+    }
+    emit_verbs_object(&verbs, symbol)
 }
 
-fn emit_verb_object(symbol: &str, verb: &VerbDecl) -> Result<Vec<u8>, NativeEmitError> {
+fn emit_verbs_object(verbs: &[&VerbDecl], symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
+    let mut module = create_module()?;
+    let frontend_config = module.isa().frontend_config();
+    let metadata = declare_functions(&mut module, verbs, symbol)?;
+    let functions = metadata
+        .iter()
+        .map(|(name, meta)| {
+            (
+                name.clone(),
+                FunctionMeta { id: meta.id, parameter_names: meta.parameter_names.clone() },
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    for verb in verbs {
+        let name = verb.name.as_str();
+        let meta = functions
+            .get(name)
+            .ok_or_else(|| NativeEmitError(format!("missing native function `{name}`")))?;
+        define_function(&mut module, frontend_config, verb, meta, &functions)?;
+    }
+    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn create_module() -> Result<ObjectModule, NativeEmitError> {
     let mut flag_builder = settings::builder();
     flag_builder.set("is_pic", "true").map_err(|error| NativeEmitError(error.to_string()))?;
     let flags = settings::Flags::new(flag_builder);
@@ -48,16 +90,52 @@ fn emit_verb_object(symbol: &str, verb: &VerbDecl) -> Result<Vec<u8>, NativeEmit
         .map_err(|error| NativeEmitError(error.to_string()))?;
     let builder = ObjectBuilder::new(isa, "actus", default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
-    let mut module = ObjectModule::new(builder);
-    let frontend_config = module.isa().frontend_config();
+    Ok(ObjectModule::new(builder))
+}
+
+fn declare_functions(
+    module: &mut ObjectModule,
+    verbs: &[&VerbDecl],
+    entry_symbol: &str,
+) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let mut metadata = HashMap::new();
+    for (index, verb) in verbs.iter().enumerate() {
+        let signature = integer_signature(module, verb);
+        let symbol = if index == 0 { entry_symbol } else { &verb.name };
+        let id = module
+            .declare_function(symbol, Linkage::Export, &signature)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+        metadata.insert(
+            verb.name.clone(),
+            FunctionMeta {
+                id,
+                parameter_names: verb.params.iter().map(|param| param.name.clone()).collect(),
+            },
+        );
+    }
+    Ok(metadata)
+}
+
+fn integer_signature(
+    module: &mut ObjectModule,
+    verb: &VerbDecl,
+) -> cranelift_codegen::ir::Signature {
     let mut signature = module.make_signature();
     signature.params.extend((0..verb.params.len()).map(|_| AbiParam::new(types::I32)));
     signature.returns.push(AbiParam::new(types::I32));
-    let function_id = module
-        .declare_function(symbol, Linkage::Export, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+    signature
+}
+
+fn define_function(
+    module: &mut ObjectModule,
+    frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
+    verb: &VerbDecl,
+    metadata: &FunctionMeta,
+    functions: &HashMap<String, FunctionMeta>,
+) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = signature;
+    context.func.signature = integer_signature(module, verb);
+    let references = declare_function_refs(module, &mut context.func, functions)?;
     let mut function_context = FunctionBuilderContext::new();
     {
         let mut function = FunctionBuilder::new(&mut context.func, &mut function_context);
@@ -70,50 +148,32 @@ fn emit_verb_object(symbol: &str, verb: &VerbDecl) -> Result<Vec<u8>, NativeEmit
             locals.insert(&parameter.name, value);
         }
         function.seal_block(block);
-        let result = lower_body(&mut function, &verb.body.statements, &locals)?;
+        let result = lower_body(&mut function, &verb.body.statements, &locals, &references)?;
         function.ins().return_(&[result]);
         function.finalize(frontend_config);
     }
     module
-        .define_function(function_id, &mut context)
+        .define_function(metadata.id, &mut context)
         .map_err(|error| NativeEmitError(error.to_string()))?;
     module.clear_context(&mut context);
-    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+    Ok(())
 }
 
-fn lower_body(
-    function: &mut cranelift_frontend::FunctionBuilder<'_>,
-    statements: &[Stmt],
-    initial_locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let mut locals = initial_locals.clone();
-    for statement in statements {
-        match statement {
-            Stmt::OwnerDecl { role: Role::Erg, name, initializer, .. } => {
-                let value = lower_expression(function, initializer, &locals)?;
-                locals.insert(name, value);
-            }
-            Stmt::Assignment { name, value, .. } => {
-                let value = lower_expression(function, value, &locals)?;
-                locals.insert(name, value);
-            }
-            Stmt::Return { value: Some(expression), .. } => {
-                return lower_expression(function, expression, &locals);
-            }
-            Stmt::Return { value: None, .. } => {
-                return Err(NativeEmitError(
-                    "native integer slice requires a return value".to_owned(),
-                ));
-            }
-            _ => {
-                return Err(NativeEmitError(
-                    "native integer slice supports only integer declarations, assignments, and returns"
-                        .to_owned(),
-                ));
-            }
-        }
-    }
-    Err(NativeEmitError("native integer slice requires a return value".to_owned()))
+fn declare_function_refs(
+    module: &mut ObjectModule,
+    function: &mut cranelift_codegen::ir::Function,
+    functions: &HashMap<String, FunctionMeta>,
+) -> Result<HashMap<String, FunctionRef>, NativeEmitError> {
+    functions
+        .iter()
+        .map(|(name, meta)| {
+            let reference = module.declare_func_in_func(meta.id, function);
+            Ok((
+                name.clone(),
+                FunctionRef { reference, parameter_names: meta.parameter_names.clone() },
+            ))
+        })
+        .collect()
 }
 
 fn emit_i32_object(symbol: &str, value: i64) -> Result<Vec<u8>, NativeEmitError> {
@@ -150,35 +210,4 @@ fn emit_i32_object(symbol: &str, value: i64) -> Result<Vec<u8>, NativeEmitError>
         .map_err(|error| NativeEmitError(error.to_string()))?;
     module.clear_context(&mut context);
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
-}
-
-fn lower_expression(
-    function: &mut cranelift_frontend::FunctionBuilder<'_>,
-    expression: &Expr,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    match expression {
-        Expr::Integer { value, .. } => value
-            .parse::<i32>()
-            .map(|value| function.ins().iconst(types::I32, i64::from(value)))
-            .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}"))),
-        Expr::Identifier { name, .. } => locals
-            .get(name)
-            .copied()
-            .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable"))),
-        Expr::Binary { left, operator, right, .. } => {
-            let left = lower_expression(function, left, locals)?;
-            let right = lower_expression(function, right, locals)?;
-            let value = match operator {
-                BinaryOp::Add => function.ins().iadd(left, right),
-                BinaryOp::Subtract => function.ins().isub(left, right),
-                BinaryOp::Multiply => function.ins().imul(left, right),
-                BinaryOp::Divide => function.ins().sdiv(left, right),
-            };
-            Ok(value)
-        }
-        _ => Err(NativeEmitError(
-            "native integer slice supports only integer expressions".to_owned(),
-        )),
-    }
 }
