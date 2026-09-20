@@ -144,7 +144,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 7: Native Backend
 
-- [ ] Define the initial native emission model.
+- [x] Define the initial native emission model.
 - [ ] Integrate a Rust-native backend such as Cranelift.
 - [ ] Emit object files or native binaries without an intermediate C representation.
 - [ ] Emit deterministic cleanup instructions.
