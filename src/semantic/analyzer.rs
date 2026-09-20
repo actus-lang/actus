@@ -30,6 +30,7 @@ impl Analyzer {
                 bindings: Vec::new(),
                 borrows: Vec::new(),
                 cleanup_plans: Vec::new(),
+                return_unwind_plans: Vec::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,

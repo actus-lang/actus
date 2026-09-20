@@ -41,7 +41,10 @@ impl Analyzer {
     }
 
     pub(super) fn visit_return(&mut self, expression: Option<&Expr>) -> Result<(), SemanticError> {
-        let Some(expression) = expression else { return Ok(()) };
+        let Some(expression) = expression else {
+            self.plan_return_unwind();
+            return Ok(());
+        };
         self.visit_expression(expression)?;
         let Expr::Identifier { name, span } = expression else {
             if matches!(expression, Expr::Borrow { .. }) {
@@ -72,6 +75,7 @@ impl Analyzer {
             }
             BindingState::Moved | BindingState::Dropped => {}
         }
+        self.plan_return_unwind();
         Ok(())
     }
 

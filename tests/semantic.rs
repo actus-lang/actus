@@ -222,3 +222,25 @@ fn plans_borrow_end_before_outer_owner_drop() {
         vec![CleanupAction::DropBinding { binding_index: 0 }]
     );
 }
+
+#[test]
+fn plans_return_unwinding_without_dropping_the_returned_owner() {
+    let model =
+        analyze_source("verb early(erg first: Buffer, erg second: Buffer) { return first; }")
+            .expect("return unwind plan should be generated");
+    assert_eq!(model.return_unwind_plans.len(), 1);
+    assert_eq!(
+        model.return_unwind_plans[0].scopes[0].actions,
+        vec![CleanupAction::DropBinding { binding_index: 1 }]
+    );
+}
+
+#[test]
+fn unwinds_nested_scopes_on_return() {
+    let model =
+        analyze_source("verb early(erg outer: Buffer) { { erg inner = make(); return outer; } }")
+            .expect("nested return unwind plan should be generated");
+    let scopes = &model.return_unwind_plans[0].scopes;
+    assert_eq!(scopes[0].actions, vec![CleanupAction::DropBinding { binding_index: 1 }]);
+    assert!(scopes[1].actions.is_empty());
+}

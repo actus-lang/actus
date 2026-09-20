@@ -133,12 +133,12 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Skip cleanup for moved bindings.
 - [x] Skip cleanup for already dropped bindings.
 - [x] End borrows at their lexical scope boundary.
-- [ ] Implement `return` scope unwinding.
+- [x] Implement `return` scope unwinding.
 - [ ] Implement `break` scope unwinding.
 - [ ] Implement `continue` scope unwinding.
-- [ ] Ensure returned owners are not dropped during unwinding.
+- [x] Ensure returned owners are not dropped during unwinding.
 - [ ] Add LIFO destruction tests.
-- [ ] Add early-return cleanup tests.
+- [x] Add early-return cleanup tests.
 - [ ] Add nested-scope cleanup tests.
 - [ ] Add move-and-drop interaction tests.
 

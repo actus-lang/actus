@@ -30,4 +30,5 @@ pub struct SemanticModel {
     pub bindings: Vec<Binding>,
     pub borrows: Vec<BorrowRecord>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
+    pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
 }
