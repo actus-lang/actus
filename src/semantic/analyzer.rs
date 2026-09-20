@@ -61,6 +61,9 @@ impl Analyzer {
         match statement {
             Stmt::OwnerDecl { role, name, initializer, span, .. } => {
                 self.visit_expression(initializer)?;
+                if *role == Role::Erg {
+                    self.initialize_owner(initializer, *span)?;
+                }
                 if *role == Role::Abs {
                     self.register_borrow(initializer, *span)?;
                 }

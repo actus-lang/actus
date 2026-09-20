@@ -20,6 +20,7 @@ pub enum SemanticErrorKind {
     InvalidArgumentRole { callee: String, parameter: String },
     AmbiguousPositionalCall { callee: String },
     BorrowedReturn { name: String },
+    InvalidOwnerInitializer { name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

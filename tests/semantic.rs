@@ -148,3 +148,18 @@ fn rejects_borrowed_returns() {
             .expect_err("a temporary borrow must not escape through return");
     assert!(matches!(returned_expression.kind, SemanticErrorKind::BorrowedReturn { .. }));
 }
+
+#[test]
+fn transfers_ownership_when_initializing_an_erg_binding() {
+    let error = analyze_source(
+        "verb broken() { erg source = make(); erg target = source; inspect(source); }",
+    )
+    .expect_err("the initializer must move the source owner");
+    assert!(matches!(error.kind, SemanticErrorKind::UseAfterMove { name } if name == "source"));
+
+    let error = analyze_source(
+        "verb broken(erg source: Buffer) { abs view = ref source; erg target = source; }",
+    )
+    .expect_err("a frozen owner must not initialize another owner");
+    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name } if name == "source"));
+}

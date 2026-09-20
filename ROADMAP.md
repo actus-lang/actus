@@ -89,7 +89,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ### Ownership
 
-- [ ] Implement `erg` owner bindings.
+- [x] Implement `erg` owner bindings.
 - [x] Implement `dat` ownership transfer at call sites.
 - [x] Transition moved caller bindings to `Moved`.
 - [x] Reject use after move.

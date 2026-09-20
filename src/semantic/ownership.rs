@@ -6,6 +6,37 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::BindingState;
 
 impl Analyzer {
+    pub(super) fn initialize_owner(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Expr::Identifier { name, span: identifier_span } = expression else { return Ok(()) };
+        let index = self.binding(name, *identifier_span)?;
+        if self.model.bindings[index].role == Role::Abs {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidOwnerInitializer { name: name.clone() },
+                span,
+            });
+        }
+        match self.model.bindings[index].state {
+            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
+            BindingState::Frozen { .. } => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::MoveFrozen { name: name.clone() },
+                    span,
+                });
+            }
+            BindingState::Moved | BindingState::Dropped => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                    span,
+                });
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn visit_return(&mut self, expression: Option<&Expr>) -> Result<(), SemanticError> {
         let Some(expression) = expression else { return Ok(()) };
         self.visit_expression(expression)?;
