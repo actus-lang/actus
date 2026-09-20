@@ -134,7 +134,7 @@ fn lower_loop<'source>(
         functions,
         Some(LoopTargets { header, exit }),
     )?;
-    if matches!(flow, Flow::Fallthrough | Flow::Continue) {
+    if matches!(flow, Flow::Fallthrough) {
         function.ins().jump(header, &[]);
     }
     function.seal_block(header);
