@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -eu
+
+commit_message_file=${1:?commit message file is required}
+commit_message=$(sed -n '/^[^#]/p' "$commit_message_file" | sed -n '1p')
+
+if [ -z "$commit_message" ]; then
+    echo "Commit message cannot be empty." >&2
+    exit 1
+fi
+
+conventional_commit_pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .{1,72}$'
+
+if ! printf '%s\n' "$commit_message" | grep -Eq "$conventional_commit_pattern"; then
+    cat >&2 <<'EOF'
+Invalid commit message.
+
+Expected format:
+  type(scope): description
+
+Allowed types:
+  feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
+Examples:
+  feat(lexer): add identifier tokens
+  fix(parser): reject unclosed blocks
+  docs(readme): explain local hook setup
+EOF
+    exit 1
+fi

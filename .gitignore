@@ -1,1 +1,22 @@
-/target
+# Rust build output
+/target/
+
+# Generated coverage and profiling output
+/coverage/
+/profraw/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local environment and tooling files
+.env
+.env.*
+!.env.example
