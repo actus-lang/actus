@@ -72,9 +72,7 @@ impl Analyzer {
                 self.visit_expression(value)
             }
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
-            Stmt::Return { value, .. } => {
-                value.as_ref().map_or(Ok(()), |value| self.visit_expression(value))
-            }
+            Stmt::Return { value, .. } => self.visit_return(value.as_ref()),
             Stmt::Drop { name, span } => self.drop_binding(name, *span),
             Stmt::Block(block) => {
                 self.enter_scope();

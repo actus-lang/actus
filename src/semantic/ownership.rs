@@ -1,4 +1,4 @@
-use crate::ast::Role;
+use crate::ast::{Expr, Role};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -6,6 +6,38 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::BindingState;
 
 impl Analyzer {
+    pub(super) fn visit_return(&mut self, expression: Option<&Expr>) -> Result<(), SemanticError> {
+        let Some(expression) = expression else { return Ok(()) };
+        self.visit_expression(expression)?;
+        let Expr::Identifier { name, span } = expression else {
+            if matches!(expression, Expr::Borrow { .. }) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::BorrowedReturn { name: "temporary borrow".to_owned() },
+                    span: expression_span(expression),
+                });
+            }
+            return Ok(());
+        };
+        let index = self.binding(name, *span)?;
+        if self.model.bindings[index].role == Role::Abs {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::BorrowedReturn { name: name.clone() },
+                span: *span,
+            });
+        }
+        match self.model.bindings[index].state {
+            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
+            BindingState::Frozen { .. } => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::MoveFrozen { name: name.clone() },
+                    span: *span,
+                });
+            }
+            BindingState::Moved | BindingState::Dropped => {}
+        }
+        Ok(())
+    }
+
     pub(super) fn ensure_readable(
         &self,
         index: usize,
@@ -70,5 +102,15 @@ impl Analyzer {
             }
         }
         Ok(())
+    }
+}
+
+fn expression_span(expression: &Expr) -> SourceSpan {
+    match expression {
+        Expr::Identifier { span, .. }
+        | Expr::Integer { span, .. }
+        | Expr::StringLiteral { span, .. }
+        | Expr::Borrow { span, .. }
+        | Expr::Call { span, .. } => *span,
     }
 }

@@ -19,6 +19,7 @@ pub enum SemanticErrorKind {
     WrongArgumentCount { callee: String },
     InvalidArgumentRole { callee: String, parameter: String },
     AmbiguousPositionalCall { callee: String },
+    BorrowedReturn { name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

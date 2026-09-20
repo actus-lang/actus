@@ -125,3 +125,26 @@ fn validates_call_roles_and_rejects_ambiguous_positional_calls() {
         matches!(ambiguous.kind, SemanticErrorKind::AmbiguousPositionalCall { callee } if callee == "copy")
     );
 }
+
+#[test]
+fn moves_returned_owners_out_of_the_function() {
+    let model = analyze_source("verb create() -> Buffer { erg buffer = make(); return buffer; }")
+        .expect("returning an owner should transfer ownership");
+    assert!(matches!(model.bindings[0].state, BindingState::Moved));
+}
+
+#[test]
+fn rejects_borrowed_returns() {
+    let returned_binding = analyze_source(
+        "verb broken(erg buffer: Buffer) -> Buffer { abs view = ref buffer; return view; }",
+    )
+    .expect_err("an abs binding must not escape through return");
+    assert!(
+        matches!(returned_binding.kind, SemanticErrorKind::BorrowedReturn { name } if name == "view")
+    );
+
+    let returned_expression =
+        analyze_source("verb broken(erg buffer: Buffer) -> Buffer { return ref buffer; }")
+            .expect_err("a temporary borrow must not escape through return");
+    assert!(matches!(returned_expression.kind, SemanticErrorKind::BorrowedReturn { .. }));
+}

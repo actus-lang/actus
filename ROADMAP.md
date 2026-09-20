@@ -95,9 +95,9 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Reject use after move.
 - [x] Reject use after explicit drop.
 - [x] Reject double drop.
-- [ ] Define ownership transfer for returned values.
-- [ ] Move returned local owners out of their scope.
-- [ ] Reject borrowed returns in Alpha.
+- [x] Define ownership transfer for returned values.
+- [x] Move returned local owners out of their scope.
+- [x] Reject borrowed returns in Alpha.
 
 ### Borrowing
 
