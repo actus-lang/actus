@@ -150,6 +150,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add `actus build` for writing a validated native object artifact.
 - [x] Lower integer locals and arithmetic expressions to native instructions.
 - [x] Lower return, break, and continue unwind plans into the native cleanup model.
+- [x] Verify deterministic native object emission for identical programs.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.

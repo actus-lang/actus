@@ -12,6 +12,18 @@ fn lowers_an_integer_returning_verb_to_a_native_object() {
 }
 
 #[test]
+fn emits_identical_objects_for_identical_programs() {
+    let source = "verb main() -> Int { erg answer = 40; return answer + 2; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+
+    let first = emit_program_object(&program, "main").expect("first emission should pass");
+    let second = emit_program_object(&program, "main").expect("second emission should pass");
+    assert_eq!(first, second);
+}
+
+#[test]
 fn codegen_rejects_semantically_invalid_programs() {
     let (tokens, errors) =
         scan("verb main() -> Int { erg value = make(); drop(value); inspect(value); }");
