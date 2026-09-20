@@ -17,6 +17,8 @@ pub enum SemanticErrorKind {
     DuplicateArgument { name: String },
     MixedArgumentModes { callee: String },
     WrongArgumentCount { callee: String },
+    InvalidArgumentRole { callee: String, parameter: String },
+    AmbiguousPositionalCall { callee: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

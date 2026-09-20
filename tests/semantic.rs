@@ -106,3 +106,22 @@ fn validates_named_and_positional_call_arguments() {
         matches!(mixed.kind, SemanticErrorKind::MixedArgumentModes { callee } if callee == "consume")
     );
 }
+
+#[test]
+fn validates_call_roles_and_rejects_ambiguous_positional_calls() {
+    let invalid_abs = analyze_source(
+        "verb inspect_view(abs view: Buffer) { inspect(view); } verb caller() { erg buffer = make(); inspect_view(buffer); }",
+    )
+    .expect_err("an owner must not be passed as an abs binding without ref");
+    assert!(
+        matches!(invalid_abs.kind, SemanticErrorKind::InvalidArgumentRole { parameter, .. } if parameter == "view")
+    );
+
+    let ambiguous = analyze_source(
+        "verb copy(erg destination: Buffer, erg source: Buffer) { } verb caller() { erg first = make(); erg second = make(); copy(first, second); }",
+    )
+    .expect_err("same-role same-type positional calls must be labeled");
+    assert!(
+        matches!(ambiguous.kind, SemanticErrorKind::AmbiguousPositionalCall { callee } if callee == "copy")
+    );
+}

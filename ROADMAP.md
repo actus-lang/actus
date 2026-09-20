@@ -108,22 +108,22 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Reject mutation while an owner is frozen.
 - [x] Reject moving a frozen owner.
 - [x] Reject dropping a frozen owner.
-- [ ] Allow shared borrows to be passed to nested calls.
+- [x] Allow shared borrows to be passed to nested calls.
 - [ ] Reject storing borrows in longer-lived structures.
 - [ ] Reject returning borrows from functions.
 - [ ] Reject borrow escape across lexical scope boundaries.
-- [ ] Reject `drop` applied to an `abs` binding.
+- [x] Reject `drop` applied to an `abs` binding.
 - [ ] Produce diagnostics that identify every active blocking borrow.
 
 ### Calls and Roles
 
-- [ ] Validate `erg`, `abs`, and `dat` parameter compatibility.
+- [x] Validate `erg`, `abs`, and `dat` parameter compatibility.
 - [x] Implement positional argument binding.
 - [x] Implement named argument binding.
 - [x] Reject duplicate argument bindings.
 - [x] Reject unknown parameter names.
 - [x] Reject invalid mixtures of positional and named arguments.
-- [ ] Reject ambiguous positional calls.
+- [x] Reject ambiguous positional calls.
 - [x] Validate argument ownership and borrow requirements.
 
 ## Phase 6: Deterministic Cleanup
