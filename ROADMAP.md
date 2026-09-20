@@ -52,16 +52,16 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Implement parsing for borrow declarations using `ref`.
 - [x] Implement parsing for assignments and calls.
 - [x] Implement parsing for returns.
-- [ ] Implement parsing for intrinsic `drop` statements.
+- [x] Implement parsing for intrinsic `drop` statements.
 - [x] Track source spans for AST nodes.
-- [ ] Produce stable parser diagnostics with error codes.
+- [x] Produce stable parser diagnostics with error codes.
 - [x] Reject missing semicolons.
 - [x] Reject unclosed blocks and unmatched braces.
 - [x] Reject invalid roles and malformed declarations.
 - [x] Reject invalid argument syntax.
-- [ ] Add valid parser fixtures.
-- [ ] Add invalid parser fixtures.
-- [ ] Add AST snapshot tests.
+- [x] Add valid parser fixtures.
+- [x] Add invalid parser fixtures.
+- [x] Add AST snapshot tests.
 
 ## Phase 4: Syntax Tooling
 

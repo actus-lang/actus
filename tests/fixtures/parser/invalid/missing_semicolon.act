@@ -1,0 +1,3 @@
+verb broken() {
+    erg value = 1
+}

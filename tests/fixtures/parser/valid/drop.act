@@ -1,0 +1,4 @@
+verb lifecycle() {
+    erg buffer = allocate(10);
+    drop(buffer);
+}

@@ -1,6 +1,6 @@
 use actus::ast::{Expr, Role, Stmt, TopLevelDecl};
 use actus::lexer::scan;
-use actus::parser::{ParseErrorKind, parse};
+use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
 
 fn parse_source(source: &str) -> actus::ast::Program {
     let (tokens, errors) = scan(source);
@@ -40,12 +40,33 @@ fn parses_nested_borrow_and_named_call_arguments() {
 
 #[test]
 fn rejects_missing_statement_semicolon() {
-    let (tokens, errors) = scan("verb broken() { erg value = 1 }");
+    let source = include_str!("fixtures/parser/invalid/missing_semicolon.act");
+    let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
 
     let error = parse(tokens).expect_err("missing semicolon must be rejected");
+    assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
     assert!(matches!(
         error.kind,
         ParseErrorKind::UnexpectedToken { .. } | ParseErrorKind::UnexpectedEndOfInput { .. }
     ));
+}
+
+#[test]
+fn parses_valid_fixtures() {
+    let transfer = parse_source(include_str!("fixtures/parser/valid/transfer.act"));
+    let lifecycle = parse_source(include_str!("fixtures/parser/valid/drop.act"));
+
+    assert_eq!(transfer.declarations.len(), 1);
+    let TopLevelDecl::Verb(verb) = &lifecycle.declarations[0];
+    assert!(matches!(verb.body.statements[1], Stmt::Drop { .. }));
+}
+
+#[test]
+fn matches_transfer_ast_snapshot() {
+    let program = parse_source(include_str!("fixtures/parser/valid/transfer.act"));
+    let actual = format!("{program:#?}");
+    let expected = include_str!("fixtures/parser/snapshots/transfer.ast.snap");
+
+    assert_eq!(actual.trim_end(), expected.trim_end());
 }

@@ -1,0 +1,3 @@
+verb transfer(erg target: File, abs packet: Buffer, dat logger: Logger) -> Int {
+    return target;
+}

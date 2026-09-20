@@ -9,8 +9,15 @@ pub enum ParseErrorKind {
     UnexpectedEndOfInput { expected: String },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParseErrorCode {
+    UnexpectedToken,
+    UnexpectedEndOfInput,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParseError {
+    pub code: ParseErrorCode,
     pub kind: ParseErrorKind,
     pub span: SourceSpan,
 }
@@ -78,6 +85,7 @@ impl Parser {
     fn parse_param(&mut self) -> Result<Param, ParseError> {
         let role_token = self.advance_required("parameter role")?;
         let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+            code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "parameter role (`erg`, `abs`, or `dat`)".to_owned(),
                 found: role_token.kind.clone(),
@@ -133,6 +141,16 @@ impl Parser {
             return Ok(Stmt::Return { value, span: SourceSpan::new(start, end) });
         }
 
+        if self.match_simple(TokenKind::Drop) {
+            let start = self.previous().span.start;
+            self.expect_simple(TokenKind::LeftParen, "`(`")?;
+            let name_token = self.take_identifier("binding name")?;
+            let name = identifier_text(&name_token.kind);
+            self.expect_simple(TokenKind::RightParen, "`)`")?;
+            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+            return Ok(Stmt::Drop { name, span: SourceSpan::new(start, end) });
+        }
+
         let expression = self.parse_expression()?;
         if let Expr::Identifier { name, span } = &expression
             && self.match_simple(TokenKind::Equals)
@@ -154,6 +172,7 @@ impl Parser {
     fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
         let role_token = self.advance_required("binding role")?;
         let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+            code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "`erg` or `abs`".to_owned(),
                 found: role_token.kind.clone(),
@@ -211,6 +230,7 @@ impl Parser {
                 Ok(Expr::Borrow { expression: Box::new(expression), span })
             }
             found => Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken { expected: "expression".to_owned(), found },
                 span: token.span,
             }),
@@ -246,6 +266,7 @@ impl Parser {
             Ok(token)
         } else {
             Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
                     expected: expected.to_owned(),
                     found: token.kind,
@@ -298,6 +319,7 @@ impl Parser {
             Ok(token)
         } else {
             Err(ParseError {
+                code: ParseErrorCode::UnexpectedEndOfInput,
                 kind: ParseErrorKind::UnexpectedEndOfInput { expected: expected.to_owned() },
                 span: SourceSpan::new(0, 0),
             })
@@ -307,6 +329,7 @@ impl Parser {
     fn error_at_current(&self, expected: &str) -> ParseError {
         match self.peek() {
             Some(token) => ParseError {
+                code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
                     expected: expected.to_owned(),
                     found: token.kind.clone(),
@@ -314,6 +337,7 @@ impl Parser {
                 span: token.span,
             },
             None => ParseError {
+                code: ParseErrorCode::UnexpectedEndOfInput,
                 kind: ParseErrorKind::UnexpectedEndOfInput { expected: expected.to_owned() },
                 span: SourceSpan::new(0, 0),
             },

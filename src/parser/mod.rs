@@ -1,7 +1,7 @@
 #[path = "parser.rs"]
 mod implementation;
 
-pub use implementation::{ParseError, ParseErrorKind, Parser};
+pub use implementation::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 
 use crate::ast::Program;
 use crate::lexer::Token;
