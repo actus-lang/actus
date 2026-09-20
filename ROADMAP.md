@@ -110,7 +110,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Reject dropping a frozen owner.
 - [x] Allow shared borrows to be passed to nested calls.
 - [ ] Reject storing borrows in longer-lived structures.
-- [ ] Reject returning borrows from functions.
+- [x] Reject returning borrows from functions.
 - [x] Reject borrow escape across lexical scope boundaries.
 - [x] Reject `drop` applied to an `abs` binding.
 - [x] Produce diagnostics that identify every active blocking borrow.
@@ -192,6 +192,65 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Add a code of conduct.
 - [ ] Add release and versioning policy.
 - [ ] Keep the README and manifesto synchronized with implemented behavior.
+
+## Phase 11: Complete Struct System
+
+Structs are intentionally deferred until the ownership, borrowing, and cleanup foundations are stable. This phase must implement structs as a complete language and compiler feature, not as parser-only syntax.
+
+### Syntax and AST
+
+- [ ] Define struct declaration grammar and source-span rules.
+- [ ] Parse named fields with explicit types.
+- [ ] Parse struct literals and field initialization.
+- [ ] Parse field access and field assignment.
+- [ ] Represent structs and fields in the AST with dedicated modules.
+- [ ] Reject duplicate struct and field names.
+- [ ] Reject unknown fields and missing required fields.
+
+### Semantic Model
+
+- [ ] Add a type environment for struct declarations.
+- [ ] Validate field types and recursive type references.
+- [ ] Define field visibility and access rules.
+- [ ] Define ownership semantics for `erg`, `abs`, and `dat` fields.
+- [ ] Define move semantics for whole structs and individual fields.
+- [ ] Reject partial use after moving a field.
+- [ ] Define and enforce struct initialization invariants.
+- [ ] Define copy, move, and assignment behavior explicitly.
+
+### Borrowing and Lifetimes
+
+- [ ] Define whether Alpha structs may contain `abs` fields.
+- [ ] Reject self-referential and escaping borrow fields unless a lifetime model exists.
+- [ ] Reject storing lexical borrows in longer-lived structs.
+- [ ] Validate borrow access through struct fields.
+- [ ] Track field-level borrow records where supported.
+- [ ] Add diagnostics identifying the struct field and blocking borrow.
+
+### Layout and Destruction
+
+- [ ] Define deterministic field declaration order.
+- [ ] Define size, alignment, and padding rules.
+- [ ] Define packed and externally represented struct policies.
+- [ ] Generate field-level cleanup in reverse declaration order.
+- [ ] Handle moved and dropped fields without double cleanup.
+- [ ] Add layout and destruction golden tests.
+
+### Methods and Backend
+
+- [ ] Define struct method syntax and receiver roles.
+- [ ] Validate receiver ownership and borrow behavior.
+- [ ] Emit valid C99 struct declarations.
+- [ ] Emit field access, initialization, assignment, and cleanup.
+- [ ] Define the C ABI contract for public structs.
+- [ ] Add generated C and native execution tests.
+
+### Documentation and Compatibility
+
+- [ ] Document the complete struct model and unsupported cases.
+- [ ] Add architecture decision records for layout and field ownership.
+- [ ] Add migration rules if struct semantics evolve after Alpha.
+- [ ] Keep the manifesto, specification, and implementation behavior synchronized.
 
 ## Future Language Extensions
 
