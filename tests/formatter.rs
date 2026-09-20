@@ -25,3 +25,13 @@ fn formatting_is_idempotent() {
 
     assert_eq!(format_source(&formatted), formatted);
 }
+
+#[test]
+fn matches_nested_block_formatter_snapshot() {
+    let source =
+        "verb process(){erg buffer=allocate(10);{abs view=ref buffer;inspect(view,source:view);}}";
+    let actual = format_source(source);
+    let expected = include_str!("fixtures/formatter/snapshots/nested_blocks.format.snap");
+
+    assert_eq!(actual, expected);
+}

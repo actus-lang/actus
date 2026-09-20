@@ -73,7 +73,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Define formatting rules for blocks, parameters, calls, and expressions.
 - [x] Make formatter output deterministic.
 - [x] Verify formatter idempotence.
-- [ ] Add formatter snapshot tests.
+- [x] Add formatter snapshot tests.
 - [x] Ensure malformed input produces diagnostics instead of panics.
 
 ## Phase 5: Semantic Analyzer

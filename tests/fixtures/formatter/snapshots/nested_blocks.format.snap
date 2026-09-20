@@ -1,0 +1,7 @@
+verb process() {
+    erg buffer = allocate(10);
+    {
+        abs view = ref buffer;
+        inspect(view, source: view);
+    }
+}
