@@ -181,6 +181,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Add valid `.act` fixtures.
 - [ ] Add invalid `.act` fixtures.
 - [ ] Add diagnostic snapshots.
+- [x] Add stable semantic diagnostic renderer tests.
 - [ ] Add semantic state-transition tests.
 - [ ] Add ownership and borrowing regression tests.
 - [ ] Add golden tests for generated native output.
