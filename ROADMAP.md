@@ -13,19 +13,19 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Protect the `main` branch from direct pushes.
 - [x] Require pull requests for changes to `main`.
 - [x] Require successful CI checks before merging.
-- [ ] Require at least one code review for pull requests.
+- [ ] Require at least one code review for pull requests. (Deferred until a second maintainer joins.)
 - [x] Add a pull request template.
 - [x] Define and enforce the Conventional Commits format.
 - [x] Add a commit-message checker.
-- [ ] Add local `pre-commit` checks.
-- [ ] Add local `pre-push` checks.
+- [x] Add local `pre-commit` checks.
+- [x] Add local `pre-push` checks.
 - [x] Add a pinned Rust toolchain with `rust-toolchain.toml`.
 - [x] Configure `rustfmt` and enforce formatting in CI.
 - [x] Configure Clippy and treat warnings as errors in CI.
-- [ ] Run `cargo check`, `cargo test`, and `cargo clippy` in GitHub Actions.
-- [ ] Add dependency auditing to CI.
-- [ ] Add dependency and license policy checks.
-- [ ] Add secret scanning to the repository workflow.
+- [x] Run `cargo check`, `cargo test`, and `cargo clippy` in GitHub Actions.
+- [x] Add dependency auditing to CI.
+- [x] Add dependency and license policy checks.
+- [x] Add secret scanning to the repository workflow.
 
 ## Phase 2: Language Foundation
 

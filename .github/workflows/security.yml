@@ -1,0 +1,25 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-policy:
+    name: Dependency and license policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked --version 0.20.2
+
+      - name: Audit dependencies and licenses
+        run: cargo deny check advisories licenses bans sources

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -eu
+
+echo "Running formatting check..."
+cargo fmt --all -- --check
+
+echo "Running compilation check..."
+cargo check --all-targets --all-features
+
+echo "Checking source limits..."
+./scripts/check_source_limits.sh
+
+echo "Scanning tracked files for secrets..."
+./scripts/check_secrets.sh
