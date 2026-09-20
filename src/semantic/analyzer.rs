@@ -17,6 +17,7 @@ pub(super) struct Analyzer {
     pub(super) next_borrow_id: usize,
     pub(super) active_borrow_ids: HashSet<usize>,
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
+    pub(super) loop_boundaries: Vec<usize>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -31,11 +32,13 @@ impl Analyzer {
                 borrows: Vec::new(),
                 cleanup_plans: Vec::new(),
                 return_unwind_plans: Vec::new(),
+                loop_unwind_plans: Vec::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
             active_borrow_ids: HashSet::new(),
             signatures: HashMap::new(),
+            loop_boundaries: Vec::new(),
         }
     }
 
@@ -82,6 +85,20 @@ impl Analyzer {
             }
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
             Stmt::Return { value, .. } => self.visit_return(value.as_ref()),
+            Stmt::Loop(block) => {
+                self.enter_scope();
+                self.loop_boundaries.push(self.scopes.len() - 1);
+                self.visit_block(block)?;
+                self.loop_boundaries.pop();
+                self.leave_scope();
+                Ok(())
+            }
+            Stmt::Break { span } => {
+                self.plan_loop_unwind(super::cleanup::LoopExitKind::Break, "break", *span)
+            }
+            Stmt::Continue { span } => {
+                self.plan_loop_unwind(super::cleanup::LoopExitKind::Continue, "continue", *span)
+            }
             Stmt::Drop { name, span } => self.drop_binding(name, *span),
             Stmt::Block(block) => {
                 self.enter_scope();

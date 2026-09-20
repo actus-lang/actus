@@ -126,29 +126,28 @@ impl Parser {
             return Ok(Stmt::Block(self.parse_block()?));
         }
 
+        if self.match_simple(TokenKind::Loop) {
+            return Ok(Stmt::Loop(self.parse_block()?));
+        }
+
         if self.check_role(&TokenKind::Erg) || self.check_role(&TokenKind::Abs) {
             return self.parse_owner_declaration();
         }
 
         if self.match_simple(TokenKind::Return) {
-            let start = self.previous().span.start;
-            let value = if self.check_simple(&TokenKind::Semicolon) {
-                None
-            } else {
-                Some(self.parse_expression()?)
-            };
-            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-            return Ok(Stmt::Return { value, span: SourceSpan::new(start, end) });
+            return self.parse_return_statement();
+        }
+
+        if self.match_simple(TokenKind::Break) {
+            return self.parse_loop_control_statement(true);
+        }
+
+        if self.match_simple(TokenKind::Continue) {
+            return self.parse_loop_control_statement(false);
         }
 
         if self.match_simple(TokenKind::Drop) {
-            let start = self.previous().span.start;
-            self.expect_simple(TokenKind::LeftParen, "`(`")?;
-            let name_token = self.take_identifier("binding name")?;
-            let name = identifier_text(&name_token.kind);
-            self.expect_simple(TokenKind::RightParen, "`)`")?;
-            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-            return Ok(Stmt::Drop { name, span: SourceSpan::new(start, end) });
+            return self.parse_drop_statement();
         }
 
         let expression = self.parse_expression()?;
@@ -167,6 +166,31 @@ impl Parser {
         let start = expression_span(&expression).start;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        let value = (!self.check_simple(&TokenKind::Semicolon))
+            .then(|| self.parse_expression())
+            .transpose()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Return { value, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_loop_control_statement(&mut self, is_break: bool) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        let span = SourceSpan::new(start, end);
+        Ok(if is_break { Stmt::Break { span } } else { Stmt::Continue { span } })
+    }
+
+    fn parse_drop_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let name = identifier_text(&self.take_identifier("binding name")?.kind);
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Drop { name, span: SourceSpan::new(start, end) })
     }
 
     fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {

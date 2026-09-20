@@ -1,7 +1,7 @@
 use actus::ast::Role;
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{BindingState, CleanupAction, SemanticErrorKind, analyze};
+use actus::semantic::{BindingState, CleanupAction, LoopExitKind, SemanticErrorKind, analyze};
 
 fn analyze_source(
     source: &str,
@@ -243,4 +243,37 @@ fn unwinds_nested_scopes_on_return() {
     let scopes = &model.return_unwind_plans[0].scopes;
     assert_eq!(scopes[0].actions, vec![CleanupAction::DropBinding { binding_index: 1 }]);
     assert!(scopes[1].actions.is_empty());
+}
+
+#[test]
+fn plans_break_and_continue_unwinding() {
+    let model = analyze_source(
+        "verb controls() { loop { erg local = make(); break; } loop { erg next = make(); continue; } }",
+    )
+    .expect("loop exits should generate cleanup plans");
+    assert_eq!(model.loop_unwind_plans[0].kind, LoopExitKind::Break);
+    assert_eq!(
+        model.loop_unwind_plans[0].scopes[0].actions,
+        vec![CleanupAction::DropBinding { binding_index: 0 }]
+    );
+    assert_eq!(model.loop_unwind_plans[1].kind, LoopExitKind::Continue);
+    assert_eq!(
+        model.loop_unwind_plans[1].scopes[0].actions,
+        vec![CleanupAction::DropBinding { binding_index: 1 }]
+    );
+}
+
+#[test]
+fn rejects_loop_control_outside_a_loop() {
+    let break_error =
+        analyze_source("verb broken() { break; }").expect_err("break outside a loop must fail");
+    assert!(
+        matches!(break_error.kind, SemanticErrorKind::LoopControlOutsideLoop { keyword } if keyword == "break")
+    );
+
+    let continue_error = analyze_source("verb broken() { continue; }")
+        .expect_err("continue outside a loop must fail");
+    assert!(
+        matches!(continue_error.kind, SemanticErrorKind::LoopControlOutsideLoop { keyword } if keyword == "continue")
+    );
 }

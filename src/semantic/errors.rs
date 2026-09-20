@@ -21,6 +21,7 @@ pub enum SemanticErrorKind {
     AmbiguousPositionalCall { callee: String },
     BorrowedReturn { name: String },
     InvalidOwnerInitializer { name: String },
+    LoopControlOutsideLoop { keyword: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

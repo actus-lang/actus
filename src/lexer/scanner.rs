@@ -87,6 +87,9 @@ impl<'source> Scanner<'source> {
             "ref" => TokenKind::Ref,
             "drop" => TokenKind::Drop,
             "return" => TokenKind::Return,
+            "loop" => TokenKind::Loop,
+            "break" => TokenKind::Break,
+            "continue" => TokenKind::Continue,
             _ => TokenKind::Identifier(text.to_owned()),
         };
 

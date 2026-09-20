@@ -8,6 +8,6 @@ mod ownership;
 mod scopes;
 
 pub use analyzer::analyze;
-pub use cleanup::{CleanupAction, ScopeCleanup, UnwindPlan};
+pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{Binding, BindingState, BorrowRecord, SemanticModel};

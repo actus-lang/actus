@@ -102,6 +102,12 @@ impl Formatter {
                 }
                 self.output.push(';');
             }
+            Stmt::Loop(block) => {
+                self.output.push_str("loop ");
+                self.block(block);
+            }
+            Stmt::Break { .. } => self.output.push_str("break;"),
+            Stmt::Continue { .. } => self.output.push_str("continue;"),
             Stmt::Drop { name, .. } => {
                 self.output.push_str("drop(");
                 self.output.push_str(name);
