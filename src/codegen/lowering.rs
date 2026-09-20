@@ -14,33 +14,55 @@ pub(super) fn lower_body(
     functions: &HashMap<String, FunctionRef>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let mut locals = initial_locals.clone();
+    lower_statements(function, statements, &mut locals, functions)?
+        .ok_or_else(|| NativeEmitError("native integer slice requires a return value".to_owned()))
+}
+
+fn lower_statements<'source>(
+    function: &mut FunctionBuilder<'_>,
+    statements: &'source [Stmt],
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    functions: &HashMap<String, FunctionRef>,
+) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     for statement in statements {
         match statement {
             Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, initializer, .. } => {
-                let value = lower_expression(function, initializer, &locals, functions)?;
+                let value = lower_expression(function, initializer, locals, functions)?;
                 locals.insert(name, value);
             }
             Stmt::Assignment { name, value, .. } => {
-                let value = lower_expression(function, value, &locals, functions)?;
+                let value = lower_expression(function, value, locals, functions)?;
                 locals.insert(name, value);
             }
             Stmt::Return { value: Some(expression), .. } => {
-                return lower_expression(function, expression, &locals, functions);
+                return lower_expression(function, expression, locals, functions).map(Some);
             }
             Stmt::Return { value: None, .. } => {
                 return Err(NativeEmitError(
                     "native integer slice requires a return value".to_owned(),
                 ));
             }
+            Stmt::Expression { expression, .. } => {
+                lower_expression(function, expression, locals, functions)?;
+            }
+            Stmt::Drop { .. } => {}
+            Stmt::Block(block) => {
+                let mut nested_locals = locals.clone();
+                if let Some(value) =
+                    lower_statements(function, &block.statements, &mut nested_locals, functions)?
+                {
+                    return Ok(Some(value));
+                }
+            }
             _ => {
                 return Err(NativeEmitError(
-                    "native integer slice supports only integer declarations, assignments, and returns"
+                    "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns"
                         .to_owned(),
                 ));
             }
         }
     }
-    Err(NativeEmitError("native integer slice requires a return value".to_owned()))
+    Ok(None)
 }
 
 fn lower_expression(
