@@ -69,10 +69,10 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add `actus check <file>`.
 - [x] Add deterministic diagnostic rendering.
 - [x] Define stable syntax error codes.
-- [ ] Implement the first `actus fmt` command.
-- [ ] Define formatting rules for blocks, parameters, calls, and expressions.
-- [ ] Make formatter output deterministic.
-- [ ] Verify formatter idempotence.
+- [x] Implement the first `actus fmt` command.
+- [x] Define formatting rules for blocks, parameters, calls, and expressions.
+- [x] Make formatter output deterministic.
+- [x] Verify formatter idempotence.
 - [ ] Add formatter snapshot tests.
 - [x] Ensure malformed input produces diagnostics instead of panics.
 
