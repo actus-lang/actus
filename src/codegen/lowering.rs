@@ -118,6 +118,11 @@ fn lower_loop<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
 ) -> Result<Flow, NativeEmitError> {
+    if let Some(name) = assigned_outer_binding(&block.statements, locals) {
+        return Err(NativeEmitError(format!(
+            "native loop assignment to outer binding `{name}` requires SSA lowering"
+        )));
+    }
     let header = function.create_block();
     let body = function.create_block();
     let exit = function.create_block();
@@ -145,6 +150,19 @@ fn lower_loop<'source>(
     } else {
         Ok(flow)
     }
+}
+
+fn assigned_outer_binding(
+    statements: &[Stmt],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+) -> Option<String> {
+    statements.iter().find_map(|statement| match statement {
+        Stmt::Assignment { name, .. } if locals.keys().any(|binding| binding.as_str() == name) => {
+            Some(name.clone())
+        }
+        Stmt::Block(block) | Stmt::Loop(block) => assigned_outer_binding(&block.statements, locals),
+        _ => None,
+    })
 }
 
 fn lower_expression(
