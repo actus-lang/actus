@@ -157,6 +157,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Lower unary negative and grouped integer expressions.
 - [x] Lower nested scalar scopes and scalar `drop` statements.
 - [x] Lower basic native loop CFG edges for `break` and `continue`.
+- [ ] Implement SSA variables and phi values for loop-carried bindings.
 - [ ] Lower return, break, and continue unwind plans into the native cleanup model.
 - [x] Verify deterministic native object emission for identical programs.
 - [ ] Emit deterministic cleanup instructions.
