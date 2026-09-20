@@ -4,7 +4,7 @@ Actus is developed in small, verifiable stages. Each item should be checked only
 
 ## Current focus
 
-**Phase 1 is the active development phase.** Lexer work exists as preserved implementation progress, but no further Phase 2 work may begin until every required Phase 1 item is complete and verified.
+**Phase 5 is the active development phase.** Earlier phases are complete except for the explicitly deferred second-maintainer review requirement.
 
 Each phase is gated: implementation progress in a later phase may be preserved, but the project must return to the earliest incomplete phase before adding new work.
 
@@ -80,12 +80,12 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ### Bindings and Scopes
 
-- [ ] Implement lexical scope frames.
-- [ ] Implement binding tables.
-- [ ] Reject use of undeclared identifiers.
-- [ ] Reject duplicate bindings within the same scope.
-- [ ] Define and enforce shadowing rules.
-- [ ] Track binding source spans.
+- [x] Implement lexical scope frames.
+- [x] Implement binding tables.
+- [x] Reject use of undeclared identifiers.
+- [x] Reject duplicate bindings within the same scope.
+- [x] Define and enforce shadowing rules.
+- [x] Track binding source spans.
 
 ### Ownership
 
@@ -101,10 +101,10 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ### Borrowing
 
-- [ ] Implement `BorrowRecord` with identity, owner, scope, and origin span.
-- [ ] Implement `abs x = ref owner`.
-- [ ] Derive `Frozen` from active borrow records.
-- [ ] Restore the owner to `Active` after the last borrow ends.
+- [x] Implement `BorrowRecord` with identity, owner, scope, and origin span.
+- [x] Implement `abs x = ref owner`.
+- [x] Derive `Frozen` from active borrow records.
+- [x] Restore the owner to `Active` after the last borrow ends.
 - [ ] Reject mutation while an owner is frozen.
 - [ ] Reject moving a frozen owner.
 - [ ] Reject dropping a frozen owner.
