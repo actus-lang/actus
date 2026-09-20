@@ -2,20 +2,26 @@
 
 Actus is developed in small, verifiable stages. Each item should be checked only after the implementation, tests, and documentation are complete.
 
+## Current focus
+
+**Phase 1 is the active development phase.** Lexer work exists as preserved implementation progress, but no further Phase 2 work may begin until every required Phase 1 item is complete and verified.
+
+Each phase is gated: implementation progress in a later phase may be preserved, but the project must return to the earliest incomplete phase before adding new work.
+
 ## Phase 1: Repository and Project Discipline
 
-- [ ] Protect the `main` branch from direct pushes.
-- [ ] Require pull requests for changes to `main`.
-- [ ] Require successful CI checks before merging.
+- [x] Protect the `main` branch from direct pushes.
+- [x] Require pull requests for changes to `main`.
+- [x] Require successful CI checks before merging.
 - [ ] Require at least one code review for pull requests.
-- [ ] Add a pull request template.
-- [ ] Define and enforce the Conventional Commits format.
-- [ ] Add a commit-message checker.
+- [x] Add a pull request template.
+- [x] Define and enforce the Conventional Commits format.
+- [x] Add a commit-message checker.
 - [ ] Add local `pre-commit` checks.
 - [ ] Add local `pre-push` checks.
-- [ ] Add a pinned Rust toolchain with `rust-toolchain.toml`.
-- [ ] Configure `rustfmt` and enforce formatting in CI.
-- [ ] Configure Clippy and treat warnings as errors in CI.
+- [x] Add a pinned Rust toolchain with `rust-toolchain.toml`.
+- [x] Configure `rustfmt` and enforce formatting in CI.
+- [x] Configure Clippy and treat warnings as errors in CI.
 - [ ] Run `cargo check`, `cargo test`, and `cargo clippy` in GitHub Actions.
 - [ ] Add dependency auditing to CI.
 - [ ] Add dependency and license policy checks.
@@ -23,17 +29,17 @@ Actus is developed in small, verifiable stages. Each item should be checked only
 
 ## Phase 2: Language Foundation
 
-- [ ] Define the initial token set.
-- [ ] Implement the lexer for Actus source files.
-- [ ] Support braces, semicolons, identifiers, literals, comments, and operators.
-- [ ] Add the `verb`, `erg`, `abs`, `dat`, `ref`, and `drop` keywords.
-- [ ] Track source spans for every token.
-- [ ] Produce structured lexer diagnostics.
-- [ ] Reject unknown characters and malformed literals.
-- [ ] Reject unterminated strings and comments.
-- [ ] Add lexer unit tests.
-- [ ] Add valid lexer fixtures.
-- [ ] Add invalid lexer fixtures.
+- [x] Define the initial token set.
+- [x] Implement the lexer for Actus source files.
+- [x] Support braces, semicolons, identifiers, literals, comments, and operators.
+- [x] Add the `verb`, `erg`, `abs`, `dat`, `ref`, and `drop` keywords.
+- [x] Track source spans for every token.
+- [x] Produce structured lexer diagnostics.
+- [x] Reject unknown characters and malformed literals.
+- [x] Reject unterminated strings and comments.
+- [x] Add lexer unit tests.
+- [x] Add valid lexer fixtures.
+- [x] Add invalid lexer fixtures.
 
 ## Phase 3: Parser and AST
 
