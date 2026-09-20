@@ -43,22 +43,22 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 3: Parser and AST
 
-- [ ] Define the initial Actus grammar.
-- [ ] Define the AST for programs, verbs, parameters, roles, types, blocks, statements, and expressions.
-- [ ] Implement parsing for top-level declarations.
-- [ ] Implement parsing for verb declarations and parameters.
-- [ ] Implement parsing for blocks and nested scopes.
-- [ ] Implement parsing for variable declarations.
-- [ ] Implement parsing for borrow declarations using `ref`.
-- [ ] Implement parsing for assignments and calls.
-- [ ] Implement parsing for returns.
+- [x] Define the initial Actus grammar.
+- [x] Define the AST for programs, verbs, parameters, roles, types, blocks, statements, and expressions.
+- [x] Implement parsing for top-level declarations.
+- [x] Implement parsing for verb declarations and parameters.
+- [x] Implement parsing for blocks and nested scopes.
+- [x] Implement parsing for variable declarations.
+- [x] Implement parsing for borrow declarations using `ref`.
+- [x] Implement parsing for assignments and calls.
+- [x] Implement parsing for returns.
 - [ ] Implement parsing for intrinsic `drop` statements.
-- [ ] Track source spans for AST nodes.
+- [x] Track source spans for AST nodes.
 - [ ] Produce stable parser diagnostics with error codes.
-- [ ] Reject missing semicolons.
-- [ ] Reject unclosed blocks and unmatched braces.
-- [ ] Reject invalid roles and malformed declarations.
-- [ ] Reject invalid argument syntax.
+- [x] Reject missing semicolons.
+- [x] Reject unclosed blocks and unmatched braces.
+- [x] Reject invalid roles and malformed declarations.
+- [x] Reject invalid argument syntax.
 - [ ] Add valid parser fixtures.
 - [ ] Add invalid parser fixtures.
 - [ ] Add AST snapshot tests.
