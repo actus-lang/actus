@@ -1,0 +1,3 @@
+verb main() -> Int {
+    return 42;
+}
