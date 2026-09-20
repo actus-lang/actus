@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::codegen::emit_program_object;
+use crate::codegen::{emit_program_object, link_object};
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::formatter::format_program;
 use crate::lexer::scan;
@@ -62,26 +62,51 @@ fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         return 2;
     };
     let mut output = None;
+    let mut emit = EmitKind::Object;
     while let Some(argument) = arguments.next() {
-        if argument != "-o" {
-            eprintln!("error: unexpected build argument `{argument}`");
-            print_usage();
-            return 2;
-        }
-        if output.is_some() {
-            eprintln!("error: duplicate output option");
-            return 2;
-        }
-        output = arguments.next();
-        if output.is_none() {
-            eprintln!("error: missing output path after `-o`");
-            return 2;
+        match argument.as_str() {
+            "-o" => {
+                if output.is_some() {
+                    eprintln!("error: duplicate output option");
+                    return 2;
+                }
+                output = arguments.next();
+                if output.is_none() {
+                    eprintln!("error: missing output path after `-o`");
+                    return 2;
+                }
+            }
+            "--emit" => {
+                let Some(kind) = arguments.next() else {
+                    eprintln!("error: missing value after `--emit`");
+                    return 2;
+                };
+                emit = match kind.as_str() {
+                    "obj" => EmitKind::Object,
+                    "exe" => EmitKind::Executable,
+                    _ => {
+                        eprintln!("error: unsupported emission kind `{kind}`");
+                        return 2;
+                    }
+                };
+            }
+            _ => {
+                eprintln!("error: unexpected build argument `{argument}`");
+                print_usage();
+                return 2;
+            }
         }
     }
-    build_file(&input, output.as_deref().map(Path::new))
+    build_file(&input, output.as_deref().map(Path::new), emit)
 }
 
-fn build_file(input: &str, output: Option<&Path>) -> i32 {
+#[derive(Clone, Copy)]
+enum EmitKind {
+    Object,
+    Executable,
+}
+
+fn build_file(input: &str, output: Option<&Path>, emit: EmitKind) -> i32 {
     let source = match fs::read_to_string(input) {
         Ok(source) => source,
         Err(error) => {
@@ -117,18 +142,35 @@ fn build_file(input: &str, output: Option<&Path>) -> i32 {
             return 1;
         }
     };
-    let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input));
-    if let Err(error) = fs::write(&output, bytes) {
-        eprintln!("error: cannot write `{}`: {error}", output.display());
+    let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit));
+    let object = if matches!(emit, EmitKind::Executable) {
+        output.with_extension("o")
+    } else {
+        output.clone()
+    };
+    if let Err(error) = fs::write(&object, bytes) {
+        eprintln!("error: cannot write `{}`: {error}", object.display());
         return 1;
+    }
+    if matches!(emit, EmitKind::Executable) {
+        if let Err(error) = link_object(&object, &output) {
+            eprintln!("error: cannot link `{input}`: {error}");
+            let _ = fs::remove_file(&object);
+            return 1;
+        }
+        let _ = fs::remove_file(&object);
     }
     println!("built `{}`", output.display());
     0
 }
 
-fn default_output(input: &str) -> PathBuf {
+fn default_output(input: &str, emit: EmitKind) -> PathBuf {
     let path = Path::new(input);
-    path.with_extension("o")
+    if matches!(emit, EmitKind::Object) {
+        path.with_extension("o")
+    } else {
+        path.with_file_name(path.file_stem().unwrap_or_default())
+    }
 }
 
 fn parse_file(path: &str, print_ast: bool) -> i32 {
@@ -209,5 +251,5 @@ fn format_file(path: &str, check_only: bool) -> i32 {
 
 fn print_usage() {
     eprintln!("usage: actus <parse|check|fmt> [--check] <file.act>");
-    eprintln!("       actus build <file.act> [-o <output.o>]");
+    eprintln!("       actus build <file.act> [--emit obj|exe] [-o <output>]");
 }

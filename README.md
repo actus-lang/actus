@@ -25,13 +25,13 @@ cargo run -- check examples/hello.act
 Emit a native object file:
 
 ```sh
-cargo run -- build examples/hello.act -o examples/hello.o
+cargo run -- build examples/hello.act --emit obj -o examples/hello.o
 ```
 
-The object can be linked with a system linker such as GCC:
+Build a native executable directly through the system linker:
 
 ```sh
-gcc examples/hello.o -o examples/hello
+cargo run -- build examples/hello.act --emit exe -o examples/hello
 ./examples/hello
 echo $?
 ```
