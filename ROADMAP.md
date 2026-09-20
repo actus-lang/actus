@@ -149,6 +149,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Emit object files or native binaries without an intermediate C representation.
 - [x] Add `actus build` for writing a validated native object artifact.
 - [x] Lower integer locals and arithmetic expressions to native instructions.
+- [x] Lower return, break, and continue unwind plans into the native cleanup model.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.
