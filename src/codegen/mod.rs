@@ -1,7 +1,9 @@
+mod abi;
 mod linker;
 mod model;
 mod native;
 
+pub use abi::{NativeAbiError, validate_integer_return};
 pub use linker::{NativeLinkError, link_object};
 pub use model::{
     NativeCleanupPlan, NativeInstruction, NativeLoopUnwindPlan, NativeUnwindPlan,

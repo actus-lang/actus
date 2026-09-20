@@ -10,6 +10,8 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use crate::ast::{BinaryOp, Expr, Program, Role, Stmt, TopLevelDecl, VerbDecl};
 use crate::semantic::analyze;
 
+use super::abi::validate_integer_return;
+
 #[derive(Debug)]
 pub struct NativeEmitError(String);
 
@@ -35,6 +37,7 @@ pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, N
     if !verb.params.is_empty() {
         return Err(NativeEmitError("native integer slice does not support parameters".to_owned()));
     }
+    validate_integer_return(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     emit_verb_object(symbol, verb)
 }
 
@@ -151,8 +154,8 @@ fn lower_expression(
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
         Expr::Integer { value, .. } => value
-            .parse::<i64>()
-            .map(|value| function.ins().iconst(types::I32, value))
+            .parse::<i32>()
+            .map(|value| function.ins().iconst(types::I32, i64::from(value)))
             .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}"))),
         Expr::Identifier { name, .. } => locals
             .get(name)

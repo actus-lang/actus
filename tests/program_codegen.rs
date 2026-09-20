@@ -33,3 +33,21 @@ fn codegen_rejects_semantically_invalid_programs() {
         emit_program_object(&program, "main").expect_err("semantic errors must block codegen");
     assert!(error.to_string().contains("semantic analysis failed"));
 }
+
+#[test]
+fn codegen_rejects_unsupported_native_return_types() {
+    let (tokens, errors) = scan("verb main() -> Buffer { return 42; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = emit_program_object(&program, "main").expect_err("Buffer is not an i32 ABI return");
+    assert!(error.to_string().contains("supports `Int` returns"));
+}
+
+#[test]
+fn codegen_rejects_integer_values_outside_native_width() {
+    let (tokens, errors) = scan("verb main() -> Int { return 2147483648; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = emit_program_object(&program, "main").expect_err("literal exceeds i32");
+    assert!(error.to_string().contains("invalid integer literal"));
+}
