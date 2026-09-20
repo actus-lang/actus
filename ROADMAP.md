@@ -147,6 +147,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Define the initial native emission model.
 - [x] Integrate a Rust-native backend such as Cranelift.
 - [x] Emit object files or native binaries without an intermediate C representation.
+- [x] Add `actus build` for writing a validated native object artifact.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.

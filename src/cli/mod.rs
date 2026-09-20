@@ -1,17 +1,26 @@
 use std::env;
 use std::fs;
+use std::path::{Path, PathBuf};
 
+use crate::codegen::emit_program_object;
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::formatter::format_program;
 use crate::lexer::scan;
 use crate::parser::parse;
 
 pub fn run() -> i32 {
-    let mut arguments = env::args().skip(1);
+    run_with_args(env::args().skip(1))
+}
+
+pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
     let Some(command) = arguments.next() else {
         print_usage();
         return 2;
     };
+    if command == "build" {
+        return build_command(arguments);
+    }
+
     let Some(first_argument) = arguments.next() else {
         eprintln!("error: missing input file");
         print_usage();
@@ -44,6 +53,82 @@ pub fn run() -> i32 {
             2
         }
     }
+}
+
+fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
+    let Some(input) = arguments.next() else {
+        eprintln!("error: missing input file");
+        print_usage();
+        return 2;
+    };
+    let mut output = None;
+    while let Some(argument) = arguments.next() {
+        if argument != "-o" {
+            eprintln!("error: unexpected build argument `{argument}`");
+            print_usage();
+            return 2;
+        }
+        if output.is_some() {
+            eprintln!("error: duplicate output option");
+            return 2;
+        }
+        output = arguments.next();
+        if output.is_none() {
+            eprintln!("error: missing output path after `-o`");
+            return 2;
+        }
+    }
+    build_file(&input, output.as_deref().map(Path::new))
+}
+
+fn build_file(input: &str, output: Option<&Path>) -> i32 {
+    let source = match fs::read_to_string(input) {
+        Ok(source) => source,
+        Err(error) => {
+            eprintln!("error: cannot read `{input}`: {error}");
+            return 1;
+        }
+    };
+    let (tokens, lex_errors) = scan(&source);
+    if !lex_errors.is_empty() {
+        for error in &lex_errors {
+            eprintln!("{input}: {}", render_lex_error(&source, error));
+        }
+        return 1;
+    }
+    let program = match parse(tokens) {
+        Ok(program) => program,
+        Err(error) => {
+            eprintln!("{input}: {}", render_parse_error(&source, &error));
+            return 1;
+        }
+    };
+    let symbol = match program.declarations.first() {
+        Some(crate::ast::TopLevelDecl::Verb(verb)) => verb.name.as_str(),
+        None => {
+            eprintln!("error: `{input}` contains no verb declarations");
+            return 1;
+        }
+    };
+    let bytes = match emit_program_object(&program, symbol) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            eprintln!("error: cannot build `{input}`: {error}");
+            return 1;
+        }
+    };
+    let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input));
+    if let Err(error) = fs::write(&output, bytes) {
+        eprintln!("error: cannot write `{}`: {error}", output.display());
+        return 1;
+    }
+    println!("built `{}`", output.display());
+    0
+}
+
+fn default_output(input: &str) -> PathBuf {
+    let path = Path::new(input);
+    path.with_extension("o")
 }
 
 fn parse_file(path: &str, print_ast: bool) -> i32 {
@@ -124,4 +209,5 @@ fn format_file(path: &str, check_only: bool) -> i32 {
 
 fn print_usage() {
     eprintln!("usage: actus <parse|check|fmt> [--check] <file.act>");
+    eprintln!("       actus build <file.act> [-o <output.o>]");
 }
