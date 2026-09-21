@@ -80,11 +80,11 @@ impl LinkerFlavor {
     pub const fn host_default() -> Self {
         #[cfg(target_os = "macos")]
         {
-            return Self::Apple;
+            Self::Apple
         }
         #[cfg(windows)]
         {
-            return Self::Msvc;
+            Self::Msvc
         }
         #[cfg(not(any(target_os = "macos", windows)))]
         Self::Gnu
