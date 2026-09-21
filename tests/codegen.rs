@@ -33,6 +33,7 @@ fn lowers_return_and_loop_unwinds_without_changing_scope_order() {
     let semantic = analyze(&program).expect("source should pass semantic analysis");
 
     let returns = lower_return_unwind_plans(&semantic);
+    assert!(returns[0].span.end > returns[0].span.start);
     assert_eq!(returns[0].scopes[0].depth, 1);
     assert_eq!(
         returns[0].scopes[0].instructions,
@@ -40,6 +41,7 @@ fn lowers_return_and_loop_unwinds_without_changing_scope_order() {
     );
 
     let loops = lower_loop_unwind_plans(&semantic);
+    assert!(loops[0].span.end > loops[0].span.start);
     assert_eq!(loops[0].scopes[0].depth, 2);
     assert_eq!(
         loops[0].scopes[0].instructions,

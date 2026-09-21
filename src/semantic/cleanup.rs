@@ -1,4 +1,5 @@
 use crate::ast::Role;
+use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::model::{Binding, BindingState};
@@ -17,6 +18,7 @@ pub struct ScopeCleanup {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UnwindPlan {
+    pub span: SourceSpan,
     pub scopes: Vec<ScopeCleanup>,
 }
 
@@ -28,6 +30,7 @@ pub enum LoopExitKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoopUnwindPlan {
+    pub span: SourceSpan,
     pub kind: LoopExitKind,
     pub scopes: Vec<ScopeCleanup>,
 }
@@ -53,7 +56,7 @@ pub(super) fn plan_scope_cleanup(
 }
 
 impl Analyzer {
-    pub(super) fn plan_return_unwind(&mut self) {
+    pub(super) fn plan_return_unwind(&mut self, span: SourceSpan) {
         let plans = self
             .scopes
             .iter()
@@ -68,7 +71,7 @@ impl Analyzer {
                 )
             })
             .collect();
-        self.model.return_unwind_plans.push(UnwindPlan { scopes: plans });
+        self.model.return_unwind_plans.push(UnwindPlan { span, scopes: plans });
     }
 
     pub(super) fn plan_loop_unwind(
@@ -98,7 +101,7 @@ impl Analyzer {
                 )
             })
             .collect();
-        self.model.loop_unwind_plans.push(LoopUnwindPlan { kind, scopes: plans });
+        self.model.loop_unwind_plans.push(LoopUnwindPlan { span, kind, scopes: plans });
         Ok(())
     }
 }

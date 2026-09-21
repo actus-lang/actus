@@ -1,3 +1,4 @@
+use crate::lexer::SourceSpan;
 use crate::semantic::{CleanupAction, LoopExitKind, SemanticModel};
 use std::collections::HashSet;
 
@@ -15,11 +16,13 @@ pub struct NativeCleanupPlan {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeUnwindPlan {
+    pub span: SourceSpan,
     pub scopes: Vec<NativeCleanupPlan>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeLoopUnwindPlan {
+    pub span: SourceSpan,
     pub kind: LoopExitKind,
     pub scopes: Vec<NativeCleanupPlan>,
 }
@@ -32,7 +35,10 @@ pub fn lower_return_unwind_plans(model: &SemanticModel) -> Vec<NativeUnwindPlan>
     model
         .return_unwind_plans
         .iter()
-        .map(|plan| NativeUnwindPlan { scopes: plan.scopes.iter().map(lower_scope).collect() })
+        .map(|plan| NativeUnwindPlan {
+            span: plan.span,
+            scopes: plan.scopes.iter().map(lower_scope).collect(),
+        })
         .collect()
 }
 
@@ -41,6 +47,7 @@ pub fn lower_loop_unwind_plans(model: &SemanticModel) -> Vec<NativeLoopUnwindPla
         .loop_unwind_plans
         .iter()
         .map(|plan| NativeLoopUnwindPlan {
+            span: plan.span,
             kind: plan.kind.clone(),
             scopes: plan.scopes.iter().map(lower_scope).collect(),
         })

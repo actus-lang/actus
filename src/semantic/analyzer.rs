@@ -84,7 +84,7 @@ impl Analyzer {
                 self.visit_expression(value)
             }
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
-            Stmt::Return { value, .. } => self.visit_return(value.as_ref()),
+            Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => {
                 self.enter_scope();
                 self.loop_boundaries.push(self.scopes.len() - 1);
