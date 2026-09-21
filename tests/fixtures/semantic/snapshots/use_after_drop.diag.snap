@@ -1,0 +1,1 @@
+error[E1006] at 4:13: use of dropped binding `value`

@@ -189,12 +189,12 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 ## Phase 8: Test Infrastructure
 
 - [ ] Organize tests into lexer, parser, semantic, formatter, and code-generation suites.
-- [ ] Add valid `.act` fixtures.
-- [ ] Add invalid `.act` fixtures.
-- [ ] Add diagnostic snapshots.
+- [x] Add valid `.act` fixtures.
+- [x] Add invalid `.act` fixtures.
+- [x] Add diagnostic snapshots.
 - [x] Add stable semantic diagnostic renderer tests.
-- [ ] Add semantic state-transition tests.
-- [ ] Add ownership and borrowing regression tests.
+- [x] Add semantic state-transition tests.
+- [x] Add ownership and borrowing regression tests.
 - [ ] Add golden tests for generated native output.
 - [ ] Make test output deterministic.
 - [ ] Add a command for intentionally updating snapshots.
