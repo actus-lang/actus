@@ -46,6 +46,16 @@ The command returns the Actus program's exit code and removes its temporary exec
 
 The example returns `42`. Object files and native executables are local build artifacts and are excluded from version control.
 
+### Toolchain configuration
+
+The linker can be selected without changing source code by setting `ACTUS_LINKER`:
+
+```sh
+ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
+```
+
+The default linker is `cc`. Toolchain and backend defaults are represented by typed compiler configuration and will become project-level `Arca.toml` settings when the Arca package workflow is implemented. Language semantics, ownership rules, and borrow safety are not configurable project options.
+
 Run the complete test suite with:
 
 ```sh
