@@ -25,7 +25,7 @@ fn build_command_writes_a_native_object() {
 
     assert_eq!(result, 0);
     let object = fs::read(&output).expect("read object");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xfe\xed"));
+    object::File::parse(object.as_slice()).expect("output should be a native object");
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
 }
