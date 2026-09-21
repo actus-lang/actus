@@ -49,6 +49,25 @@ fn generated_inputs_never_panic_across_frontend_stages() {
     }
 }
 
+#[test]
+fn arbitrary_bytes_never_panic_across_frontend_stages() {
+    let mut state = 0xBADC0DE_u64;
+
+    for case in 0..4096 {
+        let length = (next_random(&mut state) % 257) as usize;
+        let bytes = (0..length).map(|_| next_random(&mut state) as u8).collect::<Vec<_>>();
+        let source = String::from_utf8_lossy(&bytes);
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            let (tokens, _) = scan(&source);
+            if let Ok(program) = parse(tokens) {
+                let _ = format_program(&program);
+                let _ = analyze(&program);
+            }
+        }));
+        assert!(result.is_ok(), "compiler panicked for arbitrary input {case}");
+    }
+}
+
 fn next_random(state: &mut u64) -> u64 {
     *state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
     *state

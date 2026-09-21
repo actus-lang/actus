@@ -234,7 +234,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add parser fuzzing.
 - [x] Fuzz malformed braces and delimiters.
 - [x] Fuzz malformed literals and comments.
-- [ ] Verify that arbitrary input never causes a compiler panic.
+- [x] Verify that arbitrary input never causes a compiler panic.
 - [x] Add property tests for formatter idempotence.
 - [ ] Add property tests for parser round-tripping where applicable.
 - [x] Add compiler determinism checks.
