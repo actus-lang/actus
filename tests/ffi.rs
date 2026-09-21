@@ -1,0 +1,43 @@
+use actus::ffi::{CAbiError, CAbiOwnership, CAbiType, CallingConvention, c_abi_signature};
+use actus::lexer::scan;
+use actus::parser::parse;
+
+fn parse_verb(source: &str) -> actus::ast::VerbDecl {
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("source should parse");
+    match program.declarations.into_iter().next().expect("verb should exist") {
+        actus::ast::TopLevelDecl::Verb(verb) => verb,
+    }
+}
+
+#[test]
+fn maps_actus_roles_and_types_to_a_c_abi_signature() {
+    let verb = parse_verb(
+        "verb exchange(erg target: Buffer, abs view: Buffer, dat count: Int) -> Int { return 0; }",
+    );
+    let signature = c_abi_signature(&verb).expect("signature should map");
+
+    assert_eq!(signature.calling_convention, CallingConvention::C);
+    assert_eq!(signature.return_type, CAbiType::Int32);
+    assert_eq!(signature.parameters[0].ty, CAbiType::OpaquePointer);
+    assert_eq!(signature.parameters[0].ownership, CAbiOwnership::Exclusive);
+    assert_eq!(signature.parameters[1].ownership, CAbiOwnership::SharedBorrow);
+    assert_eq!(signature.parameters[2].ownership, CAbiOwnership::Consumed);
+}
+
+#[test]
+fn rejects_implicit_returns_at_the_c_abi_boundary() {
+    let verb = parse_verb("verb exchange(erg target: Buffer) { drop(target); }");
+    let error = c_abi_signature(&verb).expect_err("C exports require explicit return types");
+
+    assert!(matches!(error, CAbiError::MissingReturnType { verb } if verb == "exchange"));
+}
+
+#[test]
+fn rejects_registered_types_without_a_c_abi_mapping() {
+    let verb = parse_verb("verb exchange(erg items: Array) -> Int { return 0; }");
+    let error = c_abi_signature(&verb).expect_err("Array has no initial C ABI mapping");
+
+    assert!(matches!(error, CAbiError::UnsupportedType { name } if name == "Array"));
+}
