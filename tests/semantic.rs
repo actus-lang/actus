@@ -152,6 +152,14 @@ fn rejects_borrowed_returns() {
 }
 
 #[test]
+fn rejects_borrows_hidden_by_expression_grouping() {
+    let error = analyze_source("verb main() { erg value = make(); return (ref value); }")
+        .expect_err("grouped borrow must not escape");
+
+    assert!(matches!(error.kind, SemanticErrorKind::BorrowedReturn { .. }));
+}
+
+#[test]
 fn transfers_ownership_when_initializing_an_erg_binding() {
     let error = analyze_source(
         "verb broken() { erg source = make(); erg target = source; inspect(source); }",

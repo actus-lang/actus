@@ -51,7 +51,7 @@ impl Analyzer {
         };
         self.visit_expression(expression)?;
         let Expr::Identifier { name, span } = expression else {
-            if matches!(expression, Expr::Borrow { .. }) {
+            if contains_returned_borrow(expression) {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::BorrowedReturn { name: "temporary borrow".to_owned() },
                     span: expression_span(expression),
@@ -154,6 +154,22 @@ impl Analyzer {
             }
         }
         Ok(())
+    }
+}
+
+fn contains_returned_borrow(expression: &Expr) -> bool {
+    match expression {
+        Expr::Borrow { .. } => true,
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            contains_returned_borrow(expression)
+        }
+        Expr::Binary { left, right, .. } => {
+            contains_returned_borrow(left) || contains_returned_borrow(right)
+        }
+        Expr::Call { .. }
+        | Expr::Identifier { .. }
+        | Expr::Integer { .. }
+        | Expr::StringLiteral { .. } => false,
     }
 }
 
