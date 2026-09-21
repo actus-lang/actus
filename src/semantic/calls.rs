@@ -31,6 +31,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if self.visit_intrinsic_call(callee, arguments, span)? {
+            return Ok(());
+        }
         let Some(signature) = self.signatures.get(callee).cloned() else {
             for argument in arguments {
                 self.visit_expression(&argument.expression)?;
@@ -152,7 +155,7 @@ impl Analyzer {
         })
     }
 
-    fn is_owner_argument(&self, expression: &Expr) -> bool {
+    pub(super) fn is_owner_argument(&self, expression: &Expr) -> bool {
         let Expr::Identifier { name, span } = expression else { return false };
         let Ok(index) = self.binding(name, *span) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)

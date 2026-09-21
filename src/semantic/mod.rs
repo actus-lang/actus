@@ -3,6 +3,7 @@ mod borrowing;
 mod calls;
 mod cleanup;
 mod errors;
+mod intrinsics;
 mod model;
 mod ownership;
 mod scopes;

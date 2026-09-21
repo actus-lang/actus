@@ -18,10 +18,12 @@ pub enum SemanticErrorKind {
     MixedArgumentModes { callee: String },
     WrongArgumentCount { callee: String },
     InvalidArgumentRole { callee: String, parameter: String },
+    InvalidIntrinsicArgument { callee: String, parameter: String },
     AmbiguousPositionalCall { callee: String },
     BorrowedReturn { name: String },
     InvalidOwnerInitializer { name: String },
     LoopControlOutsideLoop { keyword: String },
+    ReservedIntrinsicName { name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

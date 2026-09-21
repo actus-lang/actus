@@ -46,6 +46,14 @@ impl Analyzer {
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Verb(verb) = declaration;
+            if super::intrinsics::is_reserved_name(&verb.name) {
+                return Err(SemanticError {
+                    kind: super::errors::SemanticErrorKind::ReservedIntrinsicName {
+                        name: verb.name.clone(),
+                    },
+                    span: verb.span,
+                });
+            }
             self.signatures.insert(verb.name.clone(), verb.signature());
         }
         for declaration in &program.declarations {

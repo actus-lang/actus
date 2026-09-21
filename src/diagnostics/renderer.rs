@@ -69,10 +69,12 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
         SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
         SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
+        SemanticErrorKind::InvalidIntrinsicArgument { .. } => "E1021",
         SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",
         SemanticErrorKind::BorrowedReturn { .. } => "E1018",
         SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
         SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
+        SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
     }
 }
 
@@ -110,6 +112,9 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
         SemanticErrorKind::InvalidArgumentRole { callee, parameter } => {
             format!("argument does not satisfy role of `{parameter}` in `{callee}`")
         }
+        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter } => {
+            format!("invalid `{parameter}` argument in intrinsic `{callee}`")
+        }
         SemanticErrorKind::AmbiguousPositionalCall { callee } => {
             format!("positional call to `{callee}` is ambiguous")
         }
@@ -121,6 +126,9 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
         }
         SemanticErrorKind::LoopControlOutsideLoop { keyword } => {
             format!("`{keyword}` is only valid inside a loop")
+        }
+        SemanticErrorKind::ReservedIntrinsicName { name } => {
+            format!("`{name}` is reserved for a built-in intrinsic")
         }
     }
 }
