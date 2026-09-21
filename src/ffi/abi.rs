@@ -6,6 +6,15 @@ pub enum CAbiType {
     OpaquePointer,
 }
 
+impl CAbiType {
+    pub const fn c_name(self) -> &'static str {
+        match self {
+            Self::Int32 => "int32_t",
+            Self::OpaquePointer => "void*",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CAbiOwnership {
     Exclusive,
@@ -22,6 +31,14 @@ pub enum CAbiReturnOwnership {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CallingConvention {
     C,
+}
+
+impl CallingConvention {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::C => "C",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

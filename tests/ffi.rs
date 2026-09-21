@@ -52,9 +52,16 @@ fn rejects_registered_types_without_a_c_abi_mapping() {
 fn maps_c_abi_types_to_target_layouts() {
     let target = CAbiTarget::new(8).expect("64-bit pointer width should be accepted");
 
+    assert_eq!(CAbiType::Int32.c_name(), "int32_t");
+    assert_eq!(CAbiType::OpaquePointer.c_name(), "void*");
     assert_eq!(target.layout(CAbiType::Int32), CAbiLayout { size: 4, alignment: 4 });
     assert_eq!(target.layout(CAbiType::OpaquePointer), CAbiLayout { size: 8, alignment: 8 });
     assert!(CAbiTarget::new(16).is_none());
+}
+
+#[test]
+fn exposes_stable_calling_convention_name() {
+    assert_eq!(CallingConvention::C.name(), "C");
 }
 
 #[test]
