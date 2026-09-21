@@ -50,6 +50,13 @@ The example returns `42`. Object files and native executables are local build ar
 
 Basic project build settings are read from the root `Arca.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
 
+```toml
+[package]
+name = "my_program"
+version = "0.1.0"
+entry = "main"
+```
+
 ```sh
 ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
 ```

@@ -34,6 +34,7 @@ struct ArcaManifest {
 struct PackageManifest {
     name: String,
     version: String,
+    entry: Option<String>,
 }
 
 #[derive(Default, Deserialize)]
@@ -75,6 +76,7 @@ pub struct CompilerConfiguration {
     linker: OsString,
     run_artifact_prefix: String,
     native_backend: NativeBackendConfiguration,
+    entry_symbol: Option<String>,
 }
 
 impl CompilerConfiguration {
@@ -85,6 +87,7 @@ impl CompilerConfiguration {
             linker,
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
+            entry_symbol: None,
         }
     }
 
@@ -99,6 +102,9 @@ impl CompilerConfiguration {
             return Err(ConfigurationError(
                 "Arca.toml package name and version must not be empty".to_owned(),
             ));
+        }
+        if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
+            return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
         }
         if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
             return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
@@ -123,6 +129,7 @@ impl CompilerConfiguration {
         Ok(Self {
             linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
             native_backend,
+            entry_symbol: manifest.package.entry,
             ..environment
         })
     }
@@ -142,5 +149,9 @@ impl CompilerConfiguration {
 
     pub fn native_backend(&self) -> &NativeBackendConfiguration {
         &self.native_backend
+    }
+
+    pub fn entry_symbol(&self) -> Option<&str> {
+        self.entry_symbol.as_deref()
     }
 }

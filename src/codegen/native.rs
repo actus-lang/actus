@@ -64,6 +64,9 @@ pub fn emit_program_object_with_configuration(
     if verbs.is_empty() {
         return Err(NativeEmitError("program has no verb declarations".to_owned()));
     }
+    if !verbs.iter().any(|verb| verb.name == symbol) {
+        return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
+    }
     for verb in &verbs {
         validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     }
@@ -121,9 +124,9 @@ fn declare_functions(
     entry_symbol: &str,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
-    for (index, verb) in verbs.iter().enumerate() {
+    for verb in verbs {
         let signature = integer_signature(module, verb);
-        let symbol = if index == 0 { entry_symbol } else { &verb.name };
+        let symbol = if verb.name == entry_symbol { entry_symbol } else { &verb.name };
         let id = module
             .declare_function(symbol, Linkage::Export, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;

@@ -7,12 +7,13 @@ fn loads_build_settings_from_an_arca_manifest() {
     let path = std::env::temp_dir().join(format!("actus-config-{}.toml", std::process::id()));
     fs::write(
         &path,
-        "[package]\nname = \"sample\"\nversion = \"1.2.3\"\n\n[build]\nlinker = \"clang\"\nnative_module = \"sample_native\"\nposition_independent = false\n",
+        "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nentry = \"main\"\n\n[build]\nlinker = \"clang\"\nnative_module = \"sample_native\"\nposition_independent = false\n",
     )
     .expect("write manifest");
 
     let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
     assert_eq!(configuration.linker().to_string_lossy(), "clang");
+    assert_eq!(configuration.entry_symbol(), Some("main"));
     assert_eq!(configuration.native_backend().module_name(), "sample_native");
     assert!(!configuration.native_backend().position_independent());
     let _ = fs::remove_file(path);

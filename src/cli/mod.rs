@@ -127,10 +127,12 @@ fn validate_entry(
     symbol: &str,
     emit: EmitKind,
 ) -> Result<(), String> {
-    if matches!(emit, EmitKind::Executable)
-        && let crate::ast::TopLevelDecl::Verb(verb) = &program.declarations[0]
-        && !verb.params.is_empty()
-    {
+    let Some(crate::ast::TopLevelDecl::Verb(verb)) = program.declarations.iter().find(|decl| {
+        matches!(decl, crate::ast::TopLevelDecl::Verb(candidate) if candidate.name == symbol)
+    }) else {
+        return Err(format!("entry verb `{symbol}` was not found"));
+    };
+    if matches!(emit, EmitKind::Executable) && !verb.params.is_empty() {
         return Err(format!("executable entry verb `{symbol}` cannot have parameters"));
     }
     Ok(())
@@ -163,20 +165,21 @@ fn build_file(
             return 1;
         }
     };
-    let symbol = match program.declarations.first() {
+    let fallback_symbol = match program.declarations.first() {
         Some(crate::ast::TopLevelDecl::Verb(verb)) => verb.name.as_str(),
         None => {
             eprintln!("error: `{input}` contains no verb declarations");
             return 1;
         }
     };
-    if let Err(error) = validate_entry(&program, symbol, emit) {
+    let symbol = configuration.entry_symbol().unwrap_or(fallback_symbol).to_owned();
+    if let Err(error) = validate_entry(&program, &symbol, emit) {
         eprintln!("error: {error}");
         return 1;
     }
     let bytes = match emit_program_object_with_configuration(
         &program,
-        symbol,
+        &symbol,
         configuration.native_backend(),
     ) {
         Ok(bytes) => bytes,
