@@ -214,7 +214,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 8: Test Infrastructure
 
-- [ ] Organize tests into lexer, parser, semantic, formatter, and code-generation suites.
+- [x] Organize tests into lexer, parser, semantic, formatter, and code-generation suites.
 - [x] Add valid `.act` fixtures.
 - [x] Add invalid `.act` fixtures.
 - [x] Add diagnostic snapshots.
