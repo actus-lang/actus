@@ -1,4 +1,6 @@
-use crate::ast::{Argument, BuiltinType, Expr, Role, VerbDecl, lookup_builtin_type};
+use crate::ast::{
+    Argument, BuiltinType, Expr, ExternalVerbDecl, Role, VerbDecl, lookup_builtin_type,
+};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -12,6 +14,24 @@ pub(super) struct VerbSignature {
 }
 
 impl VerbDecl {
+    pub(super) fn signature(&self) -> VerbSignature {
+        VerbSignature {
+            params: self
+                .params
+                .iter()
+                .map(|parameter| {
+                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
+                })
+                .collect(),
+            return_type: self
+                .return_type
+                .as_ref()
+                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+        }
+    }
+}
+
+impl ExternalVerbDecl {
     pub(super) fn signature(&self) -> VerbSignature {
         VerbSignature {
             params: self

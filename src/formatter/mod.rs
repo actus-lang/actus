@@ -48,6 +48,29 @@ impl Formatter {
                 self.output.push(' ');
                 self.block(&verb.body);
             }
+            TopLevelDecl::ExternalVerb(verb) => {
+                self.output.push_str("extern \"");
+                self.output.push_str(&verb.abi);
+                self.output.push_str("\" verb ");
+                self.output.push_str(&verb.name);
+                self.output.push('(');
+                for (index, parameter) in verb.params.iter().enumerate() {
+                    if index > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push_str(role_name(&parameter.role));
+                    self.output.push(' ');
+                    self.output.push_str(&parameter.name);
+                    self.output.push_str(": ");
+                    self.output.push_str(&parameter.ty.name);
+                }
+                self.output.push(')');
+                if let Some(return_type) = &verb.return_type {
+                    self.output.push_str(" -> ");
+                    self.output.push_str(&return_type.name);
+                }
+                self.output.push(';');
+            }
         }
     }
 

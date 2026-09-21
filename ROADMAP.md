@@ -199,7 +199,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Define the initial C ABI boundary independently from the native backend.
 - [x] Map initial primitive, opaque-handle, calling-convention, and ownership contracts.
 - [x] Define target pointer-width layout rules for initial C ABI types.
-- [ ] Support external C function declarations without generating Actus-owned C code.
+- [x] Parse and model external C function declarations without generating Actus-owned C code.
 - [ ] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
 - [ ] Define ownership and lifetime rules at the C FFI boundary.
 - [ ] Support linking static and shared C libraries.

@@ -26,6 +26,7 @@ impl Token {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenKind {
     Verb,
+    Extern,
     Erg,
     Abs,
     Dat,

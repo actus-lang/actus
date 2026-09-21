@@ -1,4 +1,6 @@
-use crate::ast::{Block, Expr, Param, Program, Role, Stmt, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{
+    Block, Expr, ExternalVerbDecl, Param, Program, Role, Stmt, TopLevelDecl, TypeName, VerbDecl,
+};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 
 mod expressions;
@@ -43,8 +45,38 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Extern) {
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb()?));
+        }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))
+    }
+
+    fn parse_external_verb(&mut self) -> Result<ExternalVerbDecl, ParseError> {
+        let start = self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start;
+        let abi = match self.advance_required("ABI string")? {
+            Token { kind: TokenKind::StringLiteral(abi), .. } => abi,
+            token => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "ABI string (for example, `\"C\"`)".to_owned(),
+                        found: token.kind,
+                    },
+                    span: token.span,
+                });
+            }
+        };
+        self.expect_keyword(TokenKind::Verb, "`verb`")?;
+        let name_token = self.take_identifier("external verb name")?;
+        let name = identifier_text(&name_token.kind);
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let params = self.parse_params()?;
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let return_type =
+            if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(ExternalVerbDecl { abi, name, params, return_type, span: SourceSpan::new(start, end) })
     }
 
     fn parse_verb(&mut self) -> Result<VerbDecl, ParseError> {

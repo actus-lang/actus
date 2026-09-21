@@ -49,33 +49,40 @@ impl Analyzer {
 
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         for declaration in &program.declarations {
-            let TopLevelDecl::Verb(verb) = declaration;
-            for parameter in &verb.params {
+            let (name, params, return_type, span, signature) = match declaration {
+                TopLevelDecl::Verb(verb) => {
+                    (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
+                }
+                TopLevelDecl::ExternalVerb(verb) => {
+                    (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
+                }
+            };
+            for parameter in params {
                 self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;
             }
-            if let Some(return_type) = &verb.return_type {
+            if let Some(return_type) = return_type {
                 self.validate_type_name(&return_type.name, return_type.span)?;
             }
-            if super::intrinsics::is_reserved_name(&verb.name) {
+            if super::intrinsics::is_reserved_name(name) {
                 return Err(SemanticError {
                     kind: super::errors::SemanticErrorKind::ReservedIntrinsicName {
-                        name: verb.name.clone(),
+                        name: name.clone(),
                     },
-                    span: verb.span,
+                    span,
                 });
             }
-            if self.signatures.contains_key(&verb.name) {
+            if self.signatures.contains_key(name) {
                 return Err(SemanticError {
                     kind: super::errors::SemanticErrorKind::DuplicateVerbName {
-                        name: verb.name.clone(),
+                        name: name.clone(),
                     },
-                    span: verb.span,
+                    span,
                 });
             }
-            self.signatures.insert(verb.name.clone(), verb.signature());
+            self.signatures.insert(name.clone(), signature);
         }
         for declaration in &program.declarations {
-            let TopLevelDecl::Verb(verb) = declaration;
+            let TopLevelDecl::Verb(verb) = declaration else { continue };
             self.current_return_type = verb
                 .return_type
                 .as_ref()

@@ -10,6 +10,16 @@ pub struct Program {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TopLevelDecl {
     Verb(VerbDecl),
+    ExternalVerb(ExternalVerbDecl),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExternalVerbDecl {
+    pub abi: String,
+    pub name: String,
+    pub params: Vec<Param>,
+    pub return_type: Option<TypeName>,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

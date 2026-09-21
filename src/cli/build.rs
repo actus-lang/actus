@@ -88,12 +88,9 @@ pub(super) fn build_file(
             return 1;
         }
     };
-    let fallback_symbol = match program.declarations.first() {
-        Some(crate::ast::TopLevelDecl::Verb(verb)) => verb.name.as_str(),
-        None => {
-            eprintln!("error: `{input}` contains no verb declarations");
-            return 1;
-        }
+    let Some(fallback_symbol) = first_defined_verb(&program) else {
+        eprintln!("error: `{input}` contains no verb declarations");
+        return 1;
     };
     let symbol = configuration.entry_symbol().unwrap_or(fallback_symbol).to_owned();
     if let Err(error) = validate_entry(&program, &symbol, emit) {
@@ -118,6 +115,13 @@ pub(super) fn build_file(
     }
     println!("built `{}`", output.display());
     0
+}
+
+fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
+    program.declarations.iter().find_map(|declaration| match declaration {
+        crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
+        crate::ast::TopLevelDecl::ExternalVerb(_) => None,
+    })
 }
 
 fn validate_entry(

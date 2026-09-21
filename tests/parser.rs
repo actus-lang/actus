@@ -15,7 +15,7 @@ fn parses_a_verb_with_roles_and_return_type() {
         "verb transfer(erg target: File, abs packet: Buffer, dat logger: Logger) -> Int { return target; }",
     );
 
-    let TopLevelDecl::Verb(verb) = &program.declarations[0];
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     assert_eq!(verb.name, "transfer");
     assert_eq!(verb.params.len(), 3);
     assert_eq!(verb.params[0].role, Role::Erg);
@@ -31,7 +31,7 @@ fn parses_nested_borrow_and_named_call_arguments() {
         "verb process() { erg buffer = allocate(10); { abs view = ref buffer; inspect(view, source: view); } }",
     );
 
-    let TopLevelDecl::Verb(verb) = &program.declarations[0];
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     let Stmt::OwnerDecl { initializer, .. } = &verb.body.statements[0] else {
         panic!("expected owner declaration");
     };
@@ -42,7 +42,7 @@ fn parses_nested_borrow_and_named_call_arguments() {
 #[test]
 fn parses_integer_expression_precedence() {
     let program = parse_source("verb main() -> Int { return 2 + 3 * 4; }");
-    let TopLevelDecl::Verb(verb) = &program.declarations[0];
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     let Stmt::Return { value: Some(Expr::Binary { right, .. }), .. } = &verb.body.statements[0]
     else {
         panic!("expected binary return expression");
@@ -53,7 +53,7 @@ fn parses_integer_expression_precedence() {
 #[test]
 fn parses_unary_and_grouped_integer_expressions() {
     let program = parse_source("verb main() -> Int { return -(2 + 3); }");
-    let TopLevelDecl::Verb(verb) = &program.declarations[0];
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     let Stmt::Return { value: Some(Expr::Unary { expression, .. }), .. } = &verb.body.statements[0]
     else {
         panic!("expected unary return expression");
@@ -81,7 +81,7 @@ fn parses_valid_fixtures() {
     let lifecycle = parse_source(include_str!("fixtures/parser/valid/drop.act"));
 
     assert_eq!(transfer.declarations.len(), 1);
-    let TopLevelDecl::Verb(verb) = &lifecycle.declarations[0];
+    let TopLevelDecl::Verb(verb) = &lifecycle.declarations[0] else { panic!("expected verb") };
     assert!(matches!(verb.body.statements[1], Stmt::Drop { .. }));
 }
 

@@ -85,6 +85,7 @@ impl<'source> Scanner<'source> {
         let text = &self.source[start..self.cursor];
         let kind = match text {
             "verb" => TokenKind::Verb,
+            "extern" => TokenKind::Extern,
             "erg" => TokenKind::Erg,
             "abs" => TokenKind::Abs,
             "dat" => TokenKind::Dat,

@@ -61,8 +61,9 @@ pub fn emit_program_object_with_configuration(
     let verbs = program
         .declarations
         .iter()
-        .map(|declaration| match declaration {
-            TopLevelDecl::Verb(verb) => verb,
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Verb(verb) => Some(verb),
+            TopLevelDecl::ExternalVerb(_) => None,
         })
         .collect::<Vec<_>>();
     if verbs.is_empty() {
