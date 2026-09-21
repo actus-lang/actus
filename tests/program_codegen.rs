@@ -116,22 +116,33 @@ fn codegen_rejects_semantically_invalid_programs() {
 }
 
 #[test]
+fn codegen_accepts_buffer_allocation_and_explicit_drop() {
+    let source =
+        "verb main() -> Int { erg buffer: Buffer = allocate(4); drop(buffer); return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let object = emit_program_object(&program, "main").expect("buffer operations should emit");
+    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+}
+
+#[test]
 fn codegen_rejects_unsupported_native_return_types() {
-    let (tokens, errors) = scan("verb main() -> Buffer { return 42; }");
+    let (tokens, errors) = scan("verb main() -> String { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("Buffer is not an i32 ABI return");
-    assert!(error.to_string().contains("supports `Int` returns"));
+    assert!(error.to_string().contains("supports `Int` and `Buffer` returns"));
 }
 
 #[test]
 fn codegen_rejects_unsupported_native_parameter_types() {
-    let (tokens, errors) = scan("verb main(erg buffer: Buffer) -> Int { return 42; }");
+    let (tokens, errors) = scan("verb main(erg buffer: String) -> Int { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error =
         emit_program_object(&program, "main").expect_err("Buffer is not an i32 ABI parameter");
-    assert!(error.to_string().contains("supports `Int` parameters"));
+    assert!(error.to_string().contains("supports `Int` and `Buffer` parameters"));
 }
 
 #[test]

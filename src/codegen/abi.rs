@@ -1,5 +1,7 @@
 use crate::ast::VerbDecl;
 
+use super::types::NativeType;
+
 #[derive(Debug)]
 pub struct NativeAbiError(String);
 
@@ -11,21 +13,22 @@ impl std::fmt::Display for NativeAbiError {
 
 impl std::error::Error for NativeAbiError {}
 
-pub fn validate_integer_signature(verb: &VerbDecl) -> Result<(), NativeAbiError> {
+pub fn validate_native_signature(verb: &VerbDecl) -> Result<(), NativeAbiError> {
     if let Some(return_type) = &verb.return_type
-        && return_type.name != "Int"
+        && NativeType::from_name(&return_type.name).is_none()
     {
-        Err(NativeAbiError(format!(
-            "native integer slice supports `Int` returns, found `{}`",
+        return Err(NativeAbiError(format!(
+            "native backend supports `Int` and `Buffer` returns, found `{}`",
             return_type.name
-        )))
-    } else if let Some(parameter) = verb.params.iter().find(|parameter| parameter.ty.name != "Int")
-    {
-        Err(NativeAbiError(format!(
-            "native integer slice supports `Int` parameters, found `{}` for `{}`",
-            parameter.ty.name, parameter.name
-        )))
-    } else {
-        Ok(())
+        )));
     }
+    if let Some(parameter) =
+        verb.params.iter().find(|parameter| NativeType::from_name(&parameter.ty.name).is_none())
+    {
+        return Err(NativeAbiError(format!(
+            "native backend supports `Int` and `Buffer` parameters, found `{}` for `{}`",
+            parameter.ty.name, parameter.name
+        )));
+    }
+    Ok(())
 }

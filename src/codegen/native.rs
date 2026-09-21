@@ -11,9 +11,10 @@ use crate::ast::{Program, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
 use crate::semantic::analyze;
 
-use super::abi::validate_integer_signature;
+use super::abi::validate_native_signature;
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
+use super::types::NativeType;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub(super) String);
@@ -21,11 +22,13 @@ pub struct NativeEmitError(pub(super) String);
 struct FunctionMeta {
     id: FuncId,
     parameter_names: Vec<String>,
+    return_type: NativeType,
 }
 
 pub(super) struct FunctionRef {
     pub(super) reference: FuncRef,
     pub(super) parameter_names: Vec<String>,
+    pub(super) return_type: NativeType,
 }
 
 impl std::fmt::Display for NativeEmitError {
@@ -68,7 +71,7 @@ pub fn emit_program_object_with_configuration(
         return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
     }
     for verb in &verbs {
-        validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
+        validate_native_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     }
     emit_verbs_object(&verbs, symbol, &cleanup_schedule, configuration)
 }
@@ -81,13 +84,18 @@ fn emit_verbs_object(
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
     let frontend_config = module.isa().frontend_config();
-    let metadata = declare_functions(&mut module, verbs, symbol)?;
+    let mut metadata = declare_functions(&mut module, verbs, symbol)?;
+    metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = metadata
         .iter()
         .map(|(name, meta)| {
             (
                 name.clone(),
-                FunctionMeta { id: meta.id, parameter_names: meta.parameter_names.clone() },
+                FunctionMeta {
+                    id: meta.id,
+                    parameter_names: meta.parameter_names.clone(),
+                    return_type: meta.return_type,
+                },
             )
         })
         .collect::<HashMap<_, _>>();
@@ -125,7 +133,7 @@ fn declare_functions(
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
     for verb in verbs {
-        let signature = integer_signature(module, verb);
+        let signature = native_signature(module, verb);
         let symbol = if verb.name == entry_symbol { entry_symbol } else { &verb.name };
         let id = module
             .declare_function(symbol, Linkage::Export, &signature)
@@ -135,20 +143,63 @@ fn declare_functions(
             FunctionMeta {
                 id,
                 parameter_names: verb.params.iter().map(|param| param.name.clone()).collect(),
+                return_type: NativeType::from_type_name(verb.return_type.as_ref()),
             },
         );
     }
     Ok(metadata)
 }
 
-fn integer_signature(
+fn native_signature(
     module: &mut ObjectModule,
     verb: &VerbDecl,
 ) -> cranelift_codegen::ir::Signature {
     let mut signature = module.make_signature();
-    signature.params.extend((0..verb.params.len()).map(|_| AbiParam::new(types::I32)));
-    signature.returns.push(AbiParam::new(types::I32));
+    let pointer_type = module.isa().pointer_type();
+    signature.params.extend(verb.params.iter().map(|parameter| {
+        AbiParam::new(NativeType::from_name(&parameter.ty.name).unwrap().ir_type(pointer_type))
+    }));
+    signature.returns.push(AbiParam::new(
+        NativeType::from_type_name(verb.return_type.as_ref()).ir_type(pointer_type),
+    ));
     signature
+}
+
+fn declare_runtime_functions(
+    module: &mut ObjectModule,
+) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let pointer_type = module.isa().pointer_type();
+    let mut allocate = module.make_signature();
+    allocate.params.push(AbiParam::new(pointer_type));
+    allocate.returns.push(AbiParam::new(pointer_type));
+    let allocate_id = module
+        .declare_function("actus_buffer_allocate", Linkage::Import, &allocate)
+        .map_err(|error| NativeEmitError(error.to_string()))?;
+
+    let mut drop = module.make_signature();
+    drop.params.push(AbiParam::new(pointer_type));
+    let drop_id = module
+        .declare_function("actus_buffer_drop", Linkage::Import, &drop)
+        .map_err(|error| NativeEmitError(error.to_string()))?;
+
+    Ok(HashMap::from([
+        (
+            "allocate".to_owned(),
+            FunctionMeta {
+                id: allocate_id,
+                parameter_names: vec!["length".to_owned()],
+                return_type: NativeType::Buffer,
+            },
+        ),
+        (
+            "actus_buffer_drop".to_owned(),
+            FunctionMeta {
+                id: drop_id,
+                parameter_names: vec!["handle".to_owned()],
+                return_type: NativeType::Int,
+            },
+        ),
+    ]))
 }
 
 fn define_function(
@@ -160,7 +211,7 @@ fn define_function(
     cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = integer_signature(module, verb);
+    context.func.signature = native_signature(module, verb);
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let mut function_context = FunctionBuilderContext::new();
     {
@@ -173,11 +224,17 @@ fn define_function(
         for (parameter, value) in verb.params.iter().zip(parameters) {
             locals.insert(&parameter.name, value);
         }
+        let local_types = verb
+            .params
+            .iter()
+            .map(|parameter| (&parameter.name, NativeType::from_name(&parameter.ty.name).unwrap()))
+            .collect();
         function.seal_block(block);
         let result = lower_body(
             &mut function,
             &verb.body.statements,
             &locals,
+            &local_types,
             &references,
             cleanup_schedule,
         )?;
@@ -202,7 +259,11 @@ fn declare_function_refs(
             let reference = module.declare_func_in_func(meta.id, function);
             Ok((
                 name.clone(),
-                FunctionRef { reference, parameter_names: meta.parameter_names.clone() },
+                FunctionRef {
+                    reference,
+                    parameter_names: meta.parameter_names.clone(),
+                    return_type: meta.return_type,
+                },
             ))
         })
         .collect()
