@@ -46,6 +46,12 @@ impl Analyzer {
         statement_span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let Some(expression) = expression else {
+            if self.current_return_type.is_some() {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::MissingReturnValue,
+                    span: statement_span,
+                });
+            }
             self.plan_return_unwind(statement_span);
             return Ok(());
         };

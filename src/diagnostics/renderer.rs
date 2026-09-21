@@ -80,6 +80,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
+        SemanticErrorKind::MissingReturnValue => "E1028",
     }
 }
 
@@ -156,6 +157,9 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::BindingTypeMismatch { binding, expected, found } => {
             format!("type mismatch for `{binding}`: expected `{expected}`, found `{found}`")
+        }
+        SemanticErrorKind::MissingReturnValue => {
+            "verb must return a value on every path".to_owned()
         }
         _ => return None,
     };

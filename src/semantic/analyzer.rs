@@ -87,6 +87,12 @@ impl Analyzer {
                 self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
             }
             self.visit_block(&verb.body)?;
+            if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::MissingReturnValue,
+                    span: verb.body.span,
+                });
+            }
             self.leave_scope();
         }
         self.current_return_type = None;
@@ -255,5 +261,18 @@ impl Analyzer {
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
             Expr::Integer { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+}
+
+fn block_guarantees_return(block: &Block) -> bool {
+    block.statements.iter().any(statement_guarantees_return)
+}
+
+fn statement_guarantees_return(statement: &Stmt) -> bool {
+    match statement {
+        Stmt::Return { .. } => true,
+        Stmt::Loop(block) => block_guarantees_return(block),
+        Stmt::Block(block) => block_guarantees_return(block),
+        _ => false,
     }
 }

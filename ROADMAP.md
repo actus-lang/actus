@@ -99,6 +99,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Reject double drop.
 - [x] Define ownership transfer for returned values.
 - [x] Validate known return expression types against verb declarations.
+- [x] Enforce required return values for typed verb declarations.
 - [x] Move returned local owners out of their scope.
 - [x] Reject borrowed returns in Alpha.
 

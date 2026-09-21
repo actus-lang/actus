@@ -111,6 +111,13 @@ fn rejects_typed_initializer_and_assignment_mismatches() {
 }
 
 #[test]
+fn enforces_return_value_contracts() {
+    let missing = analyze_source("verb main() -> Int { erg value = 1; }")
+        .expect_err("value-returning verbs must return a value");
+    assert!(matches!(missing.kind, SemanticErrorKind::MissingReturnValue));
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source(
         "verb Buffer() -> Buffer { return allocate(1); } verb main() -> Buffer { return Buffer(); }",
