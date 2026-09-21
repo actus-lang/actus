@@ -249,6 +249,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Add contributor guidelines.
 - [ ] Add a code of conduct.
 - [ ] Add release and versioning policy.
+- [x] Add automated Conventional Commit changelog generation.
 - [ ] Keep the README and manifesto synchronized with implemented behavior.
 
 ## Phase 11: Complete Struct System
