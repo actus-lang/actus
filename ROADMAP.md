@@ -194,6 +194,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add a minimal end-to-end Actus-to-native-binary test.
 - [x] Add `actus run` for temporary native execution.
 - [x] Add the initial type-aware `print` intrinsic.
+- [ ] Extend `print` to text and other displayable values without adding source-level print variants.
 
 ### C Library Interoperability
 
