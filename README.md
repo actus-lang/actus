@@ -12,7 +12,7 @@ Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot 
 
 ## Project status
 
-The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports parameterless verbs with integer locals, arithmetic expressions, and integer returns.
+The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports integer parameters and locals, arithmetic expressions, lexical scopes, loop control flow, and integer returns.
 
 ## Build and run
 
@@ -35,6 +35,14 @@ cargo run -- build examples/hello.act --emit exe -o examples/hello
 ./examples/hello
 echo $?
 ```
+
+Build and execute a temporary native binary without keeping the artifact:
+
+```sh
+cargo run -- run examples/loop_ssa.act
+```
+
+The command returns the Actus program's exit code and removes its temporary executable.
 
 The example returns `42`. Object files and native executables are local build artifacts and are excluded from version control.
 
