@@ -22,6 +22,7 @@ pub(super) struct Analyzer {
     pub(super) active_borrow_ids: HashSet<usize>,
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
     pub(super) loop_boundaries: Vec<usize>,
+    pub(super) current_return_type: Option<BuiltinType>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -43,6 +44,7 @@ impl Analyzer {
             active_borrow_ids: HashSet::new(),
             signatures: HashMap::new(),
             loop_boundaries: Vec::new(),
+            current_return_type: None,
         }
     }
 
@@ -75,6 +77,10 @@ impl Analyzer {
         }
         for declaration in &program.declarations {
             let TopLevelDecl::Verb(verb) = declaration;
+            self.current_return_type = verb
+                .return_type
+                .as_ref()
+                .and_then(|type_name| lookup_builtin_type(&type_name.name));
             self.enter_scope(verb.body.span);
             for parameter in &verb.params {
                 let ty = lookup_builtin_type(&parameter.ty.name);
@@ -83,6 +89,7 @@ impl Analyzer {
             self.visit_block(&verb.body)?;
             self.leave_scope();
         }
+        self.current_return_type = None;
         Ok(self.model)
     }
 

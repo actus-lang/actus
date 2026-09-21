@@ -50,6 +50,7 @@ impl Analyzer {
             return Ok(());
         };
         self.visit_expression(expression)?;
+        self.validate_return_type(expression)?;
         let returned_expression = unwrap_grouping(expression);
         let Expr::Identifier { name, span } = returned_expression else {
             if contains_returned_borrow(expression) {
@@ -83,6 +84,21 @@ impl Analyzer {
         }
         self.plan_return_unwind(statement_span);
         Ok(())
+    }
+
+    fn validate_return_type(&self, expression: &Expr) -> Result<(), SemanticError> {
+        let Some(expected) = self.current_return_type else { return Ok(()) };
+        let Some(found) = self.expression_type(expression) else { return Ok(()) };
+        if found == expected {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::ReturnTypeMismatch {
+                expected: expected.spec().name.to_owned(),
+                found: found.spec().name.to_owned(),
+            },
+            span: expression_span(expression),
+        })
     }
 
     pub(super) fn ensure_readable(

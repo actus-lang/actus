@@ -80,8 +80,21 @@ fn rejects_known_argument_type_mismatches() {
 }
 
 #[test]
+fn rejects_known_return_type_mismatches() {
+    let error = analyze_source("verb main() -> Int { return allocate(4); }")
+        .expect_err("return type must match the verb declaration");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::ReturnTypeMismatch { expected, found }
+            if expected == "Int" && found == "Buffer"
+    ));
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
-    analyze_source("verb Buffer() -> Int { return 1; } verb main() -> Buffer { return Buffer(); }")
+    analyze_source(
+        "verb Buffer() -> Buffer { return allocate(1); } verb main() -> Buffer { return Buffer(); }",
+    )
         .expect("a type name and a function name may coexist in separate namespaces");
 }
 
