@@ -236,7 +236,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Fuzz malformed literals and comments.
 - [x] Verify that arbitrary input never causes a compiler panic.
 - [x] Add property tests for formatter idempotence.
-- [ ] Add property tests for parser round-tripping where applicable.
+- [x] Add property tests for parser round-tripping where applicable.
 - [x] Add compiler determinism checks.
 - [ ] Add performance benchmarks for lexing and parsing.
 - [ ] Add cross-platform CI for Linux, macOS, and Windows.

@@ -41,6 +41,21 @@ fn formatter_idempotence_holds_for_the_source_corpus() {
 }
 
 #[test]
+fn parser_round_trip_holds_for_valid_source_corpus() {
+    let sources = [
+        include_str!("../fixtures/parser/valid/transfer.act"),
+        include_str!("../fixtures/parser/valid/drop.act"),
+        include_str!("../fixtures/formatter/valid/nested_blocks.act"),
+    ];
+
+    for source in sources {
+        let formatted = format_source(source);
+        let reparsed = format_source(&formatted);
+        assert_eq!(reparsed, formatted, "formatted source did not round-trip");
+    }
+}
+
+#[test]
 fn matches_nested_block_formatter_snapshot() {
     let source =
         "verb process(){erg buffer=allocate(10);{abs view=ref buffer;inspect(view,source:view);}}";
