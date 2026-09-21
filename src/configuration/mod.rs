@@ -22,6 +22,7 @@ impl Display for ConfigurationError {
 impl std::error::Error for ConfigurationError {}
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ArcaManifest {
     package: PackageManifest,
     #[serde(default)]
@@ -29,12 +30,14 @@ struct ArcaManifest {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PackageManifest {
     name: String,
     version: String,
 }
 
 #[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BuildManifest {
     linker: Option<String>,
     native_module: Option<String>,
@@ -92,10 +95,16 @@ impl CompilerConfiguration {
         let manifest = toml::from_str::<ArcaManifest>(&source).map_err(|error| {
             ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
         })?;
-        if manifest.package.name.is_empty() || manifest.package.version.is_empty() {
+        if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
             return Err(ConfigurationError(
                 "Arca.toml package name and version must not be empty".to_owned(),
             ));
+        }
+        if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
+            return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
+        }
+        if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
+            return Err(ConfigurationError("Arca.toml native_module must not be empty".to_owned()));
         }
 
         let environment = Self::from_environment();

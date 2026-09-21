@@ -17,3 +17,29 @@ fn loads_build_settings_from_an_arca_manifest() {
     assert!(!configuration.native_backend().position_independent());
     let _ = fs::remove_file(path);
 }
+
+#[test]
+fn rejects_unknown_manifest_fields() {
+    let path =
+        std::env::temp_dir().join(format!("actus-config-invalid-{}.toml", std::process::id()));
+    fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nunknown = true\n")
+        .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path).expect_err("unknown field must fail");
+    assert!(error.to_string().contains("unknown field"));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn rejects_empty_native_module_names() {
+    let path = std::env::temp_dir().join(format!("actus-config-empty-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.2.3\"\n\n[build]\nnative_module = \"  \"\n",
+    )
+    .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path).expect_err("empty module must fail");
+    assert!(error.to_string().contains("native_module must not be empty"));
+    let _ = fs::remove_file(path);
+}
