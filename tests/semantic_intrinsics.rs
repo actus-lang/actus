@@ -38,6 +38,32 @@ fn rejects_unknown_declared_types() {
 }
 
 #[test]
+fn validates_intrinsic_argument_types() {
+    let length_error =
+        analyze_source("verb main() { erg buffer: Buffer = allocate(4); allocate(buffer); }")
+            .expect_err("allocate length must be Int");
+    assert!(matches!(
+        length_error.kind,
+        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
+            if callee == "allocate" && parameter == "length"
+    ));
+
+    let handle_error = analyze_source("verb main() { erg value = 1; append(value, 2); }")
+        .expect_err("append handle must be Buffer");
+    assert!(matches!(
+        handle_error.kind,
+        SemanticErrorKind::InvalidArgumentRole { callee, parameter }
+            if callee == "append" && parameter == "handle"
+    ));
+}
+
+#[test]
+fn infers_buffer_type_from_allocate_intrinsic() {
+    analyze_source("verb main() { erg buffer = allocate(4); append(buffer, 1); drop(buffer); }")
+        .expect("allocate should infer a Buffer owner");
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source("verb Buffer() -> Int { return 1; } verb main() -> Buffer { return Buffer(); }")
         .expect("a type name and a function name may coexist in separate namespaces");

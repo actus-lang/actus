@@ -23,9 +23,10 @@ impl Analyzer {
                 let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
                 let argument = arguments[0];
                 self.visit_expression(&argument.expression)?;
-                self.require_scalar_argument(
+                self.require_intrinsic_type(
                     callee,
                     IntrinsicKind::Allocate.spec().parameters[0],
+                    crate::ast::BuiltinType::Int,
                     &argument.expression,
                 )?;
                 Ok(true)
@@ -37,7 +38,9 @@ impl Analyzer {
                 }
                 let handle = &arguments[0].expression;
                 let parameters = IntrinsicKind::Append.spec().parameters;
-                if !self.is_owner_argument(handle) {
+                if !self.is_owner_argument(handle)
+                    || self.expression_type(handle) != Some(crate::ast::BuiltinType::Buffer)
+                {
                     return Err(SemanticError {
                         kind: SemanticErrorKind::InvalidArgumentRole {
                             callee: callee.to_owned(),
@@ -46,7 +49,12 @@ impl Analyzer {
                         span: expression_span(handle),
                     });
                 }
-                self.require_scalar_argument(callee, parameters[1], &arguments[1].expression)?;
+                self.require_intrinsic_type(
+                    callee,
+                    parameters[1],
+                    crate::ast::BuiltinType::Int,
+                    &arguments[1].expression,
+                )?;
                 Ok(true)
             }
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
@@ -144,13 +152,14 @@ impl Analyzer {
         Ok(ordered)
     }
 
-    fn require_scalar_argument(
+    fn require_intrinsic_type(
         &self,
         callee: &str,
         parameter: &str,
+        expected: crate::ast::BuiltinType,
         expression: &Expr,
     ) -> Result<(), SemanticError> {
-        if is_scalar_expression(expression) {
+        if self.expression_type(expression) == Some(expected) {
             return Ok(());
         }
         Err(SemanticError {
@@ -160,19 +169,6 @@ impl Analyzer {
             },
             span: expression_span(expression),
         })
-    }
-}
-
-fn is_scalar_expression(expression: &Expr) -> bool {
-    match expression {
-        Expr::StringLiteral { .. } | Expr::Borrow { .. } => false,
-        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-            is_scalar_expression(expression)
-        }
-        Expr::Binary { left, right, .. } => {
-            is_scalar_expression(left) && is_scalar_expression(right)
-        }
-        Expr::Identifier { .. } | Expr::Integer { .. } | Expr::Call { .. } => true,
     }
 }
 

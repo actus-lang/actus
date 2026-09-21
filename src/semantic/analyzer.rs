@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Block, Expr, Program, Role, Stmt, TopLevelDecl, lookup_builtin_type};
+use crate::ast::{
+    Block, BuiltinType, Expr, IntrinsicKind, Program, Role, Stmt, TopLevelDecl,
+    lookup_builtin_type, lookup_call_intrinsic,
+};
 
 use super::errors::SemanticError;
 use super::model::SemanticModel;
@@ -74,7 +77,8 @@ impl Analyzer {
             let TopLevelDecl::Verb(verb) = declaration;
             self.enter_scope(verb.body.span);
             for parameter in &verb.params {
-                self.bind(parameter.role.clone(), parameter.name.clone(), parameter.span)?;
+                let ty = lookup_builtin_type(&parameter.ty.name);
+                self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
             }
             self.visit_block(&verb.body)?;
             self.leave_scope();
@@ -105,7 +109,8 @@ impl Analyzer {
 
     fn visit_statement(&mut self, statement: &Stmt) -> Result<(), SemanticError> {
         match statement {
-            Stmt::OwnerDecl { role, name, initializer, span, .. } => {
+            Stmt::OwnerDecl { role, name, ty, initializer, span } => {
+                let binding_type = self.resolve_binding_type(ty.as_deref(), initializer, *span)?;
                 self.visit_expression(initializer)?;
                 if *role == Role::Erg {
                     self.initialize_owner(initializer, *span)?;
@@ -113,7 +118,7 @@ impl Analyzer {
                 if *role == Role::Abs {
                     self.register_borrow(initializer, *span)?;
                 }
-                self.bind(role.clone(), name.clone(), *span)
+                self.bind(role.clone(), name.clone(), binding_type, *span)
             }
             Stmt::Assignment { name, value, span } => {
                 let index = self.binding(name, *span)?;
@@ -143,6 +148,39 @@ impl Analyzer {
                 self.leave_scope();
                 Ok(())
             }
+        }
+    }
+
+    fn resolve_binding_type(
+        &self,
+        declared_type: Option<&str>,
+        initializer: &Expr,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<Option<BuiltinType>, SemanticError> {
+        if let Some(name) = declared_type {
+            self.validate_type_name(name, span)?;
+            return Ok(lookup_builtin_type(name));
+        }
+        Ok(self.expression_type(initializer))
+    }
+
+    pub(super) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
+        match expression {
+            Expr::Integer { .. } => Some(BuiltinType::Int),
+            Expr::Grouping { expression, .. }
+            | Expr::Borrow { expression, .. }
+            | Expr::Unary { expression, .. } => self.expression_type(expression),
+            Expr::Binary { .. } => Some(BuiltinType::Int),
+            Expr::Identifier { name, span } => {
+                self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
+            }
+            Expr::Call { callee, .. } => match lookup_call_intrinsic(callee) {
+                Some(IntrinsicKind::Allocate) => Some(BuiltinType::Buffer),
+                Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
+                Some(IntrinsicKind::Drop) => None,
+                None => self.signatures.get(callee).and_then(|signature| signature.return_type),
+            },
+            Expr::StringLiteral { .. } => None,
         }
     }
 

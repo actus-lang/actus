@@ -1,4 +1,4 @@
-use crate::ast::Role;
+use crate::ast::{BuiltinType, Role};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::{Analyzer, ScopeFrame};
@@ -10,6 +10,7 @@ impl Analyzer {
         &mut self,
         role: Role,
         name: String,
+        ty: Option<BuiltinType>,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         if self.scopes.last().expect("binding requires a scope").bindings.contains_key(&name) {
@@ -22,6 +23,7 @@ impl Analyzer {
         self.model.bindings.push(Binding {
             name: name.clone(),
             role,
+            ty,
             span,
             state: BindingState::Active,
         });

@@ -190,6 +190,7 @@ mod tests {
             bindings: vec![crate::semantic::Binding {
                 name: "value".to_owned(),
                 role: crate::ast::Role::Erg,
+                ty: Some(crate::ast::BuiltinType::Int),
                 span: crate::lexer::SourceSpan::new(0, 1),
                 state: crate::semantic::BindingState::Active,
             }],

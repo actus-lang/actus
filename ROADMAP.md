@@ -133,6 +133,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Reject invalid mixtures of positional and named arguments.
 - [x] Reject ambiguous positional calls.
 - [x] Validate argument ownership and borrow requirements.
+- [x] Validate built-in intrinsic argument types before code generation.
 
 ## Phase 6: Deterministic Cleanup
 

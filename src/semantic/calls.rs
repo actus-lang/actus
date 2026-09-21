@@ -1,4 +1,4 @@
-use crate::ast::{Argument, Expr, Role, VerbDecl};
+use crate::ast::{Argument, BuiltinType, Expr, Role, VerbDecl, lookup_builtin_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -8,6 +8,7 @@ use super::model::BindingState;
 #[derive(Clone)]
 pub(super) struct VerbSignature {
     pub(super) params: Vec<(String, Role, String)>,
+    pub(super) return_type: Option<BuiltinType>,
 }
 
 impl VerbDecl {
@@ -20,6 +21,10 @@ impl VerbDecl {
                     (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
                 })
                 .collect(),
+            return_type: self
+                .return_type
+                .as_ref()
+                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
         }
     }
 }

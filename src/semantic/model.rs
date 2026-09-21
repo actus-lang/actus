@@ -1,4 +1,4 @@
-use crate::ast::Role;
+use crate::ast::{BuiltinType, Role};
 use crate::lexer::SourceSpan;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -13,6 +13,7 @@ pub enum BindingState {
 pub struct Binding {
     pub name: String,
     pub role: Role,
+    pub ty: Option<BuiltinType>,
     pub span: SourceSpan,
     pub state: BindingState,
 }
