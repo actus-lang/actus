@@ -9,15 +9,16 @@ pub enum BuiltinType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BuiltinTypeSpec {
     pub name: &'static str,
+    pub status: RegistryStatus,
 }
 
 impl BuiltinType {
     pub const fn spec(self) -> BuiltinTypeSpec {
         match self {
-            Self::Int => BuiltinTypeSpec { name: "Int" },
-            Self::Buffer => BuiltinTypeSpec { name: "Buffer" },
-            Self::Array => BuiltinTypeSpec { name: "Array" },
-            Self::Map => BuiltinTypeSpec { name: "Map" },
+            Self::Int => BuiltinTypeSpec { name: "Int", status: RegistryStatus::Active },
+            Self::Buffer => BuiltinTypeSpec { name: "Buffer", status: RegistryStatus::Active },
+            Self::Array => BuiltinTypeSpec { name: "Array", status: RegistryStatus::Active },
+            Self::Map => BuiltinTypeSpec { name: "Map", status: RegistryStatus::Active },
         }
     }
 }
@@ -31,3 +32,4 @@ pub fn lookup_builtin_type(name: &str) -> Option<BuiltinType> {
         _ => None,
     }
 }
+use super::RegistryStatus;

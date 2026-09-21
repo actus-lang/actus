@@ -127,7 +127,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add the initial built-in type registry for supported `Int` and `Buffer` types.
 - [x] Extend the built-in type registry with initial `Array` and `Map` entries.
 - [x] Define case-sensitive, separate function and type namespaces with explicit collision rules.
-- [ ] Define the registry lifecycle for adding, deprecating, and removing built-ins.
+- [x] Define registry status metadata for adding, deprecating, and removing built-ins.
 - [x] Validate declared built-in type names before code generation.
 - [x] Implement positional argument binding.
 - [x] Implement named argument binding.

@@ -1,5 +1,6 @@
 use actus::ast::{
-    BuiltinType, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic, lookup_intrinsic,
+    BuiltinType, IntrinsicKind, RegistryStatus, lookup_builtin_type, lookup_call_intrinsic,
+    lookup_intrinsic,
 };
 use actus::lexer::scan;
 use actus::parser::parse;
@@ -18,6 +19,7 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_intrinsic("drop"), Some(IntrinsicKind::Drop));
     assert!(lookup_call_intrinsic("drop").is_none());
     assert!(lookup_intrinsic("user_function").is_none());
@@ -27,8 +29,15 @@ fn intrinsic_registry_defines_source_contracts() {
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
     assert_eq!(BuiltinType::Buffer.spec().name, "Buffer");
+    assert_eq!(BuiltinType::Buffer.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_builtin_type("Array"), Some(BuiltinType::Array));
     assert_eq!(lookup_builtin_type("Map"), Some(BuiltinType::Map));
+}
+
+#[test]
+fn registry_status_exposes_lifecycle_contract() {
+    assert!(RegistryStatus::Active.is_active());
+    assert!(!RegistryStatus::Deprecated.is_active());
 }
 
 #[test]
