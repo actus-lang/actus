@@ -31,12 +31,13 @@ The Alpha runtime provides these internal operations:
 ```text
 actus_buffer_allocate(length: usize) -> BufferHandle
 actus_buffer_drop(handle: BufferHandle)
-actus_buffer_append(handle: BufferHandle, byte: u8)
+actus_buffer_append(handle: BufferHandle, byte: u8) -> bool
 ```
 
 Allocation and append must reject integer overflow and allocation failure using
-the runtime's failure path. A dropped or null handle is invalid and must never
-be passed to a runtime operation. The semantic analyzer remains responsible
+the runtime's failure path. Allocation returns a null handle on failure and
+append returns `false`. A dropped or null handle is invalid and must never be
+passed to a runtime operation. The semantic analyzer remains responsible
 for proving the ownership rules before any runtime call is emitted.
 
 `actus_buffer_drop` releases the data allocation first and then the header.
