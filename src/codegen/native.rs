@@ -12,6 +12,7 @@ use crate::configuration::NativeBackendConfiguration;
 use crate::semantic::analyze;
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
+use super::declarations::declare_functions;
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
@@ -141,75 +142,6 @@ fn create_module(
     Ok(ObjectModule::new(builder))
 }
 
-fn declare_functions(
-    module: &mut ObjectModule,
-    verbs: &[&VerbDecl],
-    external_verbs: &[&ExternalVerbDecl],
-    entry_symbol: &str,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
-    let mut metadata = HashMap::new();
-    for verb in verbs {
-        let signature = native_signature(module, verb);
-        let symbol = if verb.name == entry_symbol { entry_symbol } else { &verb.name };
-        let id = module
-            .declare_function(symbol, Linkage::Export, &signature)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
-        metadata.insert(
-            verb.name.clone(),
-            FunctionMeta {
-                id,
-                parameter_names: verb.params.iter().map(|param| param.name.clone()).collect(),
-                return_type: NativeType::from_type_name(verb.return_type.as_ref()),
-            },
-        );
-    }
-    for verb in external_verbs {
-        let signature = external_native_signature(module, verb);
-        let id = module
-            .declare_function(&verb.name, Linkage::Import, &signature)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
-        metadata.insert(
-            verb.name.clone(),
-            FunctionMeta {
-                id,
-                parameter_names: verb.params.iter().map(|param| param.name.clone()).collect(),
-                return_type: NativeType::from_type_name(verb.return_type.as_ref()),
-            },
-        );
-    }
-    Ok(metadata)
-}
-
-fn native_signature(
-    module: &mut ObjectModule,
-    verb: &VerbDecl,
-) -> cranelift_codegen::ir::Signature {
-    let mut signature = module.make_signature();
-    let pointer_type = module.isa().pointer_type();
-    signature.params.extend(verb.params.iter().map(|parameter| {
-        AbiParam::new(NativeType::from_name(&parameter.ty.name).unwrap().ir_type(pointer_type))
-    }));
-    signature.returns.push(AbiParam::new(
-        NativeType::from_type_name(verb.return_type.as_ref()).ir_type(pointer_type),
-    ));
-    signature
-}
-
-fn external_native_signature(
-    module: &mut ObjectModule,
-    verb: &ExternalVerbDecl,
-) -> cranelift_codegen::ir::Signature {
-    let mut signature = module.make_signature();
-    let pointer_type = module.isa().pointer_type();
-    signature.params.extend(verb.params.iter().map(|parameter| {
-        AbiParam::new(NativeType::from_name(&parameter.ty.name).unwrap().ir_type(pointer_type))
-    }));
-    signature.returns.push(AbiParam::new(
-        NativeType::from_type_name(verb.return_type.as_ref()).ir_type(pointer_type),
-    ));
-    signature
-}
-
 fn define_function(
     module: &mut ObjectModule,
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
@@ -219,7 +151,7 @@ fn define_function(
     cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = native_signature(module, verb);
+    context.func.signature = super::declarations::native_signature_for_definition(module, verb);
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let mut function_context = FunctionBuilderContext::new();
     {

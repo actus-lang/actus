@@ -1,5 +1,6 @@
 mod abi;
 mod cleanup;
+mod declarations;
 mod expressions;
 mod linker;
 mod lowering;
