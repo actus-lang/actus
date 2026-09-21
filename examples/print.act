@@ -1,0 +1,5 @@
+verb main() -> Int {
+    erg text = "Actus print works";
+    print(text);
+    return 0;
+}

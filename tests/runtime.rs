@@ -6,6 +6,13 @@ fn returns_printed_integer_value() {
 }
 
 #[test]
+fn returns_printed_string_length() {
+    let text = std::ffi::CString::new("Actus").expect("test string should be valid");
+    let length = unsafe { actus::runtime::actus_print_string(text.as_ptr().cast()) };
+    assert_eq!(length, 5);
+}
+
+#[test]
 fn allocates_appends_and_drops_a_buffer() {
     let handle = actus_buffer_allocate(4);
     assert!(!handle.is_null());

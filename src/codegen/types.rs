@@ -5,6 +5,7 @@ use crate::ast::{BuiltinType, TypeName, lookup_builtin_type};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NativeType {
     Int,
+    String,
     Buffer,
 }
 
@@ -12,6 +13,7 @@ impl NativeType {
     pub(super) fn from_name(name: &str) -> Option<Self> {
         match lookup_builtin_type(name)? {
             BuiltinType::Int => Some(Self::Int),
+            BuiltinType::String => Some(Self::String),
             BuiltinType::Buffer => Some(Self::Buffer),
             BuiltinType::Array | BuiltinType::Map => None,
         }
@@ -24,7 +26,7 @@ impl NativeType {
     pub(super) fn ir_type(self, pointer_type: Type) -> Type {
         match self {
             Self::Int => cranelift_codegen::ir::types::I32,
-            Self::Buffer => pointer_type,
+            Self::String | Self::Buffer => pointer_type,
         }
     }
 }

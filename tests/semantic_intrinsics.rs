@@ -30,19 +30,16 @@ fn intrinsic_registry_defines_source_contracts() {
 #[test]
 fn validates_print_arguments() {
     analyze_source("verb main() { print(42); }").expect("integer output should be valid");
-    let error = analyze_source("verb main() { print(\"text\"); }")
-        .expect_err("print must reject unsupported values");
-
-    assert!(matches!(
-        error.kind,
-        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
-            if callee == "print" && parameter == "value"
-    ));
+    analyze_source("verb main() { print(\"text\"); }")
+        .expect("string output should use the same print intrinsic");
+    analyze_source("verb main() { erg text = \"text\"; print(text); }")
+        .expect("string bindings should use the same print intrinsic");
 }
 
 #[test]
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
+    assert_eq!(lookup_builtin_type("String"), Some(BuiltinType::String));
     assert_eq!(BuiltinType::Buffer.spec().name, "Buffer");
     assert_eq!(BuiltinType::Buffer.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_builtin_type("Array"), Some(BuiltinType::Array));

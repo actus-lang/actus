@@ -137,7 +137,7 @@ fn codegen_accepts_buffer_append_calls() {
 
 #[test]
 fn semantic_analysis_rejects_unknown_return_types() {
-    let (tokens, errors) = scan("verb main() -> String { return 42; }");
+    let (tokens, errors) = scan("verb main() -> Vector { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("unknown type must be rejected");
@@ -146,7 +146,7 @@ fn semantic_analysis_rejects_unknown_return_types() {
 
 #[test]
 fn semantic_analysis_rejects_unknown_parameter_types() {
-    let (tokens, errors) = scan("verb main(erg buffer: String) -> Int { return 42; }");
+    let (tokens, errors) = scan("verb main(erg buffer: Vector) -> Int { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("unknown type must be rejected");

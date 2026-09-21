@@ -71,12 +71,23 @@ impl Analyzer {
         let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
         let argument = arguments[0];
         self.visit_expression(&argument.expression)?;
-        self.require_intrinsic_type(
-            callee,
-            IntrinsicKind::Print.spec().parameters[0],
-            crate::ast::BuiltinType::Int,
-            &argument.expression,
-        )?;
+        let value_type =
+            self.expression_type(&argument.expression).ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: IntrinsicKind::Print.spec().parameters[0].to_owned(),
+                },
+                span: expression_span(&argument.expression),
+            })?;
+        if !matches!(value_type, crate::ast::BuiltinType::Int | crate::ast::BuiltinType::String) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: IntrinsicKind::Print.spec().parameters[0].to_owned(),
+                },
+                span: expression_span(&argument.expression),
+            });
+        }
         Ok(true)
     }
 

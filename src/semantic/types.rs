@@ -77,6 +77,7 @@ impl Analyzer {
     pub(super) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
         match expression {
             Expr::Integer { .. } => Some(BuiltinType::Int),
+            Expr::StringLiteral { .. } => Some(BuiltinType::String),
             Expr::Grouping { expression, .. }
             | Expr::Borrow { expression, .. }
             | Expr::Unary { expression, .. } => self.expression_type(expression),
@@ -91,7 +92,6 @@ impl Analyzer {
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },
-            Expr::StringLiteral { .. } => None,
         }
     }
 }

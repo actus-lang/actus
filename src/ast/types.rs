@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BuiltinType {
     Int,
+    String,
     Buffer,
     Array,
     Map,
@@ -16,6 +17,7 @@ impl BuiltinType {
     pub const fn spec(self) -> BuiltinTypeSpec {
         match self {
             Self::Int => BuiltinTypeSpec { name: "Int", status: RegistryStatus::Active },
+            Self::String => BuiltinTypeSpec { name: "String", status: RegistryStatus::Active },
             Self::Buffer => BuiltinTypeSpec { name: "Buffer", status: RegistryStatus::Active },
             Self::Array => BuiltinTypeSpec { name: "Array", status: RegistryStatus::Active },
             Self::Map => BuiltinTypeSpec { name: "Map", status: RegistryStatus::Active },
@@ -26,6 +28,7 @@ impl BuiltinType {
 pub fn lookup_builtin_type(name: &str) -> Option<BuiltinType> {
     match name {
         "Int" => Some(BuiltinType::Int),
+        "String" => Some(BuiltinType::String),
         "Buffer" => Some(BuiltinType::Buffer),
         "Array" => Some(BuiltinType::Array),
         "Map" => Some(BuiltinType::Map),
