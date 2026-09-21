@@ -127,6 +127,15 @@ fn codegen_accepts_buffer_allocation_and_explicit_drop() {
 }
 
 #[test]
+fn codegen_accepts_buffer_append_calls() {
+    let source = "verb main() -> Int { erg buffer: Buffer = allocate(4); append(buffer, 42); drop(buffer); return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    emit_program_object(&program, "main").expect("buffer append should emit");
+}
+
+#[test]
 fn codegen_rejects_unsupported_native_return_types() {
     let (tokens, errors) = scan("verb main() -> String { return 42; }");
     assert!(errors.is_empty());

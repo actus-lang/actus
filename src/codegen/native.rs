@@ -182,6 +182,14 @@ fn declare_runtime_functions(
         .declare_function("actus_buffer_drop", Linkage::Import, &drop)
         .map_err(|error| NativeEmitError(error.to_string()))?;
 
+    let mut append = module.make_signature();
+    append.params.push(AbiParam::new(pointer_type));
+    append.params.push(AbiParam::new(types::I8));
+    append.returns.push(AbiParam::new(types::I8));
+    let append_id = module
+        .declare_function("actus_buffer_append", Linkage::Import, &append)
+        .map_err(|error| NativeEmitError(error.to_string()))?;
+
     Ok(HashMap::from([
         (
             "allocate".to_owned(),
@@ -196,6 +204,14 @@ fn declare_runtime_functions(
             FunctionMeta {
                 id: drop_id,
                 parameter_names: vec!["handle".to_owned()],
+                return_type: NativeType::Int,
+            },
+        ),
+        (
+            "append".to_owned(),
+            FunctionMeta {
+                id: append_id,
+                parameter_names: vec!["handle".to_owned(), "byte".to_owned()],
                 return_type: NativeType::Int,
             },
         ),

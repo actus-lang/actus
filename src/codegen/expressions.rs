@@ -67,10 +67,19 @@ fn lower_call(
         .iter()
         .map(|argument| lower_expression(function, argument, locals, functions))
         .collect::<Result<Vec<_>, _>>()?;
-    if callee == "allocate" {
-        let length =
-            values.pop().ok_or_else(|| NativeEmitError("allocate requires a length".to_owned()))?;
-        values.push(to_pointer_length(function, length));
+    match callee {
+        "allocate" => {
+            let length = values
+                .pop()
+                .ok_or_else(|| NativeEmitError("allocate requires a length".to_owned()))?;
+            values.push(to_pointer_length(function, length));
+        }
+        "append" => {
+            let byte =
+                values.pop().ok_or_else(|| NativeEmitError("append requires a byte".to_owned()))?;
+            values.push(to_byte(function, byte));
+        }
+        _ => {}
     }
     let call = function.ins().call(target.reference, &values);
     function
@@ -123,6 +132,17 @@ fn to_pointer_length(
         value
     } else {
         function.ins().uextend(types::I64, value)
+    }
+}
+
+fn to_byte(
+    function: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    if function.func.dfg.value_type(value) == types::I8 {
+        value
+    } else {
+        function.ins().ireduce(types::I8, value)
     }
 }
 

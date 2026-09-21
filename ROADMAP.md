@@ -168,6 +168,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Define the Alpha `Buffer` layout and runtime operation contract.
 - [x] Implement initial native `Buffer` allocation, append, and drop operations.
 - [x] Build and link the native runtime archive for executable emission.
+- [x] Lower initial `Buffer` allocation, append, and explicit drop calls.
 - [x] Verify deterministic native object emission for identical programs.
 - [x] Add native object structural golden tests.
 - [ ] Emit deterministic cleanup instructions.

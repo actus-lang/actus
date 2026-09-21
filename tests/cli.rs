@@ -202,7 +202,7 @@ fn build_command_links_buffer_runtime_operations() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb main() -> Int { erg buffer: Buffer = allocate(4); drop(buffer); return 42; }\n",
+        "verb main() -> Int { erg buffer: Buffer = allocate(4); append(buffer, 42); drop(buffer); return 42; }\n",
     )
     .expect("write source");
 
