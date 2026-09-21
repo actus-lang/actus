@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::process::Command;
 
+use crate::configuration::CompilerConfiguration;
+
 #[derive(Debug)]
 pub struct NativeLinkError(String);
 
@@ -12,9 +14,13 @@ impl std::fmt::Display for NativeLinkError {
 
 impl std::error::Error for NativeLinkError {}
 
-pub fn link_object(object: &Path, executable: &Path) -> Result<(), NativeLinkError> {
-    let linker = std::env::var_os("ACTUS_LINKER").unwrap_or_else(|| "cc".into());
-    let output = Command::new(&linker)
+pub fn link_object(
+    object: &Path,
+    executable: &Path,
+    configuration: &CompilerConfiguration,
+) -> Result<(), NativeLinkError> {
+    let linker = configuration.linker();
+    let output = Command::new(linker)
         .arg(object)
         .arg("-o")
         .arg(executable)

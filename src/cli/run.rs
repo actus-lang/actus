@@ -3,8 +3,12 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use super::{EmitKind, build_file};
+use crate::configuration::CompilerConfiguration;
 
-pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
+pub(super) fn run_command(
+    mut arguments: impl Iterator<Item = String>,
+    configuration: &CompilerConfiguration,
+) -> i32 {
     let Some(input) = arguments.next() else {
         eprintln!("error: missing input file");
         return 2;
@@ -14,8 +18,8 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         return 2;
     }
 
-    let output = temporary_output();
-    if build_file(&input, Some(&output), EmitKind::Executable) != 0 {
+    let output = temporary_output(configuration);
+    if build_file(&input, Some(&output), EmitKind::Executable, configuration) != 0 {
         return 1;
     }
     let result = Command::new(&output).status();
@@ -29,6 +33,10 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     }
 }
 
-fn temporary_output() -> PathBuf {
-    std::env::temp_dir().join(format!("actus-run-{}", std::process::id()))
+fn temporary_output(configuration: &CompilerConfiguration) -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "{}-{}",
+        configuration.run_artifact_prefix(),
+        std::process::id()
+    ))
 }

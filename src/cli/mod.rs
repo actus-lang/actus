@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::codegen::{emit_program_object, link_object};
+use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::formatter::format_program;
 use crate::lexer::scan;
@@ -15,15 +16,16 @@ pub fn run() -> i32 {
 }
 
 pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
+    let configuration = CompilerConfiguration::from_environment();
     let Some(command) = arguments.next() else {
         print_usage();
         return 2;
     };
     if command == "build" {
-        return build_command(arguments);
+        return build_command(arguments, &configuration);
     }
     if command == "run" {
-        return run::run_command(arguments);
+        return run::run_command(arguments, &configuration);
     }
 
     let Some(first_argument) = arguments.next() else {
@@ -60,7 +62,10 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
     }
 }
 
-fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
+fn build_command(
+    mut arguments: impl Iterator<Item = String>,
+    configuration: &CompilerConfiguration,
+) -> i32 {
     let Some(input) = arguments.next() else {
         eprintln!("error: missing input file");
         print_usage();
@@ -102,7 +107,7 @@ fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
             }
         }
     }
-    build_file(&input, output.as_deref().map(Path::new), emit)
+    build_file(&input, output.as_deref().map(Path::new), emit, configuration)
 }
 
 #[derive(Clone, Copy)]
@@ -125,7 +130,12 @@ fn validate_entry(
     Ok(())
 }
 
-fn build_file(input: &str, output: Option<&Path>, emit: EmitKind) -> i32 {
+fn build_file(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+) -> i32 {
     let source = match fs::read_to_string(input) {
         Ok(source) => source,
         Err(error) => {
@@ -166,7 +176,7 @@ fn build_file(input: &str, output: Option<&Path>, emit: EmitKind) -> i32 {
         }
     };
     let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit));
-    if let Err(error) = write_artifact(input, &output, bytes, emit) {
+    if let Err(error) = write_artifact(input, &output, bytes, emit, configuration) {
         eprintln!("error: {error}");
         return 1;
     }
@@ -179,13 +189,14 @@ fn write_artifact(
     output: &Path,
     bytes: Vec<u8>,
     emit: EmitKind,
+    configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
     let object = matches!(emit, EmitKind::Executable).then(|| output.with_extension("o"));
     let object_path = object.as_deref().unwrap_or(output);
     fs::write(object_path, bytes)
         .map_err(|error| format!("cannot write `{}`: {error}", object_path.display()))?;
     if let Some(object_path) = object {
-        let result = link_object(&object_path, output)
+        let result = link_object(&object_path, output, configuration)
             .map_err(|error| format!("cannot link `{input}`: {error}"));
         let _ = fs::remove_file(object_path);
         result
