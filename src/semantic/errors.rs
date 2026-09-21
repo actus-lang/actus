@@ -26,6 +26,7 @@ pub enum SemanticErrorKind {
     ReservedIntrinsicName { name: String },
     UnknownType { name: String },
     DuplicateVerbName { name: String },
+    TypeMismatch { callee: String, parameter: String, expected: String, found: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

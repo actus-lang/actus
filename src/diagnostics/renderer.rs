@@ -77,10 +77,14 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
         SemanticErrorKind::UnknownType { .. } => "E1023",
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
+        SemanticErrorKind::TypeMismatch { .. } => "E1025",
     }
 }
 
 fn semantic_message(kind: &SemanticErrorKind) -> String {
+    if let Some(message) = extended_semantic_message(kind) {
+        return message;
+    }
     match kind {
         SemanticErrorKind::DuplicateBinding { name } => format!("duplicate binding `{name}`"),
         SemanticErrorKind::ShadowedBinding { name } => format!("shadowed binding `{name}`"),
@@ -132,11 +136,22 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
         SemanticErrorKind::ReservedIntrinsicName { name } => {
             format!("`{name}` is reserved for a built-in intrinsic")
         }
+        _ => unreachable!("extended semantic message was not rendered"),
+    }
+}
+
+fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
         SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
         SemanticErrorKind::DuplicateVerbName { name } => {
             format!("duplicate verb declaration `{name}`")
         }
-    }
+        SemanticErrorKind::TypeMismatch { callee, parameter, expected, found } => format!(
+            "type mismatch for `{parameter}` in `{callee}`: expected `{expected}`, found `{found}`"
+        ),
+        _ => return None,
+    };
+    Some(message)
 }
 
 fn line_column(source: &str, byte_offset: usize) -> (usize, usize) {

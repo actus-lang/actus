@@ -57,11 +57,40 @@ impl Analyzer {
                 role,
                 &argument.expression,
             )?;
+            self.validate_argument_type(
+                callee,
+                &signature.params[parameter_index].0,
+                &signature.params[parameter_index].2,
+                &argument.expression,
+            )?;
             if *role == Role::Dat {
                 self.move_dat_argument(&argument.expression, argument_span(argument))?;
             }
         }
         Ok(())
+    }
+
+    fn validate_argument_type(
+        &self,
+        callee: &str,
+        parameter: &str,
+        expected: &str,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        let Some(found) = self.expression_type(expression) else { return Ok(()) };
+        let Some(expected_type) = crate::ast::lookup_builtin_type(expected) else { return Ok(()) };
+        if found == expected_type {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::TypeMismatch {
+                callee: callee.to_owned(),
+                parameter: parameter.to_owned(),
+                expected: expected.to_owned(),
+                found: found.spec().name.to_owned(),
+            },
+            span: expression_span(expression),
+        })
     }
 
     fn bind_arguments(

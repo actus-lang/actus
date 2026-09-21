@@ -64,6 +64,22 @@ fn infers_buffer_type_from_allocate_intrinsic() {
 }
 
 #[test]
+fn rejects_known_argument_type_mismatches() {
+    let error = analyze_source(
+        "verb consume(dat buffer: Buffer) { } verb main() { erg value = 1; consume(buffer: value); }",
+    )
+    .expect_err("known argument type mismatches must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::TypeMismatch { callee, parameter, expected, found }
+            if callee == "consume"
+                && parameter == "buffer"
+                && expected == "Buffer"
+                && found == "Int"
+    ));
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source("verb Buffer() -> Int { return 1; } verb main() -> Buffer { return Buffer(); }")
         .expect("a type name and a function name may coexist in separate namespaces");
