@@ -11,8 +11,12 @@ permissions:
 
 jobs:
   checks:
-    name: Rust checks
-    runs-on: ubuntu-latest
+    name: Rust checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Check out repository
@@ -31,7 +35,9 @@ jobs:
         run: cargo test --all-targets --all-features -- --test-threads=1
 
       - name: Check source limits
+        if: runner.os != 'Windows'
         run: ./scripts/check_source_limits.sh
 
       - name: Scan tracked files for secrets
+        if: runner.os != 'Windows'
         run: ./scripts/check_secrets.sh
