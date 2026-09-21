@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use crate::configuration::CompilerConfiguration;
+use crate::configuration::{CompilerConfiguration, LibraryKind, LinkLibrary, LinkerFlavor};
 
 #[derive(Debug)]
 pub struct NativeLinkError(String);
@@ -26,13 +26,8 @@ pub fn link_object(
         command.arg(runtime_archive);
     }
     for library in configuration.libraries() {
-        if matches!(library.kind(), crate::configuration::LibraryKind::Static) {
-            command.arg("-Wl,-Bstatic");
-        }
-        command.arg(format!("-l{}", library.name()));
-        if matches!(library.kind(), crate::configuration::LibraryKind::Static) {
-            command.arg("-Wl,-Bdynamic");
-        }
+        let arguments = library_arguments(library, configuration.linker_flavor())?;
+        command.args(arguments);
     }
     let output = command
         .arg("-o")
@@ -48,4 +43,55 @@ pub fn link_object(
         linker.to_string_lossy(),
         details.trim()
     )))
+}
+
+fn library_arguments(
+    library: &LinkLibrary,
+    flavor: LinkerFlavor,
+) -> Result<Vec<String>, NativeLinkError> {
+    let name = library.name();
+    match (flavor, library.kind()) {
+        (LinkerFlavor::Gnu, LibraryKind::Static) => {
+            Ok(vec!["-Wl,-Bstatic".to_owned(), format!("-l{name}"), "-Wl,-Bdynamic".to_owned()])
+        }
+        (LinkerFlavor::Gnu, LibraryKind::Shared) => Ok(vec![format!("-l{name}")]),
+        (LinkerFlavor::Apple, LibraryKind::Static) => {
+            Ok(vec![format!("-Wl,-force_load,lib{name}.a")])
+        }
+        (LinkerFlavor::Apple, LibraryKind::Shared) => Ok(vec![format!("-l{name}")]),
+        (LinkerFlavor::Msvc, _) => Ok(vec![format!("{name}.lib")]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::library_arguments;
+    use crate::configuration::{LibraryKind, LinkLibrary, LinkerFlavor};
+
+    fn library(name: &str, kind: LibraryKind) -> LinkLibrary {
+        LinkLibrary::new(name.to_owned(), kind)
+    }
+
+    #[test]
+    fn isolates_gnu_static_flags() {
+        assert_eq!(
+            library_arguments(&library("math", LibraryKind::Static), LinkerFlavor::Gnu)
+                .expect("GNU arguments should be generated"),
+            ["-Wl,-Bstatic", "-lmath", "-Wl,-Bdynamic"]
+        );
+    }
+
+    #[test]
+    fn emits_platform_specific_library_arguments() {
+        assert_eq!(
+            library_arguments(&library("math", LibraryKind::Static), LinkerFlavor::Apple)
+                .expect("Apple arguments should be generated"),
+            ["-Wl,-force_load,libmath.a"]
+        );
+        assert_eq!(
+            library_arguments(&library("math", LibraryKind::Shared), LinkerFlavor::Msvc)
+                .expect("MSVC arguments should be generated"),
+            ["math.lib"]
+        );
+    }
 }

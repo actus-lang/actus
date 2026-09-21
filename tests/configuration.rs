@@ -1,6 +1,6 @@
 use std::fs;
 
-use actus::configuration::{CompilerConfiguration, LibraryKind};
+use actus::configuration::{CompilerConfiguration, LibraryKind, LinkerFlavor};
 
 #[test]
 fn loads_build_settings_from_an_arca_manifest() {
@@ -18,6 +18,7 @@ fn loads_build_settings_from_an_arca_manifest() {
     assert!(!configuration.native_backend().position_independent());
     assert_eq!(configuration.libraries()[0].name(), "m");
     assert_eq!(configuration.libraries()[0].kind(), LibraryKind::Shared);
+    assert_eq!(configuration.linker_flavor(), LinkerFlavor::Gnu);
     let _ = fs::remove_file(path);
 }
 

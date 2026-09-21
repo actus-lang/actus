@@ -45,6 +45,7 @@ struct PackageManifest {
 #[serde(deny_unknown_fields)]
 struct BuildManifest {
     linker: Option<String>,
+    linker_flavor: Option<LinkerFlavor>,
     native_module: Option<String>,
     position_independent: Option<bool>,
     #[serde(default)]
@@ -63,6 +64,29 @@ struct LibraryManifest {
 pub enum LibraryKind {
     Static,
     Shared,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LinkerFlavor {
+    Gnu,
+    Apple,
+    Msvc,
+}
+
+impl LinkerFlavor {
+    pub const fn host_default() -> Self {
+        #[cfg(target_os = "macos")]
+        {
+            return Self::Apple;
+        }
+        #[cfg(windows)]
+        {
+            return Self::Msvc;
+        }
+        #[cfg(not(any(target_os = "macos", windows)))]
+        Self::Gnu
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -100,6 +124,7 @@ impl NativeBackendConfiguration {
 #[derive(Clone, Debug)]
 pub struct CompilerConfiguration {
     linker: OsString,
+    linker_flavor: LinkerFlavor,
     run_artifact_prefix: String,
     native_backend: NativeBackendConfiguration,
     entry_symbol: Option<String>,
@@ -112,6 +137,7 @@ impl CompilerConfiguration {
             .unwrap_or_else(|| OsString::from(DEFAULT_LINKER));
         Self {
             linker,
+            linker_flavor: LinkerFlavor::host_default(),
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
             entry_symbol: None,
@@ -145,10 +171,11 @@ impl CompilerConfiguration {
             .build
             .libraries
             .into_iter()
-            .map(|library| LinkLibrary { name: library.name, kind: library.kind })
+            .map(|library| LinkLibrary::new(library.name, library.kind))
             .collect();
         Ok(Self {
             linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
+            linker_flavor: manifest.build.linker_flavor.unwrap_or(environment.linker_flavor),
             native_backend,
             entry_symbol: manifest.package.entry,
             libraries,
@@ -163,6 +190,10 @@ impl CompilerConfiguration {
 
     pub fn linker(&self) -> &OsStr {
         &self.linker
+    }
+
+    pub const fn linker_flavor(&self) -> LinkerFlavor {
+        self.linker_flavor
     }
 
     pub fn run_artifact_prefix(&self) -> &str {
@@ -217,6 +248,10 @@ fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> 
 }
 
 impl LinkLibrary {
+    pub(crate) fn new(name: String, kind: LibraryKind) -> Self {
+        Self { name, kind }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
