@@ -1,6 +1,6 @@
 use actus::ffi::{
-    CAbiError, CAbiLayout, CAbiOwnership, CAbiTarget, CAbiType, CallingConvention,
-    c_abi_external_signature, c_abi_signature,
+    CAbiError, CAbiLayout, CAbiOwnership, CAbiReturnOwnership, CAbiTarget, CAbiType,
+    CallingConvention, c_abi_external_signature, c_abi_signature,
 };
 use actus::lexer::scan;
 use actus::parser::parse;
@@ -25,6 +25,7 @@ fn maps_actus_roles_and_types_to_a_c_abi_signature() {
 
     assert_eq!(signature.calling_convention, CallingConvention::C);
     assert_eq!(signature.return_type, CAbiType::Int32);
+    assert_eq!(signature.return_ownership, CAbiReturnOwnership::Value);
     assert_eq!(signature.parameters[0].ty, CAbiType::OpaquePointer);
     assert_eq!(signature.parameters[0].ownership, CAbiOwnership::Exclusive);
     assert_eq!(signature.parameters[1].ownership, CAbiOwnership::SharedBorrow);
@@ -72,6 +73,14 @@ fn models_external_c_declarations_without_a_definition_body() {
 
     assert_eq!(signature.name, "write");
     assert_eq!(signature.parameters[0].ownership, CAbiOwnership::Consumed);
+}
+
+#[test]
+fn marks_buffer_returns_as_owned_resources() {
+    let verb = parse_verb("verb allocate_buffer() -> Buffer { return allocate(4); }");
+    let signature = c_abi_signature(&verb).expect("Buffer return should map");
+
+    assert_eq!(signature.return_ownership, CAbiReturnOwnership::OwnedResource);
 }
 
 #[test]

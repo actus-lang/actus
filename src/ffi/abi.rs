@@ -14,6 +14,12 @@ pub enum CAbiOwnership {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CAbiReturnOwnership {
+    Value,
+    OwnedResource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CallingConvention {
     C,
 }
@@ -59,6 +65,7 @@ pub struct CAbiSignature {
     pub name: String,
     pub parameters: Vec<CAbiParameter>,
     pub return_type: CAbiType,
+    pub return_ownership: CAbiReturnOwnership,
     pub calling_convention: CallingConvention,
 }
 
@@ -121,6 +128,7 @@ fn signature_parts(
         name: name.to_owned(),
         parameters,
         return_type: map_type(&return_type.name)?,
+        return_ownership: return_ownership(&return_type.name)?,
         calling_convention: CallingConvention::C,
     })
 }
@@ -140,5 +148,12 @@ fn map_ownership(role: &Role) -> CAbiOwnership {
         Role::Erg => CAbiOwnership::Exclusive,
         Role::Abs => CAbiOwnership::SharedBorrow,
         Role::Dat => CAbiOwnership::Consumed,
+    }
+}
+
+fn return_ownership(name: &str) -> Result<CAbiReturnOwnership, CAbiError> {
+    match map_type(name)? {
+        CAbiType::Int32 => Ok(CAbiReturnOwnership::Value),
+        CAbiType::OpaquePointer => Ok(CAbiReturnOwnership::OwnedResource),
     }
 }
