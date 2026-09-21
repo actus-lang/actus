@@ -2,6 +2,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use actus::lexer::scan;
 use actus::parser::parse;
+use actus::{formatter::format_program, semantic::analyze};
 
 #[test]
 fn malformed_input_corpus_never_panics() {
@@ -25,4 +26,30 @@ fn malformed_input_corpus_never_panics() {
         }));
         assert!(result.is_ok(), "compiler panicked for malformed input: {source:?}");
     }
+}
+
+#[test]
+fn generated_inputs_never_panic_across_frontend_stages() {
+    let alphabet = b"{}();,:=+-*/\\\" abcdef0123456789";
+    let mut state = 0xAC7A5_u64;
+
+    for case in 0..2048 {
+        let length = (next_random(&mut state) % 96) as usize;
+        let source = (0..length)
+            .map(|_| alphabet[(next_random(&mut state) as usize) % alphabet.len()] as char)
+            .collect::<String>();
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            let (tokens, _) = scan(&source);
+            if let Ok(program) = parse(tokens) {
+                let _ = format_program(&program);
+                let _ = analyze(&program);
+            }
+        }));
+        assert!(result.is_ok(), "compiler panicked for generated input {case}: {source:?}");
+    }
+}
+
+fn next_random(state: &mut u64) -> u64 {
+    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+    *state
 }
