@@ -136,6 +136,19 @@ fn moves_returned_owners_out_of_the_function() {
 }
 
 #[test]
+fn moves_grouped_owners_out_of_the_function_scope() {
+    let model = analyze_source("verb create() -> Buffer { erg buffer = make(); return (buffer); }")
+        .expect("grouped owner return should transfer ownership");
+    assert_eq!(model.bindings[0].state, BindingState::Moved);
+    assert!(
+        model.return_unwind_plans[0].scopes[0]
+            .actions
+            .iter()
+            .all(|action| !matches!(action, CleanupAction::DropBinding { binding_index: 0 }))
+    );
+}
+
+#[test]
 fn rejects_borrowed_returns() {
     let returned_binding = analyze_source(
         "verb broken(erg buffer: Buffer) -> Buffer { abs view = ref buffer; return view; }",

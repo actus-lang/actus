@@ -50,7 +50,8 @@ impl Analyzer {
             return Ok(());
         };
         self.visit_expression(expression)?;
-        let Expr::Identifier { name, span } = expression else {
+        let returned_expression = unwrap_grouping(expression);
+        let Expr::Identifier { name, span } = returned_expression else {
             if contains_returned_borrow(expression) {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::BorrowedReturn { name: "temporary borrow".to_owned() },
@@ -171,6 +172,13 @@ fn contains_returned_borrow(expression: &Expr) -> bool {
         | Expr::Integer { .. }
         | Expr::StringLiteral { .. } => false,
     }
+}
+
+fn unwrap_grouping(mut expression: &Expr) -> &Expr {
+    while let Expr::Grouping { expression: inner, .. } = expression {
+        expression = inner;
+    }
+    expression
 }
 
 impl Analyzer {
