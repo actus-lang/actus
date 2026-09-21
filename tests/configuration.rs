@@ -7,7 +7,7 @@ fn loads_build_settings_from_an_arca_manifest() {
     let path = std::env::temp_dir().join(format!("actus-config-{}.toml", std::process::id()));
     fs::write(
         &path,
-        "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nentry = \"main\"\n\n[build]\nlinker = \"clang\"\nnative_module = \"sample_native\"\nposition_independent = false\n",
+        "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nlinker = \"clang\"\nnative_module = \"sample_native\"\nposition_independent = false\n",
     )
     .expect("write manifest");
 
@@ -42,5 +42,17 @@ fn rejects_empty_native_module_names() {
 
     let error = CompilerConfiguration::from_manifest(&path).expect_err("empty module must fail");
     assert!(error.to_string().contains("native_module must not be empty"));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn rejects_unknown_language_editions() {
+    let path =
+        std::env::temp_dir().join(format!("actus-config-edition-{}.toml", std::process::id()));
+    fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nedition = \"future\"\n")
+        .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path).expect_err("unknown edition must fail");
+    assert!(error.to_string().contains("unsupported Actus edition"));
     let _ = fs::remove_file(path);
 }

@@ -9,6 +9,7 @@ const DEFAULT_LINKER: &str = "cc";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
 const DEFAULT_NATIVE_MODULE_NAME: &str = "actus";
 const MANIFEST_FILE_NAME: &str = "Arca.toml";
+const DEFAULT_EDITION: &str = "alpha";
 
 pub const HOSTED_ENTRY_SYMBOL: &str = "main";
 
@@ -36,6 +37,7 @@ struct ArcaManifest {
 struct PackageManifest {
     name: String,
     version: String,
+    edition: Option<String>,
     entry: Option<String>,
 }
 
@@ -104,6 +106,11 @@ impl CompilerConfiguration {
             return Err(ConfigurationError(
                 "Arca.toml package name and version must not be empty".to_owned(),
             ));
+        }
+        if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
+            return Err(ConfigurationError(format!(
+                "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
+            )));
         }
         if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
             return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
