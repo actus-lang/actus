@@ -170,7 +170,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.
 - [x] Reject code generation when semantic analysis fails.
-- [ ] Add native object and machine-code golden tests.
+- [x] Add native object and architecture-scoped machine-code golden tests.
 - [x] Link generated objects in CI.
 - [x] Add a minimal end-to-end Actus-to-native-binary test.
 - [x] Add `actus run` for temporary native execution.
