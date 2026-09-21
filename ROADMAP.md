@@ -193,7 +193,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Link generated objects in CI.
 - [x] Add a minimal end-to-end Actus-to-native-binary test.
 - [x] Add `actus run` for temporary native execution.
-- [x] Add the initial integer stdout intrinsic.
+- [x] Add the initial type-aware `print` intrinsic.
 
 ### C Library Interoperability
 

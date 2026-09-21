@@ -87,7 +87,7 @@ impl Analyzer {
             Expr::Call { callee, .. } => match lookup_call_intrinsic(callee) {
                 Some(IntrinsicKind::Allocate) => Some(BuiltinType::Buffer),
                 Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
-                Some(IntrinsicKind::PrintInt) => Some(BuiltinType::Int),
+                Some(IntrinsicKind::Print) => Some(BuiltinType::Int),
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },

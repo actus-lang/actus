@@ -19,24 +19,24 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
-    assert_eq!(IntrinsicKind::PrintInt.spec().parameters, &["value"]);
+    assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_intrinsic("drop"), Some(IntrinsicKind::Drop));
     assert!(lookup_call_intrinsic("drop").is_none());
-    assert_eq!(lookup_call_intrinsic("print_int"), Some(IntrinsicKind::PrintInt));
+    assert_eq!(lookup_call_intrinsic("print"), Some(IntrinsicKind::Print));
     assert!(lookup_intrinsic("user_function").is_none());
 }
 
 #[test]
-fn validates_print_int_arguments() {
-    analyze_source("verb main() { print_int(42); }").expect("integer output should be valid");
-    let error = analyze_source("verb main() { print_int(\"text\"); }")
-        .expect_err("print_int must reject non-integer values");
+fn validates_print_arguments() {
+    analyze_source("verb main() { print(42); }").expect("integer output should be valid");
+    let error = analyze_source("verb main() { print(\"text\"); }")
+        .expect_err("print must reject unsupported values");
 
     assert!(matches!(
         error.kind,
         SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
-            if callee == "print_int" && parameter == "value"
+            if callee == "print" && parameter == "value"
     ));
 }
 

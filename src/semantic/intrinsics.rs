@@ -57,12 +57,12 @@ impl Analyzer {
                 )?;
                 Ok(true)
             }
-            IntrinsicKind::PrintInt => self.validate_print_int(callee, arguments, span),
+            IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
         }
     }
 
-    fn validate_print_int(
+    fn validate_print(
         &mut self,
         callee: &str,
         arguments: &[Argument],
@@ -73,7 +73,7 @@ impl Analyzer {
         self.visit_expression(&argument.expression)?;
         self.require_intrinsic_type(
             callee,
-            IntrinsicKind::PrintInt.spec().parameters[0],
+            IntrinsicKind::Print.spec().parameters[0],
             crate::ast::BuiltinType::Int,
             &argument.expression,
         )?;

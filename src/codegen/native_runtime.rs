@@ -19,7 +19,7 @@ pub(super) fn declare_runtime_functions(
     let print_int_id = declare_print_int(module)?;
     let allocate_spec = IntrinsicKind::Allocate.spec();
     let append_spec = IntrinsicKind::Append.spec();
-    let print_int_spec = IntrinsicKind::PrintInt.spec();
+    let print_spec = IntrinsicKind::Print.spec();
 
     Ok(HashMap::from([
         (
@@ -55,10 +55,10 @@ pub(super) fn declare_runtime_functions(
             },
         ),
         (
-            print_int_spec.name.to_owned(),
+            print_spec.name.to_owned(),
             FunctionMeta {
                 id: print_int_id,
-                parameter_names: print_int_spec
+                parameter_names: print_spec
                     .parameters
                     .iter()
                     .map(|name| (*name).to_owned())
