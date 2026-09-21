@@ -1,6 +1,6 @@
 mod abi;
 
 pub use abi::{
-    CAbiError, CAbiOwnership, CAbiParameter, CAbiSignature, CAbiType, CallingConvention,
-    c_abi_signature,
+    CAbiError, CAbiLayout, CAbiOwnership, CAbiParameter, CAbiSignature, CAbiTarget, CAbiType,
+    CallingConvention, c_abi_signature,
 };

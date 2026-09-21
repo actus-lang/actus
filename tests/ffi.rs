@@ -1,4 +1,6 @@
-use actus::ffi::{CAbiError, CAbiOwnership, CAbiType, CallingConvention, c_abi_signature};
+use actus::ffi::{
+    CAbiError, CAbiLayout, CAbiOwnership, CAbiTarget, CAbiType, CallingConvention, c_abi_signature,
+};
 use actus::lexer::scan;
 use actus::parser::parse;
 
@@ -40,4 +42,13 @@ fn rejects_registered_types_without_a_c_abi_mapping() {
     let error = c_abi_signature(&verb).expect_err("Array has no initial C ABI mapping");
 
     assert!(matches!(error, CAbiError::UnsupportedType { name } if name == "Array"));
+}
+
+#[test]
+fn maps_c_abi_types_to_target_layouts() {
+    let target = CAbiTarget::new(8).expect("64-bit pointer width should be accepted");
+
+    assert_eq!(target.layout(CAbiType::Int32), CAbiLayout { size: 4, alignment: 4 });
+    assert_eq!(target.layout(CAbiType::OpaquePointer), CAbiLayout { size: 8, alignment: 8 });
+    assert!(CAbiTarget::new(16).is_none());
 }

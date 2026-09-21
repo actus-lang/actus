@@ -18,6 +18,35 @@ pub enum CallingConvention {
     C,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CAbiLayout {
+    pub size: u8,
+    pub alignment: u8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CAbiTarget {
+    pub pointer_width: u8,
+}
+
+impl CAbiTarget {
+    pub const fn new(pointer_width: u8) -> Option<Self> {
+        match pointer_width {
+            4 | 8 => Some(Self { pointer_width }),
+            _ => None,
+        }
+    }
+
+    pub const fn layout(self, ty: CAbiType) -> CAbiLayout {
+        match ty {
+            CAbiType::Int32 => CAbiLayout { size: 4, alignment: 4 },
+            CAbiType::OpaquePointer => {
+                CAbiLayout { size: self.pointer_width, alignment: self.pointer_width }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CAbiParameter {
     pub name: String,
