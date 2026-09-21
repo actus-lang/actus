@@ -1,3 +1,11 @@
 pub mod ast;
+pub mod cli;
+pub mod codegen;
+pub mod configuration;
+pub mod diagnostics;
+pub mod ffi;
+pub mod formatter;
 pub mod lexer;
 pub mod parser;
+pub mod runtime;
+pub mod semantic;

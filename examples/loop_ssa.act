@@ -1,0 +1,8 @@
+verb main() -> Int {
+    erg value = 0;
+    loop {
+        value = 41;
+        break;
+    }
+    return value + 1;
+}

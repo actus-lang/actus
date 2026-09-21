@@ -1,6 +1,14 @@
 # Rust build output
 /target/
 
+# Native compiler artifacts
+*.o
+*.obj
+/examples/*.bin
+/examples/*.exe
+/examples/*.out
+/examples/hello
+
 # Generated coverage and profiling output
 /coverage/
 /profraw/

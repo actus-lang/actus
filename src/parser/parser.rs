@@ -1,7 +1,10 @@
 use crate::ast::{
-    Argument, Block, Expr, Param, Program, Role, Stmt, TopLevelDecl, TypeName, VerbDecl,
+    Block, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt, TopLevelDecl, TypeName,
+    VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
+
+mod expressions;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseErrorKind {
@@ -9,8 +12,15 @@ pub enum ParseErrorKind {
     UnexpectedEndOfInput { expected: String },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParseErrorCode {
+    UnexpectedToken,
+    UnexpectedEndOfInput,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParseError {
+    pub code: ParseErrorCode,
     pub kind: ParseErrorKind,
     pub span: SourceSpan,
 }
@@ -36,8 +46,39 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Extern) {
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb()?));
+        }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))
+    }
+
+    fn parse_external_verb(&mut self) -> Result<ExternalVerbDecl, ParseError> {
+        let start = self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start;
+        let abi_token = self.advance_required("ABI string")?;
+        let abi = match &abi_token.kind {
+            TokenKind::StringLiteral(abi) if abi == "C" => ForeignAbi::C,
+            _ => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "supported ABI string (currently `\"C\"`)".to_owned(),
+                        found: abi_token.kind.clone(),
+                    },
+                    span: abi_token.span,
+                });
+            }
+        };
+        self.expect_keyword(TokenKind::Verb, "`verb`")?;
+        let name_token = self.take_identifier("external verb name")?;
+        let name = identifier_text(&name_token.kind);
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let params = self.parse_params()?;
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let return_type =
+            if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(ExternalVerbDecl { abi, name, params, return_type, span: SourceSpan::new(start, end) })
     }
 
     fn parse_verb(&mut self) -> Result<VerbDecl, ParseError> {
@@ -78,6 +119,7 @@ impl Parser {
     fn parse_param(&mut self) -> Result<Param, ParseError> {
         let role_token = self.advance_required("parameter role")?;
         let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+            code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "parameter role (`erg`, `abs`, or `dat`)".to_owned(),
                 found: role_token.kind.clone(),
@@ -118,19 +160,28 @@ impl Parser {
             return Ok(Stmt::Block(self.parse_block()?));
         }
 
+        if self.match_simple(TokenKind::Loop) {
+            return Ok(Stmt::Loop(self.parse_block()?));
+        }
+
         if self.check_role(&TokenKind::Erg) || self.check_role(&TokenKind::Abs) {
             return self.parse_owner_declaration();
         }
 
         if self.match_simple(TokenKind::Return) {
-            let start = self.previous().span.start;
-            let value = if self.check_simple(&TokenKind::Semicolon) {
-                None
-            } else {
-                Some(self.parse_expression()?)
-            };
-            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-            return Ok(Stmt::Return { value, span: SourceSpan::new(start, end) });
+            return self.parse_return_statement();
+        }
+
+        if self.match_simple(TokenKind::Break) {
+            return self.parse_loop_control_statement(true);
+        }
+
+        if self.match_simple(TokenKind::Continue) {
+            return self.parse_loop_control_statement(false);
+        }
+
+        if self.match_simple(TokenKind::Drop) {
+            return self.parse_drop_statement();
         }
 
         let expression = self.parse_expression()?;
@@ -151,9 +202,35 @@ impl Parser {
         Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })
     }
 
+    fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        let value = (!self.check_simple(&TokenKind::Semicolon))
+            .then(|| self.parse_expression())
+            .transpose()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Return { value, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_loop_control_statement(&mut self, is_break: bool) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        let span = SourceSpan::new(start, end);
+        Ok(if is_break { Stmt::Break { span } } else { Stmt::Continue { span } })
+    }
+
+    fn parse_drop_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let name = identifier_text(&self.take_identifier("binding name")?.kind);
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Drop { name, span: SourceSpan::new(start, end) })
+    }
+
     fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
         let role_token = self.advance_required("binding role")?;
         let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+            code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "`erg` or `abs`".to_owned(),
                 found: role_token.kind.clone(),
@@ -187,65 +264,13 @@ impl Parser {
         })
     }
 
-    fn parse_expression(&mut self) -> Result<Expr, ParseError> {
-        let token = self.advance_required("expression")?;
-        match token.kind {
-            TokenKind::Identifier(name) => {
-                if self.match_simple(TokenKind::LeftParen) {
-                    let arguments = self.parse_arguments()?;
-                    let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
-                    Ok(Expr::Call {
-                        callee: name,
-                        arguments,
-                        span: SourceSpan::new(token.span.start, end),
-                    })
-                } else {
-                    Ok(Expr::Identifier { name, span: token.span })
-                }
-            }
-            TokenKind::Integer(value) => Ok(Expr::Integer { value, span: token.span }),
-            TokenKind::StringLiteral(value) => Ok(Expr::StringLiteral { value, span: token.span }),
-            TokenKind::Ref => {
-                let expression = self.parse_expression()?;
-                let span = SourceSpan::new(token.span.start, expression_span(&expression).end);
-                Ok(Expr::Borrow { expression: Box::new(expression), span })
-            }
-            found => Err(ParseError {
-                kind: ParseErrorKind::UnexpectedToken { expected: "expression".to_owned(), found },
-                span: token.span,
-            }),
-        }
-    }
-
-    fn parse_arguments(&mut self) -> Result<Vec<Argument>, ParseError> {
-        let mut arguments = Vec::new();
-        if self.check_simple(&TokenKind::RightParen) {
-            return Ok(arguments);
-        }
-
-        loop {
-            let name = if self.check_identifier() && self.peek_next_is(&TokenKind::Colon) {
-                let name = identifier_text(&self.advance_required("argument name")?.kind);
-                self.expect_simple(TokenKind::Colon, "`:`")?;
-                Some(name)
-            } else {
-                None
-            };
-            arguments.push(Argument { name, expression: self.parse_expression()? });
-            if !self.match_simple(TokenKind::Comma) {
-                break;
-            }
-        }
-
-        Ok(arguments)
-    }
-
     fn take_identifier(&mut self, expected: &str) -> Result<Token, ParseError> {
         let token = self.advance_required(expected)?;
         if matches!(token.kind, TokenKind::Identifier(_)) {
             Ok(token)
         } else {
             Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
                     expected: expected.to_owned(),
                     found: token.kind,
@@ -298,6 +323,7 @@ impl Parser {
             Ok(token)
         } else {
             Err(ParseError {
+                code: ParseErrorCode::UnexpectedEndOfInput,
                 kind: ParseErrorKind::UnexpectedEndOfInput { expected: expected.to_owned() },
                 span: SourceSpan::new(0, 0),
             })
@@ -307,6 +333,7 @@ impl Parser {
     fn error_at_current(&self, expected: &str) -> ParseError {
         match self.peek() {
             Some(token) => ParseError {
+                code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
                     expected: expected.to_owned(),
                     found: token.kind.clone(),
@@ -314,6 +341,7 @@ impl Parser {
                 span: token.span,
             },
             None => ParseError {
+                code: ParseErrorCode::UnexpectedEndOfInput,
                 kind: ParseErrorKind::UnexpectedEndOfInput { expected: expected.to_owned() },
                 span: SourceSpan::new(0, 0),
             },
@@ -354,6 +382,9 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
         | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
         | Expr::Call { span, .. } => *span,
     }

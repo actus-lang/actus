@@ -26,12 +26,16 @@ impl Token {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenKind {
     Verb,
+    Extern,
     Erg,
     Abs,
     Dat,
     Ref,
     Drop,
     Return,
+    Loop,
+    Break,
+    Continue,
     Identifier(String),
     Integer(String),
     StringLiteral(String),
@@ -43,6 +47,10 @@ pub enum TokenKind {
     Comma,
     Semicolon,
     Equals,
+    Plus,
+    Minus,
+    Star,
+    Slash,
     Arrow,
     Eof,
 }

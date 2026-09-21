@@ -60,9 +60,13 @@ impl<'source> Scanner<'source> {
             ',' => self.push_simple(TokenKind::Comma, start),
             ';' => self.push_simple(TokenKind::Semicolon, start),
             '=' => self.push_simple(TokenKind::Equals, start),
+            '+' => self.push_simple(TokenKind::Plus, start),
             '-' if self.match_character('>') => {
                 self.push_simple(TokenKind::Arrow, start);
             }
+            '-' => self.push_simple(TokenKind::Minus, start),
+            '*' => self.push_simple(TokenKind::Star, start),
+            '/' => self.push_simple(TokenKind::Slash, start),
             '"' => self.scan_string(start),
             character if is_identifier_start(character) => self.scan_identifier(start),
             character if character.is_ascii_digit() => self.scan_integer(start),
@@ -81,12 +85,16 @@ impl<'source> Scanner<'source> {
         let text = &self.source[start..self.cursor];
         let kind = match text {
             "verb" => TokenKind::Verb,
+            "extern" => TokenKind::Extern,
             "erg" => TokenKind::Erg,
             "abs" => TokenKind::Abs,
             "dat" => TokenKind::Dat,
             "ref" => TokenKind::Ref,
             "drop" => TokenKind::Drop,
             "return" => TokenKind::Return,
+            "loop" => TokenKind::Loop,
+            "break" => TokenKind::Break,
+            "continue" => TokenKind::Continue,
             _ => TokenKind::Identifier(text.to_owned()),
         };
 

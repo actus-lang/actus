@@ -1,0 +1,92 @@
+Program {
+    declarations: [
+        Verb(
+            VerbDecl {
+                name: "transfer",
+                params: [
+                    Param {
+                        role: Erg,
+                        name: "target",
+                        ty: TypeName {
+                            name: "File",
+                            span: SourceSpan {
+                                start: 26,
+                                end: 30,
+                            },
+                        },
+                        span: SourceSpan {
+                            start: 14,
+                            end: 30,
+                        },
+                    },
+                    Param {
+                        role: Abs,
+                        name: "packet",
+                        ty: TypeName {
+                            name: "Buffer",
+                            span: SourceSpan {
+                                start: 44,
+                                end: 50,
+                            },
+                        },
+                        span: SourceSpan {
+                            start: 32,
+                            end: 50,
+                        },
+                    },
+                    Param {
+                        role: Dat,
+                        name: "logger",
+                        ty: TypeName {
+                            name: "Logger",
+                            span: SourceSpan {
+                                start: 64,
+                                end: 70,
+                            },
+                        },
+                        span: SourceSpan {
+                            start: 52,
+                            end: 70,
+                        },
+                    },
+                ],
+                return_type: Some(
+                    TypeName {
+                        name: "Int",
+                        span: SourceSpan {
+                            start: 75,
+                            end: 78,
+                        },
+                    },
+                ),
+                body: Block {
+                    statements: [
+                        Return {
+                            value: Some(
+                                Identifier {
+                                    name: "target",
+                                    span: SourceSpan {
+                                        start: 92,
+                                        end: 98,
+                                    },
+                                },
+                            ),
+                            span: SourceSpan {
+                                start: 85,
+                                end: 99,
+                            },
+                        },
+                    ],
+                    span: SourceSpan {
+                        start: 79,
+                        end: 101,
+                    },
+                },
+                span: SourceSpan {
+                    start: 0,
+                    end: 101,
+                },
+            },
+        ),
+    ],
+}

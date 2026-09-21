@@ -1,0 +1,8 @@
+verb main() -> Int {
+    erg value = 41;
+    return consume(value: value);
+}
+
+verb consume(dat value: Int) -> Int {
+    return value + 1;
+}

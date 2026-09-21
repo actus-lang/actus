@@ -12,15 +12,58 @@ Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot 
 
 ## Project status
 
-The language specification and compiler architecture are under active development. The initial compiler is being bootstrapped in Rust, with a planned C99 emission backend. The current repository contains the project foundation and manifesto; language implementation work is the next milestone.
+The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports integer parameters and locals, arithmetic expressions, lexical scopes, loop control flow, and integer returns.
 
 ## Build and run
 
+Build the compiler and run the introductory example through the frontend:
+
 ```sh
-cargo run
+cargo run -- check examples/hello.act
 ```
 
-Run the test suite with:
+Emit a native object file:
+
+```sh
+cargo run -- build examples/hello.act --emit obj -o examples/hello.o
+```
+
+Build a native executable directly through the system linker:
+
+```sh
+cargo run -- build examples/hello.act --emit exe -o examples/hello
+./examples/hello
+echo $?
+```
+
+Build and execute a temporary native binary without keeping the artifact:
+
+```sh
+cargo run -- run examples/loop_ssa.act
+```
+
+The command returns the Actus program's exit code and removes its temporary executable.
+
+The example returns `42`. Object files and native executables are local build artifacts and are excluded from version control.
+
+### Toolchain configuration
+
+Basic project build settings are read from the root `Arca.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
+
+```toml
+[package]
+name = "my_program"
+version = "0.1.0"
+entry = "main"
+```
+
+```sh
+ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
+```
+
+The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
+
+Run the complete test suite with:
 
 ```sh
 cargo test

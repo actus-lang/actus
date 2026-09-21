@@ -4,7 +4,7 @@ Actus is developed in small, verifiable stages. Each item should be checked only
 
 ## Current focus
 
-**Phase 1 is the active development phase.** Lexer work exists as preserved implementation progress, but no further Phase 2 work may begin until every required Phase 1 item is complete and verified.
+**Phase 5 is the active development phase.** Earlier phases are complete except for the explicitly deferred second-maintainer review requirement. Native backend work remains preserved as completed progress while the semantic and registry foundations are finalized.
 
 Each phase is gated: implementation progress in a later phase may be preserved, but the project must return to the earliest incomplete phase before adding new work.
 
@@ -52,131 +52,189 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Implement parsing for borrow declarations using `ref`.
 - [x] Implement parsing for assignments and calls.
 - [x] Implement parsing for returns.
-- [ ] Implement parsing for intrinsic `drop` statements.
+- [x] Implement parsing for intrinsic `drop` statements.
 - [x] Track source spans for AST nodes.
-- [ ] Produce stable parser diagnostics with error codes.
+- [x] Produce stable parser diagnostics with error codes.
 - [x] Reject missing semicolons.
 - [x] Reject unclosed blocks and unmatched braces.
 - [x] Reject invalid roles and malformed declarations.
 - [x] Reject invalid argument syntax.
-- [ ] Add valid parser fixtures.
-- [ ] Add invalid parser fixtures.
-- [ ] Add AST snapshot tests.
+- [x] Add valid parser fixtures.
+- [x] Add invalid parser fixtures.
+- [x] Add AST snapshot tests.
 
 ## Phase 4: Syntax Tooling
 
-- [ ] Add `actus parse <file>`.
-- [ ] Add `actus check <file>`.
-- [ ] Add deterministic diagnostic rendering.
-- [ ] Define stable syntax error codes.
-- [ ] Implement the first `actus fmt` command.
-- [ ] Define formatting rules for blocks, parameters, calls, and expressions.
-- [ ] Make formatter output deterministic.
-- [ ] Verify formatter idempotence.
-- [ ] Add formatter snapshot tests.
-- [ ] Ensure malformed input produces diagnostics instead of panics.
+- [x] Add `actus parse <file>`.
+- [x] Add `actus check <file>`.
+- [x] Run semantic analysis from `actus check`.
+- [x] Add deterministic diagnostic rendering.
+- [x] Define stable syntax error codes.
+- [x] Implement the first `actus fmt` command.
+- [x] Define formatting rules for blocks, parameters, calls, and expressions.
+- [x] Make formatter output deterministic.
+- [x] Verify formatter idempotence.
+- [x] Add formatter snapshot tests.
+- [x] Ensure malformed input produces diagnostics instead of panics.
 
 ## Phase 5: Semantic Analyzer
 
 ### Bindings and Scopes
 
-- [ ] Implement lexical scope frames.
-- [ ] Implement binding tables.
-- [ ] Reject use of undeclared identifiers.
-- [ ] Reject duplicate bindings within the same scope.
-- [ ] Define and enforce shadowing rules.
-- [ ] Track binding source spans.
+- [x] Implement lexical scope frames.
+- [x] Implement binding tables.
+- [x] Reject use of undeclared identifiers.
+- [x] Reject duplicate bindings within the same scope.
+- [x] Define and enforce shadowing rules.
+- [x] Track binding source spans.
+- [x] Validate known typed initializers and assignments.
 
 ### Ownership
 
-- [ ] Implement `erg` owner bindings.
-- [ ] Implement `dat` ownership transfer at call sites.
-- [ ] Transition moved caller bindings to `Moved`.
-- [ ] Reject use after move.
-- [ ] Reject use after explicit drop.
-- [ ] Reject double drop.
-- [ ] Define ownership transfer for returned values.
-- [ ] Move returned local owners out of their scope.
-- [ ] Reject borrowed returns in Alpha.
+- [x] Implement `erg` owner bindings.
+- [x] Implement `dat` ownership transfer at call sites.
+- [x] Transition moved caller bindings to `Moved`.
+- [x] Reject use after move.
+- [x] Reject use after explicit drop.
+- [x] Reject double drop.
+- [x] Define ownership transfer for returned values.
+- [x] Validate known return expression types against verb declarations.
+- [x] Enforce required return values for typed verb declarations.
+- [x] Move returned local owners out of their scope.
+- [x] Reject borrowed returns in Alpha.
 
 ### Borrowing
 
-- [ ] Implement `BorrowRecord` with identity, owner, scope, and origin span.
-- [ ] Implement `abs x = ref owner`.
-- [ ] Derive `Frozen` from active borrow records.
-- [ ] Restore the owner to `Active` after the last borrow ends.
-- [ ] Reject mutation while an owner is frozen.
-- [ ] Reject moving a frozen owner.
-- [ ] Reject dropping a frozen owner.
-- [ ] Allow shared borrows to be passed to nested calls.
+- [x] Implement `BorrowRecord` with identity, owner, scope, and origin span.
+- [x] Implement `abs x = ref owner`.
+- [x] Derive `Frozen` from active borrow records.
+- [x] Restore the owner to `Active` after the last borrow ends.
+- [x] Reject mutation while an owner is frozen.
+- [x] Reject moving a frozen owner.
+- [x] Reject dropping a frozen owner.
+- [x] Allow shared borrows to be passed to nested calls.
 - [ ] Reject storing borrows in longer-lived structures.
-- [ ] Reject returning borrows from functions.
-- [ ] Reject borrow escape across lexical scope boundaries.
-- [ ] Reject `drop` applied to an `abs` binding.
-- [ ] Produce diagnostics that identify every active blocking borrow.
+- [x] Reject returning borrows from functions.
+- [x] Reject borrow escape across lexical scope boundaries.
+- [x] Reject `drop` applied to an `abs` binding.
+- [x] Produce diagnostics that identify every active blocking borrow.
 
 ### Calls and Roles
 
-- [ ] Validate `erg`, `abs`, and `dat` parameter compatibility.
-- [ ] Implement positional argument binding.
-- [ ] Implement named argument binding.
-- [ ] Reject duplicate argument bindings.
-- [ ] Reject unknown parameter names.
-- [ ] Reject invalid mixtures of positional and named arguments.
-- [ ] Reject ambiguous positional calls.
-- [ ] Validate argument ownership and borrow requirements.
+- [x] Validate `erg`, `abs`, and `dat` parameter compatibility.
+- [x] Add a centralized source-level intrinsic registry for built-in functions.
+- [x] Include statement intrinsics such as `drop` in the source-level registry.
+- [x] Add the initial built-in type registry for supported `Int` and `Buffer` types.
+- [x] Extend the built-in type registry with initial `Array` and `Map` entries.
+- [x] Define case-sensitive, separate function and type namespaces with explicit collision rules.
+- [x] Define registry status metadata for adding, deprecating, and removing built-ins.
+- [x] Validate declared built-in type names before code generation.
+- [x] Implement positional argument binding.
+- [x] Implement named argument binding.
+- [x] Reject duplicate argument bindings.
+- [x] Reject unknown parameter names.
+- [x] Reject invalid mixtures of positional and named arguments.
+- [x] Reject ambiguous positional calls.
+- [x] Validate argument ownership and borrow requirements.
+- [x] Validate built-in intrinsic argument types before code generation.
+- [x] Validate known argument types for user-defined verb calls.
 
 ## Phase 6: Deterministic Cleanup
 
-- [ ] Implement scope cleanup planning.
-- [ ] Drop active owned bindings in reverse declaration order.
-- [ ] Skip cleanup for moved bindings.
-- [ ] Skip cleanup for already dropped bindings.
-- [ ] End borrows at their lexical scope boundary.
-- [ ] Implement `return` scope unwinding.
-- [ ] Implement `break` scope unwinding.
-- [ ] Implement `continue` scope unwinding.
-- [ ] Ensure returned owners are not dropped during unwinding.
-- [ ] Add LIFO destruction tests.
-- [ ] Add early-return cleanup tests.
-- [ ] Add nested-scope cleanup tests.
-- [ ] Add move-and-drop interaction tests.
+- [x] Implement scope cleanup planning.
+- [x] Drop active owned bindings in reverse declaration order.
+- [x] Skip cleanup for moved bindings.
+- [x] Skip cleanup for already dropped bindings.
+- [x] End borrows at their lexical scope boundary.
+- [x] Implement `return` scope unwinding.
+- [x] Implement `break` scope unwinding.
+- [x] Implement `continue` scope unwinding.
+- [x] Ensure returned owners are not dropped during unwinding.
+- [x] Add LIFO destruction tests.
+- [x] Add early-return cleanup tests.
+- [x] Add nested-scope cleanup tests.
+- [x] Add move-and-drop interaction tests.
 
-## Phase 7: C99 Backend
+## Phase 7: Native Backend
 
-- [ ] Define the initial C emission model.
-- [ ] Emit valid C99 for the supported Actus subset.
+- [x] Define the initial native emission model.
+- [x] Integrate a Rust-native backend such as Cranelift.
+- [x] Emit object files or native binaries without an intermediate C representation.
+- [x] Add `actus build` for writing a validated native object artifact.
+- [x] Lower integer locals and arithmetic expressions to native instructions.
+- [x] Define and validate the native `Int` parameter and return ABI.
+- [x] Lower calls between native `Int` verbs.
+- [x] Lower scalar `Int` borrow roles through the native ABI.
+- [x] Lower scalar `Int` ownership transfers through the native ABI.
+- [x] Lower unary negative and grouped integer expressions.
+- [x] Lower nested scalar scopes and scalar `drop` statements.
+- [x] Lower basic native loop CFG edges for `break` and `continue`.
+- [x] Implement SSA variables and phi values for loop-carried bindings.
+- [x] Validate native cleanup plan references before emission.
+- [x] Reject duplicate native cleanup actions within one scope.
+- [x] Associate native unwind plans with their source control-flow spans.
+- [x] Create unwind plans for literal and call return expressions.
+- [x] Associate cleanup plans with lexical scope spans.
+- [x] Lower return, break, and continue unwind plans into the native cleanup model.
+- [x] Define the initial native resource handle and destructor contract.
+- [x] Define the Alpha `Buffer` layout and runtime operation contract.
+- [x] Implement initial native `Buffer` allocation, append, and drop operations.
+- [x] Build and link the native runtime archive for executable emission.
+- [x] Lower initial `Buffer` allocation, append, and explicit drop calls.
+- [x] Emit automatic `Buffer` cleanup on lexical scope and control-flow unwinding.
+- [x] Emit `Buffer` ownership transfers without duplicate cleanup.
+- [x] Verify deterministic native object emission for identical programs.
+- [x] Add native object structural golden tests.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
-- [ ] Emit explicit borrow scopes where required by the backend.
-- [ ] Reject code generation when semantic analysis fails.
-- [ ] Add generated C golden tests.
-- [ ] Compile generated C in CI.
-- [ ] Add a minimal end-to-end Actus-to-native-binary test.
+- [x] Emit explicit borrow scopes where required by the backend.
+- [x] Reject code generation when semantic analysis fails.
+- [x] Add native object and architecture-scoped machine-code golden tests.
+- [x] Link generated objects in CI.
+- [x] Add a minimal end-to-end Actus-to-native-binary test.
+- [x] Add `actus run` for temporary native execution.
+
+### C Library Interoperability
+
+- [x] Define the initial C ABI boundary independently from the native backend.
+- [x] Map initial primitive, opaque-handle, calling-convention, and ownership contracts.
+- [x] Define target pointer-width layout rules for initial C ABI types.
+- [x] Parse, model, and import external C function declarations without generating Actus-owned C code.
+- [x] Define initial C ABI return ownership and lifetime contracts.
+- [x] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
+- [ ] Define ownership and lifetime rules at the C FFI boundary.
+- [ ] Support linking static and shared C libraries.
+- [x] Add manifest-driven static and shared library linker inputs.
+- [ ] Define a reproducible header-to-Actus binding workflow.
+- [ ] Mark unchecked raw pointers and foreign resources with explicit unsafe boundaries.
+- [ ] Add C library integration fixtures and native link tests.
+- [x] Add a native link smoke test for an imported C symbol.
 
 ## Phase 8: Test Infrastructure
 
 - [ ] Organize tests into lexer, parser, semantic, formatter, and code-generation suites.
-- [ ] Add valid `.act` fixtures.
-- [ ] Add invalid `.act` fixtures.
-- [ ] Add diagnostic snapshots.
-- [ ] Add semantic state-transition tests.
-- [ ] Add ownership and borrowing regression tests.
-- [ ] Add golden tests for generated C.
+- [x] Add valid `.act` fixtures.
+- [x] Add invalid `.act` fixtures.
+- [x] Add diagnostic snapshots.
+- [x] Add stable semantic diagnostic renderer tests.
+- [x] Add semantic state-transition tests.
+- [x] Add ownership and borrowing regression tests.
+- [x] Add golden tests for generated native output.
 - [ ] Make test output deterministic.
 - [ ] Add a command for intentionally updating snapshots.
 - [ ] Add coverage reporting to CI.
 
 ## Phase 9: Fuzzing and Hardening
 
+- [x] Add a deterministic malformed-input no-panic corpus.
 - [ ] Add lexer fuzzing.
 - [ ] Add parser fuzzing.
 - [ ] Fuzz malformed braces and delimiters.
 - [ ] Fuzz malformed literals and comments.
 - [ ] Verify that arbitrary input never causes a compiler panic.
-- [ ] Add property tests for formatter idempotence.
+- [x] Add property tests for formatter idempotence.
 - [ ] Add property tests for parser round-tripping where applicable.
-- [ ] Add compiler determinism checks.
+- [x] Add compiler determinism checks.
 - [ ] Add performance benchmarks for lexing and parsing.
 - [ ] Add cross-platform CI for Linux, macOS, and Windows.
 
@@ -191,7 +249,99 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Add contributor guidelines.
 - [ ] Add a code of conduct.
 - [ ] Add release and versioning policy.
+- [x] Add automated Conventional Commit changelog generation.
 - [ ] Keep the README and manifesto synchronized with implemented behavior.
+
+## Phase 11: Complete Struct System
+
+Structs are intentionally deferred until the ownership, borrowing, and cleanup foundations are stable. This phase must implement structs as a complete language and compiler feature, not as parser-only syntax.
+
+### Syntax and AST
+
+- [ ] Define struct declaration grammar and source-span rules.
+- [ ] Parse named fields with explicit types.
+- [ ] Parse struct literals and field initialization.
+- [ ] Parse field access and field assignment.
+- [ ] Represent structs and fields in the AST with dedicated modules.
+- [ ] Reject duplicate struct and field names.
+- [ ] Reject unknown fields and missing required fields.
+
+### Semantic Model
+
+- [ ] Add a type environment for struct declarations.
+- [ ] Validate field types and recursive type references.
+- [ ] Define field visibility and access rules.
+- [ ] Define ownership semantics for `erg`, `abs`, and `dat` fields.
+- [ ] Define move semantics for whole structs and individual fields.
+- [ ] Reject partial use after moving a field.
+- [ ] Define and enforce struct initialization invariants.
+- [ ] Define copy, move, and assignment behavior explicitly.
+
+### Borrowing and Lifetimes
+
+- [ ] Define whether Alpha structs may contain `abs` fields.
+- [ ] Reject self-referential and escaping borrow fields unless a lifetime model exists.
+- [ ] Reject storing lexical borrows in longer-lived structs.
+- [ ] Validate borrow access through struct fields.
+- [ ] Track field-level borrow records where supported.
+- [ ] Add diagnostics identifying the struct field and blocking borrow.
+
+### Layout and Destruction
+
+- [ ] Define deterministic field declaration order.
+- [ ] Define size, alignment, and padding rules.
+- [ ] Define packed and externally represented struct policies.
+- [ ] Generate field-level cleanup in reverse declaration order.
+- [ ] Handle moved and dropped fields without double cleanup.
+- [ ] Add layout and destruction golden tests.
+
+### Methods and Backend
+
+- [ ] Define struct method syntax and receiver roles.
+- [ ] Validate receiver ownership and borrow behavior.
+- [ ] Emit native struct layouts and declarations for the selected backend.
+- [ ] Emit field access, initialization, assignment, and cleanup.
+- [ ] Define the C ABI contract for public structs.
+- [ ] Add generated native output and execution tests.
+
+### Documentation and Compatibility
+
+- [ ] Document the complete struct model and unsupported cases.
+- [ ] Add architecture decision records for layout and field ownership.
+- [ ] Add migration rules if struct semantics evolve after Alpha.
+- [ ] Keep the manifesto, specification, and implementation behavior synchronized.
+
+## Future Tooling: Arca Package Ecosystem
+
+Arca is the planned project and package manager for Actus. It will orchestrate
+the compiler, builds, tests, dependency resolution, and package publication.
+
+### Manifest and Project Model
+
+- [x] Define the initial `Arca.toml` manifest schema.
+- [ ] Define package source roots, entry points, and project layout.
+- [x] Define initial package names, versions, entry points, and Alpha edition.
+- [ ] Define the `Arca.lock` dependency lockfile format.
+- [ ] Define debug and release profile semantics.
+
+### Local Workflow
+
+- [ ] Add `arca init` and `arca new`.
+- [ ] Add `arca check`.
+- [ ] Add `arca build` and `arca build --release`.
+- [ ] Add `arca run`.
+- [ ] Add `arca test`.
+- [ ] Add `arca fmt` integration.
+
+### Dependencies and Publishing
+
+- [ ] Define dependency resolution and version constraints.
+- [ ] Define local path dependencies.
+- [ ] Define registry and package index behavior.
+- [ ] Define package validation and reproducible archives.
+- [ ] Define package signing and trust policy.
+- [ ] Add `arca publish` after the registry contract is stable.
+- [ ] Add package download and cache management.
 
 ## Future Language Extensions
 

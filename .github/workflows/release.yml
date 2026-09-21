@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.13.0
+
+      - name: Verify tag points to main history
+        run: git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+
+      - name: Generate versioned changelog
+        run: |
+          mkdir -p docs/changelog
+          git cliff --current --output "docs/changelog/${GITHUB_REF_NAME}.md" --tag "${GITHUB_REF_NAME}"
+          bash scripts/update_changelog_index.sh
+
+      - name: Open changelog pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: "automation/changelog-${{ github.ref_name }}"
+          delete-branch: true
+          commit-message: "docs(release): add ${{ github.ref_name }} changelog"
+          title: "docs(release): add ${{ github.ref_name }} changelog"
+          body: |
+            ## Summary
+            - add the generated changelog for `${{ github.ref_name }}`
+            - update the root changelog index
+
+            This pull request was created automatically from the release tag.
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --title "Actus ${GITHUB_REF_NAME}" --notes-file "docs/changelog/${GITHUB_REF_NAME}.md"

@@ -1,0 +1,5 @@
+verb main() {
+    erg value = make();
+    drop(value);
+    inspect(value);
+}
