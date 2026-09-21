@@ -57,6 +57,7 @@ impl Analyzer {
                     span: expression_span(expression),
                 });
             }
+            self.plan_return_unwind(statement_span);
             return Ok(());
         };
         let index = self.binding(name, *span)?;

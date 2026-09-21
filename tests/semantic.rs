@@ -236,6 +236,15 @@ fn plans_return_unwinding_without_dropping_the_returned_owner() {
 }
 
 #[test]
+fn plans_return_unwinding_for_literal_returns() {
+    let semantic = analyze_source("verb main() -> Int { return 42; }")
+        .expect("literal return should pass semantic analysis");
+
+    assert_eq!(semantic.return_unwind_plans.len(), 1);
+    assert!(semantic.return_unwind_plans[0].span.end > semantic.return_unwind_plans[0].span.start);
+}
+
+#[test]
 fn unwinds_nested_scopes_on_return() {
     let model =
         analyze_source("verb early(erg outer: Buffer) { { erg inner = make(); return outer; } }")

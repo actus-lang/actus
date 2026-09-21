@@ -161,6 +161,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Validate native cleanup plan references before emission.
 - [x] Reject duplicate native cleanup actions within one scope.
 - [x] Associate native unwind plans with their source control-flow spans.
+- [x] Create unwind plans for literal and call return expressions.
 - [ ] Lower return, break, and continue unwind plans into the native cleanup model.
 - [x] Verify deterministic native object emission for identical programs.
 - [ ] Emit deterministic cleanup instructions.
