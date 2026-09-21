@@ -14,6 +14,8 @@ Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot 
 
 The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports integer parameters and locals, arithmetic expressions, lexical scopes, loop control flow, and integer returns.
 
+Language style, module visibility, import conventions, and formatting rules are documented in [Actus Language Style and Conventions](docs/language/style-and-conventions.md).
+
 ## Build and run
 
 Build the compiler and run the introductory example through the frontend:
