@@ -7,11 +7,11 @@ use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_native::builder as native_builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use crate::ast::{Program, TopLevelDecl, VerbDecl};
+use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
 use crate::semantic::analyze;
 
-use super::abi::validate_native_signature;
+use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
@@ -66,6 +66,14 @@ pub fn emit_program_object_with_configuration(
             TopLevelDecl::ExternalVerb(_) => None,
         })
         .collect::<Vec<_>>();
+    let external_verbs = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Verb(_) => None,
+            TopLevelDecl::ExternalVerb(verb) => Some(verb),
+        })
+        .collect::<Vec<_>>();
     if verbs.is_empty() {
         return Err(NativeEmitError("program has no verb declarations".to_owned()));
     }
@@ -75,18 +83,23 @@ pub fn emit_program_object_with_configuration(
     for verb in &verbs {
         validate_native_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     }
-    emit_verbs_object(&verbs, symbol, &cleanup_schedule, configuration)
+    for verb in &external_verbs {
+        validate_external_native_signature(verb)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
+    emit_verbs_object(&verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
 }
 
 fn emit_verbs_object(
     verbs: &[&VerbDecl],
+    external_verbs: &[&ExternalVerbDecl],
     symbol: &str,
     cleanup_schedule: &NativeCleanupSchedule,
     configuration: &NativeBackendConfiguration,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
     let frontend_config = module.isa().frontend_config();
-    let mut metadata = declare_functions(&mut module, verbs, symbol)?;
+    let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = metadata
         .iter()
@@ -131,6 +144,7 @@ fn create_module(
 fn declare_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
+    external_verbs: &[&ExternalVerbDecl],
     entry_symbol: &str,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
@@ -149,12 +163,41 @@ fn declare_functions(
             },
         );
     }
+    for verb in external_verbs {
+        let signature = external_native_signature(module, verb);
+        let id = module
+            .declare_function(&verb.name, Linkage::Import, &signature)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+        metadata.insert(
+            verb.name.clone(),
+            FunctionMeta {
+                id,
+                parameter_names: verb.params.iter().map(|param| param.name.clone()).collect(),
+                return_type: NativeType::from_type_name(verb.return_type.as_ref()),
+            },
+        );
+    }
     Ok(metadata)
 }
 
 fn native_signature(
     module: &mut ObjectModule,
     verb: &VerbDecl,
+) -> cranelift_codegen::ir::Signature {
+    let mut signature = module.make_signature();
+    let pointer_type = module.isa().pointer_type();
+    signature.params.extend(verb.params.iter().map(|parameter| {
+        AbiParam::new(NativeType::from_name(&parameter.ty.name).unwrap().ir_type(pointer_type))
+    }));
+    signature.returns.push(AbiParam::new(
+        NativeType::from_type_name(verb.return_type.as_ref()).ir_type(pointer_type),
+    ));
+    signature
+}
+
+fn external_native_signature(
+    module: &mut ObjectModule,
+    verb: &ExternalVerbDecl,
 ) -> cranelift_codegen::ir::Signature {
     let mut signature = module.make_signature();
     let pointer_type = module.isa().pointer_type();

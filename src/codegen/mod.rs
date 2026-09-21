@@ -8,7 +8,7 @@ mod native;
 mod native_runtime;
 mod types;
 
-pub use abi::{NativeAbiError, validate_native_signature};
+pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
 pub use linker::{NativeLinkError, link_object};
 pub use model::{
     NativeCleanupPlan, NativeInstruction, NativeLoopUnwindPlan, NativeUnwindPlan,
