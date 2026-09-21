@@ -136,22 +136,21 @@ fn codegen_accepts_buffer_append_calls() {
 }
 
 #[test]
-fn codegen_rejects_unsupported_native_return_types() {
+fn semantic_analysis_rejects_unknown_return_types() {
     let (tokens, errors) = scan("verb main() -> String { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
-    let error = emit_program_object(&program, "main").expect_err("Buffer is not an i32 ABI return");
-    assert!(error.to_string().contains("supports `Int` and `Buffer` returns"));
+    let error = emit_program_object(&program, "main").expect_err("unknown type must be rejected");
+    assert!(error.to_string().contains("UnknownType"));
 }
 
 #[test]
-fn codegen_rejects_unsupported_native_parameter_types() {
+fn semantic_analysis_rejects_unknown_parameter_types() {
     let (tokens, errors) = scan("verb main(erg buffer: String) -> Int { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
-    let error =
-        emit_program_object(&program, "main").expect_err("Buffer is not an i32 ABI parameter");
-    assert!(error.to_string().contains("supports `Int` and `Buffer` parameters"));
+    let error = emit_program_object(&program, "main").expect_err("unknown type must be rejected");
+    assert!(error.to_string().contains("UnknownType"));
 }
 
 #[test]

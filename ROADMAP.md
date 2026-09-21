@@ -124,6 +124,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Extend the built-in type registry with `Array`, `Map`, and future types.
 - [ ] Define separate function and type namespaces with explicit collision rules.
 - [ ] Define the registry lifecycle for adding, deprecating, and removing built-ins.
+- [x] Validate declared built-in type names before code generation.
 - [x] Implement positional argument binding.
 - [x] Implement named argument binding.
 - [x] Reject duplicate argument bindings.

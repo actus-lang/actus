@@ -24,6 +24,7 @@ pub enum SemanticErrorKind {
     InvalidOwnerInitializer { name: String },
     LoopControlOutsideLoop { keyword: String },
     ReservedIntrinsicName { name: String },
+    UnknownType { name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

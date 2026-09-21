@@ -75,6 +75,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
         SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
         SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
+        SemanticErrorKind::UnknownType { .. } => "E1023",
     }
 }
 
@@ -130,6 +131,7 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
         SemanticErrorKind::ReservedIntrinsicName { name } => {
             format!("`{name}` is reserved for a built-in intrinsic")
         }
+        SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
     }
 }
 

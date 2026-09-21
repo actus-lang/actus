@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Block, Expr, Program, Role, Stmt, TopLevelDecl};
+use crate::ast::{Block, Expr, Program, Role, Stmt, TopLevelDecl, lookup_builtin_type};
 
 use super::errors::SemanticError;
 use super::model::SemanticModel;
@@ -46,6 +46,12 @@ impl Analyzer {
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Verb(verb) = declaration;
+            for parameter in &verb.params {
+                self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;
+            }
+            if let Some(return_type) = &verb.return_type {
+                self.validate_type_name(&return_type.name, return_type.span)?;
+            }
             if super::intrinsics::is_reserved_name(&verb.name) {
                 return Err(SemanticError {
                     kind: super::errors::SemanticErrorKind::ReservedIntrinsicName {
@@ -66,6 +72,20 @@ impl Analyzer {
             self.leave_scope();
         }
         Ok(self.model)
+    }
+
+    fn validate_type_name(
+        &self,
+        name: &str,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if lookup_builtin_type(name).is_some() {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: super::errors::SemanticErrorKind::UnknownType { name: name.to_owned() },
+            span,
+        })
     }
 
     fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {

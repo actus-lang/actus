@@ -27,6 +27,13 @@ fn builtin_type_registry_defines_supported_types() {
 }
 
 #[test]
+fn rejects_unknown_declared_types() {
+    let error = analyze_source("verb main(erg buffer: Array) { }")
+        .expect_err("unsupported types must fail before code generation");
+    assert!(matches!(error.kind, SemanticErrorKind::UnknownType { name } if name == "Array"));
+}
+
+#[test]
 fn accepts_named_allocate_length() {
     analyze_source("verb main() { erg buffer: Buffer = allocate(length: 4); drop(buffer); }")
         .expect("named intrinsic arguments should be accepted");
