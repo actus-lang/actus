@@ -5,6 +5,7 @@ mod linker;
 mod lowering;
 mod model;
 mod native;
+mod native_runtime;
 mod types;
 
 pub use abi::{NativeAbiError, validate_native_signature};

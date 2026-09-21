@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::{EmitKind, build_file};
+use super::build::{EmitKind, build_file};
 use crate::configuration::CompilerConfiguration;
 
 pub(super) fn run_command(
