@@ -1,4 +1,5 @@
 use crate::semantic::{CleanupAction, LoopExitKind, SemanticModel};
+use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeInstruction {
@@ -67,9 +68,14 @@ fn validate_scope(
     scope: &crate::semantic::ScopeCleanup,
     model: &SemanticModel,
 ) -> Result<(), String> {
+    let mut bindings = HashSet::new();
+    let mut borrows = HashSet::new();
     for action in &scope.actions {
         match action {
             CleanupAction::EndBorrow { borrow_id } => {
+                if !borrows.insert(*borrow_id) {
+                    return Err(format!("cleanup repeats borrow `{borrow_id}`"));
+                }
                 if !model.borrows.iter().any(|borrow| borrow.id == *borrow_id) {
                     return Err(format!("cleanup references unknown borrow `{borrow_id}`"));
                 }
@@ -79,7 +85,11 @@ fn validate_scope(
             {
                 return Err(format!("cleanup references invalid binding `{binding_index}`"));
             }
-            CleanupAction::DropBinding { .. } => {}
+            CleanupAction::DropBinding { binding_index } => {
+                if !bindings.insert(*binding_index) {
+                    return Err(format!("cleanup repeats binding `{binding_index}`"));
+                }
+            }
         }
     }
     Ok(())
@@ -125,5 +135,29 @@ mod tests {
 
         assert!(validate_cleanup_plans(&binding).is_err());
         assert!(validate_cleanup_plans(&borrow).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_cleanup_actions_in_one_scope() {
+        let model = SemanticModel {
+            bindings: vec![crate::semantic::Binding {
+                name: "value".to_owned(),
+                role: crate::ast::Role::Erg,
+                span: crate::lexer::SourceSpan::new(0, 1),
+                state: crate::semantic::BindingState::Active,
+            }],
+            borrows: Vec::new(),
+            cleanup_plans: vec![ScopeCleanup {
+                depth: 1,
+                actions: vec![
+                    CleanupAction::DropBinding { binding_index: 0 },
+                    CleanupAction::DropBinding { binding_index: 0 },
+                ],
+            }],
+            return_unwind_plans: Vec::new(),
+            loop_unwind_plans: Vec::new(),
+        };
+
+        assert!(validate_cleanup_plans(&model).is_err());
     }
 }
