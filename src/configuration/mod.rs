@@ -1,9 +1,45 @@
 use std::ffi::{OsStr, OsString};
+use std::fmt::{Display, Formatter};
+use std::path::Path;
+
+use serde::Deserialize;
 
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 const DEFAULT_LINKER: &str = "cc";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
 const DEFAULT_NATIVE_MODULE_NAME: &str = "actus";
+const MANIFEST_FILE_NAME: &str = "Arca.toml";
+
+#[derive(Debug)]
+pub struct ConfigurationError(String);
+
+impl Display for ConfigurationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for ConfigurationError {}
+
+#[derive(Deserialize)]
+struct ArcaManifest {
+    package: PackageManifest,
+    #[serde(default)]
+    build: BuildManifest,
+}
+
+#[derive(Deserialize)]
+struct PackageManifest {
+    name: String,
+    version: String,
+}
+
+#[derive(Default, Deserialize)]
+struct BuildManifest {
+    linker: Option<String>,
+    native_module: Option<String>,
+    position_independent: Option<bool>,
+}
 
 #[derive(Clone, Debug)]
 pub struct NativeBackendConfiguration {
@@ -47,6 +83,44 @@ impl CompilerConfiguration {
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
         }
+    }
+
+    pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
+        let source = std::fs::read_to_string(path).map_err(|error| {
+            ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
+        })?;
+        let manifest = toml::from_str::<ArcaManifest>(&source).map_err(|error| {
+            ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
+        })?;
+        if manifest.package.name.is_empty() || manifest.package.version.is_empty() {
+            return Err(ConfigurationError(
+                "Arca.toml package name and version must not be empty".to_owned(),
+            ));
+        }
+
+        let environment = Self::from_environment();
+        let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
+            .or_else(|| manifest.build.linker.as_deref().map(OsString::from));
+        let native_backend = NativeBackendConfiguration::new(
+            manifest
+                .build
+                .native_module
+                .unwrap_or_else(|| environment.native_backend.module_name.clone()),
+            manifest
+                .build
+                .position_independent
+                .unwrap_or(environment.native_backend.position_independent),
+        );
+        Ok(Self {
+            linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
+            native_backend,
+            ..environment
+        })
+    }
+
+    pub fn from_current_manifest() -> Result<Self, ConfigurationError> {
+        let path = Path::new(MANIFEST_FILE_NAME);
+        if path.exists() { Self::from_manifest(path) } else { Ok(Self::from_environment()) }
     }
 
     pub fn linker(&self) -> &OsStr {

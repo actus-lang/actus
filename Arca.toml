@@ -1,0 +1,8 @@
+[package]
+name = "actus"
+version = "0.1.0"
+
+[build]
+linker = "cc"
+native_module = "actus"
+position_independent = true

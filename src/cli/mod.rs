@@ -16,7 +16,13 @@ pub fn run() -> i32 {
 }
 
 pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
-    let configuration = CompilerConfiguration::from_environment();
+    let configuration = match CompilerConfiguration::from_current_manifest() {
+        Ok(configuration) => configuration,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 1;
+        }
+    };
     let Some(command) = arguments.next() else {
         print_usage();
         return 2;
