@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, types};
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{BinaryOp, Expr, IntrinsicKind, UnaryOp, lookup_intrinsic};
+use crate::ast::{BinaryOp, Expr, IntrinsicKind, UnaryOp, lookup_call_intrinsic};
 
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
@@ -67,7 +67,7 @@ fn lower_call(
         .iter()
         .map(|argument| lower_expression(function, argument, locals, functions))
         .collect::<Result<Vec<_>, _>>()?;
-    match lookup_intrinsic(callee) {
+    match lookup_call_intrinsic(callee) {
         Some(IntrinsicKind::Allocate) => {
             let length = values
                 .pop()

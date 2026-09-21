@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Argument, Expr, IntrinsicKind, lookup_intrinsic};
+use crate::ast::{Argument, Expr, IntrinsicKind, lookup_call_intrinsic, lookup_intrinsic};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -17,7 +17,7 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<bool, SemanticError> {
-        let Some(kind) = lookup_intrinsic(callee) else { return Ok(false) };
+        let Some(kind) = lookup_call_intrinsic(callee) else { return Ok(false) };
         match kind {
             IntrinsicKind::Allocate => {
                 let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
@@ -49,6 +49,7 @@ impl Analyzer {
                 self.require_scalar_argument(callee, parameters[1], &arguments[1].expression)?;
                 Ok(true)
             }
+            IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
         }
     }
 
@@ -58,7 +59,7 @@ impl Analyzer {
         arguments: &'a [Argument],
         span: SourceSpan,
     ) -> Result<Vec<&'a Argument>, SemanticError> {
-        let parameter_names = lookup_intrinsic(callee)
+        let parameter_names = lookup_call_intrinsic(callee)
             .expect("intrinsic call should resolve before argument binding")
             .spec()
             .parameters;

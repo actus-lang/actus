@@ -1,4 +1,6 @@
-use actus::ast::{BuiltinType, IntrinsicKind, lookup_builtin_type, lookup_intrinsic};
+use actus::ast::{
+    BuiltinType, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic, lookup_intrinsic,
+};
 use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::{SemanticErrorKind, analyze};
@@ -16,6 +18,8 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert_eq!(lookup_intrinsic("drop"), Some(IntrinsicKind::Drop));
+    assert!(lookup_call_intrinsic("drop").is_none());
     assert!(lookup_intrinsic("user_function").is_none());
 }
 

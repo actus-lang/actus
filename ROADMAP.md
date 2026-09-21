@@ -120,6 +120,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 - [x] Validate `erg`, `abs`, and `dat` parameter compatibility.
 - [x] Add a centralized source-level intrinsic registry for built-in functions.
+- [x] Include statement intrinsics such as `drop` in the source-level registry.
 - [x] Add the initial built-in type registry for supported `Int` and `Buffer` types.
 - [ ] Extend the built-in type registry with `Array`, `Map`, and future types.
 - [ ] Define separate function and type namespaces with explicit collision rules.
