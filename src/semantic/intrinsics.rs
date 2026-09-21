@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
-use crate::ast::{Argument, Expr};
+use crate::ast::{Argument, Expr, IntrinsicKind, lookup_intrinsic};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 pub(super) fn is_reserved_name(name: &str) -> bool {
-    matches!(name, "allocate" | "append")
+    lookup_intrinsic(name).is_some()
 }
 
 impl Analyzer {
@@ -17,35 +17,38 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<bool, SemanticError> {
-        match callee {
-            "allocate" => {
-                let arguments =
-                    self.bind_intrinsic_arguments(callee, arguments, &["length"], span)?;
+        let Some(kind) = lookup_intrinsic(callee) else { return Ok(false) };
+        match kind {
+            IntrinsicKind::Allocate => {
+                let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
                 let argument = arguments[0];
                 self.visit_expression(&argument.expression)?;
-                self.require_scalar_argument(callee, "length", &argument.expression)?;
+                self.require_scalar_argument(
+                    callee,
+                    IntrinsicKind::Allocate.spec().parameters[0],
+                    &argument.expression,
+                )?;
                 Ok(true)
             }
-            "append" => {
-                let arguments =
-                    self.bind_intrinsic_arguments(callee, arguments, &["handle", "byte"], span)?;
+            IntrinsicKind::Append => {
+                let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
                 for argument in &arguments {
                     self.visit_expression(&argument.expression)?;
                 }
                 let handle = &arguments[0].expression;
+                let parameters = IntrinsicKind::Append.spec().parameters;
                 if !self.is_owner_argument(handle) {
                     return Err(SemanticError {
                         kind: SemanticErrorKind::InvalidArgumentRole {
                             callee: callee.to_owned(),
-                            parameter: "handle".to_owned(),
+                            parameter: parameters[0].to_owned(),
                         },
                         span: expression_span(handle),
                     });
                 }
-                self.require_scalar_argument(callee, "byte", &arguments[1].expression)?;
+                self.require_scalar_argument(callee, parameters[1], &arguments[1].expression)?;
                 Ok(true)
             }
-            _ => Ok(false),
         }
     }
 
@@ -53,9 +56,12 @@ impl Analyzer {
         &self,
         callee: &str,
         arguments: &'a [Argument],
-        parameter_names: &[&str],
         span: SourceSpan,
     ) -> Result<Vec<&'a Argument>, SemanticError> {
+        let parameter_names = lookup_intrinsic(callee)
+            .expect("intrinsic call should resolve before argument binding")
+            .spec()
+            .parameters;
         self.validate_intrinsic_shape(callee, arguments, parameter_names, span)?;
         let named = arguments.iter().any(|argument| argument.name.is_some());
         if !named {

@@ -4,6 +4,8 @@ use cranelift_codegen::ir::{AbiParam, types};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
+use crate::ast::IntrinsicKind;
+
 use super::native::{FunctionMeta, NativeEmitError};
 use super::types::NativeType;
 
@@ -14,13 +16,19 @@ pub(super) fn declare_runtime_functions(
     let allocate_id = declare_allocate(module, pointer_type)?;
     let drop_id = declare_drop(module, pointer_type)?;
     let append_id = declare_append(module, pointer_type)?;
+    let allocate_spec = IntrinsicKind::Allocate.spec();
+    let append_spec = IntrinsicKind::Append.spec();
 
     Ok(HashMap::from([
         (
-            "allocate".to_owned(),
+            allocate_spec.name.to_owned(),
             FunctionMeta {
                 id: allocate_id,
-                parameter_names: vec!["length".to_owned()],
+                parameter_names: allocate_spec
+                    .parameters
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
                 return_type: NativeType::Buffer,
             },
         ),
@@ -33,10 +41,14 @@ pub(super) fn declare_runtime_functions(
             },
         ),
         (
-            "append".to_owned(),
+            append_spec.name.to_owned(),
             FunctionMeta {
                 id: append_id,
-                parameter_names: vec!["handle".to_owned(), "byte".to_owned()],
+                parameter_names: append_spec
+                    .parameters
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
                 return_type: NativeType::Int,
             },
         ),

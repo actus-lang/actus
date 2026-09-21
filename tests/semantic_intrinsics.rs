@@ -1,3 +1,4 @@
+use actus::ast::{IntrinsicKind, lookup_intrinsic};
 use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::{SemanticErrorKind, analyze};
@@ -9,6 +10,13 @@ fn analyze_source(
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
     let program = parse(tokens).expect("source should parse");
     analyze(&program)
+}
+
+#[test]
+fn intrinsic_registry_defines_source_contracts() {
+    assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
+    assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert!(lookup_intrinsic("user_function").is_none());
 }
 
 #[test]
