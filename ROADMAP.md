@@ -202,6 +202,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 9: Fuzzing and Hardening
 
+- [x] Add a deterministic malformed-input no-panic corpus.
 - [ ] Add lexer fuzzing.
 - [ ] Add parser fuzzing.
 - [ ] Fuzz malformed braces and delimiters.
