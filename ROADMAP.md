@@ -168,7 +168,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add native object structural golden tests.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
-- [ ] Emit explicit borrow scopes where required by the backend.
+- [x] Emit explicit borrow scopes where required by the backend.
 - [x] Reject code generation when semantic analysis fails.
 - [x] Add native object and architecture-scoped machine-code golden tests.
 - [x] Link generated objects in CI.
