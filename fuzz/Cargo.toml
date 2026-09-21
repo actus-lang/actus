@@ -1,0 +1,40 @@
+[package]
+name = "actus-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+actus = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "lexer"
+path = "fuzz_targets/lexer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser"
+path = "fuzz_targets/parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "delimiters"
+path = "fuzz_targets/delimiters.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "literals"
+path = "fuzz_targets/literals.rs"
+test = false
+doc = false
+bench = false

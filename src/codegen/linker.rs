@@ -25,6 +25,9 @@ pub fn link_object(
     if let Some(runtime_archive) = crate::runtime::runtime_archive_path() {
         command.arg(runtime_archive);
     }
+    for path in configuration.library_paths() {
+        command.arg(library_path_argument(path, configuration.linker_flavor()));
+    }
     for library in configuration.libraries() {
         let arguments = library_arguments(library, configuration.linker_flavor())?;
         command.args(arguments);
@@ -43,6 +46,13 @@ pub fn link_object(
         linker.to_string_lossy(),
         details.trim()
     )))
+}
+
+fn library_path_argument(path: &Path, flavor: LinkerFlavor) -> String {
+    match flavor {
+        LinkerFlavor::Msvc => format!("/LIBPATH:{}", path.display()),
+        LinkerFlavor::Gnu | LinkerFlavor::Apple => format!("-L{}", path.display()),
+    }
 }
 
 fn library_arguments(
@@ -65,7 +75,9 @@ fn library_arguments(
 
 #[cfg(test)]
 mod tests {
-    use super::library_arguments;
+    use std::path::Path;
+
+    use super::{library_arguments, library_path_argument};
     use crate::configuration::{LibraryKind, LinkLibrary, LinkerFlavor};
 
     fn library(name: &str, kind: LibraryKind) -> LinkLibrary {
@@ -93,5 +105,13 @@ mod tests {
                 .expect("MSVC arguments should be generated"),
             ["math.lib"]
         );
+    }
+
+    #[test]
+    fn emits_library_search_path_for_each_linker() {
+        let path = Path::new("/tmp/actus-libs");
+        assert_eq!(library_path_argument(path, LinkerFlavor::Gnu), "-L/tmp/actus-libs");
+        assert_eq!(library_path_argument(path, LinkerFlavor::Apple), "-L/tmp/actus-libs");
+        assert_eq!(library_path_argument(path, LinkerFlavor::Msvc), "/LIBPATH:/tmp/actus-libs");
     }
 }

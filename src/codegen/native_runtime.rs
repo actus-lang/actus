@@ -16,43 +16,48 @@ pub(super) fn declare_runtime_functions(
     let allocate_id = declare_allocate(module, pointer_type)?;
     let drop_id = declare_drop(module, pointer_type)?;
     let append_id = declare_append(module, pointer_type)?;
+    let print_int_id = declare_print_int(module)?;
+    let print_string_id = declare_print_string(module, pointer_type)?;
     let allocate_spec = IntrinsicKind::Allocate.spec();
     let append_spec = IntrinsicKind::Append.spec();
+    let print_spec = IntrinsicKind::Print.spec();
 
     Ok(HashMap::from([
         (
             allocate_spec.name.to_owned(),
-            FunctionMeta {
-                id: allocate_id,
-                parameter_names: allocate_spec
-                    .parameters
-                    .iter()
-                    .map(|name| (*name).to_owned())
-                    .collect(),
-                return_type: NativeType::Buffer,
-            },
+            intrinsic_meta(allocate_id, allocate_spec.parameters, NativeType::Buffer),
         ),
-        (
-            "actus_buffer_drop".to_owned(),
-            FunctionMeta {
-                id: drop_id,
-                parameter_names: vec!["handle".to_owned()],
-                return_type: NativeType::Int,
-            },
-        ),
+        ("actus_buffer_drop".to_owned(), named_meta(drop_id, &["handle"], NativeType::Int)),
         (
             append_spec.name.to_owned(),
-            FunctionMeta {
-                id: append_id,
-                parameter_names: append_spec
-                    .parameters
-                    .iter()
-                    .map(|name| (*name).to_owned())
-                    .collect(),
-                return_type: NativeType::Int,
-            },
+            intrinsic_meta(append_id, append_spec.parameters, NativeType::Int),
         ),
+        (
+            print_spec.name.to_owned(),
+            intrinsic_meta(print_int_id, print_spec.parameters, NativeType::Int),
+        ),
+        ("actus_print_string".to_owned(), named_meta(print_string_id, &["value"], NativeType::Int)),
     ]))
+}
+
+fn intrinsic_meta(
+    id: cranelift_module::FuncId,
+    parameters: &[&str],
+    return_type: NativeType,
+) -> FunctionMeta {
+    named_meta(id, parameters, return_type)
+}
+
+fn named_meta(
+    id: cranelift_module::FuncId,
+    parameters: &[&str],
+    return_type: NativeType,
+) -> FunctionMeta {
+    FunctionMeta {
+        id,
+        parameter_names: parameters.iter().map(|name| (*name).to_owned()).collect(),
+        return_type,
+    }
 }
 
 fn declare_allocate(
@@ -88,5 +93,28 @@ fn declare_append(
     signature.returns.push(AbiParam::new(types::I8));
     module
         .declare_function("actus_buffer_append", Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_print_int(
+    module: &mut ObjectModule,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(types::I32));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function("actus_print_int", Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_print_string(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function("actus_print_string", Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }

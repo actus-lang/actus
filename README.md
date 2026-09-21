@@ -14,6 +14,8 @@ Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot 
 
 The language specification and compiler architecture are under active development. The compiler is being bootstrapped in Rust and currently emits native object files through a Rust-native Cranelift backend. The native alpha slice supports integer parameters and locals, arithmetic expressions, lexical scopes, loop control flow, and integer returns.
 
+Language style, module visibility, import conventions, and formatting rules are documented in [Actus Language Style and Conventions](docs/language/style-and-conventions.md).
+
 ## Build and run
 
 Build the compiler and run the introductory example through the frontend:
@@ -62,6 +64,27 @@ ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/
 ```
 
 The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
+
+Native libraries can be supplied through manifest-relative search paths:
+
+```toml
+[build]
+library_paths = ["native"]
+
+[[build.libraries]]
+name = "example"
+kind = "static"
+```
+
+Foreign C declarations must use an explicit unsafe boundary:
+
+```act
+unsafe extern "C" verb rand() -> Int;
+```
+
+The initial C boundary supports `Int` values and `Buffer` pointers. `abs` and
+`dat` are restricted to opaque resource pointers; foreign pointer returns are
+owned by the Actus caller. Unsupported layouts are rejected before linking.
 
 Run the complete test suite with:
 

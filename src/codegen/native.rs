@@ -13,6 +13,7 @@ use crate::semantic::analyze;
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
+use super::literals::{StringDataIds, declare_string_values, define_string_data};
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
@@ -101,6 +102,7 @@ fn emit_verbs_object(
     let mut module = create_module(configuration)?;
     let frontend_config = module.isa().frontend_config();
     let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol)?;
+    let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = metadata
         .iter()
@@ -120,7 +122,15 @@ fn emit_verbs_object(
         let meta = functions
             .get(name)
             .ok_or_else(|| NativeEmitError(format!("missing native function `{name}`")))?;
-        define_function(&mut module, frontend_config, verb, meta, &functions, cleanup_schedule)?;
+        define_function(
+            &mut module,
+            frontend_config,
+            verb,
+            meta,
+            &functions,
+            cleanup_schedule,
+            &string_data,
+        )?;
     }
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
 }
@@ -149,10 +159,12 @@ fn define_function(
     metadata: &FunctionMeta,
     functions: &HashMap<String, FunctionMeta>,
     cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataIds,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
     context.func.signature = super::declarations::native_signature_for_definition(module, verb);
     let references = declare_function_refs(module, &mut context.func, functions)?;
+    let string_values = declare_string_values(module, &mut context.func, string_data);
     let mut function_context = FunctionBuilderContext::new();
     {
         let mut function = FunctionBuilder::new(&mut context.func, &mut function_context);
@@ -177,6 +189,7 @@ fn define_function(
             &local_types,
             &references,
             cleanup_schedule,
+            &string_values,
         )?;
         function.ins().return_(&[result]);
         function.finalize(frontend_config);

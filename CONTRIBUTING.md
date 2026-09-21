@@ -57,6 +57,43 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
+To generate the CI-compatible local coverage report, install
+`cargo-llvm-cov` and run:
+
+```sh
+cargo llvm-cov --all-targets --all-features --lcov --output-path lcov.info
+```
+
+Snapshot files are checked by the test suite and are not rewritten during
+ordinary tests. When an intentional snapshot update is required, run:
+
+```sh
+sh scripts/update_snapshots.sh
+```
+
+Review the resulting snapshot diff as part of the same commit.
+
+Lexer and parser fuzzing requires the `cargo-fuzz` subcommand. Run the parser
+target with:
+
+```sh
+./scripts/fuzz.sh parser
+```
+
+Use `./scripts/fuzz.sh lexer` for lexer-only fuzzing. Fuzz artifacts are local
+and must not be committed.
+
+Use `./scripts/fuzz.sh delimiters` for malformed block and call delimiters, or
+`./scripts/fuzz.sh literals` for malformed strings and comments.
+
+Run the frontend benchmarks with:
+
+```sh
+cargo bench --bench frontend
+```
+
+Set `ACTUS_BENCH_ITERATIONS` to change the iteration count for local runs.
+
 Enable the repository commit hook once per checkout:
 
 ```sh

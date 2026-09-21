@@ -89,6 +89,8 @@ pub struct CAbiSignature {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CAbiError {
     MissingReturnType { verb: String },
+    MissingUnsafeBoundary { verb: String },
+    InvalidOwnership { parameter: String, role: String, ty: String },
     UnsupportedType { name: String },
 }
 
@@ -97,6 +99,15 @@ impl std::fmt::Display for CAbiError {
         match self {
             Self::MissingReturnType { verb } => {
                 write!(formatter, "C ABI export `{verb}` requires an explicit return type")
+            }
+            Self::MissingUnsafeBoundary { verb } => {
+                write!(formatter, "external C verb `{verb}` requires an explicit `unsafe` boundary")
+            }
+            Self::InvalidOwnership { parameter, role, ty } => {
+                write!(
+                    formatter,
+                    "C ABI parameter `{parameter}` cannot use role `{role}` with type `{ty}`"
+                )
             }
             Self::UnsupportedType { name } => {
                 write!(formatter, "type `{name}` has no C ABI mapping")
@@ -114,6 +125,9 @@ pub fn c_abi_signature(verb: &VerbDecl) -> Result<CAbiSignature, CAbiError> {
 pub fn c_abi_external_signature(
     declaration: &ExternalVerbDecl,
 ) -> Result<CAbiSignature, CAbiError> {
+    if !declaration.unsafe_boundary {
+        return Err(CAbiError::MissingUnsafeBoundary { verb: declaration.name.clone() });
+    }
     match declaration.abi {
         ForeignAbi::C => {}
     }
@@ -130,9 +144,11 @@ fn signature_parts(
     let parameters = params
         .iter()
         .map(|parameter| {
+            let ty = map_type(&parameter.ty.name)?;
+            validate_parameter_ownership(parameter, ty)?;
             Ok(CAbiParameter {
                 name: parameter.name.clone(),
-                ty: map_type(&parameter.ty.name)?,
+                ty,
                 ownership: map_ownership(&parameter.role),
             })
         })
@@ -150,9 +166,31 @@ fn map_type(name: &str) -> Result<CAbiType, CAbiError> {
     match lookup_builtin_type(name) {
         Some(BuiltinType::Int) => Ok(CAbiType::Int32),
         Some(BuiltinType::Buffer) => Ok(CAbiType::OpaquePointer),
-        Some(BuiltinType::Array | BuiltinType::Map) | None => {
+        Some(BuiltinType::String | BuiltinType::Array | BuiltinType::Map) | None => {
             Err(CAbiError::UnsupportedType { name: name.to_owned() })
         }
+    }
+}
+
+fn validate_parameter_ownership(
+    parameter: &crate::ast::Param,
+    ty: CAbiType,
+) -> Result<(), CAbiError> {
+    if matches!(parameter.role, Role::Abs | Role::Dat) && ty != CAbiType::OpaquePointer {
+        return Err(CAbiError::InvalidOwnership {
+            parameter: parameter.name.clone(),
+            role: role_name(&parameter.role).to_owned(),
+            ty: parameter.ty.name.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn role_name(role: &Role) -> &'static str {
+    match role {
+        Role::Erg => "erg",
+        Role::Abs => "abs",
+        Role::Dat => "dat",
     }
 }
 

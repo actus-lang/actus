@@ -5,6 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr, IntrinsicKind, UnaryOp, lookup_call_intrinsic};
 
+use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
@@ -13,28 +14,34 @@ pub(super) fn lower_expression(
     expression: &Expr,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
+    string_data: &StringDataValues,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
         Expr::Integer { value, .. } => value
             .parse::<i32>()
             .map(|value| function.ins().iconst(types::I32, i64::from(value)))
             .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}"))),
+        Expr::StringLiteral { value, .. } => string_data
+            .get(value)
+            .copied()
+            .map(|global| function.ins().symbol_value(types::I64, global))
+            .ok_or_else(|| NativeEmitError(format!("string literal `{value}` has no native data"))),
         Expr::Identifier { name, .. } => locals
             .get(name)
             .copied()
             .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable"))),
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
-            lower_expression(function, expression, locals, functions)
+            lower_expression(function, expression, locals, functions, string_data)
         }
         Expr::Unary { operator, expression, .. } => {
-            let value = lower_expression(function, expression, locals, functions)?;
+            let value = lower_expression(function, expression, locals, functions, string_data)?;
             match operator {
                 UnaryOp::Negate => Ok(function.ins().ineg(value)),
             }
         }
         Expr::Binary { left, operator, right, .. } => {
-            let left = lower_expression(function, left, locals, functions)?;
-            let right = lower_expression(function, right, locals, functions)?;
+            let left = lower_expression(function, left, locals, functions, string_data)?;
+            let right = lower_expression(function, right, locals, functions, string_data)?;
             let value = match operator {
                 BinaryOp::Add => function.ins().iadd(left, right),
                 BinaryOp::Subtract => function.ins().isub(left, right),
@@ -44,11 +51,8 @@ pub(super) fn lower_expression(
             Ok(value)
         }
         Expr::Call { callee, arguments, .. } => {
-            lower_call(function, callee, arguments, locals, functions)
+            lower_call(function, callee, arguments, locals, functions, string_data)
         }
-        _ => Err(NativeEmitError(
-            "native backend supports only integer and buffer expressions".to_owned(),
-        )),
     }
 }
 
@@ -58,6 +62,7 @@ fn lower_call(
     arguments: &[crate::ast::Argument],
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
+    string_data: &StringDataValues,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let target = functions
         .get(callee)
@@ -65,8 +70,19 @@ fn lower_call(
     let ordered = order_arguments(arguments, &target.parameter_names)?;
     let mut values = ordered
         .iter()
-        .map(|argument| lower_expression(function, argument, locals, functions))
+        .map(|argument| lower_expression(function, argument, locals, functions, string_data))
         .collect::<Result<Vec<_>, _>>()?;
+    let target = if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print)
+        && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
+    {
+        functions.get("actus_print_string").ok_or_else(|| {
+            NativeEmitError(
+                "native runtime function `actus_print_string` is unavailable".to_owned(),
+            )
+        })?
+    } else {
+        target
+    };
     match lookup_call_intrinsic(callee) {
         Some(IntrinsicKind::Allocate) => {
             let length = values

@@ -77,6 +77,7 @@ impl Analyzer {
     pub(super) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
         match expression {
             Expr::Integer { .. } => Some(BuiltinType::Int),
+            Expr::StringLiteral { .. } => Some(BuiltinType::String),
             Expr::Grouping { expression, .. }
             | Expr::Borrow { expression, .. }
             | Expr::Unary { expression, .. } => self.expression_type(expression),
@@ -87,10 +88,10 @@ impl Analyzer {
             Expr::Call { callee, .. } => match lookup_call_intrinsic(callee) {
                 Some(IntrinsicKind::Allocate) => Some(BuiltinType::Buffer),
                 Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
+                Some(IntrinsicKind::Print) => Some(BuiltinType::Int),
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },
-            Expr::StringLiteral { .. } => None,
         }
     }
 }

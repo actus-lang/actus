@@ -49,6 +49,9 @@ impl Formatter {
                 self.block(&verb.body);
             }
             TopLevelDecl::ExternalVerb(verb) => {
+                if verb.unsafe_boundary {
+                    self.output.push_str("unsafe ");
+                }
                 self.output.push_str("extern \"");
                 self.output.push_str(verb.abi.name());
                 self.output.push_str("\" verb ");

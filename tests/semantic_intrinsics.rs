@@ -19,15 +19,27 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_intrinsic("drop"), Some(IntrinsicKind::Drop));
     assert!(lookup_call_intrinsic("drop").is_none());
+    assert_eq!(lookup_call_intrinsic("print"), Some(IntrinsicKind::Print));
     assert!(lookup_intrinsic("user_function").is_none());
+}
+
+#[test]
+fn validates_print_arguments() {
+    analyze_source("verb main() { print(42); }").expect("integer output should be valid");
+    analyze_source("verb main() { print(\"text\"); }")
+        .expect("string output should use the same print intrinsic");
+    analyze_source("verb main() { erg text = \"text\"; print(text); }")
+        .expect("string bindings should use the same print intrinsic");
 }
 
 #[test]
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
+    assert_eq!(lookup_builtin_type("String"), Some(BuiltinType::String));
     assert_eq!(BuiltinType::Buffer.spec().name, "Buffer");
     assert_eq!(BuiltinType::Buffer.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_builtin_type("Array"), Some(BuiltinType::Array));

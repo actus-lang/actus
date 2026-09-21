@@ -2,6 +2,7 @@
 pub enum IntrinsicKind {
     Allocate,
     Append,
+    Print,
     Drop,
 }
 
@@ -25,6 +26,11 @@ impl IntrinsicKind {
                 parameters: &["handle", "byte"],
                 status: RegistryStatus::Active,
             },
+            Self::Print => IntrinsicSpec {
+                name: "print",
+                parameters: &["value"],
+                status: RegistryStatus::Active,
+            },
             Self::Drop => IntrinsicSpec {
                 name: "drop",
                 parameters: &["binding"],
@@ -38,6 +44,7 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match name {
         "allocate" => Some(IntrinsicKind::Allocate),
         "append" => Some(IntrinsicKind::Append),
+        "print" => Some(IntrinsicKind::Print),
         "drop" => Some(IntrinsicKind::Drop),
         _ => None,
     }
@@ -45,7 +52,9 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
 
 pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match lookup_intrinsic(name) {
-        Some(IntrinsicKind::Allocate) | Some(IntrinsicKind::Append) => lookup_intrinsic(name),
+        Some(IntrinsicKind::Allocate)
+        | Some(IntrinsicKind::Append)
+        | Some(IntrinsicKind::Print) => lookup_intrinsic(name),
         Some(IntrinsicKind::Drop) | None => None,
     }
 }

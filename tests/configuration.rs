@@ -18,7 +18,15 @@ fn loads_build_settings_from_an_arca_manifest() {
     assert!(!configuration.native_backend().position_independent());
     assert_eq!(configuration.libraries()[0].name(), "m");
     assert_eq!(configuration.libraries()[0].kind(), LibraryKind::Shared);
-    assert_eq!(configuration.linker_flavor(), LinkerFlavor::Gnu);
+    assert!(configuration.library_paths().is_empty());
+    let expected_linker = if cfg!(target_os = "macos") {
+        LinkerFlavor::Apple
+    } else if cfg!(windows) {
+        LinkerFlavor::Msvc
+    } else {
+        LinkerFlavor::Gnu
+    };
+    assert_eq!(configuration.linker_flavor(), expected_linker);
     let _ = fs::remove_file(path);
 }
 

@@ -30,6 +30,29 @@ pub extern "C" fn actus_buffer_allocate(length: usize) -> BufferHandle {
     Box::into_raw(buffer)
 }
 
+/// Prints an integer value followed by a newline for the initial stdout API.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_int(value: i32) -> i32 {
+    println!("{value}");
+    value
+}
+
+#[unsafe(no_mangle)]
+/// Prints a null-terminated UTF-8 string followed by a newline.
+///
+/// # Safety
+///
+/// `value` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_string(value: *const u8) -> i32 {
+    if value.is_null() {
+        return 0;
+    }
+    let bytes = unsafe { std::ffi::CStr::from_ptr(value.cast()) }.to_bytes();
+    let text = String::from_utf8_lossy(bytes);
+    println!("{text}");
+    i32::try_from(bytes.len()).unwrap_or(i32::MAX)
+}
+
 #[unsafe(no_mangle)]
 /// Releases a buffer allocated by [`actus_buffer_allocate`].
 ///

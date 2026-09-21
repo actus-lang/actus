@@ -57,8 +57,38 @@ impl Analyzer {
                 )?;
                 Ok(true)
             }
+            IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
         }
+    }
+
+    fn validate_print(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
+        let argument = arguments[0];
+        self.visit_expression(&argument.expression)?;
+        let value_type =
+            self.expression_type(&argument.expression).ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: IntrinsicKind::Print.spec().parameters[0].to_owned(),
+                },
+                span: expression_span(&argument.expression),
+            })?;
+        if !matches!(value_type, crate::ast::BuiltinType::Int | crate::ast::BuiltinType::String) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: IntrinsicKind::Print.spec().parameters[0].to_owned(),
+                },
+                span: expression_span(&argument.expression),
+            });
+        }
+        Ok(true)
     }
 
     fn bind_intrinsic_arguments<'a>(

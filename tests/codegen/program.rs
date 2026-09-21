@@ -8,7 +8,7 @@ fn lowers_an_integer_returning_verb_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("program should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -18,7 +18,7 @@ fn lowers_integer_parameters_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "add").expect("integer parameters should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -28,7 +28,7 @@ fn lowers_integer_function_calls_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("integer call should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn uses_the_configured_entry_verb_when_it_is_not_first() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("configured entry should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn lowers_unary_and_grouped_integer_expressions() {
     let program = parse(tokens).expect("source should parse");
     let object =
         emit_program_object(&program, "main").expect("grouped unary expression should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn lowers_loop_continue_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("loop continue should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn lowers_multiple_loop_carried_bindings_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("loop-carried values should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn lowers_scalar_borrow_roles_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("scalar borrow should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn lowers_scalar_move_roles_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("scalar move should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn codegen_accepts_buffer_allocation_and_explicit_drop() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let object = emit_program_object(&program, "main").expect("buffer operations should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    assert_native_object(&object);
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn codegen_accepts_buffer_append_calls() {
 
 #[test]
 fn semantic_analysis_rejects_unknown_return_types() {
-    let (tokens, errors) = scan("verb main() -> String { return 42; }");
+    let (tokens, errors) = scan("verb main() -> Vector { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("unknown type must be rejected");
@@ -146,7 +146,7 @@ fn semantic_analysis_rejects_unknown_return_types() {
 
 #[test]
 fn semantic_analysis_rejects_unknown_parameter_types() {
-    let (tokens, errors) = scan("verb main(erg buffer: String) -> Int { return 42; }");
+    let (tokens, errors) = scan("verb main(erg buffer: Vector) -> Int { return 42; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("unknown type must be rejected");
@@ -160,4 +160,8 @@ fn codegen_rejects_integer_values_outside_native_width() {
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("literal exceeds i32");
     assert!(error.to_string().contains("invalid integer literal"));
+}
+
+fn assert_native_object(bytes: &[u8]) {
+    object::File::parse(bytes).expect("output should be a native object");
 }

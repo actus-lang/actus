@@ -12,6 +12,9 @@
 # Generated coverage and profiling output
 /coverage/
 /profraw/
+fuzz/artifacts/
+fuzz/corpus/
+fuzz/coverage/
 
 # Editor and IDE files
 .vscode/

@@ -4,6 +4,7 @@ use crate::ast::{
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
 
+mod cursor;
 mod expressions;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -46,15 +47,27 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Unsafe) {
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(true)?));
+        }
         if self.check_simple(&TokenKind::Extern) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb()?));
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false)?));
         }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))
     }
 
-    fn parse_external_verb(&mut self) -> Result<ExternalVerbDecl, ParseError> {
-        let start = self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start;
+    fn parse_external_verb(
+        &mut self,
+        unsafe_boundary: bool,
+    ) -> Result<ExternalVerbDecl, ParseError> {
+        let start = if unsafe_boundary {
+            let start = self.expect_keyword(TokenKind::Unsafe, "`unsafe`")?.span.start;
+            self.expect_keyword(TokenKind::Extern, "`extern`")?;
+            start
+        } else {
+            self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start
+        };
         let abi_token = self.advance_required("ABI string")?;
         let abi = match &abi_token.kind {
             TokenKind::StringLiteral(abi) if abi == "C" => ForeignAbi::C,
@@ -78,7 +91,14 @@ impl Parser {
         let return_type =
             if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(ExternalVerbDecl { abi, name, params, return_type, span: SourceSpan::new(start, end) })
+        Ok(ExternalVerbDecl {
+            unsafe_boundary,
+            abi,
+            name,
+            params,
+            return_type,
+            span: SourceSpan::new(start, end),
+        })
     }
 
     fn parse_verb(&mut self) -> Result<VerbDecl, ParseError> {
@@ -262,102 +282,6 @@ impl Parser {
             initializer,
             span: SourceSpan::new(role_token.span.start, end),
         })
-    }
-
-    fn take_identifier(&mut self, expected: &str) -> Result<Token, ParseError> {
-        let token = self.advance_required(expected)?;
-        if matches!(token.kind, TokenKind::Identifier(_)) {
-            Ok(token)
-        } else {
-            Err(ParseError {
-                code: ParseErrorCode::UnexpectedToken,
-                kind: ParseErrorKind::UnexpectedToken {
-                    expected: expected.to_owned(),
-                    found: token.kind,
-                },
-                span: token.span,
-            })
-        }
-    }
-
-    fn expect_keyword(&mut self, expected: TokenKind, label: &str) -> Result<Token, ParseError> {
-        self.expect_simple(expected, label)
-    }
-
-    fn expect_simple(&mut self, expected: TokenKind, label: &str) -> Result<Token, ParseError> {
-        if self.check_simple(&expected) {
-            Ok(self.advance_required(label)?)
-        } else {
-            Err(self.error_at_current(label))
-        }
-    }
-
-    fn match_simple(&mut self, expected: TokenKind) -> bool {
-        if self.check_simple(&expected) {
-            self.cursor += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn check_simple(&self, expected: &TokenKind) -> bool {
-        self.peek().is_some_and(|token| token.kind == *expected)
-    }
-
-    fn check_role(&self, expected: &TokenKind) -> bool {
-        self.check_simple(expected)
-    }
-
-    fn check_identifier(&self) -> bool {
-        self.peek().is_some_and(|token| matches!(token.kind, TokenKind::Identifier(_)))
-    }
-
-    fn peek_next_is(&self, expected: &TokenKind) -> bool {
-        self.tokens.get(self.cursor + 1).is_some_and(|token| token.kind == *expected)
-    }
-
-    fn advance_required(&mut self, expected: &str) -> Result<Token, ParseError> {
-        if let Some(token) = self.tokens.get(self.cursor).cloned() {
-            self.cursor += 1;
-            Ok(token)
-        } else {
-            Err(ParseError {
-                code: ParseErrorCode::UnexpectedEndOfInput,
-                kind: ParseErrorKind::UnexpectedEndOfInput { expected: expected.to_owned() },
-                span: SourceSpan::new(0, 0),
-            })
-        }
-    }
-
-    fn error_at_current(&self, expected: &str) -> ParseError {
-        match self.peek() {
-            Some(token) => ParseError {
-                code: ParseErrorCode::UnexpectedToken,
-                kind: ParseErrorKind::UnexpectedToken {
-                    expected: expected.to_owned(),
-                    found: token.kind.clone(),
-                },
-                span: token.span,
-            },
-            None => ParseError {
-                code: ParseErrorCode::UnexpectedEndOfInput,
-                kind: ParseErrorKind::UnexpectedEndOfInput { expected: expected.to_owned() },
-                span: SourceSpan::new(0, 0),
-            },
-        }
-    }
-
-    fn previous(&self) -> &Token {
-        &self.tokens[self.cursor - 1]
-    }
-
-    fn peek(&self) -> Option<&Token> {
-        self.tokens.get(self.cursor)
-    }
-
-    fn at_end(&self) -> bool {
-        self.check_simple(&TokenKind::Eof)
     }
 }
 

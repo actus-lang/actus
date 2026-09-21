@@ -1,0 +1,40 @@
+unsafe extern "C" verb rand() -> Int;
+
+verb observe_scalar(abs view: Int) -> Int {
+    return 0;
+}
+
+verb observe_buffer(abs view: Buffer) -> Int {
+    return 0;
+}
+
+verb consume(dat packet: Buffer) -> Int {
+    drop(packet);
+    return 1;
+}
+
+verb main() -> Int {
+    erg value = 40;
+
+    {
+        abs view = ref value;
+        observe_scalar(view: view);
+    }
+
+    erg buffer: Buffer = allocate(length: 4);
+    append(handle: buffer, byte: 7);
+    {
+        abs view = ref buffer;
+        observe_buffer(view: view);
+    }
+
+    loop {
+        value = value + 1;
+        break;
+    }
+
+    rand();
+    erg consumed = consume(packet: buffer);
+    print(value: value + consumed);
+    return value + consumed;
+}

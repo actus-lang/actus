@@ -7,8 +7,7 @@ use object::{Object, ObjectSection, ObjectSymbol};
 #[test]
 fn emits_a_native_object_without_c_intermediate_code() {
     let object = emit_zero_return_object("actus_entry").expect("native object should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
-    assert!(object.len() > 256);
+    object::File::parse(object.as_slice()).expect("object format should parse");
 }
 
 #[test]
@@ -17,7 +16,7 @@ fn native_object_contains_a_stable_entry_symbol_and_code_section() {
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
 
-    assert!(symbols.contains(&"actus_entry"));
+    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "actus_entry")));
     assert!(file.sections().any(|section| section.kind() == object::SectionKind::Text));
 }
 
@@ -48,7 +47,7 @@ fn native_backend_accepts_externalized_build_settings() {
 
     let object = emit_program_object_with_configuration(&program, "main", &configuration)
         .expect("custom native settings should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    object::File::parse(object.as_slice()).expect("object format should parse");
 }
 
 #[test]
@@ -64,7 +63,7 @@ fn native_backend_rejects_registered_but_unlowered_collection_types() {
 
 #[test]
 fn declares_external_c_functions_as_imported_symbols() {
-    let source = "extern \"C\" verb rand() -> Int; verb main() -> Int { return rand(); }";
+    let source = "unsafe extern \"C\" verb rand() -> Int; verb main() -> Int { return rand(); }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
@@ -73,5 +72,9 @@ fn declares_external_c_functions_as_imported_symbols() {
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
 
-    assert!(symbols.contains(&"rand"));
+    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "rand")));
+}
+
+fn symbol_matches(actual: &str, expected: &str) -> bool {
+    actual == expected || actual.strip_prefix('_') == Some(expected)
 }

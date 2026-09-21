@@ -185,14 +185,16 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Emit `Buffer` ownership transfers without duplicate cleanup.
 - [x] Verify deterministic native object emission for identical programs.
 - [x] Add native object structural golden tests.
-- [ ] Emit deterministic cleanup instructions.
-- [ ] Emit ownership transfers without duplicate cleanup.
+- [x] Emit deterministic cleanup instructions.
+- [x] Emit ownership transfers without duplicate cleanup.
 - [x] Emit explicit borrow scopes where required by the backend.
 - [x] Reject code generation when semantic analysis fails.
 - [x] Add native object and architecture-scoped machine-code golden tests.
 - [x] Link generated objects in CI.
 - [x] Add a minimal end-to-end Actus-to-native-binary test.
 - [x] Add `actus run` for temporary native execution.
+- [x] Add the initial type-aware `print` intrinsic.
+- [x] Extend `print` to text literals and String bindings without adding source-level print variants.
 
 ### C Library Interoperability
 
@@ -202,17 +204,17 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Parse, model, and import external C function declarations without generating Actus-owned C code.
 - [x] Define initial C ABI return ownership and lifetime contracts.
 - [x] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
-- [ ] Define ownership and lifetime rules at the C FFI boundary.
-- [ ] Support linking static and shared C libraries.
+- [x] Define ownership and lifetime rules at the C FFI boundary.
+- [x] Support linking static and shared C libraries.
 - [x] Add manifest-driven static and shared library linker inputs.
 - [ ] Define a reproducible header-to-Actus binding workflow.
-- [ ] Mark unchecked raw pointers and foreign resources with explicit unsafe boundaries.
-- [ ] Add C library integration fixtures and native link tests.
+- [x] Mark unchecked foreign declarations with explicit `unsafe extern` boundaries.
+- [x] Add C library integration fixtures and native link tests.
 - [x] Add a native link smoke test for an imported C symbol.
 
 ## Phase 8: Test Infrastructure
 
-- [ ] Organize tests into lexer, parser, semantic, formatter, and code-generation suites.
+- [x] Organize tests into lexer, parser, semantic, formatter, and code-generation suites.
 - [x] Add valid `.act` fixtures.
 - [x] Add invalid `.act` fixtures.
 - [x] Add diagnostic snapshots.
@@ -220,23 +222,24 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add semantic state-transition tests.
 - [x] Add ownership and borrowing regression tests.
 - [x] Add golden tests for generated native output.
-- [ ] Make test output deterministic.
-- [ ] Add a command for intentionally updating snapshots.
-- [ ] Add coverage reporting to CI.
+- [x] Make test output deterministic.
+- [x] Add a command for intentionally updating snapshots.
+- [x] Add coverage reporting to CI.
 
 ## Phase 9: Fuzzing and Hardening
 
 - [x] Add a deterministic malformed-input no-panic corpus.
-- [ ] Add lexer fuzzing.
-- [ ] Add parser fuzzing.
-- [ ] Fuzz malformed braces and delimiters.
-- [ ] Fuzz malformed literals and comments.
-- [ ] Verify that arbitrary input never causes a compiler panic.
+- [x] Add deterministic generated-input no-panic hardening checks.
+- [x] Add lexer fuzzing.
+- [x] Add parser fuzzing.
+- [x] Fuzz malformed braces and delimiters.
+- [x] Fuzz malformed literals and comments.
+- [x] Verify that arbitrary input never causes a compiler panic.
 - [x] Add property tests for formatter idempotence.
-- [ ] Add property tests for parser round-tripping where applicable.
+- [x] Add property tests for parser round-tripping where applicable.
 - [x] Add compiler determinism checks.
-- [ ] Add performance benchmarks for lexing and parsing.
-- [ ] Add cross-platform CI for Linux, macOS, and Windows.
+- [x] Add performance benchmarks for lexing and parsing.
+- [x] Add cross-platform CI for Linux, macOS, and Windows.
 
 ## Phase 10: Documentation and Architecture Records
 
