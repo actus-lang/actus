@@ -165,6 +165,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Associate cleanup plans with lexical scope spans.
 - [x] Lower return, break, and continue unwind plans into the native cleanup model.
 - [x] Verify deterministic native object emission for identical programs.
+- [x] Add native object structural golden tests.
 - [ ] Emit deterministic cleanup instructions.
 - [ ] Emit ownership transfers without duplicate cleanup.
 - [ ] Emit explicit borrow scopes where required by the backend.
