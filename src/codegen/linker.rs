@@ -25,6 +25,15 @@ pub fn link_object(
     if let Some(runtime_archive) = crate::runtime::runtime_archive_path() {
         command.arg(runtime_archive);
     }
+    for library in configuration.libraries() {
+        if matches!(library.kind(), crate::configuration::LibraryKind::Static) {
+            command.arg("-Wl,-Bstatic");
+        }
+        command.arg(format!("-l{}", library.name()));
+        if matches!(library.kind(), crate::configuration::LibraryKind::Static) {
+            command.arg("-Wl,-Bdynamic");
+        }
+    }
     let output = command
         .arg("-o")
         .arg(executable)

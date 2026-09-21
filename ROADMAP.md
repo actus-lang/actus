@@ -204,6 +204,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
 - [ ] Define ownership and lifetime rules at the C FFI boundary.
 - [ ] Support linking static and shared C libraries.
+- [x] Add manifest-driven static and shared library linker inputs.
 - [ ] Define a reproducible header-to-Actus binding workflow.
 - [ ] Mark unchecked raw pointers and foreign resources with explicit unsafe boundaries.
 - [ ] Add C library integration fixtures and native link tests.

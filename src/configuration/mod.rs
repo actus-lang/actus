@@ -47,6 +47,28 @@ struct BuildManifest {
     linker: Option<String>,
     native_module: Option<String>,
     position_independent: Option<bool>,
+    #[serde(default)]
+    libraries: Vec<LibraryManifest>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LibraryManifest {
+    name: String,
+    kind: LibraryKind,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LibraryKind {
+    Static,
+    Shared,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LinkLibrary {
+    name: String,
+    kind: LibraryKind,
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +103,7 @@ pub struct CompilerConfiguration {
     run_artifact_prefix: String,
     native_backend: NativeBackendConfiguration,
     entry_symbol: Option<String>,
+    libraries: Vec<LinkLibrary>,
 }
 
 impl CompilerConfiguration {
@@ -92,6 +115,7 @@ impl CompilerConfiguration {
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
             entry_symbol: None,
+            libraries: Vec::new(),
         }
     }
 
@@ -102,25 +126,7 @@ impl CompilerConfiguration {
         let manifest = toml::from_str::<ArcaManifest>(&source).map_err(|error| {
             ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
         })?;
-        if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
-            return Err(ConfigurationError(
-                "Arca.toml package name and version must not be empty".to_owned(),
-            ));
-        }
-        if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
-            return Err(ConfigurationError(format!(
-                "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
-            )));
-        }
-        if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
-            return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
-        }
-        if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
-            return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
-        }
-        if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
-            return Err(ConfigurationError("Arca.toml native_module must not be empty".to_owned()));
-        }
+        validate_manifest(&manifest)?;
 
         let environment = Self::from_environment();
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
@@ -135,10 +141,17 @@ impl CompilerConfiguration {
                 .position_independent
                 .unwrap_or(environment.native_backend.position_independent),
         );
+        let libraries = manifest
+            .build
+            .libraries
+            .into_iter()
+            .map(|library| LinkLibrary { name: library.name, kind: library.kind })
+            .collect();
         Ok(Self {
             linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
             native_backend,
             entry_symbol: manifest.package.entry,
+            libraries,
             ..environment
         })
     }
@@ -162,5 +175,53 @@ impl CompilerConfiguration {
 
     pub fn entry_symbol(&self) -> Option<&str> {
         self.entry_symbol.as_deref()
+    }
+
+    pub fn libraries(&self) -> &[LinkLibrary] {
+        &self.libraries
+    }
+}
+
+fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> {
+    if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
+        return Err(ConfigurationError(
+            "Arca.toml package name and version must not be empty".to_owned(),
+        ));
+    }
+    if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
+        return Err(ConfigurationError(format!(
+            "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
+        )));
+    }
+    if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
+        return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
+    }
+    if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
+        return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
+    }
+    if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
+        return Err(ConfigurationError("Arca.toml native_module must not be empty".to_owned()));
+    }
+    if let Some(library) = manifest
+        .build
+        .libraries
+        .iter()
+        .find(|library| library.name.trim().is_empty() || library.name.starts_with('-'))
+    {
+        return Err(ConfigurationError(format!(
+            "Arca.toml library name `{}` must be non-empty and must not start with `-`",
+            library.name
+        )));
+    }
+    Ok(())
+}
+
+impl LinkLibrary {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub const fn kind(&self) -> LibraryKind {
+        self.kind
     }
 }
