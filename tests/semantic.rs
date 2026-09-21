@@ -245,6 +245,16 @@ fn plans_return_unwinding_for_literal_returns() {
 }
 
 #[test]
+fn plans_return_unwinding_for_call_returns() {
+    let semantic = analyze_source(
+        "verb helper() -> Int { return 1; } verb main() -> Int { return helper(); }",
+    )
+    .expect("call return should pass semantic analysis");
+
+    assert_eq!(semantic.return_unwind_plans.len(), 2);
+}
+
+#[test]
 fn unwinds_nested_scopes_on_return() {
     let model =
         analyze_source("verb early(erg outer: Buffer) { { erg inner = make(); return outer; } }")
