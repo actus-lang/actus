@@ -1,4 +1,4 @@
-extern "C" verb rand() -> Int;
+unsafe extern "C" verb rand() -> Int;
 
 verb observe_scalar(abs view: Int) -> Int {
     return 0;

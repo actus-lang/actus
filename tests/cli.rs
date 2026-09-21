@@ -287,7 +287,7 @@ fn build_command_links_external_c_symbols() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "extern \"C\" verb rand() -> Int; verb main() -> Int { rand(); return 42; }\n",
+        "unsafe extern \"C\" verb rand() -> Int; verb main() -> Int { rand(); return 42; }\n",
     )
     .expect("write source");
 

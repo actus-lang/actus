@@ -16,6 +16,7 @@ pub enum TopLevelDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExternalVerbDecl {
+    pub unsafe_boundary: bool,
     pub abi: ForeignAbi,
     pub name: String,
     pub params: Vec<Param>,

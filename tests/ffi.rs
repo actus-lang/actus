@@ -19,7 +19,7 @@ fn parse_verb(source: &str) -> actus::ast::VerbDecl {
 #[test]
 fn maps_actus_roles_and_types_to_a_c_abi_signature() {
     let verb = parse_verb(
-        "verb exchange(erg target: Buffer, abs view: Buffer, dat count: Int) -> Int { return 0; }",
+        "verb exchange(erg target: Buffer, abs view: Buffer, erg count: Int) -> Int { return 0; }",
     );
     let signature = c_abi_signature(&verb).expect("signature should map");
 
@@ -29,7 +29,7 @@ fn maps_actus_roles_and_types_to_a_c_abi_signature() {
     assert_eq!(signature.parameters[0].ty, CAbiType::OpaquePointer);
     assert_eq!(signature.parameters[0].ownership, CAbiOwnership::Exclusive);
     assert_eq!(signature.parameters[1].ownership, CAbiOwnership::SharedBorrow);
-    assert_eq!(signature.parameters[2].ownership, CAbiOwnership::Consumed);
+    assert_eq!(signature.parameters[2].ownership, CAbiOwnership::Exclusive);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn exposes_stable_calling_convention_name() {
 #[test]
 fn models_external_c_declarations_without_a_definition_body() {
     let (tokens, errors) = scan(
-        "extern \"C\" verb write(dat buffer: Buffer) -> Int; verb main() -> Int { return 0; }",
+        "unsafe extern \"C\" verb write(dat buffer: Buffer) -> Int; verb main() -> Int { return 0; }",
     );
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
@@ -99,4 +99,25 @@ fn rejects_non_c_external_declarations() {
     assert!(
         matches!(error.kind, actus::parser::ParseErrorKind::UnexpectedToken { expected, .. } if expected.contains("currently `\"C\"`"))
     );
+}
+
+#[test]
+fn rejects_external_declarations_without_an_unsafe_boundary() {
+    let (tokens, errors) = scan("extern \"C\" verb write(dat buffer: Buffer) -> Int;");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("external declaration should parse");
+    let external = match &program.declarations[0] {
+        actus::ast::TopLevelDecl::ExternalVerb(declaration) => declaration,
+        _ => panic!("expected external declaration"),
+    };
+    let error = c_abi_external_signature(external).expect_err("unsafe boundary is required");
+    assert!(matches!(error, CAbiError::MissingUnsafeBoundary { verb } if verb == "write"));
+}
+
+#[test]
+fn rejects_primitive_consuming_and_borrowed_parameters() {
+    let verb = parse_verb("verb exchange(abs view: Int, dat count: Int) -> Int { return 0; }");
+    let error = c_abi_signature(&verb).expect_err("primitive ownership roles need no C mapping");
+    assert!(matches!(error, CAbiError::InvalidOwnership { parameter, role, ty }
+        if parameter == "view" && role == "abs" && ty == "Int"));
 }

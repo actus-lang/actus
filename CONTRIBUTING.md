@@ -57,6 +57,15 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
+Snapshot files are checked by the test suite and are not rewritten during
+ordinary tests. When an intentional snapshot update is required, run:
+
+```sh
+sh scripts/update_snapshots.sh
+```
+
+Review the resulting snapshot diff as part of the same commit.
+
 Enable the repository commit hook once per checkout:
 
 ```sh

@@ -185,8 +185,8 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Emit `Buffer` ownership transfers without duplicate cleanup.
 - [x] Verify deterministic native object emission for identical programs.
 - [x] Add native object structural golden tests.
-- [ ] Emit deterministic cleanup instructions.
-- [ ] Emit ownership transfers without duplicate cleanup.
+- [x] Emit deterministic cleanup instructions.
+- [x] Emit ownership transfers without duplicate cleanup.
 - [x] Emit explicit borrow scopes where required by the backend.
 - [x] Reject code generation when semantic analysis fails.
 - [x] Add native object and architecture-scoped machine-code golden tests.
@@ -204,11 +204,11 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Parse, model, and import external C function declarations without generating Actus-owned C code.
 - [x] Define initial C ABI return ownership and lifetime contracts.
 - [x] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
-- [ ] Define ownership and lifetime rules at the C FFI boundary.
+- [x] Define ownership and lifetime rules at the C FFI boundary.
 - [ ] Support linking static and shared C libraries.
 - [x] Add manifest-driven static and shared library linker inputs.
 - [ ] Define a reproducible header-to-Actus binding workflow.
-- [ ] Mark unchecked raw pointers and foreign resources with explicit unsafe boundaries.
+- [x] Mark unchecked foreign declarations with explicit `unsafe extern` boundaries.
 - [ ] Add C library integration fixtures and native link tests.
 - [x] Add a native link smoke test for an imported C symbol.
 
@@ -223,7 +223,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add ownership and borrowing regression tests.
 - [x] Add golden tests for generated native output.
 - [ ] Make test output deterministic.
-- [ ] Add a command for intentionally updating snapshots.
+- [x] Add a command for intentionally updating snapshots.
 - [ ] Add coverage reporting to CI.
 
 ## Phase 9: Fuzzing and Hardening

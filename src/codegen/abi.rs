@@ -34,6 +34,12 @@ pub fn validate_native_signature(verb: &VerbDecl) -> Result<(), NativeAbiError> 
 }
 
 pub fn validate_external_native_signature(verb: &ExternalVerbDecl) -> Result<(), NativeAbiError> {
+    if !verb.unsafe_boundary {
+        return Err(NativeAbiError(format!(
+            "external native verb `{}` requires an explicit `unsafe` boundary",
+            verb.name
+        )));
+    }
     if verb.return_type.is_none() {
         return Err(NativeAbiError(format!(
             "external native verb `{}` requires an explicit return type",

@@ -27,6 +27,7 @@ impl Token {
 pub enum TokenKind {
     Verb,
     Extern,
+    Unsafe,
     Erg,
     Abs,
     Dat,

@@ -63,6 +63,16 @@ ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/
 
 The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
+Foreign C declarations must use an explicit unsafe boundary:
+
+```act
+unsafe extern "C" verb rand() -> Int;
+```
+
+The initial C boundary supports `Int` values and `Buffer` pointers. `abs` and
+`dat` are restricted to opaque resource pointers; foreign pointer returns are
+owned by the Actus caller. Unsupported layouts are rejected before linking.
+
 Run the complete test suite with:
 
 ```sh

@@ -64,7 +64,7 @@ fn native_backend_rejects_registered_but_unlowered_collection_types() {
 
 #[test]
 fn declares_external_c_functions_as_imported_symbols() {
-    let source = "extern \"C\" verb rand() -> Int; verb main() -> Int { return rand(); }";
+    let source = "unsafe extern \"C\" verb rand() -> Int; verb main() -> Int { return rand(); }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
