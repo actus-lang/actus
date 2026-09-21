@@ -279,6 +279,37 @@ fn build_command_preserves_loop_carried_binding_values() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(unix)]
+#[test]
+fn build_command_links_external_c_symbols() {
+    let root = std::env::temp_dir().join(format!("actus-cli-external-c-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "extern \"C\" verb rand() -> Int; verb main() -> Int { rand(); return 42; }\n",
+    )
+    .expect("write source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run executable");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[test]
 fn check_command_rejects_semantically_invalid_source() {
     let input = std::env::temp_dir().join(format!("actus-cli-check-{}.act", std::process::id()));

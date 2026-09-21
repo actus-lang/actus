@@ -208,6 +208,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Define a reproducible header-to-Actus binding workflow.
 - [ ] Mark unchecked raw pointers and foreign resources with explicit unsafe boundaries.
 - [ ] Add C library integration fixtures and native link tests.
+- [x] Add a native link smoke test for an imported C symbol.
 
 ## Phase 8: Test Infrastructure
 
