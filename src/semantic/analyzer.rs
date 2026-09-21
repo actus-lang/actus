@@ -60,6 +60,14 @@ impl Analyzer {
                     span: verb.span,
                 });
             }
+            if self.signatures.contains_key(&verb.name) {
+                return Err(SemanticError {
+                    kind: super::errors::SemanticErrorKind::DuplicateVerbName {
+                        name: verb.name.clone(),
+                    },
+                    span: verb.span,
+                });
+            }
             self.signatures.insert(verb.name.clone(), verb.signature());
         }
         for declaration in &program.declarations {

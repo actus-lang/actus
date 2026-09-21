@@ -25,6 +25,7 @@ pub enum SemanticErrorKind {
     LoopControlOutsideLoop { keyword: String },
     ReservedIntrinsicName { name: String },
     UnknownType { name: String },
+    DuplicateVerbName { name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

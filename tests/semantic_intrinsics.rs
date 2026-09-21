@@ -38,6 +38,19 @@ fn rejects_unknown_declared_types() {
 }
 
 #[test]
+fn keeps_type_and_function_namespaces_separate() {
+    analyze_source("verb Buffer() -> Int { return 1; } verb main() -> Buffer { return Buffer(); }")
+        .expect("a type name and a function name may coexist in separate namespaces");
+}
+
+#[test]
+fn rejects_duplicate_verbs_in_the_function_namespace() {
+    let error = analyze_source("verb main() { } verb main() { }")
+        .expect_err("duplicate verb declarations must fail");
+    assert!(matches!(error.kind, SemanticErrorKind::DuplicateVerbName { name } if name == "main"));
+}
+
+#[test]
 fn accepts_named_allocate_length() {
     analyze_source("verb main() { erg buffer: Buffer = allocate(length: 4); drop(buffer); }")
         .expect("named intrinsic arguments should be accepted");

@@ -76,6 +76,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
         SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
         SemanticErrorKind::UnknownType { .. } => "E1023",
+        SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
     }
 }
 
@@ -132,6 +133,9 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
             format!("`{name}` is reserved for a built-in intrinsic")
         }
         SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
+        SemanticErrorKind::DuplicateVerbName { name } => {
+            format!("duplicate verb declaration `{name}`")
+        }
     }
 }
 
