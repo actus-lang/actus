@@ -232,8 +232,8 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add deterministic generated-input no-panic hardening checks.
 - [x] Add lexer fuzzing.
 - [x] Add parser fuzzing.
-- [ ] Fuzz malformed braces and delimiters.
-- [ ] Fuzz malformed literals and comments.
+- [x] Fuzz malformed braces and delimiters.
+- [x] Fuzz malformed literals and comments.
 - [ ] Verify that arbitrary input never causes a compiler panic.
 - [x] Add property tests for formatter idempotence.
 - [ ] Add property tests for parser round-tripping where applicable.

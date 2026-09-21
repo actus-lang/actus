@@ -24,3 +24,17 @@ path = "fuzz_targets/parser.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "delimiters"
+path = "fuzz_targets/delimiters.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "literals"
+path = "fuzz_targets/literals.rs"
+test = false
+doc = false
+bench = false

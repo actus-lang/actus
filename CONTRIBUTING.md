@@ -83,6 +83,9 @@ target with:
 Use `./scripts/fuzz.sh lexer` for lexer-only fuzzing. Fuzz artifacts are local
 and must not be committed.
 
+Use `./scripts/fuzz.sh delimiters` for malformed block and call delimiters, or
+`./scripts/fuzz.sh literals` for malformed strings and comments.
+
 Enable the repository commit hook once per checkout:
 
 ```sh
