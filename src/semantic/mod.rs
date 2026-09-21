@@ -7,6 +7,7 @@ mod intrinsics;
 mod model;
 mod ownership;
 mod scopes;
+mod types;
 
 pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};

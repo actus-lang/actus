@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, Expr, IntrinsicKind, Program, Role, Stmt, TopLevelDecl,
-    lookup_builtin_type, lookup_call_intrinsic,
+    Block, BuiltinType, Expr, Program, Role, Stmt, TopLevelDecl, lookup_builtin_type,
 };
 
 use super::errors::{SemanticError, SemanticErrorKind};
@@ -99,20 +98,6 @@ impl Analyzer {
         Ok(self.model)
     }
 
-    fn validate_type_name(
-        &self,
-        name: &str,
-        span: crate::lexer::SourceSpan,
-    ) -> Result<(), SemanticError> {
-        if lookup_builtin_type(name).is_some() {
-            return Ok(());
-        }
-        Err(SemanticError {
-            kind: super::errors::SemanticErrorKind::UnknownType { name: name.to_owned() },
-            span,
-        })
-    }
-
     fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
         for statement in &block.statements {
             self.visit_statement(statement)?;
@@ -163,84 +148,6 @@ impl Analyzer {
                 self.leave_scope();
                 Ok(())
             }
-        }
-    }
-
-    fn resolve_binding_type(
-        &self,
-        declared_type: Option<&str>,
-        initializer: &Expr,
-        span: crate::lexer::SourceSpan,
-    ) -> Result<Option<BuiltinType>, SemanticError> {
-        if let Some(name) = declared_type {
-            self.validate_type_name(name, span)?;
-            return Ok(lookup_builtin_type(name));
-        }
-        Ok(self.expression_type(initializer))
-    }
-
-    fn validate_declared_initializer(
-        &self,
-        name: &str,
-        declared_type: Option<&str>,
-        initializer: &Expr,
-        span: crate::lexer::SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Some(expected_name) = declared_type else { return Ok(()) };
-        let Some(found) = self.expression_type(initializer) else { return Ok(()) };
-        let expected = lookup_builtin_type(expected_name).expect("declared type was validated");
-        self.ensure_binding_type(name, expected, found, span)
-    }
-
-    fn validate_binding_assignment(
-        &self,
-        index: usize,
-        name: &str,
-        value: &Expr,
-        span: crate::lexer::SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Some(expected) = self.model.bindings[index].ty else { return Ok(()) };
-        let Some(found) = self.expression_type(value) else { return Ok(()) };
-        self.ensure_binding_type(name, expected, found, span)
-    }
-
-    fn ensure_binding_type(
-        &self,
-        name: &str,
-        expected: BuiltinType,
-        found: BuiltinType,
-        span: crate::lexer::SourceSpan,
-    ) -> Result<(), SemanticError> {
-        if expected == found {
-            return Ok(());
-        }
-        Err(SemanticError {
-            kind: SemanticErrorKind::BindingTypeMismatch {
-                binding: name.to_owned(),
-                expected: expected.spec().name.to_owned(),
-                found: found.spec().name.to_owned(),
-            },
-            span,
-        })
-    }
-
-    pub(super) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
-        match expression {
-            Expr::Integer { .. } => Some(BuiltinType::Int),
-            Expr::Grouping { expression, .. }
-            | Expr::Borrow { expression, .. }
-            | Expr::Unary { expression, .. } => self.expression_type(expression),
-            Expr::Binary { .. } => Some(BuiltinType::Int),
-            Expr::Identifier { name, span } => {
-                self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
-            }
-            Expr::Call { callee, .. } => match lookup_call_intrinsic(callee) {
-                Some(IntrinsicKind::Allocate) => Some(BuiltinType::Buffer),
-                Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
-                Some(IntrinsicKind::Drop) => None,
-                None => self.signatures.get(callee).and_then(|signature| signature.return_type),
-            },
-            Expr::StringLiteral { .. } => None,
         }
     }
 
