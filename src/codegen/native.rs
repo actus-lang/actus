@@ -12,7 +12,7 @@ use crate::semantic::analyze;
 
 use super::abi::validate_integer_signature;
 use super::lowering::lower_body;
-use super::model::validate_cleanup_plans;
+use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub(super) String);
@@ -44,6 +44,7 @@ pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, N
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
     validate_cleanup_plans(&semantic)
         .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
+    let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
     let verbs = program
         .declarations
         .iter()
@@ -57,10 +58,14 @@ pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, N
     for verb in &verbs {
         validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     }
-    emit_verbs_object(&verbs, symbol)
+    emit_verbs_object(&verbs, symbol, &cleanup_schedule)
 }
 
-fn emit_verbs_object(verbs: &[&VerbDecl], symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
+fn emit_verbs_object(
+    verbs: &[&VerbDecl],
+    symbol: &str,
+    cleanup_schedule: &NativeCleanupSchedule,
+) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module()?;
     let frontend_config = module.isa().frontend_config();
     let metadata = declare_functions(&mut module, verbs, symbol)?;
@@ -78,7 +83,7 @@ fn emit_verbs_object(verbs: &[&VerbDecl], symbol: &str) -> Result<Vec<u8>, Nativ
         let meta = functions
             .get(name)
             .ok_or_else(|| NativeEmitError(format!("missing native function `{name}`")))?;
-        define_function(&mut module, frontend_config, verb, meta, &functions)?;
+        define_function(&mut module, frontend_config, verb, meta, &functions, cleanup_schedule)?;
     }
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
 }
@@ -135,6 +140,7 @@ fn define_function(
     verb: &VerbDecl,
     metadata: &FunctionMeta,
     functions: &HashMap<String, FunctionMeta>,
+    cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
     context.func.signature = integer_signature(module, verb);
@@ -151,7 +157,13 @@ fn define_function(
             locals.insert(&parameter.name, value);
         }
         function.seal_block(block);
-        let result = lower_body(&mut function, &verb.body.statements, &locals, &references)?;
+        let result = lower_body(
+            &mut function,
+            &verb.body.statements,
+            &locals,
+            &references,
+            cleanup_schedule,
+        )?;
         function.ins().return_(&[result]);
         function.finalize(frontend_config);
     }

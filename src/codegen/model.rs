@@ -28,6 +28,38 @@ pub struct NativeLoopUnwindPlan {
     pub scopes: Vec<NativeCleanupPlan>,
 }
 
+pub(super) struct NativeCleanupSchedule {
+    scopes: Vec<NativeCleanupPlan>,
+    returns: Vec<NativeUnwindPlan>,
+    loops: Vec<NativeLoopUnwindPlan>,
+}
+
+impl NativeCleanupSchedule {
+    pub(super) fn from_model(model: &SemanticModel) -> Self {
+        Self {
+            scopes: lower_cleanup_plans(model),
+            returns: lower_return_unwind_plans(model),
+            loops: lower_loop_unwind_plans(model),
+        }
+    }
+
+    pub(super) fn scope(&self, span: SourceSpan) -> Option<&NativeCleanupPlan> {
+        self.scopes.iter().find(|plan| plan.span == span)
+    }
+
+    pub(super) fn return_plan(&self, span: SourceSpan) -> Option<&NativeUnwindPlan> {
+        self.returns.iter().find(|plan| plan.span == span)
+    }
+
+    pub(super) fn loop_plan(
+        &self,
+        span: SourceSpan,
+        kind: &LoopExitKind,
+    ) -> Option<&NativeLoopUnwindPlan> {
+        self.loops.iter().find(|plan| plan.span == span && &plan.kind == kind)
+    }
+}
+
 pub fn lower_cleanup_plans(model: &SemanticModel) -> Vec<NativeCleanupPlan> {
     model.cleanup_plans.iter().map(lower_scope).collect()
 }

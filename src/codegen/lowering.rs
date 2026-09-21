@@ -4,7 +4,10 @@ use cranelift_codegen::ir::{BlockArg, InstBuilder, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr, Role, Stmt, UnaryOp};
+use crate::lexer::SourceSpan;
+use crate::semantic::LoopExitKind;
 
+use super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
 use super::native::{FunctionRef, NativeEmitError};
 
 #[derive(Clone, Copy)]
@@ -27,9 +30,10 @@ pub(super) fn lower_body(
     statements: &[Stmt],
     initial_locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let mut locals = initial_locals.clone();
-    match lower_statements(function, statements, &mut locals, functions, None)? {
+    match lower_statements(function, statements, &mut locals, functions, None, cleanup_schedule)? {
         Flow::Return(value) => Ok(value),
         Flow::Fallthrough => {
             Err(NativeEmitError("native integer slice requires a return value".to_owned()))
@@ -46,9 +50,17 @@ fn lower_statements<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
+    cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<Flow, NativeEmitError> {
     for statement in statements {
-        let flow = lower_statement(function, statement, locals, functions, targets.clone())?;
+        let flow = lower_statement(
+            function,
+            statement,
+            locals,
+            functions,
+            targets.clone(),
+            cleanup_schedule,
+        )?;
         if !matches!(flow, Flow::Fallthrough) {
             return Ok(flow);
         }
@@ -62,6 +74,7 @@ fn lower_statement<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
+    cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<Flow, NativeEmitError> {
     match statement {
         Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, initializer, .. } => {
@@ -74,8 +87,10 @@ fn lower_statement<'source>(
             locals.insert(name, value);
             Ok(Flow::Fallthrough)
         }
-        Stmt::Return { value: Some(expression), .. } => {
-            lower_expression(function, expression, locals, functions).map(Flow::Return)
+        Stmt::Return { value: Some(expression), span } => {
+            let value = lower_expression(function, expression, locals, functions)?;
+            emit_return_cleanup(function, cleanup_schedule, *span)?;
+            Ok(Flow::Return(value))
         }
         Stmt::Return { value: None, .. } => Err(NativeEmitError(
             "native integer slice requires a return value".to_owned(),
@@ -85,18 +100,51 @@ fn lower_statement<'source>(
             Ok(Flow::Fallthrough)
         }
         Stmt::Drop { .. } => Ok(Flow::Fallthrough),
-        Stmt::Block(block) => {
-            let mut nested_locals = locals.clone();
-            lower_statements(function, &block.statements, &mut nested_locals, functions, targets)
+        Stmt::Block(block) => lower_scoped_block(
+            function,
+            block,
+            locals,
+            functions,
+            targets,
+            cleanup_schedule,
+        ),
+        Stmt::Loop(block) => lower_loop(function, block, locals, functions, cleanup_schedule),
+        Stmt::Break { span } => {
+            emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Break)?;
+            emit_loop_jump(function, targets, locals, false)
         }
-        Stmt::Loop(block) => lower_loop(function, block, locals, functions),
-        Stmt::Break { .. } => emit_loop_jump(function, targets, locals, false),
-        Stmt::Continue { .. } => emit_loop_jump(function, targets, locals, true),
+        Stmt::Continue { span } => {
+            emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Continue)?;
+            emit_loop_jump(function, targets, locals, true)
+        }
         _ => Err(NativeEmitError(
             "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns"
                 .to_owned(),
         )),
     }
+}
+
+fn lower_scoped_block<'source>(
+    function: &mut FunctionBuilder<'_>,
+    block: &'source crate::ast::Block,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    functions: &HashMap<String, FunctionRef>,
+    targets: Option<LoopTargets>,
+    cleanup_schedule: &NativeCleanupSchedule,
+) -> Result<Flow, NativeEmitError> {
+    let mut nested_locals = locals.clone();
+    let flow = lower_statements(
+        function,
+        &block.statements,
+        &mut nested_locals,
+        functions,
+        targets,
+        cleanup_schedule,
+    )?;
+    if matches!(flow, Flow::Fallthrough) {
+        emit_scope_cleanup(function, cleanup_schedule, block.span)?;
+    }
+    Ok(flow)
 }
 
 fn emit_loop_jump(
@@ -120,6 +168,7 @@ fn lower_loop<'source>(
     block: &'source crate::ast::Block,
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<Flow, NativeEmitError> {
     let carried = assigned_outer_bindings(&block.statements, locals);
     let header = function.create_block();
@@ -147,6 +196,7 @@ fn lower_loop<'source>(
         &mut loop_locals,
         functions,
         Some(LoopTargets { header, exit, carried: carried.clone() }),
+        cleanup_schedule,
     )?;
     if matches!(flow, Flow::Fallthrough) {
         let values = carried_values(&loop_locals, &carried)?;
@@ -164,6 +214,55 @@ fn lower_loop<'source>(
         Ok(Flow::Fallthrough)
     } else {
         Ok(flow)
+    }
+}
+
+fn emit_return_cleanup(
+    function: &mut FunctionBuilder<'_>,
+    schedule: &NativeCleanupSchedule,
+    span: SourceSpan,
+) -> Result<(), NativeEmitError> {
+    let plan = schedule.return_plan(span).ok_or_else(|| {
+        NativeEmitError(format!("missing native return cleanup plan at {span:?}"))
+    })?;
+    for scope in &plan.scopes {
+        emit_scope_instructions(function, scope);
+    }
+    Ok(())
+}
+
+fn emit_loop_cleanup(
+    function: &mut FunctionBuilder<'_>,
+    schedule: &NativeCleanupSchedule,
+    span: SourceSpan,
+    kind: LoopExitKind,
+) -> Result<(), NativeEmitError> {
+    let plan = schedule
+        .loop_plan(span, &kind)
+        .ok_or_else(|| NativeEmitError(format!("missing native loop cleanup plan at {span:?}")))?;
+    for scope in &plan.scopes {
+        emit_scope_instructions(function, scope);
+    }
+    Ok(())
+}
+
+fn emit_scope_cleanup(
+    function: &mut FunctionBuilder<'_>,
+    schedule: &NativeCleanupSchedule,
+    span: SourceSpan,
+) -> Result<(), NativeEmitError> {
+    let plan = schedule
+        .scope(span)
+        .ok_or_else(|| NativeEmitError(format!("missing native scope cleanup plan at {span:?}")))?;
+    emit_scope_instructions(function, plan);
+    Ok(())
+}
+
+fn emit_scope_instructions(_function: &mut FunctionBuilder<'_>, plan: &NativeCleanupPlan) {
+    for instruction in &plan.instructions {
+        match instruction {
+            NativeInstruction::EndBorrow { .. } | NativeInstruction::DropBinding { .. } => {}
+        }
     }
 }
 
