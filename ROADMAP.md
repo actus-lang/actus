@@ -238,7 +238,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add property tests for formatter idempotence.
 - [x] Add property tests for parser round-tripping where applicable.
 - [x] Add compiler determinism checks.
-- [ ] Add performance benchmarks for lexing and parsing.
+- [x] Add performance benchmarks for lexing and parsing.
 - [ ] Add cross-platform CI for Linux, macOS, and Windows.
 
 ## Phase 10: Documentation and Architecture Records

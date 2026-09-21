@@ -86,6 +86,14 @@ and must not be committed.
 Use `./scripts/fuzz.sh delimiters` for malformed block and call delimiters, or
 `./scripts/fuzz.sh literals` for malformed strings and comments.
 
+Run the frontend benchmarks with:
+
+```sh
+cargo bench --bench frontend
+```
+
+Set `ACTUS_BENCH_ITERATIONS` to change the iteration count for local runs.
+
 Enable the repository commit hook once per checkout:
 
 ```sh
