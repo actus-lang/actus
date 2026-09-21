@@ -1,4 +1,9 @@
 use std::mem::ManuallyDrop;
+use std::path::Path;
+
+pub fn runtime_archive_path() -> Option<&'static Path> {
+    option_env!("ACTUS_RUNTIME_ARCHIVE").map(Path::new)
+}
 
 #[repr(C)]
 pub struct ActusBuffer {

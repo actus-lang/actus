@@ -28,3 +28,9 @@ fn preserves_the_c_layout_fields_in_declaration_order() {
         std::mem::size_of::<*mut u8>() + std::mem::size_of::<usize>()
     );
 }
+
+#[test]
+fn exposes_the_cargo_built_runtime_archive() {
+    let archive = actus::runtime::runtime_archive_path().expect("runtime archive should exist");
+    assert!(archive.is_file(), "runtime archive path should point to a file");
+}

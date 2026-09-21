@@ -20,8 +20,12 @@ pub fn link_object(
     configuration: &CompilerConfiguration,
 ) -> Result<(), NativeLinkError> {
     let linker = configuration.linker();
-    let output = Command::new(linker)
-        .arg(object)
+    let mut command = Command::new(linker);
+    command.arg(object);
+    if let Some(runtime_archive) = crate::runtime::runtime_archive_path() {
+        command.arg(runtime_archive);
+    }
+    let output = command
         .arg("-o")
         .arg(executable)
         .output()

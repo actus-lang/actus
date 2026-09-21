@@ -21,7 +21,7 @@ for file in $(find src -type f -name '*.rs' -print | sort); do
             }
         }
 
-        /^[[:space:]]*((pub([[:space:]]*\([^)]*\))?[[:space:]]+)?(const[[:space:]]+|async[[:space:]]+|unsafe[[:space:]]+)*fn[[:space:]])/ {
+        /^[[:space:]]*((pub([[:space:]]*\([^)]*\))?[[:space:]]+)?(const[[:space:]]+|async[[:space:]]+|unsafe[[:space:]]+|extern[[:space:]]+[^[:space:]]+[[:space:]]+)*fn[[:space:]])/ {
             if (in_function) {
                 report_function()
             }
