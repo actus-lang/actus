@@ -1,6 +1,6 @@
 use cranelift_codegen::ir::Type;
 
-use crate::ast::TypeName;
+use crate::ast::{BuiltinType, TypeName, lookup_builtin_type};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NativeType {
@@ -10,10 +10,9 @@ pub(super) enum NativeType {
 
 impl NativeType {
     pub(super) fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "Int" => Some(Self::Int),
-            "Buffer" => Some(Self::Buffer),
-            _ => None,
+        match lookup_builtin_type(name)? {
+            BuiltinType::Int => Some(Self::Int),
+            BuiltinType::Buffer => Some(Self::Buffer),
         }
     }
 

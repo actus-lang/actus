@@ -120,7 +120,8 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 - [x] Validate `erg`, `abs`, and `dat` parameter compatibility.
 - [x] Add a centralized source-level intrinsic registry for built-in functions.
-- [ ] Add a built-in type registry for `Int`, `Buffer`, `Array`, `Map`, and future types.
+- [x] Add the initial built-in type registry for supported `Int` and `Buffer` types.
+- [ ] Extend the built-in type registry with `Array`, `Map`, and future types.
 - [ ] Define separate function and type namespaces with explicit collision rules.
 - [ ] Define the registry lifecycle for adding, deprecating, and removing built-ins.
 - [x] Implement positional argument binding.

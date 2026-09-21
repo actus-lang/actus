@@ -1,4 +1,4 @@
-use actus::ast::{IntrinsicKind, lookup_intrinsic};
+use actus::ast::{BuiltinType, IntrinsicKind, lookup_builtin_type, lookup_intrinsic};
 use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::{SemanticErrorKind, analyze};
@@ -17,6 +17,13 @@ fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
     assert!(lookup_intrinsic("user_function").is_none());
+}
+
+#[test]
+fn builtin_type_registry_defines_supported_types() {
+    assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
+    assert_eq!(BuiltinType::Buffer.spec().name, "Buffer");
+    assert!(lookup_builtin_type("Array").is_none());
 }
 
 #[test]
