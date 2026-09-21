@@ -73,6 +73,16 @@ sh scripts/update_snapshots.sh
 
 Review the resulting snapshot diff as part of the same commit.
 
+Lexer and parser fuzzing requires the `cargo-fuzz` subcommand. Run the parser
+target with:
+
+```sh
+./scripts/fuzz.sh parser
+```
+
+Use `./scripts/fuzz.sh lexer` for lexer-only fuzzing. Fuzz artifacts are local
+and must not be committed.
+
 Enable the repository commit hook once per checkout:
 
 ```sh

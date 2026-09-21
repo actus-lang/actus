@@ -230,8 +230,8 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 - [x] Add a deterministic malformed-input no-panic corpus.
 - [x] Add deterministic generated-input no-panic hardening checks.
-- [ ] Add lexer fuzzing.
-- [ ] Add parser fuzzing.
+- [x] Add lexer fuzzing.
+- [x] Add parser fuzzing.
 - [ ] Fuzz malformed braces and delimiters.
 - [ ] Fuzz malformed literals and comments.
 - [ ] Verify that arbitrary input never causes a compiler panic.
