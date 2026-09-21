@@ -170,6 +170,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Build and link the native runtime archive for executable emission.
 - [x] Lower initial `Buffer` allocation, append, and explicit drop calls.
 - [x] Emit automatic `Buffer` cleanup on lexical scope and control-flow unwinding.
+- [x] Emit `Buffer` ownership transfers without duplicate cleanup.
 - [x] Verify deterministic native object emission for identical programs.
 - [x] Add native object structural golden tests.
 - [ ] Emit deterministic cleanup instructions.
