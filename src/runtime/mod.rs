@@ -30,6 +30,13 @@ pub extern "C" fn actus_buffer_allocate(length: usize) -> BufferHandle {
     Box::into_raw(buffer)
 }
 
+/// Prints an integer value followed by a newline for the initial stdout API.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_int(value: i32) -> i32 {
+    println!("{value}");
+    value
+}
+
 #[unsafe(no_mangle)]
 /// Releases a buffer allocated by [`actus_buffer_allocate`].
 ///
