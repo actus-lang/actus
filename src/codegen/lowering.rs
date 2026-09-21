@@ -96,7 +96,7 @@ fn lower_statement<'source>(
             lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions),
         Stmt::Assignment { name, value, .. } => lower_assignment(function, name, value, locals, functions),
         Stmt::Return { value: Some(expression), span } =>
-            lower_return(function, expression, *span, locals, functions, cleanup_schedule),
+            lower_return(function, expression, *span, locals, types, functions, cleanup_schedule),
         Stmt::Return { value: None, .. } => {
             Err(NativeEmitError("native function requires a return value".to_owned()))
         }
@@ -109,12 +109,14 @@ fn lower_statement<'source>(
             function, block, locals, types, functions, targets, cleanup_schedule,
         ),
         Stmt::Loop(block) => lower_loop(function, block, locals, types, functions, cleanup_schedule),
-        Stmt::Break { span } => lower_loop_control(
-            function, targets, locals, cleanup_schedule, *span, LoopExitKind::Break,
-        ),
-        Stmt::Continue { span } => lower_loop_control(
-            function, targets, locals, cleanup_schedule, *span, LoopExitKind::Continue,
-        ),
+        Stmt::Break { span } => {
+            emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Break, locals, types, functions)?;
+            emit_loop_jump(function, targets, locals, false)
+        }
+        Stmt::Continue { span } => {
+            emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Continue, locals, types, functions)?;
+            emit_loop_jump(function, targets, locals, true)
+        }
         _ => Err(NativeEmitError(
             "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns"
                 .to_owned(),
@@ -157,11 +159,12 @@ fn lower_return(
     expression: &Expr,
     span: crate::lexer::SourceSpan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
 ) -> Result<Flow, NativeEmitError> {
     let value = lower_expression(function, expression, locals, functions)?;
-    emit_return_cleanup(function, cleanup_schedule, span)?;
+    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions)?;
     Ok(Flow::Return(value))
 }
 
@@ -176,18 +179,6 @@ fn lower_drop<'source>(
         emit_buffer_drop(function, name, locals, functions)?;
     }
     Ok(Flow::Fallthrough)
-}
-
-fn lower_loop_control(
-    function: &mut FunctionBuilder<'_>,
-    targets: Option<LoopTargets>,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    span: crate::lexer::SourceSpan,
-    kind: LoopExitKind,
-) -> Result<Flow, NativeEmitError> {
-    emit_loop_cleanup(function, cleanup_schedule, span, kind.clone())?;
-    emit_loop_jump(function, targets, locals, kind == LoopExitKind::Continue)
 }
 
 fn lower_scoped_block<'source>(
@@ -211,7 +202,14 @@ fn lower_scoped_block<'source>(
         cleanup_schedule,
     )?;
     if matches!(flow, Flow::Fallthrough) {
-        emit_scope_cleanup(function, cleanup_schedule, block)?;
+        emit_scope_cleanup(
+            function,
+            cleanup_schedule,
+            block,
+            &nested_locals,
+            &nested_types,
+            functions,
+        )?;
     }
     Ok(flow)
 }

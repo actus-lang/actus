@@ -18,8 +18,8 @@ fn lowers_semantic_cleanup_plans_without_changing_order() {
     assert_eq!(
         plans[0].instructions,
         vec![
-            NativeInstruction::DropBinding { binding_index: 1 },
-            NativeInstruction::DropBinding { binding_index: 0 },
+            NativeInstruction::DropBinding { binding_index: 1, name: "second".to_owned() },
+            NativeInstruction::DropBinding { binding_index: 0, name: "first".to_owned() },
         ]
     );
 }
@@ -38,7 +38,7 @@ fn lowers_return_and_loop_unwinds_without_changing_scope_order() {
     assert_eq!(returns[0].scopes[0].depth, 1);
     assert_eq!(
         returns[0].scopes[0].instructions,
-        vec![NativeInstruction::DropBinding { binding_index: 0 }]
+        vec![NativeInstruction::DropBinding { binding_index: 0, name: "outer".to_owned() }]
     );
 
     let loops = lower_loop_unwind_plans(&semantic);
@@ -46,6 +46,6 @@ fn lowers_return_and_loop_unwinds_without_changing_scope_order() {
     assert_eq!(loops[0].scopes[0].depth, 2);
     assert_eq!(
         loops[0].scopes[0].instructions,
-        vec![NativeInstruction::DropBinding { binding_index: 1 }]
+        vec![NativeInstruction::DropBinding { binding_index: 1, name: "inner".to_owned() }]
     );
 }

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeInstruction {
     EndBorrow { borrow_id: usize },
-    DropBinding { binding_index: usize },
+    DropBinding { binding_index: usize, name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -61,7 +61,7 @@ impl NativeCleanupSchedule {
 }
 
 pub fn lower_cleanup_plans(model: &SemanticModel) -> Vec<NativeCleanupPlan> {
-    model.cleanup_plans.iter().map(lower_scope).collect()
+    model.cleanup_plans.iter().map(|scope| lower_scope(scope, model)).collect()
 }
 
 pub fn lower_return_unwind_plans(model: &SemanticModel) -> Vec<NativeUnwindPlan> {
@@ -70,7 +70,7 @@ pub fn lower_return_unwind_plans(model: &SemanticModel) -> Vec<NativeUnwindPlan>
         .iter()
         .map(|plan| NativeUnwindPlan {
             span: plan.span,
-            scopes: plan.scopes.iter().map(lower_scope).collect(),
+            scopes: plan.scopes.iter().map(|scope| lower_scope(scope, model)).collect(),
         })
         .collect()
 }
@@ -82,7 +82,7 @@ pub fn lower_loop_unwind_plans(model: &SemanticModel) -> Vec<NativeLoopUnwindPla
         .map(|plan| NativeLoopUnwindPlan {
             span: plan.span,
             kind: plan.kind.clone(),
-            scopes: plan.scopes.iter().map(lower_scope).collect(),
+            scopes: plan.scopes.iter().map(|scope| lower_scope(scope, model)).collect(),
         })
         .collect()
 }
@@ -135,22 +135,23 @@ fn validate_scope(
     Ok(())
 }
 
-fn lower_scope(scope: &crate::semantic::ScopeCleanup) -> NativeCleanupPlan {
+fn lower_scope(scope: &crate::semantic::ScopeCleanup, model: &SemanticModel) -> NativeCleanupPlan {
     NativeCleanupPlan {
         depth: scope.depth,
         span: scope.span,
-        instructions: scope.actions.iter().map(lower_action).collect(),
+        instructions: scope.actions.iter().map(|action| lower_action(action, model)).collect(),
     }
 }
 
-fn lower_action(action: &CleanupAction) -> NativeInstruction {
+fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruction {
     match action {
         CleanupAction::EndBorrow { borrow_id } => {
             NativeInstruction::EndBorrow { borrow_id: *borrow_id }
         }
-        CleanupAction::DropBinding { binding_index } => {
-            NativeInstruction::DropBinding { binding_index: *binding_index }
-        }
+        CleanupAction::DropBinding { binding_index } => NativeInstruction::DropBinding {
+            binding_index: *binding_index,
+            name: model.bindings[*binding_index].name.clone(),
+        },
     }
 }
 
