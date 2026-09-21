@@ -8,6 +8,7 @@ use cranelift_native::builder as native_builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::ast::{Program, TopLevelDecl, VerbDecl};
+use crate::configuration::NativeBackendConfiguration;
 use crate::semantic::analyze;
 
 use super::abi::validate_integer_signature;
@@ -36,10 +37,18 @@ impl std::fmt::Display for NativeEmitError {
 impl std::error::Error for NativeEmitError {}
 
 pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
-    emit_i32_object(symbol, 0)
+    emit_i32_object(symbol, 0, &NativeBackendConfiguration::default())
 }
 
 pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
+    emit_program_object_with_configuration(program, symbol, &NativeBackendConfiguration::default())
+}
+
+pub fn emit_program_object_with_configuration(
+    program: &Program,
+    symbol: &str,
+    configuration: &NativeBackendConfiguration,
+) -> Result<Vec<u8>, NativeEmitError> {
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
     validate_cleanup_plans(&semantic)
@@ -58,15 +67,16 @@ pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, N
     for verb in &verbs {
         validate_integer_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
     }
-    emit_verbs_object(&verbs, symbol, &cleanup_schedule)
+    emit_verbs_object(&verbs, symbol, &cleanup_schedule, configuration)
 }
 
 fn emit_verbs_object(
     verbs: &[&VerbDecl],
     symbol: &str,
     cleanup_schedule: &NativeCleanupSchedule,
+    configuration: &NativeBackendConfiguration,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    let mut module = create_module()?;
+    let mut module = create_module(configuration)?;
     let frontend_config = module.isa().frontend_config();
     let metadata = declare_functions(&mut module, verbs, symbol)?;
     let functions = metadata
@@ -88,15 +98,19 @@ fn emit_verbs_object(
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
 }
 
-fn create_module() -> Result<ObjectModule, NativeEmitError> {
+fn create_module(
+    configuration: &NativeBackendConfiguration,
+) -> Result<ObjectModule, NativeEmitError> {
     let mut flag_builder = settings::builder();
-    flag_builder.set("is_pic", "true").map_err(|error| NativeEmitError(error.to_string()))?;
+    flag_builder
+        .set("is_pic", &configuration.position_independent().to_string())
+        .map_err(|error| NativeEmitError(error.to_string()))?;
     let flags = settings::Flags::new(flag_builder);
     let isa = native_builder()
         .map_err(|error| NativeEmitError(error.to_string()))?
         .finish(flags)
         .map_err(|error| NativeEmitError(error.to_string()))?;
-    let builder = ObjectBuilder::new(isa, "actus", default_libcall_names())
+    let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
     Ok(ObjectModule::new(builder))
 }
@@ -191,15 +205,21 @@ fn declare_function_refs(
         .collect()
 }
 
-fn emit_i32_object(symbol: &str, value: i64) -> Result<Vec<u8>, NativeEmitError> {
+fn emit_i32_object(
+    symbol: &str,
+    value: i64,
+    configuration: &NativeBackendConfiguration,
+) -> Result<Vec<u8>, NativeEmitError> {
     let mut flag_builder = settings::builder();
-    flag_builder.set("is_pic", "true").map_err(|error| NativeEmitError(error.to_string()))?;
+    flag_builder
+        .set("is_pic", &configuration.position_independent().to_string())
+        .map_err(|error| NativeEmitError(error.to_string()))?;
     let flags = settings::Flags::new(flag_builder);
     let isa = native_builder()
         .map_err(|error| NativeEmitError(error.to_string()))?
         .finish(flags)
         .map_err(|error| NativeEmitError(error.to_string()))?;
-    let builder = ObjectBuilder::new(isa, "actus", default_libcall_names())
+    let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
     let mut module = ObjectModule::new(builder);
     let frontend_config = module.isa().frontend_config();

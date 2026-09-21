@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::codegen::{emit_program_object, link_object};
+use crate::codegen::{emit_program_object_with_configuration, link_object};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::formatter::format_program;
@@ -168,7 +168,11 @@ fn build_file(
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match emit_program_object(&program, symbol) {
+    let bytes = match emit_program_object_with_configuration(
+        &program,
+        symbol,
+        configuration.native_backend(),
+    ) {
         Ok(bytes) => bytes,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
