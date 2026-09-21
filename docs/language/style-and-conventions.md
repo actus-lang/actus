@@ -16,24 +16,24 @@ compiler yet.
 The accepted comment syntax is:
 
 ```act
-| configure the hardware register base
+// configure the hardware register base
 erg base_addr = 0x40011000;
 ```
 
 Long explanations use an explicitly closed block:
 
 ```act
-||
+/*
 This describes the zero-copy transfer protocol.
-||
+*/
 ```
 
-Documentation comments use `#`. A sequence of documentation lines directly
+Documentation comments use `///`. A sequence of documentation lines directly
 before an `open` declaration documents that public API declaration:
 
 ```act
-# Configure the device interrupt line.
-# The declaration is visible to importing modules.
+/// Configure the device interrupt line.
+/// The declaration is visible to importing modules.
 open verb configure_interrupt() {
     ...
 }
