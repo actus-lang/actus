@@ -172,6 +172,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Add native object and machine-code golden tests.
 - [x] Link generated objects in CI.
 - [x] Add a minimal end-to-end Actus-to-native-binary test.
+- [x] Add `actus run` for temporary native execution.
 
 ### C Library Interoperability
 

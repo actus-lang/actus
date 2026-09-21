@@ -32,6 +32,18 @@ fn build_command_writes_a_native_object() {
 
 #[cfg(unix)]
 #[test]
+fn run_command_builds_and_executes_source() {
+    let input = std::env::temp_dir().join(format!("actus-cli-run-{}.act", std::process::id()));
+    fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");
+
+    let result = run_with_args(vec!["run".to_owned(), input.display().to_string()].into_iter());
+
+    assert_eq!(result, 42);
+    let _ = fs::remove_file(input);
+}
+
+#[cfg(unix)]
+#[test]
 fn build_command_links_an_executable() {
     let root = std::env::temp_dir().join(format!("actus-cli-exe-{}", std::process::id()));
     let input = root.with_extension("act");

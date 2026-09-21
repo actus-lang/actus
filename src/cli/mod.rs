@@ -8,6 +8,8 @@ use crate::formatter::format_program;
 use crate::lexer::scan;
 use crate::parser::parse;
 
+mod run;
+
 pub fn run() -> i32 {
     run_with_args(env::args().skip(1))
 }
@@ -19,6 +21,9 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
     };
     if command == "build" {
         return build_command(arguments);
+    }
+    if command == "run" {
+        return run::run_command(arguments);
     }
 
     let Some(first_argument) = arguments.next() else {
@@ -281,6 +286,6 @@ fn format_file(path: &str, check_only: bool) -> i32 {
 }
 
 fn print_usage() {
-    eprintln!("usage: actus <parse|check|fmt> [--check] <file.act>");
+    eprintln!("usage: actus <parse|check|run|fmt> [--check] <file.act>");
     eprintln!("       actus build <file.act> [--emit obj|exe] [-o <output>]");
 }
