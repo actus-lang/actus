@@ -164,6 +164,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Create unwind plans for literal and call return expressions.
 - [x] Associate cleanup plans with lexical scope spans.
 - [x] Lower return, break, and continue unwind plans into the native cleanup model.
+- [x] Define the initial native resource handle and destructor contract.
 - [x] Verify deterministic native object emission for identical programs.
 - [x] Add native object structural golden tests.
 - [ ] Emit deterministic cleanup instructions.
