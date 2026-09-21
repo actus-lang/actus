@@ -27,6 +27,20 @@ fn formatting_is_idempotent() {
 }
 
 #[test]
+fn formatter_idempotence_holds_for_the_source_corpus() {
+    let sources = [
+        "verb main() -> Int { return 42; }",
+        "verb process() { erg buffer = allocate(10); { abs view = ref buffer; inspect(view); } }",
+        "verb looped() -> Int { erg value = 0; loop { value = 1; break; } return value; }",
+    ];
+
+    for source in sources {
+        let formatted = format_source(source);
+        assert_eq!(format_source(&formatted), formatted, "formatter changed {source:?}");
+    }
+}
+
+#[test]
 fn matches_nested_block_formatter_snapshot() {
     let source =
         "verb process(){erg buffer=allocate(10);{abs view=ref buffer;inspect(view,source:view);}}";

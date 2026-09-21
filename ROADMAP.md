@@ -195,7 +195,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add stable semantic diagnostic renderer tests.
 - [x] Add semantic state-transition tests.
 - [x] Add ownership and borrowing regression tests.
-- [ ] Add golden tests for generated native output.
+- [x] Add golden tests for generated native output.
 - [ ] Make test output deterministic.
 - [ ] Add a command for intentionally updating snapshots.
 - [ ] Add coverage reporting to CI.
@@ -208,9 +208,9 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Fuzz malformed braces and delimiters.
 - [ ] Fuzz malformed literals and comments.
 - [ ] Verify that arbitrary input never causes a compiler panic.
-- [ ] Add property tests for formatter idempotence.
+- [x] Add property tests for formatter idempotence.
 - [ ] Add property tests for parser round-tripping where applicable.
-- [ ] Add compiler determinism checks.
+- [x] Add compiler determinism checks.
 - [ ] Add performance benchmarks for lexing and parsing.
 - [ ] Add cross-platform CI for Linux, macOS, and Windows.
 
