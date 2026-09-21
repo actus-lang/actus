@@ -178,8 +178,21 @@ fn block_guarantees_return(block: &Block) -> bool {
 fn statement_guarantees_return(statement: &Stmt) -> bool {
     match statement {
         Stmt::Return { .. } => true,
-        Stmt::Loop(block) => block_guarantees_return(block),
+        Stmt::Loop(block) => loop_guarantees_return(block),
         Stmt::Block(block) => block_guarantees_return(block),
         _ => false,
     }
+}
+
+fn loop_guarantees_return(block: &Block) -> bool {
+    block_guarantees_return(block) && !contains_loop_exit(block)
+}
+
+fn contains_loop_exit(block: &Block) -> bool {
+    block.statements.iter().any(|statement| match statement {
+        Stmt::Break { .. } | Stmt::Continue { .. } => true,
+        Stmt::Block(nested) => contains_loop_exit(nested),
+        Stmt::Loop(_) => false,
+        _ => false,
+    })
 }

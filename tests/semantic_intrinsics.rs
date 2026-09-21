@@ -118,6 +118,13 @@ fn enforces_return_value_contracts() {
 }
 
 #[test]
+fn rejects_return_paths_broken_by_loop_exit() {
+    let error = analyze_source("verb main() -> Int { loop { break; return 42; } }")
+        .expect_err("a loop break can bypass the return");
+    assert!(matches!(error.kind, SemanticErrorKind::MissingReturnValue));
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source(
         "verb Buffer() -> Buffer { return allocate(1); } verb main() -> Buffer { return Buffer(); }",
