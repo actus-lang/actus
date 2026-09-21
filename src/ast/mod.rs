@@ -1,3 +1,4 @@
+mod abi;
 mod decl;
 mod expr;
 mod intrinsic;
@@ -5,6 +6,7 @@ mod registry;
 mod stmt;
 mod types;
 
+pub use abi::ForeignAbi;
 pub use decl::{ExternalVerbDecl, Param, Program, Role, TopLevelDecl, TypeName, VerbDecl};
 pub use expr::{Argument, BinaryOp, Expr, UnaryOp};
 pub use intrinsic::{IntrinsicKind, IntrinsicSpec, lookup_call_intrinsic, lookup_intrinsic};

@@ -50,7 +50,7 @@ impl Formatter {
             }
             TopLevelDecl::ExternalVerb(verb) => {
                 self.output.push_str("extern \"");
-                self.output.push_str(&verb.abi);
+                self.output.push_str(verb.abi.name());
                 self.output.push_str("\" verb ");
                 self.output.push_str(&verb.name);
                 self.output.push('(');

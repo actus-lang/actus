@@ -1,5 +1,6 @@
 use crate::lexer::SourceSpan;
 
+use super::abi::ForeignAbi;
 use super::stmt::Block;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,7 +16,7 @@ pub enum TopLevelDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExternalVerbDecl {
-    pub abi: String,
+    pub abi: ForeignAbi,
     pub name: String,
     pub params: Vec<Param>,
     pub return_type: Option<TypeName>,

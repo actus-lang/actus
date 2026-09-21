@@ -1,5 +1,6 @@
 use crate::ast::{
-    Block, Expr, ExternalVerbDecl, Param, Program, Role, Stmt, TopLevelDecl, TypeName, VerbDecl,
+    Block, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt, TopLevelDecl, TypeName,
+    VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
 
@@ -54,16 +55,17 @@ impl Parser {
 
     fn parse_external_verb(&mut self) -> Result<ExternalVerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start;
-        let abi = match self.advance_required("ABI string")? {
-            Token { kind: TokenKind::StringLiteral(abi), .. } => abi,
-            token => {
+        let abi_token = self.advance_required("ABI string")?;
+        let abi = match &abi_token.kind {
+            TokenKind::StringLiteral(abi) if abi == "C" => ForeignAbi::C,
+            _ => {
                 return Err(ParseError {
                     code: ParseErrorCode::UnexpectedToken,
                     kind: ParseErrorKind::UnexpectedToken {
-                        expected: "ABI string (for example, `\"C\"`)".to_owned(),
-                        found: token.kind,
+                        expected: "supported ABI string (currently `\"C\"`)".to_owned(),
+                        found: abi_token.kind.clone(),
                     },
-                    span: token.span,
+                    span: abi_token.span,
                 });
             }
         };

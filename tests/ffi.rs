@@ -87,12 +87,9 @@ fn marks_buffer_returns_as_owned_resources() {
 fn rejects_non_c_external_declarations() {
     let (tokens, errors) = scan("extern \"Rust\" verb write() -> Int;");
     assert!(errors.is_empty());
-    let program = parse(tokens).expect("source should parse");
-    let external = match &program.declarations[0] {
-        actus::ast::TopLevelDecl::ExternalVerb(declaration) => declaration,
-        _ => panic!("expected external declaration"),
-    };
-    let error = c_abi_external_signature(external).expect_err("only C is supported initially");
+    let error = parse(tokens).expect_err("unknown ABI must be rejected by the parser");
 
-    assert!(matches!(error, CAbiError::UnsupportedCallingConvention { abi } if abi == "Rust"));
+    assert!(
+        matches!(error.kind, actus::parser::ParseErrorKind::UnexpectedToken { expected, .. } if expected.contains("currently `\"C\"`"))
+    );
 }

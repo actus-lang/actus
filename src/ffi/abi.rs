@@ -1,4 +1,4 @@
-use crate::ast::{BuiltinType, ExternalVerbDecl, Role, VerbDecl, lookup_builtin_type};
+use crate::ast::{BuiltinType, ExternalVerbDecl, ForeignAbi, Role, VerbDecl, lookup_builtin_type};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CAbiType {
@@ -73,7 +73,6 @@ pub struct CAbiSignature {
 pub enum CAbiError {
     MissingReturnType { verb: String },
     UnsupportedType { name: String },
-    UnsupportedCallingConvention { abi: String },
 }
 
 impl std::fmt::Display for CAbiError {
@@ -84,9 +83,6 @@ impl std::fmt::Display for CAbiError {
             }
             Self::UnsupportedType { name } => {
                 write!(formatter, "type `{name}` has no C ABI mapping")
-            }
-            Self::UnsupportedCallingConvention { abi } => {
-                write!(formatter, "calling convention `{abi}` is not supported")
             }
         }
     }
@@ -101,8 +97,8 @@ pub fn c_abi_signature(verb: &VerbDecl) -> Result<CAbiSignature, CAbiError> {
 pub fn c_abi_external_signature(
     declaration: &ExternalVerbDecl,
 ) -> Result<CAbiSignature, CAbiError> {
-    if declaration.abi != "C" {
-        return Err(CAbiError::UnsupportedCallingConvention { abi: declaration.abi.clone() });
+    match declaration.abi {
+        ForeignAbi::C => {}
     }
     signature_parts(&declaration.name, &declaration.params, declaration.return_type.as_ref())
 }
