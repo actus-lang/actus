@@ -39,7 +39,7 @@ open verb configure_interrupt() {
 }
 ```
 
-The `#` documentation model and `arca doc` generation are planned tooling
+The `///` documentation model and `arca doc` generation are planned tooling
 features. They must preserve source spans and remain separate from ordinary
 compiler diagnostics.
 
