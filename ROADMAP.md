@@ -4,7 +4,7 @@ Actus is developed in small, verifiable stages. Each item should be checked only
 
 ## Current focus
 
-**Phase 5 is the active development phase.** Earlier phases are complete except for the explicitly deferred second-maintainer review requirement.
+**Phase 5 is the active development phase.** Earlier phases are complete except for the explicitly deferred second-maintainer review requirement. Native backend work remains preserved as completed progress while the semantic and registry foundations are finalized.
 
 Each phase is gated: implementation progress in a later phase may be preserved, but the project must return to the earliest incomplete phase before adding new work.
 
@@ -125,7 +125,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add a centralized source-level intrinsic registry for built-in functions.
 - [x] Include statement intrinsics such as `drop` in the source-level registry.
 - [x] Add the initial built-in type registry for supported `Int` and `Buffer` types.
-- [ ] Extend the built-in type registry with `Array`, `Map`, and future types.
+- [x] Extend the built-in type registry with initial `Array` and `Map` entries.
 - [x] Define case-sensitive, separate function and type namespaces with explicit collision rules.
 - [ ] Define the registry lifecycle for adding, deprecating, and removing built-ins.
 - [x] Validate declared built-in type names before code generation.

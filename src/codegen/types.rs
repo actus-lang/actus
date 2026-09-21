@@ -13,6 +13,7 @@ impl NativeType {
         match lookup_builtin_type(name)? {
             BuiltinType::Int => Some(Self::Int),
             BuiltinType::Buffer => Some(Self::Buffer),
+            BuiltinType::Array | BuiltinType::Map => None,
         }
     }
 

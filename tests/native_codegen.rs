@@ -50,3 +50,14 @@ fn native_backend_accepts_externalized_build_settings() {
         .expect("custom native settings should emit");
     assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
 }
+
+#[test]
+fn native_backend_rejects_registered_but_unlowered_collection_types() {
+    let (tokens, errors) = scan("verb main(erg items: Array) -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = actus::codegen::emit_program_object(&program, "main")
+        .expect_err("unlowered collection types must be rejected");
+
+    assert!(error.to_string().contains("Array"));
+}

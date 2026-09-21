@@ -27,14 +27,21 @@ fn intrinsic_registry_defines_source_contracts() {
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
     assert_eq!(BuiltinType::Buffer.spec().name, "Buffer");
-    assert!(lookup_builtin_type("Array").is_none());
+    assert_eq!(lookup_builtin_type("Array"), Some(BuiltinType::Array));
+    assert_eq!(lookup_builtin_type("Map"), Some(BuiltinType::Map));
 }
 
 #[test]
 fn rejects_unknown_declared_types() {
-    let error = analyze_source("verb main(erg buffer: Array) { }")
+    let error = analyze_source("verb main(erg buffer: Vector) { }")
         .expect_err("unsupported types must fail before code generation");
-    assert!(matches!(error.kind, SemanticErrorKind::UnknownType { name } if name == "Array"));
+    assert!(matches!(error.kind, SemanticErrorKind::UnknownType { name } if name == "Vector"));
+}
+
+#[test]
+fn accepts_registered_collection_types() {
+    analyze_source("verb main(erg items: Array, erg index: Map) { }")
+        .expect("registered collection types should pass semantic analysis");
 }
 
 #[test]
