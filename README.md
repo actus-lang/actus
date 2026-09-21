@@ -61,7 +61,7 @@ entry = "main"
 ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
 ```
 
-The default linker is `cc`. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
+The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
 Run the complete test suite with:
 

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::codegen::{emit_program_object_with_configuration, link_object};
-use crate::configuration::CompilerConfiguration;
+use crate::configuration::{CompilerConfiguration, HOSTED_ENTRY_SYMBOL};
 use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::formatter::format_program;
 use crate::lexer::scan;
@@ -132,6 +132,11 @@ fn validate_entry(
     }) else {
         return Err(format!("entry verb `{symbol}` was not found"));
     };
+    if matches!(emit, EmitKind::Executable) && symbol != HOSTED_ENTRY_SYMBOL {
+        return Err(format!(
+            "hosted executables require entry verb `{HOSTED_ENTRY_SYMBOL}`; custom entry points are available for object emission only"
+        ));
+    }
     if matches!(emit, EmitKind::Executable) && !verb.params.is_empty() {
         return Err(format!("executable entry verb `{symbol}` cannot have parameters"));
     }

@@ -10,6 +10,8 @@ const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
 const DEFAULT_NATIVE_MODULE_NAME: &str = "actus";
 const MANIFEST_FILE_NAME: &str = "Arca.toml";
 
+pub const HOSTED_ENTRY_SYMBOL: &str = "main";
+
 #[derive(Debug)]
 pub struct ConfigurationError(String);
 
