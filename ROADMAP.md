@@ -285,6 +285,38 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [ ] Add migration rules if struct semantics evolve after Alpha.
 - [ ] Keep the manifesto, specification, and implementation behavior synchronized.
 
+## Future Tooling: Arca Package Ecosystem
+
+Arca is the planned project and package manager for Actus. It will orchestrate
+the compiler, builds, tests, dependency resolution, and package publication.
+
+### Manifest and Project Model
+
+- [ ] Define the `Arca.toml` manifest schema.
+- [ ] Define package source roots, entry points, and project layout.
+- [ ] Define package names, versions, editions, and metadata.
+- [ ] Define the `Arca.lock` dependency lockfile format.
+- [ ] Define debug and release profile semantics.
+
+### Local Workflow
+
+- [ ] Add `arca init` and `arca new`.
+- [ ] Add `arca check`.
+- [ ] Add `arca build` and `arca build --release`.
+- [ ] Add `arca run`.
+- [ ] Add `arca test`.
+- [ ] Add `arca fmt` integration.
+
+### Dependencies and Publishing
+
+- [ ] Define dependency resolution and version constraints.
+- [ ] Define local path dependencies.
+- [ ] Define registry and package index behavior.
+- [ ] Define package validation and reproducible archives.
+- [ ] Define package signing and trust policy.
+- [ ] Add `arca publish` after the registry contract is stable.
+- [ ] Add package download and cache management.
+
 ## Future Language Extensions
 
 These features are intentionally outside the initial Alpha core and require a separate design decision:
