@@ -48,13 +48,13 @@ The example returns `42`. Object files and native executables are local build ar
 
 ### Toolchain configuration
 
-The linker can be selected without changing source code by setting `ACTUS_LINKER`:
+Basic project build settings are read from the root `Arca.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
 
 ```sh
 ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
 ```
 
-The default linker is `cc`. Toolchain and backend defaults are represented by typed compiler configuration and will become project-level `Arca.toml` settings when the Arca package workflow is implemented. Language semantics, ownership rules, and borrow safety are not configurable project options.
+The default linker is `cc`. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
 Run the complete test suite with:
 

@@ -293,9 +293,9 @@ the compiler, builds, tests, dependency resolution, and package publication.
 
 ### Manifest and Project Model
 
-- [ ] Define the `Arca.toml` manifest schema.
+- [x] Define the initial `Arca.toml` manifest schema.
 - [ ] Define package source roots, entry points, and project layout.
-- [ ] Define package names, versions, editions, and metadata.
+- [x] Define initial package names and versions.
 - [ ] Define the `Arca.lock` dependency lockfile format.
 - [ ] Define debug and release profile semantics.
 
