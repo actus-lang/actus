@@ -87,6 +87,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Reject duplicate bindings within the same scope.
 - [x] Define and enforce shadowing rules.
 - [x] Track binding source spans.
+- [x] Validate known typed initializers and assignments.
 
 ### Ownership
 

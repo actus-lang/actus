@@ -79,6 +79,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
+        SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
     }
 }
 
@@ -152,6 +153,9 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         ),
         SemanticErrorKind::ReturnTypeMismatch { expected, found } => {
             format!("return type mismatch: expected `{expected}`, found `{found}`")
+        }
+        SemanticErrorKind::BindingTypeMismatch { binding, expected, found } => {
+            format!("type mismatch for `{binding}`: expected `{expected}`, found `{found}`")
         }
         _ => return None,
     };

@@ -91,6 +91,26 @@ fn rejects_known_return_type_mismatches() {
 }
 
 #[test]
+fn rejects_typed_initializer_and_assignment_mismatches() {
+    let initializer = analyze_source("verb main() { erg buffer: Buffer = 1; }")
+        .expect_err("typed initializer must match its binding type");
+    assert!(matches!(
+        initializer.kind,
+        SemanticErrorKind::BindingTypeMismatch { binding, expected, found }
+            if binding == "buffer" && expected == "Buffer" && found == "Int"
+    ));
+
+    let assignment =
+        analyze_source("verb main() { erg buffer: Buffer = allocate(1); buffer = 2; }")
+            .expect_err("assignment must match its binding type");
+    assert!(matches!(
+        assignment.kind,
+        SemanticErrorKind::BindingTypeMismatch { binding, expected, found }
+            if binding == "buffer" && expected == "Buffer" && found == "Int"
+    ));
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source(
         "verb Buffer() -> Buffer { return allocate(1); } verb main() -> Buffer { return Buffer(); }",

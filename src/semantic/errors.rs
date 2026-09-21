@@ -28,6 +28,7 @@ pub enum SemanticErrorKind {
     DuplicateVerbName { name: String },
     TypeMismatch { callee: String, parameter: String, expected: String, found: String },
     ReturnTypeMismatch { expected: String, found: String },
+    BindingTypeMismatch { binding: String, expected: String, found: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

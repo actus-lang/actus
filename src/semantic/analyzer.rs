@@ -5,7 +5,7 @@ use crate::ast::{
     lookup_builtin_type, lookup_call_intrinsic,
 };
 
-use super::errors::SemanticError;
+use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::SemanticModel;
 
 pub(super) struct ScopeFrame {
@@ -118,6 +118,7 @@ impl Analyzer {
         match statement {
             Stmt::OwnerDecl { role, name, ty, initializer, span } => {
                 let binding_type = self.resolve_binding_type(ty.as_deref(), initializer, *span)?;
+                self.validate_declared_initializer(name, ty.as_deref(), initializer, *span)?;
                 self.visit_expression(initializer)?;
                 if *role == Role::Erg {
                     self.initialize_owner(initializer, *span)?;
@@ -130,6 +131,7 @@ impl Analyzer {
             Stmt::Assignment { name, value, span } => {
                 let index = self.binding(name, *span)?;
                 self.ensure_mutable(index, name, *span)?;
+                self.validate_binding_assignment(index, name, value, *span)?;
                 self.visit_expression(value)
             }
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
@@ -169,6 +171,51 @@ impl Analyzer {
             return Ok(lookup_builtin_type(name));
         }
         Ok(self.expression_type(initializer))
+    }
+
+    fn validate_declared_initializer(
+        &self,
+        name: &str,
+        declared_type: Option<&str>,
+        initializer: &Expr,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(expected_name) = declared_type else { return Ok(()) };
+        let Some(found) = self.expression_type(initializer) else { return Ok(()) };
+        let expected = lookup_builtin_type(expected_name).expect("declared type was validated");
+        self.ensure_binding_type(name, expected, found, span)
+    }
+
+    fn validate_binding_assignment(
+        &self,
+        index: usize,
+        name: &str,
+        value: &Expr,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(expected) = self.model.bindings[index].ty else { return Ok(()) };
+        let Some(found) = self.expression_type(value) else { return Ok(()) };
+        self.ensure_binding_type(name, expected, found, span)
+    }
+
+    fn ensure_binding_type(
+        &self,
+        name: &str,
+        expected: BuiltinType,
+        found: BuiltinType,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if expected == found {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::BindingTypeMismatch {
+                binding: name.to_owned(),
+                expected: expected.spec().name.to_owned(),
+                found: found.spec().name.to_owned(),
+            },
+            span,
+        })
     }
 
     pub(super) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
