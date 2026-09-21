@@ -1,4 +1,5 @@
-use actus::codegen::emit_zero_return_object;
+use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_object};
+use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
 use object::{Object, ObjectSection, ObjectSymbol};
@@ -36,4 +37,16 @@ fn x86_64_machine_code_matches_the_return_zero_golden() {
         .expect("text section should have bytes");
 
     assert_eq!(text, [0x55, 0x48, 0x89, 0xe5, 0x33, 0xc0, 0x48, 0x89, 0xec, 0x5d, 0xc3]);
+}
+
+#[test]
+fn native_backend_accepts_externalized_build_settings() {
+    let (tokens, errors) = scan("verb main() -> Int { return 42; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let configuration = NativeBackendConfiguration::new("actus-test-module", false);
+
+    let object = emit_program_object_with_configuration(&program, "main", &configuration)
+        .expect("custom native settings should emit");
+    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
 }
