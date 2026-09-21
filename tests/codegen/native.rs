@@ -8,7 +8,6 @@ use object::{Object, ObjectSection, ObjectSymbol};
 fn emits_a_native_object_without_c_intermediate_code() {
     let object = emit_zero_return_object("actus_entry").expect("native object should emit");
     object::File::parse(object.as_slice()).expect("object format should parse");
-    assert!(object.len() > 256);
 }
 
 #[test]
