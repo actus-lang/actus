@@ -1,6 +1,6 @@
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -48,6 +48,8 @@ struct BuildManifest {
     linker_flavor: Option<LinkerFlavor>,
     native_module: Option<String>,
     position_independent: Option<bool>,
+    #[serde(default)]
+    library_paths: Vec<String>,
     #[serde(default)]
     libraries: Vec<LibraryManifest>,
 }
@@ -128,6 +130,7 @@ pub struct CompilerConfiguration {
     run_artifact_prefix: String,
     native_backend: NativeBackendConfiguration,
     entry_symbol: Option<String>,
+    library_paths: Vec<PathBuf>,
     libraries: Vec<LinkLibrary>,
 }
 
@@ -141,6 +144,7 @@ impl CompilerConfiguration {
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
             entry_symbol: None,
+            library_paths: Vec::new(),
             libraries: Vec::new(),
         }
     }
@@ -173,11 +177,19 @@ impl CompilerConfiguration {
             .into_iter()
             .map(|library| LinkLibrary::new(library.name, library.kind))
             .collect();
+        let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
+        let library_paths = manifest
+            .build
+            .library_paths
+            .into_iter()
+            .map(|path| manifest_directory.join(path))
+            .collect();
         Ok(Self {
             linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
             linker_flavor: manifest.build.linker_flavor.unwrap_or(environment.linker_flavor),
             native_backend,
             entry_symbol: manifest.package.entry,
+            library_paths,
             libraries,
             ..environment
         })
@@ -211,6 +223,10 @@ impl CompilerConfiguration {
     pub fn libraries(&self) -> &[LinkLibrary] {
         &self.libraries
     }
+
+    pub fn library_paths(&self) -> &[PathBuf] {
+        &self.library_paths
+    }
 }
 
 fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> {
@@ -232,6 +248,11 @@ fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> 
     }
     if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError("Arca.toml native_module must not be empty".to_owned()));
+    }
+    if manifest.build.library_paths.iter().any(|path| path.trim().is_empty()) {
+        return Err(ConfigurationError(
+            "Arca.toml library_paths must not contain empty paths".to_owned(),
+        ));
     }
     if let Some(library) = manifest
         .build

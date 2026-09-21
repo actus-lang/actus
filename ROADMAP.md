@@ -205,11 +205,11 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Define initial C ABI return ownership and lifetime contracts.
 - [x] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
 - [x] Define ownership and lifetime rules at the C FFI boundary.
-- [ ] Support linking static and shared C libraries.
+- [x] Support linking static and shared C libraries.
 - [x] Add manifest-driven static and shared library linker inputs.
 - [ ] Define a reproducible header-to-Actus binding workflow.
 - [x] Mark unchecked foreign declarations with explicit `unsafe extern` boundaries.
-- [ ] Add C library integration fixtures and native link tests.
+- [x] Add C library integration fixtures and native link tests.
 - [x] Add a native link smoke test for an imported C symbol.
 
 ## Phase 8: Test Infrastructure

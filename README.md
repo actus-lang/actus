@@ -63,6 +63,17 @@ ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/
 
 The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
+Native libraries can be supplied through manifest-relative search paths:
+
+```toml
+[build]
+library_paths = ["native"]
+
+[[build.libraries]]
+name = "example"
+kind = "static"
+```
+
 Foreign C declarations must use an explicit unsafe boundary:
 
 ```act
