@@ -11,6 +11,7 @@ pub enum NativeInstruction {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeCleanupPlan {
     pub depth: usize,
+    pub span: SourceSpan,
     pub instructions: Vec<NativeInstruction>,
 }
 
@@ -105,6 +106,7 @@ fn validate_scope(
 fn lower_scope(scope: &crate::semantic::ScopeCleanup) -> NativeCleanupPlan {
     NativeCleanupPlan {
         depth: scope.depth,
+        span: scope.span,
         instructions: scope.actions.iter().map(lower_action).collect(),
     }
 }
@@ -123,13 +125,18 @@ fn lower_action(action: &CleanupAction) -> NativeInstruction {
 #[cfg(test)]
 mod tests {
     use super::validate_cleanup_plans;
+    use crate::lexer::SourceSpan;
     use crate::semantic::{CleanupAction, ScopeCleanup, SemanticModel};
 
     fn model_with(action: CleanupAction) -> SemanticModel {
         SemanticModel {
             bindings: Vec::new(),
             borrows: Vec::new(),
-            cleanup_plans: vec![ScopeCleanup { depth: 1, actions: vec![action] }],
+            cleanup_plans: vec![ScopeCleanup {
+                depth: 1,
+                span: SourceSpan::new(0, 1),
+                actions: vec![action],
+            }],
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
         }
@@ -156,6 +163,7 @@ mod tests {
             borrows: Vec::new(),
             cleanup_plans: vec![ScopeCleanup {
                 depth: 1,
+                span: SourceSpan::new(0, 1),
                 actions: vec![
                     CleanupAction::DropBinding { binding_index: 0 },
                     CleanupAction::DropBinding { binding_index: 0 },

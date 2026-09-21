@@ -14,6 +14,7 @@ fn lowers_semantic_cleanup_plans_without_changing_order() {
     let semantic = analyze(&program).expect("source should pass semantic analysis");
 
     let plans = lower_cleanup_plans(&semantic);
+    assert!(plans[0].span.end > plans[0].span.start);
     assert_eq!(
         plans[0].instructions,
         vec![

@@ -6,6 +6,7 @@ use super::errors::SemanticError;
 use super::model::SemanticModel;
 
 pub(super) struct ScopeFrame {
+    pub(super) span: crate::lexer::SourceSpan,
     pub(super) bindings: HashMap<String, usize>,
     pub(super) borrow_ids: Vec<usize>,
     pub(super) declaration_indices: Vec<usize>,
@@ -49,7 +50,7 @@ impl Analyzer {
         }
         for declaration in &program.declarations {
             let TopLevelDecl::Verb(verb) = declaration;
-            self.enter_scope();
+            self.enter_scope(verb.body.span);
             for parameter in &verb.params {
                 self.bind(parameter.role.clone(), parameter.name.clone(), parameter.span)?;
             }
@@ -86,7 +87,7 @@ impl Analyzer {
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => {
-                self.enter_scope();
+                self.enter_scope(block.span);
                 self.loop_boundaries.push(self.scopes.len() - 1);
                 self.visit_block(block)?;
                 self.loop_boundaries.pop();
@@ -101,7 +102,7 @@ impl Analyzer {
             }
             Stmt::Drop { name, span } => self.drop_binding(name, *span),
             Stmt::Block(block) => {
-                self.enter_scope();
+                self.enter_scope(block.span);
                 self.visit_block(block)?;
                 self.leave_scope();
                 Ok(())

@@ -39,8 +39,9 @@ impl Analyzer {
         )
     }
 
-    pub(super) fn enter_scope(&mut self) {
+    pub(super) fn enter_scope(&mut self, span: SourceSpan) {
         self.scopes.push(ScopeFrame {
+            span,
             bindings: std::collections::HashMap::new(),
             borrow_ids: Vec::new(),
             declaration_indices: Vec::new(),
@@ -69,6 +70,7 @@ impl Analyzer {
         }
         self.model.cleanup_plans.push(super::cleanup::plan_scope_cleanup(
             self.scopes.len(),
+            frame.span,
             &frame.declaration_indices,
             &frame.borrow_ids,
             &self.model.bindings,

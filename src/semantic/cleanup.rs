@@ -13,6 +13,7 @@ pub enum CleanupAction {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScopeCleanup {
     pub depth: usize,
+    pub span: SourceSpan,
     pub actions: Vec<CleanupAction>,
 }
 
@@ -37,6 +38,7 @@ pub struct LoopUnwindPlan {
 
 pub(super) fn plan_scope_cleanup(
     depth: usize,
+    span: SourceSpan,
     binding_indices: &[usize],
     borrow_ids: &[usize],
     bindings: &[Binding],
@@ -52,7 +54,7 @@ pub(super) fn plan_scope_cleanup(
         let live = matches!(binding.state, BindingState::Active | BindingState::Frozen { .. });
         (owned && live).then_some(CleanupAction::DropBinding { binding_index: *index })
     }));
-    ScopeCleanup { depth, actions }
+    ScopeCleanup { depth, span, actions }
 }
 
 impl Analyzer {
@@ -65,6 +67,7 @@ impl Analyzer {
             .map(|(index, frame)| {
                 plan_scope_cleanup(
                     index + 1,
+                    frame.span,
                     &frame.declaration_indices,
                     &frame.borrow_ids,
                     &self.model.bindings,
@@ -95,6 +98,7 @@ impl Analyzer {
             .map(|(offset, frame)| {
                 plan_scope_cleanup(
                     boundary + offset + 1,
+                    frame.span,
                     &frame.declaration_indices,
                     &frame.borrow_ids,
                     &self.model.bindings,
