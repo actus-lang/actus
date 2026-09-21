@@ -1,4 +1,5 @@
 mod abi;
+mod cleanup;
 mod linker;
 mod lowering;
 mod model;
