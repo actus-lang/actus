@@ -222,9 +222,9 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Add semantic state-transition tests.
 - [x] Add ownership and borrowing regression tests.
 - [x] Add golden tests for generated native output.
-- [ ] Make test output deterministic.
+- [x] Make test output deterministic.
 - [x] Add a command for intentionally updating snapshots.
-- [ ] Add coverage reporting to CI.
+- [x] Add coverage reporting to CI.
 
 ## Phase 9: Fuzzing and Hardening
 

@@ -28,7 +28,7 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests
-        run: cargo test --all-targets --all-features
+        run: cargo test --all-targets --all-features -- --test-threads=1
 
       - name: Check source limits
         run: ./scripts/check_source_limits.sh

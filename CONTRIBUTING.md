@@ -57,6 +57,13 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features
 ```
 
+To generate the CI-compatible local coverage report, install
+`cargo-llvm-cov` and run:
+
+```sh
+cargo llvm-cov --all-targets --all-features --lcov --output-path lcov.info
+```
+
 Snapshot files are checked by the test suite and are not rewritten during
 ordinary tests. When an intentional snapshot update is required, run:
 
