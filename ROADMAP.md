@@ -4,7 +4,7 @@ Actus is developed in small, verifiable stages. Each phase has a dedicated docum
 
 ## Current Focus
 
-**Phase 12: Enums and Pattern Matching.** The active work is to finish native `case` execution and then establish the generic type system required by `Option[T]` and `Result[T, E]`.
+**Phase 13: Generic Types and Polymorphism.** The active work is to add generic parameters and type applications to the AST and then establish the type machinery required by `Option[T]` and `Result[T, E]`.
 
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
 
@@ -23,5 +23,6 @@ Phase checkboxes describe phase-level status. A phase is marked complete only wh
 - [ ] [Phase 11: Complete Struct System](docs/roadmap/phase-11-struct-system.md)
 - [ ] [Phase 12: Enums and Pattern Matching](docs/roadmap/phase-12-enums-and-pattern-matching.md)
 - [ ] [Phase 13: Generic Types and Polymorphism](docs/roadmap/phase-13-generic-types-and-polymorphism.md)
-- [ ] [Phase 14: Arca Package Ecosystem](docs/roadmap/phase-14-arca-package-ecosystem.md)
-- [ ] [Phase 15: Future Language Extensions](docs/roadmap/phase-15-future-language-extensions.md)
+- [ ] [Phase 14: Roles and Performance](docs/roadmap/phase14_roles_and_performance.md)
+- [ ] [Phase 15: Arca Ecosystem, I/O and Core Runtime](docs/roadmap/phase-15-arca-ecosystem.md)
+- [ ] [Phase 16: Self-Hosting and Future Language Extensions](docs/roadmap/phase-16-self-hosting-and-future-extensions.md)
