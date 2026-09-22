@@ -124,3 +124,58 @@ fn rejects_duplicate_and_unreachable_patterns() {
         SemanticErrorKind::UnreachablePattern { pattern } if pattern == "Color.Red"
     ));
 }
+
+#[test]
+fn keeps_abs_case_subjects_read_only_and_restores_the_owner() {
+    let mutation = analyze_source(
+        "enum Message { Move(Int), } verb broken(erg message: Message) { case abs message { Message.Move(x) => { x = 2; }, }; }",
+    )
+    .expect_err("abs case payloads must not be mutable");
+    assert!(matches!(
+        mutation.kind,
+        SemanticErrorKind::InvalidMutation { name } if name == "x"
+    ));
+
+    let model = analyze_source(
+        "enum Color { Red, } verb valid(erg color: Color) { case abs color { Color.Red => 0, }; color = Color.Red; }",
+    )
+    .expect("the owner should become active after an abs case");
+    assert_eq!(model.bindings[0].state, actus::semantic::BindingState::Active);
+}
+
+#[test]
+fn consumes_dat_case_subjects_and_rejects_abs_subjects() {
+    let moved = analyze_source(
+        "enum Color { Red, } verb broken(erg color: Color) { case dat color { Color.Red => 0, }; color = Color.Red; }",
+    )
+    .expect_err("dat case subjects must be moved after matching");
+    assert!(matches!(
+        moved.kind,
+        SemanticErrorKind::UseAfterMove { name } if name == "color"
+    ));
+
+    let invalid = analyze_source(
+        "enum Color { Red, } verb broken(abs color: Color) { case dat color { Color.Red => 0, }; }",
+    )
+    .expect_err("dat matching must require ownership");
+    assert!(matches!(
+        invalid.kind,
+        SemanticErrorKind::InvalidCaseRole { mode, subject }
+            if mode == "dat" && subject == "color"
+    ));
+}
+
+#[test]
+fn gives_dat_payload_bindings_owned_cleanup() {
+    let model = analyze_source(
+        "enum Message { Move(Int, Int), } verb consume(erg message: Message) { case dat message { Message.Move(x, y) => { drop(x); drop(y); }, }; }",
+    )
+    .expect("dat payload bindings should be owned in the branch");
+    assert_eq!(model.bindings[1].role, actus::ast::Role::Dat);
+    assert_eq!(model.bindings[2].role, actus::ast::Role::Dat);
+    assert!(model.cleanup_plans.iter().all(|plan| {
+        plan.actions.iter().all(|action| {
+            !matches!(action, actus::semantic::CleanupAction::DropBinding { binding_index: 1 | 2 })
+        })
+    }));
+}

@@ -106,6 +106,8 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::DuplicatePattern { .. } => "E1047",
         SemanticErrorKind::PatternTypeMismatch { .. } => "E1048",
         SemanticErrorKind::PatternBindingTypeMismatch { .. } => "E1049",
+        SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
+        SemanticErrorKind::InvalidMutation { .. } => "E1051",
     }
 }
 
@@ -215,6 +217,12 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::PatternBindingTypeMismatch { binding, expected, found } => {
             format!("pattern binding `{binding}` has type `{found}`, expected `{expected}`")
+        }
+        SemanticErrorKind::InvalidCaseRole { mode, subject } => {
+            format!("cannot use `{mode}` case deconstruction on `{subject}`")
+        }
+        SemanticErrorKind::InvalidMutation { name } => {
+            format!("cannot mutate read-only binding `{name}`")
         }
         _ => return None,
     };

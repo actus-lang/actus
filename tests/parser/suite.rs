@@ -1,5 +1,5 @@
 use actus::ast::{
-    CaseBody, EnumPayload, Expr, LiteralPattern, Pattern, Role, Stmt, StructFieldRole,
+    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, Pattern, Role, Stmt, StructFieldRole,
     TopLevelDecl, VariantPayload,
 };
 use actus::diagnostics::render_parse_error;
@@ -73,12 +73,13 @@ fn parses_case_variants_literals_and_wildcard_with_spans() {
         "enum Color { Red, } verb main() -> Int { return case value { Color.Red => 1, true => 2, _ => 0, }; }",
     );
     let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
-    let Stmt::Return { value: Some(Expr::Case { subject, branches, span }), .. } =
+    let Stmt::Return { value: Some(Expr::Case { mode, subject, branches, span }), .. } =
         &verb.body.statements[0]
     else {
         panic!("expected case expression");
     };
     assert!(matches!(subject.as_ref(), Expr::Identifier { name, .. } if name == "value"));
+    assert_eq!(*mode, CaseMode::Abs);
     assert_eq!(branches.len(), 3);
     assert!(matches!(
         &branches[0].pattern,

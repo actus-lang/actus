@@ -180,6 +180,13 @@ pub enum SemanticErrorKind {
         expected: String,
         found: String,
     },
+    InvalidCaseRole {
+        mode: String,
+        subject: String,
+    },
+    InvalidMutation {
+        name: String,
+    },
     MissingReturnValue,
 }
 

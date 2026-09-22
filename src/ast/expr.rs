@@ -17,7 +17,13 @@ pub enum Expr {
     MethodCall { receiver: Box<Expr>, method: String, arguments: Vec<Argument>, span: SourceSpan },
     StructLit { name: String, fields: Vec<StructFieldInit>, span: SourceSpan },
     FieldAccess { object: Box<Expr>, field: String, span: SourceSpan },
-    Case { subject: Box<Expr>, branches: Vec<CaseBranch>, span: SourceSpan },
+    Case { mode: CaseMode, subject: Box<Expr>, branches: Vec<CaseBranch>, span: SourceSpan },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CaseMode {
+    Abs,
+    Dat,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

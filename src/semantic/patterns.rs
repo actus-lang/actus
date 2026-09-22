@@ -8,10 +8,15 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
+use super::pattern_support::{
+    duplicate_pattern, is_wildcard, non_exhaustive, pattern_name, pattern_span,
+    pattern_type_mismatch, unreachable_pattern, variant_key,
+};
 
 impl Analyzer {
     pub(super) fn validate_case_patterns(
         &mut self,
+        mode: crate::ast::CaseMode,
         subject: &Expr,
         branches: &[CaseBranch],
         span: SourceSpan,
@@ -19,6 +24,11 @@ impl Analyzer {
         self.validate_pattern_coverage(subject, branches, span)?;
         let subject_type =
             self.expression_type_name(subject).unwrap_or_else(|| "unknown".to_owned());
+        self.enter_scope(span);
+        match mode {
+            crate::ast::CaseMode::Abs => self.borrow_case_subject(subject, span)?,
+            crate::ast::CaseMode::Dat => self.consume_case_subject(subject, span)?,
+        }
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
         for branch in branches {
@@ -33,10 +43,11 @@ impl Analyzer {
             }
             self.validate_pattern(&branch.pattern, &subject_type, subject)?;
             self.enter_scope(branch.span);
-            self.bind_pattern_variables(&branch.pattern)?;
+            self.bind_pattern_variables(&branch.pattern, mode)?;
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
         }
+        self.leave_scope();
         Ok(())
     }
 
@@ -172,7 +183,11 @@ impl Analyzer {
         }
     }
 
-    fn bind_pattern_variables(&mut self, pattern: &Pattern) -> Result<(), SemanticError> {
+    fn bind_pattern_variables(
+        &mut self,
+        pattern: &Pattern,
+        mode: crate::ast::CaseMode,
+    ) -> Result<(), SemanticError> {
         match pattern {
             Pattern::Variant { enum_name, variant, payload, .. } => {
                 let candidate_payload = self.enum_types[enum_name]
@@ -185,14 +200,14 @@ impl Analyzer {
                 match (candidate_payload, payload) {
                     (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
                         for (binding, ty) in bindings.iter().zip(types) {
-                            self.bind_pattern_binding(binding, &ty.name)?;
+                            self.bind_pattern_binding(binding, &ty.name, mode)?;
                         }
                     }
                     (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
                         for pattern in patterns {
                             let field =
                                 fields.iter().find(|field| field.name == pattern.name).unwrap();
-                            self.bind_pattern_binding(&pattern.binding, &field.ty.name)?;
+                            self.bind_pattern_binding(&pattern.binding, &field.ty.name, mode)?;
                         }
                     }
                     _ => {}
@@ -207,13 +222,17 @@ impl Analyzer {
         &mut self,
         binding: &PatternBinding,
         type_name: &str,
+        mode: crate::ast::CaseMode,
     ) -> Result<(), SemanticError> {
         if binding.name == "_" {
             return Ok(());
         }
         self.validate_type_name(type_name, binding.span)?;
         self.bind(
-            Role::Abs,
+            match mode {
+                crate::ast::CaseMode::Abs => Role::Abs,
+                crate::ast::CaseMode::Dat => Role::Dat,
+            },
             binding.name.clone(),
             crate::ast::lookup_builtin_type(type_name),
             binding.span,
@@ -233,62 +252,5 @@ impl Analyzer {
             CaseBody::Expression(expression) => self.visit_expression(expression),
             CaseBody::Block(block) => self.visit_block(block),
         }
-    }
-}
-
-fn pattern_span(pattern: &Pattern) -> SourceSpan {
-    match pattern {
-        Pattern::Variant { span, .. }
-        | Pattern::Literal { span, .. }
-        | Pattern::Wildcard { span } => *span,
-    }
-}
-
-fn pattern_name(pattern: &Pattern) -> String {
-    match pattern {
-        Pattern::Variant { enum_name, variant, .. } => format!("{enum_name}.{variant}"),
-        Pattern::Literal { value, .. } => match value {
-            LiteralPattern::Integer(value) => value.clone(),
-            LiteralPattern::Bool(value) => value.to_string(),
-        },
-        Pattern::Wildcard { .. } => "_".to_owned(),
-    }
-}
-
-fn variant_key(pattern: &Pattern, enum_name: &str) -> Option<String> {
-    match pattern {
-        Pattern::Variant { enum_name: found, variant, .. } if found == enum_name => {
-            Some(variant.clone())
-        }
-        _ => None,
-    }
-}
-
-fn is_wildcard(pattern: &Pattern) -> bool {
-    matches!(pattern, Pattern::Wildcard { .. })
-}
-
-fn non_exhaustive(subject: &str, missing: Vec<String>, span: SourceSpan) -> SemanticError {
-    SemanticError {
-        kind: SemanticErrorKind::NonExhaustiveMatch { subject: subject.to_owned(), missing },
-        span,
-    }
-}
-
-fn unreachable_pattern(pattern: String, span: SourceSpan) -> SemanticError {
-    SemanticError { kind: SemanticErrorKind::UnreachablePattern { pattern }, span }
-}
-
-fn duplicate_pattern(pattern: String, span: SourceSpan) -> SemanticError {
-    SemanticError { kind: SemanticErrorKind::DuplicatePattern { pattern }, span }
-}
-
-fn pattern_type_mismatch(expected: &str, found: &str, span: SourceSpan) -> SemanticError {
-    SemanticError {
-        kind: SemanticErrorKind::PatternTypeMismatch {
-            expected: expected.to_owned(),
-            found: found.to_owned(),
-        },
-        span,
     }
 }

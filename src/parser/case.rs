@@ -1,5 +1,5 @@
 use crate::ast::{
-    CaseBody, CaseBranch, LiteralPattern, NamedPattern, Pattern, PatternBinding, Stmt,
+    CaseBody, CaseBranch, CaseMode, LiteralPattern, NamedPattern, Pattern, PatternBinding, Stmt,
     VariantPayload,
 };
 use crate::lexer::{SourceSpan, TokenKind};
@@ -9,6 +9,12 @@ use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span,
 impl Parser {
     pub(super) fn parse_case_expression(&mut self) -> Result<crate::ast::Expr, ParseError> {
         let start = self.previous().span.start;
+        let mode = if self.match_simple(TokenKind::Dat) {
+            CaseMode::Dat
+        } else {
+            self.match_simple(TokenKind::Abs);
+            CaseMode::Abs
+        };
         let previous_case_subject = self.case_subject;
         self.case_subject = true;
         let subject = self.parse_expression()?;
@@ -26,6 +32,7 @@ impl Parser {
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(crate::ast::Expr::Case {
+            mode,
             subject: Box::new(subject),
             branches,
             span: SourceSpan::new(start, end),

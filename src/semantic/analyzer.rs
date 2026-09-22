@@ -218,9 +218,9 @@ impl Analyzer {
                     self.validate_field_access(object, field, *span)
                 }
             }
-            Expr::Case { subject, branches, span } => {
+            Expr::Case { mode, subject, branches, span } => {
                 self.visit_expression(subject)?;
-                self.validate_case_patterns(subject, branches, *span)
+                self.validate_case_patterns(*mode, subject, branches, *span)
             }
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }

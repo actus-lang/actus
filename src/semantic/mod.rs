@@ -10,6 +10,7 @@ mod intrinsics;
 mod methods;
 mod model;
 mod ownership;
+mod pattern_support;
 mod patterns;
 mod scopes;
 mod structs;

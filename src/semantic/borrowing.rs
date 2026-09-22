@@ -6,6 +6,22 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::{BindingState, BorrowRecord};
 
 impl Analyzer {
+    pub(super) fn borrow_case_subject(
+        &mut self,
+        subject: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Expr::Identifier { name, span: subject_span } = subject else {
+            return Err(invalid_case_role("abs", "non-binding", span));
+        };
+        let index = self.binding(name, *subject_span)?;
+        self.ensure_readable(index, name, *subject_span)?;
+        if self.model.bindings[index].role != Role::Abs {
+            self.add_borrow(name, None, index, span);
+        }
+        Ok(())
+    }
+
     pub(super) fn register_borrow(
         &mut self,
         initializer: &Expr,
@@ -75,6 +91,16 @@ impl Analyzer {
             BindingState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
             BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {}
         }
+    }
+}
+
+fn invalid_case_role(mode: &str, subject: &str, span: SourceSpan) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::InvalidCaseRole {
+            mode: mode.to_owned(),
+            subject: subject.to_owned(),
+        },
+        span,
     }
 }
 

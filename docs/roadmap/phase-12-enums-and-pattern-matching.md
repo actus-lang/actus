@@ -55,12 +55,12 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 
 ## Role-Based Deconstruction
 
-- [ ] Define `case abs` inspection without consuming the matched value.
-- [ ] Define `case dat` deconstruction as an ownership-consuming operation.
-- [ ] Reject mutation through an `abs` pattern binding.
+- [x] Define `case abs` inspection without consuming the matched value.
+- [x] Define `case dat` deconstruction as an ownership-consuming operation.
+- [x] Reject mutation through an `abs` pattern binding.
 - [ ] Track moved payload fields after `dat` deconstruction.
-- [ ] Apply deterministic cleanup to unmatched and consumed payloads.
-- [ ] Add ownership, borrowing, and cleanup regression tests.
+- [x] Apply deterministic cleanup to unmatched and consumed payloads.
+- [x] Add ownership, borrowing, and cleanup regression tests.
 
 ## Standard Result Types
 
