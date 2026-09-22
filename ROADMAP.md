@@ -4,7 +4,7 @@ Actus is developed in small, verifiable stages. Each item should be checked only
 
 ## Current focus
 
-**Phase 5 is the active development phase.** Earlier phases are complete except for the explicitly deferred second-maintainer review requirement. Native backend work remains preserved as completed progress while the semantic and registry foundations are finalized.
+**Phase 11 is the active development phase.** Phases 1–10 are complete except for explicitly deferred maintainer review, future implementation work, and items that require a separate ABI or language decision.
 
 Each phase is gated: implementation progress in a later phase may be preserved, but the project must return to the earliest incomplete phase before adding new work.
 
@@ -113,7 +113,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Reject moving a frozen owner.
 - [x] Reject dropping a frozen owner.
 - [x] Allow shared borrows to be passed to nested calls.
-- [ ] Reject storing borrows in longer-lived structures.
+- [x] Reject storing borrows in longer-lived structures.
 - [x] Reject returning borrows from functions.
 - [x] Reject borrow escape across lexical scope boundaries.
 - [x] Reject `drop` applied to an `abs` binding.
@@ -207,7 +207,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [x] Define ownership and lifetime rules at the C FFI boundary.
 - [x] Support linking static and shared C libraries.
 - [x] Add manifest-driven static and shared library linker inputs.
-- [ ] Define a reproducible header-to-Actus binding workflow.
+- [x] Define a reproducible header-to-Actus binding workflow.
 - [x] Mark unchecked foreign declarations with explicit `unsafe extern` boundaries.
 - [x] Add C library integration fixtures and native link tests.
 - [x] Add a native link smoke test for an imported C symbol.
@@ -243,17 +243,17 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 
 ## Phase 10: Documentation and Architecture Records
 
-- [ ] Document the Alpha language guarantees.
-- [ ] Document lexical, non-escaping borrow rules.
-- [ ] Document ownership and cleanup semantics.
-- [ ] Document diagnostic error codes.
-- [ ] Document the compiler pipeline.
+- [x] Document the Alpha language guarantees.
+- [x] Document lexical, non-escaping borrow rules.
+- [x] Document ownership and cleanup semantics.
+- [x] Document diagnostic error codes.
+- [x] Document the compiler pipeline.
 - [x] Add architecture decision records for major language decisions.
-- [ ] Add contributor guidelines.
-- [ ] Add a code of conduct.
-- [ ] Add release and versioning policy.
+- [x] Add contributor guidelines.
+- [x] Add a code of conduct.
+- [x] Add release and versioning policy.
 - [x] Add automated Conventional Commit changelog generation.
-- [ ] Keep the README and manifesto synchronized with implemented behavior.
+- [x] Keep the README and manifesto synchronized with implemented behavior.
 
 ## Phase 11: Complete Struct System
 
