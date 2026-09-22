@@ -1,5 +1,7 @@
+#[cfg(unix)]
 use std::fs;
 
+#[cfg(unix)]
 use actus::cli::run_with_args;
 
 #[cfg(unix)]
