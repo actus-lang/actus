@@ -35,6 +35,7 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 ## `case` Syntax and Parser
 
 - [x] Define `case` expression and statement grammar.
+- [x] Tokenize comparison and logical operators for conditional expressions and future case guards.
 - [x] Parse variant patterns with and without payload bindings.
 - [x] Parse literal patterns for primitive values.
 - [x] Parse the `_` wildcard pattern.
