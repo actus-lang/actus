@@ -1,4 +1,4 @@
-# Phase 12: Arca Package Ecosystem
+# Phase 13: Arca Package Ecosystem
 
 Arca is the planned project and package manager for Actus. It will orchestrate
 the compiler, builds, tests, dependency resolution, and package publication.
