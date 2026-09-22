@@ -10,7 +10,7 @@ fn lowers_enum_construction_to_a_native_object() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("enum program should parse");
     let object = emit_program_object(&program, "main").expect("enum construction should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    object::File::parse(object.as_slice()).expect("enum construction should emit a native object");
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn lowers_enum_case_discriminant_switch_to_native_code() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("enum case program should parse");
     let object = emit_program_object(&program, "main").expect("enum case should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    object::File::parse(object.as_slice()).expect("enum case should emit a native object");
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn lowers_case_payload_bindings_to_native_loads() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("payload case program should parse");
     let object = emit_program_object(&program, "main").expect("payload case should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    object::File::parse(object.as_slice()).expect("payload case should emit a native object");
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn lowers_case_block_body_with_return_cleanup_path() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("case block program should parse");
     let object = emit_program_object(&program, "main").expect("case block should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    object::File::parse(object.as_slice()).expect("case block should emit a native object");
 }
 
 #[test]
@@ -61,5 +61,5 @@ fn lowers_case_payload_cleanup_without_double_drop() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("cleanup case program should parse");
     let object = emit_program_object(&program, "main").expect("cleanup case should emit");
-    assert!(object.starts_with(b"\x7fELF") || object.starts_with(b"\xcf\xfa\xed\xfe"));
+    object::File::parse(object.as_slice()).expect("cleanup case should emit a native object");
 }
