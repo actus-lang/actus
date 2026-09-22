@@ -23,6 +23,34 @@ fn scans_keywords_and_punctuation() {
 }
 
 #[test]
+fn scans_struct_fields_and_dot_access() {
+    let (tokens, errors) = scan("struct Point { erg payload: Buffer, x: F32 } point.x");
+
+    assert!(errors.is_empty());
+    assert_eq!(
+        tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+        vec![
+            &TokenKind::Struct,
+            &TokenKind::Identifier("Point".to_owned()),
+            &TokenKind::LeftBrace,
+            &TokenKind::Erg,
+            &TokenKind::Identifier("payload".to_owned()),
+            &TokenKind::Colon,
+            &TokenKind::Identifier("Buffer".to_owned()),
+            &TokenKind::Comma,
+            &TokenKind::Identifier("x".to_owned()),
+            &TokenKind::Colon,
+            &TokenKind::Identifier("F32".to_owned()),
+            &TokenKind::RightBrace,
+            &TokenKind::Identifier("point".to_owned()),
+            &TokenKind::Dot,
+            &TokenKind::Identifier("x".to_owned()),
+            &TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
 fn records_half_open_byte_spans() {
     let (tokens, errors) = scan("erg buf");
 

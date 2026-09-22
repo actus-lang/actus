@@ -1,4 +1,4 @@
-use actus::ast::{Expr, Role, Stmt, TopLevelDecl};
+use actus::ast::{Expr, Role, Stmt, StructFieldRole, TopLevelDecl};
 use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -23,6 +23,71 @@ fn parses_a_verb_with_roles_and_return_type() {
     assert_eq!(verb.params[2].role, Role::Dat);
     assert_eq!(verb.return_type.as_ref().map(|ty| ty.name.as_str()), Some("Int"));
     assert!(matches!(verb.body.statements[0], Stmt::Return { .. }));
+}
+
+#[test]
+fn parses_a_struct_with_value_fields() {
+    let program = parse_source("struct Point { x: F32, y: F32, }");
+
+    let TopLevelDecl::Struct(definition) = &program.declarations[0] else {
+        panic!("expected struct");
+    };
+    assert_eq!(definition.name, "Point");
+    assert_eq!(definition.fields.len(), 2);
+    assert!(definition.fields.iter().all(|field| field.role == StructFieldRole::Value));
+}
+
+#[test]
+fn parses_an_erg_struct_field() {
+    let program = parse_source("struct Packet { erg payload: Buffer, sequence: Int, }");
+
+    let TopLevelDecl::Struct(definition) = &program.declarations[0] else {
+        panic!("expected struct");
+    };
+    assert_eq!(definition.fields[0].role, StructFieldRole::Erg);
+    assert_eq!(definition.fields[0].name, "payload");
+    assert_eq!(definition.fields[1].role, StructFieldRole::Value);
+}
+
+#[test]
+fn rejects_abs_struct_fields() {
+    for (source, role) in [
+        ("struct Borrowed { abs view: Buffer, }", actus::lexer::TokenKind::Abs),
+        ("struct Moved { dat payload: Buffer, }", actus::lexer::TokenKind::Dat),
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+
+        let error = parse(tokens).expect_err("borrow and move fields must be rejected");
+        assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
+        assert!(matches!(
+            error.kind,
+            ParseErrorKind::UnexpectedToken { found, .. } if found == role
+        ));
+    }
+}
+
+#[test]
+fn parses_struct_literals_and_field_access() {
+    let program = parse_source(
+        "struct Point { x: F32, y: F32 } verb main() { erg point = Point { x: 1.0, y: 2.0 }; inspect(point.x); }",
+    );
+
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected verb");
+    };
+    let Stmt::OwnerDecl { initializer, .. } = &verb.body.statements[0] else {
+        panic!("expected owner declaration");
+    };
+    assert!(matches!(initializer, Expr::StructLit { name, .. } if name == "Point"));
+    let Stmt::Expression { expression, .. } = &verb.body.statements[1] else {
+        panic!("expected expression statement");
+    };
+    let Expr::Call { arguments, .. } = expression else { panic!("expected call") };
+    assert!(matches!(
+        &arguments[0].expression,
+        Expr::FieldAccess { field, .. } if field == "x"
+    ));
 }
 
 #[test]
