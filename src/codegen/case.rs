@@ -107,8 +107,6 @@ fn emit_case_branches(
             function.seal_block(following);
         }
     }
-    function.switch_to_block(merge);
-    function.seal_block(merge);
     Ok(())
 }
 
