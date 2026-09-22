@@ -81,6 +81,12 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
                 collect_expression(&argument.expression, values);
             }
         }
-        Expr::Identifier { .. } | Expr::Integer { .. } => {}
+        Expr::StructLit { fields, .. } => {
+            for field in fields {
+                collect_expression(&field.value, values);
+            }
+        }
+        Expr::FieldAccess { object, .. } => collect_expression(object, values),
+        Expr::Identifier { .. } | Expr::Integer { .. } | Expr::FloatLiteral { .. } => {}
     }
 }

@@ -120,7 +120,7 @@ pub(super) fn build_file(
 fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
     program.declarations.iter().find_map(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
-        crate::ast::TopLevelDecl::ExternalVerb(_) => None,
+        crate::ast::TopLevelDecl::ExternalVerb(_) | crate::ast::TopLevelDecl::Struct(_) => None,
     })
 }
 

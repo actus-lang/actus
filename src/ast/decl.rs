@@ -12,6 +12,28 @@ pub struct Program {
 pub enum TopLevelDecl {
     Verb(VerbDecl),
     ExternalVerb(ExternalVerbDecl),
+    Struct(StructDef),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StructDef {
+    pub name: String,
+    pub fields: Vec<StructField>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StructField {
+    pub role: StructFieldRole,
+    pub name: String,
+    pub ty: TypeName,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StructFieldRole {
+    Value,
+    Erg,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

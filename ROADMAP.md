@@ -261,11 +261,11 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 
 ### Syntax and AST
 
-- [ ] Define struct declaration grammar and source-span rules.
-- [ ] Parse named fields with explicit types.
-- [ ] Parse struct literals and field initialization.
+- [x] Define struct declaration grammar and source-span rules.
+- [x] Parse named fields with explicit types.
+- [x] Parse struct literals and field initialization.
 - [ ] Parse field access and field assignment.
-- [ ] Represent structs and fields in the AST with dedicated modules.
+- [x] Represent structs and fields in the AST with dedicated modules.
 - [ ] Reject duplicate struct and field names.
 - [ ] Reject unknown fields and missing required fields.
 

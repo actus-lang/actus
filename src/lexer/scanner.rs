@@ -67,6 +67,7 @@ impl<'source> Scanner<'source> {
             '-' => self.push_simple(TokenKind::Minus, start),
             '*' => self.push_simple(TokenKind::Star, start),
             '/' => self.push_simple(TokenKind::Slash, start),
+            '.' => self.push_simple(TokenKind::Dot, start),
             '"' => self.scan_string(start),
             character if is_identifier_start(character) => self.scan_identifier(start),
             character if character.is_ascii_digit() => self.scan_integer(start),
@@ -96,6 +97,7 @@ impl<'source> Scanner<'source> {
             "loop" => TokenKind::Loop,
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
+            "struct" => TokenKind::Struct,
             _ => TokenKind::Identifier(text.to_owned()),
         };
 
@@ -105,6 +107,21 @@ impl<'source> Scanner<'source> {
     fn scan_integer(&mut self, start: usize) {
         while self.peek().is_some_and(|character| character.is_ascii_digit()) {
             self.advance();
+        }
+
+        if self.peek() == Some('.')
+            && self.peek_next().is_some_and(|character| character.is_ascii_digit())
+        {
+            self.advance();
+            while self.peek().is_some_and(|character| character.is_ascii_digit()) {
+                self.advance();
+            }
+            let text = &self.source[start..self.cursor];
+            self.tokens.push(Token::new(
+                TokenKind::FloatLiteral(text.to_owned()),
+                SourceSpan::new(start, self.cursor),
+            ));
+            return;
         }
 
         let text = &self.source[start..self.cursor];

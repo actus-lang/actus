@@ -206,11 +206,14 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
-        | Expr::Call { span, .. } => *span,
+        | Expr::Call { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. } => *span,
     }
 }

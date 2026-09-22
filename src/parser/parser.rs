@@ -6,6 +6,7 @@ use crate::lexer::{SourceSpan, Token, TokenKind};
 
 mod cursor;
 mod expressions;
+mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseErrorKind {
@@ -52,6 +53,9 @@ impl Parser {
         }
         if self.check_simple(&TokenKind::Extern) {
             return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false)?));
+        }
+        if self.check_simple(&TokenKind::Struct) {
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def()?));
         }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))
@@ -305,11 +309,14 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
-        | Expr::Call { span, .. } => *span,
+        | Expr::Call { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. } => *span,
     }
 }

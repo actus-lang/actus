@@ -13,6 +13,7 @@ fn parse_verb(source: &str) -> actus::ast::VerbDecl {
     match program.declarations.into_iter().next().expect("verb should exist") {
         actus::ast::TopLevelDecl::Verb(verb) => verb,
         actus::ast::TopLevelDecl::ExternalVerb(_) => panic!("expected regular verb"),
+        actus::ast::TopLevelDecl::Struct(_) => panic!("expected regular verb"),
     }
 }
 

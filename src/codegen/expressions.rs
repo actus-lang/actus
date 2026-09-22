@@ -21,6 +21,9 @@ pub(super) fn lower_expression(
             .parse::<i32>()
             .map(|value| function.ins().iconst(types::I32, i64::from(value)))
             .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}"))),
+        Expr::FloatLiteral { .. } | Expr::StructLit { .. } | Expr::FieldAccess { .. } => Err(
+            NativeEmitError("struct and floating-point expressions are not lowered yet".to_owned()),
+        ),
         Expr::StringLiteral { value, .. } => string_data
             .get(value)
             .copied()
@@ -117,6 +120,9 @@ pub(super) fn initializer_type(
         }
         Expr::Call { callee, .. } => {
             functions.get(callee).map(|function| function.return_type).unwrap_or(NativeType::Int)
+        }
+        Expr::FloatLiteral { .. } | Expr::StructLit { .. } | Expr::FieldAccess { .. } => {
+            NativeType::Int
         }
         _ => NativeType::Int,
     }
