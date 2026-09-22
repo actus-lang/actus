@@ -102,4 +102,3 @@ This vocabulary prevents the concepts of published packages, source modules,
 and compiler units from being conflated. It also leaves the current alpha
 implementation small while providing a stable migration vocabulary for the
 self-hosted architecture.
-

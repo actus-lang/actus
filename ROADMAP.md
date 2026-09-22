@@ -248,7 +248,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Document ownership and cleanup semantics.
 - [ ] Document diagnostic error codes.
 - [ ] Document the compiler pipeline.
-- [ ] Add architecture decision records for major language decisions.
+- [x] Add architecture decision records for major language decisions.
 - [ ] Add contributor guidelines.
 - [ ] Add a code of conduct.
 - [ ] Add release and versioning policy.
