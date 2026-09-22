@@ -16,13 +16,13 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let Expr::Identifier { name, span: object_span } = object else {
+        let Some((name, object_span)) = root_binding(object) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
                 span,
             });
         };
-        let binding_index = self.binding(name, *object_span)?;
+        let binding_index = self.binding(name, object_span)?;
         if self.model.bindings[binding_index].role != Role::Erg {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
@@ -34,14 +34,17 @@ impl Analyzer {
         {
             return Err(SemanticError {
                 kind: SemanticErrorKind::FieldBorrowConflict {
-                    owner: name.clone(),
+                    owner: name.to_owned(),
                     field: field.to_owned(),
                     borrow_ids: borrow_ids.clone(),
                 },
                 span,
             });
         }
-        self.ensure_mutable(binding_index, name, *object_span)?;
+        self.ensure_mutable(binding_index, name, object_span)?;
+        if !matches!(object, Expr::Identifier { .. }) {
+            self.visit_expression(object)?;
+        }
         let Some(struct_name) = self.expression_struct_type(object) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
@@ -257,5 +260,13 @@ impl Analyzer {
         self.struct_types.get(struct_name).and_then(|definition| {
             definition.fields.iter().find(|candidate| candidate.name == field)
         })
+    }
+}
+
+fn root_binding(expression: &Expr) -> Option<(&str, SourceSpan)> {
+    match expression {
+        Expr::Identifier { name, span } => Some((name, *span)),
+        Expr::FieldAccess { object, .. } => root_binding(object),
+        _ => None,
     }
 }

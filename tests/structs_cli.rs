@@ -58,6 +58,16 @@ fn executes_nested_struct_access_and_owned_drop() {
 
 #[cfg(unix)]
 #[test]
+fn executes_nested_struct_field_assignment() {
+    build_and_run(
+        "struct Point { x: Int, y: Int, } struct Player { position: Point, score: Int, } verb main() -> Int { erg player = Player { position: Point { x: 3, y: 4, }, score: 5, }; player.position.x = 8; return player.position.x + player.position.y + player.score; }\n",
+        "nested-struct-assignment",
+        17,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn avoids_double_drop_after_moving_owned_field() {
     build_and_run(
         "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: allocate(4), value: 42, }; consume(payload: holder.payload); return 42; }\n",
