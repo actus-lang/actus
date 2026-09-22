@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
 use crate::ast::{
-    BuiltinType, Program, StructDef, StructFieldRole, TopLevelDecl, lookup_builtin_type,
+    BuiltinType, EnumDef, Program, StructDef, StructFieldRole, TopLevelDecl, lookup_builtin_type,
 };
 
+use super::enum_layout::EnumLayout;
 use super::native::NativeEmitError;
 use super::types::NativeType;
 
@@ -30,6 +31,9 @@ pub struct LayoutRegistry {
     definitions: Vec<StructDef>,
     layouts: Vec<StructLayout>,
     ids: HashMap<String, usize>,
+    pub(super) enum_definitions: Vec<EnumDef>,
+    pub(super) enum_layouts: Vec<EnumLayout>,
+    pub(super) enum_ids: HashMap<String, usize>,
 }
 
 impl LayoutRegistry {
@@ -51,16 +55,36 @@ impl LayoutRegistry {
             .enumerate()
             .map(|(id, definition)| (definition.name.clone(), id))
             .collect::<HashMap<_, _>>();
+        let enum_definitions = program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Enum(definition) => Some(definition.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let enum_ids = enum_definitions
+            .iter()
+            .enumerate()
+            .map(|(id, definition)| (definition.name.clone(), id))
+            .collect::<HashMap<_, _>>();
         let capacity = definitions.len();
+        let enum_capacity = enum_definitions.len();
         let mut registry = Self {
             pointer_type,
             pointer_size: pointer_type.bytes(),
             definitions,
             layouts: Vec::with_capacity(capacity),
             ids,
+            enum_definitions,
+            enum_layouts: Vec::with_capacity(enum_capacity),
+            enum_ids,
         };
         for definition in registry.definitions.clone() {
             registry.layouts.push(registry.layout_for(&definition, &mut Vec::new())?);
+        }
+        for definition in registry.enum_definitions.clone() {
+            registry.enum_layouts.push(registry.enum_layout_for(&definition, &mut Vec::new())?);
         }
         Ok(registry)
     }
@@ -74,7 +98,9 @@ impl LayoutRegistry {
     }
 
     pub(super) fn type_for_name(&self, name: &str) -> Option<NativeType> {
-        self.id_for(name).map(NativeType::Struct)
+        self.id_for(name)
+            .map(NativeType::Struct)
+            .or_else(|| self.enum_id_for(name).map(NativeType::Enum))
     }
 
     pub(super) fn stack_slot(&self, layout: &StructLayout) -> StackSlotData {
@@ -117,7 +143,7 @@ impl LayoutRegistry {
         Ok(StructLayout { size: align_up(offset, alignment), alignment, fields })
     }
 
-    fn native_type(
+    pub(super) fn native_type(
         &self,
         name: &str,
         visiting: &mut Vec<String>,
@@ -132,6 +158,14 @@ impl LayoutRegistry {
                     Err(NativeEmitError(format!("unsupported layout type `{name}`")))
                 }
             };
+        }
+        if let Some(enum_id) = self.enum_id_for(name) {
+            let definition = self
+                .enum_definitions
+                .get(enum_id)
+                .ok_or_else(|| NativeEmitError(format!("missing enum layout type `{name}`")))?;
+            self.enum_layout_for(definition, visiting)?;
+            return Ok(NativeType::Enum(enum_id));
         }
         let id = self
             .id_for(name)
@@ -149,7 +183,7 @@ impl LayoutRegistry {
         Ok(NativeType::Struct(id))
     }
 
-    fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {
+    pub(super) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {
         Ok(match ty {
             NativeType::Int => (4, 4),
             NativeType::String | NativeType::Buffer => (self.pointer_size, self.pointer_size),
@@ -158,6 +192,18 @@ impl LayoutRegistry {
                     NativeEmitError(format!("missing nested struct layout `{id}`"))
                 })?;
                 let layout = self.layout_for(definition, &mut Vec::new())?;
+                (layout.size, layout.alignment)
+            }
+            NativeType::Enum(id) => {
+                let layout = if let Some(layout) = self.enum_layout(id) {
+                    layout.clone()
+                } else {
+                    let definition = self
+                        .enum_definitions
+                        .get(id)
+                        .ok_or_else(|| NativeEmitError(format!("missing enum layout `{id}`")))?;
+                    self.enum_layout_for(definition, &mut Vec::new())?
+                };
                 (layout.size, layout.alignment)
             }
         })

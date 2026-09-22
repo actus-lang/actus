@@ -25,12 +25,12 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 
 ## Tagged Union Layout
 
-- [ ] Define discriminant representation and width rules.
-- [ ] Define payload alignment, size, and byte-offset rules.
-- [ ] Represent enum layout information for semantic analysis and code generation.
-- [ ] Lower discriminant and payload storage through Cranelift.
-- [ ] Add layout and alignment tests for unit and payload variants.
-- [ ] Add deterministic native layout golden tests.
+- [x] Define discriminant representation and width rules.
+- [x] Define payload alignment, size, and byte-offset rules.
+- [x] Represent enum layout information for semantic analysis and code generation.
+- [x] Lower discriminant and payload storage through Cranelift.
+- [x] Add layout and alignment tests for unit and payload variants.
+- [x] Add deterministic native layout golden tests.
 
 ## `case` Syntax and Parser
 

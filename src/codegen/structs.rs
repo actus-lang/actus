@@ -45,12 +45,12 @@ pub(super) fn lower_struct_literal(
             string_data,
             layouts,
         )?;
-        if let NativeType::Struct(id) = field_layout.ty {
-            let nested = layouts
-                .get(id)
-                .ok_or_else(|| NativeEmitError(format!("missing nested layout `{id}`")))?;
+        if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
+            let size = layouts
+                .type_size(field_layout.ty)
+                .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
             let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
-            copy_bytes(function, value, destination, nested.size);
+            copy_bytes(function, value, destination, size);
         } else {
             function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
         }
@@ -114,12 +114,12 @@ pub(super) fn lower_field_assignment(
     )?;
     let value =
         lower_expression(function, value, locals, local_types, functions, string_data, layouts)?;
-    if let NativeType::Struct(id) = field_layout.ty {
-        let nested = layouts
-            .get(id)
-            .ok_or_else(|| NativeEmitError(format!("missing nested layout `{id}`")))?;
+    if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
+        let size = layouts
+            .type_size(field_layout.ty)
+            .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
         let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
-        copy_bytes(function, value, destination, nested.size);
+        copy_bytes(function, value, destination, size);
     } else {
         function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
     }
@@ -226,7 +226,7 @@ fn emit_struct_drop_except(
                     layouts,
                 )?;
             }
-            NativeType::Int | NativeType::String => {}
+            NativeType::Enum(_) | NativeType::Int | NativeType::String => {}
         }
     }
     Ok(())
@@ -295,6 +295,7 @@ pub(super) fn expression_native_type(
             expression_native_type(object, local_types, layouts)
                 .and_then(|ty| field_type(ty, field, layouts))
         }
+        Expr::MethodCall { .. } => super::enums::enum_expression_type(expression, layouts),
         Expr::Integer { .. } => Some(NativeType::Int),
         Expr::StringLiteral { .. } => Some(NativeType::String),
         _ => None,
