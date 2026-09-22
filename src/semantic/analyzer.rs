@@ -131,7 +131,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
+    pub(super) fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
         for statement in &block.statements {
             self.visit_statement(statement)?;
         }
@@ -218,17 +218,9 @@ impl Analyzer {
                     self.validate_field_access(object, field, *span)
                 }
             }
-            Expr::Case { subject, branches, .. } => {
+            Expr::Case { subject, branches, span } => {
                 self.visit_expression(subject)?;
-                for branch in branches {
-                    match &branch.body {
-                        crate::ast::CaseBody::Expression(expression) => {
-                            self.visit_expression(expression)?;
-                        }
-                        crate::ast::CaseBody::Block(block) => self.visit_block(block)?,
-                    }
-                }
-                Ok(())
+                self.validate_case_patterns(subject, branches, *span)
             }
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }

@@ -161,6 +161,25 @@ pub enum SemanticErrorKind {
     RecursiveType {
         name: String,
     },
+    NonExhaustiveMatch {
+        subject: String,
+        missing: Vec<String>,
+    },
+    UnreachablePattern {
+        pattern: String,
+    },
+    DuplicatePattern {
+        pattern: String,
+    },
+    PatternTypeMismatch {
+        expected: String,
+        found: String,
+    },
+    PatternBindingTypeMismatch {
+        binding: String,
+        expected: String,
+        found: String,
+    },
     MissingReturnValue,
 }
 

@@ -46,12 +46,12 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 
 ## Exhaustiveness and Pattern Semantics
 
-- [ ] Implement exhaustive coverage checks for enum variants.
-- [ ] Require a wildcard when a pattern set is intentionally open-ended.
-- [ ] Reject unreachable and duplicate patterns.
-- [ ] Check pattern binding types against variant payload types.
+- [x] Implement exhaustive coverage checks for enum variants.
+- [x] Require a wildcard when a pattern set is intentionally open-ended.
+- [x] Reject unreachable and duplicate patterns.
+- [x] Check pattern binding types against variant payload types.
 - [ ] Define deterministic evaluation order for guards and branch bodies.
-- [ ] Produce stable diagnostics for non-exhaustive and unreachable matches.
+- [x] Produce stable diagnostics for non-exhaustive and unreachable matches.
 
 ## Role-Based Deconstruction
 

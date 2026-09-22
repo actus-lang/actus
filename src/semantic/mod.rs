@@ -10,6 +10,7 @@ mod intrinsics;
 mod methods;
 mod model;
 mod ownership;
+mod patterns;
 mod scopes;
 mod structs;
 mod types;

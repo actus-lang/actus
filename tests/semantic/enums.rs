@@ -74,3 +74,53 @@ fn rejects_unknown_and_recursive_enum_payload_types() {
         SemanticErrorKind::RecursiveType { name } if name == "Node"
     ));
 }
+
+#[test]
+fn validates_exhaustive_enum_patterns_and_payload_bindings() {
+    analyze_source(
+        "enum Color { Red, Green, } enum Message { Move(Int, Int), Write { text: String, }, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Green => 2, }; } verb read(erg message: Message) -> Int { return case message { Message.Move(x, y) => x + y, Message.Write(text: text) => print(text), }; }",
+    )
+    .expect("complete enum patterns and typed bindings should pass");
+}
+
+#[test]
+fn rejects_non_exhaustive_enum_and_primitive_patterns() {
+    let enum_error = analyze_source(
+        "enum Color { Red, Green, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, }; }",
+    )
+    .expect_err("enum matches must cover every variant");
+    assert!(matches!(
+        enum_error.kind,
+        SemanticErrorKind::NonExhaustiveMatch { subject, missing }
+            if subject == "Color" && missing == vec!["Green"]
+    ));
+
+    let primitive_error =
+        analyze_source("verb choose(erg value: Int) -> Int { return case value { 1 => 1, }; }")
+            .expect_err("primitive matches require a wildcard");
+    assert!(matches!(
+        primitive_error.kind,
+        SemanticErrorKind::NonExhaustiveMatch { subject, .. } if subject == "primitive"
+    ));
+}
+
+#[test]
+fn rejects_duplicate_and_unreachable_patterns() {
+    let duplicate = analyze_source(
+        "enum Color { Red, Green, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Red => 2, _ => 0, }; }",
+    )
+    .expect_err("duplicate variants must fail");
+    assert!(matches!(
+        duplicate.kind,
+        SemanticErrorKind::DuplicatePattern { pattern } if pattern == "Color.Red"
+    ));
+
+    let unreachable = analyze_source(
+        "enum Color { Red, } verb choose(erg color: Color) -> Int { return case color { _ => 0, Color.Red => 1, }; }",
+    )
+    .expect_err("patterns after a wildcard must fail");
+    assert!(matches!(
+        unreachable.kind,
+        SemanticErrorKind::UnreachablePattern { pattern } if pattern == "Color.Red"
+    ));
+}

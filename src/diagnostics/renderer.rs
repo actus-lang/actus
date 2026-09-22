@@ -101,6 +101,11 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::EnumVariantArgumentName { .. } => "E1042",
         SemanticErrorKind::EnumVariantArgumentTypeMismatch { .. } => "E1043",
         SemanticErrorKind::RecursiveType { .. } => "E1044",
+        SemanticErrorKind::NonExhaustiveMatch { .. } => "E1045",
+        SemanticErrorKind::UnreachablePattern { .. } => "E1046",
+        SemanticErrorKind::DuplicatePattern { .. } => "E1047",
+        SemanticErrorKind::PatternTypeMismatch { .. } => "E1048",
+        SemanticErrorKind::PatternBindingTypeMismatch { .. } => "E1049",
     }
 }
 
@@ -195,6 +200,21 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         ),
         SemanticErrorKind::RecursiveType { name } => {
             format!("recursive type `{name}` requires indirection")
+        }
+        SemanticErrorKind::NonExhaustiveMatch { subject, missing } => {
+            format!("non-exhaustive match on `{subject}`; missing: {}", missing.join(", "))
+        }
+        SemanticErrorKind::UnreachablePattern { pattern } => {
+            format!("unreachable pattern `{pattern}`")
+        }
+        SemanticErrorKind::DuplicatePattern { pattern } => {
+            format!("duplicate pattern `{pattern}`")
+        }
+        SemanticErrorKind::PatternTypeMismatch { expected, found } => {
+            format!("pattern type mismatch: expected `{expected}`, found `{found}`")
+        }
+        SemanticErrorKind::PatternBindingTypeMismatch { binding, expected, found } => {
+            format!("pattern binding `{binding}` has type `{found}`, expected `{expected}`")
         }
         _ => return None,
     };

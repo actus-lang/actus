@@ -29,3 +29,28 @@ fn matches_semantic_diagnostic_snapshot() {
 
     assert_eq!(actual.trim_end(), expected.trim_end());
 }
+
+#[test]
+fn renders_case_semantic_diagnostic_codes() {
+    let sources = [
+        (
+            "enum Color { Red, Green, } verb main(erg color: Color) -> Int { return case color { Color.Red => 1, }; }",
+            "E1045",
+        ),
+        (
+            "enum Color { Red, } verb main(erg color: Color) -> Int { return case color { _ => 0, Color.Red => 1, }; }",
+            "E1046",
+        ),
+        (
+            "enum Color { Red, Green, } verb main(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Red => 2, _ => 0, }; }",
+            "E1047",
+        ),
+    ];
+    for (source, code) in sources {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("source should parse");
+        let error = analyze(&program).expect_err("case semantic validation should fail");
+        assert!(render_semantic_error(source, &error).contains(&format!("error[{code}]")));
+    }
+}
