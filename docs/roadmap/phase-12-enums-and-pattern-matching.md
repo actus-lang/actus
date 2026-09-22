@@ -70,5 +70,7 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [ ] Add compiler-facing AST and diagnostic examples using enum matching.
 - [x] Add Cranelift lowering for discriminant branches and payload bindings.
 - [x] Add a native object regression test for enum construction and matching.
+- [x] Lower case block bodies with return paths through the native cleanup plan.
+- [x] Prevent duplicate drops for moved and explicitly dropped payload fields.
 - [ ] Define `Option[T]` and `Result[T, E]` as compiler-registered generic enums.
 - [ ] Add end-to-end executable tests for `Option` and `Result` construction and matching.
