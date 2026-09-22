@@ -99,14 +99,19 @@ Actus uses lexical, non-escaping borrows and exposes no lifetime annotations
 in source code. This makes the initial ownership model easier to read and
 diagnose, but it is intentionally less expressive than Rust's lifetime
 system. Alpha Actus does not support borrowed returns or arbitrary lifetime
-relationships.
+relationships. Actus still provides explicit low-level escape hatches for raw
+pointers, MMIO, exact layouts, and inline assembly, but these capabilities
+belong inside visible `unsafe` boundaries.
 
 ### Compared with C
 
 C provides broad ABI compatibility and unrestricted low-level control, but
 ownership and cleanup are primarily programmer conventions. Actus adds
 compile-time checks for moves, borrows, use-after-move, double-drop, and
-deterministic scope cleanup while preserving a stable C FFI boundary.
+deterministic scope cleanup while preserving a stable C FFI boundary. Actus
+does not remove C-level control: raw pointers, volatile operations, exact
+layouts, and target instructions remain available through explicit `unsafe`
+primitives.
 
 ### Compared with Zig
 
@@ -114,7 +119,9 @@ Zig provides explicit low-level control and allocator-aware programming. Actus
 adds a role-based ownership and borrowing model in which `erg`, `abs`, and
 `dat` make resource relationships visible in declarations and calls. This
 reduces some classes of lifetime errors, at the cost of restricting borrowed
-values from escaping in Alpha.
+values from escaping in Alpha. Both languages expose low-level control, but
+Actus separates unchecked memory and target operations from safe code through
+an explicit `unsafe` boundary.
 
 ## 7. Design Boundaries and Trade-offs
 

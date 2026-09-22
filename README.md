@@ -16,6 +16,12 @@ The language specification and compiler architecture are under active developmen
 
 Language style, module visibility, import conventions, and formatting rules are documented in [Actus Language Style and Conventions](docs/language/style-and-conventions.md).
 
+Actus is designed to provide C-level control through raw pointers, MMIO,
+precise layouts, and inline assembly behind explicit `unsafe` boundaries,
+while keeping ownership and borrowing checks active in safe code. See
+[ADR-0012](docs/decisions/ADR-0012-low-level-primitives-and-unsafe-boundaries.md)
+for the accepted low-level design.
+
 ## Build and run
 
 Build the compiler and run the introductory example through the frontend:

@@ -177,12 +177,17 @@ Foreign declarations use an explicit ABI tag:
 unsafe extern "C" verb snprintf(...);
 ```
 
-Raw pointer operations belong in dedicated low-level modules such as
-`ffi.act`. Foreign symbols may retain their native naming conventions at the
-FFI boundary; Actus-facing wrappers follow the Actus naming rules.
+Raw pointer types, volatile MMIO operations, exact layout attributes, and
+inline assembly are accepted future low-level features defined by
+[ADR-0012](../decisions/ADR-0012-low-level-primitives-and-unsafe-boundaries.md).
+They are available only inside explicit `unsafe` boundaries and do not change
+the ownership semantics of safe `erg`, `abs`, and `dat` code. Foreign symbols
+may retain their native naming conventions at the FFI boundary; Actus-facing
+wrappers follow the Actus naming rules.
 
-Additional ABI tags and pointer types are future extensions. The current
-alpha backend supports the C ABI only.
+The current alpha backend supports the C ABI only. The low-level primitives
+described by ADR-0012 are accepted design commitments and are not all
+implemented in the current compiler.
 
 ## 9. Compatibility Rule
 
