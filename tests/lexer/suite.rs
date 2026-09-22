@@ -24,11 +24,14 @@ fn scans_keywords_and_punctuation() {
 
 #[test]
 fn scans_enum_and_case_keywords() {
-    let (tokens, errors) = scan("enum Color { Red, } case value");
+    let (tokens, errors) = scan("enum Color { Red, } case true => _");
 
     assert!(errors.is_empty());
     assert_eq!(tokens[0].kind, TokenKind::Enum);
     assert_eq!(tokens[6].kind, TokenKind::Case);
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::True));
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::FatArrow));
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::Underscore));
 }
 
 #[test]

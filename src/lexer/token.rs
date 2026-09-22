@@ -40,6 +40,9 @@ pub enum TokenKind {
     Struct,
     Enum,
     Case,
+    True,
+    False,
+    Underscore,
     Identifier(String),
     Integer(String),
     FloatLiteral(String),
@@ -57,6 +60,7 @@ pub enum TokenKind {
     Star,
     Slash,
     Arrow,
+    FatArrow,
     Dot,
     Eof,
 }

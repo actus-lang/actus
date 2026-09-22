@@ -51,7 +51,7 @@ impl Parser {
                         arguments,
                         span: SourceSpan::new(token.span.start, end),
                     })
-                } else if self.match_simple(TokenKind::LeftBrace) {
+                } else if !self.case_subject && self.match_simple(TokenKind::LeftBrace) {
                     self.parse_struct_literal(name, token.span.start)
                 } else {
                     Ok(Expr::Identifier { name, span: token.span })
@@ -65,6 +65,7 @@ impl Parser {
                 let span = SourceSpan::new(token.span.start, expression_span(&expression).end);
                 Ok(Expr::Borrow { expression: Box::new(expression), span })
             }
+            TokenKind::Case => self.parse_case_expression(),
             found => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken { expected: "expression".to_owned(), found },

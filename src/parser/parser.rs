@@ -5,6 +5,7 @@ use crate::ast::{
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
+mod case;
 mod cursor;
 mod enums;
 mod expressions;
@@ -35,11 +36,12 @@ pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
     enum_names: HashSet<String>,
+    case_subject: bool,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, cursor: 0, enum_names: HashSet::new() }
+        Self { tokens, cursor: 0, enum_names: HashSet::new(), case_subject: false }
     }
 
     pub fn parse(mut self) -> Result<Program, ParseError> {
@@ -337,6 +339,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. } => *span,
+        | Expr::FieldAccess { span, .. }
+        | Expr::Case { span, .. } => *span,
     }
 }

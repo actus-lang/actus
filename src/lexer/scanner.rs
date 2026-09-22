@@ -59,6 +59,7 @@ impl<'source> Scanner<'source> {
             ':' => self.push_simple(TokenKind::Colon, start),
             ',' => self.push_simple(TokenKind::Comma, start),
             ';' => self.push_simple(TokenKind::Semicolon, start),
+            '=' if self.match_character('>') => self.push_simple(TokenKind::FatArrow, start),
             '=' => self.push_simple(TokenKind::Equals, start),
             '+' => self.push_simple(TokenKind::Plus, start),
             '-' if self.match_character('>') => {
@@ -100,6 +101,9 @@ impl<'source> Scanner<'source> {
             "struct" => TokenKind::Struct,
             "enum" => TokenKind::Enum,
             "case" => TokenKind::Case,
+            "true" => TokenKind::True,
+            "false" => TokenKind::False,
+            "_" => TokenKind::Underscore,
             _ => TokenKind::Identifier(text.to_owned()),
         };
 

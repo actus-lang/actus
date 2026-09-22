@@ -234,6 +234,7 @@ impl Formatter {
             }
             Expr::StructLit { name, fields, .. } => self.struct_literal(name, fields),
             Expr::FieldAccess { object, field, .. } => self.field_access(object, field),
+            Expr::Case { .. } => self.output.push_str("case"),
         }
     }
 

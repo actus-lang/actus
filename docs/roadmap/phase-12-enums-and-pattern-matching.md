@@ -34,12 +34,12 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 
 ## `case` Syntax and Parser
 
-- [ ] Define `case` expression and statement grammar.
-- [ ] Parse variant patterns with and without payload bindings.
-- [ ] Parse literal patterns for primitive values.
-- [ ] Parse the `_` wildcard pattern.
-- [ ] Reject fallthrough and standalone `break` semantics in `case` branches.
-- [ ] Add valid and invalid `case` parser fixtures.
+- [x] Define `case` expression and statement grammar.
+- [x] Parse variant patterns with and without payload bindings.
+- [x] Parse literal patterns for primitive values.
+- [x] Parse the `_` wildcard pattern.
+- [x] Reject fallthrough and standalone `break` semantics in `case` branches.
+- [x] Add valid and invalid `case` parser fixtures.
 - [x] Add enum lexer and parser unit tests.
 - [x] Add duplicate enum and payload-name diagnostics tests.
 

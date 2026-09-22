@@ -218,6 +218,18 @@ impl Analyzer {
                     self.validate_field_access(object, field, *span)
                 }
             }
+            Expr::Case { subject, branches, .. } => {
+                self.visit_expression(subject)?;
+                for branch in branches {
+                    match &branch.body {
+                        crate::ast::CaseBody::Expression(expression) => {
+                            self.visit_expression(expression)?;
+                        }
+                        crate::ast::CaseBody::Block(block) => self.visit_block(block)?,
+                    }
+                }
+                Ok(())
+            }
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
     }

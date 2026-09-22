@@ -1,4 +1,7 @@
-use actus::ast::{EnumPayload, Expr, Role, Stmt, StructFieldRole, TopLevelDecl};
+use actus::ast::{
+    CaseBody, EnumPayload, Expr, LiteralPattern, Pattern, Role, Stmt, StructFieldRole,
+    TopLevelDecl, VariantPayload,
+};
 use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -61,6 +64,69 @@ fn rejects_duplicate_enum_names_variants_and_payload_fields() {
         let error = parse(tokens).expect_err("duplicate enum names must be rejected");
         assert_eq!(error.code, ParseErrorCode::DuplicateName);
         assert!(matches!(error.kind, ParseErrorKind::DuplicateName { .. }));
+    }
+}
+
+#[test]
+fn parses_case_variants_literals_and_wildcard_with_spans() {
+    let program = parse_source(
+        "enum Color { Red, } verb main() -> Int { return case value { Color.Red => 1, true => 2, _ => 0, }; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::Case { subject, branches, span }), .. } =
+        &verb.body.statements[0]
+    else {
+        panic!("expected case expression");
+    };
+    assert!(matches!(subject.as_ref(), Expr::Identifier { name, .. } if name == "value"));
+    assert_eq!(branches.len(), 3);
+    assert!(matches!(
+        &branches[0].pattern,
+        Pattern::Variant { enum_name, variant, payload: VariantPayload::Unit, .. }
+            if enum_name == "Color" && variant == "Red"
+    ));
+    assert!(matches!(
+        &branches[1].pattern,
+        Pattern::Literal { value: LiteralPattern::Bool(true), .. }
+    ));
+    assert!(matches!(&branches[2].pattern, Pattern::Wildcard { .. }));
+    assert!(matches!(branches[0].body, CaseBody::Expression(_)));
+    assert!(branches[0].span.start < branches[0].span.end);
+    assert!(span.start < span.end);
+}
+
+#[test]
+fn parses_case_payload_patterns() {
+    let program = parse_source(
+        "enum Message { Move(Int, Int), Write { text: String, }, } verb main() { case message { Message.Move(x, y) => x + y, Message.Write(text: t) => 1, }; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    let Stmt::Expression { expression: Expr::Case { branches, .. }, .. } = &verb.body.statements[0]
+    else {
+        panic!("expected case statement");
+    };
+    assert!(matches!(
+        &branches[0].pattern,
+        Pattern::Variant { payload: VariantPayload::Positional(bindings), .. }
+            if bindings.iter().map(|binding| binding.name.as_str()).collect::<Vec<_>>()
+                == ["x", "y"]
+    ));
+    assert!(matches!(
+        &branches[1].pattern,
+        Pattern::Variant { payload: VariantPayload::Named(fields), .. }
+            if fields[0].name == "text" && fields[0].binding.name == "t"
+    ));
+}
+
+#[test]
+fn rejects_case_fallthrough_and_standalone_break() {
+    for source in [
+        include_str!("../fixtures/parser/invalid/case_fallthrough.act"),
+        include_str!("../fixtures/parser/invalid/case_break.act"),
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        parse(tokens).expect_err("case fallthrough and standalone break must be rejected");
     }
 }
 
@@ -212,8 +278,10 @@ fn rejects_missing_statement_semicolon() {
 fn parses_valid_fixtures() {
     let transfer = parse_source(include_str!("../fixtures/parser/valid/transfer.act"));
     let lifecycle = parse_source(include_str!("../fixtures/parser/valid/drop.act"));
+    let case_program = parse_source(include_str!("../fixtures/parser/valid/case.act"));
 
     assert_eq!(transfer.declarations.len(), 1);
+    assert_eq!(case_program.declarations.len(), 2);
     let TopLevelDecl::Verb(verb) = &lifecycle.declarations[0] else { panic!("expected verb") };
     assert!(matches!(verb.body.statements[1], Stmt::Drop { .. }));
 }

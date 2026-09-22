@@ -278,6 +278,7 @@ fn argument_span(argument: &Argument) -> SourceSpan {
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. } => *span,
+        | Expr::FieldAccess { span, .. }
+        | Expr::Case { span, .. } => *span,
     }
 }

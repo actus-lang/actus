@@ -148,6 +148,7 @@ impl Analyzer {
                 .expression_struct_type(object)
                 .and_then(|name| self.struct_field(&name, field))
                 .and_then(|field| lookup_builtin_type(&field.ty.name)),
+            Expr::Case { .. } => None,
         }
     }
 
