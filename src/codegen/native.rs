@@ -13,6 +13,7 @@ use crate::semantic::analyze;
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
+use super::layout::LayoutRegistry;
 use super::literals::{StringDataIds, declare_string_values, define_string_data};
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
@@ -90,10 +91,11 @@ pub fn emit_program_object_with_configuration(
         validate_external_native_signature(verb)
             .map_err(|error| NativeEmitError(error.to_string()))?;
     }
-    emit_verbs_object(&verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
+    emit_verbs_object(program, &verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
 }
 
 fn emit_verbs_object(
+    program: &Program,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     symbol: &str,
@@ -101,6 +103,7 @@ fn emit_verbs_object(
     configuration: &NativeBackendConfiguration,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
+    let layouts = LayoutRegistry::from_program(program, module.isa().pointer_type())?;
     let frontend_config = module.isa().frontend_config();
     let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol)?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
@@ -131,6 +134,7 @@ fn emit_verbs_object(
             &functions,
             cleanup_schedule,
             &string_data,
+            &layouts,
         )?;
     }
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
@@ -153,6 +157,7 @@ fn create_module(
     Ok(ObjectModule::new(builder))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn define_function(
     module: &mut ObjectModule,
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
@@ -161,6 +166,7 @@ fn define_function(
     functions: &HashMap<String, FunctionMeta>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataIds,
+    layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
     context.func.signature = super::declarations::native_signature_for_definition(module, verb);
@@ -191,6 +197,7 @@ fn define_function(
             &references,
             cleanup_schedule,
             &string_values,
+            layouts,
         )?;
         function.ins().return_(&[result]);
         function.finalize(frontend_config);

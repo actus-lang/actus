@@ -291,8 +291,8 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 
 ### Layout and Destruction
 
-- [ ] Define deterministic field declaration order.
-- [ ] Define size, alignment, and padding rules.
+- [x] Define deterministic field declaration order.
+- [x] Define size, alignment, and padding rules.
 - [ ] Define packed and externally represented struct policies.
 - [ ] Generate field-level cleanup in reverse declaration order.
 - [ ] Handle moved and dropped fields without double cleanup.
@@ -303,9 +303,10 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [ ] Define struct method syntax and receiver roles.
 - [ ] Validate receiver ownership and borrow behavior.
 - [ ] Emit native struct layouts and declarations for the selected backend.
-- [ ] Emit field access, initialization, assignment, and cleanup.
+- [x] Emit field access and initialization.
+- [ ] Emit field assignment and cleanup.
 - [ ] Define the C ABI contract for public structs.
-- [ ] Add generated native output and execution tests.
+- [x] Add generated native output and execution tests.
 
 ### Documentation and Compatibility
 

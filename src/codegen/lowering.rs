@@ -9,6 +9,7 @@ use crate::semantic::LoopExitKind;
 use super::cleanup::{emit_loop_cleanup, emit_return_cleanup, emit_scope_cleanup};
 use super::control_flow::{assigned_outer_bindings, carried_values, jump_with_values};
 use super::expressions::{emit_buffer_drop, initializer_type, lower_expression};
+use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
@@ -29,6 +30,7 @@ struct LoopTargets {
     carried: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_body(
     function: &mut FunctionBuilder<'_>,
     statements: &[Stmt],
@@ -37,6 +39,7 @@ pub(super) fn lower_body(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let mut locals = initial_locals.clone();
     let mut types = initial_types.clone();
@@ -49,6 +52,7 @@ pub(super) fn lower_body(
         None,
         cleanup_schedule,
         string_data,
+        layouts,
     )? {
         Flow::Return(value) => Ok(value),
         Flow::Fallthrough => {
@@ -70,6 +74,7 @@ fn lower_statements<'source>(
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     for statement in statements {
         let flow = lower_statement(
@@ -81,6 +86,7 @@ fn lower_statements<'source>(
             targets.clone(),
             cleanup_schedule,
             string_data,
+            layouts,
         )?;
         if !matches!(flow, Flow::Fallthrough) {
             return Ok(flow);
@@ -99,25 +105,26 @@ fn lower_statement<'source>(
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     match statement {
         Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, ty, initializer, .. } =>
-            lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions, string_data),
-        Stmt::Assignment { name, value, .. } => lower_assignment(function, name, value, locals, functions, string_data),
+            lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions, string_data, layouts),
+        Stmt::Assignment { name, value, .. } => lower_assignment(function, name, value, locals, types, functions, string_data, layouts),
         Stmt::Return { value: Some(expression), span } =>
-            lower_return(function, expression, *span, locals, types, functions, cleanup_schedule, string_data),
+            lower_return(function, expression, *span, locals, types, functions, cleanup_schedule, string_data, layouts),
         Stmt::Return { value: None, .. } => {
             Err(NativeEmitError("native function requires a return value".to_owned()))
         }
         Stmt::Expression { expression, .. } => {
-            lower_expression(function, expression, locals, functions, string_data)?;
+            lower_expression(function, expression, locals, types, functions, string_data, layouts)?;
             Ok(Flow::Fallthrough)
         }
         Stmt::Drop { name, .. } => lower_drop(function, name, locals, types, functions),
         Stmt::Block(block) => lower_scoped_block(
-            function, block, locals, types, functions, targets, cleanup_schedule, string_data,
+            function, block, locals, types, functions, targets, cleanup_schedule, string_data, layouts,
         ),
-        Stmt::Loop(block) => lower_loop(function, block, locals, types, functions, cleanup_schedule, string_data),
+        Stmt::Loop(block) => lower_loop(function, block, locals, types, functions, cleanup_schedule, string_data, layouts),
         Stmt::Break { span } => {
             emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Break, locals, types, functions)?;
             emit_loop_jump(function, targets, locals, false)
@@ -143,25 +150,31 @@ fn lower_owner_declaration<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value = lower_expression(function, initializer, locals, functions, string_data)?;
+    let value =
+        lower_expression(function, initializer, locals, types, functions, string_data, layouts)?;
     locals.insert(name, value);
     let native_type = declared_type
         .and_then(NativeType::from_name)
-        .unwrap_or_else(|| initializer_type(initializer, types, functions));
+        .unwrap_or_else(|| initializer_type(initializer, types, functions, layouts));
     types.insert(name, native_type);
     Ok(Flow::Fallthrough)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_assignment<'source>(
     function: &mut FunctionBuilder<'_>,
     name: &'source String,
     expression: &Expr,
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value = lower_expression(function, expression, locals, functions, string_data)?;
+    let value =
+        lower_expression(function, expression, locals, types, functions, string_data, layouts)?;
     locals.insert(name, value);
     Ok(Flow::Fallthrough)
 }
@@ -176,8 +189,10 @@ fn lower_return(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value = lower_expression(function, expression, locals, functions, string_data)?;
+    let value =
+        lower_expression(function, expression, locals, types, functions, string_data, layouts)?;
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions)?;
     Ok(Flow::Return(value))
 }
@@ -205,6 +220,7 @@ fn lower_scoped_block<'source>(
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     let mut nested_locals = locals.clone();
     let mut nested_types = types.clone();
@@ -217,6 +233,7 @@ fn lower_scoped_block<'source>(
         targets,
         cleanup_schedule,
         string_data,
+        layouts,
     )?;
     if matches!(flow, Flow::Fallthrough) {
         emit_scope_cleanup(
@@ -247,6 +264,7 @@ fn emit_loop_jump(
     Ok(if continue_loop { Flow::Continue } else { Flow::Break })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_loop<'source>(
     function: &mut FunctionBuilder<'_>,
     block: &'source crate::ast::Block,
@@ -255,6 +273,7 @@ fn lower_loop<'source>(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     let carried = assigned_outer_bindings(&block.statements, locals);
     let header = function.create_block();
@@ -286,6 +305,7 @@ fn lower_loop<'source>(
         Some(LoopTargets { header, exit, carried: carried.clone() }),
         cleanup_schedule,
         string_data,
+        layouts,
     )?;
     if matches!(flow, Flow::Fallthrough) {
         let values = carried_values(&loop_locals, &carried)?;

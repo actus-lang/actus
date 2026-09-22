@@ -7,6 +7,7 @@ pub(super) enum NativeType {
     Int,
     String,
     Buffer,
+    Struct(usize),
 }
 
 impl NativeType {
@@ -26,7 +27,7 @@ impl NativeType {
     pub(super) fn ir_type(self, pointer_type: Type) -> Type {
         match self {
             Self::Int => cranelift_codegen::ir::types::I32,
-            Self::String | Self::Buffer => pointer_type,
+            Self::String | Self::Buffer | Self::Struct(_) => pointer_type,
         }
     }
 }
