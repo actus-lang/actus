@@ -34,6 +34,7 @@ pub enum SemanticErrorKind {
     TypeMismatch { callee: String, parameter: String, expected: String, found: String },
     ReturnTypeMismatch { expected: String, found: String },
     BindingTypeMismatch { binding: String, expected: String, found: String },
+    InvalidFieldAssignmentTarget { field: String },
     MissingReturnValue,
 }
 

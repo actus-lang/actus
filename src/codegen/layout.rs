@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
-use crate::ast::{BuiltinType, Program, StructDef, TopLevelDecl, lookup_builtin_type};
+use crate::ast::{
+    BuiltinType, Program, StructDef, StructFieldRole, TopLevelDecl, lookup_builtin_type,
+};
 
 use super::native::NativeEmitError;
 use super::types::NativeType;
@@ -12,6 +14,7 @@ pub(super) struct FieldLayout {
     pub(super) name: String,
     pub(super) offset: u32,
     pub(super) ty: NativeType,
+    pub(super) owned: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -101,7 +104,12 @@ impl LayoutRegistry {
             let ty = self.native_type(&field.ty.name, visiting)?;
             let (size, field_alignment) = self.type_layout(ty)?;
             offset = align_up(offset, field_alignment);
-            fields.push(FieldLayout { name: field.name.clone(), offset, ty });
+            fields.push(FieldLayout {
+                name: field.name.clone(),
+                offset,
+                ty,
+                owned: matches!(field.role, StructFieldRole::Erg),
+            });
             offset += size;
             alignment = alignment.max(field_alignment);
         }
@@ -180,5 +188,22 @@ mod tests {
         assert_eq!(layout.size, 8);
         assert_eq!(layout.fields[0].offset, 0);
         assert_eq!(layout.fields[1].offset, 4);
+    }
+
+    #[test]
+    fn calculates_nested_struct_offsets() {
+        let (tokens, errors) =
+            scan("struct Inner { x: Int, y: Int, } struct Outer { inner: Inner, tag: Int, }");
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("nested structs should parse");
+        let layouts =
+            LayoutRegistry::from_program(&program, types::I64).expect("layout should pass");
+        let outer =
+            layouts.get(layouts.id_for("Outer").expect("Outer layout should exist")).unwrap();
+
+        assert_eq!(outer.alignment, 4);
+        assert_eq!(outer.size, 12);
+        assert_eq!(outer.fields[0].offset, 0);
+        assert_eq!(outer.fields[1].offset, 8);
     }
 }

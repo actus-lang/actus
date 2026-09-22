@@ -209,16 +209,27 @@ impl Parser {
         }
 
         let expression = self.parse_expression()?;
-        if let Expr::Identifier { name, span } = &expression
-            && self.match_simple(TokenKind::Equals)
-        {
+        if self.match_simple(TokenKind::Equals) {
             let value = self.parse_expression()?;
             let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-            return Ok(Stmt::Assignment {
-                name: name.clone(),
-                value,
-                span: SourceSpan::new(span.start, end),
-            });
+            let span = SourceSpan::new(expression_span(&expression).start, end);
+            return match expression {
+                Expr::Identifier { name, .. } => Ok(Stmt::Assignment { name, value, span }),
+                Expr::FieldAccess { object, field, .. } => {
+                    Ok(Stmt::FieldAssignment { object: *object, field, value, span })
+                }
+                _ => Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "assignable binding or field".to_owned(),
+                        found: self
+                            .peek()
+                            .map(|token| token.kind.clone())
+                            .unwrap_or(TokenKind::Eof),
+                    },
+                    span,
+                }),
+            };
         }
 
         let start = expression_span(&expression).start;

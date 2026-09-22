@@ -86,6 +86,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
         SemanticErrorKind::MissingReturnValue => "E1028",
+        SemanticErrorKind::InvalidFieldAssignmentTarget { .. } => "E1034",
     }
 }
 
@@ -179,6 +180,9 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::BindingTypeMismatch { binding, expected, found } => {
             format!("type mismatch for `{binding}`: expected `{expected}`, found `{found}`")
+        }
+        SemanticErrorKind::InvalidFieldAssignmentTarget { field } => {
+            format!("field `{field}` can only be assigned through an erg owner")
         }
         SemanticErrorKind::MissingReturnValue => {
             "verb must return a value on every path".to_owned()

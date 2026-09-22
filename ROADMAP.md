@@ -277,7 +277,7 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [ ] Define ownership semantics for `erg`, `abs`, and `dat` fields.
 - [ ] Define move semantics for whole structs and individual fields.
 - [ ] Reject partial use after moving a field.
-- [ ] Define and enforce struct initialization invariants.
+- [x] Define and enforce struct initialization invariants.
 - [ ] Define copy, move, and assignment behavior explicitly.
 
 ### Borrowing and Lifetimes
@@ -294,7 +294,7 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [x] Define deterministic field declaration order.
 - [x] Define size, alignment, and padding rules.
 - [ ] Define packed and externally represented struct policies.
-- [ ] Generate field-level cleanup in reverse declaration order.
+- [x] Generate field-level cleanup in reverse declaration order.
 - [ ] Handle moved and dropped fields without double cleanup.
 - [ ] Add layout and destruction golden tests.
 
@@ -304,7 +304,7 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [ ] Validate receiver ownership and borrow behavior.
 - [ ] Emit native struct layouts and declarations for the selected backend.
 - [x] Emit field access and initialization.
-- [ ] Emit field assignment and cleanup.
+- [x] Emit field assignment and cleanup.
 - [ ] Define the C ABI contract for public structs.
 - [x] Add generated native output and execution tests.
 

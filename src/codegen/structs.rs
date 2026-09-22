@@ -5,6 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, StructFieldInit};
 
+use super::expressions::emit_buffer_drop;
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -35,9 +36,6 @@ pub(super) fn lower_struct_literal(
             .iter()
             .find(|candidate| candidate.name == field.name)
             .ok_or_else(|| NativeEmitError(format!("unknown native field `{}`", field.name)))?;
-        if matches!(field_layout.ty, NativeType::Struct(_)) {
-            return Err(NativeEmitError("nested struct stores are not lowered yet".to_owned()));
-        }
         let value = lower_expression(
             function,
             &field.value,
@@ -47,7 +45,15 @@ pub(super) fn lower_struct_literal(
             string_data,
             layouts,
         )?;
-        function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
+        if let NativeType::Struct(id) = field_layout.ty {
+            let nested = layouts
+                .get(id)
+                .ok_or_else(|| NativeEmitError(format!("missing nested layout `{id}`")))?;
+            let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
+            copy_bytes(function, value, destination, nested.size);
+        } else {
+            function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
+        }
     }
     Ok(address)
 }
@@ -63,6 +69,74 @@ pub(super) fn lower_field_access(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let (address, field_layout) = lower_field_address(
+        function,
+        object,
+        field,
+        locals,
+        local_types,
+        functions,
+        string_data,
+        layouts,
+    )?;
+    if matches!(field_layout.ty, NativeType::Struct(_)) {
+        return Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)));
+    }
+    Ok(function.ins().load(
+        field_layout.ty.ir_type(layouts.pointer_type),
+        MemFlagsData::new(),
+        address,
+        field_layout.offset as i32,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_field_assignment(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    value: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let (address, field_layout) = lower_field_address(
+        function,
+        object,
+        field,
+        locals,
+        local_types,
+        functions,
+        string_data,
+        layouts,
+    )?;
+    let value =
+        lower_expression(function, value, locals, local_types, functions, string_data, layouts)?;
+    if let NativeType::Struct(id) = field_layout.ty {
+        let nested = layouts
+            .get(id)
+            .ok_or_else(|| NativeEmitError(format!("missing nested layout `{id}`")))?;
+        let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
+        copy_bytes(function, value, destination, nested.size);
+    } else {
+        function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_field_address(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(cranelift_codegen::ir::Value, super::layout::FieldLayout), NativeEmitError> {
     let object_type = expression_native_type(object, local_types, layouts)
         .ok_or_else(|| NativeEmitError("field access requires a struct value".to_owned()))?;
     let NativeType::Struct(id) = object_type else {
@@ -74,18 +148,90 @@ pub(super) fn lower_field_access(
         .fields
         .iter()
         .find(|candidate| candidate.name == field)
+        .cloned()
         .ok_or_else(|| NativeEmitError(format!("unknown native field `{field}`")))?;
     let address =
         lower_expression(function, object, locals, local_types, functions, string_data, layouts)?;
-    if matches!(field_layout.ty, NativeType::Struct(_)) {
-        return Err(NativeEmitError("nested struct field loads are not lowered yet".to_owned()));
+    Ok((address, field_layout))
+}
+
+fn copy_bytes(
+    function: &mut FunctionBuilder<'_>,
+    source: cranelift_codegen::ir::Value,
+    destination: cranelift_codegen::ir::Value,
+    size: u32,
+) {
+    for offset in 0..size {
+        let source_address = function.ins().iadd_imm_s(source, i64::from(offset));
+        let destination_address = function.ins().iadd_imm_s(destination, i64::from(offset));
+        let byte = function.ins().load(
+            cranelift_codegen::ir::types::I8,
+            MemFlagsData::new(),
+            source_address,
+            0,
+        );
+        function.ins().store(MemFlagsData::new(), byte, destination_address, 0);
     }
-    Ok(function.ins().load(
-        field_layout.ty.ir_type(layouts.pointer_type),
-        MemFlagsData::new(),
-        address,
-        field_layout.offset as i32,
-    ))
+}
+
+pub(super) fn emit_struct_drop(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    id: usize,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let layout =
+        layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing drop layout `{id}`")))?;
+    for field in layout.fields.iter().rev().filter(|field| field.owned) {
+        let field_address = function.ins().iadd_imm_s(address, i64::from(field.offset));
+        match field.ty {
+            NativeType::Buffer => {
+                let handle = function.ins().load(
+                    layouts.pointer_type,
+                    MemFlagsData::new(),
+                    field_address,
+                    0,
+                );
+                let target = functions.get("actus_buffer_drop").ok_or_else(|| {
+                    NativeEmitError(
+                        "native runtime function `actus_buffer_drop` is unavailable".to_owned(),
+                    )
+                })?;
+                function.ins().call(target.reference, &[handle]);
+            }
+            NativeType::Struct(nested_id) => {
+                emit_struct_drop(function, field_address, nested_id, functions, layouts)?;
+            }
+            NativeType::Int | NativeType::String => {}
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn emit_binding_drop(
+    function: &mut FunctionBuilder<'_>,
+    name: &str,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    if types.iter().any(|(binding, ty)| binding.as_str() == name && *ty == NativeType::Buffer) {
+        return emit_buffer_drop(function, name, locals, functions);
+    }
+    let Some(NativeType::Struct(id)) =
+        types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
+    else {
+        return Ok(());
+    };
+    let address = locals
+        .iter()
+        .find(|(binding, _)| binding.as_str() == name)
+        .map(|(_, value)| *value)
+        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+    emit_struct_drop(function, address, id, functions, layouts)
 }
 
 pub(super) fn expression_native_type(

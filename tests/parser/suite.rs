@@ -91,6 +91,19 @@ fn parses_struct_literals_and_field_access() {
 }
 
 #[test]
+fn parses_field_assignment() {
+    let program = parse_source(
+        "struct Point { x: Int, } verb main() { erg point = Point { x: 1, }; point.x = 2; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    assert!(matches!(
+        &verb.body.statements[1],
+        Stmt::FieldAssignment { field, value: Expr::Integer { value, .. }, .. }
+            if field == "x" && value == "2"
+    ));
+}
+
+#[test]
 fn parses_nested_borrow_and_named_call_arguments() {
     let program = parse_source(
         "verb process() { erg buffer = allocate(10); { abs view = ref buffer; inspect(view, source: view); } }",

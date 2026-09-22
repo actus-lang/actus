@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    Expr, Program, StructDef, StructField, StructFieldInit, TopLevelDecl, lookup_builtin_type,
+    Expr, Program, Role, StructDef, StructField, StructFieldInit, TopLevelDecl, lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
 
@@ -9,6 +9,46 @@ use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
+    pub(super) fn validate_field_assignment(
+        &mut self,
+        object: &Expr,
+        field: &str,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Expr::Identifier { name, span: object_span } = object else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
+                span,
+            });
+        };
+        let binding_index = self.binding(name, *object_span)?;
+        if self.model.bindings[binding_index].role != Role::Erg {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
+                span,
+            });
+        }
+        self.ensure_mutable(binding_index, name, *object_span)?;
+        let Some(struct_name) = self.expression_struct_type(object) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
+                span,
+            });
+        };
+        let Some(struct_field) = self.struct_field(&struct_name, field).cloned() else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownStructField {
+                    struct_name,
+                    field: field.to_owned(),
+                },
+                span,
+            });
+        };
+        self.visit_expression(value)?;
+        self.validate_field_value(&struct_name, &struct_field, value, span)
+    }
+
     pub(super) fn register_structs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Struct(definition) = declaration else { continue };

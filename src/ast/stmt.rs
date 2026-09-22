@@ -13,6 +13,7 @@ pub struct Block {
 pub enum Stmt {
     OwnerDecl { role: Role, name: String, ty: Option<String>, initializer: Expr, span: SourceSpan },
     Assignment { name: String, value: Expr, span: SourceSpan },
+    FieldAssignment { object: Expr, field: String, value: Expr, span: SourceSpan },
     Expression { expression: Expr, span: SourceSpan },
     Return { value: Option<Expr>, span: SourceSpan },
     Loop(Block),

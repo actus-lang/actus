@@ -138,6 +138,14 @@ impl Formatter {
                 self.expression(value);
                 self.output.push(';');
             }
+            Stmt::FieldAssignment { object, field, value, .. } => {
+                self.expression(object);
+                self.output.push('.');
+                self.output.push_str(field);
+                self.output.push_str(" = ");
+                self.expression(value);
+                self.output.push(';');
+            }
             Stmt::Expression { expression, .. } => {
                 self.expression(expression);
                 self.output.push(';');

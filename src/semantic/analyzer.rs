@@ -150,6 +150,9 @@ impl Analyzer {
                 self.validate_binding_assignment(index, name, value, *span)?;
                 self.visit_expression(value)
             }
+            Stmt::FieldAssignment { object, field, value, span } => {
+                self.validate_field_assignment(object, field, value, *span)
+            }
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => {
