@@ -11,7 +11,17 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [x] Represent enum declarations and variants in dedicated AST nodes.
 - [x] Reject duplicate enum and variant names.
 - [x] Reject duplicate payload field names.
-- [ ] Validate variant construction syntax.
+- [x] Validate variant construction syntax.
+
+## Enum Semantic Validation
+
+- [x] Register enum types in the semantic type environment.
+- [x] Validate payload fields against built-in, struct, and enum types.
+- [x] Reject direct recursive enum payloads without indirection.
+- [x] Validate unit and payload variant construction.
+- [x] Validate positional and named payload arguments.
+- [x] Emit stable E10xx diagnostics for invalid variant construction.
+- [x] Add positive and negative semantic tests for enum validation.
 
 ## Tagged Union Layout
 
