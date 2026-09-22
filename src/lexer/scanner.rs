@@ -98,6 +98,8 @@ impl<'source> Scanner<'source> {
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
             "struct" => TokenKind::Struct,
+            "enum" => TokenKind::Enum,
+            "case" => TokenKind::Case,
             _ => TokenKind::Identifier(text.to_owned()),
         };
 

@@ -13,6 +13,35 @@ pub enum TopLevelDecl {
     Verb(VerbDecl),
     ExternalVerb(ExternalVerbDecl),
     Struct(StructDef),
+    Enum(EnumDef),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EnumDef {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EnumVariant {
+    pub name: String,
+    pub payload: EnumPayload,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EnumPayload {
+    Unit,
+    Tuple(Vec<TypeName>),
+    Struct(Vec<EnumField>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EnumField {
+    pub name: String,
+    pub ty: TypeName,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

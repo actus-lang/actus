@@ -69,7 +69,7 @@ impl Analyzer {
                 TopLevelDecl::ExternalVerb(verb) => {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
-                TopLevelDecl::Struct(_) => continue,
+                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
             };
             for parameter in params {
                 self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;

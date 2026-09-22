@@ -23,6 +23,9 @@ pub fn render_parse_error(source: &str, error: &ParseError) -> String {
         ParseErrorKind::UnexpectedEndOfInput { expected } => {
             format!("expected {expected}, found end of input")
         }
+        ParseErrorKind::DuplicateName { kind, name } => {
+            format!("duplicate {kind} `{name}`")
+        }
     };
 
     format!("error[{}] at {line}:{column}: {message}", parse_code(error.code))
@@ -48,6 +51,7 @@ fn parse_code(code: ParseErrorCode) -> &'static str {
     match code {
         ParseErrorCode::UnexpectedToken => "E0003",
         ParseErrorCode::UnexpectedEndOfInput => "E0004",
+        ParseErrorCode::DuplicateName => "E0005",
     }
 }
 

@@ -23,6 +23,15 @@ fn scans_keywords_and_punctuation() {
 }
 
 #[test]
+fn scans_enum_and_case_keywords() {
+    let (tokens, errors) = scan("enum Color { Red, } case value");
+
+    assert!(errors.is_empty());
+    assert_eq!(tokens[0].kind, TokenKind::Enum);
+    assert_eq!(tokens[6].kind, TokenKind::Case);
+}
+
+#[test]
 fn scans_struct_fields_and_dot_access() {
     let (tokens, errors) = scan("struct Point { erg payload: Buffer, x: F32 } point.x");
 

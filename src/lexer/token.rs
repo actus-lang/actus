@@ -38,6 +38,8 @@ pub enum TokenKind {
     Break,
     Continue,
     Struct,
+    Enum,
+    Case,
     Identifier(String),
     Integer(String),
     FloatLiteral(String),

@@ -29,6 +29,7 @@ impl Formatter {
             TopLevelDecl::Verb(verb) => self.verb(verb),
             TopLevelDecl::ExternalVerb(verb) => self.external_verb(verb),
             TopLevelDecl::Struct(definition) => self.struct_definition(definition),
+            TopLevelDecl::Enum(definition) => self.enum_definition(definition),
         }
     }
 
@@ -91,6 +92,49 @@ impl Formatter {
                 self.output.push_str(&field.name);
                 self.output.push_str(": ");
                 self.output.push_str(&field.ty.name);
+                self.output.push_str(",\n");
+            }
+            self.indent -= 1;
+            self.line_indent();
+        }
+        self.output.push('}');
+    }
+
+    fn enum_definition(&mut self, definition: &crate::ast::EnumDef) {
+        self.output.push_str("enum ");
+        self.output.push_str(&definition.name);
+        self.output.push_str(" {");
+        if !definition.variants.is_empty() {
+            self.output.push('\n');
+            self.indent += 1;
+            for variant in &definition.variants {
+                self.line_indent();
+                self.output.push_str(&variant.name);
+                match &variant.payload {
+                    crate::ast::EnumPayload::Unit => {}
+                    crate::ast::EnumPayload::Tuple(types) => {
+                        self.output.push('(');
+                        for (index, ty) in types.iter().enumerate() {
+                            if index > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&ty.name);
+                        }
+                        self.output.push(')');
+                    }
+                    crate::ast::EnumPayload::Struct(fields) => {
+                        self.output.push_str(" {");
+                        for (index, field) in fields.iter().enumerate() {
+                            if index > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&field.name);
+                            self.output.push_str(": ");
+                            self.output.push_str(&field.ty.name);
+                        }
+                        self.output.push('}');
+                    }
+                }
                 self.output.push_str(",\n");
             }
             self.indent -= 1;

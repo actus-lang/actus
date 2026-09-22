@@ -3,8 +3,10 @@ use crate::ast::{
     VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
+use std::collections::HashSet;
 
 mod cursor;
+mod enums;
 mod expressions;
 mod structs;
 
@@ -12,12 +14,14 @@ mod structs;
 pub enum ParseErrorKind {
     UnexpectedToken { expected: String, found: TokenKind },
     UnexpectedEndOfInput { expected: String },
+    DuplicateName { kind: String, name: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParseErrorCode {
     UnexpectedToken,
     UnexpectedEndOfInput,
+    DuplicateName,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -30,11 +34,12 @@ pub struct ParseError {
 pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
+    enum_names: HashSet<String>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, cursor: 0 }
+        Self { tokens, cursor: 0, enum_names: HashSet::new() }
     }
 
     pub fn parse(mut self) -> Result<Program, ParseError> {
@@ -56,6 +61,9 @@ impl Parser {
         }
         if self.check_simple(&TokenKind::Struct) {
             return Ok(TopLevelDecl::Struct(self.parse_struct_def()?));
+        }
+        if self.check_simple(&TokenKind::Enum) {
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def()?));
         }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))

@@ -1,4 +1,4 @@
-use actus::ast::{Expr, Role, Stmt, StructFieldRole, TopLevelDecl};
+use actus::ast::{EnumPayload, Expr, Role, Stmt, StructFieldRole, TopLevelDecl};
 use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -23,6 +23,45 @@ fn parses_a_verb_with_roles_and_return_type() {
     assert_eq!(verb.params[2].role, Role::Dat);
     assert_eq!(verb.return_type.as_ref().map(|ty| ty.name.as_str()), Some("Int"));
     assert!(matches!(verb.body.statements[0], Stmt::Return { .. }));
+}
+
+#[test]
+fn parses_unit_tuple_and_named_enum_variants() {
+    let program =
+        parse_source("enum Message { Quit, Move(Int, Int), Write { text: String, code: Int, }, }");
+
+    let TopLevelDecl::Enum(definition) = &program.declarations[0] else {
+        panic!("expected enum");
+    };
+    assert_eq!(definition.name, "Message");
+    assert!(matches!(definition.variants[0].payload, EnumPayload::Unit));
+    assert!(matches!(
+        &definition.variants[1].payload,
+        EnumPayload::Tuple(types) if types.len() == 2
+    ));
+    assert!(matches!(
+        &definition.variants[2].payload,
+        EnumPayload::Struct(fields)
+            if fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>()
+                == ["text", "code"]
+    ));
+}
+
+#[test]
+fn rejects_duplicate_enum_names_variants_and_payload_fields() {
+    let cases = [
+        "enum Color { Red, } enum Color { Blue, }",
+        "enum Color { Red, Red, }",
+        "enum Message { Write { text: String, text: Int, }, }",
+    ];
+
+    for source in cases {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let error = parse(tokens).expect_err("duplicate enum names must be rejected");
+        assert_eq!(error.code, ParseErrorCode::DuplicateName);
+        assert!(matches!(error.kind, ParseErrorKind::DuplicateName { .. }));
+    }
 }
 
 #[test]

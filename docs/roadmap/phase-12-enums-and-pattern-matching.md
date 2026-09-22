@@ -4,12 +4,13 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 
 ## Enum Syntax and AST
 
-- [ ] Define enum declaration grammar and source-span rules.
-- [ ] Parse unit variants without payloads.
-- [ ] Parse payload variants with named and positional fields.
-- [ ] Represent enum declarations and variants in dedicated AST nodes.
-- [ ] Reject duplicate enum and variant names.
-- [ ] Reject duplicate payload field names.
+- [x] Add `enum` and `case` lexer keywords.
+- [x] Define enum declaration grammar and source-span rules.
+- [x] Parse unit variants without payloads.
+- [x] Parse payload variants with named and positional fields.
+- [x] Represent enum declarations and variants in dedicated AST nodes.
+- [x] Reject duplicate enum and variant names.
+- [x] Reject duplicate payload field names.
 - [ ] Validate variant construction syntax.
 
 ## Tagged Union Layout
@@ -28,7 +29,9 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [ ] Parse literal patterns for primitive values.
 - [ ] Parse the `_` wildcard pattern.
 - [ ] Reject fallthrough and standalone `break` semantics in `case` branches.
-- [ ] Add valid and invalid parser fixtures.
+- [ ] Add valid and invalid `case` parser fixtures.
+- [x] Add enum lexer and parser unit tests.
+- [x] Add duplicate enum and payload-name diagnostics tests.
 
 ## Exhaustiveness and Pattern Semantics
 
