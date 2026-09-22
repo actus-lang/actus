@@ -315,10 +315,11 @@ impl Analyzer {
                     BindingState::PartiallyMoved { fields: vec![field.to_owned()] };
                 Ok(())
             }
-            BindingState::Frozen { .. } => Err(SemanticError {
-                kind: SemanticErrorKind::MoveFrozen {
-                    name: name.clone(),
-                    borrow_ids: self.blocking_borrow_ids(index),
+            BindingState::Frozen { borrow_ids } => Err(SemanticError {
+                kind: SemanticErrorKind::FieldBorrowConflict {
+                    owner: name.clone(),
+                    field: field.to_owned(),
+                    borrow_ids: borrow_ids.clone(),
                 },
                 span,
             }),

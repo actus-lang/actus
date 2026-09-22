@@ -87,6 +87,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
         SemanticErrorKind::MissingReturnValue => "E1028",
         SemanticErrorKind::InvalidFieldAssignmentTarget { .. } => "E1034",
+        SemanticErrorKind::FieldBorrowConflict { .. } => "E1035",
     }
 }
 
@@ -183,6 +184,9 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::InvalidFieldAssignmentTarget { field } => {
             format!("field `{field}` can only be assigned through an erg owner")
+        }
+        SemanticErrorKind::FieldBorrowConflict { owner, field, .. } => {
+            format!("cannot mutate or move field `{field}` because owner `{owner}` is frozen")
         }
         SemanticErrorKind::MissingReturnValue => {
             "verb must return a value on every path".to_owned()

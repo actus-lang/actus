@@ -29,6 +29,18 @@ impl Analyzer {
                 span,
             });
         }
+        if let crate::semantic::BindingState::Frozen { borrow_ids } =
+            &self.model.bindings[binding_index].state
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::FieldBorrowConflict {
+                    owner: name.clone(),
+                    field: field.to_owned(),
+                    borrow_ids: borrow_ids.clone(),
+                },
+                span,
+            });
+        }
         self.ensure_mutable(binding_index, name, *object_span)?;
         let Some(struct_name) = self.expression_struct_type(object) else {
             return Err(SemanticError {

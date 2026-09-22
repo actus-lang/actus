@@ -23,6 +23,7 @@ pub struct Binding {
 pub struct BorrowRecord {
     pub id: usize,
     pub owner: String,
+    pub field: Option<String>,
     pub scope_depth: usize,
     pub origin_span: SourceSpan,
 }

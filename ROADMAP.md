@@ -282,12 +282,12 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 
 ### Borrowing and Lifetimes
 
-- [ ] Define whether Alpha structs may contain `abs` fields.
+- [x] Define whether Alpha structs may contain `abs` fields.
 - [ ] Reject self-referential and escaping borrow fields unless a lifetime model exists.
-- [ ] Reject storing lexical borrows in longer-lived structs.
-- [ ] Validate borrow access through struct fields.
-- [ ] Track field-level borrow records where supported.
-- [ ] Add diagnostics identifying the struct field and blocking borrow.
+- [x] Reject storing lexical borrows in longer-lived structs.
+- [x] Validate borrow access through struct fields.
+- [x] Track field-level borrow records where supported.
+- [x] Add diagnostics identifying the struct field and blocking borrow.
 
 ### Layout and Destruction
 

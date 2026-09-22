@@ -50,3 +50,35 @@ fn rejects_partial_struct_use_after_field_move() {
         SemanticErrorKind::UseAfterMove { name } if name == "holder"
     ));
 }
+
+#[test]
+fn freezes_struct_owner_for_field_borrow_and_restores_it() {
+    let model = analyze_source(
+        "struct Holder { payload: Buffer, value: Int, } verb main() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.payload; inspect(view); } holder.value = 2; }",
+    )
+    .expect("field borrow should end with its lexical scope");
+    assert_eq!(model.borrows[0].field.as_deref(), Some("payload"));
+
+    let error = analyze_source(
+        "struct Holder { payload: Buffer, value: Int, } verb broken() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.payload; holder.value = 2; } }",
+    )
+    .expect_err("a frozen struct must reject field mutation");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::FieldBorrowConflict { owner, field, .. }
+            if owner == "holder" && field == "value"
+    ));
+}
+
+#[test]
+fn rejects_dat_move_of_a_frozen_struct_field() {
+    let error = analyze_source(
+        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.value; consume(payload: holder.payload); } }",
+    )
+    .expect_err("a frozen field owner must reject dat transfer");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::FieldBorrowConflict { owner, field, .. }
+            if owner == "holder" && field == "payload"
+    ));
+}
