@@ -1,0 +1,21 @@
+# Phase 3: Parser and AST
+
+- [x] Define the initial Actus grammar.
+- [x] Define the AST for programs, verbs, parameters, roles, types, blocks, statements, and expressions.
+- [x] Implement parsing for top-level declarations.
+- [x] Implement parsing for verb declarations and parameters.
+- [x] Implement parsing for blocks and nested scopes.
+- [x] Implement parsing for variable declarations.
+- [x] Implement parsing for borrow declarations using `ref`.
+- [x] Implement parsing for assignments and calls.
+- [x] Implement parsing for returns.
+- [x] Implement parsing for intrinsic `drop` statements.
+- [x] Track source spans for AST nodes.
+- [x] Produce stable parser diagnostics with error codes.
+- [x] Reject missing semicolons.
+- [x] Reject unclosed blocks and unmatched braces.
+- [x] Reject invalid roles and malformed declarations.
+- [x] Reject invalid argument syntax.
+- [x] Add valid parser fixtures.
+- [x] Add invalid parser fixtures.
+- [x] Add AST snapshot tests.

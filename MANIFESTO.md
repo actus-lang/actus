@@ -149,7 +149,9 @@ The first compiler is bootstrapped in Rust and consists of:
 2. an AST and typed semantic analyzer;
 3. borrow records and ownership-state checking;
 4. deterministic cleanup insertion;
-5. a Rust-native Cranelift backend for native object and executable emission.
+5. a complete Alpha struct system with natural layouts, field ownership, and
+   receiver-validated methods;
+6. a Rust-native Cranelift backend for native object and executable emission.
 
 The C ABI is a stable interoperability boundary for external libraries,
 operating-system interfaces, and platform runtimes. It is not required as an

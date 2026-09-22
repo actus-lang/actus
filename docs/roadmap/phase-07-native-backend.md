@@ -1,0 +1,56 @@
+# Phase 7: Native Backend
+
+- [x] Define the initial native emission model.
+- [x] Integrate a Rust-native backend such as Cranelift.
+- [x] Emit object files or native binaries without an intermediate C representation.
+- [x] Add `actus build` for writing a validated native object artifact.
+- [x] Lower integer locals and arithmetic expressions to native instructions.
+- [x] Define and validate the native `Int` parameter and return ABI.
+- [x] Lower calls between native `Int` verbs.
+- [x] Lower scalar `Int` borrow roles through the native ABI.
+- [x] Lower scalar `Int` ownership transfers through the native ABI.
+- [x] Lower unary negative and grouped integer expressions.
+- [x] Lower nested scalar scopes and scalar `drop` statements.
+- [x] Lower basic native loop CFG edges for `break` and `continue`.
+- [x] Implement SSA variables and phi values for loop-carried bindings.
+- [x] Validate native cleanup plan references before emission.
+- [x] Reject duplicate native cleanup actions within one scope.
+- [x] Associate native unwind plans with their source control-flow spans.
+- [x] Create unwind plans for literal and call return expressions.
+- [x] Associate cleanup plans with lexical scope spans.
+- [x] Lower return, break, and continue unwind plans into the native cleanup model.
+- [x] Define the initial native resource handle and destructor contract.
+- [x] Define the Alpha `Buffer` layout and runtime operation contract.
+- [x] Implement initial native `Buffer` allocation, append, and drop operations.
+- [x] Build and link the native runtime archive for executable emission.
+- [x] Lower initial `Buffer` allocation, append, and explicit drop calls.
+- [x] Emit automatic `Buffer` cleanup on lexical scope and control-flow unwinding.
+- [x] Emit `Buffer` ownership transfers without duplicate cleanup.
+- [x] Verify deterministic native object emission for identical programs.
+- [x] Add native object structural golden tests.
+- [x] Emit deterministic cleanup instructions.
+- [x] Emit ownership transfers without duplicate cleanup.
+- [x] Emit explicit borrow scopes where required by the backend.
+- [x] Reject code generation when semantic analysis fails.
+- [x] Add native object and architecture-scoped machine-code golden tests.
+- [x] Link generated objects in CI.
+- [x] Add a minimal end-to-end Actus-to-native-binary test.
+- [x] Add `actus run` for temporary native execution.
+- [x] Add the initial type-aware `print` intrinsic.
+- [x] Extend `print` to text literals and String bindings without adding source-level print variants.
+
+## C Library Interoperability
+
+- [x] Define the initial C ABI boundary independently from the native backend.
+- [x] Map initial primitive, opaque-handle, calling-convention, and ownership contracts.
+- [x] Define target pointer-width layout rules for initial C ABI types.
+- [x] Parse, model, and import external C function declarations without generating Actus-owned C code.
+- [x] Define initial C ABI return ownership and lifetime contracts.
+- [x] Define ABI-safe primitive, pointer, layout, and calling-convention mappings.
+- [x] Define ownership and lifetime rules at the C FFI boundary.
+- [x] Support linking static and shared C libraries.
+- [x] Add manifest-driven static and shared library linker inputs.
+- [x] Define a reproducible header-to-Actus binding workflow.
+- [x] Mark unchecked foreign declarations with explicit `unsafe extern` boundaries.
+- [x] Add C library integration fixtures and native link tests.
+- [x] Add a native link smoke test for an imported C symbol.
