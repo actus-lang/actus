@@ -185,6 +185,9 @@ impl Formatter {
             Expr::Binary { left, operator, right, .. } => self.binary(left, operator, right),
             Expr::Borrow { expression, .. } => self.borrow(expression),
             Expr::Call { callee, arguments, .. } => self.call(callee, arguments),
+            Expr::MethodCall { receiver, method, arguments, .. } => {
+                self.method_call(receiver, method, arguments)
+            }
             Expr::StructLit { name, fields, .. } => self.struct_literal(name, fields),
             Expr::FieldAccess { object, field, .. } => self.field_access(object, field),
         }
@@ -253,6 +256,12 @@ impl Formatter {
         self.expression(object);
         self.output.push('.');
         self.output.push_str(field);
+    }
+
+    fn method_call(&mut self, receiver: &Expr, method: &str, arguments: &[Argument]) {
+        self.expression(receiver);
+        self.output.push('.');
+        self.call(method, arguments);
     }
 
     fn argument(&mut self, argument: &Argument) {

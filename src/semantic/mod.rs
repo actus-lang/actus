@@ -4,6 +4,7 @@ mod calls;
 mod cleanup;
 mod errors;
 mod intrinsics;
+mod methods;
 mod model;
 mod ownership;
 mod scopes;

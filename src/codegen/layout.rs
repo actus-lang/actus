@@ -24,7 +24,7 @@ pub(super) struct StructLayout {
     pub(super) fields: Vec<FieldLayout>,
 }
 
-pub(super) struct LayoutRegistry {
+pub struct LayoutRegistry {
     pub(super) pointer_type: Type,
     pub(super) pointer_size: u32,
     definitions: Vec<StructDef>,

@@ -108,6 +108,9 @@ impl Analyzer {
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },
+            Expr::MethodCall { method, .. } => {
+                self.signatures.get(method).and_then(|signature| signature.return_type)
+            }
             Expr::StructLit { .. } => None,
             Expr::FieldAccess { object, field, .. } => self
                 .expression_struct_type(object)

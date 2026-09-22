@@ -78,8 +78,21 @@ impl Parser {
         while self.match_simple(TokenKind::Dot) {
             let field_token = self.take_identifier("field name after `.`")?;
             let field = identifier_text(&field_token.kind);
-            let span = SourceSpan::new(expression_span(&expression).start, field_token.span.end);
-            expression = Expr::FieldAccess { object: Box::new(expression), field, span };
+            if self.match_simple(TokenKind::LeftParen) {
+                let start = expression_span(&expression).start;
+                let arguments = self.parse_arguments()?;
+                let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
+                expression = Expr::MethodCall {
+                    receiver: Box::new(expression),
+                    method: field,
+                    arguments,
+                    span: SourceSpan::new(start, end),
+                };
+            } else {
+                let span =
+                    SourceSpan::new(expression_span(&expression).start, field_token.span.end);
+                expression = Expr::FieldAccess { object: Box::new(expression), field, span };
+            }
         }
         Ok(expression)
     }

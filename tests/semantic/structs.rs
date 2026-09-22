@@ -82,3 +82,29 @@ fn rejects_dat_move_of_a_frozen_struct_field() {
             if owner == "holder" && field == "payload"
     ));
 }
+
+#[test]
+fn validates_method_receiver_roles_and_types() {
+    analyze_source(
+        "struct Point { x: Int, } verb read(abs self: Point) -> Int { return self.x; } verb main() -> Int { erg point = Point { x: 7, }; return point.read(); }",
+    )
+    .expect("an abs struct receiver should be valid");
+
+    let error = analyze_source(
+        "struct Point { x: Int, } verb read(erg self: Point) -> Int { return self.x; } verb main() -> Int { abs point = ref Point { x: 7, }; return point.read(); }",
+    )
+    .expect_err("an erg receiver must not be called through an abs binding");
+    assert!(matches!(error.kind, SemanticErrorKind::InvalidArgumentRole { .. }));
+}
+
+#[test]
+fn rejects_invalid_method_receivers() {
+    let error = analyze_source(
+        "struct Point { x: Int, } verb read(dat self: Point) -> Int { return 1; } verb main() -> Int { return 1; }",
+    )
+    .expect_err("dat is not a valid method receiver role");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidReceiver { method } if method == "read"
+    ));
+}

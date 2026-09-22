@@ -36,6 +36,9 @@ pub enum SemanticErrorKind {
     BindingTypeMismatch { binding: String, expected: String, found: String },
     InvalidFieldAssignmentTarget { field: String },
     FieldBorrowConflict { owner: String, field: String, borrow_ids: Vec<usize> },
+    UnknownMethod { method: String },
+    InvalidReceiver { method: String },
+    ReceiverTypeMismatch { method: String, expected: String, found: String },
     MissingReturnValue,
 }
 

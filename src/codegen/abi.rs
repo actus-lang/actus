@@ -1,5 +1,6 @@
 use crate::ast::{ExternalVerbDecl, VerbDecl};
 
+use super::layout::LayoutRegistry;
 use super::types::NativeType;
 
 #[derive(Debug)]
@@ -13,17 +14,22 @@ impl std::fmt::Display for NativeAbiError {
 
 impl std::error::Error for NativeAbiError {}
 
-pub fn validate_native_signature(verb: &VerbDecl) -> Result<(), NativeAbiError> {
+pub fn validate_native_signature(
+    verb: &VerbDecl,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeAbiError> {
     if let Some(return_type) = &verb.return_type
-        && NativeType::from_name(&return_type.name).is_none()
+        && NativeType::from_name_with_layout(&return_type.name, layouts).is_none()
     {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` returns, found `{}`",
             return_type.name
         )));
     }
-    if let Some(parameter) =
-        verb.params.iter().find(|parameter| NativeType::from_name(&parameter.ty.name).is_none())
+    if let Some(parameter) = verb
+        .params
+        .iter()
+        .find(|parameter| NativeType::from_name_with_layout(&parameter.ty.name, layouts).is_none())
     {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` parameters, found `{}` for `{}`",
@@ -33,7 +39,10 @@ pub fn validate_native_signature(verb: &VerbDecl) -> Result<(), NativeAbiError> 
     Ok(())
 }
 
-pub fn validate_external_native_signature(verb: &ExternalVerbDecl) -> Result<(), NativeAbiError> {
+pub fn validate_external_native_signature(
+    verb: &ExternalVerbDecl,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeAbiError> {
     if !verb.unsafe_boundary {
         return Err(NativeAbiError(format!(
             "external native verb `{}` requires an explicit `unsafe` boundary",
@@ -46,8 +55,10 @@ pub fn validate_external_native_signature(verb: &ExternalVerbDecl) -> Result<(),
             verb.name
         )));
     }
-    if let Some(parameter) =
-        verb.params.iter().find(|parameter| NativeType::from_name(&parameter.ty.name).is_none())
+    if let Some(parameter) = verb
+        .params
+        .iter()
+        .find(|parameter| NativeType::from_name_with_layout(&parameter.ty.name, layouts).is_none())
     {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` parameters, found `{}` for `{}`",
@@ -55,7 +66,7 @@ pub fn validate_external_native_signature(verb: &ExternalVerbDecl) -> Result<(),
         )));
     }
     if let Some(return_type) = &verb.return_type
-        && NativeType::from_name(&return_type.name).is_none()
+        && NativeType::from_name_with_layout(&return_type.name, layouts).is_none()
     {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` returns, found `{}`",

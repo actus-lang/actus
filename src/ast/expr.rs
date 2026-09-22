@@ -11,6 +11,7 @@ pub enum Expr {
     Binary { left: Box<Expr>, operator: BinaryOp, right: Box<Expr>, span: SourceSpan },
     Borrow { expression: Box<Expr>, span: SourceSpan },
     Call { callee: String, arguments: Vec<Argument>, span: SourceSpan },
+    MethodCall { receiver: Box<Expr>, method: String, arguments: Vec<Argument>, span: SourceSpan },
     StructLit { name: String, fields: Vec<StructFieldInit>, span: SourceSpan },
     FieldAccess { object: Box<Expr>, field: String, span: SourceSpan },
 }

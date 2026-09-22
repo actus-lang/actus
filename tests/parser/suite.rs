@@ -38,6 +38,22 @@ fn parses_a_struct_with_value_fields() {
 }
 
 #[test]
+fn parses_struct_method_calls() {
+    let program = parse_source(
+        "struct Point { x: Int, } verb main() -> Int { erg point = Point { x: 1, }; return point.read(); }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected main verb");
+    };
+    let Stmt::Return { value: Some(Expr::MethodCall { method, .. }), .. } =
+        &verb.body.statements[1]
+    else {
+        panic!("expected method call return");
+    };
+    assert_eq!(method, "read");
+}
+
+#[test]
 fn parses_an_erg_struct_field() {
     let program = parse_source("struct Packet { erg payload: Buffer, sequence: Int, }");
 

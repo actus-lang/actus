@@ -228,9 +228,19 @@ impl Analyzer {
                             | BindingState::Dropped
                     )
             }
-            Expr::Borrow { expression, .. } => self.is_owner_argument(expression),
+            Expr::Borrow { expression, .. } => self.is_readable_owner(expression),
             _ => false,
         }
+    }
+
+    fn is_readable_owner(&self, expression: &Expr) -> bool {
+        let Expr::Identifier { name, span } = expression else { return false };
+        let Ok(index) = self.binding(name, *span) else { return false };
+        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
+            && matches!(
+                self.model.bindings[index].state,
+                BindingState::Active | BindingState::Frozen { .. }
+            )
     }
 
     fn move_dat_argument(
@@ -350,6 +360,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
         | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. } => *span,
     }

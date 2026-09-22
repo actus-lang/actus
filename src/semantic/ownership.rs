@@ -194,6 +194,7 @@ fn contains_returned_borrow(expression: &Expr) -> bool {
             contains_returned_borrow(left) || contains_returned_borrow(right)
         }
         Expr::Call { .. }
+        | Expr::MethodCall { .. }
         | Expr::Identifier { .. }
         | Expr::Integer { .. }
         | Expr::FloatLiteral { .. }
@@ -232,6 +233,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
         | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. } => *span,
     }

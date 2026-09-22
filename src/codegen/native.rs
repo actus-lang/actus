@@ -84,13 +84,6 @@ pub fn emit_program_object_with_configuration(
     if !verbs.iter().any(|verb| verb.name == symbol) {
         return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
     }
-    for verb in &verbs {
-        validate_native_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
-    }
-    for verb in &external_verbs {
-        validate_external_native_signature(verb)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
-    }
     emit_verbs_object(program, &verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
 }
 
@@ -104,8 +97,16 @@ fn emit_verbs_object(
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
     let layouts = LayoutRegistry::from_program(program, module.isa().pointer_type())?;
+    for verb in verbs {
+        validate_native_signature(verb, &layouts)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
+    for verb in external_verbs {
+        validate_external_native_signature(verb, &layouts)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
     let frontend_config = module.isa().frontend_config();
-    let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol)?;
+    let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol, &layouts)?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = metadata
@@ -169,7 +170,8 @@ fn define_function(
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = super::declarations::native_signature_for_definition(module, verb);
+    context.func.signature =
+        super::declarations::native_signature_for_definition(module, verb, layouts);
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let string_values = declare_string_values(module, &mut context.func, string_data);
     let mut function_context = FunctionBuilderContext::new();
@@ -186,7 +188,12 @@ fn define_function(
         let local_types = verb
             .params
             .iter()
-            .map(|parameter| (&parameter.name, NativeType::from_name(&parameter.ty.name).unwrap()))
+            .map(|parameter| {
+                (
+                    &parameter.name,
+                    NativeType::from_name_with_layout(&parameter.ty.name, layouts).unwrap(),
+                )
+            })
             .collect();
         function.seal_block(block);
         let result = lower_body(

@@ -88,6 +88,9 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::MissingReturnValue => "E1028",
         SemanticErrorKind::InvalidFieldAssignmentTarget { .. } => "E1034",
         SemanticErrorKind::FieldBorrowConflict { .. } => "E1035",
+        SemanticErrorKind::UnknownMethod { .. } => "E1036",
+        SemanticErrorKind::InvalidReceiver { .. } => "E1037",
+        SemanticErrorKind::ReceiverTypeMismatch { .. } => "E1038",
     }
 }
 
@@ -187,6 +190,13 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::FieldBorrowConflict { owner, field, .. } => {
             format!("cannot mutate or move field `{field}` because owner `{owner}` is frozen")
+        }
+        SemanticErrorKind::UnknownMethod { method } => format!("unknown method `{method}`"),
+        SemanticErrorKind::InvalidReceiver { method } => {
+            format!("invalid receiver for method `{method}`")
+        }
+        SemanticErrorKind::ReceiverTypeMismatch { method, expected, found } => {
+            format!("receiver type mismatch for `{method}`: expected `{expected}`, found `{found}`")
         }
         SemanticErrorKind::MissingReturnValue => {
             "verb must return a value on every path".to_owned()

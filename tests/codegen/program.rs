@@ -22,6 +22,27 @@ fn lowers_integer_parameters_to_a_native_object() {
 }
 
 #[test]
+fn lowers_struct_method_calls_to_a_native_object() {
+    let source = "struct Point { x: Int, } verb read(abs self: Point) -> Int { return self.x; } verb main() -> Int { erg point = Point { x: 7, }; return point.read(); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let object = emit_program_object(&program, "main").expect("struct method should emit");
+    assert_native_object(&object);
+}
+
+#[test]
+fn emits_deterministic_struct_method_objects() {
+    let source = "struct Point { x: Int, y: Int, } verb sum(abs self: Point) -> Int { return self.x + self.y; } verb main() -> Int { erg point = Point { x: 7, y: 5, }; return point.sum(); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let first = emit_program_object(&program, "main").expect("first emission should pass");
+    let second = emit_program_object(&program, "main").expect("second emission should pass");
+    assert_eq!(first, second);
+}
+
+#[test]
 fn lowers_integer_function_calls_to_a_native_object() {
     let source = "verb main() -> Int { erg left = 40; erg right = 2; return add(right: right, left: left); } verb add(erg left: Int, erg right: Int) -> Int { return left + right; }";
     let (tokens, errors) = scan(source);

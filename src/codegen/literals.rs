@@ -85,6 +85,12 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
                 collect_expression(&argument.expression, values);
             }
         }
+        Expr::MethodCall { receiver, arguments, .. } => {
+            collect_expression(receiver, values);
+            for argument in arguments {
+                collect_expression(&argument.expression, values);
+            }
+        }
         Expr::StructLit { fields, .. } => {
             for field in fields {
                 collect_expression(&field.value, values);

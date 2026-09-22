@@ -70,7 +70,10 @@ fn lower_complex_expression(
             string_data,
             layouts,
         ),
-        Expr::Call { .. } | Expr::StructLit { .. } | Expr::FieldAccess { .. } => lower_construct(
+        Expr::Call { .. }
+        | Expr::MethodCall { .. }
+        | Expr::StructLit { .. }
+        | Expr::FieldAccess { .. } => lower_construct(
             function,
             expression,
             locals,
@@ -140,6 +143,17 @@ fn lower_construct(
             string_data,
             layouts,
         ),
+        Expr::MethodCall { receiver, method, arguments, .. } => lower_method_call(
+            function,
+            receiver,
+            method,
+            arguments,
+            locals,
+            local_types,
+            functions,
+            string_data,
+            layouts,
+        ),
         Expr::StructLit { name, fields, .. } => lower_struct_literal(
             function,
             name,
@@ -162,6 +176,28 @@ fn lower_construct(
         ),
         _ => Err(NativeEmitError("unsupported native construct".to_owned())),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_method_call(
+    function: &mut FunctionBuilder<'_>,
+    receiver: &Expr,
+    method: &str,
+    arguments: &[crate::ast::Argument],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let named = arguments.iter().any(|argument| argument.name.is_some());
+    let mut combined = Vec::with_capacity(arguments.len() + 1);
+    combined.push(crate::ast::Argument {
+        name: named.then(|| "self".to_owned()),
+        expression: receiver.clone(),
+    });
+    combined.extend(arguments.iter().cloned());
+    lower_call(function, method, &combined, locals, local_types, functions, string_data, layouts)
 }
 
 fn lower_integer(
@@ -362,6 +398,9 @@ pub(super) fn initializer_type(
         }
         Expr::Call { callee, .. } => {
             functions.get(callee).map(|function| function.return_type).unwrap_or(NativeType::Int)
+        }
+        Expr::MethodCall { method, .. } => {
+            functions.get(method).map(|function| function.return_type).unwrap_or(NativeType::Int)
         }
         Expr::StructLit { name, .. } => layouts.type_for_name(name).unwrap_or(NativeType::Int),
         Expr::FieldAccess { object, field, .. } => expression_native_type(object, types, layouts)

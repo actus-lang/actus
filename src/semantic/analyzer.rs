@@ -54,6 +54,7 @@ impl Analyzer {
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         self.register_structs(program)?;
         self.register_declarations(program)?;
+        self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
         self.current_return_type = None;
         Ok(self.model)
@@ -194,6 +195,9 @@ impl Analyzer {
             }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
+            Expr::MethodCall { receiver, method, arguments, span } => {
+                self.visit_method_call(receiver, method, arguments, *span)
+            }
             Expr::StructLit { name, fields, span } => {
                 self.validate_struct_literal(name, fields, *span)
             }

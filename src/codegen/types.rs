@@ -20,8 +20,20 @@ impl NativeType {
         }
     }
 
-    pub(super) fn from_type_name(type_name: Option<&TypeName>) -> Self {
-        type_name.and_then(|type_name| Self::from_name(&type_name.name)).unwrap_or(Self::Int)
+    pub(super) fn from_name_with_layout(
+        name: &str,
+        layouts: &super::layout::LayoutRegistry,
+    ) -> Option<Self> {
+        Self::from_name(name).or_else(|| layouts.id_for(name).map(Self::Struct))
+    }
+
+    pub(super) fn from_type_name_with_layout(
+        type_name: Option<&TypeName>,
+        layouts: &super::layout::LayoutRegistry,
+    ) -> Self {
+        type_name
+            .and_then(|type_name| Self::from_name_with_layout(&type_name.name, layouts))
+            .unwrap_or(Self::Int)
     }
 
     pub(super) fn ir_type(self, pointer_type: Type) -> Type {

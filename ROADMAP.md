@@ -264,7 +264,7 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [x] Define struct declaration grammar and source-span rules.
 - [x] Parse named fields with explicit types.
 - [x] Parse struct literals and field initialization.
-- [ ] Parse field access and field assignment.
+- [x] Parse field access and field assignment.
 - [x] Represent structs and fields in the AST with dedicated modules.
 - [x] Reject duplicate struct and field names.
 - [x] Reject unknown fields and missing required fields.
@@ -296,12 +296,12 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [ ] Define packed and externally represented struct policies.
 - [x] Generate field-level cleanup in reverse declaration order.
 - [x] Handle moved and dropped fields without double cleanup.
-- [ ] Add layout and destruction golden tests.
+- [x] Add layout and destruction golden tests.
 
 ### Methods and Backend
 
-- [ ] Define struct method syntax and receiver roles.
-- [ ] Validate receiver ownership and borrow behavior.
+- [x] Define struct method syntax and receiver roles.
+- [x] Validate receiver ownership and borrow behavior.
 - [ ] Emit native struct layouts and declarations for the selected backend.
 - [x] Emit field access and initialization.
 - [x] Emit field assignment and cleanup.
