@@ -68,4 +68,7 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [ ] Define `Result[T, E]` as a standard enum.
 - [ ] Specify null-free propagation behavior for `Option` and `Result`.
 - [ ] Add compiler-facing AST and diagnostic examples using enum matching.
-- [ ] Add Cranelift execution tests for construction and matching.
+- [x] Add Cranelift lowering for discriminant branches and payload bindings.
+- [x] Add a native object regression test for enum construction and matching.
+- [ ] Define `Option[T]` and `Result[T, E]` as compiler-registered generic enums.
+- [ ] Add end-to-end executable tests for `Option` and `Result` construction and matching.

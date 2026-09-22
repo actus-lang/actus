@@ -5,6 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
+use super::case::lower_case;
 use super::enums::enum_expression_type;
 use super::expression_construct::lower_construct;
 use super::expression_literals::{lower_identifier, lower_integer, lower_string};
@@ -79,6 +80,16 @@ fn lower_complex_expression(
         | Expr::FieldAccess { .. } => lower_construct(
             function,
             expression,
+            locals,
+            local_types,
+            functions,
+            string_data,
+            layouts,
+        ),
+        Expr::Case { subject, branches, .. } => lower_case(
+            function,
+            subject,
+            branches,
             locals,
             local_types,
             functions,

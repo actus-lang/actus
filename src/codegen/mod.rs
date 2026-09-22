@@ -1,5 +1,6 @@
 mod abi;
 mod calls;
+mod case;
 mod cleanup;
 mod control_flow;
 mod declarations;
