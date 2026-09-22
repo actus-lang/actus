@@ -59,8 +59,15 @@ impl<'source> Scanner<'source> {
             ':' => self.push_simple(TokenKind::Colon, start),
             ',' => self.push_simple(TokenKind::Comma, start),
             ';' => self.push_simple(TokenKind::Semicolon, start),
+            '<' if self.match_character('=') => self.push_simple(TokenKind::LessEquals, start),
+            '<' => self.push_simple(TokenKind::LessThan, start),
             '=' if self.match_character('>') => self.push_simple(TokenKind::FatArrow, start),
+            '=' if self.match_character('=') => self.push_simple(TokenKind::DoubleEquals, start),
             '=' => self.push_simple(TokenKind::Equals, start),
+            '>' if self.match_character('=') => self.push_simple(TokenKind::GreaterEquals, start),
+            '>' => self.push_simple(TokenKind::GreaterThan, start),
+            '!' if self.match_character('=') => self.push_simple(TokenKind::BangEquals, start),
+            '!' => self.push_simple(TokenKind::Bang, start),
             '+' => self.push_simple(TokenKind::Plus, start),
             '-' if self.match_character('>') => {
                 self.push_simple(TokenKind::Arrow, start);
