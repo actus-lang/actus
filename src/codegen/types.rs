@@ -14,6 +14,7 @@ impl NativeType {
     pub(super) fn from_name(name: &str) -> Option<Self> {
         match lookup_builtin_type(name)? {
             BuiltinType::Int => Some(Self::Int),
+            BuiltinType::Bool => Some(Self::Int),
             BuiltinType::String => Some(Self::String),
             BuiltinType::Buffer => Some(Self::Buffer),
             BuiltinType::Array | BuiltinType::Map => None,

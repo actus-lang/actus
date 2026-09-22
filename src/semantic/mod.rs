@@ -3,6 +3,8 @@ mod borrowing;
 mod call_arguments;
 mod calls;
 mod cleanup;
+mod enum_registry;
+mod enums;
 mod errors;
 mod intrinsics;
 mod methods;

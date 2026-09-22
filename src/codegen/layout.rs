@@ -125,6 +125,7 @@ impl LayoutRegistry {
         if let Some(ty) = lookup_builtin_type(name) {
             return match ty {
                 BuiltinType::Int => Ok(NativeType::Int),
+                BuiltinType::Bool => Ok(NativeType::Int),
                 BuiltinType::String => Ok(NativeType::String),
                 BuiltinType::Buffer => Ok(NativeType::Buffer),
                 BuiltinType::Array | BuiltinType::Map => {
