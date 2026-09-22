@@ -266,13 +266,13 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [x] Parse struct literals and field initialization.
 - [ ] Parse field access and field assignment.
 - [x] Represent structs and fields in the AST with dedicated modules.
-- [ ] Reject duplicate struct and field names.
-- [ ] Reject unknown fields and missing required fields.
+- [x] Reject duplicate struct and field names.
+- [x] Reject unknown fields and missing required fields.
 
 ### Semantic Model
 
-- [ ] Add a type environment for struct declarations.
-- [ ] Validate field types and recursive type references.
+- [x] Add a type environment for struct declarations.
+- [x] Validate field types and recursive type references.
 - [ ] Define field visibility and access rules.
 - [ ] Define ownership semantics for `erg`, `abs`, and `dat` fields.
 - [ ] Define move semantics for whole structs and individual fields.

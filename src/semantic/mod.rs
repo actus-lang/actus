@@ -7,6 +7,7 @@ mod intrinsics;
 mod model;
 mod ownership;
 mod scopes;
+mod structs;
 mod types;
 
 pub use analyzer::analyze;

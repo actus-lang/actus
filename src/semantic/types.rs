@@ -10,7 +10,7 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if lookup_builtin_type(name).is_some() {
+        if lookup_builtin_type(name).is_some() || self.struct_types.contains_key(name) {
             return Ok(());
         }
         Err(SemanticError { kind: SemanticErrorKind::UnknownType { name: name.to_owned() }, span })
@@ -37,6 +37,21 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let Some(expected_name) = declared_type else { return Ok(()) };
+        if self.struct_types.contains_key(expected_name) {
+            let found =
+                self.expression_struct_type(initializer).unwrap_or_else(|| "unknown".to_owned());
+            if found != expected_name {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::BindingTypeMismatch {
+                        binding: name.to_owned(),
+                        expected: expected_name.to_owned(),
+                        found,
+                    },
+                    span,
+                });
+            }
+            return Ok(());
+        }
         let Some(found) = self.expression_type(initializer) else { return Ok(()) };
         let expected = lookup_builtin_type(expected_name).expect("declared type was validated");
         self.ensure_binding_type(name, expected, found, span)
@@ -93,7 +108,11 @@ impl Analyzer {
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },
-            Expr::StructLit { .. } | Expr::FieldAccess { .. } => None,
+            Expr::StructLit { .. } => None,
+            Expr::FieldAccess { object, field, .. } => self
+                .expression_struct_type(object)
+                .and_then(|name| self.struct_field(&name, field))
+                .and_then(|field| lookup_builtin_type(&field.ty.name)),
         }
     }
 }

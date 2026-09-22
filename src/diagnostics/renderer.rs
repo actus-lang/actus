@@ -77,6 +77,11 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
         SemanticErrorKind::UnknownType { .. } => "E1023",
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
+        SemanticErrorKind::DuplicateStructName { .. } => "E1029",
+        SemanticErrorKind::DuplicateStructField { .. } => "E1030",
+        SemanticErrorKind::UnknownStructField { .. } => "E1031",
+        SemanticErrorKind::MissingStructField { .. } => "E1032",
+        SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
@@ -148,6 +153,23 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
         SemanticErrorKind::DuplicateVerbName { name } => {
             format!("duplicate verb declaration `{name}`")
+        }
+        SemanticErrorKind::DuplicateStructName { name } => {
+            format!("duplicate struct declaration `{name}`")
+        }
+        SemanticErrorKind::DuplicateStructField { struct_name, field } => {
+            format!("duplicate field `{field}` in struct `{struct_name}`")
+        }
+        SemanticErrorKind::UnknownStructField { struct_name, field } => {
+            format!("unknown field `{field}` on struct `{struct_name}`")
+        }
+        SemanticErrorKind::MissingStructField { struct_name, field } => {
+            format!("missing field `{field}` in `{struct_name}` initializer")
+        }
+        SemanticErrorKind::StructFieldTypeMismatch { struct_name, field, expected, found } => {
+            format!(
+                "type mismatch for field `{field}` in `{struct_name}`: expected `{expected}`, found `{found}`"
+            )
         }
         SemanticErrorKind::TypeMismatch { callee, parameter, expected, found } => format!(
             "type mismatch for `{parameter}` in `{callee}`: expected `{expected}`, found `{found}`"
