@@ -91,10 +91,8 @@ This future layout is descriptive, not an immediate implementation task.
 - Use `unit` for compiler-level independently compiled components.
 - Use `stdlib` for the official library family and `core`, `alloc`, and `std`
   for its layers.
-- Use `target` for platform configuration, not for individual boards or
-  hardware drivers.
-- Keep board support and platform-specific runtime code behind target or
-  library boundaries; do not place it in the language frontend.
+- Use `target` for compilation platform configuration and runtime contracts.
+- Keep platform-specific implementation outside the language frontend.
 
 ## Consequences
 

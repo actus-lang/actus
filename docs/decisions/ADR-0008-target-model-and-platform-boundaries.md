@@ -6,10 +6,10 @@
 
 ## Context
 
-Actus must support hosted systems and bare-metal platforms without coupling
-the compiler frontend to a particular operating system, microcontroller, or
-development board. A target describes compilation requirements; it must not
-become a container for board-specific hardware behavior.
+Actus must support hosted systems and freestanding platforms without coupling
+the compiler frontend to a particular operating system or external hardware
+project. A target describes compilation requirements and platform runtime
+contracts; it does not contain external library implementations.
 
 ## Decision
 
@@ -35,12 +35,12 @@ program:
 - hosted or freestanding environment;
 - calling convention and ABI;
 - pointer width and fundamental layout rules;
-- linker driver and linker inputs;
+- linker command and linker inputs;
 - startup contract;
 - runtime and standard-library capabilities.
 
 For example, `armv7m` identifies a Cortex-M-class architecture. It does not
-identify STM32, RP2040, RP2350, or any other concrete board.
+identify any concrete hardware configuration.
 
 An indicative target specification is:
 

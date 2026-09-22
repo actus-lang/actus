@@ -46,11 +46,11 @@ implicitly promoted to a unit merely because it has its own directory.
 Actus uses `::` for module and namespace paths:
 
 ```act
-import driver::gpio;
-import driver::uart as serial;
+import system::io;
+import protocol::codec as codec;
 
-gpio::set_high();
-serial::write(packet);
+io::read(buffer);
+codec::encode(packet);
 ```
 
 The final path segment becomes the default namespace name. The `as` clause
@@ -59,8 +59,8 @@ imports:
 
 ```act
 import {
-    driver::gpio,
-    driver::uart as serial,
+    system::io,
+    protocol::codec as codec,
 };
 ```
 
@@ -109,4 +109,3 @@ compiler is self-hosting and an independent compilation boundary is useful.
 Explicit manifest declarations make the build graph predictable and prevent
 accidental units. The separate terms also allow Actus imports, Arca package
 publishing, and future compiler decomposition to evolve independently.
-

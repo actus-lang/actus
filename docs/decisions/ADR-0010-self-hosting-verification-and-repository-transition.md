@@ -100,12 +100,11 @@ Every step requires a passing bootstrap build and a rollback path.
 ## Non-Goals
 
 This decision does not require the current compiler to be split now. It does
-not define target-specific hardware projects, drivers, or SDK structure.
-Those concerns remain outside the Actus language repository architecture.
+not define external platform libraries or SDK structure. Those concerns remain
+outside the Actus language repository architecture.
 
 ## Consequences
 
 The current Rust monolith remains a stable and inspectable bootstrap base.
 Repository decomposition becomes an evidence-based consequence of a working
 self-hosted compiler rather than a speculative architectural exercise.
-
