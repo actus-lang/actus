@@ -223,7 +223,9 @@ impl Analyzer {
                 self.model.bindings[index].role == Role::Abs
                     && !matches!(
                         self.model.bindings[index].state,
-                        BindingState::Moved | BindingState::Dropped
+                        BindingState::PartiallyMoved { .. }
+                            | BindingState::Moved
+                            | BindingState::Dropped
                     )
             }
             Expr::Borrow { expression, .. } => self.is_owner_argument(expression),
@@ -236,6 +238,9 @@ impl Analyzer {
         expression: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if let Expr::FieldAccess { object, field, .. } = expression {
+            return self.move_struct_field(object, field, span);
+        }
         let Expr::Identifier { name, span: identifier_span } = expression else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidDatArgument { name: "expression".to_owned() },
@@ -260,7 +265,7 @@ impl Analyzer {
                     span,
                 });
             }
-            BindingState::Moved | BindingState::Dropped => {
+            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
                     span,
@@ -268,6 +273,64 @@ impl Analyzer {
             }
         }
         Ok(())
+    }
+
+    fn move_struct_field(
+        &mut self,
+        object: &Expr,
+        field: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Expr::Identifier { name, span: object_span } = object else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
+                span,
+            });
+        };
+        let index = self.binding(name, *object_span)?;
+        let Some(struct_name) = self.expression_struct_type(object) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
+                span,
+            });
+        };
+        let Some(struct_field) = self.struct_field(&struct_name, field).cloned() else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownStructField {
+                    struct_name,
+                    field: field.to_owned(),
+                },
+                span,
+            });
+        };
+        if !matches!(struct_field.role, crate::ast::StructFieldRole::Erg) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
+                span,
+            });
+        }
+        match &mut self.model.bindings[index].state {
+            BindingState::Active => {
+                self.model.bindings[index].state =
+                    BindingState::PartiallyMoved { fields: vec![field.to_owned()] };
+                Ok(())
+            }
+            BindingState::Frozen { .. } => Err(SemanticError {
+                kind: SemanticErrorKind::MoveFrozen {
+                    name: name.clone(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span,
+            }),
+            BindingState::PartiallyMoved { .. } | BindingState::Moved => Err(SemanticError {
+                kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                span,
+            }),
+            BindingState::Dropped => Err(SemanticError {
+                kind: SemanticErrorKind::UseAfterDrop { name: name.clone() },
+                span,
+            }),
+        }
     }
 }
 

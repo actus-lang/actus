@@ -30,7 +30,7 @@ impl Analyzer {
                     span,
                 });
             }
-            BindingState::Moved | BindingState::Dropped => {
+            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
                     span,
@@ -86,7 +86,7 @@ impl Analyzer {
                     span: *span,
                 });
             }
-            BindingState::Moved | BindingState::Dropped => {}
+            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {}
         }
         self.plan_return_unwind(statement_span);
         Ok(())
@@ -120,6 +120,10 @@ impl Analyzer {
             }),
             BindingState::Dropped => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterDrop { name: name.to_owned() },
+                span,
+            }),
+            BindingState::PartiallyMoved { .. } => Err(SemanticError {
+                kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
                 span,
             }),
             BindingState::Active | BindingState::Frozen { .. } => Ok(()),
@@ -169,7 +173,7 @@ impl Analyzer {
                     span,
                 });
             }
-            BindingState::Moved | BindingState::Dropped => {
+            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::DoubleDrop { name: name.to_owned() },
                     span,
@@ -209,7 +213,10 @@ impl Analyzer {
     pub(super) fn blocking_borrow_ids(&self, index: usize) -> Vec<usize> {
         match &self.model.bindings[index].state {
             BindingState::Frozen { borrow_ids } => borrow_ids.clone(),
-            BindingState::Active | BindingState::Moved | BindingState::Dropped => Vec::new(),
+            BindingState::Active
+            | BindingState::PartiallyMoved { .. }
+            | BindingState::Moved
+            | BindingState::Dropped => Vec::new(),
         }
     }
 }

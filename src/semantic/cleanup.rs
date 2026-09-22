@@ -51,7 +51,12 @@ pub(super) fn plan_scope_cleanup(
     actions.extend(binding_indices.iter().rev().filter_map(|index| {
         let binding = &bindings[*index];
         let owned = matches!(binding.role, Role::Erg | Role::Dat);
-        let live = matches!(binding.state, BindingState::Active | BindingState::Frozen { .. });
+        let live = matches!(
+            binding.state,
+            BindingState::Active
+                | BindingState::Frozen { .. }
+                | BindingState::PartiallyMoved { .. }
+        );
         (owned && live).then_some(CleanupAction::DropBinding { binding_index: *index })
     }));
     ScopeCleanup { depth, span, actions }

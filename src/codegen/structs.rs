@@ -181,9 +181,25 @@ pub(super) fn emit_struct_drop(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
+    emit_struct_drop_except(function, address, id, &[], functions, layouts)
+}
+
+fn emit_struct_drop_except(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    id: usize,
+    moved_fields: &[String],
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     let layout =
         layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing drop layout `{id}`")))?;
-    for field in layout.fields.iter().rev().filter(|field| field.owned) {
+    for field in layout
+        .fields
+        .iter()
+        .rev()
+        .filter(|field| field.owned && !moved_fields.iter().any(|moved| moved == &field.name))
+    {
         let field_address = function.ins().iadd_imm_s(address, i64::from(field.offset));
         match field.ty {
             NativeType::Buffer => {
@@ -201,12 +217,42 @@ pub(super) fn emit_struct_drop(
                 function.ins().call(target.reference, &[handle]);
             }
             NativeType::Struct(nested_id) => {
-                emit_struct_drop(function, field_address, nested_id, functions, layouts)?;
+                emit_struct_drop_except(
+                    function,
+                    field_address,
+                    nested_id,
+                    &[],
+                    functions,
+                    layouts,
+                )?;
             }
             NativeType::Int | NativeType::String => {}
         }
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn emit_partial_binding_drop(
+    function: &mut FunctionBuilder<'_>,
+    name: &str,
+    moved_fields: &[String],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let Some(NativeType::Struct(id)) =
+        types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
+    else {
+        return Ok(());
+    };
+    let address = locals
+        .iter()
+        .find(|(binding, _)| binding.as_str() == name)
+        .map(|(_, value)| *value)
+        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+    emit_struct_drop_except(function, address, id, moved_fields, functions, layouts)
 }
 
 #[allow(clippy::too_many_arguments)]

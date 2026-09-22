@@ -43,7 +43,7 @@ impl Analyzer {
                     BindingState::Frozen { borrow_ids: vec![borrow_id] }
             }
             BindingState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
-            BindingState::Moved | BindingState::Dropped => {}
+            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {}
         }
     }
 }

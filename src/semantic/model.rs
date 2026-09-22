@@ -5,6 +5,7 @@ use crate::lexer::SourceSpan;
 pub enum BindingState {
     Active,
     Frozen { borrow_ids: Vec<usize> },
+    PartiallyMoved { fields: Vec<String> },
     Moved,
     Dropped,
 }

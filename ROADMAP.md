@@ -275,8 +275,8 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [x] Validate field types and recursive type references.
 - [ ] Define field visibility and access rules.
 - [ ] Define ownership semantics for `erg`, `abs`, and `dat` fields.
-- [ ] Define move semantics for whole structs and individual fields.
-- [ ] Reject partial use after moving a field.
+- [x] Define move semantics for whole structs and individual fields.
+- [x] Reject partial use after moving a field.
 - [x] Define and enforce struct initialization invariants.
 - [ ] Define copy, move, and assignment behavior explicitly.
 
@@ -295,7 +295,7 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 - [x] Define size, alignment, and padding rules.
 - [ ] Define packed and externally represented struct policies.
 - [x] Generate field-level cleanup in reverse declaration order.
-- [ ] Handle moved and dropped fields without double cleanup.
+- [x] Handle moved and dropped fields without double cleanup.
 - [ ] Add layout and destruction golden tests.
 
 ### Methods and Backend

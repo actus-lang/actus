@@ -55,3 +55,13 @@ fn executes_nested_struct_access_and_owned_drop() {
         42,
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn avoids_double_drop_after_moving_owned_field() {
+    build_and_run(
+        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: allocate(4), value: 42, }; consume(payload: holder.payload); return 42; }\n",
+        "partial-move",
+        42,
+    );
+}

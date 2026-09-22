@@ -81,6 +81,17 @@ fn emit_scope_instructions(
             NativeInstruction::DropBinding { name, .. } => {
                 emit_binding_drop(function, name, locals, types, functions, layouts)?;
             }
+            NativeInstruction::DropBindingFields { name, moved_fields, .. } => {
+                super::structs::emit_partial_binding_drop(
+                    function,
+                    name,
+                    moved_fields,
+                    locals,
+                    types,
+                    functions,
+                    layouts,
+                )?;
+            }
         }
     }
     Ok(())
