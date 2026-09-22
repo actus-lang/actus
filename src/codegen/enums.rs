@@ -9,6 +9,7 @@ use super::enum_layout::{EnumFieldLayout, EnumVariantLayout};
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::structs::emit_struct_drop;
 use super::types::NativeType;
@@ -27,6 +28,7 @@ pub(super) fn lower_enum_constructor(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -55,6 +57,7 @@ pub(super) fn lower_enum_constructor(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )?;

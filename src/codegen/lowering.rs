@@ -17,7 +17,7 @@ use super::structs::{emit_binding_drop, lower_field_assignment};
 use super::types::NativeType;
 
 #[derive(Clone, Copy)]
-enum Flow {
+pub(super) enum Flow {
     Fallthrough,
     Return(cranelift_codegen::ir::Value),
     Break,
@@ -66,6 +66,44 @@ pub(super) fn lower_body(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub(super) fn lower_case_block<'source>(
+    function: &mut FunctionBuilder<'_>,
+    block: &'source crate::ast::Block,
+    locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
+    let mut branch_locals = locals.clone();
+    let mut branch_types = types.clone();
+    let flow = lower_statements(
+        function,
+        &block.statements,
+        &mut branch_locals,
+        &mut branch_types,
+        functions,
+        None,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    if matches!(flow, Flow::Fallthrough) {
+        emit_scope_cleanup(
+            function,
+            cleanup_schedule,
+            block,
+            &branch_locals,
+            &branch_types,
+            functions,
+            layouts,
+        )?;
+    }
+    Ok(flow)
+}
+
+#[allow(clippy::too_many_arguments)]
 fn lower_statements<'source>(
     function: &mut FunctionBuilder<'_>,
     statements: &'source [Stmt],
@@ -110,10 +148,10 @@ fn lower_statement<'source>(
 ) -> Result<Flow, NativeEmitError> {
     match statement {
         Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, ty, initializer, .. } =>
-            lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions, string_data, layouts),
-        Stmt::Assignment { name, value, .. } => lower_assignment(function, name, value, locals, types, functions, string_data, layouts),
+            lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions, cleanup_schedule, string_data, layouts),
+        Stmt::Assignment { name, value, .. } => lower_assignment(function, name, value, locals, types, functions, cleanup_schedule, string_data, layouts),
         Stmt::FieldAssignment { object, field, value, .. } => lower_field_assignment(
-            function, object, field, value, locals, types, functions, string_data, layouts,
+            function, object, field, value, locals, types, functions, cleanup_schedule, string_data, layouts,
         )
         .map(|()| Flow::Fallthrough),
         Stmt::Return { value: Some(expression), span } =>
@@ -122,7 +160,7 @@ fn lower_statement<'source>(
             Err(NativeEmitError("native function requires a return value".to_owned()))
         }
         Stmt::Expression { expression, .. } => {
-            lower_expression(function, expression, locals, types, functions, string_data, layouts)?;
+            lower_expression(function, expression, locals, types, functions, cleanup_schedule, string_data, layouts)?;
             Ok(Flow::Fallthrough)
         }
         Stmt::Drop { name, .. } => lower_drop(function, name, locals, types, functions, layouts),
@@ -154,11 +192,20 @@ fn lower_owner_declaration<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value =
-        lower_expression(function, initializer, locals, types, functions, string_data, layouts)?;
+    let value = lower_expression(
+        function,
+        initializer,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     locals.insert(name, value);
     let native_type = declared_type
         .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)))
@@ -175,11 +222,20 @@ fn lower_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value =
-        lower_expression(function, expression, locals, types, functions, string_data, layouts)?;
+    let value = lower_expression(
+        function,
+        expression,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     locals.insert(name, value);
     Ok(Flow::Fallthrough)
 }
@@ -196,8 +252,16 @@ fn lower_return(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value =
-        lower_expression(function, expression, locals, types, functions, string_data, layouts)?;
+    let value = lower_expression(
+        function,
+        expression,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
     Ok(Flow::Return(value))
 }

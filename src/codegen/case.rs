@@ -8,6 +8,7 @@ use crate::ast::{CaseBody, Expr, Pattern, VariantPayload};
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::lowering::{Flow, lower_case_block};
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
@@ -19,18 +20,60 @@ pub(super) fn lower_case(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &super::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let subject_value =
-        lower_expression(function, subject, locals, local_types, functions, string_data, layouts)?;
+    let subject_value = lower_expression(
+        function,
+        subject,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     let result_type = branch_type(branches, local_types, functions, layouts);
     let merge = function.create_block();
     function.append_block_param(merge, result_type.ir_type(layouts.pointer_type));
     let subject_type = initializer_type(subject, local_types, functions, layouts);
+    emit_case_branches(
+        function,
+        branches,
+        subject_value,
+        subject_type,
+        result_type,
+        merge,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    function.switch_to_block(merge);
+    function.seal_block(merge);
+    Ok(function.block_params(merge)[0])
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_case_branches(
+    function: &mut FunctionBuilder<'_>,
+    branches: &[crate::ast::CaseBranch],
+    subject_value: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    result_type: NativeType,
+    merge: cranelift_codegen::ir::Block,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &super::model::NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     let next_blocks =
         (0..branches.len().saturating_sub(1)).map(|_| function.create_block()).collect::<Vec<_>>();
-
     for (index, branch) in branches.iter().enumerate() {
         let matched = function.create_block();
         let following = next_blocks.get(index).copied().unwrap_or(merge);
@@ -52,6 +95,7 @@ pub(super) fn lower_case(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )?;
@@ -65,7 +109,7 @@ pub(super) fn lower_case(
     }
     function.switch_to_block(merge);
     function.seal_block(merge);
-    Ok(function.block_params(merge)[0])
+    Ok(())
 }
 
 fn branch_type(
@@ -139,25 +183,45 @@ fn lower_case_branch<'a>(
     locals: &HashMap<&'a String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &super::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let branch_locals =
         bind_payload(function, subject, subject_type, branch, locals, local_types, layouts)?;
-    let CaseBody::Expression(expression) = &branch.body else {
-        return Err(NativeEmitError(
-            "native case block bodies are not lowered yet; use expression branches".to_owned(),
-        ));
+    let branch_value = match &branch.body {
+        CaseBody::Expression(expression) => lower_expression(
+            function,
+            expression,
+            &branch_locals.0,
+            &branch_locals.1,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?,
+        CaseBody::Block(block) => match lower_case_block(
+            function,
+            block,
+            &branch_locals.0,
+            &branch_locals.1,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )? {
+            Flow::Return(value) => value,
+            Flow::Fallthrough => {
+                return Err(NativeEmitError(
+                    "case block must produce a value with return".to_owned(),
+                ));
+            }
+            Flow::Break | Flow::Continue => {
+                return Err(NativeEmitError("loop control escaped case block".to_owned()));
+            }
+        },
     };
-    lower_expression(
-        function,
-        expression,
-        &branch_locals.0,
-        &branch_locals.1,
-        functions,
-        string_data,
-        layouts,
-    )
+    Ok(branch_value)
 }
 
 fn bind_payload<'a>(

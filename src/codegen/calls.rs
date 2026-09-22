@@ -8,6 +8,7 @@ use crate::ast::{Argument, Expr, IntrinsicKind, lookup_call_intrinsic};
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
@@ -20,6 +21,7 @@ pub(super) fn lower_method_call(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -28,7 +30,17 @@ pub(super) fn lower_method_call(
     combined
         .push(Argument { name: named.then(|| "self".to_owned()), expression: receiver.clone() });
     combined.extend(arguments.iter().cloned());
-    lower_call(function, method, &combined, locals, local_types, functions, string_data, layouts)
+    lower_call(
+        function,
+        method,
+        &combined,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -39,6 +51,7 @@ pub(super) fn lower_call(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -52,6 +65,7 @@ pub(super) fn lower_call(
         locals,
         local_types,
         functions,
+        cleanup_schedule,
         string_data,
         layouts,
     )?;
@@ -73,6 +87,7 @@ fn lower_call_arguments(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Vec<cranelift_codegen::ir::Value>, NativeEmitError> {
@@ -85,6 +100,7 @@ fn lower_call_arguments(
                 locals,
                 local_types,
                 functions,
+                cleanup_schedule,
                 string_data,
                 layouts,
             )

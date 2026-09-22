@@ -8,6 +8,7 @@ use crate::ast::{BinaryOp, Expr, UnaryOp};
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
@@ -18,6 +19,7 @@ pub(super) fn lower_operation(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -29,6 +31,7 @@ pub(super) fn lower_operation(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -40,6 +43,7 @@ pub(super) fn lower_operation(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -55,6 +59,7 @@ fn lower_unary(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -64,6 +69,7 @@ fn lower_unary(
         locals,
         local_types,
         functions,
+        cleanup_schedule,
         string_data,
         layouts,
     )?;
@@ -81,13 +87,30 @@ fn lower_binary(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let left =
-        lower_expression(function, left, locals, local_types, functions, string_data, layouts)?;
-    let right =
-        lower_expression(function, right, locals, local_types, functions, string_data, layouts)?;
+    let left = lower_expression(
+        function,
+        left,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let right = lower_expression(
+        function,
+        right,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     Ok(match operator {
         BinaryOp::Add => function.ins().iadd(left, right),
         BinaryOp::Subtract => function.ins().isub(left, right),

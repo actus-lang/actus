@@ -12,6 +12,7 @@ use super::expression_literals::{lower_identifier, lower_integer, lower_string};
 use super::expression_operations::lower_operation;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::structs::{expression_native_type, field_type};
 use super::types::NativeType;
@@ -23,6 +24,7 @@ pub(super) fn lower_expression(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -39,6 +41,7 @@ pub(super) fn lower_expression(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -48,6 +51,7 @@ pub(super) fn lower_expression(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -61,6 +65,7 @@ fn lower_complex_expression(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -71,6 +76,7 @@ fn lower_complex_expression(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -83,6 +89,7 @@ fn lower_complex_expression(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -93,6 +100,7 @@ fn lower_complex_expression(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),

@@ -8,6 +8,7 @@ use super::calls::{lower_call, lower_method_call};
 use super::enums::{enum_receiver_name, lower_enum_constructor};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::structs::{lower_field_access, lower_struct_literal};
 use super::types::NativeType;
@@ -19,6 +20,7 @@ pub(super) fn lower_construct(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -30,6 +32,7 @@ pub(super) fn lower_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -41,9 +44,36 @@ pub(super) fn lower_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
+        Expr::StructLit { .. } | Expr::FieldAccess { .. } => lower_data_construct(
+            function,
+            expression,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
+        _ => Err(NativeEmitError("unsupported native construct".to_owned())),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_data_construct(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    match expression {
         Expr::StructLit { name, fields, .. } => lower_struct_literal(
             function,
             name,
@@ -51,6 +81,7 @@ pub(super) fn lower_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
@@ -61,10 +92,11 @@ pub(super) fn lower_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         ),
-        _ => Err(NativeEmitError("unsupported native construct".to_owned())),
+        _ => Err(NativeEmitError("unsupported data construct".to_owned())),
     }
 }
 
@@ -77,6 +109,7 @@ fn lower_method_construct(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -92,6 +125,7 @@ fn lower_method_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )
@@ -104,6 +138,7 @@ fn lower_method_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )
@@ -118,6 +153,7 @@ fn lower_field_construct(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -130,6 +166,7 @@ fn lower_field_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )
@@ -141,6 +178,7 @@ fn lower_field_construct(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )

@@ -9,6 +9,7 @@ use super::expressions::emit_buffer_drop;
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
@@ -20,6 +21,7 @@ pub(super) fn lower_struct_literal(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -42,6 +44,7 @@ pub(super) fn lower_struct_literal(
             locals,
             local_types,
             functions,
+            cleanup_schedule,
             string_data,
             layouts,
         )?;
@@ -66,6 +69,7 @@ pub(super) fn lower_field_access(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -76,6 +80,7 @@ pub(super) fn lower_field_access(
         locals,
         local_types,
         functions,
+        cleanup_schedule,
         string_data,
         layouts,
     )?;
@@ -99,6 +104,7 @@ pub(super) fn lower_field_assignment(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
@@ -109,11 +115,20 @@ pub(super) fn lower_field_assignment(
         locals,
         local_types,
         functions,
+        cleanup_schedule,
         string_data,
         layouts,
     )?;
-    let value =
-        lower_expression(function, value, locals, local_types, functions, string_data, layouts)?;
+    let value = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
         let size = layouts
             .type_size(field_layout.ty)
@@ -134,6 +149,7 @@ fn lower_field_address(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(cranelift_codegen::ir::Value, super::layout::FieldLayout), NativeEmitError> {
@@ -150,8 +166,16 @@ fn lower_field_address(
         .find(|candidate| candidate.name == field)
         .cloned()
         .ok_or_else(|| NativeEmitError(format!("unknown native field `{field}`")))?;
-    let address =
-        lower_expression(function, object, locals, local_types, functions, string_data, layouts)?;
+    let address = lower_expression(
+        function,
+        object,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
     Ok((address, field_layout))
 }
 
