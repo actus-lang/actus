@@ -58,7 +58,7 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [x] Define `case abs` inspection without consuming the matched value.
 - [x] Define `case dat` deconstruction as an ownership-consuming operation.
 - [x] Reject mutation through an `abs` pattern binding.
-- [ ] Track moved payload fields after `dat` deconstruction.
+- [x] Track moved payload fields after `dat` deconstruction.
 - [x] Apply deterministic cleanup to unmatched and consumed payloads.
 - [x] Add ownership, borrowing, and cleanup regression tests.
 

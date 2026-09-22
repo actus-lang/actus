@@ -179,3 +179,43 @@ fn gives_dat_payload_bindings_owned_cleanup() {
         })
     }));
 }
+
+#[test]
+fn tracks_partial_dat_payload_moves_without_double_drops() {
+    let model = analyze_source(
+        "enum Message { Move { payload: Buffer, keep: Buffer, }, } verb inspect(erg message: Message) { case dat message { Message.Move(payload: moved, keep: _) => { drop(moved); }, }; }",
+    )
+    .expect("partial dat payload moves should produce cleanup plans");
+    let subject_index =
+        model.bindings.iter().position(|binding| binding.name == "message").unwrap();
+    let moved_index = model.bindings.iter().position(|binding| binding.name == "moved").unwrap();
+    let payload_drops = model
+        .cleanup_plans
+        .iter()
+        .flat_map(|plan| plan.actions.iter())
+        .filter(|action| {
+            matches!(
+                action,
+                actus::semantic::CleanupAction::DropPayloadField {
+                    binding_index,
+                    enum_name,
+                    variant,
+                    field,
+                } if *binding_index == subject_index
+                    && enum_name == "Message"
+                    && variant == "Move"
+                    && field == "keep"
+            )
+        })
+        .count();
+    assert_eq!(payload_drops, 1);
+    assert!(!model.cleanup_plans.iter().any(|plan| {
+        plan.actions.iter().any(|action| {
+            matches!(
+                action,
+                actus::semantic::CleanupAction::DropBinding { binding_index }
+                    if *binding_index == moved_index
+            )
+        })
+    }));
+}

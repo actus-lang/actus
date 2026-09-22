@@ -13,6 +13,7 @@ pub(super) struct ScopeFrame {
     pub(super) bindings: HashMap<String, usize>,
     pub(super) borrow_ids: Vec<usize>,
     pub(super) declaration_indices: Vec<usize>,
+    pub(super) payload_cleanup: Vec<(usize, String, String, String)>,
 }
 
 pub(super) struct Analyzer {

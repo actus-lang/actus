@@ -44,6 +44,9 @@ impl Analyzer {
             self.validate_pattern(&branch.pattern, &subject_type, subject)?;
             self.enter_scope(branch.span);
             self.bind_pattern_variables(&branch.pattern, mode)?;
+            if mode == crate::ast::CaseMode::Dat {
+                self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
+            }
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
         }

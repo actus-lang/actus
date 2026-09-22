@@ -47,7 +47,23 @@ impl Analyzer {
             bindings: std::collections::HashMap::new(),
             borrow_ids: Vec::new(),
             declaration_indices: Vec::new(),
+            payload_cleanup: Vec::new(),
         });
+    }
+
+    pub(super) fn register_payload_cleanup(
+        &mut self,
+        binding_index: usize,
+        enum_name: String,
+        variant: String,
+        field: String,
+    ) {
+        self.scopes.last_mut().expect("payload cleanup requires a scope").payload_cleanup.push((
+            binding_index,
+            enum_name,
+            variant,
+            field,
+        ));
     }
 
     pub(super) fn leave_scope(&mut self) {
@@ -75,6 +91,7 @@ impl Analyzer {
             frame.span,
             &frame.declaration_indices,
             &frame.borrow_ids,
+            &frame.payload_cleanup,
             &self.model.bindings,
         ));
     }

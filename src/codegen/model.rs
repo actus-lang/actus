@@ -4,9 +4,25 @@ use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeInstruction {
-    EndBorrow { borrow_id: usize },
-    DropBinding { binding_index: usize, name: String },
-    DropBindingFields { binding_index: usize, name: String, moved_fields: Vec<String> },
+    EndBorrow {
+        borrow_id: usize,
+    },
+    DropPayloadField {
+        binding_index: usize,
+        name: String,
+        enum_name: String,
+        variant: String,
+        field: String,
+    },
+    DropBinding {
+        binding_index: usize,
+        name: String,
+    },
+    DropBindingFields {
+        binding_index: usize,
+        name: String,
+        moved_fields: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -111,6 +127,7 @@ fn validate_scope(
 ) -> Result<(), String> {
     let mut bindings = HashSet::new();
     let mut borrows = HashSet::new();
+    let mut payload_fields = HashSet::new();
     for action in &scope.actions {
         match action {
             CleanupAction::EndBorrow { borrow_id } => {
@@ -131,6 +148,14 @@ fn validate_scope(
                     return Err(format!("cleanup repeats binding `{binding_index}`"));
                 }
             }
+            CleanupAction::DropPayloadField { binding_index, field, .. } => {
+                if *binding_index >= model.bindings.len() {
+                    return Err(format!("cleanup references invalid binding `{binding_index}`"));
+                }
+                if !payload_fields.insert((*binding_index, field.clone())) {
+                    return Err(format!("cleanup repeats payload field `{field}`"));
+                }
+            }
         }
     }
     Ok(())
@@ -148,6 +173,15 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruct
     match action {
         CleanupAction::EndBorrow { borrow_id } => {
             NativeInstruction::EndBorrow { borrow_id: *borrow_id }
+        }
+        CleanupAction::DropPayloadField { binding_index, enum_name, variant, field } => {
+            NativeInstruction::DropPayloadField {
+                binding_index: *binding_index,
+                name: model.bindings[*binding_index].name.clone(),
+                enum_name: enum_name.clone(),
+                variant: variant.clone(),
+                field: field.clone(),
+            }
         }
         CleanupAction::DropBinding { binding_index } => {
             let binding = &model.bindings[*binding_index];

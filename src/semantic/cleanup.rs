@@ -7,6 +7,7 @@ use super::model::{Binding, BindingState};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CleanupAction {
     EndBorrow { borrow_id: usize },
+    DropPayloadField { binding_index: usize, enum_name: String, variant: String, field: String },
     DropBinding { binding_index: usize },
 }
 
@@ -41,6 +42,7 @@ pub(super) fn plan_scope_cleanup(
     span: SourceSpan,
     binding_indices: &[usize],
     borrow_ids: &[usize],
+    payload_cleanup: &[(usize, String, String, String)],
     bindings: &[Binding],
 ) -> ScopeCleanup {
     let mut actions = borrow_ids
@@ -48,6 +50,14 @@ pub(super) fn plan_scope_cleanup(
         .rev()
         .map(|borrow_id| CleanupAction::EndBorrow { borrow_id: *borrow_id })
         .collect::<Vec<_>>();
+    actions.extend(payload_cleanup.iter().rev().map(
+        |(binding_index, enum_name, variant, field)| CleanupAction::DropPayloadField {
+            binding_index: *binding_index,
+            enum_name: enum_name.clone(),
+            variant: variant.clone(),
+            field: field.clone(),
+        },
+    ));
     actions.extend(binding_indices.iter().rev().filter_map(|index| {
         let binding = &bindings[*index];
         let owned = matches!(binding.role, Role::Erg | Role::Dat);
@@ -75,6 +85,7 @@ impl Analyzer {
                     frame.span,
                     &frame.declaration_indices,
                     &frame.borrow_ids,
+                    &frame.payload_cleanup,
                     &self.model.bindings,
                 )
             })
@@ -106,6 +117,7 @@ impl Analyzer {
                     frame.span,
                     &frame.declaration_indices,
                     &frame.borrow_ids,
+                    &frame.payload_cleanup,
                     &self.model.bindings,
                 )
             })
