@@ -13,6 +13,7 @@ use crate::semantic::analyze;
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
+use super::layout::LayoutRegistry;
 use super::literals::{StringDataIds, declare_string_values, define_string_data};
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
@@ -65,7 +66,7 @@ pub fn emit_program_object_with_configuration(
         .iter()
         .filter_map(|declaration| match declaration {
             TopLevelDecl::Verb(verb) => Some(verb),
-            TopLevelDecl::ExternalVerb(_) => None,
+            TopLevelDecl::ExternalVerb(_) | TopLevelDecl::Struct(_) => None,
         })
         .collect::<Vec<_>>();
     let external_verbs = program
@@ -74,6 +75,7 @@ pub fn emit_program_object_with_configuration(
         .filter_map(|declaration| match declaration {
             TopLevelDecl::Verb(_) => None,
             TopLevelDecl::ExternalVerb(verb) => Some(verb),
+            TopLevelDecl::Struct(_) => None,
         })
         .collect::<Vec<_>>();
     if verbs.is_empty() {
@@ -82,17 +84,11 @@ pub fn emit_program_object_with_configuration(
     if !verbs.iter().any(|verb| verb.name == symbol) {
         return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
     }
-    for verb in &verbs {
-        validate_native_signature(verb).map_err(|error| NativeEmitError(error.to_string()))?;
-    }
-    for verb in &external_verbs {
-        validate_external_native_signature(verb)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
-    }
-    emit_verbs_object(&verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
+    emit_verbs_object(program, &verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
 }
 
 fn emit_verbs_object(
+    program: &Program,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     symbol: &str,
@@ -100,8 +96,17 @@ fn emit_verbs_object(
     configuration: &NativeBackendConfiguration,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
+    let layouts = LayoutRegistry::from_program(program, module.isa().pointer_type())?;
+    for verb in verbs {
+        validate_native_signature(verb, &layouts)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
+    for verb in external_verbs {
+        validate_external_native_signature(verb, &layouts)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
     let frontend_config = module.isa().frontend_config();
-    let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol)?;
+    let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol, &layouts)?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = metadata
@@ -130,6 +135,7 @@ fn emit_verbs_object(
             &functions,
             cleanup_schedule,
             &string_data,
+            &layouts,
         )?;
     }
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
@@ -152,6 +158,7 @@ fn create_module(
     Ok(ObjectModule::new(builder))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn define_function(
     module: &mut ObjectModule,
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
@@ -160,9 +167,11 @@ fn define_function(
     functions: &HashMap<String, FunctionMeta>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataIds,
+    layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = super::declarations::native_signature_for_definition(module, verb);
+    context.func.signature =
+        super::declarations::native_signature_for_definition(module, verb, layouts);
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let string_values = declare_string_values(module, &mut context.func, string_data);
     let mut function_context = FunctionBuilderContext::new();
@@ -179,7 +188,12 @@ fn define_function(
         let local_types = verb
             .params
             .iter()
-            .map(|parameter| (&parameter.name, NativeType::from_name(&parameter.ty.name).unwrap()))
+            .map(|parameter| {
+                (
+                    &parameter.name,
+                    NativeType::from_name_with_layout(&parameter.ty.name, layouts).unwrap(),
+                )
+            })
             .collect();
         function.seal_block(block);
         let result = lower_body(
@@ -190,6 +204,7 @@ fn define_function(
             &references,
             cleanup_schedule,
             &string_values,
+            layouts,
         )?;
         function.ins().return_(&[result]);
         function.finalize(frontend_config);

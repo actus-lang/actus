@@ -7,8 +7,11 @@ mod stmt;
 mod types;
 
 pub use abi::ForeignAbi;
-pub use decl::{ExternalVerbDecl, Param, Program, Role, TopLevelDecl, TypeName, VerbDecl};
-pub use expr::{Argument, BinaryOp, Expr, UnaryOp};
+pub use decl::{
+    ExternalVerbDecl, Param, Program, Role, StructDef, StructField, StructFieldRole, TopLevelDecl,
+    TypeName, VerbDecl,
+};
+pub use expr::{Argument, BinaryOp, Expr, StructFieldInit, UnaryOp};
 pub use intrinsic::{IntrinsicKind, IntrinsicSpec, lookup_call_intrinsic, lookup_intrinsic};
 pub use registry::RegistryStatus;
 pub use stmt::{Block, Stmt};

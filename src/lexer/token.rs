@@ -37,8 +37,10 @@ pub enum TokenKind {
     Loop,
     Break,
     Continue,
+    Struct,
     Identifier(String),
     Integer(String),
+    FloatLiteral(String),
     StringLiteral(String),
     LeftBrace,
     RightBrace,
@@ -53,5 +55,6 @@ pub enum TokenKind {
     Star,
     Slash,
     Arrow,
+    Dot,
     Eof,
 }

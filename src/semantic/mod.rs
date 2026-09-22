@@ -1,12 +1,15 @@
 mod analyzer;
 mod borrowing;
+mod call_arguments;
 mod calls;
 mod cleanup;
 mod errors;
 mod intrinsics;
+mod methods;
 mod model;
 mod ownership;
 mod scopes;
+mod structs;
 mod types;
 
 pub use analyzer::analyze;

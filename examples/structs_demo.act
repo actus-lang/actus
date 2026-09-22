@@ -1,0 +1,24 @@
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+struct Player {
+    position: Point,
+    score: Int,
+}
+
+verb total_score(abs self: Player) -> Int {
+    return self.position.x + self.position.y + self.score;
+}
+
+verb main() -> Int {
+    erg player = Player {
+        position: Point { x: 3, y: 4 },
+        score: 5,
+    };
+    player.position.x = 8;
+    erg result = player.total_score();
+    print(result);
+    return result;
+}

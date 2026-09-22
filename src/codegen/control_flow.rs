@@ -28,6 +28,7 @@ pub(super) fn assigned_outer_bindings(
             {
                 Some(name)
             }
+            Stmt::FieldAssignment { .. } => None,
             Stmt::Block(block) | Stmt::Loop(block) => {
                 names.extend(assigned_outer_bindings(&block.statements, locals));
                 None

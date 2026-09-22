@@ -6,6 +6,7 @@ use std::collections::HashSet;
 pub enum NativeInstruction {
     EndBorrow { borrow_id: usize },
     DropBinding { binding_index: usize, name: String },
+    DropBindingFields { binding_index: usize, name: String, moved_fields: Vec<String> },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -148,10 +149,22 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruct
         CleanupAction::EndBorrow { borrow_id } => {
             NativeInstruction::EndBorrow { borrow_id: *borrow_id }
         }
-        CleanupAction::DropBinding { binding_index } => NativeInstruction::DropBinding {
-            binding_index: *binding_index,
-            name: model.bindings[*binding_index].name.clone(),
-        },
+        CleanupAction::DropBinding { binding_index } => {
+            let binding = &model.bindings[*binding_index];
+            match &binding.state {
+                crate::semantic::BindingState::PartiallyMoved { fields } => {
+                    NativeInstruction::DropBindingFields {
+                        binding_index: *binding_index,
+                        name: binding.name.clone(),
+                        moved_fields: fields.clone(),
+                    }
+                }
+                _ => NativeInstruction::DropBinding {
+                    binding_index: *binding_index,
+                    name: binding.name.clone(),
+                },
+            }
+        }
     }
 }
 

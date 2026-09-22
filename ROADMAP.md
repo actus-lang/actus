@@ -248,7 +248,7 @@ Each phase is gated: implementation progress in a later phase may be preserved, 
 - [ ] Document ownership and cleanup semantics.
 - [ ] Document diagnostic error codes.
 - [ ] Document the compiler pipeline.
-- [ ] Add architecture decision records for major language decisions.
+- [x] Add architecture decision records for major language decisions.
 - [ ] Add contributor guidelines.
 - [ ] Add a code of conduct.
 - [ ] Add release and versioning policy.
@@ -261,51 +261,52 @@ Structs are intentionally deferred until the ownership, borrowing, and cleanup f
 
 ### Syntax and AST
 
-- [ ] Define struct declaration grammar and source-span rules.
-- [ ] Parse named fields with explicit types.
-- [ ] Parse struct literals and field initialization.
-- [ ] Parse field access and field assignment.
-- [ ] Represent structs and fields in the AST with dedicated modules.
-- [ ] Reject duplicate struct and field names.
-- [ ] Reject unknown fields and missing required fields.
+- [x] Define struct declaration grammar and source-span rules.
+- [x] Parse named fields with explicit types.
+- [x] Parse struct literals and field initialization.
+- [x] Parse field access and field assignment.
+- [x] Represent structs and fields in the AST with dedicated modules.
+- [x] Reject duplicate struct and field names.
+- [x] Reject unknown fields and missing required fields.
 
 ### Semantic Model
 
-- [ ] Add a type environment for struct declarations.
-- [ ] Validate field types and recursive type references.
+- [x] Add a type environment for struct declarations.
+- [x] Validate field types and recursive type references.
 - [ ] Define field visibility and access rules.
 - [ ] Define ownership semantics for `erg`, `abs`, and `dat` fields.
-- [ ] Define move semantics for whole structs and individual fields.
-- [ ] Reject partial use after moving a field.
-- [ ] Define and enforce struct initialization invariants.
+- [x] Define move semantics for whole structs and individual fields.
+- [x] Reject partial use after moving a field.
+- [x] Define and enforce struct initialization invariants.
 - [ ] Define copy, move, and assignment behavior explicitly.
 
 ### Borrowing and Lifetimes
 
-- [ ] Define whether Alpha structs may contain `abs` fields.
+- [x] Define whether Alpha structs may contain `abs` fields.
 - [ ] Reject self-referential and escaping borrow fields unless a lifetime model exists.
-- [ ] Reject storing lexical borrows in longer-lived structs.
-- [ ] Validate borrow access through struct fields.
-- [ ] Track field-level borrow records where supported.
-- [ ] Add diagnostics identifying the struct field and blocking borrow.
+- [x] Reject storing lexical borrows in longer-lived structs.
+- [x] Validate borrow access through struct fields.
+- [x] Track field-level borrow records where supported.
+- [x] Add diagnostics identifying the struct field and blocking borrow.
 
 ### Layout and Destruction
 
-- [ ] Define deterministic field declaration order.
-- [ ] Define size, alignment, and padding rules.
+- [x] Define deterministic field declaration order.
+- [x] Define size, alignment, and padding rules.
 - [ ] Define packed and externally represented struct policies.
-- [ ] Generate field-level cleanup in reverse declaration order.
-- [ ] Handle moved and dropped fields without double cleanup.
-- [ ] Add layout and destruction golden tests.
+- [x] Generate field-level cleanup in reverse declaration order.
+- [x] Handle moved and dropped fields without double cleanup.
+- [x] Add layout and destruction golden tests.
 
 ### Methods and Backend
 
-- [ ] Define struct method syntax and receiver roles.
-- [ ] Validate receiver ownership and borrow behavior.
+- [x] Define struct method syntax and receiver roles.
+- [x] Validate receiver ownership and borrow behavior.
 - [ ] Emit native struct layouts and declarations for the selected backend.
-- [ ] Emit field access, initialization, assignment, and cleanup.
+- [x] Emit field access and initialization.
+- [x] Emit field assignment and cleanup.
 - [ ] Define the C ABI contract for public structs.
-- [ ] Add generated native output and execution tests.
+- [x] Add generated native output and execution tests.
 
 ### Documentation and Compatibility
 

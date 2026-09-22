@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, Expr, Program, Role, Stmt, TopLevelDecl, lookup_builtin_type,
+    Block, BuiltinType, Expr, Program, Role, Stmt, StructDef, TopLevelDecl, lookup_builtin_type,
 };
 
 use super::errors::{SemanticError, SemanticErrorKind};
@@ -22,6 +22,8 @@ pub(super) struct Analyzer {
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
     pub(super) loop_boundaries: Vec<usize>,
     pub(super) current_return_type: Option<BuiltinType>,
+    pub(super) struct_types: HashMap<String, StructDef>,
+    pub(super) binding_struct_types: HashMap<usize, String>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -44,10 +46,21 @@ impl Analyzer {
             signatures: HashMap::new(),
             loop_boundaries: Vec::new(),
             current_return_type: None,
+            struct_types: HashMap::new(),
+            binding_struct_types: HashMap::new(),
         }
     }
 
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
+        self.register_structs(program)?;
+        self.register_declarations(program)?;
+        self.validate_method_declarations(program)?;
+        self.analyze_verbs(program)?;
+        self.current_return_type = None;
+        Ok(self.model)
+    }
+
+    fn register_declarations(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let (name, params, return_type, span, signature) = match declaration {
                 TopLevelDecl::Verb(verb) => {
@@ -56,6 +69,7 @@ impl Analyzer {
                 TopLevelDecl::ExternalVerb(verb) => {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
+                TopLevelDecl::Struct(_) => continue,
             };
             for parameter in params {
                 self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;
@@ -81,6 +95,10 @@ impl Analyzer {
             }
             self.signatures.insert(name.clone(), signature);
         }
+        Ok(())
+    }
+
+    fn analyze_verbs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Verb(verb) = declaration else { continue };
             self.current_return_type = verb
@@ -91,6 +109,7 @@ impl Analyzer {
             for parameter in &verb.params {
                 let ty = lookup_builtin_type(&parameter.ty.name);
                 self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
+                self.record_struct_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
             }
             self.visit_block(&verb.body)?;
             if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
@@ -101,8 +120,7 @@ impl Analyzer {
             }
             self.leave_scope();
         }
-        self.current_return_type = None;
-        Ok(self.model)
+        Ok(())
     }
 
     fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
@@ -124,13 +142,17 @@ impl Analyzer {
                 if *role == Role::Abs {
                     self.register_borrow(initializer, *span)?;
                 }
-                self.bind(role.clone(), name.clone(), binding_type, *span)
+                self.bind(role.clone(), name.clone(), binding_type, *span)?;
+                self.record_initializer_struct_type(name, initializer, *span)
             }
             Stmt::Assignment { name, value, span } => {
                 let index = self.binding(name, *span)?;
                 self.ensure_mutable(index, name, *span)?;
                 self.validate_binding_assignment(index, name, value, *span)?;
                 self.visit_expression(value)
+            }
+            Stmt::FieldAssignment { object, field, value, span } => {
+                self.validate_field_assignment(object, field, value, *span)
             }
             Stmt::Expression { expression, .. } => self.visit_expression(expression),
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
@@ -173,7 +195,17 @@ impl Analyzer {
             }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
-            Expr::Integer { .. } | Expr::StringLiteral { .. } => Ok(()),
+            Expr::MethodCall { receiver, method, arguments, span } => {
+                self.visit_method_call(receiver, method, arguments, *span)
+            }
+            Expr::StructLit { name, fields, span } => {
+                self.validate_struct_literal(name, fields, *span)
+            }
+            Expr::FieldAccess { object, field, span } => {
+                self.visit_expression(object)?;
+                self.validate_field_access(object, field, *span)
+            }
+            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
     }
 }

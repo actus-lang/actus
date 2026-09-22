@@ -1,14 +1,17 @@
 mod abi;
+mod calls;
 mod cleanup;
 mod control_flow;
 mod declarations;
 mod expressions;
+mod layout;
 mod linker;
 mod literals;
 mod lowering;
 mod model;
 mod native;
 mod native_runtime;
+mod structs;
 mod types;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};

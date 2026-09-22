@@ -2,13 +2,18 @@
 
 **Actus is a low-level systems language built around explicit semantic roles, deterministic ownership, and a small safety core.**
 
+Actus is a low-level language that makes ownership roles, borrowing boundaries,
+task lifetimes, and cleanup behavior explicit without requiring garbage
+collection or user-written lifetime annotations.
+
 ## 1. The Core Idea
 
 Actus expresses how a value participates in an operation through three roles:
 
 - `erg` — an owned, exclusive binding that may read, mutate, borrow, move, or be dropped;
 - `abs` — a temporary shared, read-only borrow;
-- `dat` — an owned value received through linear ownership transfer.
+- `dat` — an ownership transfer role: the caller binding becomes `Moved`, and
+  the callee or task becomes the new owner.
 
 These roles are enforced by the compiler. They are not documentation conventions.
 
@@ -59,7 +64,84 @@ verb process() {
 
 Verbs coordinate actants instead of attaching behavior exclusively to one object. Parameters are declared with semantic roles, and arguments may be positional or explicitly named. Ambiguous positional calls must use names.
 
-## 5. Compiler Roadmap
+## 5. Structured Concurrency
+
+Actus uses structured concurrency by default. Concurrent execution is an
+ownership operation, not an implicit background side effect:
+
+```act
+erg task = act(process, dat payload);
+join(dat task);
+```
+
+`act` transfers ownership of `payload` into a new task and returns an owned
+`erg Task` handle. The caller binding becomes `Moved`; the task becomes the
+new owner and deterministically cleans up the payload when execution ends.
+
+Task handles are owned resources and must be explicitly consumed:
+
+- `join(dat task)` waits for completion and consumes the task handle;
+- `detach(dat task)` explicitly transfers responsibility to the scheduler.
+
+Fire-and-forget execution is never the implicit behavior of `act`. The
+freestanding `core` layer does not provide a general task runtime. Hosted
+profiles lower task operations through the standard library, while a target
+may provide an explicit scheduler contract.
+
+## 6. Why Actus
+
+Actus is not intended to replace every systems language. Its focus is a
+smaller and more explicit ownership model for low-level programs.
+
+### Compared with Rust
+
+Actus uses lexical, non-escaping borrows and exposes no lifetime annotations
+in source code. This makes the initial ownership model easier to read and
+diagnose, but it is intentionally less expressive than Rust's lifetime
+system. Alpha Actus does not support borrowed returns or arbitrary lifetime
+relationships. Actus still provides explicit low-level escape hatches for raw
+pointers, MMIO, exact layouts, and inline assembly, but these capabilities
+belong inside visible `unsafe` boundaries.
+
+### Compared with C
+
+C provides broad ABI compatibility and unrestricted low-level control, but
+ownership and cleanup are primarily programmer conventions. Actus adds
+compile-time checks for moves, borrows, use-after-move, double-drop, and
+deterministic scope cleanup while preserving a stable C FFI boundary. Actus
+does not remove C-level control: raw pointers, volatile operations, exact
+layouts, and target instructions remain available through explicit `unsafe`
+primitives.
+
+### Compared with Zig
+
+Zig provides explicit low-level control and allocator-aware programming. Actus
+adds a role-based ownership and borrowing model in which `erg`, `abs`, and
+`dat` make resource relationships visible in declarations and calls. This
+reduces some classes of lifetime errors, at the cost of restricting borrowed
+values from escaping in Alpha. Both languages expose low-level control, but
+Actus separates unchecked memory and target operations from safe code through
+an explicit `unsafe` boundary.
+
+## 7. Design Boundaries and Trade-offs
+
+Actus Alpha deliberately chooses a restricted safety model instead of trying
+to reproduce every capability of mature systems languages.
+
+- Borrowed values cannot be returned from functions.
+- Borrows cannot be stored in longer-lived structures.
+- Complex lifetime relationships are not exposed to programmers.
+- Structured concurrency requires explicit task lifecycle handling.
+- Detached tasks require an explicit `detach` operation.
+- The internal Actus unit ABI is unstable during Alpha.
+- C is a stable FFI/ABI boundary, not a required compiler intermediate
+  representation or safety authority.
+
+These restrictions are intentional. They keep the compiler model predictable
+while leaving room for future scoped views, richer task results, and other
+zero-copy abstractions that preserve the core ownership guarantees.
+
+## 8. Compiler Roadmap
 
 The first compiler is bootstrapped in Rust and consists of:
 
@@ -67,10 +149,15 @@ The first compiler is bootstrapped in Rust and consists of:
 2. an AST and typed semantic analyzer;
 3. borrow records and ownership-state checking;
 4. deterministic cleanup insertion;
-5. a C99 emission backend.
+5. a Rust-native Cranelift backend for native object and executable emission.
 
-The C backend is an emission target, not the safety authority. Actus safety proofs are completed before code generation.
+The C ABI is a stable interoperability boundary for external libraries,
+operating-system interfaces, and platform runtimes. It is not required as an
+intermediate representation, and it is not the safety authority. Actus
+semantic safety checks are completed before code generation.
 
 Later versions may introduce explicitly scoped views or other zero-copy abstractions. Such features must preserve the Alpha ownership guarantees and will not weaken the non-escaping-borrow rule implicitly.
 
-Actus begins with a deliberately small core: predictable ownership, readable systems code, deterministic destruction, and safety rules that can be understood completely.
+Actus begins with a deliberately small core: predictable ownership, readable
+systems code, deterministic destruction, explicit task lifetimes, and safety
+rules that can be understood completely.

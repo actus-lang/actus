@@ -24,7 +24,7 @@ impl Parser {
 
     fn parse_primary_expression(&mut self) -> Result<Expr, ParseError> {
         let token = self.advance_required("expression")?;
-        match token.kind {
+        let expression = match token.kind {
             TokenKind::Minus => {
                 let expression = self.parse_primary_expression()?;
                 let span = SourceSpan::new(token.span.start, expression_span(&expression).end);
@@ -51,11 +51,14 @@ impl Parser {
                         arguments,
                         span: SourceSpan::new(token.span.start, end),
                     })
+                } else if self.match_simple(TokenKind::LeftBrace) {
+                    self.parse_struct_literal(name, token.span.start)
                 } else {
                     Ok(Expr::Identifier { name, span: token.span })
                 }
             }
             TokenKind::Integer(value) => Ok(Expr::Integer { value, span: token.span }),
+            TokenKind::FloatLiteral(value) => Ok(Expr::FloatLiteral { value, span: token.span }),
             TokenKind::StringLiteral(value) => Ok(Expr::StringLiteral { value, span: token.span }),
             TokenKind::Ref => {
                 let expression = self.parse_primary_expression()?;
@@ -67,7 +70,31 @@ impl Parser {
                 kind: ParseErrorKind::UnexpectedToken { expected: "expression".to_owned(), found },
                 span: token.span,
             }),
+        }?;
+        self.parse_field_access(expression)
+    }
+
+    fn parse_field_access(&mut self, mut expression: Expr) -> Result<Expr, ParseError> {
+        while self.match_simple(TokenKind::Dot) {
+            let field_token = self.take_identifier("field name after `.`")?;
+            let field = identifier_text(&field_token.kind);
+            if self.match_simple(TokenKind::LeftParen) {
+                let start = expression_span(&expression).start;
+                let arguments = self.parse_arguments()?;
+                let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
+                expression = Expr::MethodCall {
+                    receiver: Box::new(expression),
+                    method: field,
+                    arguments,
+                    span: SourceSpan::new(start, end),
+                };
+            } else {
+                let span =
+                    SourceSpan::new(expression_span(&expression).start, field_token.span.end);
+                expression = Expr::FieldAccess { object: Box::new(expression), field, span };
+            }
         }
+        Ok(expression)
     }
 
     fn binary_operator(&self) -> Option<(BinaryOp, u8)> {
