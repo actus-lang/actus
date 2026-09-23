@@ -19,9 +19,27 @@ impl Analyzer {
     ) -> Result<T, SemanticError> {
         self.generic_scopes
             .push(parameters.iter().map(|parameter| parameter.name.clone()).collect());
-        let result = validate(self);
+        let result = self.validate_generic_bounds(parameters).and_then(|()| validate(self));
         self.generic_scopes.pop();
         result
+    }
+
+    fn validate_generic_bounds(&self, parameters: &[GenericParam]) -> Result<(), SemanticError> {
+        for parameter in parameters {
+            let Some(bound) = &parameter.bound else { continue };
+            if !bound.arguments.is_empty() {
+                return Err(arity_error(&bound.name, 0, bound.arguments.len(), bound.span));
+            }
+            if self.is_generic_parameter(&bound.name) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::UnknownTypeParameter { name: bound.name.clone() },
+                    span: bound.span,
+                });
+            }
+            // Role declarations and their scope are introduced by Phase 14. Keeping the
+            // bound as a validated, unresolved name preserves the generic API now.
+        }
+        Ok(())
     }
 
     pub(super) fn validate_type_reference(
