@@ -24,18 +24,20 @@ impl Analyzer {
         Ok(())
     }
 
-    fn validate_enum_definition(&self, definition: &EnumDef) -> Result<(), SemanticError> {
-        for variant in &definition.variants {
-            let types = match &variant.payload {
-                EnumPayload::Unit => Vec::new(),
-                EnumPayload::Tuple(types) => types.iter().collect(),
-                EnumPayload::Struct(fields) => fields.iter().map(|field| &field.ty).collect(),
-            };
-            for type_name in types {
-                self.validate_type_name(&type_name.name, type_name.span)?;
+    fn validate_enum_definition(&mut self, definition: &EnumDef) -> Result<(), SemanticError> {
+        self.with_generic_scope(&definition.generic_parameters, |analyzer| {
+            for variant in &definition.variants {
+                let types = match &variant.payload {
+                    EnumPayload::Unit => Vec::new(),
+                    EnumPayload::Tuple(types) => types.iter().collect(),
+                    EnumPayload::Struct(fields) => fields.iter().map(|field| &field.ty).collect(),
+                };
+                for type_name in types {
+                    analyzer.validate_type_reference(type_name)?;
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     pub(super) fn validate_recursive_types(&self) -> Result<(), SemanticError> {

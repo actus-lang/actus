@@ -6,6 +6,7 @@ mod cleanup;
 mod enum_registry;
 mod enums;
 mod errors;
+mod generics;
 mod intrinsics;
 mod methods;
 mod model;

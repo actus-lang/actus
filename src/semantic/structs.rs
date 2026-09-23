@@ -81,21 +81,23 @@ impl Analyzer {
         Ok(())
     }
 
-    fn validate_struct_definition(&self, definition: &StructDef) -> Result<(), SemanticError> {
-        let mut field_names = HashSet::new();
-        for field in &definition.fields {
-            if !field_names.insert(field.name.clone()) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::DuplicateStructField {
-                        struct_name: definition.name.clone(),
-                        field: field.name.clone(),
-                    },
-                    span: field.span,
-                });
+    fn validate_struct_definition(&mut self, definition: &StructDef) -> Result<(), SemanticError> {
+        self.with_generic_scope(&definition.generic_parameters, |analyzer| {
+            let mut field_names = HashSet::new();
+            for field in &definition.fields {
+                if !field_names.insert(field.name.clone()) {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::DuplicateStructField {
+                            struct_name: definition.name.clone(),
+                            field: field.name.clone(),
+                        },
+                        span: field.span,
+                    });
+                }
+                analyzer.validate_type_reference(&field.ty)?;
             }
-            self.validate_type_name(&field.ty.name, field.ty.span)?;
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     pub(super) fn record_struct_binding(

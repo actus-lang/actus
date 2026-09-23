@@ -76,6 +76,14 @@ pub enum SemanticErrorKind {
     UnknownType {
         name: String,
     },
+    UnknownTypeParameter {
+        name: String,
+    },
+    GenericArityMismatch {
+        name: String,
+        expected: usize,
+        found: usize,
+    },
     DuplicateVerbName {
         name: String,
     },

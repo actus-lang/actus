@@ -9,10 +9,10 @@ is expanded.
 
 - [x] Represent generic parameters and applications in the AST.
 - [x] Support generic structs and enums with stable source spans.
-- [ ] Distinguish type parameters, concrete types, and applied types in the
+- [x] Distinguish type parameters, concrete types, and applied types in the
   type environment.
 - [x] Reject duplicate generic parameters during parsing.
-- [ ] Reject invalid generic arity during semantic validation.
+- [x] Reject invalid generic arity during semantic validation.
 
 ## Constraints and Type Checking
 

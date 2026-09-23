@@ -28,6 +28,7 @@ pub(super) struct Analyzer {
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_enum_types: HashMap<usize, String>,
+    pub(super) generic_scopes: Vec<HashSet<String>>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -54,6 +55,7 @@ impl Analyzer {
             enum_types: HashMap::new(),
             binding_struct_types: HashMap::new(),
             binding_enum_types: HashMap::new(),
+            generic_scopes: Vec::new(),
         }
     }
 
@@ -79,12 +81,20 @@ impl Analyzer {
                 }
                 TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
             };
-            for parameter in params {
-                self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;
-            }
-            if let Some(return_type) = return_type {
-                self.validate_type_name(&return_type.name, return_type.span)?;
-            }
+            let generic_parameters = match declaration {
+                TopLevelDecl::Verb(verb) => &verb.generic_parameters,
+                TopLevelDecl::ExternalVerb(verb) => &verb.generic_parameters,
+                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => unreachable!(),
+            };
+            self.with_generic_scope(generic_parameters, |analyzer| {
+                for parameter in params {
+                    analyzer.validate_type_reference(&parameter.ty)?;
+                }
+                if let Some(return_type) = return_type {
+                    analyzer.validate_type_reference(return_type)?;
+                }
+                Ok(())
+            })?;
             if super::intrinsics::is_reserved_name(name) {
                 return Err(SemanticError {
                     kind: super::errors::SemanticErrorKind::ReservedIntrinsicName {
