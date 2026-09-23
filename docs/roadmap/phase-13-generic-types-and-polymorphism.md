@@ -7,11 +7,12 @@ is expanded.
 
 ## Generic Type Representation
 
-- [ ] Represent generic parameters and applications in the AST.
-- [ ] Support generic structs and enums with stable source spans.
+- [x] Represent generic parameters and applications in the AST.
+- [x] Support generic structs and enums with stable source spans.
 - [ ] Distinguish type parameters, concrete types, and applied types in the
   type environment.
-- [ ] Reject duplicate parameters and invalid generic arity.
+- [x] Reject duplicate generic parameters during parsing.
+- [ ] Reject invalid generic arity during semantic validation.
 
 ## Constraints and Type Checking
 

@@ -9,8 +9,8 @@ mod types;
 
 pub use abi::ForeignAbi;
 pub use decl::{
-    EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl, Param, Program, Role,
-    StructDef, StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl,
+    EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl, GenericParam, Param, Program,
+    Role, StructDef, StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl,
 };
 pub use expr::{
     Argument, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, StructFieldInit, UnaryOp,

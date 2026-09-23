@@ -3,12 +3,14 @@ Program {
         Verb(
             VerbDecl {
                 name: "transfer",
+                generic_parameters: [],
                 params: [
                     Param {
                         role: Erg,
                         name: "target",
                         ty: TypeName {
                             name: "File",
+                            arguments: [],
                             span: SourceSpan {
                                 start: 26,
                                 end: 30,
@@ -24,6 +26,7 @@ Program {
                         name: "packet",
                         ty: TypeName {
                             name: "Buffer",
+                            arguments: [],
                             span: SourceSpan {
                                 start: 44,
                                 end: 50,
@@ -39,6 +42,7 @@ Program {
                         name: "logger",
                         ty: TypeName {
                             name: "Logger",
+                            arguments: [],
                             span: SourceSpan {
                                 start: 64,
                                 end: 70,
@@ -53,6 +57,7 @@ Program {
                 return_type: Some(
                     TypeName {
                         name: "Int",
+                        arguments: [],
                         span: SourceSpan {
                             start: 75,
                             end: 78,

@@ -1,6 +1,5 @@
 use crate::ast::{
-    Block, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt, TopLevelDecl, TypeName,
-    VerbDecl,
+    Block, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt, TopLevelDecl, VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
@@ -9,6 +8,7 @@ mod case;
 mod cursor;
 mod enums;
 mod expressions;
+mod generics;
 mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,6 +99,7 @@ impl Parser {
         self.expect_keyword(TokenKind::Verb, "`verb`")?;
         let name_token = self.take_identifier("external verb name")?;
         let name = identifier_text(&name_token.kind);
+        let generic_parameters = self.parse_generic_parameters()?;
         self.expect_simple(TokenKind::LeftParen, "`(`")?;
         let params = self.parse_params()?;
         self.expect_simple(TokenKind::RightParen, "`)`")?;
@@ -109,6 +110,7 @@ impl Parser {
             unsafe_boundary,
             abi,
             name,
+            generic_parameters,
             params,
             return_type,
             span: SourceSpan::new(start, end),
@@ -119,6 +121,7 @@ impl Parser {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
         let name_token = self.take_identifier("verb name")?;
         let name = identifier_text(&name_token.kind);
+        let generic_parameters = self.parse_generic_parameters()?;
 
         self.expect_simple(TokenKind::LeftParen, "`(`")?;
         let params = self.parse_params()?;
@@ -130,7 +133,7 @@ impl Parser {
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
 
-        Ok(VerbDecl { name, params, return_type, body, span })
+        Ok(VerbDecl { name, generic_parameters, params, return_type, body, span })
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
@@ -167,11 +170,6 @@ impl Parser {
         let ty = self.parse_type_name()?;
 
         Ok(Param { role, name, span: SourceSpan::new(role_token.span.start, ty.span.end), ty })
-    }
-
-    fn parse_type_name(&mut self) -> Result<TypeName, ParseError> {
-        let token = self.take_identifier("type name")?;
-        Ok(TypeName { name: identifier_text(&token.kind), span: token.span })
     }
 
     fn parse_block(&mut self) -> Result<Block, ParseError> {

@@ -8,10 +8,11 @@ impl Parser {
         let start = self.expect_keyword(TokenKind::Struct, "`struct`")?.span.start;
         let name_token = self.take_identifier("struct name")?;
         let name = identifier_text(&name_token.kind);
+        let generic_parameters = self.parse_generic_parameters()?;
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
         let fields = self.parse_struct_fields()?;
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(StructDef { name, fields, span: SourceSpan::new(start, end) })
+        Ok(StructDef { name, generic_parameters, fields, span: SourceSpan::new(start, end) })
     }
 
     fn parse_struct_fields(&mut self) -> Result<Vec<StructField>, ParseError> {

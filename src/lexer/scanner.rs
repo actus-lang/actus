@@ -56,6 +56,8 @@ impl<'source> Scanner<'source> {
             '}' => self.push_simple(TokenKind::RightBrace, start),
             '(' => self.push_simple(TokenKind::LeftParen, start),
             ')' => self.push_simple(TokenKind::RightParen, start),
+            '[' => self.push_simple(TokenKind::LeftBracket, start),
+            ']' => self.push_simple(TokenKind::RightBracket, start),
             ':' => self.push_simple(TokenKind::Colon, start),
             ',' => self.push_simple(TokenKind::Comma, start),
             ';' => self.push_simple(TokenKind::Semicolon, start),
