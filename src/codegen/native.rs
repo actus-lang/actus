@@ -9,10 +9,11 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
-use crate::semantic::analyze;
+use crate::semantic::{GenericInstance, analyze};
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
+use super::generic_layout::GenericLayoutRegistry;
 use super::layout::LayoutRegistry;
 use super::literals::{StringDataIds, declare_string_values, define_string_data};
 use super::lowering::lower_body;
@@ -84,19 +85,37 @@ pub fn emit_program_object_with_configuration(
     if !verbs.iter().any(|verb| verb.name == symbol) {
         return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
     }
-    emit_verbs_object(program, &verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
+    emit_verbs_object(
+        program,
+        &verbs,
+        &external_verbs,
+        &semantic.generic_instances,
+        symbol,
+        &cleanup_schedule,
+        configuration,
+    )
 }
 
 fn emit_verbs_object(
     program: &Program,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
+    generic_instances: &[GenericInstance],
     symbol: &str,
     cleanup_schedule: &NativeCleanupSchedule,
     configuration: &NativeBackendConfiguration,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
-    let layouts = LayoutRegistry::from_program(program, module.isa().pointer_type())?;
+    GenericLayoutRegistry::from_program(
+        program,
+        generic_instances,
+        module.isa().pointer_type().bytes(),
+    )?;
+    let layouts = LayoutRegistry::from_program_with_instances(
+        program,
+        module.isa().pointer_type(),
+        generic_instances,
+    )?;
     for verb in verbs {
         validate_native_signature(verb, &layouts)
             .map_err(|error| NativeEmitError(error.to_string()))?;
@@ -109,7 +128,21 @@ fn emit_verbs_object(
     let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol, &layouts)?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
-    let functions = metadata
+    let functions = function_metadata(&metadata);
+    define_verbs(
+        &mut module,
+        frontend_config,
+        verbs,
+        &functions,
+        cleanup_schedule,
+        &string_data,
+        &layouts,
+    )?;
+    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn function_metadata(metadata: &HashMap<String, FunctionMeta>) -> HashMap<String, FunctionMeta> {
+    metadata
         .iter()
         .map(|(name, meta)| {
             (
@@ -121,24 +154,35 @@ fn emit_verbs_object(
                 },
             )
         })
-        .collect::<HashMap<_, _>>();
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn define_verbs(
+    module: &mut ObjectModule,
+    frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
+    verbs: &[&VerbDecl],
+    functions: &HashMap<String, FunctionMeta>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataIds,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     for verb in verbs {
-        let name = verb.name.as_str();
         let meta = functions
-            .get(name)
-            .ok_or_else(|| NativeEmitError(format!("missing native function `{name}`")))?;
+            .get(&verb.name)
+            .ok_or_else(|| NativeEmitError(format!("missing native function `{}`", verb.name)))?;
         define_function(
-            &mut module,
+            module,
             frontend_config,
             verb,
             meta,
-            &functions,
+            functions,
             cleanup_schedule,
-            &string_data,
-            &layouts,
+            string_data,
+            layouts,
         )?;
     }
-    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+    Ok(())
 }
 
 fn create_module(

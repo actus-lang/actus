@@ -27,7 +27,11 @@ pub(super) struct Analyzer {
     pub(super) struct_types: HashMap<String, StructDef>,
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) binding_struct_types: HashMap<usize, String>,
+    pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
+    pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
+    pub(super) generic_scopes: Vec<HashSet<String>>,
+    pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -43,6 +47,7 @@ impl Analyzer {
                 cleanup_plans: Vec::new(),
                 return_unwind_plans: Vec::new(),
                 loop_unwind_plans: Vec::new(),
+                generic_instances: Vec::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
@@ -53,7 +58,11 @@ impl Analyzer {
             struct_types: HashMap::new(),
             enum_types: HashMap::new(),
             binding_struct_types: HashMap::new(),
+            binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
+            binding_enum_type_applications: HashMap::new(),
+            generic_scopes: Vec::new(),
+            generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
         }
     }
 
@@ -64,6 +73,7 @@ impl Analyzer {
         self.register_declarations(program)?;
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
+        self.model.generic_instances = self.generic_instances.into_instances();
         self.current_return_type = None;
         Ok(self.model)
     }
@@ -79,12 +89,20 @@ impl Analyzer {
                 }
                 TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
             };
-            for parameter in params {
-                self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;
-            }
-            if let Some(return_type) = return_type {
-                self.validate_type_name(&return_type.name, return_type.span)?;
-            }
+            let generic_parameters = match declaration {
+                TopLevelDecl::Verb(verb) => &verb.generic_parameters,
+                TopLevelDecl::ExternalVerb(verb) => &verb.generic_parameters,
+                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => unreachable!(),
+            };
+            self.with_generic_scope(generic_parameters, |analyzer| {
+                for parameter in params {
+                    analyzer.validate_type_reference(&parameter.ty)?;
+                }
+                if let Some(return_type) = return_type {
+                    analyzer.validate_type_reference(return_type)?;
+                }
+                Ok(())
+            })?;
             if super::intrinsics::is_reserved_name(name) {
                 return Err(SemanticError {
                     kind: super::errors::SemanticErrorKind::ReservedIntrinsicName {
@@ -117,8 +135,8 @@ impl Analyzer {
             for parameter in &verb.params {
                 let ty = lookup_builtin_type(&parameter.ty.name);
                 self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
-                self.record_struct_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
-                self.record_enum_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
+                self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
+                self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
             }
             self.visit_block(&verb.body)?;
             if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
@@ -208,8 +226,8 @@ impl Analyzer {
             Expr::MethodCall { receiver, method, arguments, span } => {
                 self.visit_method_call(receiver, method, arguments, *span)
             }
-            Expr::StructLit { name, fields, span } => {
-                self.validate_struct_literal(name, fields, *span)
+            Expr::StructLit { name, type_arguments, fields, span } => {
+                self.validate_struct_literal(name, type_arguments, fields, *span)
             }
             Expr::FieldAccess { object, field, span } => {
                 if self.enum_receiver_name(object).is_some() {

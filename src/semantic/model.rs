@@ -1,4 +1,4 @@
-use crate::ast::{BuiltinType, Role};
+use crate::ast::{BuiltinType, Role, TypeName};
 use crate::lexer::SourceSpan;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,10 +29,18 @@ pub struct BorrowRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenericInstance {
+    pub name: String,
+    pub arguments: Vec<TypeName>,
+    pub canonical_key: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticModel {
     pub bindings: Vec<Binding>,
     pub borrows: Vec<BorrowRecord>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
+    pub generic_instances: Vec<GenericInstance>,
 }

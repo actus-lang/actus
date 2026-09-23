@@ -125,7 +125,14 @@ pub(super) fn initializer_type(
         Expr::MethodCall { method, .. } => enum_expression_type(expression, layouts)
             .or_else(|| functions.get(method).map(|function| function.return_type))
             .unwrap_or(NativeType::Int),
-        Expr::StructLit { name, .. } => layouts.type_for_name(name).unwrap_or(NativeType::Int),
+        Expr::StructLit { name, type_arguments, .. } => {
+            let type_name = crate::ast::TypeName {
+                name: name.clone(),
+                arguments: type_arguments.clone(),
+                span: crate::lexer::SourceSpan::new(0, 0),
+            };
+            layouts.type_for_type_name(&type_name).unwrap_or(NativeType::Int)
+        }
         Expr::FieldAccess { object, field, .. } => expression_native_type(object, types, layouts)
             .and_then(|ty| field_type(ty, field, layouts))
             .or_else(|| enum_expression_type(expression, layouts))

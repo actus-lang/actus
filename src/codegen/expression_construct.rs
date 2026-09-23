@@ -74,9 +74,10 @@ fn lower_data_construct(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
-        Expr::StructLit { name, fields, .. } => lower_struct_literal(
+        Expr::StructLit { name, type_arguments, fields, .. } => lower_struct_literal(
             function,
             name,
+            type_arguments,
             fields,
             locals,
             local_types,

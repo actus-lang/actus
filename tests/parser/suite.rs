@@ -29,6 +29,59 @@ fn parses_a_verb_with_roles_and_return_type() {
 }
 
 #[test]
+fn parses_generic_parameters_and_type_applications() {
+    let program = parse_source(
+        "struct Box[T] { item: T, } enum Result[T, E: Error] { Ok(T), Err(E), } verb wrap[T](erg item: T) -> Box[T] { return Box { item: item, }; }",
+    );
+
+    let TopLevelDecl::Struct(box_definition) = &program.declarations[0] else {
+        panic!("expected generic struct");
+    };
+    assert_eq!(box_definition.generic_parameters.len(), 1);
+    assert_eq!(box_definition.generic_parameters[0].name, "T");
+    assert_eq!(box_definition.fields[0].ty.name, "T");
+
+    let TopLevelDecl::Enum(result_definition) = &program.declarations[1] else {
+        panic!("expected generic enum");
+    };
+    assert_eq!(result_definition.generic_parameters.len(), 2);
+    assert_eq!(result_definition.generic_parameters[1].bound.as_ref().unwrap().name, "Error");
+
+    let TopLevelDecl::Verb(verb) = &program.declarations[2] else {
+        panic!("expected generic verb");
+    };
+    assert_eq!(verb.generic_parameters[0].name, "T");
+    let return_type = verb.return_type.as_ref().expect("generic return type");
+    assert_eq!(return_type.name, "Box");
+    assert_eq!(return_type.arguments[0].name, "T");
+}
+
+#[test]
+fn parses_multiple_generic_bounds() {
+    let (tokens, errors) = scan("verb write[T: Writer + Serializable](erg item: T) { }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("multiple generic bounds should parse");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let bounds = &verb.generic_parameters[0].bounds;
+    assert_eq!(
+        bounds.iter().map(|bound| bound.name.as_str()).collect::<Vec<_>>(),
+        ["Writer", "Serializable"]
+    );
+}
+
+#[test]
+fn rejects_duplicate_generic_parameters() {
+    let (tokens, errors) = scan("struct Pair[T, T] { first: T, second: T, }");
+    assert!(errors.is_empty());
+
+    let error = parse(tokens).expect_err("duplicate generic parameters must be rejected");
+    assert_eq!(error.code, ParseErrorCode::DuplicateName);
+    assert!(
+        matches!(error.kind, ParseErrorKind::DuplicateName { kind, .. } if kind == "generic parameter")
+    );
+}
+
+#[test]
 fn parses_unit_tuple_and_named_enum_variants() {
     let program =
         parse_source("enum Message { Quit, Move(Int, Int), Write { text: String, code: Int, }, }");

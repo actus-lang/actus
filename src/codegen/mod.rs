@@ -1,6 +1,7 @@
 mod abi;
 mod calls;
 mod case;
+mod case_payload;
 mod cleanup;
 mod control_flow;
 mod declarations;
@@ -10,6 +11,10 @@ mod expression_construct;
 mod expression_literals;
 mod expression_operations;
 mod expressions;
+mod generic_definitions;
+mod generic_enum_layout;
+mod generic_layout;
+mod generic_struct_layout;
 mod layout;
 mod linker;
 mod literals;

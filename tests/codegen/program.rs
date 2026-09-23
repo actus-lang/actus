@@ -43,6 +43,18 @@ fn emits_deterministic_struct_method_objects() {
 }
 
 #[test]
+fn emits_deterministic_nested_generic_instances() {
+    let source = "struct Box[T] { item: T, } struct Pair[T] { item: T, } verb main() -> Int { erg pair = Pair[Box[Int]] { item: Box[Int] { item: 42, }, }; return pair.item.item; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("nested generic source should parse");
+    let first = emit_program_object(&program, "main").expect("first generic emission should pass");
+    let second =
+        emit_program_object(&program, "main").expect("second generic emission should pass");
+    assert_eq!(first, second);
+}
+
+#[test]
 fn lowers_integer_function_calls_to_a_native_object() {
     let source = "verb main() -> Int { erg left = 40; erg right = 2; return add(right: right, left: left); } verb add(erg left: Int, erg right: Int) -> Int { return left + right; }";
     let (tokens, errors) = scan(source);

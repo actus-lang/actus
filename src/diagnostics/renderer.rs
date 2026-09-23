@@ -108,6 +108,9 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::PatternBindingTypeMismatch { .. } => "E1049",
         SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
         SemanticErrorKind::InvalidMutation { .. } => "E1051",
+        SemanticErrorKind::UnknownTypeParameter { .. } => "E1052",
+        SemanticErrorKind::GenericArityMismatch { .. } => "E1053",
+        SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
     }
 }
 
@@ -262,6 +265,15 @@ fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
 fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
+        SemanticErrorKind::UnknownTypeParameter { name } => {
+            format!("undeclared generic type parameter `{name}`")
+        }
+        SemanticErrorKind::GenericArityMismatch { name, expected, found } => format!(
+            "wrong number of type arguments for `{name}`: expected {expected}, found {found}"
+        ),
+        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } => {
+            format!("generic parameter `{parameter}` requires `{constraint}`, found `{argument}`")
+        }
         SemanticErrorKind::DuplicateVerbName { name } => {
             format!("duplicate verb declaration `{name}`")
         }

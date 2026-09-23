@@ -3,10 +3,13 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
 use crate::ast::{
-    BuiltinType, EnumDef, Program, StructDef, StructFieldRole, TopLevelDecl, lookup_builtin_type,
+    BuiltinType, EnumDef, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName,
+    lookup_builtin_type,
 };
+use crate::semantic::GenericInstance;
 
 use super::enum_layout::EnumLayout;
+use super::generic_definitions::{canonical_type_name, specialized_enums, specialized_structs};
 use super::native::NativeEmitError;
 use super::types::NativeType;
 
@@ -37,32 +40,28 @@ pub struct LayoutRegistry {
 }
 
 impl LayoutRegistry {
+    // Retained for layout unit tests and non-generic callers.
+    #[allow(dead_code)]
     pub(super) fn from_program(
         program: &Program,
         pointer_type: Type,
     ) -> Result<Self, NativeEmitError> {
-        let definitions = program
-            .declarations
-            .iter()
-            .filter_map(|declaration| match declaration {
-                TopLevelDecl::Struct(definition) => Some(definition),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        let definitions = definitions.into_iter().cloned().collect::<Vec<_>>();
+        Self::from_program_with_instances(program, pointer_type, &[])
+    }
+
+    pub(super) fn from_program_with_instances(
+        program: &Program,
+        pointer_type: Type,
+        instances: &[GenericInstance],
+    ) -> Result<Self, NativeEmitError> {
+        let (mut definitions, mut enum_definitions) = base_definitions(program);
+        definitions.extend(specialized_structs(program, instances)?);
         let ids = definitions
             .iter()
             .enumerate()
             .map(|(id, definition)| (definition.name.clone(), id))
             .collect::<HashMap<_, _>>();
-        let enum_definitions = program
-            .declarations
-            .iter()
-            .filter_map(|declaration| match declaration {
-                TopLevelDecl::Enum(definition) => Some(definition.clone()),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+        enum_definitions.extend(specialized_enums(program, instances)?);
         let enum_ids = enum_definitions
             .iter()
             .enumerate()
@@ -101,6 +100,11 @@ impl LayoutRegistry {
         self.id_for(name)
             .map(NativeType::Struct)
             .or_else(|| self.enum_id_for(name).map(NativeType::Enum))
+    }
+
+    pub(super) fn type_for_type_name(&self, type_name: &TypeName) -> Option<NativeType> {
+        let canonical = canonical_type_name(type_name);
+        self.type_for_name(&canonical).or_else(|| self.type_for_name(&type_name.name))
     }
 
     pub(super) fn stack_slot(&self, layout: &StructLayout) -> StackSlotData {
@@ -208,6 +212,23 @@ impl LayoutRegistry {
             }
         })
     }
+}
+
+fn base_definitions(program: &Program) -> (Vec<StructDef>, Vec<EnumDef>) {
+    let mut structs = Vec::new();
+    let mut enums = Vec::new();
+    for declaration in &program.declarations {
+        match declaration {
+            TopLevelDecl::Struct(definition) if definition.generic_parameters.is_empty() => {
+                structs.push(definition.clone());
+            }
+            TopLevelDecl::Enum(definition) if definition.generic_parameters.is_empty() => {
+                enums.push(definition.clone());
+            }
+            _ => {}
+        }
+    }
+    (structs, enums)
 }
 
 fn align_up(offset: u32, alignment: u32) -> u32 {

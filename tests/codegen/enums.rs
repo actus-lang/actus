@@ -63,3 +63,37 @@ fn lowers_case_payload_cleanup_without_double_drop() {
     let object = emit_program_object(&program, "main").expect("cleanup case should emit");
     object::File::parse(object.as_slice()).expect("cleanup case should emit a native object");
 }
+
+#[test]
+fn lowers_generic_option_case_to_native_code() {
+    let source = "verb main() -> Int { erg option = Option[Int].Some(42); return case dat option { Option.Some(value) => value, Option.None => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("generic Option program should parse");
+    let object = emit_program_object(&program, "main").expect("generic Option should emit");
+    object::File::parse(object.as_slice()).expect("generic Option should emit a native object");
+}
+
+#[test]
+fn lowers_generic_result_case_to_native_code() {
+    let source = "verb main() -> Int { erg result = Result[Int, String].Ok(42); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("generic Result program should parse");
+    let object = emit_program_object(&program, "main").expect("generic Result should emit");
+    object::File::parse(object.as_slice()).expect("generic Result should emit a native object");
+}
+
+#[test]
+fn emits_deterministic_generic_result_objects() {
+    let source = "verb main() -> Int { erg result = Result[Int, String].Ok(42); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("generic Result program should parse");
+    let first =
+        emit_program_object(&program, "main").expect("first generic Result emission should pass");
+    let second =
+        emit_program_object(&program, "main").expect("second generic Result emission should pass");
+    assert_eq!(first, second);
+    object::File::parse(first.as_slice()).expect("generic Result should emit a native object");
+}

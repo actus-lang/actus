@@ -23,6 +23,30 @@ fn scans_keywords_and_punctuation() {
 }
 
 #[test]
+fn scans_generic_delimiters() {
+    let (tokens, errors) = scan("Option[Int, Result[Bool, String]]");
+
+    assert!(errors.is_empty());
+    assert_eq!(
+        tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+        vec![
+            &TokenKind::Identifier("Option".to_owned()),
+            &TokenKind::LeftBracket,
+            &TokenKind::Identifier("Int".to_owned()),
+            &TokenKind::Comma,
+            &TokenKind::Identifier("Result".to_owned()),
+            &TokenKind::LeftBracket,
+            &TokenKind::Identifier("Bool".to_owned()),
+            &TokenKind::Comma,
+            &TokenKind::Identifier("String".to_owned()),
+            &TokenKind::RightBracket,
+            &TokenKind::RightBracket,
+            &TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
 fn scans_enum_and_case_keywords() {
     let (tokens, errors) = scan("enum Color { Red, } case true => _");
 
