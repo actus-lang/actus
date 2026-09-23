@@ -16,6 +16,7 @@ mod pattern_support;
 mod patterns;
 mod scopes;
 mod structs;
+mod type_substitution;
 mod types;
 
 pub use analyzer::analyze;

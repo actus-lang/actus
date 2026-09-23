@@ -3,6 +3,7 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
+use super::type_substitution::TypeSubstitution;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum ResolvedType {
@@ -75,6 +76,9 @@ impl Analyzer {
         if type_name.arguments.is_empty() {
             return Ok(ResolvedType::Concrete(name.to_owned()));
         }
+        if let Some(parameters) = self.named_type_parameters(name) {
+            TypeSubstitution::for_type(name, &parameters, &type_name.arguments, type_name.span)?;
+        }
         let arguments = type_name
             .arguments
             .iter()
@@ -93,6 +97,12 @@ impl Analyzer {
         }
         self.struct_types.get(name).map(|definition| definition.generic_parameters.len()).or_else(
             || self.enum_types.get(name).map(|definition| definition.generic_parameters.len()),
+        )
+    }
+
+    fn named_type_parameters(&self, name: &str) -> Option<Vec<GenericParam>> {
+        self.struct_types.get(name).map(|definition| definition.generic_parameters.clone()).or_else(
+            || self.enum_types.get(name).map(|definition| definition.generic_parameters.clone()),
         )
     }
 }

@@ -41,7 +41,7 @@ is expanded.
 
 ## Completion Gates
 
-- [ ] Add positive and negative semantic tests for generic declarations and
+- [x] Add positive and negative semantic tests for generic declarations and
   applications.
 - [ ] Add deterministic monomorphization and cache invalidation tests.
 - [ ] Add end-to-end executable tests for `Option` and `Result`.
