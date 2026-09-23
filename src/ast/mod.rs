@@ -2,17 +2,21 @@ mod abi;
 mod decl;
 mod expr;
 mod intrinsic;
+mod pattern;
 mod registry;
 mod stmt;
 mod types;
 
 pub use abi::ForeignAbi;
 pub use decl::{
-    ExternalVerbDecl, Param, Program, Role, StructDef, StructField, StructFieldRole, TopLevelDecl,
-    TypeName, VerbDecl,
+    EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl, Param, Program, Role,
+    StructDef, StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl,
 };
-pub use expr::{Argument, BinaryOp, Expr, StructFieldInit, UnaryOp};
+pub use expr::{
+    Argument, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, StructFieldInit, UnaryOp,
+};
 pub use intrinsic::{IntrinsicKind, IntrinsicSpec, lookup_call_intrinsic, lookup_intrinsic};
+pub use pattern::{LiteralPattern, NamedPattern, Pattern, PatternBinding, VariantPayload};
 pub use registry::RegistryStatus;
 pub use stmt::{Block, Stmt};
 pub use types::{BuiltinType, BuiltinTypeSpec, lookup_builtin_type};

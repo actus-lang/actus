@@ -78,6 +78,11 @@ fn emit_scope_instructions(
     for instruction in &plan.instructions {
         match instruction {
             NativeInstruction::EndBorrow { .. } => {}
+            NativeInstruction::DropPayloadField { name, enum_name, variant, field, .. } => {
+                super::enums::emit_enum_payload_drop(
+                    function, name, enum_name, variant, field, locals, functions, layouts,
+                )?;
+            }
             NativeInstruction::DropBinding { name, .. } => {
                 emit_binding_drop(function, name, locals, types, functions, layouts)?;
             }

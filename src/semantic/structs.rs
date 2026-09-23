@@ -250,12 +250,6 @@ impl Analyzer {
         })
     }
 
-    fn expression_type_name(&self, expression: &Expr) -> Option<String> {
-        self.expression_type(expression)
-            .map(|ty| ty.spec().name.to_owned())
-            .or_else(|| self.expression_struct_type(expression))
-    }
-
     pub(super) fn struct_field(&self, struct_name: &str, field: &str) -> Option<&StructField> {
         self.struct_types.get(struct_name).and_then(|definition| {
             definition.fields.iter().find(|candidate| candidate.name == field)

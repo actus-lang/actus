@@ -1,8 +1,14 @@
 mod abi;
 mod calls;
+mod case;
 mod cleanup;
 mod control_flow;
 mod declarations;
+mod enum_layout;
+mod enums;
+mod expression_construct;
+mod expression_literals;
+mod expression_operations;
 mod expressions;
 mod layout;
 mod linker;

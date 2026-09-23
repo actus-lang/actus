@@ -1,4 +1,4 @@
-# Phase 14: Future Language Extensions
+# Phase 16: Self-Hosting and Future Language Extensions
 
 These features are intentionally outside the initial Alpha core and require a separate design decision:
 

@@ -34,6 +34,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if self.enum_receiver_name(receiver).is_some() {
+            return self.validate_enum_constructor(receiver, method, arguments, span);
+        }
         self.visit_expression(receiver)?;
         let signature = self.method_signature(method, span)?;
         let (receiver_name, receiver_role, receiver_type) =
@@ -133,6 +136,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. } => *span,
+        | Expr::FieldAccess { span, .. }
+        | Expr::Case { span, .. } => *span,
     }
 }

@@ -97,6 +97,14 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
             }
         }
         Expr::FieldAccess { object, .. } => collect_expression(object, values),
+        Expr::Case { subject, branches, .. } => {
+            collect_expression(subject, values);
+            for branch in branches {
+                if let crate::ast::CaseBody::Expression(expression) = &branch.body {
+                    collect_expression(expression, values);
+                }
+            }
+        }
         Expr::Identifier { .. } | Expr::Integer { .. } | Expr::FloatLiteral { .. } => {}
     }
 }

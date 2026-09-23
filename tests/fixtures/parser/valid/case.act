@@ -1,0 +1,9 @@
+enum Color { Red, }
+
+verb main() -> Int {
+    return case value {
+        Color.Red => 1,
+        true => 2,
+        _ => 0,
+    };
+}

@@ -23,6 +23,18 @@ fn scans_keywords_and_punctuation() {
 }
 
 #[test]
+fn scans_enum_and_case_keywords() {
+    let (tokens, errors) = scan("enum Color { Red, } case true => _");
+
+    assert!(errors.is_empty());
+    assert_eq!(tokens[0].kind, TokenKind::Enum);
+    assert_eq!(tokens[6].kind, TokenKind::Case);
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::True));
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::FatArrow));
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::Underscore));
+}
+
+#[test]
 fn scans_struct_fields_and_dot_access() {
     let (tokens, errors) = scan("struct Point { erg payload: Buffer, x: F32 } point.x");
 
@@ -45,6 +57,29 @@ fn scans_struct_fields_and_dot_access() {
             &TokenKind::Identifier("point".to_owned()),
             &TokenKind::Dot,
             &TokenKind::Identifier("x".to_owned()),
+            &TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn scans_comparison_and_logical_operators() {
+    let (tokens, errors) = scan("< <= > >= == != ! => -> =");
+
+    assert!(errors.is_empty());
+    assert_eq!(
+        tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+        vec![
+            &TokenKind::LessThan,
+            &TokenKind::LessEquals,
+            &TokenKind::GreaterThan,
+            &TokenKind::GreaterEquals,
+            &TokenKind::DoubleEquals,
+            &TokenKind::BangEquals,
+            &TokenKind::Bang,
+            &TokenKind::FatArrow,
+            &TokenKind::Arrow,
+            &TokenKind::Equals,
             &TokenKind::Eof,
         ]
     );

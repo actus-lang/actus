@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, Expr, Program, Role, Stmt, StructDef, TopLevelDecl, lookup_builtin_type,
+    Block, BuiltinType, EnumDef, Expr, Program, Role, Stmt, StructDef, TopLevelDecl,
+    lookup_builtin_type,
 };
 
 use super::errors::{SemanticError, SemanticErrorKind};
@@ -12,6 +13,7 @@ pub(super) struct ScopeFrame {
     pub(super) bindings: HashMap<String, usize>,
     pub(super) borrow_ids: Vec<usize>,
     pub(super) declaration_indices: Vec<usize>,
+    pub(super) payload_cleanup: Vec<(usize, String, String, String)>,
 }
 
 pub(super) struct Analyzer {
@@ -23,7 +25,9 @@ pub(super) struct Analyzer {
     pub(super) loop_boundaries: Vec<usize>,
     pub(super) current_return_type: Option<BuiltinType>,
     pub(super) struct_types: HashMap<String, StructDef>,
+    pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) binding_struct_types: HashMap<usize, String>,
+    pub(super) binding_enum_types: HashMap<usize, String>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -47,12 +51,16 @@ impl Analyzer {
             loop_boundaries: Vec::new(),
             current_return_type: None,
             struct_types: HashMap::new(),
+            enum_types: HashMap::new(),
             binding_struct_types: HashMap::new(),
+            binding_enum_types: HashMap::new(),
         }
     }
 
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
+        self.register_enums(program)?;
         self.register_structs(program)?;
+        self.validate_recursive_types()?;
         self.register_declarations(program)?;
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
@@ -69,7 +77,7 @@ impl Analyzer {
                 TopLevelDecl::ExternalVerb(verb) => {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
-                TopLevelDecl::Struct(_) => continue,
+                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
             };
             for parameter in params {
                 self.validate_type_name(&parameter.ty.name, parameter.ty.span)?;
@@ -110,6 +118,7 @@ impl Analyzer {
                 let ty = lookup_builtin_type(&parameter.ty.name);
                 self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
                 self.record_struct_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
+                self.record_enum_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
             }
             self.visit_block(&verb.body)?;
             if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
@@ -123,7 +132,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
+    pub(super) fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
         for statement in &block.statements {
             self.visit_statement(statement)?;
         }
@@ -143,7 +152,8 @@ impl Analyzer {
                     self.register_borrow(initializer, *span)?;
                 }
                 self.bind(role.clone(), name.clone(), binding_type, *span)?;
-                self.record_initializer_struct_type(name, initializer, *span)
+                self.record_initializer_struct_type(name, initializer, *span)?;
+                self.record_initializer_enum_type(name, initializer, *span)
             }
             Stmt::Assignment { name, value, span } => {
                 let index = self.binding(name, *span)?;
@@ -202,8 +212,16 @@ impl Analyzer {
                 self.validate_struct_literal(name, fields, *span)
             }
             Expr::FieldAccess { object, field, span } => {
-                self.visit_expression(object)?;
-                self.validate_field_access(object, field, *span)
+                if self.enum_receiver_name(object).is_some() {
+                    self.validate_enum_unit_variant(object, field, *span)
+                } else {
+                    self.visit_expression(object)?;
+                    self.validate_field_access(object, field, *span)
+                }
+            }
+            Expr::Case { mode, subject, branches, span } => {
+                self.visit_expression(subject)?;
+                self.validate_case_patterns(*mode, subject, branches, *span)
             }
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }

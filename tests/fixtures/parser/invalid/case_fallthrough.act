@@ -1,0 +1,5 @@
+verb main() {
+    case value {
+        1: 2,
+    };
+}

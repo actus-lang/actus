@@ -6,6 +6,51 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::BindingState;
 
 impl Analyzer {
+    pub(super) fn consume_case_subject(
+        &mut self,
+        subject: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Expr::Identifier { name, span: subject_span } = subject else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidCaseRole {
+                    mode: "dat".to_owned(),
+                    subject: "non-binding".to_owned(),
+                },
+                span,
+            });
+        };
+        let index = self.binding(name, *subject_span)?;
+        if self.model.bindings[index].role == Role::Abs {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidCaseRole {
+                    mode: "dat".to_owned(),
+                    subject: name.clone(),
+                },
+                span,
+            });
+        }
+        match self.model.bindings[index].state {
+            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
+            BindingState::Frozen { .. } => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::MoveFrozen {
+                        name: name.clone(),
+                        borrow_ids: self.blocking_borrow_ids(index),
+                    },
+                    span,
+                });
+            }
+            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                    span,
+                });
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn initialize_owner(
         &mut self,
         expression: &Expr,
@@ -137,6 +182,12 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         self.ensure_readable(index, name, span)?;
+        if self.model.bindings[index].role == Role::Abs {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidMutation { name: name.to_owned() },
+                span,
+            });
+        }
         if matches!(self.model.bindings[index].state, BindingState::Frozen { .. }) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MoveFrozen {
@@ -200,6 +251,7 @@ fn contains_returned_borrow(expression: &Expr) -> bool {
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. } => false,
         Expr::StructLit { .. } | Expr::FieldAccess { .. } => false,
+        Expr::Case { .. } => false,
     }
 }
 
@@ -235,6 +287,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. } => *span,
+        | Expr::FieldAccess { span, .. }
+        | Expr::Case { span, .. } => *span,
     }
 }

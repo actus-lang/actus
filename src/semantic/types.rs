@@ -10,7 +10,10 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if lookup_builtin_type(name).is_some() || self.struct_types.contains_key(name) {
+        if lookup_builtin_type(name).is_some()
+            || self.struct_types.contains_key(name)
+            || self.enum_types.contains_key(name)
+        {
             return Ok(());
         }
         Err(SemanticError { kind: SemanticErrorKind::UnknownType { name: name.to_owned() }, span })
@@ -52,6 +55,21 @@ impl Analyzer {
             }
             return Ok(());
         }
+        if self.enum_types.contains_key(expected_name) {
+            let found =
+                self.expression_type_name(initializer).unwrap_or_else(|| "unknown".to_owned());
+            if found != expected_name {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::BindingTypeMismatch {
+                        binding: name.to_owned(),
+                        expected: expected_name.to_owned(),
+                        found,
+                    },
+                    span,
+                });
+            }
+            return Ok(());
+        }
         let Some(found) = self.expression_type(initializer) else { return Ok(()) };
         let expected = lookup_builtin_type(expected_name).expect("declared type was validated");
         self.ensure_binding_type(name, expected, found, span)
@@ -64,6 +82,20 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if let Some(expected) = self.binding_enum_types.get(&index) {
+            let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
+            if &found == expected {
+                return Ok(());
+            }
+            return Err(SemanticError {
+                kind: SemanticErrorKind::BindingTypeMismatch {
+                    binding: name.to_owned(),
+                    expected: expected.clone(),
+                    found,
+                },
+                span,
+            });
+        }
         let Some(expected) = self.model.bindings[index].ty else { return Ok(()) };
         let Some(found) = self.expression_type(value) else { return Ok(()) };
         self.ensure_binding_type(name, expected, found, span)
@@ -116,6 +148,14 @@ impl Analyzer {
                 .expression_struct_type(object)
                 .and_then(|name| self.struct_field(&name, field))
                 .and_then(|field| lookup_builtin_type(&field.ty.name)),
+            Expr::Case { .. } => None,
         }
+    }
+
+    pub(super) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
+        self.expression_type(expression)
+            .map(|ty| ty.spec().name.to_owned())
+            .or_else(|| self.expression_struct_type(expression))
+            .or_else(|| self.expression_enum_type(expression))
     }
 }
