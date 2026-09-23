@@ -295,3 +295,7 @@ fn canonical_type_name(type_name: &TypeName) -> String {
         type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )
 }
+
+pub(super) fn generic_receiver_type(receiver: &Expr) -> Option<TypeName> {
+    receiver_type_name(receiver)
+}

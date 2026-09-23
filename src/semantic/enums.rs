@@ -1,4 +1,4 @@
-use crate::ast::{EnumPayload, Expr};
+use crate::ast::{EnumPayload, Expr, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -16,12 +16,15 @@ impl Analyzer {
     }
 
     pub(super) fn validate_enum_unit_variant(
-        &self,
+        &mut self,
         receiver: &Expr,
         variant: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let enum_name = self.enum_receiver_name(receiver).expect("enum receiver expected");
+        if let Some(receiver_type) = super::enum_constructors::generic_receiver_type(receiver) {
+            self.validate_type_reference(&receiver_type)?;
+        }
         let definition = &self.enum_types[enum_name];
         let Some(candidate) = definition.variants.iter().find(|item| item.name == variant) else {
             return Err(SemanticError {
@@ -65,14 +68,17 @@ impl Analyzer {
     pub(super) fn record_enum_binding(
         &mut self,
         name: &str,
-        type_name: &str,
+        type_name: &TypeName,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if !self.enum_types.contains_key(type_name) {
+        if !self.enum_types.contains_key(&type_name.name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.binding_enum_types.insert(index, type_name.to_owned());
+        self.binding_enum_types.insert(index, type_name.name.clone());
+        if !type_name.arguments.is_empty() {
+            self.binding_enum_type_applications.insert(index, type_name.clone());
+        }
         Ok(())
     }
 

@@ -90,6 +90,36 @@ fn cleans_up_owned_field_in_monomorphized_generic_struct() {
 
 #[cfg(unix)]
 #[test]
+fn executes_monomorphized_generic_enum_cleanup() {
+    build_and_run(
+        "enum Box[T] { Some(T), None, } verb main() -> Int { erg item = Box[Buffer].Some(allocate(4)); return case dat item { Box.Some(payload) => { drop(payload); return 42; }, Box.None => 0, }; }\n",
+        "generic-enum-cleanup",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_option_none_without_null_propagation() {
+    build_and_run(
+        "verb main() -> Int { erg option = Option[Int].None; return case dat option { Option.Some(_) => 1, Option.None => 0, }; }\n",
+        "option-none",
+        0,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_result_err_without_exception_propagation() {
+    build_and_run(
+        "verb main() -> Int { erg result = Result[Int, String].Err(\"error\"); return case dat result { Result.Ok(_) => 1, Result.Err(message) => { drop(message); return 0; }, }; }\n",
+        "result-err",
+        0,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn avoids_double_drop_after_moving_owned_field() {
     build_and_run(
         "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: allocate(4), value: 42, }; consume(payload: holder.payload); return 42; }\n",

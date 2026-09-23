@@ -84,6 +84,28 @@ fn validates_exhaustive_enum_patterns_and_payload_bindings() {
 }
 
 #[test]
+fn applies_generic_enum_ownership_to_payload_cleanup() {
+    let model = analyze_source(
+        "enum Box[T] { Some(T), None, } verb main(erg item: Box[Buffer]) -> Int { return case dat item { Box.Some(_) => 42, Box.None => 0, }; }",
+    )
+    .expect("generic enum ownership should be valid");
+    assert!(model.cleanup_plans.iter().any(|plan| {
+        plan.actions
+            .iter()
+            .any(|action| matches!(action, actus::semantic::CleanupAction::DropPayloadField { .. }))
+    }));
+}
+
+#[test]
+fn rejects_use_after_move_for_generic_enum_owners() {
+    let error = analyze_source(
+        "enum Box[T] { Some(T), None, } verb consume(dat item: Box[Int]) { } verb main(erg item: Box[Int]) { consume(item: item); return item; }",
+    )
+    .expect_err("moved generic enum owners must not be reused");
+    assert!(matches!(error.kind, SemanticErrorKind::UseAfterMove { name } if name == "item"));
+}
+
+#[test]
 fn rejects_non_exhaustive_enum_and_primitive_patterns() {
     let enum_error = analyze_source(
         "enum Color { Red, Green, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, }; }",

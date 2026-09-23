@@ -27,9 +27,9 @@ is expanded.
 - [x] Monomorphize reachable generic instances deterministically.
 - [x] Cache instances by canonical type arguments and compiler toolchain hash.
 - [x] Calculate concrete struct and tagged-union layouts after substitution.
-- [ ] Lower generic ownership, borrow, move, and cleanup semantics without
+- [x] Lower generic ownership, borrow, move, and cleanup semantics without
   weakening `erg`, `abs`, or `dat` rules.
-- [ ] Add Cranelift layout and native execution golden tests.
+- [x] Add Cranelift layout and native execution golden tests.
 
 ## Built-in Result Types
 
@@ -37,7 +37,12 @@ is expanded.
 - [x] Register `Result[T, E]` as a compiler-provided generic enum.
 - [x] Validate `Some`, `None`, `Ok`, and `Err` construction.
 - [x] Support exhaustive `case abs` and consuming `case dat` matching.
-- [ ] Define null-free propagation behavior without exceptions.
+- [x] Define null-free propagation behavior without exceptions.
+
+`Option[T]` and `Result[T, E]` propagate only through explicit exhaustive
+`case abs` or `case dat` branches. `None` and `Err` are ordinary tagged
+variants, never null values or hidden exceptions; unmatched paths are rejected
+by semantic analysis.
 
 ## Completion Gates
 

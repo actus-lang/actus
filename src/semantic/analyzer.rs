@@ -29,6 +29,7 @@ pub(super) struct Analyzer {
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
+    pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
 }
@@ -59,6 +60,7 @@ impl Analyzer {
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
+            binding_enum_type_applications: HashMap::new(),
             generic_scopes: Vec::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
         }
@@ -134,7 +136,7 @@ impl Analyzer {
                 let ty = lookup_builtin_type(&parameter.ty.name);
                 self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
                 self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
-                self.record_enum_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
+                self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
             }
             self.visit_block(&verb.body)?;
             if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
