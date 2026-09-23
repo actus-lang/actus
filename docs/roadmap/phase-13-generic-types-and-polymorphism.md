@@ -25,7 +25,7 @@ is expanded.
 ## Monomorphization and Layout
 
 - [x] Monomorphize reachable generic instances deterministically.
-- [ ] Cache instances by canonical type arguments and compiler toolchain hash.
+- [x] Cache instances by canonical type arguments and compiler toolchain hash.
 - [x] Calculate concrete struct and tagged-union layouts after substitution.
 - [ ] Lower generic ownership, borrow, move, and cleanup semantics without
   weakening `erg`, `abs`, or `dat` rules.
@@ -33,16 +33,16 @@ is expanded.
 
 ## Built-in Result Types
 
-- [ ] Register `Option[T]` as a compiler-provided generic enum.
-- [ ] Register `Result[T, E]` as a compiler-provided generic enum.
-- [ ] Validate `Some`, `None`, `Ok`, and `Err` construction.
-- [ ] Support exhaustive `case abs` and consuming `case dat` matching.
+- [x] Register `Option[T]` as a compiler-provided generic enum.
+- [x] Register `Result[T, E]` as a compiler-provided generic enum.
+- [x] Validate `Some`, `None`, `Ok`, and `Err` construction.
+- [x] Support exhaustive `case abs` and consuming `case dat` matching.
 - [ ] Define null-free propagation behavior without exceptions.
 
 ## Completion Gates
 
 - [x] Add positive and negative semantic tests for generic declarations and
   applications.
-- [ ] Add deterministic monomorphization and cache invalidation tests.
-- [ ] Add end-to-end executable tests for `Option` and `Result`.
+- [x] Add deterministic monomorphization and cache invalidation tests.
+- [x] Add end-to-end executable tests for `Option` and `Result`.
 - [x] Keep all source and function limits within repository policy.

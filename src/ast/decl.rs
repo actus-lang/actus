@@ -116,3 +116,54 @@ pub struct GenericParam {
     pub bound: Option<TypeName>,
     pub span: SourceSpan,
 }
+
+pub fn builtin_enum_definitions() -> Vec<EnumDef> {
+    vec![
+        EnumDef {
+            name: "Option".to_owned(),
+            generic_parameters: vec![generic_parameter("T")],
+            variants: vec![
+                EnumVariant {
+                    name: "Some".to_owned(),
+                    payload: EnumPayload::Tuple(vec![type_name("T")]),
+                    span: zero_span(),
+                },
+                EnumVariant {
+                    name: "None".to_owned(),
+                    payload: EnumPayload::Unit,
+                    span: zero_span(),
+                },
+            ],
+            span: zero_span(),
+        },
+        EnumDef {
+            name: "Result".to_owned(),
+            generic_parameters: vec![generic_parameter("T"), generic_parameter("E")],
+            variants: vec![
+                EnumVariant {
+                    name: "Ok".to_owned(),
+                    payload: EnumPayload::Tuple(vec![type_name("T")]),
+                    span: zero_span(),
+                },
+                EnumVariant {
+                    name: "Err".to_owned(),
+                    payload: EnumPayload::Tuple(vec![type_name("E")]),
+                    span: zero_span(),
+                },
+            ],
+            span: zero_span(),
+        },
+    ]
+}
+
+fn generic_parameter(name: &str) -> GenericParam {
+    GenericParam { name: name.to_owned(), bound: None, span: zero_span() }
+}
+
+fn type_name(name: &str) -> TypeName {
+    TypeName { name: name.to_owned(), arguments: Vec::new(), span: zero_span() }
+}
+
+fn zero_span() -> SourceSpan {
+    SourceSpan::new(0, 0)
+}

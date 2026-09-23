@@ -53,6 +53,10 @@ impl LayoutRegistry {
             .map(|variant| (id, variant))
     }
 
+    pub(super) fn enum_variant(&self, enum_id: usize, variant: &str) -> Option<&EnumVariantLayout> {
+        self.enum_layout(enum_id)?.variants.iter().find(|candidate| candidate.name == variant)
+    }
+
     pub(super) fn enum_stack_slot(&self, layout: &EnumLayout) -> StackSlotData {
         StackSlotData::new(
             StackSlotKind::ExplicitSlot,

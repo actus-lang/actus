@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     EnumDef, EnumPayload, EnumVariant, GenericParam, Program, StructDef, StructField, TopLevelDecl,
-    TypeName,
+    TypeName, builtin_enum_definitions,
 };
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
@@ -78,14 +78,23 @@ fn struct_definitions(program: &Program) -> HashMap<String, StructDef> {
 }
 
 fn enum_definitions(program: &Program) -> HashMap<String, EnumDef> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            TopLevelDecl::Enum(definition) => Some((definition.name.clone(), definition.clone())),
-            _ => None,
-        })
-        .collect()
+    let mut definitions = builtin_enum_definitions()
+        .into_iter()
+        .map(|definition| (definition.name.clone(), definition))
+        .collect::<HashMap<_, _>>();
+    definitions.extend(
+        program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Enum(definition) => {
+                    Some((definition.name.clone(), definition.clone()))
+                }
+                _ => None,
+            })
+            .collect::<HashMap<_, _>>(),
+    );
+    definitions
 }
 
 fn generic_struct_names(definitions: &HashMap<String, StructDef>) -> HashSet<String> {

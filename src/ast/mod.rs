@@ -11,6 +11,7 @@ pub use abi::ForeignAbi;
 pub use decl::{
     EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl, GenericParam, Param, Program,
     Role, StructDef, StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl,
+    builtin_enum_definitions,
 };
 pub use expr::{
     Argument, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, StructFieldInit, UnaryOp,

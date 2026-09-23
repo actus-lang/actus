@@ -123,12 +123,10 @@ impl Analyzer {
             return;
         }
         let canonical_key = canonical_type_name(type_name);
-        self.generic_instances.entry(canonical_key.clone()).or_insert_with(|| {
-            super::model::GenericInstance {
-                name: type_name.name.clone(),
-                arguments: type_name.arguments.clone(),
-                canonical_key,
-            }
+        self.generic_instances.insert(super::model::GenericInstance {
+            name: type_name.name.clone(),
+            arguments: type_name.arguments.clone(),
+            canonical_key,
         });
     }
 

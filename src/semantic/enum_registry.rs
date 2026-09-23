@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{EnumDef, EnumPayload, Program, StructDef, TopLevelDecl};
+use crate::ast::{
+    EnumDef, EnumPayload, Program, StructDef, TopLevelDecl, builtin_enum_definitions,
+};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -16,6 +18,9 @@ impl Analyzer {
                     span: definition.span,
                 });
             }
+        }
+        for definition in builtin_enum_definitions() {
+            self.enum_types.entry(definition.name.clone()).or_insert(definition);
         }
         let definitions = self.enum_types.values().cloned().collect::<Vec<_>>();
         for definition in definitions {

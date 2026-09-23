@@ -230,7 +230,12 @@ impl Analyzer {
         if binding.name == "_" {
             return Ok(());
         }
-        self.validate_type_name(type_name, binding.span)?;
+        let is_generic_payload = self.enum_types.values().any(|definition| {
+            definition.generic_parameters.iter().any(|parameter| parameter.name == type_name)
+        });
+        if !self.is_generic_parameter(type_name) && !is_generic_payload {
+            self.validate_type_name(type_name, binding.span)?;
+        }
         self.bind(
             match mode {
                 crate::ast::CaseMode::Abs => Role::Abs,

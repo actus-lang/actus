@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     Block, BuiltinType, EnumDef, Expr, Program, Role, Stmt, StructDef, TopLevelDecl,
@@ -30,7 +30,7 @@ pub(super) struct Analyzer {
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
-    pub(super) generic_instances: BTreeMap<String, super::model::GenericInstance>,
+    pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -60,7 +60,7 @@ impl Analyzer {
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
             generic_scopes: Vec::new(),
-            generic_instances: BTreeMap::new(),
+            generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
         }
     }
 
@@ -71,7 +71,7 @@ impl Analyzer {
         self.register_declarations(program)?;
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
-        self.model.generic_instances = self.generic_instances.into_values().collect();
+        self.model.generic_instances = self.generic_instances.into_instances();
         self.current_return_type = None;
         Ok(self.model)
     }

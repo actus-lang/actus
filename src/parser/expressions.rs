@@ -83,6 +83,10 @@ impl Parser {
                 span: SourceSpan::new(span.start, end),
             });
         }
+        if !type_arguments.is_empty() && self.check_simple(&TokenKind::Dot) {
+            let qualified_name = format_type_application(&name, &type_arguments);
+            return Ok(Expr::Identifier { name: qualified_name, span });
+        }
         if !self.case_subject && self.match_simple(TokenKind::LeftBrace) {
             return self.parse_struct_literal(name, type_arguments, span.start);
         }
@@ -150,4 +154,15 @@ impl Parser {
         }
         Ok(arguments)
     }
+}
+
+fn format_type_application(name: &str, arguments: &[crate::ast::TypeName]) -> String {
+    format!("{}[{}]", name, arguments.iter().map(format_type_name).collect::<Vec<_>>().join(","))
+}
+
+fn format_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format_type_application(&type_name.name, &type_name.arguments)
 }
