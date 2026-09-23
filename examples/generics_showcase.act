@@ -1,0 +1,48 @@
+// Generic ownership, nested applications, and explicit enum propagation.
+
+struct Box[T] {
+    erg item: T,
+    label: Int,
+}
+
+verb consume_buffer(dat buffer: Buffer) -> Int {
+    drop(buffer);
+    return 1;
+}
+
+verb consume_item(dat item: Int) -> Int {
+    return item;
+}
+
+verb main() -> Int {
+    erg nested = Box[Option[Int]] {
+        item: Option[Int].Some(40),
+        label: 2,
+    };
+
+    erg option = Option[Int].Some(40);
+    abs option_view = ref option;
+    erg inspected = case abs option_view {
+        Option.Some(value) => value,
+        Option.None => 0,
+    };
+
+    erg boxed = Box[Int] {
+        item: 41,
+        label: 1,
+    };
+    erg consumed = consume_item(item: boxed.item);
+
+    erg result = Result[Int, String].Ok(39);
+    erg handled = case dat result {
+        Result.Ok(value) => value,
+        Result.Err(message) => {
+            drop(message);
+            return 0;
+        },
+    };
+    erg buffer = allocate(length: 4);
+    erg cleanup = consume_buffer(buffer: buffer);
+
+    return consumed + cleanup + handled + inspected + nested.label;
+}
