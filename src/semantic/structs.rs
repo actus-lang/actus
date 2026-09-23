@@ -143,7 +143,7 @@ impl Analyzer {
             .map(|type_name| canonical_type_name(&type_name))
     }
 
-    fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
+    pub(super) fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
         match expression {
             Expr::StructLit { name, type_arguments, span, .. } => Some(TypeName {
                 name: name.clone(),
@@ -312,7 +312,7 @@ impl Analyzer {
         {
             self.expression_type(value) == Some(expected_builtin)
         } else {
-            self.expression_struct_type(value).as_deref() == Some(expected_name.as_str())
+            self.expression_type_name(value).as_deref() == Some(expected_name.as_str())
         };
         if matches {
             return Ok(());

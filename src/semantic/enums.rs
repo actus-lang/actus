@@ -50,6 +50,11 @@ impl Analyzer {
     }
 
     pub(super) fn expression_enum_type(&self, expression: &Expr) -> Option<String> {
+        if let Some(type_name) = self.resolved_type_name(expression)
+            && self.enum_types.contains_key(&type_name.name)
+        {
+            return Some(type_name.name);
+        }
         match expression {
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => {
                 self.enum_receiver_name(object).map(str::to_owned)
@@ -63,6 +68,10 @@ impl Analyzer {
                 .and_then(|index| self.binding_enum_types.get(&index).cloned()),
             _ => None,
         }
+    }
+
+    pub(super) fn expression_enum_type_application(&self, expression: &Expr) -> Option<String> {
+        self.enum_type_application(expression).map(|type_name| canonical_type_name(&type_name))
     }
 
     pub(super) fn record_enum_binding(
@@ -91,7 +100,25 @@ impl Analyzer {
         let Some(type_name) = self.expression_enum_type(initializer) else { return Ok(()) };
         let index = self.binding(name, span)?;
         self.binding_enum_types.insert(index, type_name);
+        if let Some(type_name) = self.enum_type_application(initializer) {
+            self.binding_enum_type_applications.insert(index, type_name);
+        }
         Ok(())
+    }
+
+    fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
+        if let Some(type_name) = self.resolved_type_name(expression)
+            && self.enum_types.contains_key(&type_name.name)
+        {
+            return Some(type_name);
+        }
+        let receiver = match expression {
+            Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => object,
+            Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => expression,
+            _ => return None,
+        };
+        super::enum_constructors::generic_receiver_type(receiver)
+            .filter(|type_name| self.enum_types.contains_key(&type_name.name))
     }
 }
 
@@ -101,4 +128,15 @@ fn payload_count(payload: &EnumPayload) -> usize {
         EnumPayload::Tuple(types) => types.len(),
         EnumPayload::Struct(fields) => fields.len(),
     }
+}
+
+fn canonical_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }

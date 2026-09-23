@@ -156,6 +156,7 @@ impl Analyzer {
         self.expression_type(expression)
             .map(|ty| ty.spec().name.to_owned())
             .or_else(|| self.expression_struct_type(expression))
+            .or_else(|| self.expression_enum_type_application(expression))
             .or_else(|| self.expression_enum_type(expression))
     }
 }

@@ -13,7 +13,10 @@ pub(super) fn specialized_structs(
     instances: &[GenericInstance],
 ) -> Result<Vec<StructDef>, NativeEmitError> {
     let definitions = struct_definitions(program);
-    let generic_names = generic_struct_names(&definitions);
+    let generic_names = generic_struct_names(&definitions)
+        .into_iter()
+        .chain(generic_enum_names(&enum_definitions(program)))
+        .collect::<HashSet<_>>();
     instances
         .iter()
         .filter_map(|instance| {
