@@ -27,6 +27,7 @@ pub(super) struct Analyzer {
     pub(super) struct_types: HashMap<String, StructDef>,
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) binding_struct_types: HashMap<usize, String>,
+    pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
     pub(super) generic_instances: BTreeMap<String, super::model::GenericInstance>,
@@ -56,6 +57,7 @@ impl Analyzer {
             struct_types: HashMap::new(),
             enum_types: HashMap::new(),
             binding_struct_types: HashMap::new(),
+            binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
             generic_scopes: Vec::new(),
             generic_instances: BTreeMap::new(),
@@ -131,7 +133,7 @@ impl Analyzer {
             for parameter in &verb.params {
                 let ty = lookup_builtin_type(&parameter.ty.name);
                 self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
-                self.record_struct_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
+                self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
                 self.record_enum_binding(&parameter.name, &parameter.ty.name, parameter.span)?;
             }
             self.visit_block(&verb.body)?;

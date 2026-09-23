@@ -105,14 +105,17 @@ impl Analyzer {
     pub(super) fn record_struct_binding(
         &mut self,
         name: &str,
-        type_name: &str,
+        type_name: &TypeName,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if !self.struct_types.contains_key(type_name) {
+        if !self.struct_types.contains_key(&type_name.name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.binding_struct_types.insert(index, type_name.to_owned());
+        self.binding_struct_types.insert(index, type_name.name.clone());
+        if !type_name.arguments.is_empty() {
+            self.binding_struct_type_applications.insert(index, type_name.clone());
+        }
         Ok(())
     }
 
@@ -122,32 +125,64 @@ impl Analyzer {
         initializer: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let Some(type_name) = self.expression_struct_type(initializer) else { return Ok(()) };
+        let Some(type_name) = self.resolved_type_name(initializer) else { return Ok(()) };
+        if !self.struct_types.contains_key(&type_name.name) {
+            return Ok(());
+        }
         let index = self.binding(name, span)?;
-        self.binding_struct_types.insert(index, type_name);
+        self.binding_struct_types.insert(index, type_name.name.clone());
+        if !type_name.arguments.is_empty() {
+            self.binding_struct_type_applications.insert(index, type_name);
+        }
         Ok(())
     }
 
     pub(super) fn expression_struct_type(&self, expression: &Expr) -> Option<String> {
+        self.resolved_type_name(expression)
+            .filter(|type_name| self.struct_types.contains_key(&type_name.name))
+            .map(|type_name| canonical_type_name(&type_name))
+    }
+
+    fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
         match expression {
-            Expr::StructLit { name, .. } if self.struct_types.contains_key(name) => {
-                Some(name.clone())
-            }
-            Expr::Identifier { name, span } => self
-                .binding(name, *span)
-                .ok()
-                .and_then(|index| self.binding_struct_types.get(&index).cloned()),
+            Expr::StructLit { name, type_arguments, span, .. } => Some(TypeName {
+                name: name.clone(),
+                arguments: type_arguments.clone(),
+                span: *span,
+            }),
+            Expr::Identifier { name, span } => self.binding(name, *span).ok().and_then(|index| {
+                self.binding_struct_type_applications.get(&index).cloned().or_else(|| {
+                    self.binding_struct_types.get(&index).map(|name| TypeName {
+                        name: name.clone(),
+                        arguments: Vec::new(),
+                        span: *span,
+                    })
+                })
+            }),
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
-                self.expression_struct_type(expression)
+                self.resolved_type_name(expression)
             }
             Expr::FieldAccess { object, field, .. } => self
-                .expression_struct_type(object)
-                .and_then(|name| self.struct_field(&name, field))
-                .and_then(|field| {
-                    self.struct_types.contains_key(&field.ty.name).then(|| field.ty.name.clone())
-                }),
+                .resolved_type_name(object)
+                .and_then(|type_name| self.specialized_field_type(&type_name, field)),
             _ => None,
         }
+    }
+
+    fn specialized_field_type(&self, type_name: &TypeName, field: &str) -> Option<TypeName> {
+        let definition = self.struct_types.get(&type_name.name)?;
+        let field = definition.fields.iter().find(|candidate| candidate.name == field)?;
+        if type_name.arguments.is_empty() {
+            return Some(field.ty.clone());
+        }
+        TypeSubstitution::for_type(
+            &definition.name,
+            &definition.generic_parameters,
+            &type_name.arguments,
+            type_name.span,
+        )
+        .ok()
+        .map(|substitution| substitution.apply(&field.ty))
     }
 
     pub(super) fn validate_struct_literal(
@@ -269,12 +304,15 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        let expected_name = canonical_type_name(expected_type);
         let expected = expected_type.name.as_str();
         let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
-        let matches = if let Some(expected_builtin) = lookup_builtin_type(expected) {
+        let matches = if expected_type.arguments.is_empty()
+            && let Some(expected_builtin) = lookup_builtin_type(expected)
+        {
             self.expression_type(value) == Some(expected_builtin)
         } else {
-            self.expression_struct_type(value).as_deref() == Some(expected)
+            self.expression_struct_type(value).as_deref() == Some(expected_name.as_str())
         };
         if matches {
             return Ok(());
@@ -283,7 +321,7 @@ impl Analyzer {
             kind: SemanticErrorKind::StructFieldTypeMismatch {
                 struct_name: struct_name.to_owned(),
                 field: field.name.clone(),
-                expected: expected.to_owned(),
+                expected: expected_name,
                 found,
             },
             span,
@@ -291,7 +329,8 @@ impl Analyzer {
     }
 
     pub(super) fn struct_field(&self, struct_name: &str, field: &str) -> Option<&StructField> {
-        self.struct_types.get(struct_name).and_then(|definition| {
+        let base_name = struct_name.split('[').next().unwrap_or(struct_name);
+        self.struct_types.get(base_name).and_then(|definition| {
             definition.fields.iter().find(|candidate| candidate.name == field)
         })
     }
@@ -303,4 +342,15 @@ fn root_binding(expression: &Expr) -> Option<(&str, SourceSpan)> {
         Expr::FieldAccess { object, .. } => root_binding(object),
         _ => None,
     }
+}
+
+fn canonical_type_name(type_name: &TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }

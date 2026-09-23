@@ -24,7 +24,7 @@ is expanded.
 
 ## Monomorphization and Layout
 
-- [ ] Monomorphize reachable generic instances deterministically.
+- [x] Monomorphize reachable generic instances deterministically.
 - [ ] Cache instances by canonical type arguments and compiler toolchain hash.
 - [x] Calculate concrete struct and tagged-union layouts after substitution.
 - [ ] Lower generic ownership, borrow, move, and cleanup semantics without
@@ -45,4 +45,4 @@ is expanded.
   applications.
 - [ ] Add deterministic monomorphization and cache invalidation tests.
 - [ ] Add end-to-end executable tests for `Option` and `Result`.
-- [ ] Keep all source and function limits within repository policy.
+- [x] Keep all source and function limits within repository policy.
