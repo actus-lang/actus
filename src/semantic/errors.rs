@@ -84,6 +84,11 @@ pub enum SemanticErrorKind {
         expected: usize,
         found: usize,
     },
+    GenericConstraintMismatch {
+        parameter: String,
+        constraint: String,
+        argument: String,
+    },
     DuplicateVerbName {
         name: String,
     },

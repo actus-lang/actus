@@ -57,6 +57,19 @@ fn parses_generic_parameters_and_type_applications() {
 }
 
 #[test]
+fn parses_multiple_generic_bounds() {
+    let (tokens, errors) = scan("verb write[T: Writer + Serializable](erg item: T) { }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("multiple generic bounds should parse");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let bounds = &verb.generic_parameters[0].bounds;
+    assert_eq!(
+        bounds.iter().map(|bound| bound.name.as_str()).collect::<Vec<_>>(),
+        ["Writer", "Serializable"]
+    );
+}
+
+#[test]
 fn rejects_duplicate_generic_parameters() {
     let (tokens, errors) = scan("struct Pair[T, T] { first: T, second: T, }");
     assert!(errors.is_empty());

@@ -19,15 +19,21 @@ impl Parser {
             if !names.insert(name.clone()) {
                 return Err(duplicate_name("generic parameter", name, name_token.span));
             }
-            let bound = if self.match_simple(TokenKind::Colon) {
-                Some(self.parse_type_name()?)
+            let bounds = if self.match_simple(TokenKind::Colon) {
+                let mut bounds = vec![self.parse_type_name()?];
+                while self.match_simple(TokenKind::Plus) {
+                    bounds.push(self.parse_type_name()?);
+                }
+                bounds
             } else {
-                None
+                Vec::new()
             };
-            let end = bound.as_ref().map_or(name_token.span.end, |ty| ty.span.end);
+            let bound = bounds.first().cloned();
+            let end = bounds.last().map_or(name_token.span.end, |ty| ty.span.end);
             parameters.push(GenericParam {
                 name,
                 bound,
+                bounds,
                 span: SourceSpan::new(name_token.span.start, end),
             });
             if !self.match_simple(TokenKind::Comma) {

@@ -110,6 +110,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::InvalidMutation { .. } => "E1051",
         SemanticErrorKind::UnknownTypeParameter { .. } => "E1052",
         SemanticErrorKind::GenericArityMismatch { .. } => "E1053",
+        SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
     }
 }
 
@@ -270,6 +271,9 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::GenericArityMismatch { name, expected, found } => format!(
             "wrong number of type arguments for `{name}`: expected {expected}, found {found}"
         ),
+        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } => {
+            format!("generic parameter `{parameter}` requires `{constraint}`, found `{argument}`")
+        }
         SemanticErrorKind::DuplicateVerbName { name } => {
             format!("duplicate verb declaration `{name}`")
         }

@@ -70,8 +70,12 @@ mod tests {
 
     #[test]
     fn substitutes_nested_type_applications() {
-        let parameters =
-            vec![GenericParam { name: "T".to_owned(), bound: None, span: ty("T").span }];
+        let parameters = vec![GenericParam {
+            name: "T".to_owned(),
+            bound: None,
+            bounds: Vec::new(),
+            span: ty("T").span,
+        }];
         let substitution =
             TypeSubstitution::for_type("Box", &parameters, &[ty("Int")], ty("Box").span)
                 .expect("arity should match");

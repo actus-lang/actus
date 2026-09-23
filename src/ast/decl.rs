@@ -114,6 +114,7 @@ pub struct TypeName {
 pub struct GenericParam {
     pub name: String,
     pub bound: Option<TypeName>,
+    pub bounds: Vec<TypeName>,
     pub span: SourceSpan,
 }
 
@@ -157,7 +158,7 @@ pub fn builtin_enum_definitions() -> Vec<EnumDef> {
 }
 
 fn generic_parameter(name: &str) -> GenericParam {
-    GenericParam { name: name.to_owned(), bound: None, span: zero_span() }
+    GenericParam { name: name.to_owned(), bound: None, bounds: Vec::new(), span: zero_span() }
 }
 
 fn type_name(name: &str) -> TypeName {

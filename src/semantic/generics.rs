@@ -27,18 +27,17 @@ impl Analyzer {
 
     fn validate_generic_bounds(&self, parameters: &[GenericParam]) -> Result<(), SemanticError> {
         for parameter in parameters {
-            let Some(bound) = &parameter.bound else { continue };
-            if !bound.arguments.is_empty() {
-                return Err(arity_error(&bound.name, 0, bound.arguments.len(), bound.span));
+            for bound in parameter_bounds(parameter) {
+                if !bound.arguments.is_empty() {
+                    return Err(arity_error(&bound.name, 0, bound.arguments.len(), bound.span));
+                }
+                if self.is_generic_parameter(&bound.name) {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::UnknownTypeParameter { name: bound.name.clone() },
+                        span: bound.span,
+                    });
+                }
             }
-            if self.is_generic_parameter(&bound.name) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::UnknownTypeParameter { name: bound.name.clone() },
-                    span: bound.span,
-                });
-            }
-            // Role declarations and their scope are introduced by Phase 14. Keeping the
-            // bound as a validated, unresolved name preserves the generic API now.
         }
         Ok(())
     }
@@ -80,6 +79,7 @@ impl Analyzer {
         }
         if let Some(parameters) = self.named_type_parameters(name) {
             TypeSubstitution::for_type(name, &parameters, &type_name.arguments, type_name.span)?;
+            self.validate_type_arguments(&parameters, &type_name.arguments)?;
         }
         let arguments = type_name
             .arguments
@@ -134,6 +134,57 @@ impl Analyzer {
         self.is_generic_parameter(&type_name.name)
             || type_name.arguments.iter().any(|argument| self.contains_generic_parameter(argument))
     }
+
+    fn validate_type_arguments(
+        &self,
+        parameters: &[GenericParam],
+        arguments: &[TypeName],
+    ) -> Result<(), SemanticError> {
+        for (parameter, argument) in parameters.iter().zip(arguments) {
+            for bound in parameter_bounds(parameter) {
+                if bound.name == "Numeric"
+                    && !self.is_generic_parameter(&argument.name)
+                    && !is_numeric_type(argument)
+                {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::GenericConstraintMismatch {
+                            parameter: parameter.name.clone(),
+                            constraint: bound.name.clone(),
+                            argument: canonical_type_name(argument),
+                        },
+                        span: argument.span,
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn parameter_bounds(parameter: &GenericParam) -> Vec<&TypeName> {
+    if parameter.bounds.is_empty() {
+        parameter.bound.iter().collect()
+    } else {
+        parameter.bounds.iter().collect()
+    }
+}
+
+fn is_numeric_type(type_name: &TypeName) -> bool {
+    matches!(
+        type_name.name.as_str(),
+        "Int"
+            | "I8"
+            | "I16"
+            | "I32"
+            | "I64"
+            | "U8"
+            | "U16"
+            | "U32"
+            | "U64"
+            | "Usize"
+            | "F32"
+            | "F64"
+    ) && type_name.arguments.is_empty()
 }
 
 fn canonical_type_name(type_name: &TypeName) -> String {

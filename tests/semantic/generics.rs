@@ -74,6 +74,24 @@ fn rejects_applied_role_bounds() {
 }
 
 #[test]
+fn accepts_multiple_symbolic_bounds() {
+    analyze_source("verb write[T: Writer + Serializable](erg item: T) { }")
+        .expect("simple symbolic bounds should be retained for role validation");
+}
+
+#[test]
+fn rejects_known_constraint_mismatch() {
+    let error =
+        analyze_source("struct Box[T: Numeric] { item: T, } verb main(erg item: Box[String]) { }")
+            .expect_err("String must not satisfy Numeric");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument }
+            if parameter == "T" && constraint == "Numeric" && argument == "String"
+    ));
+}
+
+#[test]
 fn discovers_sorted_concrete_generic_instances_with_canonical_keys() {
     let model = analyze_source(
         "struct Box[T] { item: T, } struct Pair[T] { item: T, } verb main(erg left: Pair[Box[Int]], erg right: Box[Int]) { }",

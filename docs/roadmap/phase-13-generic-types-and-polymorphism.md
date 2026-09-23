@@ -16,10 +16,10 @@ is expanded.
 
 ## Constraints and Type Checking
 
-- [ ] Define the constraint syntax and built-in constraint vocabulary.
-- [ ] Validate constraints at declaration and instantiation sites.
+- [x] Define the constraint syntax and built-in constraint vocabulary.
+- [x] Validate constraints at declaration and instantiation sites.
 - [x] Resolve generic field, payload, parameter, and return types.
-- [ ] Produce stable diagnostics for failed constraints and type mismatches.
+- [x] Produce stable diagnostics for failed constraints and type mismatches.
 - [x] Reject invalid recursive generic layouts unless indirection is explicit.
 
 ## Monomorphization and Layout
