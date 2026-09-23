@@ -44,10 +44,12 @@ impl Analyzer {
     }
 
     pub(super) fn validate_type_reference(
-        &self,
+        &mut self,
         type_name: &TypeName,
     ) -> Result<(), SemanticError> {
-        self.resolve_type_reference(type_name).map(|_| ())
+        self.resolve_type_reference(type_name)?;
+        self.record_generic_instances(type_name);
+        Ok(())
     }
 
     fn resolve_type_reference(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
@@ -105,6 +107,46 @@ impl Analyzer {
             || self.enum_types.get(name).map(|definition| definition.generic_parameters.clone()),
         )
     }
+
+    fn record_generic_instances(&mut self, type_name: &TypeName) {
+        for argument in &type_name.arguments {
+            self.record_generic_instances(argument);
+        }
+        if type_name.arguments.is_empty()
+            || self.is_generic_parameter(&type_name.name)
+            || type_name.arguments.iter().any(|argument| self.contains_generic_parameter(argument))
+        {
+            return;
+        }
+        let Some(parameters) = self.named_type_parameters(&type_name.name) else { return };
+        if parameters.is_empty() {
+            return;
+        }
+        let canonical_key = canonical_type_name(type_name);
+        self.generic_instances.entry(canonical_key.clone()).or_insert_with(|| {
+            super::model::GenericInstance {
+                name: type_name.name.clone(),
+                arguments: type_name.arguments.iter().map(canonical_type_name).collect(),
+                canonical_key,
+            }
+        });
+    }
+
+    fn contains_generic_parameter(&self, type_name: &TypeName) -> bool {
+        self.is_generic_parameter(&type_name.name)
+            || type_name.arguments.iter().any(|argument| self.contains_generic_parameter(argument))
+    }
+}
+
+fn canonical_type_name(type_name: &TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }
 
 fn arity_error(name: &str, expected: usize, found: usize, span: SourceSpan) -> SemanticError {

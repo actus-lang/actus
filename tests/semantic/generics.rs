@@ -72,3 +72,17 @@ fn rejects_applied_role_bounds() {
         SemanticErrorKind::GenericArityMismatch { name, expected: 0, found: 1 } if name == "Writer"
     ));
 }
+
+#[test]
+fn discovers_sorted_concrete_generic_instances_with_canonical_keys() {
+    let model = analyze_source(
+        "struct Box[T] { item: T, } struct Pair[T] { item: T, } verb main(erg left: Pair[Box[Int]], erg right: Box[Int]) { }",
+    )
+    .expect("concrete generic applications should be accepted");
+    let keys = model
+        .generic_instances
+        .iter()
+        .map(|instance| instance.canonical_key.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(keys, ["Box[Int]", "Pair[Box[Int]]"]);
+}

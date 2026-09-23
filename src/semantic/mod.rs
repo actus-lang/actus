@@ -22,4 +22,4 @@ mod types;
 pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
-pub use model::{Binding, BindingState, BorrowRecord, SemanticModel};
+pub use model::{Binding, BindingState, BorrowRecord, GenericInstance, SemanticModel};

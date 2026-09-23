@@ -219,6 +219,7 @@ mod tests {
             }],
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
+            generic_instances: Vec::new(),
         }
     }
 
@@ -252,6 +253,7 @@ mod tests {
             }],
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
+            generic_instances: Vec::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());
