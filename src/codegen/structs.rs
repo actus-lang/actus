@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{Expr, StructFieldInit};
+use crate::ast::{Expr, StructFieldInit, TypeName};
 
 use super::expressions::emit_buffer_drop;
 use super::expressions::lower_expression;
@@ -17,6 +17,7 @@ use super::types::NativeType;
 pub(super) fn lower_struct_literal(
     function: &mut FunctionBuilder<'_>,
     name: &str,
+    type_arguments: &[TypeName],
     fields: &[StructFieldInit],
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
@@ -25,8 +26,17 @@ pub(super) fn lower_struct_literal(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let type_name = TypeName {
+        name: name.to_owned(),
+        arguments: type_arguments.to_vec(),
+        span: crate::lexer::SourceSpan::new(0, 0),
+    };
     let id = layouts
-        .id_for(name)
+        .type_for_type_name(&type_name)
+        .and_then(|ty| match ty {
+            NativeType::Struct(id) => Some(id),
+            _ => None,
+        })
         .ok_or_else(|| NativeEmitError(format!("missing layout for struct `{name}`")))?;
     let layout =
         layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing layout `{id}`")))?;
@@ -311,7 +321,14 @@ pub(super) fn expression_native_type(
 ) -> Option<NativeType> {
     match expression {
         Expr::Identifier { name, .. } => local_types.get(name).copied(),
-        Expr::StructLit { name, .. } => layouts.type_for_name(name),
+        Expr::StructLit { name, type_arguments, .. } => {
+            let type_name = TypeName {
+                name: name.clone(),
+                arguments: type_arguments.clone(),
+                span: crate::lexer::SourceSpan::new(0, 0),
+            };
+            layouts.type_for_type_name(&type_name)
+        }
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             expression_native_type(expression, local_types, layouts)
         }

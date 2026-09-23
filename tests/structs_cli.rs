@@ -70,6 +70,26 @@ fn executes_nested_struct_field_assignment() {
 
 #[cfg(unix)]
 #[test]
+fn executes_monomorphized_generic_struct() {
+    build_and_run(
+        "struct Box[T] { item: T, } verb main() -> Int { erg boxed = Box[Int] { item: 42, }; return boxed.item; }\n",
+        "generic-struct",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cleans_up_owned_field_in_monomorphized_generic_struct() {
+    build_and_run(
+        "struct Box[T] { erg item: T, } verb main() -> Int { erg boxed = Box[Buffer] { item: allocate(4), }; return 42; }\n",
+        "generic-owned-field",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn avoids_double_drop_after_moving_owned_field() {
     build_and_run(
         "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: allocate(4), value: 42, }; consume(payload: holder.payload); return 42; }\n",

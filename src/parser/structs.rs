@@ -68,6 +68,7 @@ impl Parser {
     pub(super) fn parse_struct_literal(
         &mut self,
         name: String,
+        type_arguments: Vec<crate::ast::TypeName>,
         start: usize,
     ) -> Result<Expr, ParseError> {
         let mut fields = Vec::new();
@@ -86,6 +87,6 @@ impl Parser {
             }
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(Expr::StructLit { name, fields, span: SourceSpan::new(start, end) })
+        Ok(Expr::StructLit { name, type_arguments, fields, span: SourceSpan::new(start, end) })
     }
 }

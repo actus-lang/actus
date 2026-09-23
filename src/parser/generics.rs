@@ -50,7 +50,7 @@ impl Parser {
         Ok(TypeName { name, arguments, span: SourceSpan::new(token.span.start, end) })
     }
 
-    fn parse_type_arguments(&mut self) -> Result<Vec<TypeName>, ParseError> {
+    pub(super) fn parse_type_arguments(&mut self) -> Result<Vec<TypeName>, ParseError> {
         let mut arguments = Vec::new();
         if self.check_simple(&TokenKind::RightBracket) {
             return Err(self.error_at_current("a type argument"));

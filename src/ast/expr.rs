@@ -1,23 +1,75 @@
 use crate::lexer::SourceSpan;
 
+use super::decl::TypeName;
+
 use super::pattern::Pattern;
 use super::stmt::Block;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expr {
-    Identifier { name: String, span: SourceSpan },
-    Integer { value: String, span: SourceSpan },
-    FloatLiteral { value: String, span: SourceSpan },
-    StringLiteral { value: String, span: SourceSpan },
-    Grouping { expression: Box<Expr>, span: SourceSpan },
-    Unary { operator: UnaryOp, expression: Box<Expr>, span: SourceSpan },
-    Binary { left: Box<Expr>, operator: BinaryOp, right: Box<Expr>, span: SourceSpan },
-    Borrow { expression: Box<Expr>, span: SourceSpan },
-    Call { callee: String, arguments: Vec<Argument>, span: SourceSpan },
-    MethodCall { receiver: Box<Expr>, method: String, arguments: Vec<Argument>, span: SourceSpan },
-    StructLit { name: String, fields: Vec<StructFieldInit>, span: SourceSpan },
-    FieldAccess { object: Box<Expr>, field: String, span: SourceSpan },
-    Case { mode: CaseMode, subject: Box<Expr>, branches: Vec<CaseBranch>, span: SourceSpan },
+    Identifier {
+        name: String,
+        span: SourceSpan,
+    },
+    Integer {
+        value: String,
+        span: SourceSpan,
+    },
+    FloatLiteral {
+        value: String,
+        span: SourceSpan,
+    },
+    StringLiteral {
+        value: String,
+        span: SourceSpan,
+    },
+    Grouping {
+        expression: Box<Expr>,
+        span: SourceSpan,
+    },
+    Unary {
+        operator: UnaryOp,
+        expression: Box<Expr>,
+        span: SourceSpan,
+    },
+    Binary {
+        left: Box<Expr>,
+        operator: BinaryOp,
+        right: Box<Expr>,
+        span: SourceSpan,
+    },
+    Borrow {
+        expression: Box<Expr>,
+        span: SourceSpan,
+    },
+    Call {
+        callee: String,
+        arguments: Vec<Argument>,
+        span: SourceSpan,
+    },
+    MethodCall {
+        receiver: Box<Expr>,
+        method: String,
+        arguments: Vec<Argument>,
+        span: SourceSpan,
+    },
+    StructLit {
+        name: String,
+        type_arguments: Vec<TypeName>,
+        fields: Vec<StructFieldInit>,
+        span: SourceSpan,
+    },
+    FieldAccess {
+        object: Box<Expr>,
+        field: String,
+        span: SourceSpan,
+    },
+    Case {
+        mode: CaseMode,
+        subject: Box<Expr>,
+        branches: Vec<CaseBranch>,
+        span: SourceSpan,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

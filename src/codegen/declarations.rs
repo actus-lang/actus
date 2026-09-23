@@ -81,8 +81,7 @@ fn signature_for(
     let pointer_type = module.isa().pointer_type();
     signature.params.extend(params.iter().map(|parameter| {
         AbiParam::new(
-            NativeType::from_name_with_layout(&parameter.ty.name, layouts)
-                .unwrap()
+            NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
                 .ir_type(pointer_type),
         )
     }));

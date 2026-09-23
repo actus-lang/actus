@@ -111,7 +111,11 @@ fn emit_verbs_object(
         generic_instances,
         module.isa().pointer_type().bytes(),
     )?;
-    let layouts = LayoutRegistry::from_program(program, module.isa().pointer_type())?;
+    let layouts = LayoutRegistry::from_program_with_instances(
+        program,
+        module.isa().pointer_type(),
+        generic_instances,
+    )?;
     for verb in verbs {
         validate_native_signature(verb, &layouts)
             .map_err(|error| NativeEmitError(error.to_string()))?;
@@ -124,7 +128,21 @@ fn emit_verbs_object(
     let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol, &layouts)?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
-    let functions = metadata
+    let functions = function_metadata(&metadata);
+    define_verbs(
+        &mut module,
+        frontend_config,
+        verbs,
+        &functions,
+        cleanup_schedule,
+        &string_data,
+        &layouts,
+    )?;
+    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn function_metadata(metadata: &HashMap<String, FunctionMeta>) -> HashMap<String, FunctionMeta> {
+    metadata
         .iter()
         .map(|(name, meta)| {
             (
@@ -136,24 +154,35 @@ fn emit_verbs_object(
                 },
             )
         })
-        .collect::<HashMap<_, _>>();
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn define_verbs(
+    module: &mut ObjectModule,
+    frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
+    verbs: &[&VerbDecl],
+    functions: &HashMap<String, FunctionMeta>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataIds,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     for verb in verbs {
-        let name = verb.name.as_str();
         let meta = functions
-            .get(name)
-            .ok_or_else(|| NativeEmitError(format!("missing native function `{name}`")))?;
+            .get(&verb.name)
+            .ok_or_else(|| NativeEmitError(format!("missing native function `{}`", verb.name)))?;
         define_function(
-            &mut module,
+            module,
             frontend_config,
             verb,
             meta,
-            &functions,
+            functions,
             cleanup_schedule,
-            &string_data,
-            &layouts,
+            string_data,
+            layouts,
         )?;
     }
-    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+    Ok(())
 }
 
 fn create_module(

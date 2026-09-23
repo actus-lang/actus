@@ -222,8 +222,8 @@ impl Analyzer {
             Expr::MethodCall { receiver, method, arguments, span } => {
                 self.visit_method_call(receiver, method, arguments, *span)
             }
-            Expr::StructLit { name, fields, span } => {
-                self.validate_struct_literal(name, fields, *span)
+            Expr::StructLit { name, type_arguments, fields, span } => {
+                self.validate_struct_literal(name, type_arguments, fields, *span)
             }
             Expr::FieldAccess { object, field, span } => {
                 if self.enum_receiver_name(object).is_some() {

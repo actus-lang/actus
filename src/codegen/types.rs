@@ -36,7 +36,11 @@ impl NativeType {
         layouts: &super::layout::LayoutRegistry,
     ) -> Self {
         type_name
-            .and_then(|type_name| Self::from_name_with_layout(&type_name.name, layouts))
+            .and_then(|type_name| {
+                layouts
+                    .type_for_type_name(type_name)
+                    .or_else(|| Self::from_name_with_layout(&type_name.name, layouts))
+            })
             .unwrap_or(Self::Int)
     }
 
