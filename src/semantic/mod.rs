@@ -23,3 +23,4 @@ pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{Binding, BindingState, BorrowRecord, GenericInstance, SemanticModel};
+pub(crate) use type_substitution::TypeSubstitution;

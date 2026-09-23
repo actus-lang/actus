@@ -126,7 +126,7 @@ impl Analyzer {
         self.generic_instances.entry(canonical_key.clone()).or_insert_with(|| {
             super::model::GenericInstance {
                 name: type_name.name.clone(),
-                arguments: type_name.arguments.iter().map(canonical_type_name).collect(),
+                arguments: type_name.arguments.clone(),
                 canonical_key,
             }
         });

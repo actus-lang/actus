@@ -86,3 +86,13 @@ fn discovers_sorted_concrete_generic_instances_with_canonical_keys() {
         .collect::<Vec<_>>();
     assert_eq!(keys, ["Box[Int]", "Pair[Box[Int]]"]);
 }
+
+#[test]
+fn rejects_direct_recursive_generic_layouts() {
+    let error = analyze_source("struct Node[T] { next: Node[T], }")
+        .expect_err("recursive generic layouts require indirection");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RecursiveType { name } if name == "Node"
+    ));
+}

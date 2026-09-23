@@ -20,13 +20,13 @@ is expanded.
 - [ ] Validate constraints at declaration and instantiation sites.
 - [x] Resolve generic field, payload, parameter, and return types.
 - [ ] Produce stable diagnostics for failed constraints and type mismatches.
-- [ ] Reject invalid recursive generic layouts unless indirection is explicit.
+- [x] Reject invalid recursive generic layouts unless indirection is explicit.
 
 ## Monomorphization and Layout
 
 - [ ] Monomorphize reachable generic instances deterministically.
 - [ ] Cache instances by canonical type arguments and compiler toolchain hash.
-- [ ] Calculate concrete struct and tagged-union layouts after substitution.
+- [x] Calculate concrete struct and tagged-union layouts after substitution.
 - [ ] Lower generic ownership, borrow, move, and cleanup semantics without
   weakening `erg`, `abs`, or `dat` rules.
 - [ ] Add Cranelift layout and native execution golden tests.

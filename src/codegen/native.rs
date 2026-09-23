@@ -9,10 +9,11 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
-use crate::semantic::analyze;
+use crate::semantic::{GenericInstance, analyze};
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
+use super::generic_layout::GenericLayoutRegistry;
 use super::layout::LayoutRegistry;
 use super::literals::{StringDataIds, declare_string_values, define_string_data};
 use super::lowering::lower_body;
@@ -84,18 +85,32 @@ pub fn emit_program_object_with_configuration(
     if !verbs.iter().any(|verb| verb.name == symbol) {
         return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
     }
-    emit_verbs_object(program, &verbs, &external_verbs, symbol, &cleanup_schedule, configuration)
+    emit_verbs_object(
+        program,
+        &verbs,
+        &external_verbs,
+        &semantic.generic_instances,
+        symbol,
+        &cleanup_schedule,
+        configuration,
+    )
 }
 
 fn emit_verbs_object(
     program: &Program,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
+    generic_instances: &[GenericInstance],
     symbol: &str,
     cleanup_schedule: &NativeCleanupSchedule,
     configuration: &NativeBackendConfiguration,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(configuration)?;
+    GenericLayoutRegistry::from_program(
+        program,
+        generic_instances,
+        module.isa().pointer_type().bytes(),
+    )?;
     let layouts = LayoutRegistry::from_program(program, module.isa().pointer_type())?;
     for verb in verbs {
         validate_native_signature(verb, &layouts)

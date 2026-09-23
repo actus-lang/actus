@@ -10,12 +10,12 @@ use super::errors::{SemanticError, SemanticErrorKind};
 /// This is the semantic input for future monomorphization. It does not emit code
 /// or allocate a backend representation.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct TypeSubstitution {
+pub(crate) struct TypeSubstitution {
     bindings: HashMap<String, TypeName>,
 }
 
 impl TypeSubstitution {
-    pub(super) fn for_type(
+    pub(crate) fn for_type(
         type_name: &str,
         parameters: &[GenericParam],
         arguments: &[TypeName],
@@ -42,7 +42,7 @@ impl TypeSubstitution {
     // Used by the forthcoming monomorphization pass after concrete instances
     // become reachable from the semantic type graph.
     #[allow(dead_code)]
-    pub(super) fn apply(&self, type_name: &TypeName) -> TypeName {
+    pub(crate) fn apply(&self, type_name: &TypeName) -> TypeName {
         if let Some(argument) = self.bindings.get(&type_name.name) {
             return Self::replace_root(argument, type_name.span);
         }
