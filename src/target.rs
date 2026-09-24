@@ -3,7 +3,8 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 use target_lexicon::{
-    Architecture, BinaryFormat, CallingConvention, Endianness, Environment, PointerWidth, Triple,
+    Architecture, BinaryFormat, CallingConvention, Endianness, Environment, OperatingSystem,
+    PointerWidth, Triple,
 };
 
 #[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
@@ -12,6 +13,13 @@ pub enum LinkerFlavor {
     Gnu,
     Apple,
     Msvc,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum EntryContract {
+    Hosted,
+    Freestanding,
 }
 
 impl LinkerFlavor {
@@ -59,6 +67,13 @@ impl LinkerFlavor {
             (Self::Gnu, false) | (Self::Apple, false) => vec![format!("-l{name}")],
             (Self::Apple, true) => vec![format!("-Wl,-force_load,lib{name}.a")],
             (Self::Msvc, _) => vec![format!("{name}.lib")],
+        }
+    }
+
+    pub const fn default_executable(self) -> &'static str {
+        match self {
+            Self::Gnu | Self::Apple => "cc",
+            Self::Msvc => "link.exe",
         }
     }
 }
@@ -135,6 +150,21 @@ impl TargetSpec {
         self.linker_flavor
     }
 
+    pub fn default_linker(&self) -> &'static str {
+        self.linker_flavor.default_executable()
+    }
+
+    pub fn entry_contract(&self) -> EntryContract {
+        match self.triple.operating_system {
+            OperatingSystem::Unknown
+            | OperatingSystem::None_
+            | OperatingSystem::Uefi
+            | OperatingSystem::Espidf
+            | OperatingSystem::VxWorks => EntryContract::Freestanding,
+            _ => EntryContract::Hosted,
+        }
+    }
+
     pub fn spec_hash(&self) -> String {
         let identity = format!(
             "triple={};architecture={:?};pointer_width={:?};endianness={:?};object_format={:?};abi={:?};linker={:?}",
@@ -159,7 +189,7 @@ impl TargetSpec {
 mod tests {
     use target_lexicon::{CallingConvention, Endianness, PointerWidth};
 
-    use super::{LinkerFlavor, TargetSpec};
+    use super::{EntryContract, LinkerFlavor, TargetSpec};
 
     #[test]
     fn derives_target_contract_fields_from_a_triple() {
@@ -169,6 +199,8 @@ mod tests {
         assert_eq!(spec.object_format.into_str(), "elf");
         assert_eq!(spec.abi, CallingConvention::SystemV);
         assert_eq!(spec.linker_flavor(), LinkerFlavor::Gnu);
+        assert_eq!(spec.default_linker(), "cc");
+        assert_eq!(spec.entry_contract(), EntryContract::Hosted);
         assert_eq!(spec.triple().to_string(), "x86_64-unknown-linux-gnu");
     }
 
@@ -191,6 +223,12 @@ mod tests {
                 .expect("GNU Windows target should parse")
                 .linker_flavor(),
             LinkerFlavor::Gnu
+        );
+        assert_eq!(
+            TargetSpec::parse("x86_64-pc-windows-msvc")
+                .expect("MSVC target should parse")
+                .default_linker(),
+            "link.exe"
         );
     }
 }

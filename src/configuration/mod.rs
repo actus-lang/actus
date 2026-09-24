@@ -4,11 +4,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-pub use crate::target::LinkerFlavor;
+pub use crate::target::{EntryContract, LinkerFlavor};
 use crate::target::{TargetSpec, TargetSpecError};
 
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
-const DEFAULT_LINKER: &str = "cc";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
 const DEFAULT_NATIVE_MODULE_NAME: &str = "actus";
 const MANIFEST_FILE_NAME: &str = "Arca.toml";
@@ -51,6 +50,7 @@ struct BuildManifest {
     profile: Option<BuildProfile>,
     linker: Option<String>,
     linker_flavor: Option<LinkerFlavor>,
+    entry_contract: Option<EntryContract>,
     native_module: Option<String>,
     position_independent: Option<bool>,
     #[serde(default)]
@@ -129,6 +129,7 @@ pub struct CompilerConfiguration {
     profile: BuildProfile,
     linker: OsString,
     linker_flavor: LinkerFlavor,
+    entry_contract: EntryContract,
     run_artifact_prefix: String,
     native_backend: NativeBackendConfiguration,
     entry_symbol: Option<String>,
@@ -138,10 +139,11 @@ pub struct CompilerConfiguration {
 
 impl CompilerConfiguration {
     pub fn from_environment() -> Self {
-        let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
-            .unwrap_or_else(|| OsString::from(DEFAULT_LINKER));
         let target = TargetSpec::host().expect("host target must have a valid target contract");
         let linker_flavor = target.linker_flavor();
+        let entry_contract = target.entry_contract();
+        let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
+            .unwrap_or_else(|| OsString::from(target.default_linker()));
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             target_spec_hash: target.spec_hash(),
@@ -149,6 +151,7 @@ impl CompilerConfiguration {
             profile: BuildProfile::Debug,
             linker,
             linker_flavor,
+            entry_contract,
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
             entry_symbol: None,
@@ -167,18 +170,9 @@ impl CompilerConfiguration {
         validate_manifest(&manifest)?;
 
         let environment = Self::from_environment();
-        let target = manifest
-            .build
-            .target
-            .as_deref()
-            .map(TargetSpec::parse)
-            .transpose()
-            .map_err(|error: TargetSpecError| ConfigurationError(error.to_string()))?
-            .unwrap_or_else(|| environment.target.clone());
-        let linker_flavor = manifest.build.linker_flavor.unwrap_or(target.linker_flavor());
+        let (target, linker_flavor, entry_contract, linker) =
+            resolve_manifest_target(&manifest, &environment)?;
         let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
-        let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
-            .or_else(|| manifest.build.linker.as_deref().map(OsString::from));
         let native_backend = NativeBackendConfiguration::new(
             manifest
                 .build
@@ -206,8 +200,9 @@ impl CompilerConfiguration {
             target_spec_hash: target.spec_hash(),
             target,
             profile: manifest.build.profile.unwrap_or(environment.profile),
-            linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
+            linker,
             linker_flavor,
+            entry_contract,
             native_backend,
             entry_symbol: manifest.package.entry,
             library_paths,
@@ -227,6 +222,10 @@ impl CompilerConfiguration {
 
     pub const fn linker_flavor(&self) -> LinkerFlavor {
         self.linker_flavor
+    }
+
+    pub const fn entry_contract(&self) -> EntryContract {
+        self.entry_contract
     }
 
     pub fn run_artifact_prefix(&self) -> &str {
@@ -267,6 +266,26 @@ impl CompilerConfiguration {
             .join(self.profile.directory_name())
             .join(self.target.triple().to_string())
     }
+}
+
+fn resolve_manifest_target(
+    manifest: &ArcaManifest,
+    environment: &CompilerConfiguration,
+) -> Result<(TargetSpec, LinkerFlavor, EntryContract, OsString), ConfigurationError> {
+    let target = manifest
+        .build
+        .target
+        .as_deref()
+        .map(TargetSpec::parse)
+        .transpose()
+        .map_err(|error: TargetSpecError| ConfigurationError(error.to_string()))?
+        .unwrap_or_else(|| environment.target.clone());
+    let linker_flavor = manifest.build.linker_flavor.unwrap_or(target.linker_flavor());
+    let entry_contract = manifest.build.entry_contract.unwrap_or_else(|| target.entry_contract());
+    let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
+        .or_else(|| manifest.build.linker.as_deref().map(OsString::from))
+        .unwrap_or_else(|| OsString::from(target.default_linker()));
+    Ok((target, linker_flavor, entry_contract, linker))
 }
 
 fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> {

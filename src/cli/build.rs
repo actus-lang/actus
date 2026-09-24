@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::build_graph::{invalidate_stale_artifact, write_metadata};
 use crate::codegen::link_object;
-use crate::configuration::{CompilerConfiguration, HOSTED_ENTRY_SYMBOL};
+use crate::configuration::{CompilerConfiguration, EntryContract};
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::lexer::scan;
 use crate::parser::parse;
@@ -93,8 +93,23 @@ pub(super) fn build_file(
         eprintln!("error: `{input}` contains no verb declarations");
         return 1;
     };
-    let symbol = configuration.entry_symbol().unwrap_or(fallback_symbol).to_owned();
-    if let Err(error) = validate_entry(&program, &symbol, emit) {
+    let symbol = configuration
+        .entry_symbol()
+        .or_else(|| hosted_entry_symbol(configuration, fallback_symbol))
+        .unwrap_or(fallback_symbol)
+        .to_owned();
+    emit_and_write(input, output, emit, configuration, &program, &symbol)
+}
+
+fn emit_and_write(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+    program: &crate::ast::Program,
+    symbol: &str,
+) -> i32 {
+    if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
         eprintln!("error: {error}");
         return 1;
     }
@@ -104,7 +119,7 @@ pub(super) fn build_file(
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match emit_object(&program, &symbol, configuration) {
+    let bytes = match emit_object(program, symbol, configuration) {
         Ok(bytes) => bytes,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
@@ -147,21 +162,35 @@ fn validate_entry(
     program: &crate::ast::Program,
     symbol: &str,
     emit: EmitKind,
+    contract: EntryContract,
 ) -> Result<(), String> {
     let Some(crate::ast::TopLevelDecl::Verb(verb)) = program.declarations.iter().find(|decl| {
         matches!(decl, crate::ast::TopLevelDecl::Verb(candidate) if candidate.name == symbol)
     }) else {
         return Err(format!("entry verb `{symbol}` was not found"));
     };
-    if matches!(emit, EmitKind::Executable) && symbol != HOSTED_ENTRY_SYMBOL {
-        return Err(format!(
-            "hosted executables require entry verb `{HOSTED_ENTRY_SYMBOL}`; custom entry points are available for object emission only"
-        ));
+    if matches!(emit, EmitKind::Executable)
+        && matches!(contract, EntryContract::Hosted)
+        && symbol != "main"
+    {
+        return Err(
+            "hosted executables require entry verb `main`; freestanding targets accept a configured entry symbol"
+                .to_owned(),
+        );
     }
     if matches!(emit, EmitKind::Executable) && !verb.params.is_empty() {
         return Err(format!("executable entry verb `{symbol}` cannot have parameters"));
     }
     Ok(())
+}
+
+fn hosted_entry_symbol<'a>(
+    configuration: &CompilerConfiguration,
+    fallback_symbol: &'a str,
+) -> Option<&'a str> {
+    matches!(configuration.entry_contract(), EntryContract::Hosted)
+        .then_some("main")
+        .or(Some(fallback_symbol))
 }
 
 fn write_artifact(
