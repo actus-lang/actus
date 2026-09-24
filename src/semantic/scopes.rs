@@ -3,7 +3,8 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::{Analyzer, ScopeFrame};
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::{Binding, BindingState};
+use super::model::Binding;
+use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
     pub(super) fn bind(
@@ -25,7 +26,8 @@ impl Analyzer {
             role,
             ty,
             span,
-            state: BindingState::Active,
+            ownership: OwnershipState::Active,
+            access: AccessState::Mutable,
         });
         self.scopes.last_mut().expect("binding requires a scope").declaration_indices.push(index);
         self.scopes.last_mut().expect("binding requires a scope").bindings.insert(name, index);
@@ -83,7 +85,7 @@ impl Analyzer {
                 && let Some(index) =
                     self.model.bindings.iter().position(|binding| binding.name == owner)
             {
-                self.model.bindings[index].state = BindingState::Active;
+                self.model.bindings[index].access = AccessState::Mutable;
             }
         }
         self.model.cleanup_plans.push(super::cleanup::plan_scope_cleanup(

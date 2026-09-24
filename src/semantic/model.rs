@@ -1,14 +1,7 @@
 use crate::ast::{BuiltinType, Role, TypeName};
 use crate::lexer::SourceSpan;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum BindingState {
-    Active,
-    Frozen { borrow_ids: Vec<usize> },
-    PartiallyMoved { fields: Vec<String> },
-    Moved,
-    Dropped,
-}
+use super::state::{AccessState, OwnershipState};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Binding {
@@ -16,7 +9,8 @@ pub struct Binding {
     pub role: Role,
     pub ty: Option<BuiltinType>,
     pub span: SourceSpan,
-    pub state: BindingState,
+    pub ownership: OwnershipState,
+    pub access: AccessState,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

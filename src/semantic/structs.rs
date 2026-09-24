@@ -31,8 +31,8 @@ impl Analyzer {
                 span,
             });
         }
-        if let crate::semantic::BindingState::Frozen { borrow_ids } =
-            &self.model.bindings[binding_index].state
+        if let crate::semantic::AccessState::Frozen { borrow_ids } =
+            &self.model.bindings[binding_index].access
         {
             return Err(SemanticError {
                 kind: SemanticErrorKind::FieldBorrowConflict {

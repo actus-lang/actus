@@ -6,7 +6,7 @@ use crate::lexer::SourceSpan;
 use super::analyzer::Analyzer;
 use super::call_arguments::argument_span;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::BindingState;
+use super::state::OwnershipState;
 
 #[derive(Clone)]
 pub(super) struct VerbSignature {
@@ -112,18 +112,20 @@ impl Analyzer {
                 span,
             });
         }
-        match self.model.bindings[index].state {
-            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
-            BindingState::Frozen { .. } => {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen {
-                        name: name.clone(),
-                        borrow_ids: self.blocking_borrow_ids(index),
-                    },
-                    span,
-                });
-            }
-            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
+        if self.model.bindings[index].access.is_frozen() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MoveFrozen {
+                    name: name.clone(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span,
+            });
+        }
+        match self.model.bindings[index].ownership {
+            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::PartiallyMoved { .. }
+            | OwnershipState::Moved
+            | OwnershipState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
                     span,
@@ -146,13 +148,47 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, *object_span)?;
+        self.validate_struct_field_move(object, field, span)?;
+        if self.model.bindings[index].access.is_frozen() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::FieldBorrowConflict {
+                    owner: name.clone(),
+                    field: field.to_owned(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span,
+            });
+        }
+        match self.model.bindings[index].ownership {
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership =
+                    OwnershipState::PartiallyMoved { fields: vec![field.to_owned()] };
+                Ok(())
+            }
+            OwnershipState::PartiallyMoved { .. } | OwnershipState::Moved => Err(SemanticError {
+                kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                span,
+            }),
+            OwnershipState::Dropped => Err(SemanticError {
+                kind: SemanticErrorKind::UseAfterDrop { name: name.clone() },
+                span,
+            }),
+        }
+    }
+
+    fn validate_struct_field_move(
+        &self,
+        object: &Expr,
+        field: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         let Some(struct_name) = self.expression_struct_type(object) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
                 span,
             });
         };
-        let Some(struct_field) = self.struct_field(&struct_name, field).cloned() else {
+        let Some(struct_field) = self.struct_field(&struct_name, field) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownStructField {
                     struct_name,
@@ -161,34 +197,12 @@ impl Analyzer {
                 span,
             });
         };
-        if !matches!(struct_field.role, crate::ast::StructFieldRole::Erg) {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
-                span,
-            });
+        if matches!(struct_field.role, crate::ast::StructFieldRole::Erg) {
+            return Ok(());
         }
-        match &mut self.model.bindings[index].state {
-            BindingState::Active => {
-                self.model.bindings[index].state =
-                    BindingState::PartiallyMoved { fields: vec![field.to_owned()] };
-                Ok(())
-            }
-            BindingState::Frozen { borrow_ids } => Err(SemanticError {
-                kind: SemanticErrorKind::FieldBorrowConflict {
-                    owner: name.clone(),
-                    field: field.to_owned(),
-                    borrow_ids: borrow_ids.clone(),
-                },
-                span,
-            }),
-            BindingState::PartiallyMoved { .. } | BindingState::Moved => Err(SemanticError {
-                kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
-                span,
-            }),
-            BindingState::Dropped => Err(SemanticError {
-                kind: SemanticErrorKind::UseAfterDrop { name: name.clone() },
-                span,
-            }),
-        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
+            span,
+        })
     }
 }
