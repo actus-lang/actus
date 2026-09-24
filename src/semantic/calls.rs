@@ -66,7 +66,17 @@ impl Analyzer {
             }
             return Ok(());
         };
-        let parameter_indices = self.bind_arguments(callee, &signature, arguments, span)?;
+        self.visit_call_with_signature(callee, arguments, span, &signature)
+    }
+
+    pub(super) fn visit_call_with_signature(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+        signature: &VerbSignature,
+    ) -> Result<(), SemanticError> {
+        let parameter_indices = self.bind_arguments(callee, signature, arguments, span)?;
         for argument in arguments {
             self.visit_expression(&argument.expression)?;
         }
@@ -89,6 +99,31 @@ impl Analyzer {
             }
         }
         Ok(())
+    }
+
+    pub(super) fn performance_signature(
+        &self,
+        target_type: &str,
+        method: &str,
+    ) -> Option<VerbSignature> {
+        self.performance_methods.get(&(target_type.to_owned(), method.to_owned())).cloned()
+    }
+
+    pub(super) fn performance_role(&self, target_type: &str, method: &str) -> Option<&str> {
+        self.performance_roles.get(&(target_type.to_owned(), method.to_owned())).map(String::as_str)
+    }
+
+    pub(super) fn mark_reachable_performance(
+        &mut self,
+        target_type: &str,
+        method: &str,
+        role_name: &str,
+    ) {
+        self.reachable_performances.insert(super::model::ReachablePerformance {
+            role_name: role_name.to_owned(),
+            target_type: target_type.to_owned(),
+            method_name: method.to_owned(),
+        });
     }
 
     fn move_dat_argument(

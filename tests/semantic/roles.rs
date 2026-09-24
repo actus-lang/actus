@@ -62,3 +62,25 @@ fn rejects_mismatched_and_implicit_performance_receivers() {
         matches!(invalid_receiver.kind, SemanticErrorKind::InvalidRoleReceiver { role, method } if role == "Writer" && method == "write")
     );
 }
+
+#[test]
+fn resolves_performance_calls_and_records_reachable_implementations() {
+    let model = analyze_source(
+        "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg file = File { value: 1, }; return file.write(); }",
+    )
+    .expect("performed method calls should resolve");
+    assert_eq!(model.reachable_performances.len(), 1);
+    assert_eq!(model.reachable_performances[0].role_name, "Writer");
+    assert_eq!(model.reachable_performances[0].target_type, "File");
+    assert_eq!(model.reachable_performances[0].method_name, "write");
+}
+
+#[test]
+fn resolves_dat_receivers_and_moves_the_receiver_owner() {
+    let model = analyze_source(
+        "struct File { value: Int, } role Consumer { verb consume(dat self: File); } perform Consumer for File { verb consume(dat self: File) { } } verb main() { erg file = File { value: 1, }; file.consume(); }",
+    )
+    .expect("performed dat receiver should resolve");
+    assert_eq!(model.reachable_performances[0].role_name, "Consumer");
+    assert!(matches!(model.bindings[0].ownership, actus::semantic::OwnershipState::Moved));
+}

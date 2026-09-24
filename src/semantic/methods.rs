@@ -38,18 +38,20 @@ impl Analyzer {
             return self.validate_enum_constructor(receiver, method, arguments, span);
         }
         self.visit_expression(receiver)?;
-        let signature = self.method_signature(method, span)?;
-        let (receiver_name, receiver_role, receiver_type) =
-            signature.params.first().ok_or_else(|| SemanticError {
-                kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
-                span,
-            })?;
         let Some(actual_type) = self.expression_struct_type(receiver) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
                 span,
             });
         };
+        let performance = self.performance_signature(&actual_type, method);
+        let signature =
+            performance.clone().map(Ok).unwrap_or_else(|| self.method_signature(method, span))?;
+        let (receiver_name, receiver_role, receiver_type) =
+            signature.params.first().ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
+                span,
+            })?;
         if &actual_type != receiver_type {
             return Err(SemanticError {
                 kind: SemanticErrorKind::ReceiverTypeMismatch {
@@ -61,7 +63,15 @@ impl Analyzer {
             });
         }
         let combined = self.method_arguments(receiver, receiver_role, receiver_name, arguments);
-        self.visit_call(method, &combined, span)
+        if performance.is_some() {
+            if let Some(role_name) = self.performance_role(&actual_type, method).map(str::to_owned)
+            {
+                self.mark_reachable_performance(&actual_type, method, &role_name);
+            }
+            self.visit_call_with_signature(method, &combined, span, &signature)
+        } else {
+            self.visit_call(method, &combined, span)
+        }
     }
 
     fn method_signature(
@@ -103,7 +113,7 @@ impl Analyzer {
                 expression: Box::new(receiver.clone()),
                 span: expression_span(receiver),
             },
-            Role::Dat => unreachable!(),
+            Role::Dat => receiver.clone(),
         };
         let named = arguments.iter().any(|argument| argument.name.is_some());
         let mut combined = Vec::with_capacity(arguments.len() + 1);

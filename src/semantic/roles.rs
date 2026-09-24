@@ -116,6 +116,13 @@ impl Analyzer {
                 ));
             }
         }
+        let target_key = canonical_type_name(&perform.target);
+        for method in &perform.methods {
+            self.performance_methods
+                .insert((target_key.clone(), method.name.clone()), method.signature());
+            self.performance_roles
+                .insert((target_key.clone(), method.name.clone()), perform.role_name.clone());
+        }
         Ok(())
     }
 }

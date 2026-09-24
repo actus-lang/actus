@@ -29,6 +29,13 @@ pub struct GenericInstance {
     pub canonical_key: String,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ReachablePerformance {
+    pub role_name: String,
+    pub target_type: String,
+    pub method_name: String,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticModel {
     pub bindings: Vec<Binding>,
@@ -37,4 +44,5 @@ pub struct SemanticModel {
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,
+    pub reachable_performances: Vec<ReachablePerformance>,
 }

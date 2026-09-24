@@ -28,6 +28,9 @@ pub(super) struct Analyzer {
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) role_types: HashMap<String, RoleDecl>,
     pub(super) performances: HashSet<(String, String)>,
+    pub(super) performance_methods: HashMap<(String, String), super::calls::VerbSignature>,
+    pub(super) performance_roles: HashMap<(String, String), String>,
+    pub(super) reachable_performances: HashSet<super::model::ReachablePerformance>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
@@ -50,6 +53,7 @@ impl Analyzer {
                 return_unwind_plans: Vec::new(),
                 loop_unwind_plans: Vec::new(),
                 generic_instances: Vec::new(),
+                reachable_performances: Vec::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
@@ -61,6 +65,9 @@ impl Analyzer {
             enum_types: HashMap::new(),
             role_types: HashMap::new(),
             performances: HashSet::new(),
+            performance_methods: HashMap::new(),
+            performance_roles: HashMap::new(),
+            reachable_performances: HashSet::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
@@ -81,6 +88,14 @@ impl Analyzer {
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
         self.model.generic_instances = self.generic_instances.into_instances();
+        self.model.reachable_performances = self.reachable_performances.into_iter().collect();
+        self.model.reachable_performances.sort_by(|left, right| {
+            (&left.target_type, &left.role_name, &left.method_name).cmp(&(
+                &right.target_type,
+                &right.role_name,
+                &right.method_name,
+            ))
+        });
         self.current_return_type = None;
         Ok(self.model)
     }
