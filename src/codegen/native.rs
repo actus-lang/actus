@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
 use cranelift_codegen::ir::{AbiParam, FuncRef, InstBuilder, types};
-use cranelift_codegen::settings::{self, Configurable};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
-use cranelift_native::builder as native_builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, VerbDecl};
@@ -21,7 +19,9 @@ use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
 use super::performance::PerformanceRegistry;
 use super::performance_emit::define_performances;
+use super::target::build_isa;
 use super::types::NativeType;
+use crate::target::TargetSpec;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub(super) String);
@@ -47,7 +47,8 @@ impl std::fmt::Display for NativeEmitError {
 impl std::error::Error for NativeEmitError {}
 
 pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
-    emit_i32_object(symbol, 0, &NativeBackendConfiguration::default())
+    let target = TargetSpec::host().map_err(|error| NativeEmitError(error.to_string()))?;
+    emit_i32_object(symbol, 0, &NativeBackendConfiguration::default(), &target)
 }
 
 pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
@@ -58,6 +59,16 @@ pub fn emit_program_object_with_configuration(
     program: &Program,
     symbol: &str,
     configuration: &NativeBackendConfiguration,
+) -> Result<Vec<u8>, NativeEmitError> {
+    let target = TargetSpec::host().map_err(|error| NativeEmitError(error.to_string()))?;
+    emit_program_object_for_target(program, symbol, configuration, &target)
+}
+
+pub fn emit_program_object_for_target(
+    program: &Program,
+    symbol: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
@@ -107,6 +118,7 @@ pub fn emit_program_object_with_configuration(
         symbol,
         &cleanup_schedule,
         configuration,
+        target,
     )
 }
 
@@ -120,8 +132,9 @@ fn emit_verbs_object(
     symbol: &str,
     cleanup_schedule: &NativeCleanupSchedule,
     configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    let mut module = create_module(configuration)?;
+    let mut module = create_module(configuration, target)?;
     GenericLayoutRegistry::from_program(
         program,
         generic_instances,
@@ -132,23 +145,17 @@ fn emit_verbs_object(
         module.isa().pointer_type(),
         generic_instances,
     )?;
-    for verb in verbs {
-        validate_native_signature(verb, &layouts)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
-    }
-    for verb in external_verbs {
-        validate_external_native_signature(verb, &layouts)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
-    }
+    validate_native_program(verbs, external_verbs, &layouts)?;
     let frontend_config = module.isa().frontend_config();
-    let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol, &layouts)?;
-    metadata.extend(super::performance::declare_performance_functions(
+    let metadata = declare_all_functions(
         &mut module,
+        verbs,
+        external_verbs,
         performance_definitions,
+        symbol,
         &layouts,
-    )?);
+    )?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
-    metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = function_metadata(&metadata);
     define_verbs(
         &mut module,
@@ -169,6 +176,40 @@ fn emit_verbs_object(
         &layouts,
     )?;
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_all_functions(
+    module: &mut ObjectModule,
+    verbs: &[&VerbDecl],
+    external_verbs: &[&ExternalVerbDecl],
+    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
+    symbol: &str,
+    layouts: &LayoutRegistry,
+) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let mut metadata = declare_functions(module, verbs, external_verbs, symbol, layouts)?;
+    metadata.extend(super::performance::declare_performance_functions(
+        module,
+        performance_definitions,
+        layouts,
+    )?);
+    metadata.extend(declare_runtime_functions(module)?);
+    Ok(metadata)
+}
+
+fn validate_native_program(
+    verbs: &[&VerbDecl],
+    external_verbs: &[&ExternalVerbDecl],
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    for verb in verbs {
+        validate_native_signature(verb, layouts)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
+    for verb in external_verbs {
+        validate_external_native_signature(verb, layouts)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+    }
+    Ok(())
 }
 
 fn function_metadata(metadata: &HashMap<String, FunctionMeta>) -> HashMap<String, FunctionMeta> {
@@ -217,15 +258,9 @@ fn define_verbs(
 
 fn create_module(
     configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
 ) -> Result<ObjectModule, NativeEmitError> {
-    let mut flag_builder = settings::builder();
-    flag_builder
-        .set("is_pic", &configuration.position_independent().to_string())
-        .map_err(|error| NativeEmitError(error.to_string()))?;
-    let flags = settings::Flags::new(flag_builder);
-    let isa = native_builder()
-        .map_err(|error| NativeEmitError(error.to_string()))?
-        .finish(flags)
+    let isa = build_isa(target, configuration.position_independent())
         .map_err(|error| NativeEmitError(error.to_string()))?;
     let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
@@ -236,19 +271,9 @@ fn emit_i32_object(
     symbol: &str,
     value: i64,
     configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    let mut flag_builder = settings::builder();
-    flag_builder
-        .set("is_pic", &configuration.position_independent().to_string())
-        .map_err(|error| NativeEmitError(error.to_string()))?;
-    let flags = settings::Flags::new(flag_builder);
-    let isa = native_builder()
-        .map_err(|error| NativeEmitError(error.to_string()))?
-        .finish(flags)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
-    let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
-        .map_err(|error| NativeEmitError(error.to_string()))?;
-    let mut module = ObjectModule::new(builder);
+    let mut module = create_module(configuration, target)?;
     let frontend_config = module.isa().frontend_config();
     let mut signature = module.make_signature();
     signature.returns.push(AbiParam::new(types::I32));

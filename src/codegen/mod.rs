@@ -26,6 +26,7 @@ mod native_runtime;
 mod performance;
 mod performance_emit;
 mod structs;
+mod target;
 mod types;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
@@ -35,6 +36,6 @@ pub use model::{
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
 pub use native::{
-    NativeEmitError, emit_program_object, emit_program_object_with_configuration,
-    emit_zero_return_object,
+    NativeEmitError, emit_program_object, emit_program_object_for_target,
+    emit_program_object_with_configuration, emit_zero_return_object,
 };

@@ -8,9 +8,9 @@ license = "MIT"
 cranelift-codegen = "0.135.2"
 cranelift-frontend = "0.135.2"
 cranelift-module = "0.135.2"
-cranelift-native = "0.135.2"
 cranelift-object = "0.135.2"
 serde = { version = "1.0.228", features = ["derive"] }
+target-lexicon = "0.13.5"
 toml = "0.9.8"
 
 [dev-dependencies]
