@@ -39,9 +39,11 @@ operations require an explicit `unsafe` boundary.
   deterministic remaining cleanup state.
 - [x] Define guard semantics, including evaluation order, temporary `abs`
   inspection, failed-guard ownership, and move restrictions.
+- [x] Lower pattern guards with conditional native branches and rollback-safe
+  fallthrough to the next pattern.
 - [x] Add semantic regressions for branch conflicts, join failures, nested
   moves, and relevant early exits.
-- [ ] Add semantic regressions for guards and failed-guard ownership.
+- [x] Add semantic regressions for guards and failed-guard ownership.
 - [ ] Add an end-to-end `examples/` showcase covering `case abs`, `case dat`,
   nested partial moves, and deterministic cleanup.
 - [x] Verify all return, break, continue, and error-propagation cleanup paths.
