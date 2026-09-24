@@ -15,9 +15,14 @@ the compiler, builds, tests, dependency resolution, and package publication.
   `foo.act` modules, rejecting ambiguous roots.
 - [x] Discover direct sibling `.act` files deterministically and ignore nested
   directories and non-Actus files.
+- [x] Parse facade and sibling sources and aggregate their AST declarations
+  into one module scope.
+- [x] Validate duplicate struct, enum, role, and verb declarations with both
+  source locations.
+- [x] Make sibling declarations visible to semantic analysis without imports.
 - [ ] Integrate resolver source roots with `Arca.toml` package manifests.
 - [ ] Validate facade-only `open` exports and zero-import intra-module scope.
-- [ ] Emit compile-time namespace collision diagnostics across siblings.
+- [x] Emit compile-time namespace collision diagnostics across siblings.
 - [x] Define initial package names, versions, entry points, and Alpha edition.
 - [ ] Define the `Arca.lock` dependency lockfile format.
 - [ ] Define debug and release profile semantics.

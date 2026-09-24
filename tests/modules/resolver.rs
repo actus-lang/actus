@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use actus::module_resolver::{ModuleResolutionError, ModuleResolver};
+use actus::modules::{ModuleResolutionError, ModuleResolver};
 
 struct Fixture {
     root: PathBuf,
