@@ -4,7 +4,9 @@ Actus is developed in small, verifiable stages. Each phase has a dedicated docum
 
 ## Current Focus
 
-**Phase 13: Generic Types and Polymorphism.** The active work is to add generic parameters and type applications to the AST and then establish the type machinery required by `Option[T]` and `Result[T, E]`.
+**Phase 14: Roles and Performance.** Static role contracts, performance
+implementations, deterministic symbols, and direct Cranelift dispatch are
+implemented. The remaining scope is explicit dynamic dispatch and its ABI.
 
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
 
