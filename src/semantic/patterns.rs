@@ -12,6 +12,7 @@ use super::pattern_support::{
     duplicate_pattern, is_wildcard, non_exhaustive, pattern_name, pattern_span,
     pattern_type_mismatch, unreachable_pattern, variant_key,
 };
+use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
     pub(super) fn validate_case_patterns(
@@ -29,9 +30,11 @@ impl Analyzer {
             crate::ast::CaseMode::Abs => self.borrow_case_subject(subject, span)?,
             crate::ast::CaseMode::Dat => self.consume_case_subject(subject, span)?,
         }
+        let branch_state = self.snapshot_binding_states();
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
         for branch in branches {
+            self.restore_binding_states(&branch_state);
             let pattern_name = pattern_name(&branch.pattern);
             if wildcard_seen {
                 return Err(unreachable_pattern(pattern_name, pattern_span(&branch.pattern)));
@@ -49,9 +52,25 @@ impl Analyzer {
             }
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
+            self.restore_binding_states(&branch_state);
         }
         self.leave_scope();
         Ok(())
+    }
+
+    fn snapshot_binding_states(&self) -> Vec<(OwnershipState, AccessState)> {
+        self.model
+            .bindings
+            .iter()
+            .map(|binding| (binding.ownership.clone(), binding.access.clone()))
+            .collect()
+    }
+
+    fn restore_binding_states(&mut self, snapshot: &[(OwnershipState, AccessState)]) {
+        for (binding, (ownership, access)) in self.model.bindings.iter_mut().zip(snapshot.iter()) {
+            binding.ownership = ownership.clone();
+            binding.access = access.clone();
+        }
     }
 
     fn validate_pattern_coverage(

@@ -56,3 +56,25 @@ fn dat_case_return_unwinds_remaining_payload_once() {
         .count();
     assert_eq!(drops, 1);
 }
+
+#[test]
+fn isolates_ownership_transfers_between_abs_case_branches() {
+    analyze_source(
+        "enum Color { Red, Green, } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red => { erg first = payload; }, Color.Green => { erg second = payload; }, }; }",
+    )
+    .expect("each alternative branch should start with the same payload owner");
+}
+
+#[test]
+fn isolates_drops_between_abs_case_branches() {
+    let model = analyze_source(
+        "enum Color { Red, Green, } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red => { drop(payload); }, Color.Green => { drop(payload); }, }; }",
+    )
+    .expect("each alternative branch should observe an active payload owner");
+    let payload = model
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "payload")
+        .expect("payload binding should exist");
+    assert_eq!(payload.ownership, OwnershipState::Active);
+}
