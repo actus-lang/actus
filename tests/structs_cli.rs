@@ -80,6 +80,16 @@ fn executes_monomorphized_generic_struct() {
 
 #[cfg(unix)]
 #[test]
+fn executes_static_performance_dispatch() {
+    build_and_run(
+        "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value + 1; } } verb main() -> Int { erg file = File { value: 41, }; return file.write(); }\n",
+        "static-performance-dispatch",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn cleans_up_owned_field_in_monomorphized_generic_struct() {
     build_and_run(
         "struct Box[T] { erg item: T, } verb main() -> Int { erg boxed = Box[Buffer] { item: allocate(4), }; return 42; }\n",

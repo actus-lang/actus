@@ -154,27 +154,38 @@ impl Analyzer {
 
     fn analyze_verbs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
-            let TopLevelDecl::Verb(verb) = declaration else { continue };
-            self.current_return_type = verb
-                .return_type
-                .as_ref()
-                .and_then(|type_name| lookup_builtin_type(&type_name.name));
-            self.enter_scope(verb.body.span);
-            for parameter in &verb.params {
-                let ty = lookup_builtin_type(&parameter.ty.name);
-                self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
-                self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
-                self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
+            if let TopLevelDecl::Verb(verb) = declaration {
+                self.analyze_verb_body(verb)?;
             }
-            self.visit_block(&verb.body)?;
-            if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MissingReturnValue,
-                    span: verb.body.span,
-                });
-            }
-            self.leave_scope();
         }
+        for declaration in &program.declarations {
+            if let TopLevelDecl::Perform(perform) = declaration {
+                for method in &perform.methods {
+                    self.analyze_verb_body(method)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn analyze_verb_body(&mut self, verb: &crate::ast::VerbDecl) -> Result<(), SemanticError> {
+        self.current_return_type =
+            verb.return_type.as_ref().and_then(|type_name| lookup_builtin_type(&type_name.name));
+        self.enter_scope(verb.body.span);
+        for parameter in &verb.params {
+            let ty = lookup_builtin_type(&parameter.ty.name);
+            self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
+            self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
+            self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
+        }
+        self.visit_block(&verb.body)?;
+        if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MissingReturnValue,
+                span: verb.body.span,
+            });
+        }
+        self.leave_scope();
         Ok(())
     }
 
