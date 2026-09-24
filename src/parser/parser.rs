@@ -57,31 +57,69 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Open) {
+            if self.peek_next_is_identifier() {
+                let start = self.expect_keyword(TokenKind::Open, "`open`")?.span.start;
+                let name = identifier_text(&self.take_identifier("sibling module name")?.kind);
+                let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+                return Ok(TopLevelDecl::OpenSibling(crate::ast::OpenSiblingDecl {
+                    name,
+                    span: SourceSpan::new(start, end),
+                }));
+            }
+            self.expect_keyword(TokenKind::Open, "`open`")?;
+            return self.parse_open_declaration();
+        }
         if self.check_simple(&TokenKind::Unsafe) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(true)?));
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(true, false)?));
         }
         if self.check_simple(&TokenKind::Extern) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false)?));
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false, false)?));
         }
         if self.check_simple(&TokenKind::Struct) {
-            return Ok(TopLevelDecl::Struct(self.parse_struct_def()?));
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def(false)?));
         }
         if self.check_simple(&TokenKind::Enum) {
-            return Ok(TopLevelDecl::Enum(self.parse_enum_def()?));
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def(false)?));
         }
         if self.check_simple(&TokenKind::Role) {
-            return Ok(TopLevelDecl::Role(self.parse_role_decl()?));
+            return Ok(TopLevelDecl::Role(self.parse_role_decl(false)?));
         }
         if self.check_simple(&TokenKind::Perform) {
-            return Ok(TopLevelDecl::Perform(self.parse_perform_decl()?));
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false)?));
         }
-        let declaration = self.parse_verb()?;
+        let declaration = self.parse_verb(false)?;
         Ok(TopLevelDecl::Verb(declaration))
+    }
+
+    fn parse_open_declaration(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Struct) {
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def(true)?));
+        }
+        if self.check_simple(&TokenKind::Enum) {
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def(true)?));
+        }
+        if self.check_simple(&TokenKind::Role) {
+            return Ok(TopLevelDecl::Role(self.parse_role_decl(true)?));
+        }
+        if self.check_simple(&TokenKind::Perform) {
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(true)?));
+        }
+        if self.check_simple(&TokenKind::Verb) {
+            return Ok(TopLevelDecl::Verb(self.parse_verb(true)?));
+        }
+        if self.check_simple(&TokenKind::Extern) || self.check_simple(&TokenKind::Unsafe) {
+            return Ok(TopLevelDecl::ExternalVerb(
+                self.parse_external_verb(self.check_simple(&TokenKind::Unsafe), true)?,
+            ));
+        }
+        Err(self.error_at_current("a declaration after `open`"))
     }
 
     fn parse_external_verb(
         &mut self,
         unsafe_boundary: bool,
+        is_open: bool,
     ) -> Result<ExternalVerbDecl, ParseError> {
         let start = if unsafe_boundary {
             let start = self.expect_keyword(TokenKind::Unsafe, "`unsafe`")?.span.start;
@@ -115,6 +153,7 @@ impl Parser {
             if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(ExternalVerbDecl {
+            is_open,
             unsafe_boundary,
             abi,
             name,
@@ -125,7 +164,7 @@ impl Parser {
         })
     }
 
-    fn parse_verb(&mut self) -> Result<VerbDecl, ParseError> {
+    fn parse_verb(&mut self, is_open: bool) -> Result<VerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
         let name_token = self.take_identifier("verb name")?;
         let name = identifier_text(&name_token.kind);
@@ -141,7 +180,7 @@ impl Parser {
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
 
-        Ok(VerbDecl { name, generic_parameters, params, return_type, body, span })
+        Ok(VerbDecl { is_open, name, generic_parameters, params, return_type, body, span })
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {

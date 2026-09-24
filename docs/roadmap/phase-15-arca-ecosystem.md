@@ -21,7 +21,8 @@ the compiler, builds, tests, dependency resolution, and package publication.
   source locations.
 - [x] Make sibling declarations visible to semantic analysis without imports.
 - [ ] Integrate resolver source roots with `Arca.toml` package manifests.
-- [ ] Validate facade-only `open` exports and zero-import intra-module scope.
+- [x] Validate facade-only `open <sibling>;` exports and zero-import
+  intra-module scope.
 - [x] Emit compile-time namespace collision diagnostics across siblings.
 - [x] Define initial package names, versions, entry points, and Alpha edition.
 - [ ] Define the `Arca.lock` dependency lockfile format.

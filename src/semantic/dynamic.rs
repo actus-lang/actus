@@ -100,7 +100,9 @@ impl Analyzer {
                     }
                     continue;
                 }
-                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
+                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) | TopLevelDecl::OpenSibling(_) => {
+                    continue;
+                }
             };
             for parameter in parameters {
                 if parameter.dispatch == DispatchMode::Dynamic

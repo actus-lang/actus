@@ -113,6 +113,20 @@ marked `open` in `gpio/gpio.act` are visible to an external importer. An
 `open` declaration in a sibling file remains module-internal unless the
 facade explicitly exposes the corresponding API.
 
+The facade exposes a sibling file with an extension-free declaration:
+
+```act
+open registers;
+open ops;
+```
+
+The name resolves only to a direct `<name>.act` sibling. The sibling's own
+`open` declarations are re-exported through the facade; its closed
+declarations remain module-private. A sibling that is not named by the facade
+does not contribute any external exports, even when it contains `open`
+declarations. The facade may also declare and directly export its own
+`open` declarations.
+
 All `.act` files directly inside the same module directory share one internal
 scope. Sibling declarations can refer to one another without `import`
 statements, relative paths, or re-export boilerplate. Types, roles, enums,

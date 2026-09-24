@@ -31,6 +31,7 @@ pub(super) fn specialized_structs(
                 .map(|field| specialize_field(field, &substitution, &generic_names))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(StructDef {
+                is_open: false,
                 name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
                 fields,
@@ -60,6 +61,7 @@ pub(super) fn specialized_enums(
                 .map(|variant| specialize_variant(variant, &substitution, &generic_names))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(EnumDef {
+                is_open: false,
                 name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
                 variants,

@@ -39,6 +39,20 @@ in `gpio/gpio.act` are visible to importers. An `open` declaration in a
 sibling file is visible within the module but is not exported through the
 module boundary unless the facade explicitly exposes it.
 
+Facade re-exports use an extension-free sibling declaration:
+
+```act
+open registers;
+open ops;
+```
+
+`open <sibling>;` resolves only to a direct `<sibling>.act` file in the same
+directory. The facade re-exports only declarations marked `open` inside those
+named siblings. Closed sibling declarations remain private, and an unlisted
+sibling contributes no external symbols even if it declares `open` items.
+The facade's own `open` declarations are exported directly. An unknown
+sibling name is a deterministic `UnknownSiblingModule` compile-time error.
+
 ### Zero-import sibling scope
 
 All `.act` files directly inside the module directory share one internal

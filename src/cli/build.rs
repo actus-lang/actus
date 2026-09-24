@@ -154,7 +154,8 @@ fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
         | crate::ast::TopLevelDecl::Struct(_)
         | crate::ast::TopLevelDecl::Enum(_)
         | crate::ast::TopLevelDecl::Role(_)
-        | crate::ast::TopLevelDecl::Perform(_) => None,
+        | crate::ast::TopLevelDecl::Perform(_)
+        | crate::ast::TopLevelDecl::OpenSibling(_) => None,
     })
 }
 

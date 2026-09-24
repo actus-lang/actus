@@ -117,6 +117,7 @@ impl Analyzer {
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Role(_)
                 | TopLevelDecl::Perform(_) => continue,
+                TopLevelDecl::OpenSibling(_) => continue,
             };
             let generic_parameters = match declaration {
                 TopLevelDecl::Verb(verb) => &verb.generic_parameters,
@@ -125,6 +126,7 @@ impl Analyzer {
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Role(_)
                 | TopLevelDecl::Perform(_) => unreachable!(),
+                TopLevelDecl::OpenSibling(_) => unreachable!(),
             };
             self.with_generic_scope(generic_parameters, |analyzer| {
                 for parameter in params {
