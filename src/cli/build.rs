@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::build_graph::{invalidate_stale_artifact, write_metadata};
 use crate::codegen::link_object;
 use crate::configuration::{CompilerConfiguration, HOSTED_ENTRY_SYMBOL};
 use crate::diagnostics::{render_lex_error, render_parse_error};
@@ -97,26 +98,38 @@ pub(super) fn build_file(
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match crate::codegen::emit_program_object_for_target(
-        &program,
-        &symbol,
-        configuration.native_backend(),
-        configuration.target(),
-    ) {
+    let output =
+        output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit, configuration));
+    if let Err(error) = invalidate_stale_artifact(&output, configuration) {
+        eprintln!("error: {error}");
+        return 1;
+    }
+    let bytes = match emit_object(&program, &symbol, configuration) {
         Ok(bytes) => bytes,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
             return 1;
         }
     };
-    let output =
-        output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit, configuration));
     if let Err(error) = write_artifact(input, &output, bytes, emit, configuration) {
         eprintln!("error: {error}");
         return 1;
     }
     println!("built `{}`", output.display());
     0
+}
+
+fn emit_object(
+    program: &crate::ast::Program,
+    symbol: &str,
+    configuration: &CompilerConfiguration,
+) -> Result<Vec<u8>, crate::codegen::NativeEmitError> {
+    crate::codegen::emit_program_object_for_target(
+        program,
+        symbol,
+        configuration.native_backend(),
+        configuration.target(),
+    )
 }
 
 fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
@@ -158,7 +171,9 @@ fn write_artifact(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
-    let object = matches!(emit, EmitKind::Executable).then(|| output.with_extension("o"));
+    let persistent_capsula_artifact = output.starts_with(configuration.capsula_target_directory());
+    let object = matches!(emit, EmitKind::Executable)
+        .then(|| output.with_extension(if persistent_capsula_artifact { "obj" } else { "o" }));
     let object_path = object.as_deref().unwrap_or(output);
     if let Some(parent) = object_path.parent() {
         fs::create_dir_all(parent)
@@ -169,10 +184,13 @@ fn write_artifact(
     if let Some(object_path) = object {
         let result = link_object(&object_path, output, configuration)
             .map_err(|error| format!("cannot link `{input}`: {error}"));
-        let _ = fs::remove_file(object_path);
+        if !persistent_capsula_artifact {
+            let _ = fs::remove_file(object_path);
+        }
         result
+            .and_then(|()| write_metadata(output, configuration).map_err(|error| error.to_string()))
     } else {
-        Ok(())
+        write_metadata(output, configuration).map_err(|error| error.to_string())
     }
 }
 

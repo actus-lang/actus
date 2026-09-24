@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod build_graph;
 pub mod cli;
 pub mod codegen;
 pub mod configuration;
