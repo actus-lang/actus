@@ -14,6 +14,31 @@ pub enum TopLevelDecl {
     ExternalVerb(ExternalVerbDecl),
     Struct(StructDef),
     Enum(EnumDef),
+    Role(RoleDecl),
+    Perform(PerformDecl),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleDecl {
+    pub name: String,
+    pub methods: Vec<RoleMethod>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleMethod {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub return_type: Option<TypeName>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PerformDecl {
+    pub role_name: String,
+    pub target: TypeName,
+    pub methods: Vec<VerbDecl>,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

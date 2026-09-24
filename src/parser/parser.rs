@@ -9,6 +9,7 @@ mod cursor;
 mod enums;
 mod expressions;
 mod generics;
+mod roles;
 mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -66,6 +67,12 @@ impl Parser {
         }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def()?));
+        }
+        if self.check_simple(&TokenKind::Role) {
+            return Ok(TopLevelDecl::Role(self.parse_role_decl()?));
+        }
+        if self.check_simple(&TokenKind::Perform) {
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl()?));
         }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))

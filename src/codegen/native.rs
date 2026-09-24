@@ -67,7 +67,11 @@ pub fn emit_program_object_with_configuration(
         .iter()
         .filter_map(|declaration| match declaration {
             TopLevelDecl::Verb(verb) => Some(verb),
-            TopLevelDecl::ExternalVerb(_) | TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => None,
+            TopLevelDecl::ExternalVerb(_)
+            | TopLevelDecl::Struct(_)
+            | TopLevelDecl::Enum(_)
+            | TopLevelDecl::Role(_)
+            | TopLevelDecl::Perform(_) => None,
         })
         .collect::<Vec<_>>();
     let external_verbs = program
@@ -76,7 +80,10 @@ pub fn emit_program_object_with_configuration(
         .filter_map(|declaration| match declaration {
             TopLevelDecl::Verb(_) => None,
             TopLevelDecl::ExternalVerb(verb) => Some(verb),
-            TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => None,
+            TopLevelDecl::Struct(_)
+            | TopLevelDecl::Enum(_)
+            | TopLevelDecl::Role(_)
+            | TopLevelDecl::Perform(_) => None,
         })
         .collect::<Vec<_>>();
     if verbs.is_empty() {

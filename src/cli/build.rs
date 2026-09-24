@@ -122,7 +122,9 @@ fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
         crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
         crate::ast::TopLevelDecl::ExternalVerb(_)
         | crate::ast::TopLevelDecl::Struct(_)
-        | crate::ast::TopLevelDecl::Enum(_) => None,
+        | crate::ast::TopLevelDecl::Enum(_)
+        | crate::ast::TopLevelDecl::Role(_)
+        | crate::ast::TopLevelDecl::Perform(_) => None,
     })
 }
 
