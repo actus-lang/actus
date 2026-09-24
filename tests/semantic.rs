@@ -1,3 +1,5 @@
+#[path = "semantic/borrowing.rs"]
+mod borrowing;
 #[path = "semantic/enums.rs"]
 mod enums;
 #[path = "semantic/generics.rs"]

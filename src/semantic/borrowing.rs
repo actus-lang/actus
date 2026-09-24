@@ -33,7 +33,7 @@ impl Analyzer {
             return Ok(());
         };
         let owner_index = self.binding(name, *owner_span)?;
-        if self.model.bindings[owner_index].role != Role::Erg {
+        if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidBorrowTarget { name: name.clone() },
                 span,
