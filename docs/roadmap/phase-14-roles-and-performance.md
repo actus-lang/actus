@@ -37,7 +37,7 @@ operations require an explicit `unsafe` boundary.
   all reachable branches.
 - [x] Track nested partial moves using precise field paths and preserve their
   deterministic remaining cleanup state.
-- [ ] Define guard semantics, including evaluation order, temporary `abs`
+- [x] Define guard semantics, including evaluation order, temporary `abs`
   inspection, failed-guard ownership, and move restrictions.
 - [x] Add semantic regressions for branch conflicts, join failures, nested
   moves, and relevant early exits.

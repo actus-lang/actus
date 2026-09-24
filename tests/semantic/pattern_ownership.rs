@@ -106,3 +106,35 @@ fn rejects_incompatible_ownership_states_at_case_join() {
         SemanticErrorKind::BranchStateMismatch { name, .. } if name == "payload"
     ));
 }
+
+#[test]
+fn accepts_bool_pattern_guards_with_read_only_bindings() {
+    analyze_source(
+        "enum Color { Red, Green, } verb inspect(abs ready: Bool, erg color: Color) { case abs color { Color.Red if ready => 1, _ => 0, }; }",
+    )
+    .expect("bool guards over read-only bindings should be valid");
+}
+
+#[test]
+fn rejects_non_bool_pattern_guards() {
+    let error = analyze_source(
+        "enum Color { Red, Green, } verb inspect(erg count: Int, erg color: Color) { case abs color { Color.Red if count => 1, _ => 0, }; }",
+    )
+    .expect_err("pattern guards must return Bool");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::GuardTypeMismatch { found } if found == "Int"
+    ));
+}
+
+#[test]
+fn rejects_move_calls_inside_pattern_guards() {
+    let error = analyze_source(
+        "enum Color { Red, Green, } verb consume(dat payload: Buffer) { drop(payload); } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red if consume(payload: payload) => 1, _ => 0, }; }",
+    )
+    .expect_err("guards must not move resources through calls");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidGuardAccess { name } if name == "consume"
+    ));
+}

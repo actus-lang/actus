@@ -42,6 +42,11 @@ impl Parser {
     fn parse_case_branch(&mut self) -> Result<CaseBranch, ParseError> {
         let pattern = self.parse_pattern()?;
         let start = pattern_span(&pattern).start;
+        let guard = if self.match_simple(TokenKind::If) {
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
         self.expect_simple(TokenKind::FatArrow, "`=>`")?;
         let body = if self.check_simple(&TokenKind::LeftBrace) {
             CaseBody::Block(self.parse_case_block()?)
@@ -49,7 +54,7 @@ impl Parser {
             CaseBody::Expression(Box::new(self.parse_expression()?))
         };
         let end = case_body_end(&body);
-        Ok(CaseBranch { pattern, body, span: SourceSpan::new(start, end) })
+        Ok(CaseBranch { pattern, guard, body, span: SourceSpan::new(start, end) })
     }
 
     fn parse_case_block(&mut self) -> Result<crate::ast::Block, ParseError> {

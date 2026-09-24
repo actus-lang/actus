@@ -123,6 +123,8 @@ fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
         SemanticErrorKind::InvalidMutation { .. } => "E1051",
         SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
+        SemanticErrorKind::InvalidGuardAccess { .. } => "E1062",
+        SemanticErrorKind::GuardTypeMismatch { .. } => "E1063",
         SemanticErrorKind::BranchStateMismatch { .. } => "E1061",
         _ => return None,
     })
@@ -201,6 +203,7 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
 
 fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     enum_semantic_message(kind)
+        .or_else(|| guard_semantic_message(kind))
         .or_else(|| struct_semantic_message(kind))
         .or_else(|| type_semantic_message(kind))
 }
@@ -250,13 +253,26 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidCaseRole { mode, subject } => {
             format!("cannot use `{mode}` case deconstruction on `{subject}`")
         }
+        SemanticErrorKind::InvalidMutation { name } => {
+            format!("cannot mutate read-only binding `{name}`")
+        }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn guard_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::InvalidGuardAccess { name } => {
+            format!("case guard `{name}` requires read-only access")
+        }
+        SemanticErrorKind::GuardTypeMismatch { found } => {
+            format!("case guard must return `Bool`, found `{found}`")
+        }
         SemanticErrorKind::BranchStateMismatch { name, expected, found } => {
             format!(
                 "case branch state mismatch for `{name}`: expected `{expected}`, found `{found}`"
             )
-        }
-        SemanticErrorKind::InvalidMutation { name } => {
-            format!("cannot mutate read-only binding `{name}`")
         }
         _ => return None,
     };

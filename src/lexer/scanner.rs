@@ -113,6 +113,7 @@ impl<'source> Scanner<'source> {
             "perform" => TokenKind::Perform,
             "for" => TokenKind::For,
             "case" => TokenKind::Case,
+            "if" => TokenKind::If,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
             "_" => TokenKind::Underscore,

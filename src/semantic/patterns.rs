@@ -52,6 +52,9 @@ impl Analyzer {
             if mode == crate::ast::CaseMode::Dat {
                 self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
             }
+            if let Some(guard) = &branch.guard {
+                self.validate_case_guard(guard, branch.span)?;
+            }
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
             branch_results.push(self.snapshot_binding_prefix(branch_count));
@@ -108,6 +111,64 @@ impl Analyzer {
         Ok(())
     }
 
+    fn validate_case_guard(&mut self, guard: &Expr, span: SourceSpan) -> Result<(), SemanticError> {
+        let state = self.snapshot_binding_states();
+        self.validate_guard_access(guard)?;
+        self.visit_expression(guard)?;
+        let found = self.expression_type_name(guard).unwrap_or_else(|| "unknown".to_owned());
+        if found != "Bool" {
+            self.restore_binding_states(&state);
+            return Err(SemanticError {
+                kind: SemanticErrorKind::GuardTypeMismatch { found },
+                span,
+            });
+        }
+        self.restore_binding_states(&state);
+        Ok(())
+    }
+
+    fn validate_guard_access(&self, expression: &Expr) -> Result<(), SemanticError> {
+        match expression {
+            Expr::Identifier { name, span } => {
+                let index = self.binding(name, *span)?;
+                if self.model.bindings[index].ownership.is_live() {
+                    Ok(())
+                } else {
+                    Err(SemanticError {
+                        kind: SemanticErrorKind::InvalidGuardAccess { name: name.clone() },
+                        span: *span,
+                    })
+                }
+            }
+            Expr::FieldAccess { object, field, span } => {
+                self.validate_field_access(object, field, *span)?;
+                self.ensure_field_access_readable(object, field, *span)
+            }
+            Expr::Grouping { expression, .. }
+            | Expr::Borrow { expression, .. }
+            | Expr::Unary { expression, .. } => self.validate_guard_access(expression),
+            Expr::Binary { left, right, .. } => {
+                self.validate_guard_access(left)?;
+                self.validate_guard_access(right)
+            }
+            Expr::Call { callee, span, .. } | Expr::MethodCall { method: callee, span, .. } => {
+                Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidGuardAccess { name: callee.clone() },
+                    span: *span,
+                })
+            }
+            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
+            Expr::StructLit { name, span, .. } => Err(SemanticError {
+                kind: SemanticErrorKind::InvalidGuardAccess { name: name.clone() },
+                span: *span,
+            }),
+            Expr::Case { span, .. } => Err(SemanticError {
+                kind: SemanticErrorKind::InvalidGuardAccess { name: "case".to_owned() },
+                span: *span,
+            }),
+        }
+    }
+
     fn validate_pattern_coverage(
         &self,
         subject: &Expr,
@@ -125,6 +186,7 @@ impl Analyzer {
         }
         let covered = branches
             .iter()
+            .filter(|branch| branch.guard.is_none())
             .filter_map(|branch| variant_key(&branch.pattern, &enum_name))
             .collect::<HashSet<_>>();
         let missing = self.enum_types[&enum_name]

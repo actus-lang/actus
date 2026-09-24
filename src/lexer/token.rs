@@ -43,6 +43,7 @@ pub enum TokenKind {
     Perform,
     For,
     Case,
+    If,
     True,
     False,
     Underscore,

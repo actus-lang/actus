@@ -219,6 +219,12 @@ pub enum SemanticErrorKind {
         mode: String,
         subject: String,
     },
+    InvalidGuardAccess {
+        name: String,
+    },
+    GuardTypeMismatch {
+        found: String,
+    },
     BranchStateMismatch {
         name: String,
         expected: String,
