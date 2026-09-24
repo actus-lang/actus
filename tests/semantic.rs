@@ -4,6 +4,8 @@ mod borrowing;
 mod enums;
 #[path = "semantic/generics.rs"]
 mod generics;
+#[path = "semantic/pattern_ownership.rs"]
+mod pattern_ownership;
 #[path = "semantic/state.rs"]
 mod state;
 #[path = "semantic/structs.rs"]
