@@ -83,8 +83,8 @@ operations require an explicit `unsafe` boundary.
 - [x] Reserve and parse `dynamic` as a full language keyword.
 - [x] Define `abs dynamic Role` type checking and ownership boundaries.
 - [x] Specify dynamic object and fat-pointer layout.
-- [ ] Generate and validate role vtables for dynamic performances.
-- [ ] Lower dynamic calls through explicit vtable dispatch.
+- [x] Generate and validate role vtables for dynamic performances.
+- [x] Lower dynamic calls through explicit vtable dispatch.
 - [ ] Define the dynamic ABI before enabling cross-unit use.
 
 ## Testing and Completion Gates
@@ -92,7 +92,7 @@ operations require an explicit `unsafe` boundary.
 - [x] Add parser and AST tests for roles, performances, bounds, and `dynamic`.
 - [x] Add positive and negative semantic tests for receiver roles and bounds.
 - [x] Add monomorphization and deterministic static-dispatch golden tests.
-- [ ] Add dynamic object layout and vtable tests.
+- [x] Add dynamic object layout and vtable tests.
 - [x] Add ownership, borrowing, and cleanup regression tests.
 - [x] Keep source and function limits within repository policy.
 - [ ] Update the manifesto, language conventions, and user documentation.
