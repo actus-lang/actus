@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted. This decision defines the semantic contract that Phase 14 must
-implement and verify before adding further borrowing mechanisms.
+Accepted. Phase 14 now implements and verifies the ownership/access state
+model, case branch isolation, branch joins, nested partial moves, pattern
+guards, and native guard branching. Remaining Phase 14 work is listed in the
+roadmap and must not weaken these rules.
 
 ## Context
 
@@ -48,19 +50,39 @@ This is the only initial reborrow/coercion rule. Mutable borrowing,
 reborrowing chains, and lifetime polymorphism remain deferred until a concrete
 Actus use case proves they are necessary.
 
-### Pattern matching ownership
+### `case abs` lifecycle
 
-`case abs subject` inspects without consuming the subject. Payload bindings are
-read-only and the subject remains active after the lexical case scope.
+`case abs subject` performs a lexical inspection without consuming `subject`.
+The subject must be readable and is temporarily frozen for the case scope.
+Variant payload bindings are read-only `abs` bindings. Every branch starts
+from the same subject snapshot, so a branch-local ownership or access change
+cannot leak into another alternative. At the case boundary, temporary access
+is released and an active owner returns to mutable access.
 
-`case dat subject` consumes the subject. Moving a payload marks the subject
-`PartiallyMoved`; moving the complete value marks it `Moved`. Unmoved owned
-payloads are cleaned up in deterministic reverse declaration order. A branch
-join is valid only when every path has a compatible ownership state.
+### `case dat` lifecycle
 
-Pattern guards do not silently create ambiguous ownership. A guard must either
-inspect bindings through temporary `abs` access or consume them explicitly. A
-failed guard cannot restore a value that has already been moved.
+`case dat subject` consumes the subject before branch evaluation. Moving the
+complete value marks it `Moved`; moving nested payload fields records precise
+paths such as `inner.first` and marks the root `PartiallyMoved`. Overlapping
+paths are rejected. Every branch starts from the same consumed snapshot and a
+join is valid only when all reachable paths have compatible ownership and
+access states.
+
+Unmoved owned payloads are cleaned up in deterministic reverse declaration
+order. Nested struct cleanup preserves the hierarchy and skips exactly the
+paths already transferred, preventing leaks and double drops.
+
+### Pattern guards
+
+A guard has the form `Pattern if condition => body`. The condition must have
+type `Bool` and may inspect bindings only through temporary read-only access.
+Calls or expressions that could transfer ownership are rejected. Guard
+evaluation is isolated from branch body state; a failed guard rolls back its
+temporary access and continues with the next pattern without consuming a
+resource.
+
+Pattern guards do not silently create ambiguous ownership. They cannot move or
+mutate resources while deciding whether a branch is applicable.
 
 ### Exit and failure behavior
 

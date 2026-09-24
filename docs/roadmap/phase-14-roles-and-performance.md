@@ -27,9 +27,9 @@ operations require an explicit `unsafe` boundary.
 - [x] Add the ownership/access state model: `Active`, `Moved`,
   `PartiallyMoved`, `Dropped` plus `Mutable` and `Frozen` access.
 - [x] Define and test temporary `erg`/`dat` to `abs` access.
-- [ ] Specify the `case abs` subject lifecycle: temporary frozen access,
+- [x] Specify the `case abs` subject lifecycle: temporary frozen access,
   read-only payload bindings, and restoration at the case boundary.
-- [ ] Specify the `case dat` subject lifecycle: consuming transfer, moved
+- [x] Specify the `case dat` subject lifecycle: consuming transfer, moved
   source state, payload ownership, and branch-local cleanup.
 - [x] Implement semantic state isolation for each case branch so alternative
   branches cannot mutate one shared ownership state.
@@ -44,7 +44,7 @@ operations require an explicit `unsafe` boundary.
 - [x] Add semantic regressions for branch conflicts, join failures, nested
   moves, and relevant early exits.
 - [x] Add semantic regressions for guards and failed-guard ownership.
-- [ ] Add an end-to-end `examples/` showcase covering `case abs`, `case dat`,
+- [x] Add an end-to-end `examples/` showcase covering `case abs`, `case dat`,
   nested partial moves, and deterministic cleanup.
 - [x] Verify all return, break, continue, and error-propagation cleanup paths.
 - [ ] Define task-transfer failure ownership for future `act` support.
