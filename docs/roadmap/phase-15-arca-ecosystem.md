@@ -9,11 +9,15 @@ the compiler, builds, tests, dependency resolution, and package publication.
 - [x] Define package source roots, unit entry points, and project layout.
 - [x] Accept the Directory Module architecture and facade contract in
   [ADR-0018](../decisions/ADR-0018-directory-modules-facade-contracts-and-intra-module-scoping.md).
-- [ ] Implement the Directory Module Resolver from `Arca.toml` source roots.
-- [ ] Validate the canonical `foo/foo.act` facade and facade-only `open`
-  exports.
-- [ ] Implement deterministic sibling discovery and zero-import intra-module
-  scope with compile-time collision diagnostics.
+- [x] Implement the Directory Module Resolver core from an explicit source
+  root.
+- [x] Resolve both canonical `foo/foo.act` facades and single-file
+  `foo.act` modules, rejecting ambiguous roots.
+- [x] Discover direct sibling `.act` files deterministically and ignore nested
+  directories and non-Actus files.
+- [ ] Integrate resolver source roots with `Arca.toml` package manifests.
+- [ ] Validate facade-only `open` exports and zero-import intra-module scope.
+- [ ] Emit compile-time namespace collision diagnostics across siblings.
 - [x] Define initial package names, versions, entry points, and Alpha edition.
 - [ ] Define the `Arca.lock` dependency lockfile format.
 - [ ] Define debug and release profile semantics.

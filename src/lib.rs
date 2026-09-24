@@ -7,6 +7,7 @@ pub mod diagnostics;
 pub mod ffi;
 pub mod formatter;
 pub mod lexer;
+pub mod module_resolver;
 pub mod parser;
 pub mod runtime;
 pub mod semantic;
