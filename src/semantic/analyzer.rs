@@ -87,12 +87,18 @@ impl Analyzer {
                 TopLevelDecl::ExternalVerb(verb) => {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
-                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
+                TopLevelDecl::Struct(_)
+                | TopLevelDecl::Enum(_)
+                | TopLevelDecl::Role(_)
+                | TopLevelDecl::Perform(_) => continue,
             };
             let generic_parameters = match declaration {
                 TopLevelDecl::Verb(verb) => &verb.generic_parameters,
                 TopLevelDecl::ExternalVerb(verb) => &verb.generic_parameters,
-                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => unreachable!(),
+                TopLevelDecl::Struct(_)
+                | TopLevelDecl::Enum(_)
+                | TopLevelDecl::Role(_)
+                | TopLevelDecl::Perform(_) => unreachable!(),
             };
             self.with_generic_scope(generic_parameters, |analyzer| {
                 for parameter in params {
