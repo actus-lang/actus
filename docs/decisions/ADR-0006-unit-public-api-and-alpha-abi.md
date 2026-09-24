@@ -97,6 +97,12 @@ Each exported symbol records its name, declaration kind, parameter types,
 return type, and `erg`/`abs`/`dat` roles. The metadata representation must be
 deterministic so identical inputs produce identical interface artifacts.
 
+When a unit exports or imports `abs dynamic Role`, the metadata also records
+the dynamic role name, `data_ptr,vtable_ptr` layout, target pointer width,
+deterministic vtable symbol, method slot, complete semantic signature, and
+native calling convention. The dynamic cross-unit contract is defined in
+[ADR-0017](ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
+
 The exact serialized encoding may be selected during Arca implementation,
 but it must remain versioned and independently parseable by the compiler and
 package tooling.
@@ -134,4 +140,3 @@ Actus can evolve its compiler and internal representation without prematurely
 freezing a binary contract. Public APIs remain explicit and type-safe, C
 interoperability has a clear stable boundary, and Arca can reject stale
 artifacts deterministically instead of producing unreliable links.
-

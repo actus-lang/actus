@@ -47,9 +47,10 @@ operations require an explicit `unsafe` boundary.
 - [x] Add an end-to-end `examples/` showcase covering `case abs`, `case dat`,
   nested partial moves, and deterministic cleanup.
 - [x] Verify all return, break, continue, and error-propagation cleanup paths.
-- [ ] Define task-transfer failure ownership for future `act` support.
-- [ ] Keep mutable borrowing, reborrow chains, advanced lifetime polymorphism,
-  and shared mutable ownership deferred.
+- [x] Record task-transfer failure ownership as deferred to the future
+  concurrency/library phase; no `act` runtime is enabled in Phase 14.
+- [x] Record mutable borrowing, reborrow chains, advanced lifetime
+  polymorphism, and shared mutable ownership as explicit deferred scope.
 
 ## Role Contracts
 
@@ -85,7 +86,8 @@ operations require an explicit `unsafe` boundary.
 - [x] Specify dynamic object and fat-pointer layout.
 - [x] Generate and validate role vtables for dynamic performances.
 - [x] Lower dynamic calls through explicit vtable dispatch.
-- [ ] Define the dynamic ABI before enabling cross-unit use.
+- [x] Define the dynamic ABI and `.actmeta` contract in ADR-0017 before
+  enabling cross-unit use.
 
 ## Testing and Completion Gates
 
@@ -95,4 +97,5 @@ operations require an explicit `unsafe` boundary.
 - [x] Add dynamic object layout and vtable tests.
 - [x] Add ownership, borrowing, and cleanup regression tests.
 - [x] Keep source and function limits within repository policy.
-- [ ] Update the manifesto, language conventions, and user documentation.
+- [x] Update the manifesto, language conventions, and user documentation with
+  the accepted dynamic ABI and deferred ownership scope.

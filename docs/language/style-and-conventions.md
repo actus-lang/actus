@@ -138,6 +138,13 @@ Actus uses three explicit roles for ownership and borrowing:
 `abs` does not create runtime reference counting. It is valid only within its
 lexical lifetime and cannot be returned or stored in a longer-lived owner.
 
+`perform Role for Type` is compile-time static dispatch. `abs dynamic Role` is
+explicit runtime dispatch and uses a borrowed two-word fat pointer in the
+order `data_ptr`, then `vtable_ptr`. Its cross-unit metadata and compatibility
+rules are defined in
+[ADR-0017](../decisions/ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
+Dynamic dispatch does not grant ownership or mutation capabilities.
+
 ## 7. Canonical Formatting
 
 The canonical formatter must enforce:

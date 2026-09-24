@@ -66,7 +66,8 @@ silently change a call into runtime dispatch.
 ### Explicit dynamic dispatch
 
 Runtime polymorphism uses the complete `dynamic` keyword and is separate from
-`perform`:
+`perform`. Its Alpha cross-unit ABI is defined by
+[ADR-0017](ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md):
 
 ```act
 verb send(abs writer: dynamic Writer, abs bytes: Buffer): Int {
@@ -105,8 +106,9 @@ mutate ownership through the role object. `dynamic` is not an alias for
 - Dynamic dispatch remains available as a deliberate future extension.
 - The compiler must maintain separate resolution and lowering paths for static
   performance and dynamic role objects.
-- Dynamic role objects require additional design for vtable layout, object
-  lifetime, ABI stability, and FFI interoperability.
+- Dynamic role objects use the explicit Alpha ABI in ADR-0017. Cross-unit
+  linking remains gated on `.actmeta` import/export validation, and C FFI
+  interoperability still requires a separate adapter contract.
 
 ## Rejected Alternatives
 
