@@ -26,7 +26,7 @@ mod tests {
 
     #[test]
     fn configures_cranelift_from_the_target_spec() {
-        let spec = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
+        let spec = TargetSpec::host().expect("host target should parse");
         let isa = build_isa(&spec, true).expect("Cranelift should accept the target");
         assert_eq!(isa.triple(), spec.triple());
         assert_eq!(isa.pointer_type().bytes(), u32::from(PointerWidth::U64.bytes()));
