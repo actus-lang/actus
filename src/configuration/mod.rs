@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::target::{TargetSpec, TargetSpecError};
+
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 const DEFAULT_LINKER: &str = "cc";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
@@ -44,6 +46,8 @@ struct PackageManifest {
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BuildManifest {
+    target: Option<String>,
+    profile: Option<BuildProfile>,
     linker: Option<String>,
     linker_flavor: Option<LinkerFlavor>,
     native_module: Option<String>,
@@ -52,6 +56,22 @@ struct BuildManifest {
     library_paths: Vec<String>,
     #[serde(default)]
     libraries: Vec<LibraryManifest>,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum BuildProfile {
+    Debug,
+    Release,
+}
+
+impl BuildProfile {
+    pub const fn directory_name(self) -> &'static str {
+        match self {
+            Self::Debug => "debug",
+            Self::Release => "release",
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -125,6 +145,10 @@ impl NativeBackendConfiguration {
 
 #[derive(Clone, Debug)]
 pub struct CompilerConfiguration {
+    project_root: PathBuf,
+    target: TargetSpec,
+    target_spec_hash: String,
+    profile: BuildProfile,
     linker: OsString,
     linker_flavor: LinkerFlavor,
     run_artifact_prefix: String,
@@ -138,7 +162,12 @@ impl CompilerConfiguration {
     pub fn from_environment() -> Self {
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
             .unwrap_or_else(|| OsString::from(DEFAULT_LINKER));
+        let target = TargetSpec::host().expect("host target must have a valid target contract");
         Self {
+            project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            target_spec_hash: target.spec_hash(),
+            target,
+            profile: BuildProfile::Debug,
             linker,
             linker_flavor: LinkerFlavor::host_default(),
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
@@ -159,6 +188,15 @@ impl CompilerConfiguration {
         validate_manifest(&manifest)?;
 
         let environment = Self::from_environment();
+        let target = manifest
+            .build
+            .target
+            .as_deref()
+            .map(TargetSpec::parse)
+            .transpose()
+            .map_err(|error: TargetSpecError| ConfigurationError(error.to_string()))?
+            .unwrap_or_else(|| environment.target.clone());
+        let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
             .or_else(|| manifest.build.linker.as_deref().map(OsString::from));
         let native_backend = NativeBackendConfiguration::new(
@@ -177,7 +215,6 @@ impl CompilerConfiguration {
             .into_iter()
             .map(|library| LinkLibrary::new(library.name, library.kind))
             .collect();
-        let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
         let library_paths = manifest
             .build
             .library_paths
@@ -185,6 +222,10 @@ impl CompilerConfiguration {
             .map(|path| manifest_directory.join(path))
             .collect();
         Ok(Self {
+            project_root: manifest_directory.to_path_buf(),
+            target_spec_hash: target.spec_hash(),
+            target,
+            profile: manifest.build.profile.unwrap_or(environment.profile),
             linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
             linker_flavor: manifest.build.linker_flavor.unwrap_or(environment.linker_flavor),
             native_backend,
@@ -226,6 +267,25 @@ impl CompilerConfiguration {
 
     pub fn library_paths(&self) -> &[PathBuf] {
         &self.library_paths
+    }
+
+    pub fn target(&self) -> &TargetSpec {
+        &self.target
+    }
+
+    pub fn target_spec_hash(&self) -> &str {
+        &self.target_spec_hash
+    }
+
+    pub const fn profile(&self) -> BuildProfile {
+        self.profile
+    }
+
+    pub fn capsula_target_directory(&self) -> PathBuf {
+        self.project_root
+            .join("capsula")
+            .join(self.profile.directory_name())
+            .join(self.target.triple().to_string())
     }
 }
 

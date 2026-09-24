@@ -1,6 +1,7 @@
 use std::fs;
 
-use actus::configuration::{CompilerConfiguration, LibraryKind, LinkerFlavor};
+use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind, LinkerFlavor};
+use actus::target::TargetSpec;
 
 #[test]
 fn loads_build_settings_from_an_arca_manifest() {
@@ -28,6 +29,30 @@ fn loads_build_settings_from_an_arca_manifest() {
     };
     assert_eq!(configuration.linker_flavor(), expected_linker);
     let _ = fs::remove_file(path);
+}
+
+#[test]
+fn loads_target_profile_and_hash_for_capsula_artifacts() {
+    let root = std::env::temp_dir().join(format!("actus-target-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create project directory");
+    let path = root.join("Arca.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"x86_64-unknown-linux-gnu\"\nprofile = \"release\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
+    let target = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
+    assert_eq!(configuration.target().triple(), target.triple());
+    assert_eq!(configuration.target_spec_hash(), target.spec_hash());
+    assert_eq!(configuration.profile(), BuildProfile::Release);
+    assert_eq!(
+        configuration.capsula_target_directory(),
+        root.join("capsula/release/x86_64-unknown-linux-gnu")
+    );
+
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]

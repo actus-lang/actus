@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::codegen::{emit_program_object_with_configuration, link_object};
+use crate::codegen::link_object;
 use crate::configuration::{CompilerConfiguration, HOSTED_ENTRY_SYMBOL};
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::lexer::scan;
@@ -97,10 +97,11 @@ pub(super) fn build_file(
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match emit_program_object_with_configuration(
+    let bytes = match crate::codegen::emit_program_object_for_target(
         &program,
         &symbol,
         configuration.native_backend(),
+        configuration.target(),
     ) {
         Ok(bytes) => bytes,
         Err(error) => {
@@ -108,7 +109,8 @@ pub(super) fn build_file(
             return 1;
         }
     };
-    let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit));
+    let output =
+        output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit, configuration));
     if let Err(error) = write_artifact(input, &output, bytes, emit, configuration) {
         eprintln!("error: {error}");
         return 1;
@@ -158,6 +160,10 @@ fn write_artifact(
 ) -> Result<(), String> {
     let object = matches!(emit, EmitKind::Executable).then(|| output.with_extension("o"));
     let object_path = object.as_deref().unwrap_or(output);
+    if let Some(parent) = object_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create `{}`: {error}", parent.display()))?;
+    }
     fs::write(object_path, bytes)
         .map_err(|error| format!("cannot write `{}`: {error}", object_path.display()))?;
     if let Some(object_path) = object {
@@ -170,11 +176,11 @@ fn write_artifact(
     }
 }
 
-fn default_output(input: &str, emit: EmitKind) -> PathBuf {
+fn default_output(input: &str, emit: EmitKind, configuration: &CompilerConfiguration) -> PathBuf {
     let path = Path::new(input);
-    if matches!(emit, EmitKind::Object) {
-        path.with_extension("o")
-    } else {
-        path.with_file_name(path.file_stem().unwrap_or_default())
-    }
+    let extension = if matches!(emit, EmitKind::Object) { "obj" } else { "bin" };
+    configuration
+        .capsula_target_directory()
+        .join(path.file_stem().unwrap_or_default())
+        .with_extension(extension)
 }
