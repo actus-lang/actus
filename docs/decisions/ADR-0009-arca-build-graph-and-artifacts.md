@@ -4,6 +4,12 @@
 - Date: 2026-09-22
 - Scope: Arca dependency resolution, unit builds, caching, and artifacts
 
+Implementation status: The P0/P1 artifact boundary is implemented. Builds
+select targets from Arca configuration, place generated files under
+`capsula/`, emit `.actmeta` with the target specification hash, and invalidate
+stale artifacts when the target contract changes. Full lockfile resolution,
+multi-unit graph reuse, and package caching remain Phase 15 scope.
+
 ## Context
 
 Arca needs a deterministic build graph for packages, units, and modules. It

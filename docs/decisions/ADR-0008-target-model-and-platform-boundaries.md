@@ -4,6 +4,11 @@
 - Date: 2026-09-22
 - Scope: Actus compilation targets and platform runtime contracts
 
+Implementation status: The initial target engine is implemented. TargetSpec
+now provides target-derived linker flavor, default linker executable, and
+hosted/freestanding entry contract data; platform-specific linker and startup
+expansion remain future target-spec work.
+
 ## Context
 
 Actus must support hosted systems and freestanding platforms without coupling
