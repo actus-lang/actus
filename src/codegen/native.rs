@@ -19,6 +19,7 @@ use super::literals::{StringDataIds, declare_string_values, define_string_data};
 use super::lowering::lower_body;
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
+use super::performance::PerformanceRegistry;
 use super::types::NativeType;
 
 #[derive(Debug)]
@@ -62,6 +63,9 @@ pub fn emit_program_object_with_configuration(
     validate_cleanup_plans(&semantic)
         .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
+    let performance_registry =
+        PerformanceRegistry::from_reachable(&semantic.reachable_performances);
+    performance_registry.validate().map_err(NativeEmitError)?;
     let verbs = program
         .declarations
         .iter()

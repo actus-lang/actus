@@ -22,6 +22,7 @@ mod lowering;
 mod model;
 mod native;
 mod native_runtime;
+mod performance;
 mod structs;
 mod types;
 
