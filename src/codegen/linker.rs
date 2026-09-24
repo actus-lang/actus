@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use crate::configuration::{CompilerConfiguration, LibraryKind, LinkLibrary, LinkerFlavor};
+use crate::configuration::CompilerConfiguration;
 
 #[derive(Debug)]
 pub struct NativeLinkError(String);
@@ -26,11 +26,13 @@ pub fn link_object(
         command.arg(runtime_archive);
     }
     for path in configuration.library_paths() {
-        command.arg(library_path_argument(path, configuration.linker_flavor()));
+        command.arg(configuration.linker_flavor().library_path_argument(path));
     }
     for library in configuration.libraries() {
-        let arguments = library_arguments(library, configuration.linker_flavor())?;
-        command.args(arguments);
+        command.args(configuration.linker_flavor().library_arguments(
+            library.name(),
+            matches!(library.kind(), crate::configuration::LibraryKind::Static),
+        ));
     }
     let output = command
         .arg("-o")
@@ -48,47 +50,16 @@ pub fn link_object(
     )))
 }
 
-fn library_path_argument(path: &Path, flavor: LinkerFlavor) -> String {
-    match flavor {
-        LinkerFlavor::Msvc => format!("/LIBPATH:{}", path.display()),
-        LinkerFlavor::Gnu | LinkerFlavor::Apple => format!("-L{}", path.display()),
-    }
-}
-
-fn library_arguments(
-    library: &LinkLibrary,
-    flavor: LinkerFlavor,
-) -> Result<Vec<String>, NativeLinkError> {
-    let name = library.name();
-    match (flavor, library.kind()) {
-        (LinkerFlavor::Gnu, LibraryKind::Static) => {
-            Ok(vec!["-Wl,-Bstatic".to_owned(), format!("-l{name}"), "-Wl,-Bdynamic".to_owned()])
-        }
-        (LinkerFlavor::Gnu, LibraryKind::Shared) => Ok(vec![format!("-l{name}")]),
-        (LinkerFlavor::Apple, LibraryKind::Static) => {
-            Ok(vec![format!("-Wl,-force_load,lib{name}.a")])
-        }
-        (LinkerFlavor::Apple, LibraryKind::Shared) => Ok(vec![format!("-l{name}")]),
-        (LinkerFlavor::Msvc, _) => Ok(vec![format!("{name}.lib")]),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use super::{library_arguments, library_path_argument};
-    use crate::configuration::{LibraryKind, LinkLibrary, LinkerFlavor};
-
-    fn library(name: &str, kind: LibraryKind) -> LinkLibrary {
-        LinkLibrary::new(name.to_owned(), kind)
-    }
+    use crate::target::LinkerFlavor;
 
     #[test]
     fn isolates_gnu_static_flags() {
         assert_eq!(
-            library_arguments(&library("math", LibraryKind::Static), LinkerFlavor::Gnu)
-                .expect("GNU arguments should be generated"),
+            LinkerFlavor::Gnu.library_arguments("math", true),
             ["-Wl,-Bstatic", "-lmath", "-Wl,-Bdynamic"]
         );
     }
@@ -96,22 +67,17 @@ mod tests {
     #[test]
     fn emits_platform_specific_library_arguments() {
         assert_eq!(
-            library_arguments(&library("math", LibraryKind::Static), LinkerFlavor::Apple)
-                .expect("Apple arguments should be generated"),
+            LinkerFlavor::Apple.library_arguments("math", true),
             ["-Wl,-force_load,libmath.a"]
         );
-        assert_eq!(
-            library_arguments(&library("math", LibraryKind::Shared), LinkerFlavor::Msvc)
-                .expect("MSVC arguments should be generated"),
-            ["math.lib"]
-        );
+        assert_eq!(LinkerFlavor::Msvc.library_arguments("math", false), ["math.lib"]);
     }
 
     #[test]
     fn emits_library_search_path_for_each_linker() {
         let path = Path::new("/tmp/actus-libs");
-        assert_eq!(library_path_argument(path, LinkerFlavor::Gnu), "-L/tmp/actus-libs");
-        assert_eq!(library_path_argument(path, LinkerFlavor::Apple), "-L/tmp/actus-libs");
-        assert_eq!(library_path_argument(path, LinkerFlavor::Msvc), "/LIBPATH:/tmp/actus-libs");
+        assert_eq!(LinkerFlavor::Gnu.library_path_argument(path), "-L/tmp/actus-libs");
+        assert_eq!(LinkerFlavor::Apple.library_path_argument(path), "-L/tmp/actus-libs");
+        assert_eq!(LinkerFlavor::Msvc.library_path_argument(path), "/LIBPATH:/tmp/actus-libs");
     }
 }

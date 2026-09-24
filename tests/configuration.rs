@@ -1,6 +1,6 @@
 use std::fs;
 
-use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind, LinkerFlavor};
+use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind};
 use actus::target::TargetSpec;
 
 #[test]
@@ -20,13 +20,7 @@ fn loads_build_settings_from_an_arca_manifest() {
     assert_eq!(configuration.libraries()[0].name(), "m");
     assert_eq!(configuration.libraries()[0].kind(), LibraryKind::Shared);
     assert!(configuration.library_paths().is_empty());
-    let expected_linker = if cfg!(target_os = "macos") {
-        LinkerFlavor::Apple
-    } else if cfg!(windows) {
-        LinkerFlavor::Msvc
-    } else {
-        LinkerFlavor::Gnu
-    };
+    let expected_linker = TargetSpec::host().expect("host target should parse").linker_flavor();
     assert_eq!(configuration.linker_flavor(), expected_linker);
     let _ = fs::remove_file(path);
 }

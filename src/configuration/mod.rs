@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+pub use crate::target::LinkerFlavor;
 use crate::target::{TargetSpec, TargetSpecError};
 
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
@@ -88,29 +89,6 @@ pub enum LibraryKind {
     Shared,
 }
 
-#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum LinkerFlavor {
-    Gnu,
-    Apple,
-    Msvc,
-}
-
-impl LinkerFlavor {
-    pub const fn host_default() -> Self {
-        #[cfg(target_os = "macos")]
-        {
-            Self::Apple
-        }
-        #[cfg(windows)]
-        {
-            Self::Msvc
-        }
-        #[cfg(not(any(target_os = "macos", windows)))]
-        Self::Gnu
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkLibrary {
     name: String,
@@ -163,13 +141,14 @@ impl CompilerConfiguration {
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
             .unwrap_or_else(|| OsString::from(DEFAULT_LINKER));
         let target = TargetSpec::host().expect("host target must have a valid target contract");
+        let linker_flavor = target.linker_flavor();
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             target_spec_hash: target.spec_hash(),
             target,
             profile: BuildProfile::Debug,
             linker,
-            linker_flavor: LinkerFlavor::host_default(),
+            linker_flavor,
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: NativeBackendConfiguration::default(),
             entry_symbol: None,
@@ -196,6 +175,7 @@ impl CompilerConfiguration {
             .transpose()
             .map_err(|error: TargetSpecError| ConfigurationError(error.to_string()))?
             .unwrap_or_else(|| environment.target.clone());
+        let linker_flavor = manifest.build.linker_flavor.unwrap_or(target.linker_flavor());
         let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
             .or_else(|| manifest.build.linker.as_deref().map(OsString::from));
@@ -227,7 +207,7 @@ impl CompilerConfiguration {
             target,
             profile: manifest.build.profile.unwrap_or(environment.profile),
             linker: linker.unwrap_or_else(|| OsString::from(DEFAULT_LINKER)),
-            linker_flavor: manifest.build.linker_flavor.unwrap_or(environment.linker_flavor),
+            linker_flavor,
             native_backend,
             entry_symbol: manifest.package.entry,
             library_paths,
