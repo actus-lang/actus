@@ -11,6 +11,7 @@ mod expression_construct;
 mod expression_literals;
 mod expression_operations;
 mod expressions;
+mod function_definition;
 mod generic_definitions;
 mod generic_enum_layout;
 mod generic_layout;
@@ -23,6 +24,7 @@ mod model;
 mod native;
 mod native_runtime;
 mod performance;
+mod performance_emit;
 mod structs;
 mod types;
 

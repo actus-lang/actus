@@ -2,6 +2,14 @@ use std::collections::HashSet;
 
 use crate::semantic::ReachablePerformance;
 
+use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
+
+use super::layout::LayoutRegistry;
+use super::native::{FunctionMeta, NativeEmitError};
+use super::types::NativeType;
+use cranelift_module::{Linkage, Module};
+use cranelift_object::ObjectModule;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct PerformanceImplementation {
     pub(super) role_name: String,
@@ -13,6 +21,12 @@ pub(super) struct PerformanceImplementation {
 #[derive(Default)]
 pub(super) struct PerformanceRegistry {
     implementations: Vec<PerformanceImplementation>,
+}
+
+pub(super) struct PerformanceDefinition<'a> {
+    pub(super) target: &'a TypeName,
+    pub(super) method: &'a VerbDecl,
+    pub(super) symbol: String,
 }
 
 impl PerformanceRegistry {
@@ -44,10 +58,83 @@ impl PerformanceRegistry {
         Ok(())
     }
 
+    pub(super) fn definitions<'a>(
+        &self,
+        program: &'a Program,
+    ) -> Result<Vec<PerformanceDefinition<'a>>, NativeEmitError> {
+        self.implementations
+            .iter()
+            .map(|implementation| {
+                program
+                    .declarations
+                    .iter()
+                    .find_map(|declaration| {
+                        let TopLevelDecl::Perform(perform) = declaration else { return None };
+                        if perform.role_name != implementation.role_name
+                            || canonical_type_name(&perform.target) != implementation.target_type
+                        {
+                            return None;
+                        }
+                        perform
+                            .methods
+                            .iter()
+                            .find(|method| method.name == implementation.method_name)
+                            .map(|method| PerformanceDefinition {
+                                target: &perform.target,
+                                method,
+                                symbol: implementation.symbol.clone(),
+                            })
+                    })
+                    .ok_or_else(|| {
+                        NativeEmitError(format!(
+                            "reachable performance `{}` has no source definition",
+                            implementation.symbol
+                        ))
+                    })
+            })
+            .collect()
+    }
+
     #[cfg(test)]
     fn implementations(&self) -> &[PerformanceImplementation] {
         &self.implementations
     }
+}
+
+pub(super) fn declare_performance_functions(
+    module: &mut ObjectModule,
+    definitions: &[PerformanceDefinition<'_>],
+    layouts: &LayoutRegistry,
+) -> Result<std::collections::HashMap<String, FunctionMeta>, NativeEmitError> {
+    let mut metadata = std::collections::HashMap::new();
+    for definition in definitions {
+        let signature = super::declarations::native_signature_for_definition(
+            module,
+            definition.method,
+            layouts,
+        );
+        let id = module
+            .declare_function(&definition.symbol, Linkage::Local, &signature)
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+        let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts);
+        metadata.insert(
+            dispatch_key(target_type, &definition.method.name),
+            FunctionMeta {
+                id,
+                parameter_names: definition
+                    .method
+                    .params
+                    .iter()
+                    .map(|parameter| parameter.name.clone())
+                    .collect(),
+                return_type: NativeType::from_type_name_with_layout(
+                    definition.method.return_type.as_ref(),
+                    layouts,
+                ),
+            },
+        );
+    }
+    Ok(metadata)
 }
 
 fn performance_symbol(role: &str, target: &str, method: &str) -> String {
@@ -56,6 +143,31 @@ fn performance_symbol(role: &str, target: &str, method: &str) -> String {
         encode_component(role),
         encode_component(target),
         encode_component(method)
+    )
+}
+
+pub(super) fn dispatch_key(target: NativeType, method: &str) -> String {
+    format!("actus_dispatch_{}_{}", native_type_key(target), encode_component(method))
+}
+
+fn native_type_key(target: NativeType) -> String {
+    match target {
+        NativeType::Struct(id) => format!("struct_{id}"),
+        NativeType::Enum(id) => format!("enum_{id}"),
+        NativeType::Int => "int".to_owned(),
+        NativeType::String => "string".to_owned(),
+        NativeType::Buffer => "buffer".to_owned(),
+    }
+}
+
+fn canonical_type_name(type_name: &TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )
 }
 

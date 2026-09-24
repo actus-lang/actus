@@ -13,13 +13,14 @@ use crate::semantic::{GenericInstance, analyze};
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
+use super::function_definition::define_function;
 use super::generic_layout::GenericLayoutRegistry;
 use super::layout::LayoutRegistry;
-use super::literals::{StringDataIds, declare_string_values, define_string_data};
-use super::lowering::lower_body;
+use super::literals::{StringDataIds, define_string_data};
 use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
 use super::performance::PerformanceRegistry;
+use super::performance_emit::define_performances;
 use super::types::NativeType;
 
 #[derive(Debug)]
@@ -66,6 +67,7 @@ pub fn emit_program_object_with_configuration(
     let performance_registry =
         PerformanceRegistry::from_reachable(&semantic.reachable_performances);
     performance_registry.validate().map_err(NativeEmitError)?;
+    let performance_definitions = performance_registry.definitions(program)?;
     let verbs = program
         .declarations
         .iter()
@@ -101,17 +103,20 @@ pub fn emit_program_object_with_configuration(
         &verbs,
         &external_verbs,
         &semantic.generic_instances,
+        &performance_definitions,
         symbol,
         &cleanup_schedule,
         configuration,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_verbs_object(
     program: &Program,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     generic_instances: &[GenericInstance],
+    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
     symbol: &str,
     cleanup_schedule: &NativeCleanupSchedule,
     configuration: &NativeBackendConfiguration,
@@ -137,6 +142,11 @@ fn emit_verbs_object(
     }
     let frontend_config = module.isa().frontend_config();
     let mut metadata = declare_functions(&mut module, verbs, external_verbs, symbol, &layouts)?;
+    metadata.extend(super::performance::declare_performance_functions(
+        &mut module,
+        performance_definitions,
+        &layouts,
+    )?);
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     metadata.extend(declare_runtime_functions(&mut module)?);
     let functions = function_metadata(&metadata);
@@ -144,6 +154,15 @@ fn emit_verbs_object(
         &mut module,
         frontend_config,
         verbs,
+        &functions,
+        cleanup_schedule,
+        &string_data,
+        &layouts,
+    )?;
+    define_performances(
+        &mut module,
+        frontend_config,
+        performance_definitions,
         &functions,
         cleanup_schedule,
         &string_data,
@@ -211,85 +230,6 @@ fn create_module(
     let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
     Ok(ObjectModule::new(builder))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn define_function(
-    module: &mut ObjectModule,
-    frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
-    verb: &VerbDecl,
-    metadata: &FunctionMeta,
-    functions: &HashMap<String, FunctionMeta>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataIds,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    let mut context = module.make_context();
-    context.func.signature =
-        super::declarations::native_signature_for_definition(module, verb, layouts);
-    let references = declare_function_refs(module, &mut context.func, functions)?;
-    let string_values = declare_string_values(module, &mut context.func, string_data);
-    let mut function_context = FunctionBuilderContext::new();
-    {
-        let mut function = FunctionBuilder::new(&mut context.func, &mut function_context);
-        let block = function.create_block();
-        function.switch_to_block(block);
-        function.append_block_params_for_function_params(block);
-        let parameters = function.block_params(block).to_vec();
-        let mut locals = HashMap::new();
-        for (parameter, value) in verb.params.iter().zip(parameters) {
-            locals.insert(&parameter.name, value);
-        }
-        let local_types = verb
-            .params
-            .iter()
-            .map(|parameter| {
-                (
-                    &parameter.name,
-                    NativeType::from_name_with_layout(&parameter.ty.name, layouts).unwrap(),
-                )
-            })
-            .collect();
-        function.seal_block(block);
-        let result = lower_body(
-            &mut function,
-            &verb.body.statements,
-            &locals,
-            &local_types,
-            &references,
-            cleanup_schedule,
-            &string_values,
-            layouts,
-        )?;
-        function.ins().return_(&[result]);
-        function.finalize(frontend_config);
-    }
-    module
-        .define_function(metadata.id, &mut context)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
-    module.clear_context(&mut context);
-    Ok(())
-}
-
-fn declare_function_refs(
-    module: &mut ObjectModule,
-    function: &mut cranelift_codegen::ir::Function,
-    functions: &HashMap<String, FunctionMeta>,
-) -> Result<HashMap<String, FunctionRef>, NativeEmitError> {
-    functions
-        .iter()
-        .map(|(name, meta)| {
-            let reference = module.declare_func_in_func(meta.id, function);
-            Ok((
-                name.clone(),
-                FunctionRef {
-                    reference,
-                    parameter_names: meta.parameter_names.clone(),
-                    return_type: meta.return_type,
-                },
-            ))
-        })
-        .collect()
 }
 
 fn emit_i32_object(

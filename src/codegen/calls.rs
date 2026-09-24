@@ -10,6 +10,7 @@ use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
+use super::performance::dispatch_key;
 use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
@@ -30,9 +31,14 @@ pub(super) fn lower_method_call(
     combined
         .push(Argument { name: named.then(|| "self".to_owned()), expression: receiver.clone() });
     combined.extend(arguments.iter().cloned());
+    let receiver_type =
+        super::expressions::initializer_type(receiver, local_types, functions, layouts);
+    let dispatch_name = dispatch_key(receiver_type, method);
+    let callee =
+        if functions.contains_key(&dispatch_name) { dispatch_name.as_str() } else { method };
     lower_call(
         function,
-        method,
+        callee,
         &combined,
         locals,
         local_types,
