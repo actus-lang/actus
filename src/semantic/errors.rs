@@ -219,6 +219,11 @@ pub enum SemanticErrorKind {
         mode: String,
         subject: String,
     },
+    BranchStateMismatch {
+        name: String,
+        expected: String,
+        found: String,
+    },
     InvalidMutation {
         name: String,
     },

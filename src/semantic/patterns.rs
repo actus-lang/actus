@@ -31,6 +31,8 @@ impl Analyzer {
             crate::ast::CaseMode::Dat => self.consume_case_subject(subject, span)?,
         }
         let branch_state = self.snapshot_binding_states();
+        let branch_count = branch_state.len();
+        let mut branch_results = Vec::new();
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
         for branch in branches {
@@ -52,7 +54,12 @@ impl Analyzer {
             }
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
+            branch_results.push(self.snapshot_binding_prefix(branch_count));
             self.restore_binding_states(&branch_state);
+        }
+        self.validate_branch_join(&branch_results, span)?;
+        if let Some(joined_state) = branch_results.first() {
+            self.restore_binding_states(joined_state);
         }
         self.leave_scope();
         Ok(())
@@ -71,6 +78,34 @@ impl Analyzer {
             binding.ownership = ownership.clone();
             binding.access = access.clone();
         }
+    }
+
+    fn snapshot_binding_prefix(&self, count: usize) -> Vec<(OwnershipState, AccessState)> {
+        self.snapshot_binding_states().into_iter().take(count).collect()
+    }
+
+    fn validate_branch_join(
+        &self,
+        branch_results: &[Vec<(OwnershipState, AccessState)>],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(expected_states) = branch_results.first() else { return Ok(()) };
+        for states in branch_results.iter().skip(1) {
+            for (index, (expected, found)) in expected_states.iter().zip(states).enumerate() {
+                if expected != found {
+                    let name = self.model.bindings[index].name.clone();
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::BranchStateMismatch {
+                            name,
+                            expected: format!("{expected:?}"),
+                            found: format!("{found:?}"),
+                        },
+                        span,
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     fn validate_pattern_coverage(

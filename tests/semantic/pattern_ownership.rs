@@ -1,6 +1,6 @@
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{CleanupAction, OwnershipState, SemanticModel, analyze};
+use actus::semantic::{CleanupAction, OwnershipState, SemanticErrorKind, SemanticModel, analyze};
 
 fn analyze_source(source: &str) -> Result<SemanticModel, actus::semantic::SemanticError> {
     let (tokens, errors) = scan(source);
@@ -66,7 +66,7 @@ fn isolates_ownership_transfers_between_abs_case_branches() {
 }
 
 #[test]
-fn isolates_drops_between_abs_case_branches() {
+fn joins_drops_from_each_abs_case_branch() {
     let model = analyze_source(
         "enum Color { Red, Green, } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red => { drop(payload); }, Color.Green => { drop(payload); }, }; }",
     )
@@ -76,5 +76,33 @@ fn isolates_drops_between_abs_case_branches() {
         .iter()
         .find(|binding| binding.name == "payload")
         .expect("payload binding should exist");
-    assert_eq!(payload.ownership, OwnershipState::Active);
+    assert_eq!(payload.ownership, OwnershipState::Dropped);
+}
+
+#[test]
+fn joins_identical_ownership_transitions_after_abs_case() {
+    let model = analyze_source(
+        "enum Color { Red, Green, } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red => { erg first = payload; }, Color.Green => { erg second = payload; }, }; }",
+    )
+    .expect("branches with identical ownership states should join");
+
+    let payload = model
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "payload")
+        .expect("payload binding should exist");
+    assert_eq!(payload.ownership, OwnershipState::Moved);
+}
+
+#[test]
+fn rejects_incompatible_ownership_states_at_case_join() {
+    let error = analyze_source(
+        "enum Color { Red, Green, } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red => { erg first = payload; }, Color.Green => 0, }; }",
+    )
+    .expect_err("branches with different ownership states should be rejected");
+
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::BranchStateMismatch { name, .. } if name == "payload"
+    ));
 }

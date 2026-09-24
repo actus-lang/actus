@@ -123,6 +123,7 @@ fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
         SemanticErrorKind::InvalidMutation { .. } => "E1051",
         SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
+        SemanticErrorKind::BranchStateMismatch { .. } => "E1061",
         _ => return None,
     })
 }
@@ -248,6 +249,11 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::InvalidCaseRole { mode, subject } => {
             format!("cannot use `{mode}` case deconstruction on `{subject}`")
+        }
+        SemanticErrorKind::BranchStateMismatch { name, expected, found } => {
+            format!(
+                "case branch state mismatch for `{name}`: expected `{expected}`, found `{found}`"
+            )
         }
         SemanticErrorKind::InvalidMutation { name } => {
             format!("cannot mutate read-only binding `{name}`")
