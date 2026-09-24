@@ -1,5 +1,6 @@
 use crate::ast::{
-    Argument, BuiltinType, Expr, ExternalVerbDecl, Role, VerbDecl, lookup_builtin_type,
+    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, Role, VerbDecl,
+    lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
 
@@ -11,6 +12,7 @@ use super::state::OwnershipState;
 #[derive(Clone)]
 pub(super) struct VerbSignature {
     pub(super) params: Vec<(String, Role, String)>,
+    pub(super) dynamic_params: Vec<DispatchMode>,
     pub(super) return_type: Option<BuiltinType>,
 }
 
@@ -24,6 +26,7 @@ impl VerbDecl {
                     (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
                 })
                 .collect(),
+            dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
             return_type: self
                 .return_type
                 .as_ref()
@@ -42,6 +45,7 @@ impl ExternalVerbDecl {
                     (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
                 })
                 .collect(),
+            dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
             return_type: self
                 .return_type
                 .as_ref()
@@ -123,6 +127,7 @@ impl Analyzer {
                 callee,
                 &signature.params[parameter_index].0,
                 &signature.params[parameter_index].2,
+                signature.dynamic_params[parameter_index],
                 &argument.expression,
             )?;
             if *role == Role::Dat {

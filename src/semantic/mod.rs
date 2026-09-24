@@ -3,6 +3,7 @@ mod borrowing;
 mod call_arguments;
 mod calls;
 mod cleanup;
+mod dynamic;
 mod enum_constructors;
 mod enum_registry;
 mod enums;
@@ -26,6 +27,9 @@ mod types;
 pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
-pub use model::{Binding, BorrowRecord, GenericInstance, ReachablePerformance, SemanticModel};
+pub use model::{
+    Binding, BorrowRecord, DynamicRoleType, FatPointerLayout, GenericInstance,
+    ReachablePerformance, SemanticModel,
+};
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub(crate) use type_substitution::TypeSubstitution;

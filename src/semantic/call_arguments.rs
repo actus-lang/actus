@@ -1,4 +1,4 @@
-use crate::ast::{Argument, Expr, Role, lookup_builtin_type};
+use crate::ast::{Argument, DispatchMode, Expr, Role, lookup_builtin_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -12,8 +12,26 @@ impl Analyzer {
         callee: &str,
         parameter: &str,
         expected: &str,
+        dispatch: DispatchMode,
         expression: &Expr,
     ) -> Result<(), SemanticError> {
+        if dispatch == DispatchMode::Dynamic {
+            let Some(found) = self.expression_type_name(expression) else { return Ok(()) };
+            if self.has_performance(
+                expected,
+                &crate::ast::TypeName {
+                    name: found.clone(),
+                    arguments: Vec::new(),
+                    span: expression_span(expression),
+                },
+            ) {
+                return Ok(());
+            }
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DynamicRoleMismatch { role: expected.to_owned(), found },
+                span: expression_span(expression),
+            });
+        }
         let Some(found) = self.expression_type(expression) else { return Ok(()) };
         let Some(expected_type) = lookup_builtin_type(expected) else { return Ok(()) };
         if found == expected_type {

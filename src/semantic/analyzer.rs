@@ -54,6 +54,7 @@ impl Analyzer {
                 loop_unwind_plans: Vec::new(),
                 generic_instances: Vec::new(),
                 reachable_performances: Vec::new(),
+                dynamic_roles: Vec::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
@@ -85,6 +86,7 @@ impl Analyzer {
         self.validate_performances(program)?;
         self.validate_recursive_types()?;
         self.register_declarations(program)?;
+        self.collect_dynamic_roles(program);
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
         self.model.generic_instances = self.generic_instances.into_instances();
@@ -124,7 +126,10 @@ impl Analyzer {
             };
             self.with_generic_scope(generic_parameters, |analyzer| {
                 for parameter in params {
-                    analyzer.validate_type_reference(&parameter.ty)?;
+                    analyzer.validate_dynamic_parameter(parameter)?;
+                    if parameter.dispatch == crate::ast::DispatchMode::Static {
+                        analyzer.validate_type_reference(&parameter.ty)?;
+                    }
                 }
                 if let Some(return_type) = return_type {
                     analyzer.validate_type_reference(return_type)?;

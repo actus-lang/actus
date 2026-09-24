@@ -74,10 +74,17 @@ verb send(abs writer: dynamic Writer, abs bytes: Buffer): Int {
 }
 ```
 
-`abs dynamic Role` denotes an explicit role object represented by a fat pointer
-and vtable. Its ABI, object layout, and lifetime rules will be specified before
-the feature is implemented. `dynamic` is not an alias for `perform`, and a
-role cannot become dynamic accidentally.
+`abs dynamic Role` denotes an explicit borrowed role object represented by a
+fat pointer. Its target-neutral logical layout is two pointer words in order:
+`data_ptr` at word offset 0 and `vtable_ptr` at word offset 1. Each word uses
+the selected target's native pointer width and alignment. The object therefore
+has two pointer-word slots and does not own the data behind `data_ptr`.
+
+The type checker accepts a dynamic parameter only with the `abs` access role,
+requires the named role to exist, and requires every concrete argument type to
+have a matching `perform Role for Type`. Dynamic arguments cannot transfer or
+mutate ownership through the role object. `dynamic` is not an alias for
+`perform`, and a role cannot become dynamic accidentally.
 
 ## Static and Dynamic Dispatch Boundary
 

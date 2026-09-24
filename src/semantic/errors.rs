@@ -111,6 +111,16 @@ pub enum SemanticErrorKind {
         role: String,
         method: String,
     },
+    DynamicRequiresAbs {
+        parameter: String,
+    },
+    UnknownDynamicRole {
+        name: String,
+    },
+    DynamicRoleMismatch {
+        role: String,
+        found: String,
+    },
     DuplicateVerbName {
         name: String,
     },

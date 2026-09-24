@@ -221,6 +221,7 @@ mod tests {
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
             reachable_performances: Vec::new(),
+            dynamic_roles: Vec::new(),
         }
     }
 
@@ -257,6 +258,7 @@ mod tests {
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
             reachable_performances: Vec::new(),
+            dynamic_roles: Vec::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());

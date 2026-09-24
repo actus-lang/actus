@@ -81,8 +81,8 @@ operations require an explicit `unsafe` boundary.
 ## Explicit Dynamic Dispatch
 
 - [x] Reserve and parse `dynamic` as a full language keyword.
-- [ ] Define `abs dynamic Role` type checking and ownership boundaries.
-- [ ] Specify dynamic object and fat-pointer layout.
+- [x] Define `abs dynamic Role` type checking and ownership boundaries.
+- [x] Specify dynamic object and fat-pointer layout.
 - [ ] Generate and validate role vtables for dynamic performances.
 - [ ] Lower dynamic calls through explicit vtable dispatch.
 - [ ] Define the dynamic ABI before enabling cross-unit use.

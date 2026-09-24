@@ -53,7 +53,10 @@ impl Analyzer {
                 ));
             }
             for parameter in &method.params {
-                self.validate_type_reference(&parameter.ty)?;
+                self.validate_dynamic_parameter(parameter)?;
+                if parameter.dispatch == crate::ast::DispatchMode::Static {
+                    self.validate_type_reference(&parameter.ty)?;
+                }
             }
             if let Some(return_type) = &method.return_type {
                 self.validate_type_reference(return_type)?;
@@ -136,6 +139,7 @@ fn method_matches(
         && required.params.len() == implementation.params.len()
         && required.params.iter().zip(&implementation.params).all(|(left, right)| {
             left.role == right.role
+                && left.dispatch == right.dispatch
                 && left.name == right.name
                 && type_names_match(&left.ty, &right.ty)
         })

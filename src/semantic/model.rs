@@ -36,6 +36,25 @@ pub struct ReachablePerformance {
     pub method_name: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FatPointerLayout {
+    pub data_ptr_word: u8,
+    pub vtable_ptr_word: u8,
+    pub word_count: u8,
+    pub alignment_words: u8,
+}
+
+impl FatPointerLayout {
+    pub const DYNAMIC_ROLE: Self =
+        Self { data_ptr_word: 0, vtable_ptr_word: 1, word_count: 2, alignment_words: 1 };
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DynamicRoleType {
+    pub role_name: String,
+    pub layout: FatPointerLayout,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticModel {
     pub bindings: Vec<Binding>,
@@ -45,4 +64,5 @@ pub struct SemanticModel {
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,
     pub reachable_performances: Vec<ReachablePerformance>,
+    pub dynamic_roles: Vec<DynamicRoleType>,
 }
