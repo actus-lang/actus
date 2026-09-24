@@ -117,8 +117,15 @@ pub struct VerbDecl {
 pub struct Param {
     pub role: Role,
     pub name: String,
+    pub dispatch: DispatchMode,
     pub ty: TypeName,
     pub span: SourceSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DispatchMode {
+    Static,
+    Dynamic,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1,4 +1,4 @@
-use actus::ast::{Role, TopLevelDecl};
+use actus::ast::{DispatchMode, Role, TopLevelDecl};
 use actus::lexer::scan;
 use actus::parser::parse;
 
@@ -30,4 +30,19 @@ fn parses_performance_for_a_target_type() {
     assert_eq!(performance.role_name, "Writer");
     assert_eq!(performance.target.name, "File");
     assert_eq!(performance.methods[0].name, "write");
+}
+
+#[test]
+fn parses_dynamic_dispatch_parameter_type() {
+    let (tokens, errors) = scan(
+        "role Writer { verb write(abs self: File) -> Int; } \
+         verb send(abs writer: dynamic Writer, abs bytes: Buffer) -> Int { return 0; }",
+    );
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("dynamic parameter should parse");
+
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    assert_eq!(verb.params[0].dispatch, DispatchMode::Dynamic);
+    assert_eq!(verb.params[0].ty.name, "Writer");
+    assert_eq!(verb.params[1].dispatch, DispatchMode::Static);
 }

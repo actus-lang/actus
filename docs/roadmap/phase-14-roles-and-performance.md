@@ -80,7 +80,7 @@ operations require an explicit `unsafe` boundary.
 
 ## Explicit Dynamic Dispatch
 
-- [ ] Reserve and parse `dynamic` as a full language keyword.
+- [x] Reserve and parse `dynamic` as a full language keyword.
 - [ ] Define `abs dynamic Role` type checking and ownership boundaries.
 - [ ] Specify dynamic object and fat-pointer layout.
 - [ ] Generate and validate role vtables for dynamic performances.
@@ -89,7 +89,7 @@ operations require an explicit `unsafe` boundary.
 
 ## Testing and Completion Gates
 
-- [ ] Add parser and AST tests for roles, performances, bounds, and `dynamic`.
+- [x] Add parser and AST tests for roles, performances, bounds, and `dynamic`.
 - [x] Add positive and negative semantic tests for receiver roles and bounds.
 - [x] Add monomorphization and deterministic static-dispatch golden tests.
 - [ ] Add dynamic object layout and vtable tests.

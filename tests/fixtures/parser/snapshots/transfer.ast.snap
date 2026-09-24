@@ -8,6 +8,7 @@ Program {
                     Param {
                         role: Erg,
                         name: "target",
+                        dispatch: Static,
                         ty: TypeName {
                             name: "File",
                             arguments: [],
@@ -24,6 +25,7 @@ Program {
                     Param {
                         role: Abs,
                         name: "packet",
+                        dispatch: Static,
                         ty: TypeName {
                             name: "Buffer",
                             arguments: [],
@@ -40,6 +42,7 @@ Program {
                     Param {
                         role: Dat,
                         name: "logger",
+                        dispatch: Static,
                         ty: TypeName {
                             name: "Logger",
                             arguments: [],

@@ -1,5 +1,6 @@
 use crate::ast::{
-    Block, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt, TopLevelDecl, VerbDecl,
+    Block, DispatchMode, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt,
+    TopLevelDecl, VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
@@ -174,9 +175,20 @@ impl Parser {
         let name_token = self.take_identifier("parameter name")?;
         let name = identifier_text(&name_token.kind);
         self.expect_simple(TokenKind::Colon, "`:`")?;
+        let dispatch = if self.match_simple(TokenKind::Dynamic) {
+            DispatchMode::Dynamic
+        } else {
+            DispatchMode::Static
+        };
         let ty = self.parse_type_name()?;
 
-        Ok(Param { role, name, span: SourceSpan::new(role_token.span.start, ty.span.end), ty })
+        Ok(Param {
+            role,
+            name,
+            dispatch,
+            span: SourceSpan::new(role_token.span.start, ty.span.end),
+            ty,
+        })
     }
 
     fn parse_block(&mut self) -> Result<Block, ParseError> {

@@ -41,6 +41,7 @@ pub enum TokenKind {
     Enum,
     Role,
     Perform,
+    Dynamic,
     For,
     Case,
     If,

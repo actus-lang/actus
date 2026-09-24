@@ -111,6 +111,7 @@ impl<'source> Scanner<'source> {
             "enum" => TokenKind::Enum,
             "role" => TokenKind::Role,
             "perform" => TokenKind::Perform,
+            "dynamic" => TokenKind::Dynamic,
             "for" => TokenKind::For,
             "case" => TokenKind::Case,
             "if" => TokenKind::If,
