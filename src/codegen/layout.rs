@@ -191,6 +191,7 @@ impl LayoutRegistry {
         Ok(match ty {
             NativeType::Int => (4, 4),
             NativeType::String | NativeType::Buffer => (self.pointer_size, self.pointer_size),
+            NativeType::FatPointer => (self.pointer_size * 2, self.pointer_size),
             NativeType::Struct(id) => {
                 let definition = self.definitions.get(id).ok_or_else(|| {
                     NativeEmitError(format!("missing nested struct layout `{id}`"))

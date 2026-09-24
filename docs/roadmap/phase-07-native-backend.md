@@ -54,3 +54,11 @@
 - [x] Mark unchecked foreign declarations with explicit `unsafe extern` boundaries.
 - [x] Add C library integration fixtures and native link tests.
 - [x] Add a native link smoke test for an imported C symbol.
+
+## Architecture Debt Audit
+
+- [x] P0: Select targets from `TargetSpec`, emit target-hashed `.actmeta`,
+  and invalidate stale capsula artifacts.
+- [x] P1: Derive linker flavor and executable from the target, generate
+  target-owned linker arguments, support Arca linker overrides, and separate
+  hosted `main` from freestanding entry contracts.

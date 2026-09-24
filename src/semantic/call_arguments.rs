@@ -1,10 +1,10 @@
-use crate::ast::{Argument, Expr, Role, lookup_builtin_type};
+use crate::ast::{Argument, DispatchMode, Expr, Role, lookup_builtin_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::calls::VerbSignature;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::BindingState;
+use super::state::OwnershipState;
 
 impl Analyzer {
     pub(super) fn validate_argument_type(
@@ -12,8 +12,26 @@ impl Analyzer {
         callee: &str,
         parameter: &str,
         expected: &str,
+        dispatch: DispatchMode,
         expression: &Expr,
     ) -> Result<(), SemanticError> {
+        if dispatch == DispatchMode::Dynamic {
+            let Some(found) = self.expression_type_name(expression) else { return Ok(()) };
+            if self.has_performance(
+                expected,
+                &crate::ast::TypeName {
+                    name: found.clone(),
+                    arguments: Vec::new(),
+                    span: expression_span(expression),
+                },
+            ) {
+                return Ok(());
+            }
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DynamicRoleMismatch { role: expected.to_owned(), found },
+                span: expression_span(expression),
+            });
+        }
         let Some(found) = self.expression_type(expression) else { return Ok(()) };
         let Some(expected_type) = lookup_builtin_type(expected) else { return Ok(()) };
         if found == expected_type {
@@ -130,7 +148,7 @@ impl Analyzer {
         let Expr::Identifier { name, span } = expression else { return false };
         let Ok(index) = self.binding(name, *span) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
-            && matches!(self.model.bindings[index].state, BindingState::Active)
+            && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
     }
 
     fn is_borrow_argument(&self, expression: &Expr) -> bool {
@@ -139,10 +157,10 @@ impl Analyzer {
                 let Ok(index) = self.binding(name, *span) else { return false };
                 self.model.bindings[index].role == Role::Abs
                     && !matches!(
-                        self.model.bindings[index].state,
-                        BindingState::PartiallyMoved { .. }
-                            | BindingState::Moved
-                            | BindingState::Dropped
+                        self.model.bindings[index].ownership,
+                        OwnershipState::PartiallyMoved { .. }
+                            | OwnershipState::Moved
+                            | OwnershipState::Dropped
                     )
             }
             Expr::Borrow { expression, .. } => self.is_readable_owner(expression),
@@ -155,8 +173,8 @@ impl Analyzer {
         let Ok(index) = self.binding(name, *span) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
             && matches!(
-                self.model.bindings[index].state,
-                BindingState::Active | BindingState::Frozen { .. }
+                self.model.bindings[index].ownership,
+                OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
             )
     }
 }

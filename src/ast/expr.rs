@@ -81,6 +81,7 @@ pub enum CaseMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaseBranch {
     pub pattern: Pattern,
+    pub guard: Option<Box<Expr>>,
     pub body: CaseBody,
     pub span: SourceSpan,
 }

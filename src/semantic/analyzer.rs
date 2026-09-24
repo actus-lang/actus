@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, EnumDef, Expr, Program, Role, Stmt, StructDef, TopLevelDecl,
+    Block, BuiltinType, EnumDef, Expr, Program, Role, RoleDecl, Stmt, StructDef, TopLevelDecl,
     lookup_builtin_type,
 };
 
@@ -26,10 +26,16 @@ pub(super) struct Analyzer {
     pub(super) current_return_type: Option<BuiltinType>,
     pub(super) struct_types: HashMap<String, StructDef>,
     pub(super) enum_types: HashMap<String, EnumDef>,
+    pub(super) role_types: HashMap<String, RoleDecl>,
+    pub(super) performances: HashSet<(String, String)>,
+    pub(super) performance_methods: HashMap<(String, String), super::calls::VerbSignature>,
+    pub(super) performance_roles: HashMap<(String, String), String>,
+    pub(super) reachable_performances: HashSet<super::model::ReachablePerformance>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
+    pub(super) binding_dynamic_roles: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
 }
@@ -48,6 +54,8 @@ impl Analyzer {
                 return_unwind_plans: Vec::new(),
                 loop_unwind_plans: Vec::new(),
                 generic_instances: Vec::new(),
+                reachable_performances: Vec::new(),
+                dynamic_roles: Vec::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
@@ -57,10 +65,16 @@ impl Analyzer {
             current_return_type: None,
             struct_types: HashMap::new(),
             enum_types: HashMap::new(),
+            role_types: HashMap::new(),
+            performances: HashSet::new(),
+            performance_methods: HashMap::new(),
+            performance_roles: HashMap::new(),
+            reachable_performances: HashSet::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
             binding_enum_type_applications: HashMap::new(),
+            binding_dynamic_roles: HashMap::new(),
             generic_scopes: Vec::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
         }
@@ -68,12 +82,24 @@ impl Analyzer {
 
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         self.register_enums(program)?;
+        self.register_roles(program)?;
         self.register_structs(program)?;
+        self.validate_role_declarations()?;
+        self.validate_performances(program)?;
         self.validate_recursive_types()?;
         self.register_declarations(program)?;
+        self.collect_dynamic_roles(program);
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
         self.model.generic_instances = self.generic_instances.into_instances();
+        self.model.reachable_performances = self.reachable_performances.into_iter().collect();
+        self.model.reachable_performances.sort_by(|left, right| {
+            (&left.target_type, &left.role_name, &left.method_name).cmp(&(
+                &right.target_type,
+                &right.role_name,
+                &right.method_name,
+            ))
+        });
         self.current_return_type = None;
         Ok(self.model)
     }
@@ -87,16 +113,25 @@ impl Analyzer {
                 TopLevelDecl::ExternalVerb(verb) => {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
-                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => continue,
+                TopLevelDecl::Struct(_)
+                | TopLevelDecl::Enum(_)
+                | TopLevelDecl::Role(_)
+                | TopLevelDecl::Perform(_) => continue,
             };
             let generic_parameters = match declaration {
                 TopLevelDecl::Verb(verb) => &verb.generic_parameters,
                 TopLevelDecl::ExternalVerb(verb) => &verb.generic_parameters,
-                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) => unreachable!(),
+                TopLevelDecl::Struct(_)
+                | TopLevelDecl::Enum(_)
+                | TopLevelDecl::Role(_)
+                | TopLevelDecl::Perform(_) => unreachable!(),
             };
             self.with_generic_scope(generic_parameters, |analyzer| {
                 for parameter in params {
-                    analyzer.validate_type_reference(&parameter.ty)?;
+                    analyzer.validate_dynamic_parameter(parameter)?;
+                    if parameter.dispatch == crate::ast::DispatchMode::Static {
+                        analyzer.validate_type_reference(&parameter.ty)?;
+                    }
                 }
                 if let Some(return_type) = return_type {
                     analyzer.validate_type_reference(return_type)?;
@@ -126,27 +161,42 @@ impl Analyzer {
 
     fn analyze_verbs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
-            let TopLevelDecl::Verb(verb) = declaration else { continue };
-            self.current_return_type = verb
-                .return_type
-                .as_ref()
-                .and_then(|type_name| lookup_builtin_type(&type_name.name));
-            self.enter_scope(verb.body.span);
-            for parameter in &verb.params {
-                let ty = lookup_builtin_type(&parameter.ty.name);
-                self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
-                self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
-                self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
+            if let TopLevelDecl::Verb(verb) = declaration {
+                self.analyze_verb_body(verb)?;
             }
-            self.visit_block(&verb.body)?;
-            if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MissingReturnValue,
-                    span: verb.body.span,
-                });
-            }
-            self.leave_scope();
         }
+        for declaration in &program.declarations {
+            if let TopLevelDecl::Perform(perform) = declaration {
+                for method in &perform.methods {
+                    self.analyze_verb_body(method)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn analyze_verb_body(&mut self, verb: &crate::ast::VerbDecl) -> Result<(), SemanticError> {
+        self.current_return_type =
+            verb.return_type.as_ref().and_then(|type_name| lookup_builtin_type(&type_name.name));
+        self.enter_scope(verb.body.span);
+        for parameter in &verb.params {
+            let ty = lookup_builtin_type(&parameter.ty.name);
+            self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
+            if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
+                let index = self.binding(&parameter.name, parameter.span)?;
+                self.binding_dynamic_roles.insert(index, parameter.ty.name.clone());
+            }
+            self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
+            self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
+        }
+        self.visit_block(&verb.body)?;
+        if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MissingReturnValue,
+                span: verb.body.span,
+            });
+        }
+        self.leave_scope();
         Ok(())
     }
 
@@ -233,8 +283,8 @@ impl Analyzer {
                 if self.enum_receiver_name(object).is_some() {
                     self.validate_enum_unit_variant(object, field, *span)
                 } else {
-                    self.visit_expression(object)?;
-                    self.validate_field_access(object, field, *span)
+                    self.validate_field_access(object, field, *span)?;
+                    self.ensure_field_access_readable(object, field, *span)
                 }
             }
             Expr::Case { mode, subject, branches, span } => {

@@ -162,7 +162,7 @@ fn keeps_abs_case_subjects_read_only_and_restores_the_owner() {
         "enum Color { Red, } verb valid(erg color: Color) { case abs color { Color.Red => 0, }; color = Color.Red; }",
     )
     .expect("the owner should become active after an abs case");
-    assert_eq!(model.bindings[0].state, actus::semantic::BindingState::Active);
+    assert_eq!(model.bindings[0].ownership, actus::semantic::OwnershipState::Active);
 }
 
 #[test]

@@ -5,6 +5,8 @@ edition = "alpha"
 entry = "main"
 
 [build]
+target = "host"
+profile = "debug"
 linker = "cc"
 native_module = "actus"
 position_independent = true

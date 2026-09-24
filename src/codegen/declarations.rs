@@ -4,7 +4,7 @@ use cranelift_codegen::ir::AbiParam;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
-use crate::ast::{ExternalVerbDecl, VerbDecl};
+use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::layout::LayoutRegistry;
 use super::native::{FunctionMeta, NativeEmitError};
@@ -52,6 +52,16 @@ fn function_meta(
         id,
         parameter_names: params.iter().map(|param| param.name.clone()).collect(),
         return_type: NativeType::from_type_name_with_layout(return_type, layouts),
+        dynamic_params: params
+            .iter()
+            .map(|parameter| parameter.dispatch == DispatchMode::Dynamic)
+            .collect(),
+        dynamic_roles: params
+            .iter()
+            .map(|parameter| {
+                (parameter.dispatch == DispatchMode::Dynamic).then(|| parameter.ty.name.clone())
+            })
+            .collect(),
     }
 }
 
@@ -79,12 +89,17 @@ fn signature_for(
 ) -> cranelift_codegen::ir::Signature {
     let mut signature = module.make_signature();
     let pointer_type = module.isa().pointer_type();
-    signature.params.extend(params.iter().map(|parameter| {
-        AbiParam::new(
+    for parameter in params {
+        let native_type = if parameter.dispatch == DispatchMode::Dynamic {
+            NativeType::FatPointer
+        } else {
             NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
-                .ir_type(pointer_type),
-        )
-    }));
+        };
+        signature.params.push(AbiParam::new(native_type.ir_type(pointer_type)));
+        if parameter.dispatch == DispatchMode::Dynamic {
+            signature.params.push(AbiParam::new(pointer_type));
+        }
+    }
     signature.returns.push(AbiParam::new(
         NativeType::from_type_name_with_layout(return_type, layouts).ir_type(pointer_type),
     ));

@@ -30,7 +30,36 @@ impl Formatter {
             TopLevelDecl::ExternalVerb(verb) => self.external_verb(verb),
             TopLevelDecl::Struct(definition) => self.struct_definition(definition),
             TopLevelDecl::Enum(definition) => self.enum_definition(definition),
+            TopLevelDecl::Role(role) => self.role_definition(role),
+            TopLevelDecl::Perform(perform) => self.perform_definition(perform),
         }
+    }
+
+    fn role_definition(&mut self, role: &crate::ast::RoleDecl) {
+        self.output.push_str("role ");
+        self.output.push_str(&role.name);
+        self.output.push_str(" {");
+        for method in &role.methods {
+            self.output.push_str(" verb ");
+            self.output.push_str(&method.name);
+            self.parameters(&method.params);
+            self.return_type(&method.return_type);
+            self.output.push(';');
+        }
+        self.output.push_str(" }");
+    }
+
+    fn perform_definition(&mut self, perform: &crate::ast::PerformDecl) {
+        self.output.push_str("perform ");
+        self.output.push_str(&perform.role_name);
+        self.output.push_str(" for ");
+        self.output.push_str(&perform.target.name);
+        self.output.push_str(" {");
+        for method in &perform.methods {
+            self.output.push(' ');
+            self.verb(method);
+        }
+        self.output.push_str(" }");
     }
 
     fn verb(&mut self, verb: &crate::ast::VerbDecl) {

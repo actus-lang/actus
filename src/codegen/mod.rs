@@ -5,12 +5,14 @@ mod case_payload;
 mod cleanup;
 mod control_flow;
 mod declarations;
+mod dynamic_call;
 mod enum_layout;
 mod enums;
 mod expression_construct;
 mod expression_literals;
 mod expression_operations;
 mod expressions;
+mod function_definition;
 mod generic_definitions;
 mod generic_enum_layout;
 mod generic_layout;
@@ -22,8 +24,12 @@ mod lowering;
 mod model;
 mod native;
 mod native_runtime;
+mod performance;
+mod performance_emit;
 mod structs;
+mod target;
 mod types;
+mod vtable;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
 pub use linker::{NativeLinkError, link_object};
@@ -32,6 +38,6 @@ pub use model::{
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
 pub use native::{
-    NativeEmitError, emit_program_object, emit_program_object_with_configuration,
-    emit_zero_return_object,
+    NativeEmitError, emit_program_object, emit_program_object_for_target,
+    emit_program_object_with_configuration, emit_zero_return_object,
 };

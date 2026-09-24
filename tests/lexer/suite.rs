@@ -59,6 +59,15 @@ fn scans_enum_and_case_keywords() {
 }
 
 #[test]
+fn scans_dynamic_as_a_reserved_keyword() {
+    let (tokens, errors) = scan("abs writer: dynamic Writer");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].kind, TokenKind::Abs);
+    assert_eq!(tokens[3].kind, TokenKind::Dynamic);
+    assert_eq!(tokens[4].kind, TokenKind::Identifier("Writer".to_owned()));
+}
+
+#[test]
 fn scans_struct_fields_and_dot_access() {
     let (tokens, errors) = scan("struct Point { erg payload: Buffer, x: F32 } point.x");
 

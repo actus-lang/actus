@@ -5,11 +5,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr, IntrinsicKind, lookup_call_intrinsic};
 
+use super::dynamic_call::lower_dynamic_call;
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
+use super::performance::dispatch_key;
 use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
@@ -30,9 +32,27 @@ pub(super) fn lower_method_call(
     combined
         .push(Argument { name: named.then(|| "self".to_owned()), expression: receiver.clone() });
     combined.extend(arguments.iter().cloned());
+    let receiver_type =
+        super::expressions::initializer_type(receiver, local_types, functions, layouts);
+    if receiver_type == NativeType::FatPointer {
+        let fat_pointer = lower_expression(
+            function,
+            receiver,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?;
+        return lower_dynamic_call(function, fat_pointer);
+    }
+    let dispatch_name = dispatch_key(receiver_type, method);
+    let callee =
+        if functions.contains_key(&dispatch_name) { dispatch_name.as_str() } else { method };
     lower_call(
         function,
-        method,
+        callee,
         &combined,
         locals,
         local_types,
@@ -62,6 +82,8 @@ pub(super) fn lower_call(
         function,
         arguments,
         &target.parameter_names,
+        &target.dynamic_params,
+        &target.dynamic_roles,
         locals,
         local_types,
         functions,
@@ -84,6 +106,8 @@ fn lower_call_arguments(
     function: &mut FunctionBuilder<'_>,
     arguments: &[Argument],
     parameter_names: &[String],
+    dynamic_params: &[bool],
+    dynamic_roles: &[Option<String>],
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
@@ -91,21 +115,36 @@ fn lower_call_arguments(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Vec<cranelift_codegen::ir::Value>, NativeEmitError> {
-    order_arguments(arguments, parameter_names)?
-        .iter()
-        .map(|argument| {
-            lower_expression(
-                function,
-                argument,
-                locals,
-                local_types,
-                functions,
-                cleanup_schedule,
-                string_data,
-                layouts,
-            )
-        })
-        .collect()
+    let ordered = order_arguments(arguments, parameter_names)?;
+    let mut values = Vec::new();
+    for (index, argument) in ordered.iter().enumerate() {
+        let value = lower_expression(
+            function,
+            argument,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?;
+        values.push(value);
+        if dynamic_params.get(index).copied().unwrap_or(false) {
+            let role = dynamic_roles
+                .get(index)
+                .and_then(Option::as_deref)
+                .ok_or_else(|| NativeEmitError("dynamic parameter has no role".to_owned()))?;
+            let native_type =
+                super::expressions::initializer_type(argument, local_types, functions, layouts);
+            let symbol = super::vtable::vtable_symbol_for_native(role, native_type);
+            let global = string_data
+                .get(&symbol)
+                .copied()
+                .ok_or_else(|| NativeEmitError(format!("vtable `{symbol}` has no native data")))?;
+            values.push(function.ins().symbol_value(layouts.pointer_type, global));
+        }
+    }
+    Ok(values)
 }
 
 fn resolve_call_target<'a>(

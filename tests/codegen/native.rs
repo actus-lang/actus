@@ -75,6 +75,34 @@ fn declares_external_c_functions_as_imported_symbols() {
     assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "rand")));
 }
 
+#[test]
+fn emits_a_deterministic_role_vtable_data_object() {
+    let source = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value; } } verb main() -> Int { erg file = File { value: 1, }; return file.write(); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("role performance source should parse");
+    let bytes = actus::codegen::emit_program_object(&program, "main")
+        .expect("role vtable data should emit");
+    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+
+    assert!(symbols.iter().any(|symbol| {
+        symbol.strip_prefix('_').is_some_and(|name| name.starts_with("actus_vtable_Writer_struct_"))
+            || symbol.starts_with("actus_vtable_Writer_struct_")
+    }));
+}
+
+#[test]
+fn lowers_dynamic_role_call_through_fat_pointer_abi() {
+    let source = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value + 1; } } verb send(abs writer: dynamic Writer) -> Int { return writer.write(); } verb main() -> Int { erg file = File { value: 41, }; return send(writer: ref file); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("dynamic source should parse");
+    let object = actus::codegen::emit_program_object(&program, "main")
+        .expect("dynamic call should lower to native code");
+    object::File::parse(object.as_slice()).expect("native object should parse");
+}
+
 fn symbol_matches(actual: &str, expected: &str) -> bool {
     actual == expected || actual.strip_prefix('_') == Some(expected)
 }

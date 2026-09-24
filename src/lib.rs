@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod build_graph;
 pub mod cli;
 pub mod codegen;
 pub mod configuration;
@@ -9,3 +10,4 @@ pub mod lexer;
 pub mod parser;
 pub mod runtime;
 pub mod semantic;
+pub mod target;

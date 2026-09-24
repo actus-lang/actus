@@ -1,0 +1,67 @@
+struct Inner {
+    erg first: Buffer,
+    erg second: Buffer,
+}
+
+struct Outer {
+    erg inner: Inner,
+    erg tail: Buffer,
+}
+
+struct File {
+    value: Int,
+}
+
+role Writer {
+    verb write(abs self: File) -> Int;
+}
+
+perform Writer for File {
+    verb write(abs self: File) -> Int {
+        return self.value + 1;
+    }
+}
+
+enum Color {
+    Red,
+    Green,
+}
+
+enum Message {
+    Data {
+        code: Int,
+    },
+    Empty,
+}
+
+verb consume(dat item: Buffer) -> Int {
+    drop(item);
+    return 0;
+}
+
+verb main() -> Int {
+    erg file = File { value: 41, };
+    erg static_score = file.write();
+
+    erg color = Color.Red;
+    erg inspected = case abs color {
+        Color.Red => 1,
+        _ => 0,
+    };
+
+    erg outer = Outer {
+        inner: Inner {
+            first: allocate(length: 1),
+            second: allocate(length: 2),
+        },
+        tail: allocate(length: 3),
+    };
+    consume(item: outer.inner.first);
+    consume(item: outer.inner.second);
+
+    erg message = Message.Data(code: 1);
+    return case dat message {
+        Message.Data(code: value) => static_score + inspected + value,
+        Message.Empty => 0,
+    };
+}

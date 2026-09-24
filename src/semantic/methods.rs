@@ -34,22 +34,27 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if let Some(role_name) = self.dynamic_role_for_expression(receiver) {
+            return self.visit_dynamic_method_call(receiver, &role_name, method, arguments, span);
+        }
         if self.enum_receiver_name(receiver).is_some() {
             return self.validate_enum_constructor(receiver, method, arguments, span);
         }
         self.visit_expression(receiver)?;
-        let signature = self.method_signature(method, span)?;
-        let (receiver_name, receiver_role, receiver_type) =
-            signature.params.first().ok_or_else(|| SemanticError {
-                kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
-                span,
-            })?;
         let Some(actual_type) = self.expression_struct_type(receiver) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
                 span,
             });
         };
+        let performance = self.performance_signature(&actual_type, method);
+        let signature =
+            performance.clone().map(Ok).unwrap_or_else(|| self.method_signature(method, span))?;
+        let (receiver_name, receiver_role, receiver_type) =
+            signature.params.first().ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
+                span,
+            })?;
         if &actual_type != receiver_type {
             return Err(SemanticError {
                 kind: SemanticErrorKind::ReceiverTypeMismatch {
@@ -61,7 +66,42 @@ impl Analyzer {
             });
         }
         let combined = self.method_arguments(receiver, receiver_role, receiver_name, arguments);
-        self.visit_call(method, &combined, span)
+        if performance.is_some() {
+            if let Some(role_name) = self.performance_role(&actual_type, method).map(str::to_owned)
+            {
+                self.mark_reachable_performance(&actual_type, method, &role_name);
+            }
+            self.visit_call_with_signature(method, &combined, span, &signature)
+        } else {
+            self.visit_call(method, &combined, span)
+        }
+    }
+
+    fn visit_dynamic_method_call(
+        &mut self,
+        receiver: &Expr,
+        role_name: &str,
+        method_name: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let role = self.role_types.get(role_name).cloned().ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::UnknownRole { name: role_name.to_owned() },
+            span,
+        })?;
+        let method = role
+            .methods
+            .iter()
+            .find(|candidate| candidate.name == method_name)
+            .cloned()
+            .ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::UnknownMethod { method: method_name.to_owned() },
+            span,
+        })?;
+        let signature = super::dynamic::role_method_signature(&method);
+        let combined = self.method_arguments(receiver, &Role::Abs, "self", arguments);
+        self.mark_dynamic_role_performances(role_name, method.name.as_str());
+        self.visit_call_with_signature(method.name.as_str(), &combined, span, &signature)
     }
 
     fn method_signature(
@@ -103,7 +143,7 @@ impl Analyzer {
                 expression: Box::new(receiver.clone()),
                 span: expression_span(receiver),
             },
-            Role::Dat => unreachable!(),
+            Role::Dat => receiver.clone(),
         };
         let named = arguments.iter().any(|argument| argument.name.is_some());
         let mut combined = Vec::with_capacity(arguments.len() + 1);

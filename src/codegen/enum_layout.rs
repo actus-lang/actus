@@ -71,6 +71,7 @@ impl LayoutRegistry {
             NativeType::Enum(id) => self.enum_layout(id).map(|layout| layout.size),
             NativeType::Int => Some(4),
             NativeType::String | NativeType::Buffer => Some(self.pointer_size),
+            NativeType::FatPointer => Some(self.pointer_size * 2),
         }
     }
 

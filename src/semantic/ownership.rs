@@ -3,7 +3,7 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::BindingState;
+use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
     pub(super) fn consume_case_subject(
@@ -30,18 +30,20 @@ impl Analyzer {
                 span,
             });
         }
-        match self.model.bindings[index].state {
-            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
-            BindingState::Frozen { .. } => {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen {
-                        name: name.clone(),
-                        borrow_ids: self.blocking_borrow_ids(index),
-                    },
-                    span,
-                });
-            }
-            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
+        if self.model.bindings[index].access.is_frozen() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MoveFrozen {
+                    name: name.clone(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span,
+            });
+        }
+        match self.model.bindings[index].ownership {
+            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::PartiallyMoved { .. }
+            | OwnershipState::Moved
+            | OwnershipState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
                     span,
@@ -64,18 +66,20 @@ impl Analyzer {
                 span,
             });
         }
-        match self.model.bindings[index].state {
-            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
-            BindingState::Frozen { .. } => {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen {
-                        name: name.clone(),
-                        borrow_ids: self.blocking_borrow_ids(index),
-                    },
-                    span,
-                });
-            }
-            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
+        if self.model.bindings[index].access.is_frozen() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MoveFrozen {
+                    name: name.clone(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span,
+            });
+        }
+        match self.model.bindings[index].ownership {
+            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::PartiallyMoved { .. }
+            | OwnershipState::Moved
+            | OwnershipState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
                     span,
@@ -120,18 +124,20 @@ impl Analyzer {
                 span: *span,
             });
         }
-        match self.model.bindings[index].state {
-            BindingState::Active => self.model.bindings[index].state = BindingState::Moved,
-            BindingState::Frozen { .. } => {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MoveFrozen {
-                        name: name.clone(),
-                        borrow_ids: self.blocking_borrow_ids(index),
-                    },
-                    span: *span,
-                });
-            }
-            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {}
+        if self.model.bindings[index].access.is_frozen() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MoveFrozen {
+                    name: name.clone(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span: *span,
+            });
+        }
+        match self.model.bindings[index].ownership {
+            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::PartiallyMoved { .. }
+            | OwnershipState::Moved
+            | OwnershipState::Dropped => {}
         }
         self.plan_return_unwind(statement_span);
         Ok(())
@@ -158,20 +164,20 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        match self.model.bindings[index].state {
-            BindingState::Moved => Err(SemanticError {
+        match self.model.bindings[index].ownership {
+            OwnershipState::Moved => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
                 span,
             }),
-            BindingState::Dropped => Err(SemanticError {
+            OwnershipState::Dropped => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterDrop { name: name.to_owned() },
                 span,
             }),
-            BindingState::PartiallyMoved { .. } => Err(SemanticError {
+            OwnershipState::PartiallyMoved { .. } => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
                 span,
             }),
-            BindingState::Active | BindingState::Frozen { .. } => Ok(()),
+            OwnershipState::Active => Ok(()),
         }
     }
 
@@ -188,7 +194,7 @@ impl Analyzer {
                 span,
             });
         }
-        if matches!(self.model.bindings[index].state, BindingState::Frozen { .. }) {
+        if self.model.bindings[index].access.is_frozen() {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MoveFrozen {
                     name: name.to_owned(),
@@ -213,18 +219,22 @@ impl Analyzer {
                 span,
             });
         }
-        match binding.state {
-            BindingState::Active => self.model.bindings[index].state = BindingState::Dropped,
-            BindingState::Frozen { .. } => {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::DropFrozen {
-                        name: name.to_owned(),
-                        borrow_ids: self.blocking_borrow_ids(index),
-                    },
-                    span,
-                });
+        if binding.access.is_frozen() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DropFrozen {
+                    name: name.to_owned(),
+                    borrow_ids: self.blocking_borrow_ids(index),
+                },
+                span,
+            });
+        }
+        match binding.ownership {
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Dropped
             }
-            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {
+            OwnershipState::PartiallyMoved { .. }
+            | OwnershipState::Moved
+            | OwnershipState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::DoubleDrop { name: name.to_owned() },
                     span,
@@ -264,12 +274,9 @@ fn unwrap_grouping(mut expression: &Expr) -> &Expr {
 
 impl Analyzer {
     pub(super) fn blocking_borrow_ids(&self, index: usize) -> Vec<usize> {
-        match &self.model.bindings[index].state {
-            BindingState::Frozen { borrow_ids } => borrow_ids.clone(),
-            BindingState::Active
-            | BindingState::PartiallyMoved { .. }
-            | BindingState::Moved
-            | BindingState::Dropped => Vec::new(),
+        match &self.model.bindings[index].access {
+            AccessState::Frozen { borrow_ids } => borrow_ids.clone(),
+            AccessState::Mutable => Vec::new(),
         }
     }
 }

@@ -58,9 +58,10 @@ fn generic_parameter_scope_does_not_escape_its_verb() {
 }
 
 #[test]
-fn validates_role_bound_shape_before_role_resolution_exists() {
-    analyze_source("verb write[T: Writer](erg item: T) { }")
-        .expect("a simple role bound should be retained for Phase 14 resolution");
+fn rejects_unknown_role_bounds() {
+    let error = analyze_source("verb write[T: Writer](erg item: T) { }")
+        .expect_err("unknown role bounds must fail");
+    assert!(matches!(error.kind, SemanticErrorKind::UnknownRole { name } if name == "Writer"));
 }
 
 #[test]
@@ -75,8 +76,23 @@ fn rejects_applied_role_bounds() {
 
 #[test]
 fn accepts_multiple_symbolic_bounds() {
-    analyze_source("verb write[T: Writer + Serializable](erg item: T) { }")
-        .expect("simple symbolic bounds should be retained for role validation");
+    analyze_source("role Writer { verb write(abs self: Int); } role Serializable { verb encode(abs self: Int); } verb write[T: Writer + Serializable](erg item: T) { }")
+        .expect("declared role bounds should resolve");
+}
+
+#[test]
+fn accepts_generic_role_bound_for_a_performed_type() {
+    analyze_source("struct File { value: Int, } role Writer { verb write(abs self: File); } perform Writer for File { verb write(abs self: File) { } } struct Box[T: Writer] { item: T, } verb main(erg item: Box[File]) { }")
+        .expect("a performed type should satisfy a role bound");
+}
+
+#[test]
+fn rejects_generic_role_bound_without_a_performance() {
+    let error = analyze_source("struct File { value: Int, } role Writer { verb write(abs self: File); } struct Box[T: Writer] { item: T, } verb main(erg item: Box[File]) { }")
+        .expect_err("a type without a performance must fail its role bound");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } if parameter == "T" && constraint == "Writer" && argument == "File")
+    );
 }
 
 #[test]

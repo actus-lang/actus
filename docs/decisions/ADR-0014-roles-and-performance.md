@@ -66,7 +66,8 @@ silently change a call into runtime dispatch.
 ### Explicit dynamic dispatch
 
 Runtime polymorphism uses the complete `dynamic` keyword and is separate from
-`perform`:
+`perform`. Its Alpha cross-unit ABI is defined by
+[ADR-0017](ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md):
 
 ```act
 verb send(abs writer: dynamic Writer, abs bytes: Buffer): Int {
@@ -74,10 +75,17 @@ verb send(abs writer: dynamic Writer, abs bytes: Buffer): Int {
 }
 ```
 
-`abs dynamic Role` denotes an explicit role object represented by a fat pointer
-and vtable. Its ABI, object layout, and lifetime rules will be specified before
-the feature is implemented. `dynamic` is not an alias for `perform`, and a
-role cannot become dynamic accidentally.
+`abs dynamic Role` denotes an explicit borrowed role object represented by a
+fat pointer. Its target-neutral logical layout is two pointer words in order:
+`data_ptr` at word offset 0 and `vtable_ptr` at word offset 1. Each word uses
+the selected target's native pointer width and alignment. The object therefore
+has two pointer-word slots and does not own the data behind `data_ptr`.
+
+The type checker accepts a dynamic parameter only with the `abs` access role,
+requires the named role to exist, and requires every concrete argument type to
+have a matching `perform Role for Type`. Dynamic arguments cannot transfer or
+mutate ownership through the role object. `dynamic` is not an alias for
+`perform`, and a role cannot become dynamic accidentally.
 
 ## Static and Dynamic Dispatch Boundary
 
@@ -98,8 +106,9 @@ role cannot become dynamic accidentally.
 - Dynamic dispatch remains available as a deliberate future extension.
 - The compiler must maintain separate resolution and lowering paths for static
   performance and dynamic role objects.
-- Dynamic role objects require additional design for vtable layout, object
-  lifetime, ABI stability, and FFI interoperability.
+- Dynamic role objects use the explicit Alpha ABI in ADR-0017. Cross-unit
+  linking remains gated on `.actmeta` import/export validation, and C FFI
+  interoperability still requires a separate adapter contract.
 
 ## Rejected Alternatives
 

@@ -1,7 +1,7 @@
 use actus::ast::Role;
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{BindingState, CleanupAction, LoopExitKind, SemanticErrorKind, analyze};
+use actus::semantic::{CleanupAction, LoopExitKind, OwnershipState, SemanticErrorKind, analyze};
 
 fn analyze_source(
     source: &str,
@@ -22,7 +22,7 @@ fn tracks_parameters_and_nested_borrow_records() {
     assert_eq!(model.bindings[0].role, Role::Erg);
     assert_eq!(model.borrows.len(), 2);
     assert_eq!(model.borrows[0].owner, "buffer");
-    assert_eq!(model.bindings[0].state, BindingState::Active);
+    assert_eq!(model.bindings[0].ownership, OwnershipState::Active);
 }
 
 #[test]
@@ -132,14 +132,14 @@ fn validates_call_roles_and_rejects_ambiguous_positional_calls() {
 fn moves_returned_owners_out_of_the_function() {
     let model = analyze_source("verb create() -> Buffer { erg buffer = make(); return buffer; }")
         .expect("returning an owner should transfer ownership");
-    assert!(matches!(model.bindings[0].state, BindingState::Moved));
+    assert!(matches!(model.bindings[0].ownership, OwnershipState::Moved));
 }
 
 #[test]
 fn moves_grouped_owners_out_of_the_function_scope() {
     let model = analyze_source("verb create() -> Buffer { erg buffer = make(); return (buffer); }")
         .expect("grouped owner return should transfer ownership");
-    assert_eq!(model.bindings[0].state, BindingState::Moved);
+    assert_eq!(model.bindings[0].ownership, OwnershipState::Moved);
     assert!(
         model.return_unwind_plans[0].scopes[0]
             .actions

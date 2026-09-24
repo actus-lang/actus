@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::codegen::{emit_program_object_with_configuration, link_object};
-use crate::configuration::{CompilerConfiguration, HOSTED_ENTRY_SYMBOL};
+use crate::build_graph::{invalidate_stale_artifact, write_metadata};
+use crate::codegen::link_object;
+use crate::configuration::{CompilerConfiguration, EntryContract};
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::lexer::scan;
 use crate::parser::parse;
@@ -92,23 +93,39 @@ pub(super) fn build_file(
         eprintln!("error: `{input}` contains no verb declarations");
         return 1;
     };
-    let symbol = configuration.entry_symbol().unwrap_or(fallback_symbol).to_owned();
-    if let Err(error) = validate_entry(&program, &symbol, emit) {
+    let symbol = configuration
+        .entry_symbol()
+        .or_else(|| hosted_entry_symbol(configuration, fallback_symbol))
+        .unwrap_or(fallback_symbol)
+        .to_owned();
+    emit_and_write(input, output, emit, configuration, &program, &symbol)
+}
+
+fn emit_and_write(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+    program: &crate::ast::Program,
+    symbol: &str,
+) -> i32 {
+    if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match emit_program_object_with_configuration(
-        &program,
-        &symbol,
-        configuration.native_backend(),
-    ) {
+    let output =
+        output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit, configuration));
+    if let Err(error) = invalidate_stale_artifact(&output, configuration) {
+        eprintln!("error: {error}");
+        return 1;
+    }
+    let bytes = match emit_object(program, symbol, configuration) {
         Ok(bytes) => bytes,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
             return 1;
         }
     };
-    let output = output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit));
     if let Err(error) = write_artifact(input, &output, bytes, emit, configuration) {
         eprintln!("error: {error}");
         return 1;
@@ -117,12 +134,27 @@ pub(super) fn build_file(
     0
 }
 
+fn emit_object(
+    program: &crate::ast::Program,
+    symbol: &str,
+    configuration: &CompilerConfiguration,
+) -> Result<Vec<u8>, crate::codegen::NativeEmitError> {
+    crate::codegen::emit_program_object_for_target(
+        program,
+        symbol,
+        configuration.native_backend(),
+        configuration.target(),
+    )
+}
+
 fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
     program.declarations.iter().find_map(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
         crate::ast::TopLevelDecl::ExternalVerb(_)
         | crate::ast::TopLevelDecl::Struct(_)
-        | crate::ast::TopLevelDecl::Enum(_) => None,
+        | crate::ast::TopLevelDecl::Enum(_)
+        | crate::ast::TopLevelDecl::Role(_)
+        | crate::ast::TopLevelDecl::Perform(_) => None,
     })
 }
 
@@ -130,21 +162,35 @@ fn validate_entry(
     program: &crate::ast::Program,
     symbol: &str,
     emit: EmitKind,
+    contract: EntryContract,
 ) -> Result<(), String> {
     let Some(crate::ast::TopLevelDecl::Verb(verb)) = program.declarations.iter().find(|decl| {
         matches!(decl, crate::ast::TopLevelDecl::Verb(candidate) if candidate.name == symbol)
     }) else {
         return Err(format!("entry verb `{symbol}` was not found"));
     };
-    if matches!(emit, EmitKind::Executable) && symbol != HOSTED_ENTRY_SYMBOL {
-        return Err(format!(
-            "hosted executables require entry verb `{HOSTED_ENTRY_SYMBOL}`; custom entry points are available for object emission only"
-        ));
+    if matches!(emit, EmitKind::Executable)
+        && matches!(contract, EntryContract::Hosted)
+        && symbol != "main"
+    {
+        return Err(
+            "hosted executables require entry verb `main`; freestanding targets accept a configured entry symbol"
+                .to_owned(),
+        );
     }
     if matches!(emit, EmitKind::Executable) && !verb.params.is_empty() {
         return Err(format!("executable entry verb `{symbol}` cannot have parameters"));
     }
     Ok(())
+}
+
+fn hosted_entry_symbol<'a>(
+    configuration: &CompilerConfiguration,
+    fallback_symbol: &'a str,
+) -> Option<&'a str> {
+    matches!(configuration.entry_contract(), EntryContract::Hosted)
+        .then_some("main")
+        .or(Some(fallback_symbol))
 }
 
 fn write_artifact(
@@ -154,25 +200,34 @@ fn write_artifact(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
-    let object = matches!(emit, EmitKind::Executable).then(|| output.with_extension("o"));
+    let persistent_capsula_artifact = output.starts_with(configuration.capsula_target_directory());
+    let object = matches!(emit, EmitKind::Executable)
+        .then(|| output.with_extension(if persistent_capsula_artifact { "obj" } else { "o" }));
     let object_path = object.as_deref().unwrap_or(output);
+    if let Some(parent) = object_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create `{}`: {error}", parent.display()))?;
+    }
     fs::write(object_path, bytes)
         .map_err(|error| format!("cannot write `{}`: {error}", object_path.display()))?;
     if let Some(object_path) = object {
         let result = link_object(&object_path, output, configuration)
             .map_err(|error| format!("cannot link `{input}`: {error}"));
-        let _ = fs::remove_file(object_path);
+        if !persistent_capsula_artifact {
+            let _ = fs::remove_file(object_path);
+        }
         result
+            .and_then(|()| write_metadata(output, configuration).map_err(|error| error.to_string()))
     } else {
-        Ok(())
+        write_metadata(output, configuration).map_err(|error| error.to_string())
     }
 }
 
-fn default_output(input: &str, emit: EmitKind) -> PathBuf {
+fn default_output(input: &str, emit: EmitKind, configuration: &CompilerConfiguration) -> PathBuf {
     let path = Path::new(input);
-    if matches!(emit, EmitKind::Object) {
-        path.with_extension("o")
-    } else {
-        path.with_file_name(path.file_stem().unwrap_or_default())
-    }
+    let extension = if matches!(emit, EmitKind::Object) { "obj" } else { "bin" };
+    configuration
+        .capsula_target_directory()
+        .join(path.file_stem().unwrap_or_default())
+        .with_extension(extension)
 }

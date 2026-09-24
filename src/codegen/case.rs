@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBody, Expr, Pattern};
 
-use super::case_payload::bind_payload;
+use super::case_payload::{BranchLocals, bind_payload};
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -93,6 +93,9 @@ fn emit_case_branches(
             subject_value,
             subject_type,
             branch,
+            following,
+            merge,
+            result_type,
             locals,
             local_types,
             functions,
@@ -102,7 +105,9 @@ fn emit_case_branches(
         )?;
         let argument = cranelift_codegen::ir::BlockArg::Value(branch_value);
         function.ins().jump(merge, [&argument]);
-        function.seal_block(matched);
+        if branch.guard.is_none() {
+            function.seal_block(matched);
+        }
         if following != merge {
             function.switch_to_block(following);
             function.seal_block(following);
@@ -175,6 +180,9 @@ fn lower_case_branch<'a>(
     subject: cranelift_codegen::ir::Value,
     subject_type: NativeType,
     branch: &'a crate::ast::CaseBranch,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    result_type: NativeType,
     locals: &HashMap<&'a String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
@@ -184,6 +192,71 @@ fn lower_case_branch<'a>(
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let branch_locals =
         bind_payload(function, subject, subject_type, branch, locals, local_types, layouts)?;
+    if let Some(guard) = &branch.guard {
+        let condition = lower_expression(
+            function,
+            guard,
+            &branch_locals.0,
+            &branch_locals.1,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?;
+        let body = function.create_block();
+        emit_guard_branch(function, condition, body, following, merge, result_type, layouts);
+        function.seal_block(function.current_block().expect("guard block is active"));
+        function.switch_to_block(body);
+        let branch_value = lower_case_body(
+            function,
+            branch,
+            &branch_locals,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?;
+        function.seal_block(body);
+        return Ok(branch_value);
+    }
+    lower_case_body(
+        function,
+        branch,
+        &branch_locals,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
+}
+
+fn emit_guard_branch(
+    function: &mut FunctionBuilder<'_>,
+    condition: cranelift_codegen::ir::Value,
+    body: cranelift_codegen::ir::Block,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    result_type: NativeType,
+    layouts: &LayoutRegistry,
+) {
+    if following == merge {
+        let fallback = function.ins().iconst(result_type.ir_type(layouts.pointer_type), 0);
+        let fallback_arg = cranelift_codegen::ir::BlockArg::Value(fallback);
+        function.ins().brif(condition, body, &[], following, [&fallback_arg]);
+    } else {
+        function.ins().brif(condition, body, &[], following, &[]);
+    }
+}
+
+fn lower_case_body<'a>(
+    function: &mut FunctionBuilder<'_>,
+    branch: &'a crate::ast::CaseBranch,
+    branch_locals: &BranchLocals<'a>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &super::model::NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let branch_value = match &branch.body {
         CaseBody::Expression(expression) => lower_expression(
             function,

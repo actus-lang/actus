@@ -173,6 +173,22 @@ fn parses_case_payload_patterns() {
 }
 
 #[test]
+fn parses_pattern_guards_without_general_if_statements() {
+    let program = parse_source(
+        "enum Color { Red, } verb main(abs ready: Bool) { case color { Color.Red if ready => 1, }; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    let Stmt::Expression { expression: Expr::Case { branches, .. }, .. } = &verb.body.statements[0]
+    else {
+        panic!("expected case statement");
+    };
+    assert!(matches!(
+        branches[0].guard.as_deref(),
+        Some(Expr::Identifier { name, .. }) if name == "ready"
+    ));
+}
+
+#[test]
 fn rejects_case_fallthrough_and_standalone_break() {
     for source in [
         include_str!("../fixtures/parser/invalid/case_fallthrough.act"),

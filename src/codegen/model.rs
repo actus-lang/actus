@@ -185,8 +185,8 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruct
         }
         CleanupAction::DropBinding { binding_index } => {
             let binding = &model.bindings[*binding_index];
-            match &binding.state {
-                crate::semantic::BindingState::PartiallyMoved { fields } => {
+            match &binding.ownership {
+                crate::semantic::OwnershipState::PartiallyMoved { fields } => {
                     NativeInstruction::DropBindingFields {
                         binding_index: *binding_index,
                         name: binding.name.clone(),
@@ -220,6 +220,8 @@ mod tests {
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
+            reachable_performances: Vec::new(),
+            dynamic_roles: Vec::new(),
         }
     }
 
@@ -240,7 +242,8 @@ mod tests {
                 role: crate::ast::Role::Erg,
                 ty: Some(crate::ast::BuiltinType::Int),
                 span: crate::lexer::SourceSpan::new(0, 1),
-                state: crate::semantic::BindingState::Active,
+                ownership: crate::semantic::OwnershipState::Active,
+                access: crate::semantic::AccessState::Mutable,
             }],
             borrows: Vec::new(),
             cleanup_plans: vec![ScopeCleanup {
@@ -254,6 +257,8 @@ mod tests {
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
+            reachable_performances: Vec::new(),
+            dynamic_roles: Vec::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());

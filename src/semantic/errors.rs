@@ -89,6 +89,38 @@ pub enum SemanticErrorKind {
         constraint: String,
         argument: String,
     },
+    DuplicateRoleName {
+        name: String,
+    },
+    UnknownRole {
+        name: String,
+    },
+    DuplicateRoleMethod {
+        role: String,
+        method: String,
+    },
+    MissingRoleMethod {
+        role: String,
+        method: String,
+    },
+    RoleMethodMismatch {
+        role: String,
+        method: String,
+    },
+    InvalidRoleReceiver {
+        role: String,
+        method: String,
+    },
+    DynamicRequiresAbs {
+        parameter: String,
+    },
+    UnknownDynamicRole {
+        name: String,
+    },
+    DynamicRoleMismatch {
+        role: String,
+        found: String,
+    },
     DuplicateVerbName {
         name: String,
     },
@@ -196,6 +228,17 @@ pub enum SemanticErrorKind {
     InvalidCaseRole {
         mode: String,
         subject: String,
+    },
+    InvalidGuardAccess {
+        name: String,
+    },
+    GuardTypeMismatch {
+        found: String,
+    },
+    BranchStateMismatch {
+        name: String,
+        expected: String,
+        found: String,
     },
     InvalidMutation {
         name: String,

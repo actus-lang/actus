@@ -92,6 +92,43 @@ The following rules apply:
 
 The module resolver and grouped import syntax are planned compiler features.
 
+### 3.1. Directory Modules and Internal Scoping
+
+A directory forms one cohesive module namespace and one compilation unit. A
+multi-file module must contain a root entry file whose name exactly matches
+the directory:
+
+```text
+src/
+└── driver/
+    └── gpio/
+        ├── gpio.act       // canonical facade for driver::gpio
+        ├── registers.act  // internal layout declarations
+        ├── roles.act      // internal role declarations
+        └── ops.act        // internal verb implementations
+```
+
+The root entry file is the module's sole external facade. Only declarations
+marked `open` in `gpio/gpio.act` are visible to an external importer. An
+`open` declaration in a sibling file remains module-internal unless the
+facade explicitly exposes the corresponding API.
+
+All `.act` files directly inside the same module directory share one internal
+scope. Sibling declarations can refer to one another without `import`
+statements, relative paths, or re-export boilerplate. Types, roles, enums,
+and helper verbs therefore remain local to the directory compilation unit.
+
+The compiler must discover sibling files deterministically and reject
+duplicate declarations in the shared namespace. File-system enumeration
+order must not affect name resolution, diagnostics, layout, or generated
+artifacts. A nested directory starts a separate module namespace and is not
+implicitly included in its parent module.
+
+This model keeps implementation logic easy to split across focused files
+while giving external consumers and language servers one deterministic facade
+to inspect. Arca controls which directory is a module root; the compiler
+does not infer modules from arbitrary filesystem paths.
+
 ## 4. Visibility
 
 Actus declarations are closed by default. The `open` keyword exports a
@@ -137,6 +174,13 @@ Actus uses three explicit roles for ownership and borrowing:
 
 `abs` does not create runtime reference counting. It is valid only within its
 lexical lifetime and cannot be returned or stored in a longer-lived owner.
+
+`perform Role for Type` is compile-time static dispatch. `abs dynamic Role` is
+explicit runtime dispatch and uses a borrowed two-word fat pointer in the
+order `data_ptr`, then `vtable_ptr`. Its cross-unit metadata and compatibility
+rules are defined in
+[ADR-0017](../decisions/ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
+Dynamic dispatch does not grant ownership or mutation capabilities.
 
 ## 7. Canonical Formatting
 

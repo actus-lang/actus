@@ -12,6 +12,7 @@ use super::pattern_support::{
     duplicate_pattern, is_wildcard, non_exhaustive, pattern_name, pattern_span,
     pattern_type_mismatch, unreachable_pattern, variant_key,
 };
+use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
     pub(super) fn validate_case_patterns(
@@ -29,9 +30,13 @@ impl Analyzer {
             crate::ast::CaseMode::Abs => self.borrow_case_subject(subject, span)?,
             crate::ast::CaseMode::Dat => self.consume_case_subject(subject, span)?,
         }
+        let branch_state = self.snapshot_binding_states();
+        let branch_count = branch_state.len();
+        let mut branch_results = Vec::new();
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
         for branch in branches {
+            self.restore_binding_states(&branch_state);
             let pattern_name = pattern_name(&branch.pattern);
             if wildcard_seen {
                 return Err(unreachable_pattern(pattern_name, pattern_span(&branch.pattern)));
@@ -47,11 +52,121 @@ impl Analyzer {
             if mode == crate::ast::CaseMode::Dat {
                 self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
             }
+            if let Some(guard) = &branch.guard {
+                self.validate_case_guard(guard, branch.span)?;
+            }
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
+            branch_results.push(self.snapshot_binding_prefix(branch_count));
+            self.restore_binding_states(&branch_state);
+        }
+        self.validate_branch_join(&branch_results, span)?;
+        if let Some(joined_state) = branch_results.first() {
+            self.restore_binding_states(joined_state);
         }
         self.leave_scope();
         Ok(())
+    }
+
+    fn snapshot_binding_states(&self) -> Vec<(OwnershipState, AccessState)> {
+        self.model
+            .bindings
+            .iter()
+            .map(|binding| (binding.ownership.clone(), binding.access.clone()))
+            .collect()
+    }
+
+    fn restore_binding_states(&mut self, snapshot: &[(OwnershipState, AccessState)]) {
+        for (binding, (ownership, access)) in self.model.bindings.iter_mut().zip(snapshot.iter()) {
+            binding.ownership = ownership.clone();
+            binding.access = access.clone();
+        }
+    }
+
+    fn snapshot_binding_prefix(&self, count: usize) -> Vec<(OwnershipState, AccessState)> {
+        self.snapshot_binding_states().into_iter().take(count).collect()
+    }
+
+    fn validate_branch_join(
+        &self,
+        branch_results: &[Vec<(OwnershipState, AccessState)>],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(expected_states) = branch_results.first() else { return Ok(()) };
+        for states in branch_results.iter().skip(1) {
+            for (index, (expected, found)) in expected_states.iter().zip(states).enumerate() {
+                if expected != found {
+                    let name = self.model.bindings[index].name.clone();
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::BranchStateMismatch {
+                            name,
+                            expected: format!("{expected:?}"),
+                            found: format!("{found:?}"),
+                        },
+                        span,
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_case_guard(&mut self, guard: &Expr, span: SourceSpan) -> Result<(), SemanticError> {
+        let state = self.snapshot_binding_states();
+        self.validate_guard_access(guard)?;
+        self.visit_expression(guard)?;
+        let found = self.expression_type_name(guard).unwrap_or_else(|| "unknown".to_owned());
+        if found != "Bool" {
+            self.restore_binding_states(&state);
+            return Err(SemanticError {
+                kind: SemanticErrorKind::GuardTypeMismatch { found },
+                span,
+            });
+        }
+        self.restore_binding_states(&state);
+        Ok(())
+    }
+
+    fn validate_guard_access(&self, expression: &Expr) -> Result<(), SemanticError> {
+        match expression {
+            Expr::Identifier { name, span } => {
+                let index = self.binding(name, *span)?;
+                if self.model.bindings[index].ownership.is_live() {
+                    Ok(())
+                } else {
+                    Err(SemanticError {
+                        kind: SemanticErrorKind::InvalidGuardAccess { name: name.clone() },
+                        span: *span,
+                    })
+                }
+            }
+            Expr::FieldAccess { object, field, span } => {
+                self.validate_field_access(object, field, *span)?;
+                self.ensure_field_access_readable(object, field, *span)
+            }
+            Expr::Grouping { expression, .. }
+            | Expr::Borrow { expression, .. }
+            | Expr::Unary { expression, .. } => self.validate_guard_access(expression),
+            Expr::Binary { left, right, .. } => {
+                self.validate_guard_access(left)?;
+                self.validate_guard_access(right)
+            }
+            Expr::Call { callee, span, .. } | Expr::MethodCall { method: callee, span, .. } => {
+                Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidGuardAccess { name: callee.clone() },
+                    span: *span,
+                })
+            }
+            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
+            Expr::StructLit { name, span, .. } => Err(SemanticError {
+                kind: SemanticErrorKind::InvalidGuardAccess { name: name.clone() },
+                span: *span,
+            }),
+            Expr::Case { span, .. } => Err(SemanticError {
+                kind: SemanticErrorKind::InvalidGuardAccess { name: "case".to_owned() },
+                span: *span,
+            }),
+        }
     }
 
     fn validate_pattern_coverage(
@@ -71,6 +186,7 @@ impl Analyzer {
         }
         let covered = branches
             .iter()
+            .filter(|branch| branch.guard.is_none())
             .filter_map(|branch| variant_key(&branch.pattern, &enum_name))
             .collect::<HashSet<_>>();
         let missing = self.enum_types[&enum_name]

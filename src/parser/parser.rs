@@ -1,5 +1,6 @@
 use crate::ast::{
-    Block, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt, TopLevelDecl, VerbDecl,
+    Block, DispatchMode, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt,
+    TopLevelDecl, VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
@@ -9,6 +10,7 @@ mod cursor;
 mod enums;
 mod expressions;
 mod generics;
+mod roles;
 mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -66,6 +68,12 @@ impl Parser {
         }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def()?));
+        }
+        if self.check_simple(&TokenKind::Role) {
+            return Ok(TopLevelDecl::Role(self.parse_role_decl()?));
+        }
+        if self.check_simple(&TokenKind::Perform) {
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl()?));
         }
         let declaration = self.parse_verb()?;
         Ok(TopLevelDecl::Verb(declaration))
@@ -167,9 +175,20 @@ impl Parser {
         let name_token = self.take_identifier("parameter name")?;
         let name = identifier_text(&name_token.kind);
         self.expect_simple(TokenKind::Colon, "`:`")?;
+        let dispatch = if self.match_simple(TokenKind::Dynamic) {
+            DispatchMode::Dynamic
+        } else {
+            DispatchMode::Static
+        };
         let ty = self.parse_type_name()?;
 
-        Ok(Param { role, name, span: SourceSpan::new(role_token.span.start, ty.span.end), ty })
+        Ok(Param {
+            role,
+            name,
+            dispatch,
+            span: SourceSpan::new(role_token.span.start, ty.span.end),
+            ty,
+        })
     }
 
     fn parse_block(&mut self) -> Result<Block, ParseError> {

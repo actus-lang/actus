@@ -56,6 +56,12 @@ fn parse_code(code: ParseErrorCode) -> &'static str {
 }
 
 fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
+    if let Some(code) = role_semantic_code(kind) {
+        return code;
+    }
+    if let Some(code) = type_semantic_code(kind) {
+        return code;
+    }
     match kind {
         SemanticErrorKind::DuplicateBinding { .. } => "E1001",
         SemanticErrorKind::ShadowedBinding { .. } => "E1002",
@@ -79,7 +85,6 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
         SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
         SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
-        SemanticErrorKind::UnknownType { .. } => "E1023",
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
         SemanticErrorKind::DuplicateStructName { .. } => "E1029",
         SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
@@ -106,12 +111,35 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::DuplicatePattern { .. } => "E1047",
         SemanticErrorKind::PatternTypeMismatch { .. } => "E1048",
         SemanticErrorKind::PatternBindingTypeMismatch { .. } => "E1049",
-        SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
-        SemanticErrorKind::InvalidMutation { .. } => "E1051",
+        _ => unreachable!("extended semantic diagnostic code handled above"),
+    }
+}
+
+fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
+        SemanticErrorKind::UnknownType { .. } => "E1023",
         SemanticErrorKind::UnknownTypeParameter { .. } => "E1052",
         SemanticErrorKind::GenericArityMismatch { .. } => "E1053",
         SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
-    }
+        SemanticErrorKind::InvalidMutation { .. } => "E1051",
+        SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
+        SemanticErrorKind::InvalidGuardAccess { .. } => "E1062",
+        SemanticErrorKind::GuardTypeMismatch { .. } => "E1063",
+        SemanticErrorKind::BranchStateMismatch { .. } => "E1061",
+        _ => return None,
+    })
+}
+
+fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
+        SemanticErrorKind::DuplicateRoleName { .. } => "E1055",
+        SemanticErrorKind::UnknownRole { .. } => "E1056",
+        SemanticErrorKind::DuplicateRoleMethod { .. } => "E1057",
+        SemanticErrorKind::MissingRoleMethod { .. } => "E1058",
+        SemanticErrorKind::RoleMethodMismatch { .. } => "E1059",
+        SemanticErrorKind::InvalidRoleReceiver { .. } => "E1060",
+        _ => return None,
+    })
 }
 
 fn semantic_message(kind: &SemanticErrorKind) -> String {
@@ -175,6 +203,7 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
 
 fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     enum_semantic_message(kind)
+        .or_else(|| guard_semantic_message(kind))
         .or_else(|| struct_semantic_message(kind))
         .or_else(|| type_semantic_message(kind))
 }
@@ -232,6 +261,24 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     Some(message)
 }
 
+fn guard_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::InvalidGuardAccess { name } => {
+            format!("case guard `{name}` requires read-only access")
+        }
+        SemanticErrorKind::GuardTypeMismatch { found } => {
+            format!("case guard must return `Bool`, found `{found}`")
+        }
+        SemanticErrorKind::BranchStateMismatch { name, expected, found } => {
+            format!(
+                "case branch state mismatch for `{name}`: expected `{expected}`, found `{found}`"
+            )
+        }
+        _ => return None,
+    };
+    Some(message)
+}
+
 fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::DuplicateStructName { name } => {
@@ -273,6 +320,22 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         ),
         SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } => {
             format!("generic parameter `{parameter}` requires `{constraint}`, found `{argument}`")
+        }
+        SemanticErrorKind::DuplicateRoleName { name } => {
+            format!("duplicate role declaration `{name}`")
+        }
+        SemanticErrorKind::UnknownRole { name } => format!("unknown role `{name}`"),
+        SemanticErrorKind::DuplicateRoleMethod { role, method } => {
+            format!("duplicate method `{method}` in role `{role}`")
+        }
+        SemanticErrorKind::MissingRoleMethod { role, method } => {
+            format!("performance for role `{role}` is missing method `{method}`")
+        }
+        SemanticErrorKind::RoleMethodMismatch { role, method } => {
+            format!("method `{method}` does not satisfy role `{role}`")
+        }
+        SemanticErrorKind::InvalidRoleReceiver { role, method } => {
+            format!("method `{method}` in role `{role}` must declare an explicit `self` receiver")
         }
         SemanticErrorKind::DuplicateVerbName { name } => {
             format!("duplicate verb declaration `{name}`")

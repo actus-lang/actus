@@ -228,12 +228,11 @@ fn emit_struct_drop_except(
 ) -> Result<(), NativeEmitError> {
     let layout =
         layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing drop layout `{id}`")))?;
-    for field in layout
-        .fields
-        .iter()
-        .rev()
-        .filter(|field| field.owned && !moved_fields.iter().any(|moved| moved == &field.name))
-    {
+    for field in layout.fields.iter().rev().filter(|field| field.owned) {
+        let nested_paths = moved_field_suffixes(moved_fields, &field.name);
+        if nested_paths.iter().any(String::is_empty) {
+            continue;
+        }
         let field_address = function.ins().iadd_imm_s(address, i64::from(field.offset));
         match field.ty {
             NativeType::Buffer => {
@@ -255,15 +254,30 @@ fn emit_struct_drop_except(
                     function,
                     field_address,
                     nested_id,
-                    &[],
+                    &nested_paths,
                     functions,
                     layouts,
                 )?;
             }
-            NativeType::Enum(_) | NativeType::Int | NativeType::String => {}
+            NativeType::Enum(_) | NativeType::Int | NativeType::String | NativeType::FatPointer => {
+            }
         }
     }
     Ok(())
+}
+
+fn moved_field_suffixes(moved_fields: &[String], field_name: &str) -> Vec<String> {
+    moved_fields
+        .iter()
+        .filter_map(|moved| {
+            moved.strip_prefix(field_name).and_then(|suffix| {
+                suffix
+                    .strip_prefix('.')
+                    .map(str::to_owned)
+                    .or_else(|| (suffix.is_empty()).then(String::new))
+            })
+        })
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]

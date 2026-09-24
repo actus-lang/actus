@@ -136,6 +136,12 @@ to reproduce every capability of mature systems languages.
 - The internal Actus unit ABI is unstable during Alpha.
 - C is a stable FFI/ABI boundary, not a required compiler intermediate
   representation or safety authority.
+- `perform Role for Type` is compile-time and lowers to direct calls. `abs
+  dynamic Role` is explicit runtime dispatch through a two-word fat pointer;
+  its Alpha cross-unit metadata contract is defined in
+  [ADR-0017](docs/decisions/ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
+- Mutable borrowing, reborrow chains, advanced lifetime polymorphism, and
+  task-transfer failure semantics remain deferred to future phases.
 
 These restrictions are intentional. They keep the compiler model predictable
 while leaving room for future scoped views, richer task results, and other

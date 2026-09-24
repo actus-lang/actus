@@ -3,7 +3,8 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::{BindingState, BorrowRecord};
+use super::model::BorrowRecord;
+use super::state::AccessState;
 
 impl Analyzer {
     pub(super) fn borrow_case_subject(
@@ -32,7 +33,7 @@ impl Analyzer {
             return Ok(());
         };
         let owner_index = self.binding(name, *owner_span)?;
-        if self.model.bindings[owner_index].role != Role::Erg {
+        if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidBorrowTarget { name: name.clone() },
                 span,
@@ -83,13 +84,15 @@ impl Analyzer {
         });
         self.active_borrow_ids.insert(borrow_id);
         self.scopes.last_mut().expect("a verb always has a scope").borrow_ids.push(borrow_id);
-        match &mut self.model.bindings[owner_index].state {
-            BindingState::Active => {
-                self.model.bindings[owner_index].state =
-                    BindingState::Frozen { borrow_ids: vec![borrow_id] }
+        match &mut self.model.bindings[owner_index].access {
+            AccessState::Mutable => {
+                self.model.bindings[owner_index].access =
+                    AccessState::Frozen { borrow_ids: vec![borrow_id] }
             }
-            BindingState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
-            BindingState::PartiallyMoved { .. } | BindingState::Moved | BindingState::Dropped => {}
+            AccessState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
+        }
+        if !self.model.bindings[owner_index].ownership.is_live() {
+            self.model.bindings[owner_index].access = AccessState::Mutable;
         }
     }
 }

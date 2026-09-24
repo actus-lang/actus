@@ -2,7 +2,8 @@ use crate::ast::Role;
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
-use super::model::{Binding, BindingState};
+use super::model::Binding;
+use super::state::OwnershipState;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CleanupAction {
@@ -62,10 +63,8 @@ pub(super) fn plan_scope_cleanup(
         let binding = &bindings[*index];
         let owned = matches!(binding.role, Role::Erg | Role::Dat);
         let live = matches!(
-            binding.state,
-            BindingState::Active
-                | BindingState::Frozen { .. }
-                | BindingState::PartiallyMoved { .. }
+            binding.ownership,
+            OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
         );
         (owned && live).then_some(CleanupAction::DropBinding { binding_index: *index })
     }));
