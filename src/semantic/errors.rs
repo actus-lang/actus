@@ -89,6 +89,28 @@ pub enum SemanticErrorKind {
         constraint: String,
         argument: String,
     },
+    DuplicateRoleName {
+        name: String,
+    },
+    UnknownRole {
+        name: String,
+    },
+    DuplicateRoleMethod {
+        role: String,
+        method: String,
+    },
+    MissingRoleMethod {
+        role: String,
+        method: String,
+    },
+    RoleMethodMismatch {
+        role: String,
+        method: String,
+    },
+    InvalidRoleReceiver {
+        role: String,
+        method: String,
+    },
     DuplicateVerbName {
         name: String,
     },

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, EnumDef, Expr, Program, Role, Stmt, StructDef, TopLevelDecl,
+    Block, BuiltinType, EnumDef, Expr, Program, Role, RoleDecl, Stmt, StructDef, TopLevelDecl,
     lookup_builtin_type,
 };
 
@@ -26,6 +26,7 @@ pub(super) struct Analyzer {
     pub(super) current_return_type: Option<BuiltinType>,
     pub(super) struct_types: HashMap<String, StructDef>,
     pub(super) enum_types: HashMap<String, EnumDef>,
+    pub(super) role_types: HashMap<String, RoleDecl>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
@@ -57,6 +58,7 @@ impl Analyzer {
             current_return_type: None,
             struct_types: HashMap::new(),
             enum_types: HashMap::new(),
+            role_types: HashMap::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
@@ -69,6 +71,8 @@ impl Analyzer {
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         self.register_enums(program)?;
         self.register_structs(program)?;
+        self.register_roles(program)?;
+        self.validate_performances(program)?;
         self.validate_recursive_types()?;
         self.register_declarations(program)?;
         self.validate_method_declarations(program)?;

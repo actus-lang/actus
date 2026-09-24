@@ -16,6 +16,7 @@ mod ownership;
 mod pattern_moves;
 mod pattern_support;
 mod patterns;
+mod roles;
 mod scopes;
 mod state;
 mod structs;

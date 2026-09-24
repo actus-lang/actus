@@ -6,6 +6,8 @@ mod enums;
 mod generics;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
+#[path = "semantic/roles.rs"]
+mod roles;
 #[path = "semantic/state.rs"]
 mod state;
 #[path = "semantic/structs.rs"]
