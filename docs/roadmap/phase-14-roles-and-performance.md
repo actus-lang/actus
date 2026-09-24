@@ -4,6 +4,36 @@ This phase introduces Actus role contracts and separates compile-time static
 performance from explicit runtime dynamic dispatch. It depends on the generic
 type system in Phase 13 and must preserve `erg`, `abs`, and `dat` semantics.
 
+Phase 14 is also the ownership-semantics verification phase. Its success is
+measured by compiler-proven invariants, not by the number of new keywords.
+The normative ownership model is defined in
+[ADR-0016](../decisions/ADR-0016-ownership-semantics.md).
+
+## Implementation Gates and Invariants
+
+Every gate follows this structure:
+
+```text
+Prerequisites -> Implemented Scope -> Verification -> Invariant -> Deferral
+```
+
+The ownership gate must prove that every owner has one ownership path, every
+move invalidates its source, partial moves have deterministic cleanup, every
+exit resolves ownership, `abs` cannot outlive its owner, temporary freezing
+does not consume an active owner, `dat` has one destination, cleanup happens
+exactly once, failed operations do not create ambiguous ownership, and unsafe
+operations require an explicit `unsafe` boundary.
+
+- [ ] Add the ownership/access state model: `Active`, `Moved`,
+  `PartiallyMoved`, `Dropped` plus `Mutable` and `Frozen` access.
+- [ ] Define and test temporary `erg`/`dat` to `abs` access.
+- [ ] Define `case abs` and `case dat` ownership, guards, branch joins, and
+  nested partial moves.
+- [ ] Verify all return, break, continue, and error-propagation cleanup paths.
+- [ ] Define task-transfer failure ownership for future `act` support.
+- [ ] Keep mutable borrowing, reborrow chains, advanced lifetime polymorphism,
+  and shared mutable ownership deferred.
+
 ## Role Contracts
 
 - [ ] Add `role` declarations to the lexer and parser.
@@ -25,6 +55,8 @@ type system in Phase 13 and must preserve `erg`, `abs`, and `dat` semantics.
 ## Ownership and Contract Semantics
 
 - [ ] Preserve `erg`, `abs`, and `dat` rules across role contracts.
+- [ ] Keep ownership state independent from frozen access state.
+- [ ] Allow temporary frozen views from active `erg` and received `dat` owners.
 - [ ] Reject mutation through `abs` receivers and use-after-move through `dat`.
 - [ ] Track deterministic cleanup for owned role receivers and payloads.
 - [ ] Define role-bound diagnostics for borrow, move, and cleanup failures.

@@ -112,24 +112,24 @@ availability of each operation.
 Actus uses explicit attributes for externally constrained layouts:
 
 ```act
-@repr(C)
+meta repr(C)
 open struct RegisterBlock {
     control: u32,
     status: u32,
 }
 
-@repr(transparent)
+meta repr(transparent)
 struct Handle {
     raw: *mut u8,
 }
 
-@packed
+meta packed
 struct WireHeader {
     kind: u8,
     length: u32,
 }
 
-@align(64)
+meta align(64)
 struct CacheLine {
     ...
 }
@@ -137,10 +137,10 @@ struct CacheLine {
 
 The attributes mean:
 
-- `@repr(C)` defines C-compatible field order and layout rules;
-- `@repr(transparent)` preserves the ABI of the underlying representation;
-- `@packed` removes padding and makes unaligned access a caller responsibility;
-- `@align(N)` raises the required alignment to at least `N`.
+- `meta repr(C)` defines C-compatible field order and layout rules;
+- `meta repr(transparent)` preserves the ABI of the underlying representation;
+- `meta packed` removes padding and makes unaligned access a caller responsibility;
+- `meta align(N)` raises the required alignment to at least `N`.
 
 The compiler provides compile-time layout queries and assertions:
 
@@ -197,4 +197,3 @@ target instructions without turning ordinary programs into unchecked C-like
 code. The unmanaged pointer model avoids falsely treating addresses as owned
 resources, while explicit unsafe boundaries make the remaining obligations
 visible to programmers and reviewers.
-

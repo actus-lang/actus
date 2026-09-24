@@ -105,13 +105,17 @@ dependency interface hashes
 compiler version
 toolchain hash
 target triple
+target specification hash
 profile
 ABI identity
 build settings
 ```
 
 Any change to one of these inputs invalidates the affected unit and its
-dependent artifacts.
+dependent artifacts. The target specification hash is required unless the
+target triple is guaranteed to be an immutable identity for the complete
+architecture, environment, ABI, linker, startup, runtime capability, and
+profile contract.
 
 ## Generated Artifact Directory
 
@@ -163,4 +167,3 @@ Arca gains an explicit and reproducible package build model. `capsula/`
 separates generated state from source and removes ambiguity between artifact
 storage and compilation targets. Exact cache identity and source fallback
 prevent stale or incompatible units from entering a build silently.
-
