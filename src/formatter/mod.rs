@@ -33,6 +33,7 @@ impl Formatter {
             TopLevelDecl::Role(role) => self.role_definition(role),
             TopLevelDecl::Perform(perform) => self.perform_definition(perform),
             TopLevelDecl::OpenSibling(sibling) => self.open_sibling(sibling),
+            TopLevelDecl::Import(import) => self.import(import),
         }
     }
 
@@ -194,6 +195,12 @@ impl Formatter {
     fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {
         self.output.push_str("open ");
         self.output.push_str(&sibling.name);
+        self.output.push(';');
+    }
+
+    fn import(&mut self, import: &crate::ast::ImportDecl) {
+        self.output.push_str("import ");
+        self.output.push_str(&import.path);
         self.output.push(';');
     }
 

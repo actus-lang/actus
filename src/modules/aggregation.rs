@@ -178,6 +178,7 @@ fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &St
         TopLevelDecl::ExternalVerb(value) => Some(("verb", &value.name, value.span)),
         TopLevelDecl::Perform(_) => None,
         TopLevelDecl::OpenSibling(_) => None,
+        TopLevelDecl::Import(_) => None,
     }
 }
 
@@ -218,7 +219,7 @@ fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
     let mut symbols = Vec::new();
     for (index, (path, program)) in parsed.iter().enumerate() {
         let sibling_name = path.file_stem().and_then(|stem| stem.to_str());
-        if index == 0 || sibling_name.is_some_and(|name| facade_open.contains(name)) {
+        if index > 0 && sibling_name.is_some_and(|name| facade_open.contains(name)) {
             symbols.extend(program.declarations.iter().filter_map(|declaration| {
                 let (kind, name, _) = declaration_identity(declaration)?;
                 declaration_is_open(declaration).then(|| ExportedSymbol {
@@ -241,5 +242,6 @@ fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
         TopLevelDecl::Role(value) => value.is_open,
         TopLevelDecl::Perform(value) => value.is_open,
         TopLevelDecl::OpenSibling(_) => false,
+        TopLevelDecl::Import(_) => false,
     }
 }

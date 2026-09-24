@@ -57,6 +57,19 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Import) {
+            let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
+            let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
+            while self.match_simple(TokenKind::Colon) {
+                self.expect_simple(TokenKind::Colon, "`:`")?;
+                segments.push(identifier_text(&self.take_identifier("module name")?.kind));
+            }
+            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+            return Ok(TopLevelDecl::Import(crate::ast::ImportDecl {
+                path: segments.join("::"),
+                span: SourceSpan::new(start, end),
+            }));
+        }
         if self.check_simple(&TokenKind::Open) {
             if self.peek_next_is_identifier() {
                 let start = self.expect_keyword(TokenKind::Open, "`open`")?.span.start;

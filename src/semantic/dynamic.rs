@@ -100,7 +100,10 @@ impl Analyzer {
                     }
                     continue;
                 }
-                TopLevelDecl::Struct(_) | TopLevelDecl::Enum(_) | TopLevelDecl::OpenSibling(_) => {
+                TopLevelDecl::Struct(_)
+                | TopLevelDecl::Enum(_)
+                | TopLevelDecl::OpenSibling(_)
+                | TopLevelDecl::Import(_) => {
                     continue;
                 }
             };

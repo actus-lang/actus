@@ -43,6 +43,7 @@ pub enum TokenKind {
     Perform,
     Dynamic,
     Open,
+    Import,
     For,
     Case,
     If,

@@ -17,11 +17,18 @@ pub enum TopLevelDecl {
     Role(RoleDecl),
     Perform(PerformDecl),
     OpenSibling(OpenSiblingDecl),
+    Import(ImportDecl),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OpenSiblingDecl {
     pub name: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImportDecl {
+    pub path: String,
     pub span: SourceSpan,
 }
 

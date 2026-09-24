@@ -50,8 +50,9 @@ open ops;
 directory. The facade re-exports only declarations marked `open` inside those
 named siblings. Closed sibling declarations remain private, and an unlisted
 sibling contributes no external symbols even if it declares `open` items.
-The facade's own `open` declarations are exported directly. An unknown
-sibling name is a deterministic `UnknownSiblingModule` compile-time error.
+The facade contains no implementation declarations; it is only a gateway for
+sibling exports. An unknown sibling name is a deterministic
+`UnknownSiblingModule` compile-time error.
 
 ### Zero-import sibling scope
 

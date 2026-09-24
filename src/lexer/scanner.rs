@@ -113,6 +113,7 @@ impl<'source> Scanner<'source> {
             "perform" => TokenKind::Perform,
             "dynamic" => TokenKind::Dynamic,
             "open" => TokenKind::Open,
+            "import" => TokenKind::Import,
             "for" => TokenKind::For,
             "case" => TokenKind::Case,
             "if" => TokenKind::If,

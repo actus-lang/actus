@@ -124,8 +124,9 @@ The name resolves only to a direct `<name>.act` sibling. The sibling's own
 `open` declarations are re-exported through the facade; its closed
 declarations remain module-private. A sibling that is not named by the facade
 does not contribute any external exports, even when it contains `open`
-declarations. The facade may also declare and directly export its own
-`open` declarations.
+declarations. The facade contains no implementation declarations; it is only
+a gateway that lists sibling files whose internal `open` declarations become
+external exports.
 
 All `.act` files directly inside the same module directory share one internal
 scope. Sibling declarations can refer to one another without `import`
