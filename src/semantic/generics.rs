@@ -37,6 +37,12 @@ impl Analyzer {
                         span: bound.span,
                     });
                 }
+                if bound.name != "Numeric" && !self.role_types.contains_key(&bound.name) {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::UnknownRole { name: bound.name.clone() },
+                        span: bound.span,
+                    });
+                }
             }
         }
         Ok(())
@@ -155,9 +161,28 @@ impl Analyzer {
                         span: argument.span,
                     });
                 }
+                if bound.name != "Numeric"
+                    && !self.is_generic_parameter(&argument.name)
+                    && !self.has_performance(&bound.name, argument)
+                {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::GenericConstraintMismatch {
+                            parameter: parameter.name.clone(),
+                            constraint: bound.name.clone(),
+                            argument: canonical_type_name(argument),
+                        },
+                        span: argument.span,
+                    });
+                }
             }
         }
         Ok(())
+    }
+}
+
+impl Analyzer {
+    pub(super) fn has_performance(&self, role: &str, target: &TypeName) -> bool {
+        self.performances.contains(&(role.to_owned(), canonical_type_name(target)))
     }
 }
 

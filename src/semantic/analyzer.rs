@@ -27,6 +27,7 @@ pub(super) struct Analyzer {
     pub(super) struct_types: HashMap<String, StructDef>,
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) role_types: HashMap<String, RoleDecl>,
+    pub(super) performances: HashSet<(String, String)>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
@@ -59,6 +60,7 @@ impl Analyzer {
             struct_types: HashMap::new(),
             enum_types: HashMap::new(),
             role_types: HashMap::new(),
+            performances: HashSet::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
@@ -70,8 +72,9 @@ impl Analyzer {
 
     fn analyze(mut self, program: &Program) -> Result<SemanticModel, SemanticError> {
         self.register_enums(program)?;
-        self.register_structs(program)?;
         self.register_roles(program)?;
+        self.register_structs(program)?;
+        self.validate_role_declarations()?;
         self.validate_performances(program)?;
         self.validate_recursive_types()?;
         self.register_declarations(program)?;

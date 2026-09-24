@@ -19,6 +19,13 @@ impl Analyzer {
                     role.span,
                 ));
             }
+        }
+        Ok(())
+    }
+
+    pub(super) fn validate_role_declarations(&mut self) -> Result<(), SemanticError> {
+        let roles = self.role_types.values().cloned().collect::<Vec<_>>();
+        for role in &roles {
             self.validate_role_methods(role)?;
         }
         Ok(())
@@ -74,6 +81,7 @@ impl Analyzer {
             ));
         };
         self.validate_type_reference(&perform.target)?;
+        self.performances.insert((perform.role_name.clone(), canonical_type_name(&perform.target)));
         let mut methods = HashSet::new();
         for method in &perform.methods {
             if !methods.insert(method.name.clone()) {
@@ -141,6 +149,17 @@ fn type_names_match(left: &TypeName, right: &TypeName) -> bool {
             .iter()
             .zip(&right.arguments)
             .all(|(left, right)| type_names_match(left, right))
+}
+
+fn canonical_type_name(type_name: &TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }
 
 fn role_error(kind: SemanticErrorKind, span: SourceSpan) -> SemanticError {
