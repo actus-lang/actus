@@ -272,8 +272,8 @@ impl Analyzer {
                 if self.enum_receiver_name(object).is_some() {
                     self.validate_enum_unit_variant(object, field, *span)
                 } else {
-                    self.visit_expression(object)?;
-                    self.validate_field_access(object, field, *span)
+                    self.validate_field_access(object, field, *span)?;
+                    self.ensure_field_access_readable(object, field, *span)
                 }
             }
             Expr::Case { mode, subject, branches, span } => {

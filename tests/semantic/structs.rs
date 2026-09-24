@@ -133,6 +133,51 @@ fn rejects_partial_struct_use_after_field_move() {
 }
 
 #[test]
+fn tracks_nested_partial_moves_as_paths_for_lifo_cleanup() {
+    let model = analyze_source(
+        "struct Inner { erg first: Buffer, erg second: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat item: Buffer) { drop(item); } verb main() { erg outer = Outer { inner: Inner { first: allocate(1), second: allocate(2), }, }; consume(item: outer.inner.first); consume(item: outer.inner.second); }",
+    )
+    .expect("nested field moves should remain valid and deterministic");
+
+    let outer = model
+        .bindings
+        .iter()
+        .find(|binding| binding.name == "outer")
+        .expect("outer binding should exist");
+    assert!(matches!(
+        &outer.ownership,
+        actus::semantic::OwnershipState::PartiallyMoved { fields }
+            if fields == &["inner.first".to_owned(), "inner.second".to_owned()]
+    ));
+
+    let native_plans = actus::codegen::lower_cleanup_plans(&model);
+    let partial_drop = native_plans
+        .iter()
+        .flat_map(|plan| plan.instructions.iter())
+        .find_map(|instruction| match instruction {
+            actus::codegen::NativeInstruction::DropBindingFields { moved_fields, .. } => {
+                Some(moved_fields)
+            }
+            _ => None,
+        })
+        .expect("nested partial moves should reach native cleanup");
+    assert_eq!(partial_drop, &["inner.first", "inner.second"]);
+}
+
+#[test]
+fn rejects_nested_move_that_overlaps_an_existing_partial_move() {
+    let error = analyze_source(
+        "struct Inner { erg first: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat item: Inner) { } verb consume_buffer(dat item: Buffer) { drop(item); } verb main() { erg outer = Outer { inner: Inner { first: allocate(1), }, }; consume(item: outer.inner); consume_buffer(item: outer.inner.first); }",
+    )
+    .expect_err("a nested field cannot be moved after its parent was moved");
+
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UseAfterMove { name } if name == "outer"
+    ));
+}
+
+#[test]
 fn freezes_struct_owner_for_field_borrow_and_restores_it() {
     let model = analyze_source(
         "struct Holder { payload: Buffer, value: Int, } verb main() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.payload; inspect(view); } holder.value = 2; }",
