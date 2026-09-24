@@ -35,6 +35,7 @@ pub(super) struct Analyzer {
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
+    pub(super) binding_dynamic_roles: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
 }
@@ -73,6 +74,7 @@ impl Analyzer {
             binding_struct_type_applications: HashMap::new(),
             binding_enum_types: HashMap::new(),
             binding_enum_type_applications: HashMap::new(),
+            binding_dynamic_roles: HashMap::new(),
             generic_scopes: Vec::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
         }
@@ -180,6 +182,10 @@ impl Analyzer {
         for parameter in &verb.params {
             let ty = lookup_builtin_type(&parameter.ty.name);
             self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
+            if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
+                let index = self.binding(&parameter.name, parameter.span)?;
+                self.binding_dynamic_roles.insert(index, parameter.ty.name.clone());
+            }
             self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
             self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
         }

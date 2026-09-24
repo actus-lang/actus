@@ -10,6 +10,7 @@ use super::model::NativeCleanupSchedule;
 use super::native::{FunctionMeta, NativeEmitError};
 use super::performance::{PerformanceDefinition, dispatch_key};
 use super::types::NativeType;
+use super::vtable::VtableDataIds;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn define_performances(
@@ -20,6 +21,7 @@ pub(super) fn define_performances(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
+    vtable_data: &VtableDataIds,
 ) -> Result<(), NativeEmitError> {
     for definition in definitions {
         let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts);
@@ -36,6 +38,7 @@ pub(super) fn define_performances(
             cleanup_schedule,
             string_data,
             layouts,
+            vtable_data,
         )?;
     }
     Ok(())

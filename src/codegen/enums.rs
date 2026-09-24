@@ -177,7 +177,7 @@ pub(super) fn emit_enum_payload_drop(
         NativeType::Struct(nested_id) => {
             emit_struct_drop(function, field_address, nested_id, functions, layouts)?;
         }
-        NativeType::Int | NativeType::String | NativeType::Enum(_) => {}
+        NativeType::Int | NativeType::String | NativeType::Enum(_) | NativeType::FatPointer => {}
     }
     Ok(())
 }

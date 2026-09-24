@@ -30,12 +30,16 @@ pub(super) struct FunctionMeta {
     pub(super) id: FuncId,
     pub(super) parameter_names: Vec<String>,
     pub(super) return_type: NativeType,
+    pub(super) dynamic_params: Vec<bool>,
+    pub(super) dynamic_roles: Vec<Option<String>>,
 }
 
 pub(super) struct FunctionRef {
     pub(super) reference: FuncRef,
     pub(super) parameter_names: Vec<String>,
     pub(super) return_type: NativeType,
+    pub(super) dynamic_params: Vec<bool>,
+    pub(super) dynamic_roles: Vec<Option<String>>,
 }
 
 impl std::fmt::Display for NativeEmitError {
@@ -157,6 +161,8 @@ fn emit_verbs_object(
     )?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     let functions = function_metadata(&metadata);
+    let vtable_data =
+        super::vtable::define_vtables(&mut module, performance_definitions, &functions, &layouts)?;
     define_verbs(
         &mut module,
         frontend_config,
@@ -165,6 +171,7 @@ fn emit_verbs_object(
         cleanup_schedule,
         &string_data,
         &layouts,
+        &vtable_data,
     )?;
     define_performances(
         &mut module,
@@ -174,6 +181,7 @@ fn emit_verbs_object(
         cleanup_schedule,
         &string_data,
         &layouts,
+        &vtable_data,
     )?;
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
 }
@@ -222,6 +230,8 @@ fn function_metadata(metadata: &HashMap<String, FunctionMeta>) -> HashMap<String
                     id: meta.id,
                     parameter_names: meta.parameter_names.clone(),
                     return_type: meta.return_type,
+                    dynamic_params: meta.dynamic_params.clone(),
+                    dynamic_roles: meta.dynamic_roles.clone(),
                 },
             )
         })
@@ -237,6 +247,7 @@ fn define_verbs(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
+    vtable_data: &super::vtable::VtableDataIds,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let meta = functions
@@ -251,6 +262,7 @@ fn define_verbs(
             cleanup_schedule,
             string_data,
             layouts,
+            vtable_data,
         )?;
     }
     Ok(())

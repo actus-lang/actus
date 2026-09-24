@@ -9,6 +9,7 @@ pub(super) enum NativeType {
     Buffer,
     Struct(usize),
     Enum(usize),
+    FatPointer,
 }
 
 impl NativeType {
@@ -47,7 +48,9 @@ impl NativeType {
     pub(super) fn ir_type(self, pointer_type: Type) -> Type {
         match self {
             Self::Int => cranelift_codegen::ir::types::I32,
-            Self::String | Self::Buffer | Self::Struct(_) | Self::Enum(_) => pointer_type,
+            Self::String | Self::Buffer | Self::Struct(_) | Self::Enum(_) | Self::FatPointer => {
+                pointer_type
+            }
         }
     }
 }

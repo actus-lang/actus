@@ -34,6 +34,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if let Some(role_name) = self.dynamic_role_for_expression(receiver) {
+            return self.visit_dynamic_method_call(receiver, &role_name, method, arguments, span);
+        }
         if self.enum_receiver_name(receiver).is_some() {
             return self.validate_enum_constructor(receiver, method, arguments, span);
         }
@@ -72,6 +75,33 @@ impl Analyzer {
         } else {
             self.visit_call(method, &combined, span)
         }
+    }
+
+    fn visit_dynamic_method_call(
+        &mut self,
+        receiver: &Expr,
+        role_name: &str,
+        method_name: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let role = self.role_types.get(role_name).cloned().ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::UnknownRole { name: role_name.to_owned() },
+            span,
+        })?;
+        let method = role
+            .methods
+            .iter()
+            .find(|candidate| candidate.name == method_name)
+            .cloned()
+            .ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::UnknownMethod { method: method_name.to_owned() },
+            span,
+        })?;
+        let signature = super::dynamic::role_method_signature(&method);
+        let combined = self.method_arguments(receiver, &Role::Abs, "self", arguments);
+        self.mark_dynamic_role_performances(role_name, method.name.as_str());
+        self.visit_call_with_signature(method.name.as_str(), &combined, span, &signature)
     }
 
     fn method_signature(

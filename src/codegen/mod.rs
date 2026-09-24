@@ -5,6 +5,7 @@ mod case_payload;
 mod cleanup;
 mod control_flow;
 mod declarations;
+mod dynamic_call;
 mod enum_layout;
 mod enums;
 mod expression_construct;
@@ -28,6 +29,7 @@ mod performance_emit;
 mod structs;
 mod target;
 mod types;
+mod vtable;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
 pub use linker::{NativeLinkError, link_object};

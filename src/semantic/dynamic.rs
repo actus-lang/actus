@@ -1,8 +1,51 @@
-use crate::ast::{DispatchMode, Param, Program, Role, TopLevelDecl};
+use crate::ast::{
+    DispatchMode, Param, Program, Role, RoleMethod, TopLevelDecl, lookup_builtin_type,
+};
 
 use super::analyzer::Analyzer;
+use super::calls::VerbSignature;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::{DynamicRoleType, FatPointerLayout};
+
+impl Analyzer {
+    pub(super) fn mark_dynamic_role_performances(&mut self, role: &str, method: &str) {
+        let targets = self
+            .performances
+            .iter()
+            .filter(|(candidate_role, _)| candidate_role == role)
+            .map(|(_, target)| target.clone())
+            .collect::<Vec<_>>();
+        for target in targets {
+            self.mark_reachable_performance(&target, method, role);
+        }
+    }
+
+    pub(super) fn dynamic_role_for_expression(
+        &self,
+        expression: &crate::ast::Expr,
+    ) -> Option<String> {
+        let crate::ast::Expr::Identifier { name, span } = expression else { return None };
+        let index = self.binding(name, *span).ok()?;
+        self.binding_dynamic_roles.get(&index).cloned()
+    }
+}
+
+pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
+    VerbSignature {
+        params: method
+            .params
+            .iter()
+            .map(|parameter| {
+                (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
+            })
+            .collect(),
+        dynamic_params: method.params.iter().map(|parameter| parameter.dispatch).collect(),
+        return_type: method
+            .return_type
+            .as_ref()
+            .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+    }
+}
 
 impl Analyzer {
     pub(super) fn validate_dynamic_parameter(

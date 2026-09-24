@@ -24,6 +24,7 @@ pub(super) struct PerformanceRegistry {
 }
 
 pub(super) struct PerformanceDefinition<'a> {
+    pub(super) role_name: String,
     pub(super) target: &'a TypeName,
     pub(super) method: &'a VerbDecl,
     pub(super) symbol: String,
@@ -80,6 +81,7 @@ impl PerformanceRegistry {
                             .iter()
                             .find(|method| method.name == implementation.method_name)
                             .map(|method| PerformanceDefinition {
+                                role_name: implementation.role_name.clone(),
                                 target: &perform.target,
                                 method,
                                 symbol: implementation.symbol.clone(),
@@ -131,6 +133,21 @@ pub(super) fn declare_performance_functions(
                     definition.method.return_type.as_ref(),
                     layouts,
                 ),
+                dynamic_params: definition
+                    .method
+                    .params
+                    .iter()
+                    .map(|parameter| parameter.dispatch == crate::ast::DispatchMode::Dynamic)
+                    .collect(),
+                dynamic_roles: definition
+                    .method
+                    .params
+                    .iter()
+                    .map(|parameter| {
+                        (parameter.dispatch == crate::ast::DispatchMode::Dynamic)
+                            .then(|| parameter.ty.name.clone())
+                    })
+                    .collect(),
             },
         );
     }
@@ -157,6 +174,7 @@ fn native_type_key(target: NativeType) -> String {
         NativeType::Int => "int".to_owned(),
         NativeType::String => "string".to_owned(),
         NativeType::Buffer => "buffer".to_owned(),
+        NativeType::FatPointer => "fat_pointer".to_owned(),
     }
 }
 

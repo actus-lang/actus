@@ -1,4 +1,4 @@
-use crate::ast::{ExternalVerbDecl, VerbDecl};
+use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::layout::LayoutRegistry;
 use super::types::NativeType;
@@ -26,11 +26,10 @@ pub fn validate_native_signature(
             return_type.name
         )));
     }
-    if let Some(parameter) = verb
-        .params
-        .iter()
-        .find(|parameter| NativeType::from_name_with_layout(&parameter.ty.name, layouts).is_none())
-    {
+    if let Some(parameter) = verb.params.iter().find(|parameter| {
+        parameter.dispatch != DispatchMode::Dynamic
+            && NativeType::from_name_with_layout(&parameter.ty.name, layouts).is_none()
+    }) {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` parameters, found `{}` for `{}`",
             parameter.ty.name, parameter.name
