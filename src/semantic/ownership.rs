@@ -108,6 +108,11 @@ impl Analyzer {
         };
         self.visit_expression(expression)?;
         self.validate_return_type(expression)?;
+        if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
+            self.validate_abs_return(expression)?;
+            self.plan_return_unwind(statement_span);
+            return Ok(());
+        }
         let returned_expression = unwrap_grouping(expression);
         let Expr::Identifier { name, span } = returned_expression else {
             if contains_returned_borrow(expression) {

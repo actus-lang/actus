@@ -36,8 +36,15 @@ pub enum Origin {
     None,
     AbsParameter { parameter_index: usize },
     Derived { root_parameter: usize },
+    Binding { binding_index: usize },
     Unknown,
-    Multiple { roots: Vec<usize> },
+    Multiple { roots: Vec<OriginRoot> },
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum OriginRoot {
+    Parameter(usize),
+    Binding(usize),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

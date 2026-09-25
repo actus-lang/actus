@@ -74,3 +74,45 @@ fn rejects_multiple_origins_from_an_abs_return_call() {
     .expect_err("multiple view roots must not be returned");
     assert!(matches!(error.kind, SemanticErrorKind::InvalidAbsReturnOrigin { .. }));
 }
+
+#[test]
+fn propagates_a_returned_view_into_the_caller_scope() {
+    let model = analyze_source(
+        "extern \"C\" verb sub_slice(abs input: Buffer) -> abs Buffer; verb main() -> Int { erg buffer = Buffer[8]; abs view = ref sub_slice(input: abs buffer); return 0; }",
+    )
+    .expect("a returned view should freeze its caller owner");
+    assert_eq!(model.borrows.len(), 1);
+    assert!(model.cleanup_plans.iter().any(|plan| {
+        plan.actions
+            .iter()
+            .any(|action| matches!(action, actus::semantic::CleanupAction::EndBorrow { .. }))
+    }));
+    let buffer = model.bindings.iter().find(|binding| binding.name == "buffer").unwrap();
+    assert_eq!(buffer.access, actus::semantic::AccessState::Mutable);
+}
+
+#[test]
+fn thaws_the_source_after_a_nested_view_scope() {
+    let model = analyze_source(
+        "extern \"C\" verb sub_slice(abs input: Buffer) -> abs Buffer; verb main() -> Int { erg buffer = Buffer[8]; { abs view = ref sub_slice(input: abs buffer); } drop(buffer); return 0; }",
+    )
+    .expect("the source should thaw after the view scope");
+    let buffer = model.bindings.iter().find(|binding| binding.name == "buffer").unwrap();
+    assert_eq!(buffer.ownership, actus::semantic::OwnershipState::Dropped);
+    assert_eq!(buffer.access, actus::semantic::AccessState::Mutable);
+}
+
+#[test]
+fn rejects_owner_move_and_drop_while_a_returned_view_is_live() {
+    let moved = analyze_source(
+        "extern \"C\" verb sub_slice(abs input: Buffer) -> abs Buffer; verb consume(dat input: Buffer) { drop(input); } verb main() -> Int { erg buffer = Buffer[8]; abs view = ref sub_slice(input: abs buffer); consume(input: dat buffer); return 0; }",
+    )
+    .expect_err("a frozen source cannot be moved");
+    assert!(matches!(moved.kind, SemanticErrorKind::MoveFrozen { .. }));
+
+    let dropped = analyze_source(
+        "extern \"C\" verb sub_slice(abs input: Buffer) -> abs Buffer; verb main() -> Int { erg buffer = Buffer[8]; abs view = ref sub_slice(input: abs buffer); drop(buffer); return 0; }",
+    )
+    .expect_err("a frozen source cannot be dropped");
+    assert!(matches!(dropped.kind, SemanticErrorKind::DropFrozen { .. }));
+}

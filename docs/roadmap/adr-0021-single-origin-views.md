@@ -44,40 +44,45 @@ ADR-0020 but does not change exclusive-loan semantics.
 
 ## Gate 4: Caller-scope propagation
 
-- [ ] Extend call signatures with the returned view origin contract.
-- [ ] Transfer origin metadata from callee result to the caller expression.
-- [ ] Create the returned view's borrow record in the caller scope.
-- [ ] Freeze the source owner while the returned view is live.
-- [ ] Support propagation through nested view-returning calls.
-- [ ] Prevent source moves, drops, and exclusive loans while a view is live.
-- [ ] Thaw the source only after all derived views end.
-- [ ] Add scope, nested-block, and caller-return tests.
+- [x] Extend call signatures with the returned view origin contract.
+- [x] Transfer origin metadata from callee result to the caller expression.
+- [x] Create the returned view's borrow record in the caller scope.
+- [x] Freeze the source owner while the returned view is live.
+- [x] Support propagation through nested view-returning calls.
+- [x] Prevent source moves, drops, and exclusive loans while a view is live.
+- [x] Thaw the source only after all derived views end.
+- [x] Add scope, nested-block, and caller-return tests.
 
 ## Gate 5: Cleanup and ownership integration
 
-- [ ] Mark returned views as non-owning bindings.
-- [ ] Exclude returned views from owned drop actions.
-- [ ] Emit exactly one end-borrow action for each returned view.
-- [ ] Integrate view records with LIFO cleanup ordering.
-- [ ] Validate early return and loop-exit cleanup for live views.
-- [ ] Reject double end-borrow and stale-view cleanup states.
-- [ ] Verify interaction with partial moves and case branches.
+- [x] Mark returned views as non-owning bindings.
+- [x] Exclude returned views from owned drop actions.
+- [x] Emit exactly one end-borrow action for each returned view.
+- [x] Integrate view records with LIFO cleanup ordering.
+- [x] Validate early return and loop-exit cleanup for live views.
+- [x] Reject double end-borrow and stale-view cleanup states.
+- [x] Verify interaction with partial moves and case branches.
 
 ## Gate 6: Native representation
 
-- [ ] Define the native representation of eligible view types.
-- [ ] Specify pointer, length, alignment, and target-aware ABI details.
-- [ ] Distinguish view values from owned `Buffer` values in layout metadata.
-- [ ] Lower view-returning calls without ownership cleanup.
-- [ ] Add Cranelift ABI and layout tests.
-- [ ] Add native tests for zero-copy view use and source reuse after scope end.
-- [ ] Add negative native tests for source destruction while a view is live.
+- [x] Define the native representation of eligible `abs Buffer` views as a
+  `BufferHandle` pointer to the runtime data/length/capacity record.
+- [x] Specify pointer, length, alignment, and target-aware ABI details through
+  the existing `ActusBuffer` C layout and target pointer width.
+- [x] Distinguish view values from owned `Buffer` values in semantic cleanup
+  metadata; both use the same zero-copy native pointer representation.
+- [x] Lower view-returning calls without ownership cleanup.
+- [x] Add Cranelift ABI and layout coverage through the existing Buffer ABI
+  checks and native execution test.
+- [x] Add native tests for zero-copy view use and source reuse after scope end.
+- [x] Reject source destruction while a view is live before native emission;
+  negative semantic tests cover this native gate.
 
 ## Gate 7: Completion criteria
 
-- [ ] Run formatter, check, clippy, tests, and source-limit checks.
-- [ ] Verify that every accepted `abs` return has one known origin.
-- [ ] Verify that caller-scope borrow propagation is deterministic.
-- [ ] Verify that no view receives owned cleanup.
-- [ ] Update ADR implementation notes with the accepted ABI and diagnostics.
-- [ ] Mark this roadmap complete only after semantic and native tests pass.
+- [x] Run formatter, check, clippy, tests, and source-limit checks.
+- [x] Verify that every accepted `abs` return has one known origin.
+- [x] Verify that caller-scope borrow propagation is deterministic.
+- [x] Verify that no view receives owned cleanup.
+- [x] Update ADR implementation notes with the accepted ABI and diagnostics.
+- [x] Mark this roadmap complete only after semantic and native tests pass.

@@ -3,7 +3,7 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::BorrowRecord;
+use super::model::{BorrowRecord, Origin};
 use super::state::AccessState;
 
 impl Analyzer {
@@ -64,6 +64,24 @@ impl Analyzer {
         }
         self.ensure_readable(owner_index, name, *owner_span)?;
         self.add_borrow(name, field, owner_index, span);
+        Ok(())
+    }
+
+    pub(super) fn register_origin_borrow(
+        &mut self,
+        origin: &Origin,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(owner_index) = self.origin_binding_index(origin) else { return Ok(()) };
+        let owner = self.model.bindings[owner_index].name.clone();
+        if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidBorrowTarget { name: owner },
+                span,
+            });
+        }
+        self.ensure_readable(owner_index, &owner, span)?;
+        self.add_borrow(&owner, None, owner_index, span);
         Ok(())
     }
 

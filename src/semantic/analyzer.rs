@@ -262,7 +262,11 @@ impl Analyzer {
                 if *role == Role::Abs
                     && let Ok(index) = self.binding(name, *span)
                 {
-                    self.binding_origins.insert(index, self.origin_of(initializer));
+                    let origin = self.origin_of(initializer);
+                    self.binding_origins.insert(index, origin.clone());
+                    if is_origin_return_expression(initializer) {
+                        self.register_origin_borrow(&origin, *span)?;
+                    }
                 }
                 self.record_initializer_struct_type(name, initializer, *span)?;
                 self.record_initializer_enum_type(name, initializer, *span)
@@ -347,6 +351,16 @@ impl Analyzer {
 
 fn block_guarantees_return(block: &Block) -> bool {
     block.statements.iter().any(statement_guarantees_return)
+}
+
+fn is_origin_return_expression(expression: &Expr) -> bool {
+    match expression {
+        Expr::Borrow { expression, .. } | Expr::Grouping { expression, .. } => {
+            is_origin_return_expression(expression)
+        }
+        Expr::Call { .. } | Expr::MethodCall { .. } => true,
+        _ => false,
+    }
 }
 
 fn statement_guarantees_return(statement: &Stmt) -> bool {

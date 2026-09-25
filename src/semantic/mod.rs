@@ -31,7 +31,7 @@ pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, Unw
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{
     Binding, BorrowRecord, DynamicRoleType, ExclusiveLoan, FatPointerLayout, GenericInstance,
-    Origin, OriginRecord, ReachablePerformance, SemanticModel,
+    Origin, OriginRecord, OriginRoot, ReachablePerformance, SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub(crate) use type_substitution::TypeSubstitution;

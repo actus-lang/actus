@@ -5,7 +5,7 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::{Origin, OriginRecord};
+use super::model::{Origin, OriginRecord, OriginRoot};
 
 impl Analyzer {
     pub(super) fn initialize_origin_parameter_map(&mut self, parameters: &[crate::ast::Param]) {
@@ -79,7 +79,9 @@ impl Analyzer {
         let reason = match origin {
             Origin::Multiple { .. } => "the returned view has multiple origins",
             Origin::Unknown => "the returned view has an unknown origin",
-            Origin::None => "the returned view has no abs parameter origin",
+            Origin::None | Origin::Binding { .. } => {
+                "the returned view has no abs parameter origin"
+            }
             _ => "the returned view does not preserve its abs parameter origin",
         };
         Err(abs_origin_error(reason, expression))
@@ -88,11 +90,25 @@ impl Analyzer {
     fn binding_origin(&self, name: &str, span: SourceSpan) -> Origin {
         let Some(index) = self.binding(name, span).ok() else { return Origin::Unknown };
         self.binding_origins.get(&index).cloned().unwrap_or_else(|| {
-            self.current_abs_origins
-                .get(name)
-                .copied()
-                .map_or(Origin::None, |parameter_index| Origin::AbsParameter { parameter_index })
+            self.current_abs_origins.get(name).copied().map_or_else(
+                || {
+                    matches!(
+                        self.model.bindings[index].role,
+                        crate::ast::Role::Erg | crate::ast::Role::Dat
+                    )
+                    .then_some(Origin::Binding { binding_index: index })
+                    .unwrap_or(Origin::None)
+                },
+                |parameter_index| Origin::AbsParameter { parameter_index },
+            )
         })
+    }
+
+    pub(super) fn origin_binding_index(&self, origin: &Origin) -> Option<usize> {
+        match origin {
+            Origin::Binding { binding_index } => Some(*binding_index),
+            _ => None,
+        }
     }
 
     fn origin_from_abs_call<'a>(&self, expressions: impl Iterator<Item = &'a Expr>) -> Origin {
@@ -124,7 +140,10 @@ where
         match origin {
             Origin::AbsParameter { parameter_index }
             | Origin::Derived { root_parameter: parameter_index } => {
-                roots.insert(parameter_index);
+                roots.insert(OriginRoot::Parameter(parameter_index));
+            }
+            Origin::Binding { binding_index } => {
+                roots.insert(OriginRoot::Binding(binding_index));
             }
             Origin::Unknown => saw_unknown = true,
             Origin::Multiple { roots: nested } => roots.extend(nested),
@@ -137,7 +156,11 @@ where
     if saw_unknown {
         return Origin::Unknown;
     }
-    roots.into_iter().next().map_or(Origin::None, |root| Origin::Derived { root_parameter: root })
+    match roots.into_iter().next() {
+        Some(OriginRoot::Parameter(root_parameter)) => Origin::Derived { root_parameter },
+        Some(OriginRoot::Binding(binding_index)) => Origin::Binding { binding_index },
+        None => Origin::None,
+    }
 }
 
 fn abs_origin_error(reason: &str, expression: &Expr) -> SemanticError {

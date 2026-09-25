@@ -63,3 +63,10 @@ fn executes_exclusive_buffer_mutation_and_reuses_the_caller_owner() {
     let source = "verb append_one(ins buffer: Buffer) -> Int { append(buffer, 1); return 0; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; append_one(buffer: ins buffer); append(buffer, 41); return 42; }\n";
     assert_eq!(build_and_run(source, "buffer-ins"), 42);
 }
+
+#[cfg(unix)]
+#[test]
+fn returns_and_reuses_a_zero_copy_abs_buffer_view() {
+    let source = "verb identity(abs input: Buffer) -> abs Buffer { return input; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; { abs view = ref identity(input: abs buffer); } append(buffer, 41); return 42; }\n";
+    assert_eq!(build_and_run(source, "buffer-abs-view"), 42);
+}

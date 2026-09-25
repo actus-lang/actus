@@ -4,6 +4,20 @@
 - Date: 2026-09-26
 - Scope: `abs` returns, view provenance, and caller-owned borrow lifetimes
 
+## Implementation status
+
+Gates 0 through 5 are implemented. Gate 6 is implemented for the current
+eligible view representation, `abs Buffer`: its native value is the existing
+`BufferHandle` pointer, so returning a view is a pointer return with no copy
+and no owned cleanup. The handle points to the runtime's `ActusBuffer`, which
+contains the data pointer, length, and capacity. A future dedicated `Slice`
+type may define a separate pointer-and-length ABI; it is not part of this
+implementation.
+
+Gate 7 is complete for the implemented `abs Buffer` contract. Native
+execution, semantic rejection, cleanup planning, and source-limit checks are
+covered by the repository quality gates.
+
 ## Context
 
 Actus needs zero-copy views such as slices without introducing lifetime
@@ -75,7 +89,9 @@ Origin:
   None
   AbsParameter(parameter_index)
   Derived(AbsParameter(parameter_index))
+  Binding(binding_index)
   Unknown
+  Multiple(origins)
 ```
 
 The following forms are valid when they preserve the one origin:
@@ -134,6 +150,11 @@ after scope:  buffer = Active + Mutable
 The callee reports an origin contract. It does not leave a borrow record in
 the callee's scope. The caller creates the borrow record for the returned view,
 and the caller's scope owns the corresponding end-borrow action.
+
+In the current implementation, the callee's `abs` return contract is stored in
+its signature. At the call site, the argument origin is resolved to the
+caller's owner binding. That `Binding` origin creates the caller borrow record
+and freezes the binding until the record is ended.
 
 ## Ownership and cleanup rules
 
