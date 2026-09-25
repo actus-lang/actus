@@ -140,6 +140,10 @@ impl Analyzer {
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },
+            Expr::MethodCall { receiver, method, .. } if method == "raw_slice" => {
+                (self.expression_type(receiver) == Some(BuiltinType::Buffer))
+                    .then_some(BuiltinType::Buffer)
+            }
             Expr::MethodCall { method, .. } => {
                 self.signatures.get(method).and_then(|signature| signature.return_type)
             }

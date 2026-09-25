@@ -8,6 +8,8 @@ mod enums;
 mod generics;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/origins.rs"]
+mod origins;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
 #[path = "semantic/roles.rs"]

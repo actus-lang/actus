@@ -1,5 +1,5 @@
 use crate::ast::{
-    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, Role, VerbDecl,
+    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, ReturnAccess, Role, VerbDecl,
     lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
@@ -14,6 +14,7 @@ pub(super) struct VerbSignature {
     pub(super) params: Vec<(String, Role, String)>,
     pub(super) dynamic_params: Vec<DispatchMode>,
     pub(super) return_type: Option<BuiltinType>,
+    pub(super) return_access: Option<ReturnAccess>,
 }
 
 impl VerbDecl {
@@ -31,6 +32,7 @@ impl VerbDecl {
                 .return_type
                 .as_ref()
                 .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
+            return_access: self.return_type.as_ref().map(|return_type| return_type.access),
         }
     }
 }
@@ -50,6 +52,7 @@ impl ExternalVerbDecl {
                 .return_type
                 .as_ref()
                 .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
+            return_access: self.return_type.as_ref().map(|return_type| return_type.access),
         }
     }
 }

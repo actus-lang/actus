@@ -114,6 +114,7 @@ fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
         SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
         SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
+        SemanticErrorKind::InvalidAbsReturnOrigin { .. } => "E1066",
         SemanticErrorKind::InvalidIntrinsicArgument { .. } => "E1021",
         SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",
         SemanticErrorKind::BorrowedReturn { .. } => "E1018",
@@ -206,6 +207,9 @@ fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::InvalidArgumentRole { callee, parameter } => {
             format!("argument does not satisfy role of `{parameter}` in `{callee}`")
+        }
+        SemanticErrorKind::InvalidAbsReturnOrigin { reason } => {
+            format!("invalid abs return origin: {reason}")
         }
         SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter } => {
             format!("invalid `{parameter}` argument in intrinsic `{callee}`")

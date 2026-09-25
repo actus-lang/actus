@@ -14,6 +14,7 @@ mod intrinsics;
 mod loans;
 mod methods;
 mod model;
+mod origins;
 mod ownership;
 mod pattern_moves;
 mod pattern_support;
@@ -30,7 +31,7 @@ pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, Unw
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{
     Binding, BorrowRecord, DynamicRoleType, ExclusiveLoan, FatPointerLayout, GenericInstance,
-    ReachablePerformance, SemanticModel,
+    Origin, OriginRecord, ReachablePerformance, SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub(crate) use type_substitution::TypeSubstitution;

@@ -10,8 +10,8 @@ ADR-0020 but does not change exclusive-loan semantics.
 - [x] Define `abs self` as the receiver form of the single source parameter.
 - [x] Define which view types are eligible for non-owning returns.
 - [x] Define the distinction between owned returns and `abs` view returns.
-- [ ] Reject multiple-origin returns without adding explicit origin syntax.
-- [ ] Add stable diagnostics for missing, multiple, and unknown origins.
+- [x] Reject multiple-origin returns without adding explicit origin syntax.
+- [x] Add stable diagnostics for missing, multiple, and unknown origins.
 
 ## Gate 1: AST and parser
 
@@ -24,23 +24,23 @@ ADR-0020 but does not change exclusive-loan semantics.
 
 ## Gate 2: Origin model
 
-- [ ] Add semantic origin metadata for expressions.
-- [ ] Represent `None`, one `abs` parameter, derived origin, and unknown origin.
-- [ ] Count `abs self` as the method's single origin parameter.
-- [ ] Exclude scalar parameters from origin counting.
-- [ ] Reject verbs with zero or multiple `abs` source parameters.
-- [ ] Reject expressions derived from local owned temporaries.
-- [ ] Reject unknown calls and expressions with multiple origins.
+- [x] Add semantic origin metadata for expressions.
+- [x] Represent `None`, one `abs` parameter, derived origin, and unknown origin.
+- [x] Count `abs self` as the method's single origin parameter.
+- [x] Exclude scalar parameters from origin counting.
+- [x] Reject verbs with zero or multiple `abs` source parameters.
+- [x] Reject expressions derived from local owned temporaries.
+- [x] Reject unknown calls and expressions with multiple origins.
 
 ## Gate 3: Origin-preserving operations
 
-- [ ] Define the approved origin-preserving intrinsic and method operations.
-- [ ] Track direct return of the source view.
-- [ ] Track field and slice derivations from the source view.
-- [ ] Preserve the root origin through nested view derivations.
-- [ ] Reject operations that combine two source roots.
-- [ ] Add positive provenance unit tests.
-- [ ] Add negative provenance and temporary-owner tests.
+- [x] Define the approved origin-preserving intrinsic and method operations.
+- [x] Track direct return of the source view.
+- [x] Track field and slice derivations from the source view.
+- [x] Preserve the root origin through nested view derivations.
+- [x] Reject operations that combine two source roots.
+- [x] Add positive provenance unit tests.
+- [x] Add negative provenance and temporary-owner tests.
 
 ## Gate 4: Caller-scope propagation
 

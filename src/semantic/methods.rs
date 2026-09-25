@@ -1,4 +1,4 @@
-use crate::ast::{Argument, Expr, Program, Role, TopLevelDecl};
+use crate::ast::{Argument, BuiltinType, Expr, Program, Role, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -40,6 +40,9 @@ impl Analyzer {
         if self.enum_receiver_name(receiver).is_some() {
             return self.validate_enum_constructor(receiver, method, arguments, span);
         }
+        if method == "raw_slice" {
+            return self.visit_raw_slice_call(receiver, arguments, span);
+        }
         self.visit_expression(receiver)?;
         let Some(actual_type) = self.expression_struct_type(receiver) else {
             return Err(SemanticError {
@@ -75,6 +78,37 @@ impl Analyzer {
         } else {
             self.visit_call(method, &combined, span)
         }
+    }
+
+    fn visit_raw_slice_call(
+        &mut self,
+        receiver: &Expr,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        self.visit_expression(receiver)?;
+        if self.expression_type(receiver) != Some(BuiltinType::Buffer) || arguments.len() != 2 {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: "raw_slice".to_owned(),
+                    parameter: "receiver and bounds".to_owned(),
+                },
+                span,
+            });
+        }
+        for argument in arguments {
+            self.visit_expression(&argument.expression)?;
+            if self.expression_type(&argument.expression) != Some(BuiltinType::Int) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                        callee: "raw_slice".to_owned(),
+                        parameter: "start and length".to_owned(),
+                    },
+                    span: expression_span(&argument.expression),
+                });
+            }
+        }
+        Ok(())
     }
 
     fn visit_dynamic_method_call(
