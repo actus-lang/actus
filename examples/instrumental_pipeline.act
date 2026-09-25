@@ -1,0 +1,23 @@
+// Exclusive call-scope loans keep one Buffer owner while helpers mutate it.
+
+verb write_marker(ins target: Buffer) -> Int {
+    append(target, 7);
+    return 0;
+}
+
+verb enrich(ins target: Buffer) -> Int {
+    write_marker(target: ins target);
+    append(target, 35);
+    return 0;
+}
+
+verb main() -> Int {
+    erg buffer: Buffer = Buffer[8];
+
+    enrich(target: ins buffer);
+
+    // The caller still owns the same buffer after both loans complete.
+    append(buffer, 0);
+    print(42);
+    return 42;
+}
