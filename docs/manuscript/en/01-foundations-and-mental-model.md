@@ -234,8 +234,7 @@ verb main() -> Int {
 
 Read the declaration from left to right. `verb` is Actus's keyword for an
 executable operation. It emphasizes that a declaration describes an action,
-rather than copying the terminology of `fn`, `function`, or `def` from another
-language.
+rather than borrowing terminology from another language.
 
 `main` is the declaration's identifier. The empty parentheses `()` say that
 the operation accepts no parameters. The arrow `->` separates the parameter
@@ -346,7 +345,7 @@ a body, while a body contains statements and expressions. Source spans are
 retained so that later diagnostics can point back to the original characters.
 
 The **semantic analyzer** asks questions syntax alone cannot answer: does
-`inspect` exist, is `input` an `Int`, does the role match the argument, and is
+`inspect` exist, is `input` an `Int`, does the role correspond to the argument, and is
 `value` still available? It tracks uninitialized, active, moved, partially
 moved, and dropped ownership states, while access state distinguishes mutable
 access from temporary frozen inspection. It validates exits and builds a

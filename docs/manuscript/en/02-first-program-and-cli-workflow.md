@@ -159,8 +159,7 @@ Read it from left to right.
 
 `verb` is a declaration keyword. It says that the following name introduces
 an executable Actus action. Actus uses `verb` to make the operation itself
-the center of the declaration; it does not use `fn`, `function`, or
-`def`.
+the center of the declaration.
 
 `main` is the identifier of the action. In a hosted executable, the
 manifest's `entry = "main"` selects this verb. The empty parentheses `()`
