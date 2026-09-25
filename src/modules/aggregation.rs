@@ -150,6 +150,34 @@ pub fn analyze_module(
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
+pub fn analyze_with_imports(
+    program: &Program,
+    resolver: &ModuleResolver,
+) -> Result<SemanticModel, ModuleError> {
+    let expanded = resolve_imports(program, resolver)?;
+    analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))
+}
+
+pub fn resolve_imports(
+    program: &Program,
+    resolver: &ModuleResolver,
+) -> Result<Program, ModuleError> {
+    let mut declarations = Vec::new();
+    for declaration in &program.declarations {
+        let TopLevelDecl::Import(import) = declaration else {
+            declarations.push(declaration.clone());
+            continue;
+        };
+        let imported = parse_module(resolver, &import.path)?;
+        let exports = exports_module(resolver, &import.path)?;
+        declarations.extend(imported.declarations.into_iter().filter(|candidate| {
+            let Some((kind, name, _)) = declaration_identity(candidate) else { return false };
+            exports.contains(kind, name)
+        }));
+    }
+    Ok(Program { declarations })
+}
+
 fn check_declaration_name(
     declaration: &TopLevelDecl,
     path: &Path,
