@@ -21,10 +21,7 @@ struct BuildOptions {
     profile: Option<BuildProfile>,
 }
 
-pub(super) fn build_command(
-    mut arguments: impl Iterator<Item = String>,
-    _configuration: &CompilerConfiguration,
-) -> i32 {
+pub(super) fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let Some(input) = arguments.next() else {
         eprintln!("error: missing input file");
         super::print_usage();

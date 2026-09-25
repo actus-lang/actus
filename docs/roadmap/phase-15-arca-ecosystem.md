@@ -40,10 +40,12 @@ the compiler, builds, tests, dependency resolution, and package publication.
 
 ## Local Workflow
 
-- [ ] Add `arca init` and `arca new`.
-- [ ] Add `arca check`.
+- [x] Add `arca init` and `arca new` with optional Git initialization and
+  canonical `.gitignore` generation.
+- [x] Add `arca check` with module resolution and semantic validation without
+  code generation.
 - [x] Add `arca build` and `arca build --release` / `--profile <name>`.
-- [ ] Add `arca run`.
+- [x] Add `arca run` with profile selection and program-argument forwarding.
 - [ ] Add `arca test`.
 - [ ] Add `arca fmt` integration.
 
