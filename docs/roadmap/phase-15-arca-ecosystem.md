@@ -33,7 +33,8 @@ the compiler, builds, tests, dependency resolution, and package publication.
 - [x] Lower a module-aware CLI build and link imported units.
 - [x] Verify a real multi-file executable with a stable exit code.
 - [x] Define initial package names, versions, entry points, and Alpha edition.
-- [ ] Define the `Arca.lock` dependency lockfile format.
+- [x] Define the `Arca.lock` dependency lockfile format, deterministic package
+  ordering, generation, and `LockfileOutOfDate` validation.
 - [ ] Define debug and release profile semantics.
 
 ## Local Workflow
