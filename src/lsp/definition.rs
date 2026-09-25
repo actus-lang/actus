@@ -185,7 +185,7 @@ fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
     let path = uri.strip_prefix("file://")?;
     #[cfg(windows)]
     {
-        return Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")));
+        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
     }
     #[cfg(not(windows))]
     Some(PathBuf::from(path))
