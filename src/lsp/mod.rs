@@ -1,3 +1,4 @@
+mod definition;
 mod diagnostics;
 mod documents;
 mod position;

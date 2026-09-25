@@ -7,23 +7,23 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 
 ## Goals
 
-- [ ] Expose `actus lsp` through the main compiler binary.
-- [ ] Serve LSP over stdio JSON-RPC without contaminating stdout with logs.
-- [ ] Reuse lexer, parser, semantic analyzer, diagnostics, module resolver,
+- [x] Expose `actus lsp` through the main compiler binary.
+- [x] Serve LSP over stdio JSON-RPC without contaminating stdout with logs.
+- [x] Reuse lexer, parser, semantic analyzer, diagnostics, module resolver,
   and canonical formatter instead of creating parallel implementations.
-- [ ] Support unsaved documents through a versioned in-memory document store.
-- [ ] Keep editor visibility identical to compiler visibility, including
+- [x] Support unsaved documents through a versioned in-memory document store.
+- [x] Keep editor visibility identical to compiler visibility, including
   facade exports and closed siblings.
 
 ## Invariants
 
-- [ ] Every diagnostic is derived from the current document snapshot.
-- [ ] The LSP server never implements ownership, type, or visibility rules of
+- [x] Every diagnostic is derived from the current document snapshot.
+- [x] The LSP server never implements ownership, type, or visibility rules of
   its own.
-- [ ] JSON-RPC framing is deterministic and stdout contains protocol messages
+- [x] JSON-RPC framing is deterministic and stdout contains protocol messages
   only.
-- [ ] Byte spans are converted to valid UTF-8 and UTF-16 LSP positions.
-- [ ] A malformed document cannot terminate the server session.
+- [x] Byte spans are converted to valid UTF-8 and UTF-16 LSP positions.
+- [x] A malformed document cannot terminate the server session.
 - [ ] Formatting delegates to the canonical no-config formatter.
 
 ## Gate 1: Lifecycle and Diagnostics
@@ -43,12 +43,12 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 
 ## Gate 2: Navigation and Modules
 
-- [ ] Implement `textDocument/definition`.
-- [ ] Reuse Arca manifest/source-root discovery.
-- [ ] Reuse Directory Module Resolver and facade export filtering.
-- [ ] Resolve local symbols, sibling symbols, and cross-file imports.
-- [ ] Reject definition results for private or unlisted declarations.
-- [ ] Convert definition spans through the shared position adapter.
+- [x] Implement `textDocument/definition`.
+- [x] Reuse Arca manifest/source-root discovery.
+- [x] Reuse Directory Module Resolver and facade export filtering.
+- [x] Resolve local symbols, sibling symbols, and cross-file imports.
+- [x] Reject definition results for private or unlisted declarations.
+- [x] Convert definition spans through the shared position adapter.
 
 ## Gate 3: Hover and Formatting
 
@@ -62,9 +62,9 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 
 ## Position Adapter
 
-- [ ] Index line starts for every document snapshot.
-- [ ] Convert Actus byte offsets to LSP line/character positions.
-- [ ] Support UTF-8 scalar boundaries and UTF-16 code-unit positions.
+- [x] Index line starts for every document snapshot.
+- [x] Convert Actus byte offsets to LSP line/character positions.
+- [x] Support UTF-8 scalar boundaries and UTF-16 code-unit positions.
 - [ ] Convert LSP edits back to validated byte ranges.
 - [ ] Reject ranges that split a UTF-8 code point.
 

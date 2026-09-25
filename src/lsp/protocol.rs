@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::documents::ContentChange;
-use super::position::LspRange;
+use super::position::{LspPosition, LspRange};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Request {
@@ -37,6 +37,18 @@ pub struct DidChangeParams {
     pub text_document: VersionedTextDocumentIdentifier,
     #[serde(rename = "contentChanges")]
     pub content_changes: Vec<RawContentChange>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DefinitionParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentPosition,
+    pub position: LspPosition,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct TextDocumentPosition {
+    pub uri: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
