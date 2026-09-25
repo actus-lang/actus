@@ -46,8 +46,9 @@ the compiler, builds, tests, dependency resolution, and package publication.
   code generation.
 - [x] Add `arca build` and `arca build --release` / `--profile <name>`.
 - [x] Add `arca run` with profile selection and program-argument forwarding.
-- [ ] Add `arca test`.
-- [ ] Add `arca fmt` integration.
+- [x] Add `arca test` with `meta test` discovery, native execution, timing,
+  exit codes, and pass/fail reporting.
+- [x] Add project-wide `arca fmt` integration with `--check` support.
 
 ## Dependencies and Publishing
 

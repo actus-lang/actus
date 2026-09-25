@@ -174,6 +174,10 @@ impl CompilerConfiguration {
         &self.source_root
     }
 
+    pub fn project_root(&self) -> &Path {
+        &self.project_root
+    }
+
     pub fn linker(&self) -> &OsStr {
         &self.linker
     }

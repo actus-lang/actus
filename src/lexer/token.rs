@@ -42,6 +42,7 @@ pub enum TokenKind {
     Role,
     Perform,
     Dynamic,
+    Meta,
     Open,
     Import,
     For,

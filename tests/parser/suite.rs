@@ -1,6 +1,6 @@
 use actus::ast::{
-    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, Pattern, Role, Stmt, StructFieldRole,
-    TopLevelDecl, VariantPayload,
+    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, MetaAttribute, Pattern, Role, Stmt,
+    StructFieldRole, TopLevelDecl, VariantPayload,
 };
 use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
@@ -26,6 +26,14 @@ fn parses_a_verb_with_roles_and_return_type() {
     assert_eq!(verb.params[2].role, Role::Dat);
     assert_eq!(verb.return_type.as_ref().map(|ty| ty.name.as_str()), Some("Int"));
     assert!(matches!(verb.body.statements[0], Stmt::Return { .. }));
+}
+
+#[test]
+fn parses_meta_test_attribute_without_name_convention() {
+    let program = parse_source("meta test\nverb smoke() -> Int { return 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(verb.metadata, vec![MetaAttribute::Test]);
+    assert_eq!(verb.name, "smoke");
 }
 
 #[test]

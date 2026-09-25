@@ -125,12 +125,18 @@ pub struct ExternalVerbDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerbDecl {
     pub is_open: bool,
+    pub metadata: Vec<MetaAttribute>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub params: Vec<Param>,
     pub return_type: Option<TypeName>,
     pub body: Block,
     pub span: SourceSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MetaAttribute {
+    Test,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

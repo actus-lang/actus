@@ -1,6 +1,6 @@
 use crate::ast::{
-    Block, DispatchMode, Expr, ExternalVerbDecl, ForeignAbi, Param, Program, Role, Stmt,
-    TopLevelDecl, VerbDecl,
+    Block, DispatchMode, Expr, ExternalVerbDecl, ForeignAbi, MetaAttribute, Param, Program, Role,
+    Stmt, TopLevelDecl, VerbDecl,
 };
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
@@ -57,6 +57,13 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Meta) {
+            let metadata = self.parse_metadata()?;
+            if !self.check_simple(&TokenKind::Verb) {
+                return Err(self.error_at_current("`verb` after `meta test`"));
+            }
+            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata)?));
+        }
         if self.check_simple(&TokenKind::Import) {
             let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
             let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
@@ -178,6 +185,14 @@ impl Parser {
     }
 
     fn parse_verb(&mut self, is_open: bool) -> Result<VerbDecl, ParseError> {
+        self.parse_verb_with_metadata(is_open, Vec::new())
+    }
+
+    fn parse_verb_with_metadata(
+        &mut self,
+        is_open: bool,
+        metadata: Vec<MetaAttribute>,
+    ) -> Result<VerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
         let name_token = self.take_identifier("verb name")?;
         let name = identifier_text(&name_token.kind);
@@ -193,7 +208,26 @@ impl Parser {
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
 
-        Ok(VerbDecl { is_open, name, generic_parameters, params, return_type, body, span })
+        Ok(VerbDecl {
+            is_open,
+            metadata,
+            name,
+            generic_parameters,
+            params,
+            return_type,
+            body,
+            span,
+        })
+    }
+
+    fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
+        self.expect_keyword(TokenKind::Meta, "`meta`")?;
+        let attribute = self.take_identifier("metadata name")?;
+        if identifier_text(&attribute.kind) != "test" {
+            return Err(self.error_at_current("supported metadata name `test`"));
+        }
+        let _ = self.match_simple(TokenKind::Semicolon);
+        Ok(vec![MetaAttribute::Test])
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {

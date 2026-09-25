@@ -71,6 +71,11 @@ impl Formatter {
     }
 
     fn verb(&mut self, verb: &crate::ast::VerbDecl) {
+        for metadata in &verb.metadata {
+            self.output.push_str("meta ");
+            self.output.push_str(meta_name(*metadata));
+            self.output.push('\n');
+        }
         if verb.is_open {
             self.output.push_str("open ");
         }
@@ -380,6 +385,12 @@ impl Formatter {
 
     fn line_indent(&mut self) {
         self.output.push_str(&"    ".repeat(self.indent));
+    }
+}
+
+fn meta_name(metadata: crate::ast::MetaAttribute) -> &'static str {
+    match metadata {
+        crate::ast::MetaAttribute::Test => "test",
     }
 }
 

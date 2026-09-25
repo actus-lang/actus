@@ -67,3 +67,67 @@ fn run_accepts_release_profile_and_forwards_arguments() {
     assert_eq!(result, 42);
     let _ = fs::remove_file(input);
 }
+
+#[cfg(unix)]
+#[test]
+fn test_discovers_meta_test_verbs_and_reports_native_results() {
+    let root = std::env::temp_dir().join(format!("actus-test-runner-{}", std::process::id()));
+    fs::create_dir_all(root.join("tests")).expect("create test directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"runner\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("tests/smoke.act"), "meta test\nverb smoke() -> Int { return 0; }\n")
+        .expect("write meta test");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("test")
+        .current_dir(&root)
+        .output()
+        .expect("run test command");
+
+    assert!(
+        output.status.success(),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("1 passed; 0 failed"));
+    assert!(stdout.contains("exit code 0"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn fmt_check_reports_drift_then_accepts_canonical_output() {
+    let root = std::env::temp_dir().join(format!("actus-fmt-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"formatter\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main()->Int{return 0;}\n").expect("write source");
+
+    let before = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["fmt", "--check"])
+        .current_dir(&root)
+        .status()
+        .expect("run formatter check");
+    assert!(!before.success());
+    let format = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("fmt")
+        .current_dir(&root)
+        .status()
+        .expect("run formatter");
+    assert!(format.success());
+    let after = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["fmt", "--check"])
+        .current_dir(&root)
+        .status()
+        .expect("run formatter check after formatting");
+    assert!(after.success());
+    let _ = fs::remove_dir_all(root);
+}

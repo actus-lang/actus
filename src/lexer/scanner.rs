@@ -112,6 +112,7 @@ impl<'source> Scanner<'source> {
             "role" => TokenKind::Role,
             "perform" => TokenKind::Perform,
             "dynamic" => TokenKind::Dynamic,
+            "meta" => TokenKind::Meta,
             "open" => TokenKind::Open,
             "import" => TokenKind::Import,
             "for" => TokenKind::For,
