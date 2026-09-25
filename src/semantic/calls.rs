@@ -117,6 +117,15 @@ impl Analyzer {
         }
         for (argument, parameter_index) in arguments.iter().zip(parameter_indices) {
             let (_, role, _) = &signature.params[parameter_index];
+            if argument.role.as_ref().is_some_and(|actual| actual != role) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidArgumentRole {
+                        callee: callee.to_owned(),
+                        parameter: signature.params[parameter_index].0.clone(),
+                    },
+                    span: argument_span(argument),
+                });
+            }
             self.validate_argument_role(
                 callee,
                 &signature.params[parameter_index].0,

@@ -159,6 +159,7 @@ pub enum Role {
     Erg,
     Abs,
     Dat,
+    Ins,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

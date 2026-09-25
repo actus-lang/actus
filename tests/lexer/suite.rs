@@ -23,6 +23,14 @@ fn scans_keywords_and_punctuation() {
 }
 
 #[test]
+fn scans_the_instrumental_role_keyword() {
+    let (tokens, errors) = scan("verb update(ins buffer: Buffer) { }");
+
+    assert!(errors.is_empty());
+    assert_eq!(tokens[3].kind, TokenKind::Ins);
+}
+
+#[test]
 fn scans_generic_delimiters() {
     let (tokens, errors) = scan("Option[Int, Result[Bool, String]]");
 

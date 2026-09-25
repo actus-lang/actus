@@ -123,7 +123,7 @@ fn rejects_whole_struct_use_after_dat_transfer() {
 #[test]
 fn rejects_partial_struct_use_after_field_move() {
     let error = analyze_source(
-        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: allocate(4), value: 1, }; consume(payload: holder.payload); inspect(holder.value); }",
+        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: Buffer[4], value: 1, }; consume(payload: holder.payload); inspect(holder.value); }",
     )
     .expect_err("partially moved structs must not be reused");
     assert!(matches!(
@@ -135,7 +135,7 @@ fn rejects_partial_struct_use_after_field_move() {
 #[test]
 fn tracks_nested_partial_moves_as_paths_for_lifo_cleanup() {
     let model = analyze_source(
-        "struct Inner { erg first: Buffer, erg second: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat item: Buffer) { drop(item); } verb main() { erg outer = Outer { inner: Inner { first: allocate(1), second: allocate(2), }, }; consume(item: outer.inner.first); consume(item: outer.inner.second); }",
+        "struct Inner { erg first: Buffer, erg second: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat item: Buffer) { drop(item); } verb main() { erg outer = Outer { inner: Inner { first: Buffer[1], second: Buffer[2], }, }; consume(item: outer.inner.first); consume(item: outer.inner.second); }",
     )
     .expect("nested field moves should remain valid and deterministic");
 
@@ -167,7 +167,7 @@ fn tracks_nested_partial_moves_as_paths_for_lifo_cleanup() {
 #[test]
 fn rejects_nested_move_that_overlaps_an_existing_partial_move() {
     let error = analyze_source(
-        "struct Inner { erg first: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat item: Inner) { } verb consume_buffer(dat item: Buffer) { drop(item); } verb main() { erg outer = Outer { inner: Inner { first: allocate(1), }, }; consume(item: outer.inner); consume_buffer(item: outer.inner.first); }",
+        "struct Inner { erg first: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat item: Inner) { } verb consume_buffer(dat item: Buffer) { drop(item); } verb main() { erg outer = Outer { inner: Inner { first: Buffer[1], }, }; consume(item: outer.inner); consume_buffer(item: outer.inner.first); }",
     )
     .expect_err("a nested field cannot be moved after its parent was moved");
 
@@ -180,13 +180,13 @@ fn rejects_nested_move_that_overlaps_an_existing_partial_move() {
 #[test]
 fn freezes_struct_owner_for_field_borrow_and_restores_it() {
     let model = analyze_source(
-        "struct Holder { payload: Buffer, value: Int, } verb main() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.payload; inspect(view); } holder.value = 2; }",
+        "struct Holder { payload: Buffer, value: Int, } verb main() { erg holder = Holder { payload: Buffer[4], value: 1, }; { abs view = ref holder.payload; inspect(view); } holder.value = 2; }",
     )
     .expect("field borrow should end with its lexical scope");
     assert_eq!(model.borrows[0].field.as_deref(), Some("payload"));
 
     let error = analyze_source(
-        "struct Holder { payload: Buffer, value: Int, } verb broken() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.payload; holder.value = 2; } }",
+        "struct Holder { payload: Buffer, value: Int, } verb broken() { erg holder = Holder { payload: Buffer[4], value: 1, }; { abs view = ref holder.payload; holder.value = 2; } }",
     )
     .expect_err("a frozen struct must reject field mutation");
     assert!(matches!(
@@ -199,7 +199,7 @@ fn freezes_struct_owner_for_field_borrow_and_restores_it() {
 #[test]
 fn rejects_dat_move_of_a_frozen_struct_field() {
     let error = analyze_source(
-        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: allocate(4), value: 1, }; { abs view = ref holder.value; consume(payload: holder.payload); } }",
+        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: Buffer[4], value: 1, }; { abs view = ref holder.value; consume(payload: holder.payload); } }",
     )
     .expect_err("a frozen field owner must reject dat transfer");
     assert!(matches!(

@@ -143,12 +143,14 @@ impl Analyzer {
                 expression: Box::new(receiver.clone()),
                 span: expression_span(receiver),
             },
-            Role::Dat => receiver.clone(),
+            Role::Dat | Role::Ins => receiver.clone(),
         };
         let named = arguments.iter().any(|argument| argument.name.is_some());
         let mut combined = Vec::with_capacity(arguments.len() + 1);
         combined.push(Argument {
             name: named.then(|| receiver_name.to_owned()),
+            role: None,
+            role_span: None,
             expression: receiver_expression,
         });
         combined.extend(arguments.iter().cloned());
@@ -167,6 +169,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

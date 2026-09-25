@@ -105,6 +105,9 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
                 }
             }
         }
-        Expr::Identifier { .. } | Expr::Integer { .. } | Expr::FloatLiteral { .. } => {}
+        Expr::Identifier { .. }
+        | Expr::Integer { .. }
+        | Expr::BufferLiteral { .. }
+        | Expr::FloatLiteral { .. } => {}
     }
 }

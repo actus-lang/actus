@@ -51,10 +51,10 @@ verb main() -> Int {
 
     erg outer = Outer {
         inner: Inner {
-            first: allocate(length: 1),
-            second: allocate(length: 2),
+            first: Buffer[1],
+            second: Buffer[2],
         },
-        tail: allocate(length: 3),
+        tail: Buffer[3],
     };
     consume(item: outer.inner.first);
     consume(item: outer.inner.second);

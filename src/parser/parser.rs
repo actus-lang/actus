@@ -249,10 +249,10 @@ impl Parser {
 
     fn parse_param(&mut self) -> Result<Param, ParseError> {
         let role_token = self.advance_required("parameter role")?;
-        let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+        let role = parameter_role_from_token(&role_token.kind).ok_or_else(|| ParseError {
             code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
-                expected: "parameter role (`erg`, `abs`, or `dat`)".to_owned(),
+                expected: "parameter role (`erg`, `abs`, `dat`, or `ins`)".to_owned(),
                 found: role_token.kind.clone(),
             },
             span: role_token.span,
@@ -377,7 +377,7 @@ impl Parser {
 
     fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
         let role_token = self.advance_required("binding role")?;
-        let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+        let role = binding_role_from_token(&role_token.kind).ok_or_else(|| ParseError {
             code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "`erg` or `abs`".to_owned(),
@@ -420,11 +420,20 @@ fn identifier_text(kind: &TokenKind) -> String {
     }
 }
 
-fn role_from_token(kind: &TokenKind) -> Option<Role> {
+fn parameter_role_from_token(kind: &TokenKind) -> Option<Role> {
     match kind {
         TokenKind::Erg => Some(Role::Erg),
         TokenKind::Abs => Some(Role::Abs),
         TokenKind::Dat => Some(Role::Dat),
+        TokenKind::Ins => Some(Role::Ins),
+        _ => None,
+    }
+}
+
+fn binding_role_from_token(kind: &TokenKind) -> Option<Role> {
+    match kind {
+        TokenKind::Erg => Some(Role::Erg),
+        TokenKind::Abs => Some(Role::Abs),
         _ => None,
     }
 }
@@ -433,6 +442,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

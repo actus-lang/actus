@@ -190,6 +190,7 @@ fn role_name(role: &Role) -> &'static str {
         Role::Erg => "erg",
         Role::Abs => "abs",
         Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }
 
@@ -198,6 +199,7 @@ fn map_ownership(role: &Role) -> CAbiOwnership {
         Role::Erg => CAbiOwnership::Exclusive,
         Role::Abs => CAbiOwnership::SharedBorrow,
         Role::Dat => CAbiOwnership::Consumed,
+        Role::Ins => CAbiOwnership::Exclusive,
     }
 }
 

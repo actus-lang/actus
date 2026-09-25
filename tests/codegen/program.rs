@@ -150,8 +150,7 @@ fn codegen_rejects_semantically_invalid_programs() {
 
 #[test]
 fn codegen_accepts_buffer_allocation_and_explicit_drop() {
-    let source =
-        "verb main() -> Int { erg buffer: Buffer = allocate(4); drop(buffer); return 42; }";
+    let source = "verb main() -> Int { erg buffer: Buffer = Buffer[4]; drop(buffer); return 42; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
@@ -161,7 +160,7 @@ fn codegen_accepts_buffer_allocation_and_explicit_drop() {
 
 #[test]
 fn codegen_accepts_buffer_append_calls() {
-    let source = "verb main() -> Int { erg buffer: Buffer = allocate(4); append(buffer, 42); drop(buffer); return 42; }";
+    let source = "verb main() -> Int { erg buffer: Buffer = Buffer[4]; append(buffer, 42); drop(buffer); return 42; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");

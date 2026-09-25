@@ -1,5 +1,5 @@
 verb process() {
-    erg buffer = allocate(10);
+    erg buffer = Buffer[10];
     {
         abs view = ref buffer;
         inspect(view, source: view);

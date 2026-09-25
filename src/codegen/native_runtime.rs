@@ -18,14 +18,13 @@ pub(super) fn declare_runtime_functions(
     let append_id = declare_append(module, pointer_type)?;
     let print_int_id = declare_print_int(module)?;
     let print_string_id = declare_print_string(module, pointer_type)?;
-    let allocate_spec = IntrinsicKind::Allocate.spec();
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
 
     Ok(HashMap::from([
         (
-            allocate_spec.name.to_owned(),
-            intrinsic_meta(allocate_id, allocate_spec.parameters, NativeType::Buffer),
+            "__actus_buffer_allocate".to_owned(),
+            named_meta(allocate_id, &["length"], NativeType::Buffer),
         ),
         ("actus_buffer_drop".to_owned(), named_meta(drop_id, &["handle"], NativeType::Int)),
         (

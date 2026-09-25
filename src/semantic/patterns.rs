@@ -157,7 +157,10 @@ impl Analyzer {
                     span: *span,
                 })
             }
-            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
+            Expr::Integer { .. }
+            | Expr::BufferLiteral { .. }
+            | Expr::FloatLiteral { .. }
+            | Expr::StringLiteral { .. } => Ok(()),
             Expr::StructLit { name, span, .. } => Err(SemanticError {
                 kind: SemanticErrorKind::InvalidGuardAccess { name: name.clone() },
                 span: *span,

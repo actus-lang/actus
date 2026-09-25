@@ -6,23 +6,23 @@ ADR-0021.
 
 ## Gate 0: Contract and allocation syntax
 
-- [ ] Confirm `ins` as a parameter and call-site role, using `buffer: ins value`.
-- [ ] Confirm that `ins` is not a local binding role, struct-field role, or case mode.
-- [ ] Audit compiler, examples, tests, and documentation for `allocate(...)`.
-- [ ] Replace valid allocation examples with the canonical `Buffer[...]` form.
-- [ ] Remove the allocation intrinsic only after equivalent `Buffer[...]` behavior exists.
-- [ ] Add parser fixtures for valid and invalid `ins` placement.
+- [x] Confirm `ins` as a parameter and call-site role, using `buffer: ins value`.
+- [x] Confirm that `ins` is not a local binding role, struct-field role, or case mode.
+- [x] Audit compiler, examples, tests, and documentation for legacy allocation calls.
+- [x] Replace valid allocation examples with the canonical `Buffer[...]` form.
+- [x] Remove the allocation intrinsic only after equivalent `Buffer[...]` behavior exists.
+- [x] Add parser fixtures for valid and invalid `ins` placement.
 
 ## Gate 1: Lexer and AST
 
-- [ ] Add `TokenKind::Ins` and scan the `ins` keyword deterministically.
-- [ ] Add `Role::Ins` to the AST role model.
-- [ ] Add an optional role annotation to call arguments.
-- [ ] Add source spans covering the call-site role and expression.
-- [ ] Split parameter-role parsing from local-binding-role parsing.
-- [ ] Reject `ins` local declarations and `ins` struct fields in the parser.
-- [ ] Add lexer tests for `ins` and identifier-boundary behavior.
-- [ ] Add parser tests for declarations, calls, nesting, and malformed annotations.
+- [x] Add `TokenKind::Ins` and scan the `ins` keyword deterministically.
+- [x] Add `Role::Ins` to the AST role model.
+- [x] Add an optional role annotation to call arguments.
+- [x] Add source spans covering the call-site role and expression.
+- [x] Split parameter-role parsing from local-binding-role parsing.
+- [x] Reject `ins` local declarations and `ins` struct fields in the parser.
+- [x] Add lexer tests for `ins` and identifier-boundary behavior.
+- [x] Add parser tests for declarations, calls, nesting, and malformed annotations.
 
 ## Gate 2: Access-state model
 

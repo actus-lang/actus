@@ -41,7 +41,7 @@ verb main() -> Int {
             return 0;
         },
     };
-    erg buffer = allocate(length: 4);
+    erg buffer = Buffer[4];
     erg cleanup = consume_buffer(buffer: buffer);
 
     return consumed + cleanup + handled + inspected + nested.label;

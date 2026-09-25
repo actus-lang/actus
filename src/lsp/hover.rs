@@ -209,6 +209,7 @@ fn role_name(role: &Role) -> &'static str {
         Role::Erg => "erg",
         Role::Abs => "abs",
         Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }
 

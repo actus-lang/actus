@@ -286,6 +286,11 @@ impl Formatter {
     fn expression(&mut self, expression: &Expr) {
         match expression {
             Expr::Identifier { name, .. } => self.output.push_str(name),
+            Expr::BufferLiteral { length, .. } => {
+                self.output.push_str("Buffer[");
+                self.expression(length);
+                self.output.push(']');
+            }
             Expr::Integer { value, .. } | Expr::FloatLiteral { value, .. } => {
                 self.output.push_str(value)
             }
@@ -399,5 +404,6 @@ fn role_name(role: &Role) -> &'static str {
         Role::Erg => "erg",
         Role::Abs => "abs",
         Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }

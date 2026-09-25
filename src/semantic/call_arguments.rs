@@ -131,6 +131,7 @@ impl Analyzer {
             Role::Dat => true,
             Role::Erg => self.is_owner_argument(expression),
             Role::Abs => self.is_borrow_argument(expression),
+            Role::Ins => false,
         };
         if valid {
             return Ok(());
@@ -187,6 +188,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

@@ -21,7 +21,7 @@ verb main() -> Int {
         observe_scalar(view: view);
     }
 
-    erg buffer: Buffer = allocate(length: 4);
+    erg buffer: Buffer = Buffer[4];
     append(handle: buffer, byte: 7);
     {
         abs view = ref buffer;

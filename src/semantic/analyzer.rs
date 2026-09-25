@@ -4,6 +4,7 @@ use crate::ast::{
     Block, BuiltinType, EnumDef, Expr, Program, Role, RoleDecl, Stmt, StructDef, TopLevelDecl,
     lookup_builtin_type,
 };
+use crate::lexer::SourceSpan;
 
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::SemanticModel;
@@ -45,6 +46,19 @@ pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
 }
 
 impl Analyzer {
+    fn require_buffer_length(&self, expression: &Expr) -> Result<(), SemanticError> {
+        if self.expression_type(expression) == Some(BuiltinType::Int) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                callee: "Buffer".to_owned(),
+                parameter: "length".to_owned(),
+            },
+            span: expression_span(expression),
+        })
+    }
+
     fn new() -> Self {
         Self {
             model: SemanticModel {
@@ -262,6 +276,10 @@ impl Analyzer {
 
     pub(super) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         match expression {
+            Expr::BufferLiteral { length, .. } => {
+                self.visit_expression(length)?;
+                self.require_buffer_length(length)
+            }
             Expr::Identifier { name, span } => {
                 let index = self.binding(name, *span)?;
                 self.ensure_readable(index, name, *span)
@@ -322,4 +340,23 @@ fn contains_loop_exit(block: &Block) -> bool {
         Stmt::Loop(_) => false,
         _ => false,
     })
+}
+
+fn expression_span(expression: &Expr) -> SourceSpan {
+    match expression {
+        Expr::Identifier { span, .. }
+        | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
+        | Expr::FloatLiteral { span, .. }
+        | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Binary { span, .. }
+        | Expr::Borrow { span, .. }
+        | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. }
+        | Expr::Case { span, .. } => *span,
+    }
 }

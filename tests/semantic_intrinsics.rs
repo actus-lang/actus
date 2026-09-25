@@ -17,7 +17,7 @@ fn analyze_source(
 
 #[test]
 fn intrinsic_registry_defines_source_contracts() {
-    assert_eq!(lookup_intrinsic("allocate"), Some(IntrinsicKind::Allocate));
+    assert!(lookup_intrinsic("allocate").is_none());
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
     assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
@@ -67,15 +67,6 @@ fn accepts_registered_collection_types() {
 
 #[test]
 fn validates_intrinsic_argument_types() {
-    let length_error =
-        analyze_source("verb main() { erg buffer: Buffer = allocate(4); allocate(buffer); }")
-            .expect_err("allocate length must be Int");
-    assert!(matches!(
-        length_error.kind,
-        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
-            if callee == "allocate" && parameter == "length"
-    ));
-
     let handle_error = analyze_source("verb main() { erg value = 1; append(value, 2); }")
         .expect_err("append handle must be Buffer");
     assert!(matches!(
@@ -86,9 +77,9 @@ fn validates_intrinsic_argument_types() {
 }
 
 #[test]
-fn infers_buffer_type_from_allocate_intrinsic() {
-    analyze_source("verb main() { erg buffer = allocate(4); append(buffer, 1); drop(buffer); }")
-        .expect("allocate should infer a Buffer owner");
+fn infers_buffer_type_from_buffer_literal() {
+    analyze_source("verb main() { erg buffer = Buffer[4]; append(buffer, 1); drop(buffer); }")
+        .expect("Buffer literal should infer a Buffer owner");
 }
 
 #[test]
@@ -109,7 +100,7 @@ fn rejects_known_argument_type_mismatches() {
 
 #[test]
 fn rejects_known_return_type_mismatches() {
-    let error = analyze_source("verb main() -> Int { return allocate(4); }")
+    let error = analyze_source("verb main() -> Int { return Buffer[4]; }")
         .expect_err("return type must match the verb declaration");
     assert!(matches!(
         error.kind,
@@ -128,9 +119,8 @@ fn rejects_typed_initializer_and_assignment_mismatches() {
             if binding == "buffer" && expected == "Buffer" && found == "Int"
     ));
 
-    let assignment =
-        analyze_source("verb main() { erg buffer: Buffer = allocate(1); buffer = 2; }")
-            .expect_err("assignment must match its binding type");
+    let assignment = analyze_source("verb main() { erg buffer: Buffer = Buffer[1]; buffer = 2; }")
+        .expect_err("assignment must match its binding type");
     assert!(matches!(
         assignment.kind,
         SemanticErrorKind::BindingTypeMismatch { binding, expected, found }
@@ -155,9 +145,9 @@ fn rejects_return_paths_broken_by_loop_exit() {
 #[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source(
-        "verb Buffer() -> Buffer { return allocate(1); } verb main() -> Buffer { return Buffer(); }",
+        "verb Buffer() -> Buffer { return Buffer[1]; } verb main() -> Buffer { return Buffer(); }",
     )
-        .expect("a type name and a function name may coexist in separate namespaces");
+    .expect("a type name and a function name may coexist in separate namespaces");
 }
 
 #[test]
@@ -168,19 +158,13 @@ fn rejects_duplicate_verbs_in_the_function_namespace() {
 }
 
 #[test]
-fn accepts_named_allocate_length() {
-    analyze_source("verb main() { erg buffer: Buffer = allocate(length: 4); drop(buffer); }")
-        .expect("named intrinsic arguments should be accepted");
+fn accepts_buffer_literal_length() {
+    analyze_source("verb main() { erg buffer: Buffer = Buffer[4]; drop(buffer); }")
+        .expect("Buffer literal lengths should be accepted");
 }
 
 #[test]
 fn rejects_intrinsic_wrong_argument_count() {
-    let error =
-        analyze_source("verb main() { allocate(); }").expect_err("allocate requires one argument");
-    assert!(
-        matches!(error.kind, SemanticErrorKind::WrongArgumentCount { callee } if callee == "allocate")
-    );
-
     let error =
         analyze_source("verb main() { append(1); }").expect_err("append requires two arguments");
     assert!(
@@ -189,18 +173,18 @@ fn rejects_intrinsic_wrong_argument_count() {
 }
 
 #[test]
-fn rejects_non_scalar_intrinsic_arguments() {
-    let error = analyze_source("verb main() { allocate(length: \"large\"); }")
-        .expect_err("allocate length must be scalar");
+fn rejects_non_integer_buffer_lengths() {
+    let error = analyze_source("verb main() { erg buffer = Buffer[\"large\"]; }")
+        .expect_err("Buffer length must be an integer");
     assert!(
-        matches!(error.kind, SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter } if callee == "allocate" && parameter == "length")
+        matches!(error.kind, SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter } if callee == "Buffer" && parameter == "length")
     );
 }
 
 #[test]
 fn rejects_borrow_as_append_handle() {
     let error = analyze_source(
-        "verb main() { erg buffer: Buffer = allocate(4); { abs view = ref buffer; append(view, 1); } }",
+        "verb main() { erg buffer: Buffer = Buffer[4]; { abs view = ref buffer; append(view, 1); } }",
     )
     .expect_err("append must require an exclusive owner");
     assert!(
