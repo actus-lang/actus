@@ -16,10 +16,25 @@ pub enum TopLevelDecl {
     Enum(EnumDef),
     Role(RoleDecl),
     Perform(PerformDecl),
+    OpenSibling(OpenSiblingDecl),
+    Import(ImportDecl),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OpenSiblingDecl {
+    pub name: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImportDecl {
+    pub path: String,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleDecl {
+    pub is_open: bool,
     pub name: String,
     pub methods: Vec<RoleMethod>,
     pub span: SourceSpan,
@@ -35,6 +50,7 @@ pub struct RoleMethod {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerformDecl {
+    pub is_open: bool,
     pub role_name: String,
     pub target: TypeName,
     pub methods: Vec<VerbDecl>,
@@ -43,6 +59,7 @@ pub struct PerformDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnumDef {
+    pub is_open: bool,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub variants: Vec<EnumVariant>,
@@ -72,6 +89,7 @@ pub struct EnumField {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructDef {
+    pub is_open: bool,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub fields: Vec<StructField>,
@@ -94,6 +112,7 @@ pub enum StructFieldRole {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExternalVerbDecl {
+    pub is_open: bool,
     pub unsafe_boundary: bool,
     pub abi: ForeignAbi,
     pub name: String,
@@ -105,12 +124,19 @@ pub struct ExternalVerbDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerbDecl {
+    pub is_open: bool,
+    pub metadata: Vec<MetaAttribute>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub params: Vec<Param>,
     pub return_type: Option<TypeName>,
     pub body: Block,
     pub span: SourceSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MetaAttribute {
+    Test,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -153,6 +179,7 @@ pub struct GenericParam {
 pub fn builtin_enum_definitions() -> Vec<EnumDef> {
     vec![
         EnumDef {
+            is_open: false,
             name: "Option".to_owned(),
             generic_parameters: vec![generic_parameter("T")],
             variants: vec![
@@ -170,6 +197,7 @@ pub fn builtin_enum_definitions() -> Vec<EnumDef> {
             span: zero_span(),
         },
         EnumDef {
+            is_open: false,
             name: "Result".to_owned(),
             generic_parameters: vec![generic_parameter("T"), generic_parameter("E")],
             variants: vec![

@@ -60,6 +60,7 @@ fn build_command_links_an_executable() {
             input.display().to_string(),
             "--emit".to_owned(),
             "exe".to_owned(),
+            "--release".to_owned(),
             "-o".to_owned(),
             output.display().to_string(),
         ]

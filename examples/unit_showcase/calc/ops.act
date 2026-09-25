@@ -1,0 +1,11 @@
+open verb add(erg left: Int, erg right: Int) -> Int {
+    return left + right;
+}
+
+open verb calc_sum(erg left: Int, erg right: Int) -> Int {
+    return add(left: left, right: right);
+}
+
+verb hidden_helper() -> Int {
+    return 0;
+}

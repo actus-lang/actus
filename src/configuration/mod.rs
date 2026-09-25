@@ -1,17 +1,31 @@
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-
 pub use crate::target::{EntryContract, LinkerFlavor};
 use crate::target::{TargetSpec, TargetSpecError};
+
+mod dependencies;
+mod lockfile;
+mod manifest;
+mod version;
+
+pub use lockfile::{ArcaLock, LockedPackage, LockfileError};
+use manifest::ArcaManifest;
+pub use manifest::OptimizationLevel;
+pub use manifest::{BuildProfile, LibraryKind};
+pub use version::{Version, VersionConstraint, VersionError};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackageIdentity {
+    pub name: String,
+    pub version: String,
+}
 
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
 const DEFAULT_NATIVE_MODULE_NAME: &str = "actus";
-const MANIFEST_FILE_NAME: &str = "Arca.toml";
-const DEFAULT_EDITION: &str = "alpha";
 
 pub const HOSTED_ENTRY_SYMBOL: &str = "main";
 
@@ -26,69 +40,6 @@ impl Display for ConfigurationError {
 
 impl std::error::Error for ConfigurationError {}
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ArcaManifest {
-    package: PackageManifest,
-    #[serde(default)]
-    build: BuildManifest,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PackageManifest {
-    name: String,
-    version: String,
-    edition: Option<String>,
-    entry: Option<String>,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct BuildManifest {
-    target: Option<String>,
-    profile: Option<BuildProfile>,
-    linker: Option<String>,
-    linker_flavor: Option<LinkerFlavor>,
-    entry_contract: Option<EntryContract>,
-    native_module: Option<String>,
-    position_independent: Option<bool>,
-    #[serde(default)]
-    library_paths: Vec<String>,
-    #[serde(default)]
-    libraries: Vec<LibraryManifest>,
-}
-
-#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum BuildProfile {
-    Debug,
-    Release,
-}
-
-impl BuildProfile {
-    pub const fn directory_name(self) -> &'static str {
-        match self {
-            Self::Debug => "debug",
-            Self::Release => "release",
-        }
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LibraryManifest {
-    name: String,
-    kind: LibraryKind,
-}
-
-#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum LibraryKind {
-    Static,
-    Shared,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkLibrary {
     name: String,
@@ -99,17 +50,26 @@ pub struct LinkLibrary {
 pub struct NativeBackendConfiguration {
     module_name: String,
     position_independent: bool,
+    optimization_level: OptimizationLevel,
 }
 
 impl Default for NativeBackendConfiguration {
     fn default() -> Self {
-        Self { module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(), position_independent: true }
+        Self {
+            module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(),
+            position_independent: true,
+            optimization_level: OptimizationLevel::None,
+        }
     }
 }
 
 impl NativeBackendConfiguration {
     pub fn new(module_name: impl Into<String>, position_independent: bool) -> Self {
-        Self { module_name: module_name.into(), position_independent }
+        Self {
+            module_name: module_name.into(),
+            position_independent,
+            optimization_level: OptimizationLevel::None,
+        }
     }
 
     pub fn module_name(&self) -> &str {
@@ -119,14 +79,26 @@ impl NativeBackendConfiguration {
     pub fn position_independent(&self) -> bool {
         self.position_independent
     }
+
+    pub fn with_optimization_level(mut self, optimization_level: OptimizationLevel) -> Self {
+        self.optimization_level = optimization_level;
+        self
+    }
+
+    pub const fn optimization_level(&self) -> OptimizationLevel {
+        self.optimization_level
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct CompilerConfiguration {
     project_root: PathBuf,
+    source_root: PathBuf,
+    dependency_roots: BTreeMap<String, PathBuf>,
     target: TargetSpec,
     target_spec_hash: String,
     profile: BuildProfile,
+    profiles: manifest::ProfilesManifest,
     linker: OsString,
     linker_flavor: LinkerFlavor,
     entry_contract: EntryContract,
@@ -146,9 +118,12 @@ impl CompilerConfiguration {
             .unwrap_or_else(|| OsString::from(target.default_linker()));
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
+            dependency_roots: BTreeMap::new(),
             target_spec_hash: target.spec_hash(),
             target,
             profile: BuildProfile::Debug,
+            profiles: manifest::ProfilesManifest::default(),
             linker,
             linker_flavor,
             entry_contract,
@@ -161,45 +136,30 @@ impl CompilerConfiguration {
     }
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
-        let source = std::fs::read_to_string(path).map_err(|error| {
-            ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
-        })?;
-        let manifest = toml::from_str::<ArcaManifest>(&source).map_err(|error| {
-            ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
-        })?;
-        validate_manifest(&manifest)?;
-
+        let manifest = manifest::read(path)?;
+        let dependency_graph = dependencies::resolve(path)?;
+        validate_lockfile(path)?;
         let environment = Self::from_environment();
         let (target, linker_flavor, entry_contract, linker) =
             resolve_manifest_target(&manifest, &environment)?;
         let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
-        let native_backend = NativeBackendConfiguration::new(
-            manifest
-                .build
-                .native_module
-                .unwrap_or_else(|| environment.native_backend.module_name.clone()),
-            manifest
-                .build
-                .position_independent
-                .unwrap_or(environment.native_backend.position_independent),
-        );
-        let libraries = manifest
-            .build
-            .libraries
-            .into_iter()
-            .map(|library| LinkLibrary::new(library.name, library.kind))
-            .collect();
-        let library_paths = manifest
-            .build
-            .library_paths
-            .into_iter()
-            .map(|path| manifest_directory.join(path))
-            .collect();
+        let source_root = manifest::source_root(&manifest, manifest_directory);
+        if manifest.package.source_root.is_some() && !source_root.is_dir() {
+            return Err(ConfigurationError(format!(
+                "InvalidSourceRoot: Arca.toml package.source_root `{}` does not exist",
+                source_root.display()
+            )));
+        }
+        let (profile, native_backend, libraries, library_paths) =
+            build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
         Ok(Self {
             project_root: manifest_directory.to_path_buf(),
+            source_root,
+            dependency_roots: dependency_graph.roots,
             target_spec_hash: target.spec_hash(),
             target,
-            profile: manifest.build.profile.unwrap_or(environment.profile),
+            profile,
+            profiles: manifest.profile,
             linker,
             linker_flavor,
             entry_contract,
@@ -212,8 +172,28 @@ impl CompilerConfiguration {
     }
 
     pub fn from_current_manifest() -> Result<Self, ConfigurationError> {
-        let path = Path::new(MANIFEST_FILE_NAME);
+        let path = Path::new(manifest::MANIFEST_FILE_NAME);
         if path.exists() { Self::from_manifest(path) } else { Ok(Self::from_environment()) }
+    }
+
+    pub fn from_input_path(path: &Path) -> Result<Self, ConfigurationError> {
+        let start = if path.is_dir() { path } else { path.parent().unwrap_or(path) };
+        let Some(manifest) = manifest::find_manifest(start) else {
+            return Ok(Self::from_environment());
+        };
+        Self::from_manifest(&manifest)
+    }
+
+    pub fn source_root(&self) -> &Path {
+        &self.source_root
+    }
+
+    pub fn project_root(&self) -> &Path {
+        &self.project_root
+    }
+
+    pub fn dependency_roots(&self) -> &BTreeMap<String, PathBuf> {
+        &self.dependency_roots
     }
 
     pub fn linker(&self) -> &OsStr {
@@ -260,12 +240,73 @@ impl CompilerConfiguration {
         self.profile
     }
 
+    pub fn with_profile(mut self, profile: BuildProfile) -> Self {
+        self.profile = profile;
+        self.native_backend =
+            self.native_backend.with_optimization_level(optimization_level(profile, self.profiles));
+        self
+    }
+
     pub fn capsula_target_directory(&self) -> PathBuf {
         self.project_root
             .join("capsula")
             .join(self.profile.directory_name())
             .join(self.target.triple().to_string())
     }
+}
+
+pub fn package_identity(path: &Path) -> Result<PackageIdentity, ConfigurationError> {
+    let manifest = manifest::read(path)?;
+    Ok(PackageIdentity { name: manifest.package.name, version: manifest.package.version })
+}
+
+fn validate_lockfile(path: &Path) -> Result<(), ConfigurationError> {
+    let lock_path = path.with_file_name("Arca.lock");
+    if !lock_path.is_file() {
+        ArcaLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
+        return Ok(());
+    }
+    let lock_source = std::fs::read_to_string(&lock_path).map_err(|error| {
+        ConfigurationError(format!("cannot read `{}`: {error}", lock_path.display()))
+    })?;
+    ArcaLock::parse(&lock_source)
+        .and_then(|lock| lock.validate_against_manifest(path))
+        .map_err(|error| ConfigurationError(error.to_string()))
+}
+
+fn build_settings(
+    build: manifest::BuildManifest,
+    profiles: manifest::ProfilesManifest,
+    environment: &CompilerConfiguration,
+    directory: &Path,
+) -> (BuildProfile, NativeBackendConfiguration, Vec<LinkLibrary>, Vec<PathBuf>) {
+    let profile = build.profile.unwrap_or(environment.profile);
+    let native_backend = NativeBackendConfiguration::new(
+        build.native_module.unwrap_or_else(|| environment.native_backend.module_name.clone()),
+        build.position_independent.unwrap_or(environment.native_backend.position_independent),
+    )
+    .with_optimization_level(optimization_level(profile, profiles));
+    let libraries = build
+        .libraries
+        .into_iter()
+        .map(|library| LinkLibrary::new(library.name, library.kind))
+        .collect();
+    let library_paths = build.library_paths.into_iter().map(|path| directory.join(path)).collect();
+    (profile, native_backend, libraries, library_paths)
+}
+
+fn optimization_level(
+    profile: BuildProfile,
+    profiles: manifest::ProfilesManifest,
+) -> OptimizationLevel {
+    let configured = match profile {
+        BuildProfile::Debug => profiles.debug.opt_level,
+        BuildProfile::Release => profiles.release.opt_level,
+    };
+    configured.unwrap_or(match profile {
+        BuildProfile::Debug => OptimizationLevel::None,
+        BuildProfile::Release => OptimizationLevel::Speed,
+    })
 }
 
 fn resolve_manifest_target(
@@ -286,45 +327,6 @@ fn resolve_manifest_target(
         .or_else(|| manifest.build.linker.as_deref().map(OsString::from))
         .unwrap_or_else(|| OsString::from(target.default_linker()));
     Ok((target, linker_flavor, entry_contract, linker))
-}
-
-fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> {
-    if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
-        return Err(ConfigurationError(
-            "Arca.toml package name and version must not be empty".to_owned(),
-        ));
-    }
-    if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
-        return Err(ConfigurationError(format!(
-            "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
-        )));
-    }
-    if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
-    }
-    if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
-    }
-    if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Arca.toml native_module must not be empty".to_owned()));
-    }
-    if manifest.build.library_paths.iter().any(|path| path.trim().is_empty()) {
-        return Err(ConfigurationError(
-            "Arca.toml library_paths must not contain empty paths".to_owned(),
-        ));
-    }
-    if let Some(library) = manifest
-        .build
-        .libraries
-        .iter()
-        .find(|library| library.name.trim().is_empty() || library.name.starts_with('-'))
-    {
-        return Err(ConfigurationError(format!(
-            "Arca.toml library name `{}` must be non-empty and must not start with `-`",
-            library.name
-        )));
-    }
-    Ok(())
 }
 
 impl LinkLibrary {

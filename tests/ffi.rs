@@ -16,7 +16,9 @@ fn parse_verb(source: &str) -> actus::ast::VerbDecl {
         actus::ast::TopLevelDecl::Struct(_)
         | actus::ast::TopLevelDecl::Enum(_)
         | actus::ast::TopLevelDecl::Role(_)
-        | actus::ast::TopLevelDecl::Perform(_) => {
+        | actus::ast::TopLevelDecl::Perform(_)
+        | actus::ast::TopLevelDecl::OpenSibling(_)
+        | actus::ast::TopLevelDecl::Import(_) => {
             panic!("expected regular verb")
         }
     }

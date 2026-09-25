@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 
 use crate::build_graph::{invalidate_stale_artifact, write_metadata};
 use crate::codegen::link_object;
-use crate::configuration::{CompilerConfiguration, EntryContract};
+use crate::configuration::{BuildProfile, CompilerConfiguration, EntryContract};
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::lexer::scan;
+use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
 
 #[derive(Clone, Copy)]
@@ -14,52 +15,88 @@ pub(super) enum EmitKind {
     Executable,
 }
 
-pub(super) fn build_command(
-    mut arguments: impl Iterator<Item = String>,
-    configuration: &CompilerConfiguration,
-) -> i32 {
+struct BuildOptions {
+    output: Option<String>,
+    emit: EmitKind,
+    profile: Option<BuildProfile>,
+}
+
+pub(super) fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let Some(input) = arguments.next() else {
         eprintln!("error: missing input file");
         super::print_usage();
         return 2;
     };
+    let options = match parse_build_options(arguments) {
+        Ok(options) => options,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 2;
+        }
+    };
+    let input_configuration = match CompilerConfiguration::from_input_path(Path::new(&input)) {
+        Ok(configuration) => configuration,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 1;
+        }
+    };
+    let input_configuration = match options.profile {
+        Some(profile) => input_configuration.with_profile(profile),
+        None => input_configuration,
+    };
+    build_file(&input, options.output.as_deref().map(Path::new), options.emit, &input_configuration)
+}
+
+fn parse_build_options(
+    mut arguments: impl Iterator<Item = String>,
+) -> Result<BuildOptions, String> {
     let mut output = None;
     let mut emit = EmitKind::Object;
+    let mut profile = None;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
+            "--release" => {
+                if profile.replace(BuildProfile::Release).is_some() {
+                    return Err("duplicate or conflicting profile option".to_owned());
+                }
+            }
+            "--profile" => {
+                let Some(name) = arguments.next() else {
+                    return Err("missing value after `--profile`".to_owned());
+                };
+                let parsed_profile = match name.as_str() {
+                    "debug" => BuildProfile::Debug,
+                    "release" => BuildProfile::Release,
+                    _ => return Err(format!("unsupported build profile `{name}`")),
+                };
+                if profile.replace(parsed_profile).is_some() {
+                    return Err("duplicate or conflicting profile option".to_owned());
+                }
+            }
             "-o" => {
                 if output.is_some() {
-                    eprintln!("error: duplicate output option");
-                    return 2;
+                    return Err("duplicate output option".to_owned());
                 }
                 output = arguments.next();
                 if output.is_none() {
-                    eprintln!("error: missing output path after `-o`");
-                    return 2;
+                    return Err("missing output path after `-o`".to_owned());
                 }
             }
             "--emit" => {
                 let Some(kind) = arguments.next() else {
-                    eprintln!("error: missing value after `--emit`");
-                    return 2;
+                    return Err("missing value after `--emit`".to_owned());
                 };
                 emit = match kind.as_str() {
                     "obj" => EmitKind::Object,
                     "exe" => EmitKind::Executable,
-                    _ => {
-                        eprintln!("error: unsupported emission kind `{kind}`");
-                        return 2;
-                    }
+                    _ => return Err(format!("unsupported emission kind `{kind}`")),
                 };
             }
-            _ => {
-                eprintln!("error: unexpected build argument `{argument}`");
-                super::print_usage();
-                return 2;
-            }
+            _ => return Err(format!("unexpected build argument `{argument}`")),
         }
     }
-    build_file(&input, output.as_deref().map(Path::new), emit, configuration)
+    Ok(BuildOptions { output, emit, profile })
 }
 
 pub(super) fn build_file(
@@ -86,6 +123,19 @@ pub(super) fn build_file(
         Ok(program) => program,
         Err(error) => {
             eprintln!("{input}: {}", render_parse_error(&source, &error));
+            return 1;
+        }
+    };
+    let program = match resolve_imports(
+        &program,
+        &ModuleResolver::with_dependencies(
+            configuration.source_root(),
+            configuration.dependency_roots(),
+        ),
+    ) {
+        Ok(program) => program,
+        Err(error) => {
+            eprintln!("error: cannot resolve imports for `{input}`: {error}");
             return 1;
         }
     };
@@ -154,7 +204,9 @@ fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {
         | crate::ast::TopLevelDecl::Struct(_)
         | crate::ast::TopLevelDecl::Enum(_)
         | crate::ast::TopLevelDecl::Role(_)
-        | crate::ast::TopLevelDecl::Perform(_) => None,
+        | crate::ast::TopLevelDecl::Perform(_)
+        | crate::ast::TopLevelDecl::OpenSibling(_)
+        | crate::ast::TopLevelDecl::Import(_) => None,
     })
 }
 

@@ -1,6 +1,6 @@
 use std::fs;
 
-use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind};
+use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel};
 use actus::target::TargetSpec;
 
 #[test]
@@ -48,6 +48,24 @@ fn loads_target_profile_and_hash_for_capsula_artifacts() {
     );
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn loads_profile_tables_and_maps_release_to_speed_optimization() {
+    let path = std::env::temp_dir().join(format!("actus-profiles-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[profile.debug]\nopt_level = \"none\"\n\n[profile.release]\nopt_level = \"speed\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
+    assert_eq!(configuration.profile(), BuildProfile::Debug);
+    assert_eq!(configuration.native_backend().optimization_level(), OptimizationLevel::None);
+    let release = configuration.with_profile(BuildProfile::Release);
+    assert_eq!(release.profile(), BuildProfile::Release);
+    assert_eq!(release.native_backend().optimization_level(), OptimizationLevel::Speed);
+    let _ = fs::remove_file(path);
 }
 
 #[test]

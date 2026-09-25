@@ -4,7 +4,7 @@ use crate::lexer::{SourceSpan, TokenKind};
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
 
 impl Parser {
-    pub(super) fn parse_struct_def(&mut self) -> Result<StructDef, ParseError> {
+    pub(super) fn parse_struct_def(&mut self, is_open: bool) -> Result<StructDef, ParseError> {
         let start = self.expect_keyword(TokenKind::Struct, "`struct`")?.span.start;
         let name_token = self.take_identifier("struct name")?;
         let name = identifier_text(&name_token.kind);
@@ -12,7 +12,13 @@ impl Parser {
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
         let fields = self.parse_struct_fields()?;
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(StructDef { name, generic_parameters, fields, span: SourceSpan::new(start, end) })
+        Ok(StructDef {
+            is_open,
+            name,
+            generic_parameters,
+            fields,
+            span: SourceSpan::new(start, end),
+        })
     }
 
     fn parse_struct_fields(&mut self) -> Result<Vec<StructField>, ParseError> {

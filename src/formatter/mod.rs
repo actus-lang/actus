@@ -32,10 +32,15 @@ impl Formatter {
             TopLevelDecl::Enum(definition) => self.enum_definition(definition),
             TopLevelDecl::Role(role) => self.role_definition(role),
             TopLevelDecl::Perform(perform) => self.perform_definition(perform),
+            TopLevelDecl::OpenSibling(sibling) => self.open_sibling(sibling),
+            TopLevelDecl::Import(import) => self.import(import),
         }
     }
 
     fn role_definition(&mut self, role: &crate::ast::RoleDecl) {
+        if role.is_open {
+            self.output.push_str("open ");
+        }
         self.output.push_str("role ");
         self.output.push_str(&role.name);
         self.output.push_str(" {");
@@ -50,6 +55,9 @@ impl Formatter {
     }
 
     fn perform_definition(&mut self, perform: &crate::ast::PerformDecl) {
+        if perform.is_open {
+            self.output.push_str("open ");
+        }
         self.output.push_str("perform ");
         self.output.push_str(&perform.role_name);
         self.output.push_str(" for ");
@@ -63,6 +71,14 @@ impl Formatter {
     }
 
     fn verb(&mut self, verb: &crate::ast::VerbDecl) {
+        for metadata in &verb.metadata {
+            self.output.push_str("meta ");
+            self.output.push_str(meta_name(*metadata));
+            self.output.push('\n');
+        }
+        if verb.is_open {
+            self.output.push_str("open ");
+        }
         self.output.push_str("verb ");
         self.output.push_str(&verb.name);
         self.parameters(&verb.params);
@@ -72,6 +88,9 @@ impl Formatter {
     }
 
     fn external_verb(&mut self, verb: &crate::ast::ExternalVerbDecl) {
+        if verb.is_open {
+            self.output.push_str("open ");
+        }
         if verb.unsafe_boundary {
             self.output.push_str("unsafe ");
         }
@@ -107,6 +126,9 @@ impl Formatter {
     }
 
     fn struct_definition(&mut self, definition: &crate::ast::StructDef) {
+        if definition.is_open {
+            self.output.push_str("open ");
+        }
         self.output.push_str("struct ");
         self.output.push_str(&definition.name);
         self.output.push_str(" {");
@@ -130,6 +152,9 @@ impl Formatter {
     }
 
     fn enum_definition(&mut self, definition: &crate::ast::EnumDef) {
+        if definition.is_open {
+            self.output.push_str("open ");
+        }
         self.output.push_str("enum ");
         self.output.push_str(&definition.name);
         self.output.push_str(" {");
@@ -170,6 +195,18 @@ impl Formatter {
             self.line_indent();
         }
         self.output.push('}');
+    }
+
+    fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {
+        self.output.push_str("open ");
+        self.output.push_str(&sibling.name);
+        self.output.push(';');
+    }
+
+    fn import(&mut self, import: &crate::ast::ImportDecl) {
+        self.output.push_str("import ");
+        self.output.push_str(&import.path);
+        self.output.push(';');
     }
 
     fn block(&mut self, block: &Block) {
@@ -348,6 +385,12 @@ impl Formatter {
 
     fn line_indent(&mut self) {
         self.output.push_str(&"    ".repeat(self.indent));
+    }
+}
+
+fn meta_name(metadata: crate::ast::MetaAttribute) -> &'static str {
+    match metadata {
+        crate::ast::MetaAttribute::Test => "test",
     }
 }
 

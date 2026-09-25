@@ -19,7 +19,7 @@ use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
 use super::performance::PerformanceRegistry;
 use super::performance_emit::define_performances;
-use super::target::build_isa;
+use super::target::build_isa_with_optimization;
 use super::types::NativeType;
 use crate::target::TargetSpec;
 
@@ -83,30 +83,9 @@ pub fn emit_program_object_for_target(
         PerformanceRegistry::from_reachable(&semantic.reachable_performances);
     performance_registry.validate().map_err(NativeEmitError)?;
     let performance_definitions = performance_registry.definitions(program)?;
-    let verbs = program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            TopLevelDecl::Verb(verb) => Some(verb),
-            TopLevelDecl::ExternalVerb(_)
-            | TopLevelDecl::Struct(_)
-            | TopLevelDecl::Enum(_)
-            | TopLevelDecl::Role(_)
-            | TopLevelDecl::Perform(_) => None,
-        })
-        .collect::<Vec<_>>();
-    let external_verbs = program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            TopLevelDecl::Verb(_) => None,
-            TopLevelDecl::ExternalVerb(verb) => Some(verb),
-            TopLevelDecl::Struct(_)
-            | TopLevelDecl::Enum(_)
-            | TopLevelDecl::Role(_)
-            | TopLevelDecl::Perform(_) => None,
-        })
-        .collect::<Vec<_>>();
+    let verbs = program.declarations.iter().filter_map(declaration_verb).collect::<Vec<_>>();
+    let external_verbs =
+        program.declarations.iter().filter_map(declaration_external_verb).collect::<Vec<_>>();
     if verbs.is_empty() {
         return Err(NativeEmitError("program has no verb declarations".to_owned()));
     }
@@ -124,6 +103,20 @@ pub fn emit_program_object_for_target(
         configuration,
         target,
     )
+}
+
+fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
+    match declaration {
+        TopLevelDecl::Verb(verb) => Some(verb),
+        _ => None,
+    }
+}
+
+fn declaration_external_verb(declaration: &TopLevelDecl) -> Option<&ExternalVerbDecl> {
+    match declaration {
+        TopLevelDecl::ExternalVerb(verb) => Some(verb),
+        _ => None,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -272,8 +265,12 @@ fn create_module(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<ObjectModule, NativeEmitError> {
-    let isa = build_isa(target, configuration.position_independent())
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+    let isa = build_isa_with_optimization(
+        target,
+        configuration.position_independent(),
+        configuration.optimization_level(),
+    )
+    .map_err(|error| NativeEmitError(error.to_string()))?;
     let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
     Ok(ObjectModule::new(builder))

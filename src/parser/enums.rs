@@ -6,7 +6,7 @@ use crate::lexer::{SourceSpan, TokenKind};
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
 
 impl Parser {
-    pub(super) fn parse_enum_def(&mut self) -> Result<EnumDef, ParseError> {
+    pub(super) fn parse_enum_def(&mut self, is_open: bool) -> Result<EnumDef, ParseError> {
         let start = self.expect_keyword(TokenKind::Enum, "`enum`")?.span.start;
         let name_token = self.take_identifier("enum name")?;
         let name = identifier_text(&name_token.kind);
@@ -17,7 +17,13 @@ impl Parser {
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
         let variants = self.parse_enum_variants()?;
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(EnumDef { name, generic_parameters, variants, span: SourceSpan::new(start, end) })
+        Ok(EnumDef {
+            is_open,
+            name,
+            generic_parameters,
+            variants,
+            span: SourceSpan::new(start, end),
+        })
     }
 
     fn parse_enum_variants(&mut self) -> Result<Vec<EnumVariant>, ParseError> {
