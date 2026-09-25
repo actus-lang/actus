@@ -24,7 +24,7 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
   only.
 - [x] Byte spans are converted to valid UTF-8 and UTF-16 LSP positions.
 - [x] A malformed document cannot terminate the server session.
-- [ ] Formatting delegates to the canonical no-config formatter.
+- [x] Formatting delegates to the canonical no-config formatter.
 
 ## Gate 1: Lifecycle and Diagnostics
 
@@ -52,12 +52,12 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 
 ## Gate 3: Hover and Formatting
 
-- [ ] Implement `textDocument/hover` for resolved types and generic
+- [x] Implement `textDocument/hover` for resolved types and generic
   applications.
-- [ ] Show `erg`, `abs`, and `dat` role information in hover results.
-- [ ] Show role bounds and available documentation comments.
-- [ ] Implement `textDocument/formatting` using the canonical formatter.
-- [ ] Return deterministic text edits without editor-specific style options.
+- [x] Show `erg`, `abs`, and `dat` role information in hover results.
+- [x] Show role bounds and available documentation comments.
+- [x] Implement `textDocument/formatting` using the canonical formatter.
+- [x] Return deterministic text edits without editor-specific style options.
 - [ ] Verify hover ranges and formatting edits with multibyte UTF-8 text.
 
 ## Position Adapter

@@ -5,9 +5,11 @@ use serde_json::{Value, json};
 use super::definition::find_definition;
 use super::diagnostics::analyze_document;
 use super::documents::DocumentStore;
+use super::formatting::format_document;
+use super::hover::find_hover;
 use super::protocol::{
-    DefinitionParams, DidChangeParams, DidOpenParams, Notification, PublishDiagnosticsParams,
-    Request, Response,
+    DefinitionParams, DidChangeParams, DidOpenParams, FormattingParams, Notification,
+    PublishDiagnosticsParams, Request, Response, TextEdit,
 };
 
 pub fn run_stdio() -> io::Result<()> {
@@ -44,6 +46,8 @@ fn handle_request(
         "textDocument/didChange" => change_document(request.params, store, output)?,
         "textDocument/didClose" => close_document(request.params, store, output)?,
         "textDocument/definition" => definition(request.id, request.params, store, output)?,
+        "textDocument/hover" => hover(request.id, request.params, store, output)?,
+        "textDocument/formatting" => formatting(request.id, request.params, store, output)?,
         _ if request.id.is_some() => respond(output, request.id, Value::Null)?,
         _ => {}
     }
@@ -65,6 +69,38 @@ fn definition(
         .map(|location| json!({ "uri": location.uri, "range": location.range }))
         .unwrap_or(Value::Null);
     respond(output, id, result)
+}
+
+fn hover(
+    id: Option<Value>,
+    params: Value,
+    store: &DocumentStore,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let params = serde_json::from_value::<DefinitionParams>(params).map_err(invalid_params)?;
+    let result = store
+        .get(&params.text_document.uri)
+        .and_then(|document| {
+            find_hover(&params.text_document.uri, &document.text, &params.position)
+        })
+        .map(|info| json!({ "contents": { "kind": "markdown", "value": info.contents }, "range": info.range }))
+        .unwrap_or(Value::Null);
+    respond(output, id, result)
+}
+
+fn formatting(
+    id: Option<Value>,
+    params: Value,
+    store: &DocumentStore,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let params = serde_json::from_value::<FormattingParams>(params).map_err(invalid_params)?;
+    let edits = store
+        .get(&params.text_document.uri)
+        .and_then(|document| format_document(&document.text))
+        .map(|(range, new_text)| vec![TextEdit { range, new_text }])
+        .unwrap_or_default();
+    respond(output, id, serde_json::to_value(edits).map_err(invalid_params)?)
 }
 
 fn open_document(
@@ -138,8 +174,8 @@ fn initialize_result() -> Value {
         "capabilities": {
             "textDocumentSync": 1,
             "definitionProvider": true,
-            "hoverProvider": false,
-            "documentFormattingProvider": false
+            "hoverProvider": true,
+            "documentFormattingProvider": true
         },
         "serverInfo": { "name": "actus-lsp", "version": env!("CARGO_PKG_VERSION") }
     })

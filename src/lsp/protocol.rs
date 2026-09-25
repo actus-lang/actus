@@ -52,6 +52,24 @@ pub struct TextDocumentPosition {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct FormattingParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct TextDocumentIdentifier {
+    pub uri: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TextEdit {
+    pub range: LspRange,
+    #[serde(rename = "newText")]
+    pub new_text: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct RawContentChange {
     pub text: String,
     pub range: Option<LspRange>,
