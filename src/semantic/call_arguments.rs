@@ -148,7 +148,7 @@ impl Analyzer {
     pub(super) fn is_owner_argument(&self, expression: &Expr) -> bool {
         let Expr::Identifier { name, span } = expression else { return false };
         let Ok(index) = self.binding(name, *span) else { return false };
-        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
+        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
             && matches!(self.model.bindings[index].access, AccessState::Mutable)
     }

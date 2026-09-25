@@ -23,6 +23,9 @@ fn accepts_explicit_ins_call_and_restores_the_owner() {
     assert_eq!(model.bindings[1].role, Role::Erg);
     assert_eq!(model.bindings[1].ownership, OwnershipState::Active);
     assert_eq!(model.bindings[1].access, AccessState::Mutable);
+    assert!(model.cleanup_plans[0].actions.iter().all(|action| {
+        !matches!(action, actus::semantic::CleanupAction::DropBinding { binding_index: 0 })
+    }));
 }
 
 #[test]
@@ -31,6 +34,23 @@ fn allows_nested_ins_forwarding() {
         "verb inner(ins buffer: Buffer) { } verb outer(ins buffer: Buffer) { inner(buffer: ins buffer); }",
     )
     .expect("an instrumental parameter may be forwarded sequentially");
+}
+
+#[test]
+fn forwards_ins_through_multiple_named_helpers() {
+    let model = analyze_source(
+        "verb inner(ins buffer: Buffer) -> Int { return 0; } verb middle(ins buffer: Buffer) -> Int { return inner(buffer: ins buffer); } verb outer(ins buffer: Buffer) -> Int { return middle(buffer: ins buffer); }",
+    )
+    .expect("nested helpers should forward the exclusive loan");
+    assert_eq!(model.exclusive_loans.iter().map(|loan| loan.id).collect::<Vec<_>>(), vec![0, 1]);
+}
+
+#[test]
+fn joins_case_branches_after_sequential_exclusive_loans() {
+    analyze_source(
+        "enum Color { Red, Green, } verb mutate(ins buffer: Buffer) { } verb main(erg color: Color) { erg buffer = Buffer[1]; case abs color { Color.Red => { mutate(buffer: ins buffer); }, Color.Green => { mutate(buffer: ins buffer); }, }; inspect(buffer); }",
+    )
+    .expect("case branch snapshots should restore the owner after each loan");
 }
 
 #[test]

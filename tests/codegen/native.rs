@@ -103,6 +103,30 @@ fn lowers_dynamic_role_call_through_fat_pointer_abi() {
     object::File::parse(object.as_slice()).expect("native object should parse");
 }
 
+#[test]
+fn lowers_ins_parameters_without_a_wrapper_or_extra_allocation() {
+    let source = "verb mutate(ins buffer: Buffer) -> Int { return 0; } verb main() -> Int { erg buffer = Buffer[1]; return mutate(buffer: ins buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("ins source should parse");
+    let bytes = actus::codegen::emit_program_object(&program, "main")
+        .expect("ins parameter should use the ordinary native argument representation");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "mutate")));
+}
+
+#[test]
+fn rejects_ins_aliasing_before_native_lowering() {
+    let source = "verb merge(ins left: Buffer, abs view: Buffer) -> Int { return 0; } verb main() -> Int { erg buffer = Buffer[1]; return merge(left: ins buffer, view: abs buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("aliasing source should parse");
+    let error = actus::codegen::emit_program_object(&program, "main")
+        .expect_err("semantic aliasing must stop native lowering");
+    assert!(error.to_string().contains("ExclusiveLoanAlias"));
+}
+
 fn symbol_matches(actual: &str, expected: &str) -> bool {
     actual == expected || actual.strip_prefix('_') == Some(expected)
 }

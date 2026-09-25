@@ -4,6 +4,15 @@
 - Date: 2026-09-26
 - Scope: `ins` parameters, explicit call-site loans, and access transitions
 
+## Implementation status
+
+Gates 0 through 6 are implemented and verified in the reference compiler.
+The semantic model records deterministic loan identifiers, snapshots access
+state across `case` branches, and restores each call-scoped loan before the
+caller continues. Native lowering reuses the ordinary parameter ABI; no loan
+object, wrapper, or allocation is emitted. Cleanup planning excludes `ins`
+parameters because they never become owners.
+
 ## Context
 
 Actus distinguishes ownership transfer (`dat`), immutable inspection (`abs`),

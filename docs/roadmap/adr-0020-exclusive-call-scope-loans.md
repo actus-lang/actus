@@ -49,27 +49,27 @@ ADR-0021.
 
 ## Gate 4: Loan forwarding
 
-- [ ] Permit forwarding an active `ins` loan to a nested helper call.
-- [ ] Suspend the outer binding for the duration of the nested call.
-- [ ] Restore the outer function's exclusive access after the helper returns.
-- [ ] Reject parallel aliases while allowing sequential helper composition.
-- [ ] Test nested forwarding across one and multiple helper levels.
-- [ ] Test forwarding through named and positional calls where supported.
-- [ ] Verify branch snapshots and joins preserve suspended-loan state.
+- [x] Permit forwarding an active `ins` loan to a nested helper call.
+- [x] Suspend the outer binding for the duration of the nested call.
+- [x] Restore the outer function's exclusive access after the helper returns.
+- [x] Reject parallel aliases while allowing sequential helper composition.
+- [x] Test nested forwarding across one and multiple helper levels.
+- [x] Test forwarding through named and positional calls where supported.
+- [x] Verify branch snapshots and joins preserve suspended-loan state.
 
 ## Gate 5: Cleanup and native integration
 
-- [ ] Ensure an `ins` loan does not create an ownership drop action.
-- [ ] Ensure every early return, loop exit, and scope exit closes the loan.
-- [ ] Validate cleanup schedules for nested loans and owner fields.
-- [ ] Keep the existing native representation for `ins` parameters.
-- [ ] Add native ABI tests proving no hidden wrapper or allocation is emitted.
-- [ ] Add native execution tests for mutation followed by caller reuse.
-- [ ] Add negative native tests for rejected aliasing programs.
+- [x] Ensure an `ins` loan does not create an ownership drop action.
+- [x] Ensure every early return, loop exit, and scope exit closes the loan.
+- [x] Validate cleanup schedules for nested loans and owner fields.
+- [x] Keep the existing native representation for `ins` parameters.
+- [x] Add native ABI tests proving no hidden wrapper or allocation is emitted.
+- [x] Add native execution tests for mutation followed by caller reuse.
+- [x] Add negative native tests for rejected aliasing programs.
 
 ## Gate 6: Completion criteria
 
-- [ ] Run formatter, check, clippy, tests, and source-limit checks.
-- [ ] Confirm no semantic rule is inferred or repaired by codegen.
-- [ ] Update ADR status and implementation notes with verified behavior.
-- [ ] Mark this roadmap complete only after all diagnostics and native tests pass.
+- [x] Run formatter, check, clippy, tests, and source-limit checks.
+- [x] Confirm no semantic rule is inferred or repaired by codegen.
+- [x] Update ADR status and implementation notes with verified behavior.
+- [x] Mark this roadmap complete only after all diagnostics and native tests pass.

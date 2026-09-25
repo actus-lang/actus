@@ -56,3 +56,10 @@ fn transfers_dat_buffer_without_duplicate_cleanup() {
     let source = "verb consume(dat buffer: Buffer) -> Int { return 42; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; return consume(buffer: buffer); }\n";
     assert_eq!(build_and_run(source, "buffer-dat"), 42);
 }
+
+#[cfg(unix)]
+#[test]
+fn executes_exclusive_buffer_mutation_and_reuses_the_caller_owner() {
+    let source = "verb append_one(ins buffer: Buffer) -> Int { append(buffer, 1); return 0; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; append_one(buffer: ins buffer); append(buffer, 41); return 42; }\n";
+    assert_eq!(build_and_run(source, "buffer-ins"), 42);
+}
