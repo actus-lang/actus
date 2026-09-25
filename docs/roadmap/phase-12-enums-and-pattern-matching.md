@@ -50,7 +50,7 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [x] Require a wildcard when a pattern set is intentionally open-ended.
 - [x] Reject unreachable and duplicate patterns.
 - [x] Check pattern binding types against variant payload types.
-- [ ] Define deterministic evaluation order for guards and branch bodies.
+- [x] Define deterministic evaluation order for guards and branch bodies.
 - [x] Produce stable diagnostics for non-exhaustive and unreachable matches.
 
 ## Role-Based Deconstruction
@@ -64,13 +64,13 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 
 ## Standard Result Types
 
-- [ ] Define `Option[T]` as a standard enum.
-- [ ] Define `Result[T, E]` as a standard enum.
-- [ ] Specify null-free propagation behavior for `Option` and `Result`.
-- [ ] Add compiler-facing AST and diagnostic examples using enum matching.
+- [x] Define `Option[T]` as a standard enum.
+- [x] Define `Result[T, E]` as a standard enum.
+- [x] Specify null-free propagation behavior for `Option` and `Result`.
+- [x] Add compiler-facing AST and diagnostic examples using enum matching.
 - [x] Add Cranelift lowering for discriminant branches and payload bindings.
 - [x] Add a native object regression test for enum construction and matching.
 - [x] Lower case block bodies with return paths through the native cleanup plan.
 - [x] Prevent duplicate drops for moved and explicitly dropped payload fields.
-- [ ] Define `Option[T]` and `Result[T, E]` as compiler-registered generic enums.
-- [ ] Add end-to-end executable tests for `Option` and `Result` construction and matching.
+- [x] Define `Option[T]` and `Result[T, E]` as compiler-registered generic enums.
+- [x] Add end-to-end executable tests for `Option` and `Result` construction and matching.
