@@ -1,6 +1,6 @@
 use actus::ast::{
-    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, MetaAttribute, Pattern, Role, Stmt,
-    StructFieldRole, TopLevelDecl, VariantPayload,
+    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, MetaAttribute, Pattern, ReturnAccess,
+    Role, Stmt, StructFieldRole, TopLevelDecl, VariantPayload,
 };
 use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
@@ -24,7 +24,8 @@ fn parses_a_verb_with_roles_and_return_type() {
     assert_eq!(verb.params[0].role, Role::Erg);
     assert_eq!(verb.params[1].role, Role::Abs);
     assert_eq!(verb.params[2].role, Role::Dat);
-    assert_eq!(verb.return_type.as_ref().map(|ty| ty.name.as_str()), Some("Int"));
+    assert_eq!(verb.return_type.as_ref().map(|ty| ty.ty.name.as_str()), Some("Int"));
+    assert_eq!(verb.return_type.as_ref().map(|ty| ty.access), Some(ReturnAccess::Owned));
     assert!(matches!(verb.body.statements[0], Stmt::Return { .. }));
 }
 
@@ -88,8 +89,8 @@ fn parses_generic_parameters_and_type_applications() {
     };
     assert_eq!(verb.generic_parameters[0].name, "T");
     let return_type = verb.return_type.as_ref().expect("generic return type");
-    assert_eq!(return_type.name, "Box");
-    assert_eq!(return_type.arguments[0].name, "T");
+    assert_eq!(return_type.ty.name, "Box");
+    assert_eq!(return_type.ty.arguments[0].name, "T");
 }
 
 #[test]

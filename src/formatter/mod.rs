@@ -118,10 +118,13 @@ impl Formatter {
         self.output.push(')');
     }
 
-    fn return_type(&mut self, return_type: &Option<crate::ast::TypeName>) {
+    fn return_type(&mut self, return_type: &Option<crate::ast::ReturnType>) {
         if let Some(return_type) = return_type {
             self.output.push_str(" -> ");
-            self.output.push_str(&return_type.name);
+            if matches!(return_type.access, crate::ast::ReturnAccess::Abs) {
+                self.output.push_str("abs ");
+            }
+            self.output.push_str(&return_type.ty.name);
         }
     }
 

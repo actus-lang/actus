@@ -153,7 +153,7 @@ impl Analyzer {
                     }
                 }
                 if let Some(return_type) = return_type {
-                    analyzer.validate_type_reference(return_type)?;
+                    analyzer.validate_type_reference(&return_type.ty)?;
                 }
                 Ok(())
             })?;
@@ -195,8 +195,10 @@ impl Analyzer {
     }
 
     fn analyze_verb_body(&mut self, verb: &crate::ast::VerbDecl) -> Result<(), SemanticError> {
-        self.current_return_type =
-            verb.return_type.as_ref().and_then(|type_name| lookup_builtin_type(&type_name.name));
+        self.current_return_type = verb
+            .return_type
+            .as_ref()
+            .and_then(|return_type| lookup_builtin_type(&return_type.ty.name));
         self.enter_scope(verb.body.span);
         for parameter in &verb.params {
             let ty = lookup_builtin_type(&parameter.ty.name);

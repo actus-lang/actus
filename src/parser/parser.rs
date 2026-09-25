@@ -169,8 +169,7 @@ impl Parser {
         self.expect_simple(TokenKind::LeftParen, "`(`")?;
         let params = self.parse_params()?;
         self.expect_simple(TokenKind::RightParen, "`)`")?;
-        let return_type =
-            if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
+        let return_type = self.parse_return_type()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(ExternalVerbDecl {
             is_open,
@@ -202,8 +201,7 @@ impl Parser {
         let params = self.parse_params()?;
         self.expect_simple(TokenKind::RightParen, "`)`")?;
 
-        let return_type =
-            if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
+        let return_type = self.parse_return_type()?;
 
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
@@ -218,6 +216,21 @@ impl Parser {
             body,
             span,
         })
+    }
+
+    fn parse_return_type(&mut self) -> Result<Option<crate::ast::ReturnType>, ParseError> {
+        if !self.match_simple(TokenKind::Arrow) {
+            return Ok(None);
+        }
+        let start = self.previous().span.start;
+        let access = if self.match_simple(TokenKind::Abs) {
+            crate::ast::ReturnAccess::Abs
+        } else {
+            crate::ast::ReturnAccess::Owned
+        };
+        let ty = self.parse_type_name()?;
+        let span = SourceSpan::new(start, ty.span.end);
+        Ok(Some(crate::ast::ReturnType { access, ty, span }))
     }
 
     fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {

@@ -44,7 +44,7 @@ pub struct RoleDecl {
 pub struct RoleMethod {
     pub name: String,
     pub params: Vec<Param>,
-    pub return_type: Option<TypeName>,
+    pub return_type: Option<ReturnType>,
     pub span: SourceSpan,
 }
 
@@ -118,7 +118,7 @@ pub struct ExternalVerbDecl {
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub params: Vec<Param>,
-    pub return_type: Option<TypeName>,
+    pub return_type: Option<ReturnType>,
     pub span: SourceSpan,
 }
 
@@ -129,7 +129,7 @@ pub struct VerbDecl {
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub params: Vec<Param>,
-    pub return_type: Option<TypeName>,
+    pub return_type: Option<ReturnType>,
     pub body: Block,
     pub span: SourceSpan,
 }
@@ -166,6 +166,19 @@ pub enum Role {
 pub struct TypeName {
     pub name: String,
     pub arguments: Vec<TypeName>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReturnAccess {
+    Owned,
+    Abs,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReturnType {
+    pub access: ReturnAccess,
+    pub ty: TypeName,
     pub span: SourceSpan,
 }
 

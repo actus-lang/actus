@@ -30,7 +30,7 @@ impl VerbDecl {
             return_type: self
                 .return_type
                 .as_ref()
-                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+                .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
         }
     }
 }
@@ -49,7 +49,7 @@ impl ExternalVerbDecl {
             return_type: self
                 .return_type
                 .as_ref()
-                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+                .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
         }
     }
 }

@@ -6,21 +6,21 @@ ADR-0020 but does not change exclusive-loan semantics.
 
 ## Gate 0: Return contract
 
-- [ ] Define the canonical `-> abs ViewType` return syntax.
-- [ ] Define `abs self` as the receiver form of the single source parameter.
-- [ ] Define which view types are eligible for non-owning returns.
-- [ ] Define the distinction between owned returns and `abs` view returns.
+- [x] Define the canonical `-> abs ViewType` return syntax.
+- [x] Define `abs self` as the receiver form of the single source parameter.
+- [x] Define which view types are eligible for non-owning returns.
+- [x] Define the distinction between owned returns and `abs` view returns.
 - [ ] Reject multiple-origin returns without adding explicit origin syntax.
 - [ ] Add stable diagnostics for missing, multiple, and unknown origins.
 
 ## Gate 1: AST and parser
 
-- [ ] Add an access-qualified return type representation.
-- [ ] Preserve separate spans for the access qualifier and underlying type.
-- [ ] Parse `-> abs Type` for verbs, role methods, and external declarations.
-- [ ] Reject `abs` in unsupported type positions.
-- [ ] Add parser fixtures for ordinary and method returns.
-- [ ] Add parser rejection fixtures for malformed qualified returns.
+- [x] Add an access-qualified return type representation.
+- [x] Preserve the combined return span and the underlying type span.
+- [x] Parse `-> abs Type` for verbs, role methods, and external declarations.
+- [x] Reject `abs` in unsupported type positions.
+- [x] Add parser fixtures for ordinary and method returns.
+- [x] Add parser rejection fixtures for malformed qualified returns.
 
 ## Gate 2: Origin model
 

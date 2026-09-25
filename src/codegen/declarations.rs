@@ -26,7 +26,12 @@ pub(super) fn declare_functions(
             .map_err(|error| NativeEmitError(error.to_string()))?;
         metadata.insert(
             verb.name.clone(),
-            function_meta(id, &verb.params, verb.return_type.as_ref(), layouts),
+            function_meta(
+                id,
+                &verb.params,
+                verb.return_type.as_ref().map(|return_type| &return_type.ty),
+                layouts,
+            ),
         );
     }
     for verb in external_verbs {
@@ -36,7 +41,12 @@ pub(super) fn declare_functions(
             .map_err(|error| NativeEmitError(error.to_string()))?;
         metadata.insert(
             verb.name.clone(),
-            function_meta(id, &verb.params, verb.return_type.as_ref(), layouts),
+            function_meta(
+                id,
+                &verb.params,
+                verb.return_type.as_ref().map(|return_type| &return_type.ty),
+                layouts,
+            ),
         );
     }
     Ok(metadata)
@@ -70,7 +80,12 @@ pub(super) fn native_signature_for_definition(
     verb: &VerbDecl,
     layouts: &LayoutRegistry,
 ) -> cranelift_codegen::ir::Signature {
-    signature_for(module, &verb.params, verb.return_type.as_ref(), layouts)
+    signature_for(
+        module,
+        &verb.params,
+        verb.return_type.as_ref().map(|return_type| &return_type.ty),
+        layouts,
+    )
 }
 
 fn external_native_signature(
@@ -78,7 +93,12 @@ fn external_native_signature(
     verb: &ExternalVerbDecl,
     layouts: &LayoutRegistry,
 ) -> cranelift_codegen::ir::Signature {
-    signature_for(module, &verb.params, verb.return_type.as_ref(), layouts)
+    signature_for(
+        module,
+        &verb.params,
+        verb.return_type.as_ref().map(|return_type| &return_type.ty),
+        layouts,
+    )
 }
 
 fn signature_for(

@@ -59,7 +59,7 @@ impl Analyzer {
                 }
             }
             if let Some(return_type) = &method.return_type {
-                self.validate_type_reference(return_type)?;
+                self.validate_type_reference(&return_type.ty)?;
             }
         }
         Ok(())
@@ -145,7 +145,7 @@ fn method_matches(
         })
         && required.return_type.as_ref().zip(implementation.return_type.as_ref()).map_or(
             required.return_type.is_none() && implementation.return_type.is_none(),
-            |(left, right)| type_names_match(left, right),
+            |(left, right)| left.access == right.access && type_names_match(&left.ty, &right.ty),
         )
         && implementation.params.first().is_some_and(|parameter| {
             parameter.name == "self" && type_names_match(&parameter.ty, target)
