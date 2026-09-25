@@ -58,15 +58,15 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 - [x] Show role bounds and available documentation comments.
 - [x] Implement `textDocument/formatting` using the canonical formatter.
 - [x] Return deterministic text edits without editor-specific style options.
-- [ ] Verify hover ranges and formatting edits with multibyte UTF-8 text.
+- [x] Verify hover ranges and formatting edits with multibyte UTF-8 text.
 
 ## Position Adapter
 
 - [x] Index line starts for every document snapshot.
 - [x] Convert Actus byte offsets to LSP line/character positions.
 - [x] Support UTF-8 scalar boundaries and UTF-16 code-unit positions.
-- [ ] Convert LSP edits back to validated byte ranges.
-- [ ] Reject ranges that split a UTF-8 code point.
+- [x] Convert LSP edits back to validated byte ranges.
+- [x] Reject ranges that split a UTF-8 code point.
 
 ## Deferred Capabilities
 

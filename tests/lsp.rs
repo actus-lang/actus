@@ -153,6 +153,44 @@ fn lsp_hover_and_formatting_return_compiler_information() {
     assert!(stdout.contains("verb add(abs value: Int) -> Int"));
 }
 
+#[test]
+fn lsp_preserves_utf16_ranges_with_multibyte_source_text() {
+    let uri = "file:///tmp/actus-lsp-unicode.act";
+    let source = "/// ქართული 🚀\nverb greet() -> Int { return \"გამარჯობა 🚀\"; }\n";
+    let verb_position = position_after(source, "verb greet");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({
+            "jsonrpc":"2.0","method":"textDocument/didOpen",
+            "params":{"textDocument":{"uri":uri,"version":1,"text":source}}
+        }),
+        json!({
+            "jsonrpc":"2.0","id":2,"method":"textDocument/hover",
+            "params":{"textDocument":{"uri":uri},"position":verb_position}
+        }),
+        json!({
+            "jsonrpc":"2.0","id":3,"method":"textDocument/formatting",
+            "params":{"textDocument":{"uri":uri}}
+        }),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let input = messages.into_iter().flat_map(frame).collect::<Vec<_>>();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("start lsp");
+    child.stdin.take().unwrap().write_all(&input).expect("write lsp input");
+    let output = child.wait_with_output().expect("wait for lsp");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 protocol output");
+    assert!(stdout.contains("\"start\":{\"character\":5,\"line\":1}"), "stdout: {stdout}");
+    assert!(stdout.contains("\"end\":{\"character\":10,\"line\":1}"), "stdout: {stdout}");
+    assert!(stdout.contains("გამარჯობა 🚀"), "stdout: {stdout}");
+}
+
 fn position_after(source: &str, marker: &str) -> Value {
     let offset = source.find(marker).expect("marker in source") + marker.len() - 1;
     let line = source[..offset].bytes().filter(|byte| *byte == b'\n').count();
