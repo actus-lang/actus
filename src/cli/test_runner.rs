@@ -89,7 +89,10 @@ fn collect_tests(
     files: Vec<PathBuf>,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<DiscoveredTest>, String> {
-    let resolver = ModuleResolver::new(configuration.source_root());
+    let resolver = ModuleResolver::with_dependencies(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+    );
     let mut tests = Vec::new();
     for path in files {
         let source = fs::read_to_string(&path)

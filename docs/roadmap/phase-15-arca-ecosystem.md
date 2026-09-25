@@ -53,7 +53,8 @@ the compiler, builds, tests, dependency resolution, and package publication.
 ## Dependencies and Publishing
 
 - [ ] Define dependency resolution and version constraints.
-- [ ] Define local path dependencies.
+- [x] Define local path dependencies, recursively resolve dependency manifests,
+  hash package contents, and expose dependency namespaces to imports.
 - [ ] Define registry and package index behavior.
 - [ ] Define package validation and reproducible archives.
 - [ ] Define package signing and trust policy.

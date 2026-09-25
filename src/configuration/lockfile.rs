@@ -2,8 +2,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::manifest;
-
 const LOCKFILE_VERSION: u32 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -61,17 +59,17 @@ impl ArcaLock {
     }
 
     pub fn generate_from_manifest(path: &Path) -> Result<Self, LockfileError> {
-        let manifest = manifest::read(path).map_err(|error| LockfileError(error.to_string()))?;
-        let packages = manifest
-            .package
-            .dependencies
+        let graph =
+            super::dependencies::resolve(path).map_err(|error| LockfileError(error.to_string()))?;
+        let packages = graph
+            .packages
             .into_iter()
-            .map(|(name, version)| LockedPackage {
-                name,
-                version,
-                source: Some("registry".to_owned()),
-                path: None,
-                checksum: None,
+            .map(|package| LockedPackage {
+                name: package.name,
+                version: package.version,
+                source: Some(if package.path.is_some() { "path" } else { "registry" }.to_owned()),
+                path: package.path,
+                checksum: package.checksum,
             })
             .collect();
         Ok(Self::from_packages(packages))

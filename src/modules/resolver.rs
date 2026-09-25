@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -62,21 +63,30 @@ impl ResolvedModule {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleResolver {
     source_root: PathBuf,
+    dependency_roots: BTreeMap<String, PathBuf>,
 }
 
 impl ModuleResolver {
     pub fn new(source_root: impl Into<PathBuf>) -> Self {
-        Self { source_root: source_root.into() }
+        Self { source_root: source_root.into(), dependency_roots: BTreeMap::new() }
+    }
+
+    pub fn with_dependencies(
+        source_root: impl Into<PathBuf>,
+        dependency_roots: &BTreeMap<String, PathBuf>,
+    ) -> Self {
+        Self { source_root: source_root.into(), dependency_roots: dependency_roots.clone() }
     }
 
     pub fn resolve(&self, module_path: &str) -> Result<ResolvedModule, ModuleResolutionError> {
         let segments = parse_segments(module_path)?;
-        let directory =
-            segments.iter().fold(self.source_root.clone(), |path, segment| path.join(segment));
-        let file = self
-            .source_root
-            .join(segments.iter().fold(PathBuf::new(), |path, segment| path.join(segment)))
-            .with_extension("act");
+        let root = self
+            .dependency_roots
+            .get(segments[0])
+            .cloned()
+            .unwrap_or_else(|| self.source_root.clone());
+        let directory = segments.iter().fold(root.clone(), |path, segment| path.join(segment));
+        let file = self.module_file_root(&root, &segments).with_extension("act");
         if directory.is_dir() && file.is_file() {
             return Err(ModuleResolutionError::AmbiguousModule {
                 module: module_path.to_owned(),
@@ -98,6 +108,10 @@ impl ModuleResolver {
             module: module_path.to_owned(),
             expected: directory.join(format!("{}.act", segments.last().expect("path"))),
         })
+    }
+
+    fn module_file_root(&self, root: &Path, segments: &[&str]) -> PathBuf {
+        segments.iter().fold(root.to_owned(), |path, segment| path.join(segment))
     }
 }
 

@@ -126,8 +126,13 @@ pub(super) fn build_file(
             return 1;
         }
     };
-    let program = match resolve_imports(&program, &ModuleResolver::new(configuration.source_root()))
-    {
+    let program = match resolve_imports(
+        &program,
+        &ModuleResolver::with_dependencies(
+            configuration.source_root(),
+            configuration.dependency_roots(),
+        ),
+    ) {
         Ok(program) => program,
         Err(error) => {
             eprintln!("error: cannot resolve imports for `{input}`: {error}");

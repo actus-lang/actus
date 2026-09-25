@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -5,6 +6,7 @@ use std::path::{Path, PathBuf};
 pub use crate::target::{EntryContract, LinkerFlavor};
 use crate::target::{TargetSpec, TargetSpecError};
 
+mod dependencies;
 mod lockfile;
 mod manifest;
 
@@ -84,6 +86,7 @@ impl NativeBackendConfiguration {
 pub struct CompilerConfiguration {
     project_root: PathBuf,
     source_root: PathBuf,
+    dependency_roots: BTreeMap<String, PathBuf>,
     target: TargetSpec,
     target_spec_hash: String,
     profile: BuildProfile,
@@ -108,6 +111,7 @@ impl CompilerConfiguration {
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
+            dependency_roots: BTreeMap::new(),
             target_spec_hash: target.spec_hash(),
             target,
             profile: BuildProfile::Debug,
@@ -125,6 +129,7 @@ impl CompilerConfiguration {
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
         let manifest = manifest::read(path)?;
+        let dependency_graph = dependencies::resolve(path)?;
         validate_lockfile(path)?;
         let environment = Self::from_environment();
         let (target, linker_flavor, entry_contract, linker) =
@@ -142,6 +147,7 @@ impl CompilerConfiguration {
         Ok(Self {
             project_root: manifest_directory.to_path_buf(),
             source_root,
+            dependency_roots: dependency_graph.roots,
             target_spec_hash: target.spec_hash(),
             target,
             profile,
@@ -176,6 +182,10 @@ impl CompilerConfiguration {
 
     pub fn project_root(&self) -> &Path {
         &self.project_root
+    }
+
+    pub fn dependency_roots(&self) -> &BTreeMap<String, PathBuf> {
+        &self.dependency_roots
     }
 
     pub fn linker(&self) -> &OsStr {

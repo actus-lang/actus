@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use super::ConfigurationError;
+use super::dependencies::DependencySpec;
 
 pub(crate) const MANIFEST_FILE_NAME: &str = "Arca.toml";
 pub(crate) const DEFAULT_EDITION: &str = "alpha";
@@ -11,6 +12,8 @@ pub(crate) const DEFAULT_EDITION: &str = "alpha";
 #[serde(deny_unknown_fields)]
 pub(crate) struct ArcaManifest {
     pub(crate) package: PackageManifest,
+    #[serde(default)]
+    pub(crate) dependencies: std::collections::BTreeMap<String, DependencySpec>,
     #[serde(default)]
     pub(crate) build: BuildManifest,
     #[serde(default)]
