@@ -27,4 +27,5 @@ Phase checkboxes describe phase-level status. A phase is marked complete only wh
 - [ ] [Phase 13: Generic Types and Polymorphism](docs/roadmap/phase-13-generic-types-and-polymorphism.md)
 - [ ] [Phase 14: Roles and Performance](docs/roadmap/phase-14-roles-and-performance.md)
 - [x] [Phase 15: Arca Ecosystem, I/O and Core Runtime](docs/roadmap/phase-15-arca-ecosystem.md)
+- [ ] [Phase 15.5: Language Server and Editor Tooling](docs/roadmap/phase-15.5-language-server-and-tooling.md)
 - [ ] [Phase 16: Self-Hosting and Future Language Extensions](docs/roadmap/phase-16-self-hosting-and-future-extensions.md)

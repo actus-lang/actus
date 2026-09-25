@@ -7,6 +7,7 @@ pub mod diagnostics;
 pub mod ffi;
 pub mod formatter;
 pub mod lexer;
+pub mod lsp;
 pub mod modules;
 pub mod packaging;
 pub mod parser;
