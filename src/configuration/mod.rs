@@ -41,6 +41,7 @@ struct PackageManifest {
     version: String,
     edition: Option<String>,
     entry: Option<String>,
+    source_root: Option<String>,
 }
 
 #[derive(Default, Deserialize)]
@@ -124,6 +125,7 @@ impl NativeBackendConfiguration {
 #[derive(Clone, Debug)]
 pub struct CompilerConfiguration {
     project_root: PathBuf,
+    source_root: PathBuf,
     target: TargetSpec,
     target_spec_hash: String,
     profile: BuildProfile,
@@ -146,6 +148,7 @@ impl CompilerConfiguration {
             .unwrap_or_else(|| OsString::from(target.default_linker()));
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
             target_spec_hash: target.spec_hash(),
             target,
             profile: BuildProfile::Debug,
@@ -173,6 +176,14 @@ impl CompilerConfiguration {
         let (target, linker_flavor, entry_contract, linker) =
             resolve_manifest_target(&manifest, &environment)?;
         let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
+        let source_root = manifest.package.source_root.as_deref().unwrap_or("src");
+        let source_root = manifest_directory.join(source_root);
+        if manifest.package.source_root.is_some() && !source_root.is_dir() {
+            return Err(ConfigurationError(format!(
+                "InvalidSourceRoot: Arca.toml package.source_root `{}` does not exist",
+                source_root.display()
+            )));
+        }
         let native_backend = NativeBackendConfiguration::new(
             manifest
                 .build
@@ -197,6 +208,7 @@ impl CompilerConfiguration {
             .collect();
         Ok(Self {
             project_root: manifest_directory.to_path_buf(),
+            source_root,
             target_spec_hash: target.spec_hash(),
             target,
             profile: manifest.build.profile.unwrap_or(environment.profile),
@@ -214,6 +226,18 @@ impl CompilerConfiguration {
     pub fn from_current_manifest() -> Result<Self, ConfigurationError> {
         let path = Path::new(MANIFEST_FILE_NAME);
         if path.exists() { Self::from_manifest(path) } else { Ok(Self::from_environment()) }
+    }
+
+    pub fn from_input_path(path: &Path) -> Result<Self, ConfigurationError> {
+        let start = if path.is_dir() { path } else { path.parent().unwrap_or(path) };
+        let Some(manifest) = find_manifest(start) else {
+            return Ok(Self::from_environment());
+        };
+        Self::from_manifest(&manifest)
+    }
+
+    pub fn source_root(&self) -> &Path {
+        &self.source_root
     }
 
     pub fn linker(&self) -> &OsStr {
@@ -302,6 +326,11 @@ fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> 
     if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
     }
+    if manifest.package.source_root.as_deref().is_some_and(|value| value.trim().is_empty()) {
+        return Err(ConfigurationError(
+            "Arca.toml package.source_root must not be empty".to_owned(),
+        ));
+    }
     if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
     }
@@ -325,6 +354,13 @@ fn validate_manifest(manifest: &ArcaManifest) -> Result<(), ConfigurationError> 
         )));
     }
     Ok(())
+}
+
+fn find_manifest(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .map(|directory| directory.join(MANIFEST_FILE_NAME))
+        .find(|path| path.is_file())
 }
 
 impl LinkLibrary {

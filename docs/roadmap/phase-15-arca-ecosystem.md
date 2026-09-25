@@ -20,7 +20,8 @@ the compiler, builds, tests, dependency resolution, and package publication.
 - [x] Validate duplicate struct, enum, role, and verb declarations with both
   source locations.
 - [x] Make sibling declarations visible to semantic analysis without imports.
-- [ ] Integrate resolver source roots with `Arca.toml` package manifests.
+- [x] Integrate resolver source roots with `Arca.toml` package manifests,
+  including default `src/` and custom `package.source_root` discovery.
 - [x] Validate facade-only `open <sibling>;` exports and zero-import
   intra-module scope.
 - [x] Emit compile-time namespace collision diagnostics across siblings.

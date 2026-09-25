@@ -17,7 +17,7 @@ pub(super) enum EmitKind {
 
 pub(super) fn build_command(
     mut arguments: impl Iterator<Item = String>,
-    configuration: &CompilerConfiguration,
+    _configuration: &CompilerConfiguration,
 ) -> i32 {
     let Some(input) = arguments.next() else {
         eprintln!("error: missing input file");
@@ -60,7 +60,14 @@ pub(super) fn build_command(
             }
         }
     }
-    build_file(&input, output.as_deref().map(Path::new), emit, configuration)
+    let input_configuration = match CompilerConfiguration::from_input_path(Path::new(&input)) {
+        Ok(configuration) => configuration,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 1;
+        }
+    };
+    build_file(&input, output.as_deref().map(Path::new), emit, &input_configuration)
 }
 
 pub(super) fn build_file(
@@ -90,8 +97,8 @@ pub(super) fn build_file(
             return 1;
         }
     };
-    let source_root = Path::new(input).parent().unwrap_or_else(|| Path::new("."));
-    let program = match resolve_imports(&program, &ModuleResolver::new(source_root)) {
+    let program = match resolve_imports(&program, &ModuleResolver::new(configuration.source_root()))
+    {
         Ok(program) => program,
         Err(error) => {
             eprintln!("error: cannot resolve imports for `{input}`: {error}");
