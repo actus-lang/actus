@@ -8,6 +8,7 @@ pub mod ffi;
 pub mod formatter;
 pub mod lexer;
 pub mod modules;
+pub mod packaging;
 pub mod parser;
 pub mod runtime;
 pub mod semantic;

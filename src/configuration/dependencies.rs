@@ -7,14 +7,14 @@ use serde::Deserialize;
 use super::ConfigurationError;
 use super::manifest::{ArcaManifest, source_root};
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
 pub(crate) enum DependencySpec {
     Version(String),
     Local(DependencyTable),
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DependencyTable {
     pub(crate) path: Option<String>,
@@ -61,11 +61,17 @@ fn visit_manifest(
         )));
     }
     let manifest = super::manifest::read(&canonical)?;
-    let dependencies = dependency_specs(&manifest);
+    let dependencies = dependency_specs(&manifest)?;
     for (name, specification) in dependencies {
         match specification {
             DependencySpec::Version(version) => {
-                graph.packages.push(DependencyPackage { name, version, path: None, checksum: None })
+                super::version::validate_constraint(&version).map_err(|error| {
+                    ConfigurationError(format!("InvalidVersionConstraint for `{name}`: {error}"))
+                })?;
+                record_package(
+                    graph,
+                    DependencyPackage { name, version, path: None, checksum: None },
+                )?;
             }
             DependencySpec::Local(table) => {
                 visit_local_dependency(&canonical, name, table, graph, visiting)?
@@ -76,15 +82,24 @@ fn visit_manifest(
     Ok(())
 }
 
-fn dependency_specs(manifest: &ArcaManifest) -> BTreeMap<String, DependencySpec> {
-    let mut dependencies = manifest
-        .package
-        .dependencies
-        .iter()
-        .map(|(name, version)| (name.clone(), DependencySpec::Version(version.clone())))
-        .collect::<BTreeMap<_, _>>();
-    dependencies.extend(manifest.dependencies.clone());
-    dependencies
+fn dependency_specs(
+    manifest: &ArcaManifest,
+) -> Result<BTreeMap<String, DependencySpec>, ConfigurationError> {
+    let mut dependencies = BTreeMap::new();
+    for (name, version) in &manifest.package.dependencies {
+        dependencies.insert(name.clone(), DependencySpec::Version(version.clone()));
+    }
+    for (name, specification) in &manifest.dependencies {
+        if let Some(previous) = dependencies.get(name)
+            && previous != specification
+        {
+            return Err(ConfigurationError(format!(
+                "VersionConflict: dependency `{name}` has conflicting declarations"
+            )));
+        }
+        dependencies.insert(name.clone(), specification.clone());
+    }
+    Ok(dependencies)
 }
 
 fn visit_local_dependency(
@@ -107,6 +122,20 @@ fn visit_local_dependency(
         )));
     }
     let child = super::manifest::read(&dependency_manifest)?;
+    if let Some(constraint) = &table.version {
+        let constraint = super::version::VersionConstraint::parse(constraint).map_err(|error| {
+            ConfigurationError(format!("InvalidVersionConstraint for `{name}`: {error}"))
+        })?;
+        let package_version = super::version::Version::parse(&child.package.version)
+            .map_err(|error| ConfigurationError(format!("InvalidVersion for `{name}`: {error}")))?;
+        if !constraint.matches(&package_version) {
+            return Err(ConfigurationError(format!(
+                "VersionConflict: dependency `{name}` requires `{}` but package provides `{}`",
+                constraint_text(constraint),
+                child.package.version
+            )));
+        }
+    }
     let child_source_root = source_root(&child, &package_root);
     if !child_source_root.is_dir() {
         return Err(ConfigurationError(format!(
@@ -115,14 +144,47 @@ fn visit_local_dependency(
         )));
     }
     graph.roots.insert(name.clone(), child_source_root);
-    let version = table.version.unwrap_or(child.package.version.clone());
-    graph.packages.push(DependencyPackage {
-        name,
-        version,
-        path: Some(relative_path),
-        checksum: Some(content_checksum(&package_root)?),
-    });
+    record_package(
+        graph,
+        DependencyPackage {
+            name,
+            version: child.package.version.clone(),
+            path: Some(relative_path),
+            checksum: Some(content_checksum(&package_root)?),
+        },
+    )?;
     visit_manifest(&dependency_manifest, graph, visiting)
+}
+
+fn record_package(
+    graph: &mut DependencyGraph,
+    package: DependencyPackage,
+) -> Result<(), ConfigurationError> {
+    if let Some(previous) = graph.packages.iter().find(|entry| entry.name == package.name) {
+        if previous.version != package.version || previous.path != package.path {
+            return Err(ConfigurationError(format!(
+                "VersionConflict: dependency `{}` resolves to incompatible packages",
+                package.name
+            )));
+        }
+        return Ok(());
+    }
+    graph.packages.push(package);
+    Ok(())
+}
+
+fn constraint_text(constraint: super::version::VersionConstraint) -> String {
+    match constraint {
+        super::version::VersionConstraint::Exact(version) => {
+            format!("={}.{}.{}", version.major, version.minor, version.patch)
+        }
+        super::version::VersionConstraint::Compatible(version) => {
+            format!("^{}.{}.{}", version.major, version.minor, version.patch)
+        }
+        super::version::VersionConstraint::GreaterOrEqual(version) => {
+            format!(">={}.{}.{}", version.major, version.minor, version.patch)
+        }
+    }
 }
 
 fn content_checksum(root: &Path) -> Result<String, ConfigurationError> {

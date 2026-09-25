@@ -96,3 +96,33 @@ fn rejects_a_missing_local_dependency_manifest() {
         .expect_err("missing dependency must fail");
     assert!(error.to_string().contains("InvalidDependencyPath"));
 }
+
+#[test]
+fn enforces_a_local_dependency_version_constraint() {
+    let fixture = dependency_fixture();
+    fixture.write(
+        "app/Arca.toml",
+        "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nfoo = { path = \"../foo\", version = \"^1.0.0\" }\n",
+    );
+    CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+        .expect("compatible local dependency should resolve");
+    fixture.write(
+        "app/Arca.toml",
+        "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nfoo = { path = \"../foo\", version = \"^2.0.0\" }\n",
+    );
+    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+        .expect_err("incompatible local dependency must fail");
+    assert!(error.to_string().contains("VersionConflict"));
+}
+
+#[test]
+fn rejects_conflicting_dependency_declarations() {
+    let fixture = dependency_fixture();
+    fixture.write(
+        "app/Arca.toml",
+        "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[package.dependencies]\nfoo = \"1.0.0\"\n\n[dependencies]\nfoo = \"2.0.0\"\n",
+    );
+    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+        .expect_err("conflicting declarations must fail");
+    assert!(error.to_string().contains("VersionConflict"));
+}

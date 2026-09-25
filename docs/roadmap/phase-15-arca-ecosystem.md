@@ -52,9 +52,13 @@ the compiler, builds, tests, dependency resolution, and package publication.
 
 ## Dependencies and Publishing
 
-- [ ] Define dependency resolution and version constraints.
+- [x] Define basic SemVer constraints (`^`, `=`, and `>=`) and reject
+  conflicting dependency declarations or incompatible local package versions.
 - [x] Define local path dependencies, recursively resolve dependency manifests,
   hash package contents, and expose dependency namespaces to imports.
+- [x] Define deterministic `.arca` package archives that exclude generated
+  `capsula/`, VCS metadata, and build output directories.
+- [x] Validate package archive integrity with deterministic FNV-1a checksums.
 - [ ] Define registry and package index behavior.
 - [ ] Define package validation and reproducible archives.
 - [ ] Define package signing and trust policy.

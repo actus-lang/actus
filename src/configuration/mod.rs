@@ -9,11 +9,13 @@ use crate::target::{TargetSpec, TargetSpecError};
 mod dependencies;
 mod lockfile;
 mod manifest;
+mod version;
 
 pub use lockfile::{ArcaLock, LockedPackage, LockfileError};
 use manifest::ArcaManifest;
 pub use manifest::OptimizationLevel;
 pub use manifest::{BuildProfile, LibraryKind};
+pub use version::{Version, VersionConstraint, VersionError};
 
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
