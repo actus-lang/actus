@@ -1,0 +1,9 @@
+import calc;
+
+verb main() -> Int {
+    erg left = 40;
+    erg right = 2;
+    erg result = calc_sum(left: left, right: right);
+    print(result);
+    return result;
+}

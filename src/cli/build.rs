@@ -6,6 +6,7 @@ use crate::codegen::link_object;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::lexer::scan;
+use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
 
 #[derive(Clone, Copy)]
@@ -86,6 +87,14 @@ pub(super) fn build_file(
         Ok(program) => program,
         Err(error) => {
             eprintln!("{input}: {}", render_parse_error(&source, &error));
+            return 1;
+        }
+    };
+    let source_root = Path::new(input).parent().unwrap_or_else(|| Path::new("."));
+    let program = match resolve_imports(&program, &ModuleResolver::new(source_root)) {
+        Ok(program) => program,
+        Err(error) => {
+            eprintln!("error: cannot resolve imports for `{input}`: {error}");
             return 1;
         }
     };

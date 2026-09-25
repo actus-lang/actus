@@ -24,13 +24,13 @@ the compiler, builds, tests, dependency resolution, and package publication.
 - [x] Validate facade-only `open <sibling>;` exports and zero-import
   intra-module scope.
 - [x] Emit compile-time namespace collision diagnostics across siblings.
-- [ ] Add `import <module>;` lexer token and AST declaration.
-- [ ] Parse extension-free module imports with source spans and diagnostics.
-- [ ] Resolve imports through the Directory Module Resolver.
-- [ ] Merge imported facade exports into the semantic namespace.
-- [ ] Reject imports of closed or unlisted sibling symbols.
-- [ ] Lower a module-aware CLI build and link imported units.
-- [ ] Verify a real multi-file executable with a stable exit code.
+- [x] Add `import <module>;` lexer token and AST declaration.
+- [x] Parse extension-free module imports with source spans and diagnostics.
+- [x] Resolve imports through the Directory Module Resolver.
+- [x] Merge imported facade exports into the semantic namespace.
+- [x] Reject imports of closed or unlisted sibling symbols.
+- [x] Lower a module-aware CLI build and link imported units.
+- [x] Verify a real multi-file executable with a stable exit code.
 - [x] Define initial package names, versions, entry points, and Alpha edition.
 - [ ] Define the `Arca.lock` dependency lockfile format.
 - [ ] Define debug and release profile semantics.
