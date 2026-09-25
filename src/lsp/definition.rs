@@ -182,9 +182,20 @@ fn location(uri: &str, source: &str, span: SourceSpan) -> DefinitionLocation {
 }
 
 fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    uri.strip_prefix("file://").map(PathBuf::from)
+    let path = uri.strip_prefix("file://")?;
+    #[cfg(windows)]
+    {
+        return Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")));
+    }
+    #[cfg(not(windows))]
+    Some(PathBuf::from(path))
 }
 
 fn path_to_uri(path: &Path) -> String {
-    format!("file://{}", path.display())
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    if normalized.as_bytes().get(1) == Some(&b':') {
+        format!("file:///{}", normalized.trim_start_matches('/'))
+    } else {
+        format!("file://{normalized}")
+    }
 }

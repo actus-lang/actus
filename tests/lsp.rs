@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -67,7 +67,8 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
     fs::write(root.join("src/math/ops.act"), ops).expect("write sibling");
     let source = "import math;\nverb main() -> Int { erg number = add(left: 40, right: 2); return number; }\n";
     fs::write(root.join("src/main.act"), source).expect("write main");
-    let uri = format!("file://{}", root.join("src/main.act").display());
+    let uri = file_uri(&root.join("src/main.act"));
+    let ops_uri = file_uri(&root.join("src/math/ops.act"));
     let local_position = position_after(source, "return number");
     let external_position = position_after(source, "= add");
     let messages = [
@@ -99,12 +100,8 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("utf8 protocol output");
     assert!(stdout.contains("\"id\":2") && stdout.contains(&uri), "stdout: {stdout}");
-    assert!(
-        stdout.contains("\"id\":3")
-            && stdout.contains(&format!("file://{}", root.join("src/math/ops.act").display())),
-        "stdout: {stdout}"
-    );
-    assert!(stdout.contains(&format!("file://{}", root.join("src/math/ops.act").display())));
+    assert!(stdout.contains("\"id\":3") && stdout.contains(&ops_uri), "stdout: {stdout}");
+    assert!(stdout.contains(&ops_uri), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);
 }
 
@@ -201,4 +198,13 @@ fn position_after(source: &str, marker: &str) -> Value {
 fn temp_root() -> PathBuf {
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
     std::env::temp_dir().join(format!("actus-lsp-definition-{stamp}"))
+}
+
+fn file_uri(path: &Path) -> String {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    if normalized.as_bytes().get(1) == Some(&b':') {
+        format!("file:///{}", normalized.trim_start_matches('/'))
+    } else {
+        format!("file://{normalized}")
+    }
 }
