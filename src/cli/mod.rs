@@ -151,5 +151,7 @@ fn format_file(path: &str, check_only: bool) -> i32 {
 
 fn print_usage() {
     eprintln!("usage: actus <parse|check|run|fmt> [--check] <file.act>");
-    eprintln!("       actus build <file.act> [--emit obj|exe] [-o <output>]");
+    eprintln!(
+        "       actus build <file.act> [--release|--profile <name>] [--emit obj|exe] [-o <output>]"
+    );
 }

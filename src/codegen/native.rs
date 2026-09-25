@@ -19,7 +19,7 @@ use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
 use super::performance::PerformanceRegistry;
 use super::performance_emit::define_performances;
-use super::target::build_isa;
+use super::target::build_isa_with_optimization;
 use super::types::NativeType;
 use crate::target::TargetSpec;
 
@@ -265,8 +265,12 @@ fn create_module(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<ObjectModule, NativeEmitError> {
-    let isa = build_isa(target, configuration.position_independent())
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+    let isa = build_isa_with_optimization(
+        target,
+        configuration.position_independent(),
+        configuration.optimization_level(),
+    )
+    .map_err(|error| NativeEmitError(error.to_string()))?;
     let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
         .map_err(|error| NativeEmitError(error.to_string()))?;
     Ok(ObjectModule::new(builder))

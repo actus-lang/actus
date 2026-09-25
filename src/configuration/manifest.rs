@@ -13,6 +13,8 @@ pub(crate) struct ArcaManifest {
     pub(crate) package: PackageManifest,
     #[serde(default)]
     pub(crate) build: BuildManifest,
+    #[serde(default)]
+    pub(crate) profile: ProfilesManifest,
 }
 
 #[derive(Deserialize)]
@@ -41,6 +43,28 @@ pub(crate) struct BuildManifest {
     pub(crate) library_paths: Vec<String>,
     #[serde(default)]
     pub(crate) libraries: Vec<LibraryManifest>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProfilesManifest {
+    #[serde(default)]
+    pub(crate) debug: ProfileManifest,
+    #[serde(default)]
+    pub(crate) release: ProfileManifest,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProfileManifest {
+    pub(crate) opt_level: Option<OptimizationLevel>,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum OptimizationLevel {
+    None,
+    Speed,
 }
 
 #[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]

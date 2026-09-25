@@ -35,13 +35,14 @@ the compiler, builds, tests, dependency resolution, and package publication.
 - [x] Define initial package names, versions, entry points, and Alpha edition.
 - [x] Define the `Arca.lock` dependency lockfile format, deterministic package
   ordering, generation, and `LockfileOutOfDate` validation.
-- [ ] Define debug and release profile semantics.
+- [x] Define debug and release profile semantics and map profiles to Cranelift
+  optimization levels.
 
 ## Local Workflow
 
 - [ ] Add `arca init` and `arca new`.
 - [ ] Add `arca check`.
-- [ ] Add `arca build` and `arca build --release`.
+- [x] Add `arca build` and `arca build --release` / `--profile <name>`.
 - [ ] Add `arca run`.
 - [ ] Add `arca test`.
 - [ ] Add `arca fmt` integration.

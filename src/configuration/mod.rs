@@ -10,6 +10,7 @@ mod manifest;
 
 pub use lockfile::{ArcaLock, LockedPackage, LockfileError};
 use manifest::ArcaManifest;
+pub use manifest::OptimizationLevel;
 pub use manifest::{BuildProfile, LibraryKind};
 
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
@@ -39,17 +40,26 @@ pub struct LinkLibrary {
 pub struct NativeBackendConfiguration {
     module_name: String,
     position_independent: bool,
+    optimization_level: OptimizationLevel,
 }
 
 impl Default for NativeBackendConfiguration {
     fn default() -> Self {
-        Self { module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(), position_independent: true }
+        Self {
+            module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(),
+            position_independent: true,
+            optimization_level: OptimizationLevel::None,
+        }
     }
 }
 
 impl NativeBackendConfiguration {
     pub fn new(module_name: impl Into<String>, position_independent: bool) -> Self {
-        Self { module_name: module_name.into(), position_independent }
+        Self {
+            module_name: module_name.into(),
+            position_independent,
+            optimization_level: OptimizationLevel::None,
+        }
     }
 
     pub fn module_name(&self) -> &str {
@@ -58,6 +68,15 @@ impl NativeBackendConfiguration {
 
     pub fn position_independent(&self) -> bool {
         self.position_independent
+    }
+
+    pub fn with_optimization_level(mut self, optimization_level: OptimizationLevel) -> Self {
+        self.optimization_level = optimization_level;
+        self
+    }
+
+    pub const fn optimization_level(&self) -> OptimizationLevel {
+        self.optimization_level
     }
 }
 
@@ -68,6 +87,7 @@ pub struct CompilerConfiguration {
     target: TargetSpec,
     target_spec_hash: String,
     profile: BuildProfile,
+    profiles: manifest::ProfilesManifest,
     linker: OsString,
     linker_flavor: LinkerFlavor,
     entry_contract: EntryContract,
@@ -91,6 +111,7 @@ impl CompilerConfiguration {
             target_spec_hash: target.spec_hash(),
             target,
             profile: BuildProfile::Debug,
+            profiles: manifest::ProfilesManifest::default(),
             linker,
             linker_flavor,
             entry_contract,
@@ -117,13 +138,14 @@ impl CompilerConfiguration {
             )));
         }
         let (profile, native_backend, libraries, library_paths) =
-            build_settings(manifest.build, &environment, manifest_directory);
+            build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
         Ok(Self {
             project_root: manifest_directory.to_path_buf(),
             source_root,
             target_spec_hash: target.spec_hash(),
             target,
             profile,
+            profiles: manifest.profile,
             linker,
             linker_flavor,
             entry_contract,
@@ -196,6 +218,13 @@ impl CompilerConfiguration {
         self.profile
     }
 
+    pub fn with_profile(mut self, profile: BuildProfile) -> Self {
+        self.profile = profile;
+        self.native_backend =
+            self.native_backend.with_optimization_level(optimization_level(profile, self.profiles));
+        self
+    }
+
     pub fn capsula_target_directory(&self) -> PathBuf {
         self.project_root
             .join("capsula")
@@ -219,20 +248,37 @@ fn validate_lockfile(path: &Path) -> Result<(), ConfigurationError> {
 
 fn build_settings(
     build: manifest::BuildManifest,
+    profiles: manifest::ProfilesManifest,
     environment: &CompilerConfiguration,
     directory: &Path,
 ) -> (BuildProfile, NativeBackendConfiguration, Vec<LinkLibrary>, Vec<PathBuf>) {
+    let profile = build.profile.unwrap_or(environment.profile);
     let native_backend = NativeBackendConfiguration::new(
         build.native_module.unwrap_or_else(|| environment.native_backend.module_name.clone()),
         build.position_independent.unwrap_or(environment.native_backend.position_independent),
-    );
+    )
+    .with_optimization_level(optimization_level(profile, profiles));
     let libraries = build
         .libraries
         .into_iter()
         .map(|library| LinkLibrary::new(library.name, library.kind))
         .collect();
     let library_paths = build.library_paths.into_iter().map(|path| directory.join(path)).collect();
-    (build.profile.unwrap_or(environment.profile), native_backend, libraries, library_paths)
+    (profile, native_backend, libraries, library_paths)
+}
+
+fn optimization_level(
+    profile: BuildProfile,
+    profiles: manifest::ProfilesManifest,
+) -> OptimizationLevel {
+    let configured = match profile {
+        BuildProfile::Debug => profiles.debug.opt_level,
+        BuildProfile::Release => profiles.release.opt_level,
+    };
+    configured.unwrap_or(match profile {
+        BuildProfile::Debug => OptimizationLevel::None,
+        BuildProfile::Release => OptimizationLevel::Speed,
+    })
 }
 
 fn resolve_manifest_target(
