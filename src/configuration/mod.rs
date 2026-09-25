@@ -250,6 +250,7 @@ impl CompilerConfiguration {
 fn validate_lockfile(path: &Path) -> Result<(), ConfigurationError> {
     let lock_path = path.with_file_name("Arca.lock");
     if !lock_path.is_file() {
+        ArcaLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
         return Ok(());
     }
     let lock_source = std::fs::read_to_string(&lock_path).map_err(|error| {
