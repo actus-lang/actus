@@ -1,0 +1,83 @@
+# ADR-0021 Implementation Roadmap: Single-Origin Views
+
+This roadmap implements non-owning `abs` returns and caller-scope borrow
+propagation. It depends on the completed `ins` access-state foundations from
+ADR-0020 but does not change exclusive-loan semantics.
+
+## Gate 0: Return contract
+
+- [ ] Define the canonical `-> abs ViewType` return syntax.
+- [ ] Define `abs self` as the receiver form of the single source parameter.
+- [ ] Define which view types are eligible for non-owning returns.
+- [ ] Define the distinction between owned returns and `abs` view returns.
+- [ ] Reject multiple-origin returns without adding explicit origin syntax.
+- [ ] Add stable diagnostics for missing, multiple, and unknown origins.
+
+## Gate 1: AST and parser
+
+- [ ] Add an access-qualified return type representation.
+- [ ] Preserve separate spans for the access qualifier and underlying type.
+- [ ] Parse `-> abs Type` for verbs, role methods, and external declarations.
+- [ ] Reject `abs` in unsupported type positions.
+- [ ] Add parser fixtures for ordinary and method returns.
+- [ ] Add parser rejection fixtures for malformed qualified returns.
+
+## Gate 2: Origin model
+
+- [ ] Add semantic origin metadata for expressions.
+- [ ] Represent `None`, one `abs` parameter, derived origin, and unknown origin.
+- [ ] Count `abs self` as the method's single origin parameter.
+- [ ] Exclude scalar parameters from origin counting.
+- [ ] Reject verbs with zero or multiple `abs` source parameters.
+- [ ] Reject expressions derived from local owned temporaries.
+- [ ] Reject unknown calls and expressions with multiple origins.
+
+## Gate 3: Origin-preserving operations
+
+- [ ] Define the approved origin-preserving intrinsic and method operations.
+- [ ] Track direct return of the source view.
+- [ ] Track field and slice derivations from the source view.
+- [ ] Preserve the root origin through nested view derivations.
+- [ ] Reject operations that combine two source roots.
+- [ ] Add positive provenance unit tests.
+- [ ] Add negative provenance and temporary-owner tests.
+
+## Gate 4: Caller-scope propagation
+
+- [ ] Extend call signatures with the returned view origin contract.
+- [ ] Transfer origin metadata from callee result to the caller expression.
+- [ ] Create the returned view's borrow record in the caller scope.
+- [ ] Freeze the source owner while the returned view is live.
+- [ ] Support propagation through nested view-returning calls.
+- [ ] Prevent source moves, drops, and exclusive loans while a view is live.
+- [ ] Thaw the source only after all derived views end.
+- [ ] Add scope, nested-block, and caller-return tests.
+
+## Gate 5: Cleanup and ownership integration
+
+- [ ] Mark returned views as non-owning bindings.
+- [ ] Exclude returned views from owned drop actions.
+- [ ] Emit exactly one end-borrow action for each returned view.
+- [ ] Integrate view records with LIFO cleanup ordering.
+- [ ] Validate early return and loop-exit cleanup for live views.
+- [ ] Reject double end-borrow and stale-view cleanup states.
+- [ ] Verify interaction with partial moves and case branches.
+
+## Gate 6: Native representation
+
+- [ ] Define the native representation of eligible view types.
+- [ ] Specify pointer, length, alignment, and target-aware ABI details.
+- [ ] Distinguish view values from owned `Buffer` values in layout metadata.
+- [ ] Lower view-returning calls without ownership cleanup.
+- [ ] Add Cranelift ABI and layout tests.
+- [ ] Add native tests for zero-copy view use and source reuse after scope end.
+- [ ] Add negative native tests for source destruction while a view is live.
+
+## Gate 7: Completion criteria
+
+- [ ] Run formatter, check, clippy, tests, and source-limit checks.
+- [ ] Verify that every accepted `abs` return has one known origin.
+- [ ] Verify that caller-scope borrow propagation is deterministic.
+- [ ] Verify that no view receives owned cleanup.
+- [ ] Update ADR implementation notes with the accepted ABI and diagnostics.
+- [ ] Mark this roadmap complete only after semantic and native tests pass.

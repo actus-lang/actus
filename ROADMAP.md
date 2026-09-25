@@ -10,6 +10,15 @@ web authentication are explicitly deferred to a separate platform project.
 
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
 
+## Ownership Model Extensions
+
+The following accepted architecture decisions extend the ownership model after
+the original Roles and Performance phase. They are tracked as separate,
+gated implementation roadmaps:
+
+- [ ] [ADR-0020: Exclusive Call-Scope Loans and the Instrumental Role](docs/roadmap/adr-0020-exclusive-call-scope-loans.md)
+- [ ] [ADR-0021: Single-Origin Views and Caller-Scope Borrow Propagation](docs/roadmap/adr-0021-single-origin-views.md)
+
 ## Phases
 
 - [x] [Phase 1: Repository and Project Discipline](docs/roadmap/phase-01-repository-discipline.md)
