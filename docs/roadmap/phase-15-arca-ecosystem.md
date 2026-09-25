@@ -3,6 +3,12 @@
 Arca is the planned project and package manager for Actus. It will orchestrate
 the compiler, builds, tests, dependency resolution, and package publication.
 
+## Alpha Scope Closure
+
+The local Alpha infrastructure defined by this phase is complete. Remote
+registry hosting, web authentication, API tokens, and remote package transport
+are deferred to a separate Arca web platform project and do not block Phase 16.
+
 ## Manifest and Project Model
 
 - [x] Define the initial `Arca.toml` manifest schema.
@@ -59,8 +65,17 @@ the compiler, builds, tests, dependency resolution, and package publication.
 - [x] Define deterministic `.arca` package archives that exclude generated
   `capsula/`, VCS metadata, and build output directories.
 - [x] Validate package archive integrity with deterministic FNV-1a checksums.
-- [ ] Define registry and package index behavior.
-- [ ] Define package validation and reproducible archives.
-- [ ] Define package signing and trust policy.
-- [ ] Add `arca publish` after the registry contract is stable.
-- [ ] Add package download and cache management.
+- [x] Define a deterministic local package index with package versions and
+  checksums.
+- [deferred] Define the remote registry and package index protocol in the Arca
+  web platform project.
+- [x] Define package validation and reproducible archives.
+- [x] Define checksum-based archive integrity verification as the initial trust
+  policy.
+- [deferred] Define cryptographic package signing and key trust policy in the
+  Arca web platform project.
+- [x] Add `arca publish` for local registry publication after package
+  validation.
+- [x] Add a local checksum-addressed package cache.
+- [deferred] Add remote package download and cache population in the Arca web
+  platform project.

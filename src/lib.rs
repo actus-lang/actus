@@ -10,6 +10,7 @@ pub mod lexer;
 pub mod modules;
 pub mod packaging;
 pub mod parser;
+pub mod registry;
 pub mod runtime;
 pub mod semantic;
 pub mod target;

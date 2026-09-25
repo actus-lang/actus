@@ -9,6 +9,7 @@ mod build;
 mod check;
 mod fmt;
 mod project;
+mod publish;
 mod run;
 mod test_runner;
 
@@ -41,6 +42,9 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
     }
     if command == "fmt" {
         return fmt::fmt_command(arguments);
+    }
+    if command == "publish" {
+        return publish::publish_command(arguments);
     }
 
     let Some(first_argument) = arguments.next() else {
@@ -106,7 +110,7 @@ fn parse_file(path: &str, print_ast: bool) -> i32 {
 }
 
 fn print_usage() {
-    eprintln!("usage: actus <new|init|check|parse|run|test|fmt> [options] [file.act]");
+    eprintln!("usage: actus <new|init|check|parse|run|test|fmt|publish> [options] [file.act]");
     eprintln!(
         "       actus build <file.act> [--release|--profile <name>] [--emit obj|exe] [-o <output>]"
     );

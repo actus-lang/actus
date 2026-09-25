@@ -17,6 +17,12 @@ pub use manifest::OptimizationLevel;
 pub use manifest::{BuildProfile, LibraryKind};
 pub use version::{Version, VersionConstraint, VersionError};
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackageIdentity {
+    pub name: String,
+    pub version: String,
+}
+
 const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
 const DEFAULT_NATIVE_MODULE_NAME: &str = "actus";
@@ -247,6 +253,11 @@ impl CompilerConfiguration {
             .join(self.profile.directory_name())
             .join(self.target.triple().to_string())
     }
+}
+
+pub fn package_identity(path: &Path) -> Result<PackageIdentity, ConfigurationError> {
+    let manifest = manifest::read(path)?;
+    Ok(PackageIdentity { name: manifest.package.name, version: manifest.package.version })
 }
 
 fn validate_lockfile(path: &Path) -> Result<(), ConfigurationError> {
