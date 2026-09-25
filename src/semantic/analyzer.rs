@@ -21,6 +21,7 @@ pub(super) struct Analyzer {
     pub(super) model: SemanticModel,
     pub(super) scopes: Vec<ScopeFrame>,
     pub(super) next_borrow_id: usize,
+    pub(super) next_loan_id: usize,
     pub(super) active_borrow_ids: HashSet<usize>,
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
     pub(super) loop_boundaries: Vec<usize>,
@@ -64,6 +65,7 @@ impl Analyzer {
             model: SemanticModel {
                 bindings: Vec::new(),
                 borrows: Vec::new(),
+                exclusive_loans: Vec::new(),
                 cleanup_plans: Vec::new(),
                 return_unwind_plans: Vec::new(),
                 loop_unwind_plans: Vec::new(),
@@ -73,6 +75,7 @@ impl Analyzer {
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
+            next_loan_id: 0,
             active_borrow_ids: HashSet::new(),
             signatures: HashMap::new(),
             loop_boundaries: Vec::new(),

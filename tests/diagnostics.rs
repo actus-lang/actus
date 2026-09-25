@@ -54,3 +54,16 @@ fn renders_case_semantic_diagnostic_codes() {
         assert!(render_semantic_error(source, &error).contains(&format!("error[{code}]")));
     }
 }
+
+#[test]
+fn renders_exclusive_loan_alias_diagnostic() {
+    let source = "verb merge(ins left: Buffer, abs view: Buffer) { } verb main() { erg buffer = Buffer[1]; merge(left: ins buffer, view: abs buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = analyze(&program).expect_err("ins and abs aliasing should fail");
+    assert_eq!(
+        render_semantic_error(source, &error),
+        "error[E1065] at 1:124: exclusive loan aliases resource `buffer` more than once"
+    );
+}

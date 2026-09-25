@@ -33,6 +33,7 @@ impl Analyzer {
             return Ok(());
         };
         let owner_index = self.binding(name, *owner_span)?;
+        self.ensure_access_available(owner_index, name, span)?;
         if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidBorrowTarget { name: name.clone() },
@@ -90,6 +91,7 @@ impl Analyzer {
                     AccessState::Frozen { borrow_ids: vec![borrow_id] }
             }
             AccessState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
+            AccessState::Suspended { .. } => return,
         }
         if !self.model.bindings[owner_index].ownership.is_live() {
             self.model.bindings[owner_index].access = AccessState::Mutable;

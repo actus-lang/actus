@@ -62,29 +62,10 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
     if let Some(code) = type_semantic_code(kind) {
         return code;
     }
+    if let Some(code) = ownership_semantic_code(kind) {
+        return code;
+    }
     match kind {
-        SemanticErrorKind::DuplicateBinding { .. } => "E1001",
-        SemanticErrorKind::ShadowedBinding { .. } => "E1002",
-        SemanticErrorKind::UndeclaredIdentifier { .. } => "E1003",
-        SemanticErrorKind::InvalidBorrowTarget { .. } => "E1004",
-        SemanticErrorKind::UseAfterMove { .. } => "E1005",
-        SemanticErrorKind::UseAfterDrop { .. } => "E1006",
-        SemanticErrorKind::DoubleDrop { .. } => "E1007",
-        SemanticErrorKind::DropBorrow { .. } => "E1008",
-        SemanticErrorKind::DropFrozen { .. } => "E1009",
-        SemanticErrorKind::InvalidDatArgument { .. } => "E1010",
-        SemanticErrorKind::MoveFrozen { .. } => "E1011",
-        SemanticErrorKind::UnknownParameter { .. } => "E1012",
-        SemanticErrorKind::DuplicateArgument { .. } => "E1013",
-        SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
-        SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
-        SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
-        SemanticErrorKind::InvalidIntrinsicArgument { .. } => "E1021",
-        SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",
-        SemanticErrorKind::BorrowedReturn { .. } => "E1018",
-        SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
-        SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
-        SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
         SemanticErrorKind::DuplicateStructName { .. } => "E1029",
         SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
@@ -115,6 +96,36 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
     }
 }
 
+fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
+        SemanticErrorKind::DuplicateBinding { .. } => "E1001",
+        SemanticErrorKind::ShadowedBinding { .. } => "E1002",
+        SemanticErrorKind::UndeclaredIdentifier { .. } => "E1003",
+        SemanticErrorKind::InvalidBorrowTarget { .. } => "E1004",
+        SemanticErrorKind::UseAfterMove { .. } => "E1005",
+        SemanticErrorKind::UseAfterDrop { .. } => "E1006",
+        SemanticErrorKind::DoubleDrop { .. } => "E1007",
+        SemanticErrorKind::DropBorrow { .. } => "E1008",
+        SemanticErrorKind::DropFrozen { .. } => "E1009",
+        SemanticErrorKind::InvalidDatArgument { .. } => "E1010",
+        SemanticErrorKind::MoveFrozen { .. } => "E1011",
+        SemanticErrorKind::UnknownParameter { .. } => "E1012",
+        SemanticErrorKind::DuplicateArgument { .. } => "E1013",
+        SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
+        SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
+        SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
+        SemanticErrorKind::InvalidIntrinsicArgument { .. } => "E1021",
+        SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",
+        SemanticErrorKind::BorrowedReturn { .. } => "E1018",
+        SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
+        SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
+        SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
+        SemanticErrorKind::SuspendedAccess { .. } => "E1064",
+        SemanticErrorKind::ExclusiveLoanAlias { .. } => "E1065",
+        _ => return None,
+    })
+}
+
 fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
     Some(match kind {
         SemanticErrorKind::UnknownType { .. } => "E1023",
@@ -143,10 +154,21 @@ fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
 }
 
 fn semantic_message(kind: &SemanticErrorKind) -> String {
+    if let Some(message) = ownership_semantic_message(kind) {
+        return message;
+    }
     if let Some(message) = extended_semantic_message(kind) {
         return message;
     }
-    match kind {
+    unreachable!("extended semantic message was not rendered")
+}
+
+fn ownership_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    ownership_core_message(kind).or_else(|| ownership_call_message(kind))
+}
+
+fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
         SemanticErrorKind::DuplicateBinding { name } => format!("duplicate binding `{name}`"),
         SemanticErrorKind::ShadowedBinding { name } => format!("shadowed binding `{name}`"),
         SemanticErrorKind::UndeclaredIdentifier { name } => {
@@ -166,6 +188,12 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
         SemanticErrorKind::MoveFrozen { name, .. } => {
             format!("cannot move frozen binding `{name}`")
         }
+        _ => return None,
+    })
+}
+
+fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
         SemanticErrorKind::UnknownParameter { callee, name } => {
             format!("unknown parameter `{name}` in call to `{callee}`")
         }
@@ -197,8 +225,14 @@ fn semantic_message(kind: &SemanticErrorKind) -> String {
         SemanticErrorKind::ReservedIntrinsicName { name } => {
             format!("`{name}` is reserved for a built-in intrinsic")
         }
-        _ => unreachable!("extended semantic message was not rendered"),
-    }
+        SemanticErrorKind::SuspendedAccess { name, loan_id } => {
+            format!("binding `{name}` is suspended by exclusive loan #{loan_id}")
+        }
+        SemanticErrorKind::ExclusiveLoanAlias { name } => {
+            format!("exclusive loan aliases resource `{name}` more than once")
+        }
+        _ => return None,
+    })
 }
 
 fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {

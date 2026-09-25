@@ -26,26 +26,26 @@ ADR-0021.
 
 ## Gate 2: Access-state model
 
-- [ ] Add `AccessState::Suspended { loan_id }`.
-- [ ] Add a semantic loan record containing owner, callee, parameter, and span.
-- [ ] Define transitions from mutable access to suspended access.
-- [ ] Define restoration from suspended access to mutable access.
-- [ ] Reject reads, writes, moves, drops, and borrows of suspended owners.
-- [ ] Reject a second exclusive loan from a suspended owner.
-- [ ] Preserve `OwnershipState` while an `ins` loan is active.
-- [ ] Add transition-matrix unit tests for valid and invalid states.
+- [x] Add `AccessState::Suspended { loan_id }`.
+- [x] Add a semantic loan record containing owner, callee, parameter, and span.
+- [x] Define transitions from mutable access to suspended access.
+- [x] Define restoration from suspended access to mutable access.
+- [x] Reject reads, writes, moves, drops, and borrows of suspended owners.
+- [x] Reject a second exclusive loan from a suspended owner.
+- [x] Preserve `OwnershipState` while an `ins` loan is active.
+- [x] Add transition-matrix unit tests for valid and invalid states.
 
 ## Gate 3: Call-boundary validation
 
-- [ ] Validate declared parameter role and call-site role equality.
-- [ ] Resolve the root binding for every `ins` argument.
-- [ ] Accept active `erg` and `dat` owners as loan sources.
-- [ ] Reject `abs`, frozen, moved, dropped, and ambiguous sources.
-- [ ] Detect overlapping `ins` and `abs` access to one root resource.
-- [ ] Detect duplicate `ins` access in one call.
-- [ ] Assign deterministic loan identifiers.
-- [ ] Restore each owner after the call exactly once.
-- [ ] Add stable diagnostics for every rejected call-boundary case.
+- [x] Validate declared parameter role and call-site role equality.
+- [x] Resolve the root binding for every `ins` argument.
+- [x] Accept active `erg` and `dat` owners as loan sources.
+- [x] Reject `abs`, frozen, moved, dropped, and ambiguous sources.
+- [x] Detect overlapping `ins` and `abs` access to one root resource.
+- [x] Detect duplicate `ins` access in one call.
+- [x] Assign deterministic loan identifiers.
+- [x] Restore each owner after the call exactly once.
+- [x] Add stable diagnostics for every rejected call-boundary case.
 
 ## Gate 4: Loan forwarding
 

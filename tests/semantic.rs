@@ -6,6 +6,8 @@ mod dynamic;
 mod enums;
 #[path = "semantic/generics.rs"]
 mod generics;
+#[path = "semantic/loans.rs"]
+mod loans;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
 #[path = "semantic/roles.rs"]

@@ -21,6 +21,7 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, *subject_span)?;
+        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidCaseRole {
@@ -60,6 +61,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let Expr::Identifier { name, span: identifier_span } = expression else { return Ok(()) };
         let index = self.binding(name, *identifier_span)?;
+        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidOwnerInitializer { name: name.clone() },
@@ -118,6 +120,7 @@ impl Analyzer {
             return Ok(());
         };
         let index = self.binding(name, *span)?;
+        self.ensure_access_available(index, name, *span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::BorrowedReturn { name: name.clone() },
@@ -164,6 +167,7 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        self.ensure_access_available(index, name, span)?;
         match self.model.bindings[index].ownership {
             OwnershipState::Moved => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
@@ -179,6 +183,21 @@ impl Analyzer {
             }),
             OwnershipState::Active => Ok(()),
         }
+    }
+
+    pub(super) fn ensure_access_available(
+        &self,
+        index: usize,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if let AccessState::Suspended { loan_id } = self.model.bindings[index].access {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::SuspendedAccess { name: name.to_owned(), loan_id },
+                span,
+            });
+        }
+        Ok(())
     }
 
     pub(super) fn ensure_mutable(
@@ -212,6 +231,7 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
+        self.ensure_access_available(index, name, span)?;
         let binding = &self.model.bindings[index];
         if binding.role == Role::Abs {
             return Err(SemanticError {
@@ -278,6 +298,7 @@ impl Analyzer {
         match &self.model.bindings[index].access {
             AccessState::Frozen { borrow_ids } => borrow_ids.clone(),
             AccessState::Mutable => Vec::new(),
+            AccessState::Suspended { loan_id } => vec![*loan_id],
         }
     }
 }

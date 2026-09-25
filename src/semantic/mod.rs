@@ -11,6 +11,7 @@ mod errors;
 mod generic_cache;
 mod generics;
 mod intrinsics;
+mod loans;
 mod methods;
 mod model;
 mod ownership;
@@ -28,7 +29,7 @@ pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{
-    Binding, BorrowRecord, DynamicRoleType, FatPointerLayout, GenericInstance,
+    Binding, BorrowRecord, DynamicRoleType, ExclusiveLoan, FatPointerLayout, GenericInstance,
     ReachablePerformance, SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
