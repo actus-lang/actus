@@ -177,6 +177,7 @@ the hosted-runtime boundary, and deterministic status reporting.
 - [x] Map stream operations to target-specific runtime capabilities.
 - [x] Add ownership and aliasing tests for read/write calls.
 - [x] Add native tests for complete and partial transfers.
+- [x] Document public `std::io` ownership, Result, error, and C ABI contracts.
 
 ### Gate 2.4: Buffering (`BufReader` & `BufWriter`)
 
