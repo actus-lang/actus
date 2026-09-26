@@ -1,14 +1,13 @@
 use std::collections::HashSet;
 
-use crate::ast::{
-    Expr, Program, Role, StructDef, StructField, StructFieldInit, TopLevelDecl, TypeName,
-    lookup_builtin_type,
-};
+use crate::ast::{Expr, Program, Role, StructDef, StructField, TopLevelDecl, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::type_substitution::TypeSubstitution;
+
+mod literals;
 
 impl Analyzer {
     pub(super) fn validate_field_assignment(
@@ -195,83 +194,6 @@ impl Analyzer {
         .map(|substitution| substitution.apply(&field.ty))
     }
 
-    pub(super) fn validate_struct_literal(
-        &mut self,
-        name: &str,
-        type_arguments: &[TypeName],
-        fields: &[StructFieldInit],
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Some(definition) = self.struct_types.get(name).cloned() else {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::UnknownType { name: name.to_owned() },
-                span,
-            });
-        };
-        let declared_type =
-            TypeName { name: name.to_owned(), arguments: type_arguments.to_vec(), span };
-        self.validate_type_reference(&declared_type)?;
-        let substitution =
-            TypeSubstitution::for_type(name, &definition.generic_parameters, type_arguments, span)?;
-        self.validate_struct_initializers(name, &definition, &substitution, fields, span)?;
-        Ok(())
-    }
-
-    fn validate_struct_initializers(
-        &mut self,
-        name: &str,
-        definition: &StructDef,
-        substitution: &TypeSubstitution,
-        fields: &[StructFieldInit],
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let mut initialized = HashSet::new();
-        for initializer in fields {
-            if !initialized.insert(initializer.name.clone()) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::DuplicateStructField {
-                        struct_name: name.to_owned(),
-                        field: initializer.name.clone(),
-                    },
-                    span: initializer.span,
-                });
-            }
-            let Some(field) = self.struct_field(name, &initializer.name).cloned() else {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::UnknownStructField {
-                        struct_name: name.to_owned(),
-                        field: initializer.name.clone(),
-                    },
-                    span: initializer.span,
-                });
-            };
-            self.visit_expression(&initializer.value)?;
-            let expected = substitution.apply(&field.ty);
-            self.validate_field_value_type(
-                name,
-                &field,
-                &expected,
-                &initializer.value,
-                initializer.span,
-            )?;
-            if matches!(field.role, crate::ast::StructFieldRole::Erg) {
-                self.initialize_owner(&initializer.value, initializer.span)?;
-            }
-        }
-        for field in &definition.fields {
-            if !initialized.contains(&field.name) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MissingStructField {
-                        struct_name: name.to_owned(),
-                        field: field.name.clone(),
-                    },
-                    span,
-                });
-            }
-        }
-        Ok(())
-    }
-
     pub(super) fn validate_field_access(
         &self,
         object: &Expr,
@@ -299,48 +221,6 @@ impl Analyzer {
         Ok(())
     }
 
-    fn validate_field_value(
-        &self,
-        struct_name: &str,
-        field: &StructField,
-        value: &Expr,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        self.validate_field_value_type(struct_name, field, &field.ty, value, span)
-    }
-
-    fn validate_field_value_type(
-        &self,
-        struct_name: &str,
-        field: &StructField,
-        expected_type: &TypeName,
-        value: &Expr,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let expected_name = canonical_type_name(expected_type);
-        let expected = expected_type.name.as_str();
-        let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
-        let matches = if expected_type.arguments.is_empty()
-            && let Some(expected_builtin) = lookup_builtin_type(expected)
-        {
-            self.expression_type(value) == Some(expected_builtin)
-        } else {
-            self.expression_type_name(value).as_deref() == Some(expected_name.as_str())
-        };
-        if matches {
-            return Ok(());
-        }
-        Err(SemanticError {
-            kind: SemanticErrorKind::StructFieldTypeMismatch {
-                struct_name: struct_name.to_owned(),
-                field: field.name.clone(),
-                expected: expected_name,
-                found,
-            },
-            span,
-        })
-    }
-
     pub(super) fn struct_field(&self, struct_name: &str, field: &str) -> Option<&StructField> {
         let base_name = struct_name.split('[').next().unwrap_or(struct_name);
         self.struct_types.get(base_name).and_then(|definition| {
@@ -357,7 +237,7 @@ fn root_binding(expression: &Expr) -> Option<(&str, SourceSpan)> {
     }
 }
 
-fn canonical_type_name(type_name: &TypeName) -> String {
+pub(super) fn canonical_type_name(type_name: &TypeName) -> String {
     if type_name.arguments.is_empty() {
         return type_name.name.clone();
     }
