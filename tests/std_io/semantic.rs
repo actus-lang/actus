@@ -30,6 +30,11 @@ fn std_io_declarations_pass_semantic_validation() {
         ("verb", "refill"),
         ("verb", "buffered_write"),
         ("verb", "flush_buffer"),
+        ("struct", "Cursor"),
+        ("verb", "cursor"),
+        ("verb", "cursor_read"),
+        ("verb", "cursor_write"),
+        ("verb", "cursor_flush"),
         ("enum", "IoError"),
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");

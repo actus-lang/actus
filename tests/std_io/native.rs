@@ -153,3 +153,18 @@ fn std_io_stream_result_chain_propagates_success() {
     assert_eq!(execution.status.code(), Some(42));
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn std_io_cursor_reader_uses_static_generic_dispatch() {
+    let (root, input, output) = project(
+        "cursor-reader",
+        "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
+        &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg payload = Buffer[0]; append(payload, 67); append(payload, 117); append(payload, 114); erg storage = Buffer[0]; actus_cursor_write(target: ins storage, source: abs payload); erg output = Buffer[0]; actus_cursor_read(source: abs storage, target: ins output); print(text: abs output); flush(); return 0; }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("cursor fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"Cur");
+    let _ = fs::remove_dir_all(root);
+}

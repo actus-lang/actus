@@ -15,7 +15,7 @@ impl Analyzer {
             if receiver.name != "self" {
                 continue;
             }
-            if !matches!(receiver.role, Role::Erg | Role::Abs)
+            if !matches!(receiver.role, Role::Erg | Role::Abs | Role::Ins)
                 || !self.struct_types.contains_key(&receiver.ty.name)
             {
                 return Err(SemanticError {
@@ -111,8 +111,21 @@ impl Analyzer {
                     span,
                 }
             })?;
+        let receiver_role =
+            method_decl.params.first().map(|parameter| parameter.role.clone()).ok_or_else(
+                || SemanticError {
+                    kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
+                    span,
+                },
+            )?;
         let signature = super::dynamic::role_method_signature(method_decl);
         self.visit_expression(receiver)?;
+        if receiver_role == Role::Ins && !self.is_exclusive_owner(receiver) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
+                span,
+            });
+        }
         let mut parameters = signature.params;
         let mut dispatch = signature.dynamic_params;
         parameters.remove(0);
@@ -232,7 +245,7 @@ impl Analyzer {
         let mut combined = Vec::with_capacity(arguments.len() + 1);
         combined.push(Argument {
             name: named.then(|| receiver_name.to_owned()),
-            role: None,
+            role: matches!(role, Role::Ins).then_some(Role::Ins),
             role_span: None,
             expression: receiver_expression,
         });

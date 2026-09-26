@@ -192,6 +192,9 @@ impl Analyzer {
             }
         }
         self.execute_exclusive_loans(callee, arguments, &parameter_indices, signature)?;
+        if let Some(return_type) = &signature.return_type_name {
+            self.inferred_expression_types.insert((span.start, span.end), return_type.clone());
+        }
         Ok(())
     }
 

@@ -110,7 +110,7 @@ pub fn emit_program_object_for_target(
 
 fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
     match declaration {
-        TopLevelDecl::Verb(verb) => Some(verb),
+        TopLevelDecl::Verb(verb) if verb.generic_parameters.is_empty() => Some(verb),
         _ => None,
     }
 }

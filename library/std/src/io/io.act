@@ -16,5 +16,7 @@ open write;
 /// Re-export static reader and writer contracts.
 open reader;
 open writer;
+/// Re-export the in-memory cursor stream.
+open cursor;
 /// Re-export buffered reader and writer abstractions.
 open buffered;

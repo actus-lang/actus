@@ -92,6 +92,42 @@ pub unsafe extern "C" fn actus_flush_buffered_stdout(handle: BufferHandle) -> i3
     if count < 0 || unsafe { flush_raw_buffer(target) }.is_err() { -1 } else { count }
 }
 
+/// Copies an in-memory cursor source into a caller-owned destination buffer.
+///
+/// # Safety
+///
+/// Both handles must be null or live buffers returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_cursor_read(
+    source_handle: BufferHandle,
+    target_handle: BufferHandle,
+) -> i32 {
+    unsafe { copy_buffer(source_handle, target_handle) }
+}
+
+/// Appends a borrowed source buffer to in-memory cursor storage.
+///
+/// # Safety
+///
+/// Both handles must be distinct live buffers returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_cursor_write(
+    target_handle: BufferHandle,
+    source_handle: BufferHandle,
+) -> i32 {
+    unsafe { copy_buffer(source_handle, target_handle) }
+}
+
+/// Flushes cursor state. In-memory cursors have no external stream to sync.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_cursor_flush(handle: BufferHandle) -> i32 {
+    if handle.is_null() { -1 } else { 0 }
+}
+
 unsafe fn flush_raw_buffer(buffer: &mut ActusBuffer) -> std::io::Result<()> {
     let written = unsafe { actus_write_buffer_stdout(buffer as *mut ActusBuffer) };
     if written < 0 || std::io::stdout().flush().is_err() {
@@ -108,4 +144,28 @@ fn write_bytes(stream: &mut impl Write, bytes: &[u8], newline: bool) -> std::io:
         stream.write_all(b"\n")?;
     }
     Ok(())
+}
+
+unsafe fn copy_buffer(source_handle: BufferHandle, target_handle: BufferHandle) -> i32 {
+    if source_handle.is_null() || target_handle.is_null() || source_handle == target_handle {
+        return -1;
+    }
+    let source = unsafe { &*source_handle };
+    let target = unsafe { &mut *target_handle };
+    if (source.length > 0 && source.data.is_null())
+        || target.length > target.capacity
+        || (target.length > 0 && target.data.is_null())
+    {
+        return -1;
+    }
+    let source_bytes = unsafe { std::slice::from_raw_parts(source.data, source.length) };
+    let mut data = unsafe { Vec::from_raw_parts(target.data, target.length, target.capacity) };
+    if data.try_reserve(source_bytes.len()).is_err() {
+        super::types::restore_buffer(target, data);
+        return -1;
+    }
+    data.extend_from_slice(source_bytes);
+    let count = i32::try_from(source_bytes.len()).unwrap_or(-1);
+    super::types::restore_buffer(target, data);
+    count
 }

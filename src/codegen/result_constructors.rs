@@ -9,16 +9,30 @@ pub(super) fn normalize_program(program: &Program) -> Program {
     let signatures = collect_signatures(program);
     let mut normalized = program.clone();
     for declaration in &mut normalized.declarations {
-        let TopLevelDecl::Verb(verb) = declaration else { continue };
-        let return_type = verb.return_type.as_ref().map(|return_type| return_type.ty.clone());
-        let mut locals = verb
-            .params
-            .iter()
-            .map(|parameter| (parameter.name.clone(), parameter.ty.clone()))
-            .collect();
-        normalize_block(&mut verb.body, return_type.as_ref(), &signatures, &mut locals);
+        match declaration {
+            TopLevelDecl::Verb(verb) => normalize_verb(verb, &signatures),
+            TopLevelDecl::Perform(perform) => {
+                for method in &mut perform.methods {
+                    normalize_verb(method, &signatures);
+                }
+            }
+            _ => {}
+        }
     }
     normalized
+}
+
+fn normalize_verb(
+    verb: &mut crate::ast::VerbDecl,
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+) {
+    let return_type = verb.return_type.as_ref().map(|return_type| return_type.ty.clone());
+    let mut locals = verb
+        .params
+        .iter()
+        .map(|parameter| (parameter.name.clone(), parameter.ty.clone()))
+        .collect();
+    normalize_block(&mut verb.body, return_type.as_ref(), signatures, &mut locals);
 }
 
 fn collect_signatures(program: &Program) -> HashMap<String, Vec<(String, TypeName)>> {

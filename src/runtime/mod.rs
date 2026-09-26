@@ -27,7 +27,8 @@ pub use contract::{
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use stream::{
-    actus_buffered_write_stdout, actus_flush_buffered_stdout, actus_write_buffer_stdout,
+    actus_buffered_write_stdout, actus_cursor_flush, actus_cursor_read, actus_cursor_write,
+    actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
 pub use types::{ActusBuffer, BufferHandle};
 

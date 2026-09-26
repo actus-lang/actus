@@ -172,7 +172,7 @@ impl Analyzer {
 
     pub(super) fn is_readable_owner(&self, expression: &Expr) -> bool {
         let Some(index) = self.root_binding_index(expression) else { return false };
-        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
+        matches!(self.model.bindings[index].role, Role::Erg | Role::Abs | Role::Dat | Role::Ins)
             && matches!(
                 self.model.bindings[index].ownership,
                 OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
@@ -180,7 +180,7 @@ impl Analyzer {
             && !self.model.bindings[index].access.is_suspended()
     }
 
-    fn is_exclusive_owner(&self, expression: &Expr) -> bool {
+    pub(super) fn is_exclusive_owner(&self, expression: &Expr) -> bool {
         let Some(index) = self.root_binding_index(expression) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
