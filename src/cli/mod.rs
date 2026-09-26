@@ -135,8 +135,6 @@ fn print_usage() {
 
 fn print_help() {
     println!("{}", usage_text());
-    println!();
-    println!("Run `actus <command> --help` for command-specific options.");
 }
 
 fn print_command_help(command: &str) -> i32 {
@@ -154,7 +152,7 @@ fn is_help_flag(argument: &str) -> bool {
 }
 
 fn usage_text() -> &'static str {
-    "usage: actus <new|init|check|parse|build|run|watch|test|fmt|lsp|publish> [options] [file.act]"
+    "usage: actus <command> [options]\n\nCommands:\n  new      Create a new Actus project.\n  init     Initialize an existing directory as an Actus project.\n  check    Parse, resolve, and validate without code generation.\n  parse    Parse one source file and print its AST.\n  build    Compile an object or executable from a file or project.\n  run      Build and execute a program once.\n  watch    Re-check or rebuild after source changes.\n  test     Discover and run `meta test` verbs.\n  fmt      Format Actus sources, or check formatting.\n  lsp      Serve the Language Server Protocol over stdio.\n  publish  Validate and publish a local package archive.\n\nRun `actus <command> --help` for command-specific options."
 }
 
 fn command_help_text(command: &str) -> Option<&'static str> {
@@ -208,7 +206,10 @@ mod tests {
         ] {
             assert!(command_help_text(command).is_some(), "missing help for {command}");
         }
-        assert!(usage_text().contains("build"));
+        let help = usage_text();
+        assert!(help.contains("Commands:"));
+        assert!(help.contains("build    Compile"));
+        assert!(help.contains("watch    Re-check"));
     }
 
     #[test]

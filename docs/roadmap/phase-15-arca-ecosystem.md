@@ -46,15 +46,15 @@ are deferred to a separate Arca web platform project and do not block Phase 16.
 
 ## Local Workflow
 
-- [x] Add `arca init` and `arca new` with optional Git initialization and
-  canonical `.gitignore` generation.
-- [x] Add `arca check` with module resolution and semantic validation without
-  code generation.
-- [x] Add `arca build` and `arca build --release` / `--profile <name>`.
-- [x] Add `arca run` with profile selection and program-argument forwarding.
-- [x] Add `arca test` with `meta test` discovery, native execution, timing,
-  exit codes, and pass/fail reporting.
-- [x] Add project-wide `arca fmt` integration with `--check` support.
+- [x] Add `actus init` and `actus new` with optional Git initialization and
+      canonical `.gitignore` generation.
+- [x] Add `actus check` with module resolution and semantic validation without
+      code generation.
+- [x] Add `actus build` and `actus build --release` / `--profile <name>`.
+- [x] Add `actus run` with profile selection and program-argument forwarding.
+- [x] Add `actus test` with `meta test` discovery, native execution, timing,
+      exit codes, and pass/fail reporting.
+- [x] Add project-wide `actus fmt` integration with `--check` support.
 
 ## Dependencies and Publishing
 
