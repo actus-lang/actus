@@ -140,30 +140,30 @@ interaction.
 
 ### API contract
 
-- [ ] Define the `std::io` module layout and public facade.
-- [ ] Define stdout output for supported scalar values.
-- [ ] Define stderr output for diagnostics or explicit error reporting.
+- [x] Define the `std::io` module layout and public facade.
+- [x] Define stdout output for supported scalar values.
+- [x] Define stderr output for diagnostics or explicit error reporting.
 - [ ] Define input behavior and its failure contract.
-- [ ] Define whether output operations return a status or `Result` value.
+- [x] Define whether output operations return a status or `Result` value.
 - [ ] Define buffering and flushing behavior.
-- [ ] Define ownership roles for input and output buffers.
-- [ ] Keep the public API independent of the host implementation language.
+- [x] Define ownership roles for input and output buffers.
+- [x] Keep the public API independent of the host implementation language.
 
 ### Implementation
 
-- [ ] Implement the public `std::io` declarations in Actus.
-- [ ] Implement the minimal runtime bridge for stdout.
-- [ ] Implement the minimal runtime bridge for stderr.
+- [x] Implement the public `std::io` declarations in Actus.
+- [x] Implement the minimal runtime bridge for stdout.
+- [x] Implement the minimal runtime bridge for stderr.
 - [ ] Implement the minimal runtime bridge for input.
-- [ ] Keep host calls inside the approved FFI boundary.
-- [ ] Avoid hidden heap allocation in scalar output operations.
-- [ ] Add semantic tests for valid and invalid calls.
-- [ ] Add native execution tests for stdout and exit status.
+- [x] Keep host calls inside the approved FFI boundary.
+- [x] Avoid hidden heap allocation in scalar output operations.
+- [x] Add semantic tests for valid and invalid calls.
+- [x] Add native execution tests for stdout and exit status.
 - [ ] Add failure-path tests for unavailable or failed I/O.
 
 ### Gate 2 invariant
 
-- [ ] A small Actus program can perform deterministic console I/O through
+- [x] A small Actus program can perform deterministic console I/O through
       `std::io` without compiler-specific application intrinsics.
 
 ## Gate 3: `std::fs`

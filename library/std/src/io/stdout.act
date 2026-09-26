@@ -1,0 +1,5 @@
+open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
+
+open verb print_int(erg value: Int) -> Int {
+    return actus_print_int(value: value);
+}

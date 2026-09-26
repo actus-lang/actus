@@ -4,8 +4,9 @@ use std::path::Path;
 mod contract;
 
 pub use contract::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, PRINT_INT_SYMBOL,
-    PRINT_STRING_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, PRINT_INT_STDERR_SYMBOL,
+    PRINT_INT_SYMBOL, PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, RUNTIME_ABI_VERSION,
+    RuntimeCapability,
 };
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
@@ -44,6 +45,13 @@ pub extern "C" fn actus_print_int(value: i32) -> i32 {
     value
 }
 
+/// Prints an integer value to stderr followed by a newline.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_int_stderr(value: i32) -> i32 {
+    eprintln!("{value}");
+    value
+}
+
 #[unsafe(no_mangle)]
 /// Prints a null-terminated UTF-8 string followed by a newline.
 ///
@@ -57,6 +65,22 @@ pub unsafe extern "C" fn actus_print_string(value: *const u8) -> i32 {
     let bytes = unsafe { std::ffi::CStr::from_ptr(value.cast()) }.to_bytes();
     let text = String::from_utf8_lossy(bytes);
     println!("{text}");
+    i32::try_from(bytes.len()).unwrap_or(i32::MAX)
+}
+
+#[unsafe(no_mangle)]
+/// Prints a null-terminated UTF-8 string to stderr followed by a newline.
+///
+/// # Safety
+///
+/// `value` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_string_stderr(value: *const u8) -> i32 {
+    if value.is_null() {
+        return 0;
+    }
+    let bytes = unsafe { std::ffi::CStr::from_ptr(value.cast()) }.to_bytes();
+    let text = String::from_utf8_lossy(bytes);
+    eprintln!("{text}");
     i32::try_from(bytes.len()).unwrap_or(i32::MAX)
 }
 
