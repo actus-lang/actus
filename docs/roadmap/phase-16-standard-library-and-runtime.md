@@ -181,12 +181,13 @@ the hosted-runtime boundary, and deterministic status reporting.
 
 ### Gate 2.4: Buffering (`BufReader` & `BufWriter`)
 
-- [ ] Define `BufReader` ownership and refill behavior.
-- [ ] Define `BufWriter` ownership, buffering, and flush behavior.
-- [ ] Define explicit close/flush failure handling.
-- [ ] Ensure internal buffers have deterministic cleanup paths.
-- [ ] Add semantic tests for nested views and exclusive refill/write loans.
-- [ ] Add native tests comparing buffered and direct stream behavior.
+- [x] Define `BufReader` ownership and refill behavior.
+- [x] Verify reusable caller-provided buffers for zero-allocation refill paths.
+- [x] Define `BufWriter` ownership, buffering, and flush behavior.
+- [x] Define explicit close/flush failure handling.
+- [x] Ensure internal buffers have deterministic cleanup paths.
+- [x] Add semantic tests for nested views and exclusive refill/write loans.
+- [x] Add native tests comparing buffered and direct stream behavior.
 
 ### Gate 2.5: In-Memory Cursor & Stream Utilities
 

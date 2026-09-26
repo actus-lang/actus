@@ -7,6 +7,10 @@ use actus::cli::run_with_args;
 use actus::lexer::scan;
 use actus::modules::{ModuleResolver, analyze_module, exports_module};
 use actus::parser::parse;
+use actus::runtime::{
+    actus_buffer_allocate, actus_buffer_append, actus_buffer_reserve, actus_buffered_write_stdout,
+    actus_flush_buffered_stdout,
+};
 use actus::semantic::analyze;
 
 fn library_source(file: &str) -> String {
@@ -34,8 +38,10 @@ fn std_io_declarations_pass_semantic_validation() {
     assert!(exports.contains("struct", "BufferedWriter"));
     assert!(exports.contains("verb", "buffered_reader"));
     assert!(exports.contains("verb", "buffered_writer"));
+    assert!(exports.contains("verb", "reserve"));
     assert!(exports.contains("verb", "refill"));
     assert!(exports.contains("verb", "buffered_write"));
+    assert!(exports.contains("verb", "flush_buffer"));
     assert!(exports.contains("enum", "IoError"));
     analyze_module(&resolver, "io").expect("std io declarations should be semantically valid");
 }
@@ -50,25 +56,23 @@ fn std_io_buffered_constructor_requires_dat_ownership_transfer() {
 }
 
 #[test]
-fn std_io_native_buffered_reader_reuses_owned_buffer() {
+fn std_io_buffered_write_requires_distinct_ins_and_abs_bindings() {
+    let source = "verb buffered_write(ins buffer: Buffer, abs input: Buffer) -> Int { return 0; } verb main() -> Int { erg buffer = Buffer[0]; return buffered_write(buffer: ins buffer, input: abs buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("buffered alias fixture should parse");
+    assert!(analyze(&program).is_err());
+}
+
+#[test]
+fn std_io_native_buffer_flushes_pending_bytes() {
     let root = std::env::temp_dir().join(format!("actus-std-buffered-{}", std::process::id()));
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create buffered fixture");
-    fs::write(
-        io_root.join("io.act"),
-        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\nopen read;\nopen write;\nopen buffered;\n",
-    )
-    .expect("write buffered facade");
-    for file in [
-        "stdout.act",
-        "stderr.act",
-        "stdin.act",
-        "error.act",
-        "read.act",
-        "write.act",
-        "buffered.act",
-    ] {
+    fs::write(io_root.join("io.act"), "open stdout;\nopen error;\n")
+        .expect("write buffered facade");
+    for file in ["stdout.act", "error.act"] {
         fs::write(io_root.join(file), library_source(file)).expect("copy buffered source");
     }
     fs::write(
@@ -79,7 +83,7 @@ fn std_io_native_buffered_reader_reuses_owned_buffer() {
     let input = source_root.join("main.act");
     fs::write(
         &input,
-        "import io; verb main() -> Int { erg reader = BufferedReader { buffer: Buffer[0], }; erg writer = BufferedWriter { buffer: Buffer[0], }; erg payload = Buffer[0]; buffered_write(input: abs payload); return 0; }\n",
+        "import io; verb main() -> Int { erg storage = Buffer[0]; append(storage, 97); append(storage, 98); append(storage, 99); append(storage, 100); append(storage, 101); append(storage, 102); print(text: abs storage); flush(); return 0; }\n",
     )
     .expect("write buffered entry");
     let output = root.join("std-buffered");
@@ -105,6 +109,7 @@ fn std_io_native_buffered_reader_reuses_owned_buffer() {
     child.stdin.take().expect("stdin pipe should exist").write_all(b"buffered\n").unwrap();
     let execution = child.wait_with_output().expect("wait for buffered fixture");
     assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"abcdef");
     let _ = fs::remove_dir_all(root);
 }
 
@@ -346,4 +351,22 @@ fn std_io_stream_result_chain_propagates_success() {
     let execution = child.wait_with_output().expect("wait for stream fixture");
     assert_eq!(execution.status.code(), Some(42));
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_buffered_runtime_flushes_full_and_partial_chunks() {
+    let target = actus_buffer_allocate(0);
+    let source = actus_buffer_allocate(0);
+    assert!(!target.is_null());
+    assert!(!source.is_null());
+    unsafe {
+        assert_eq!(actus_buffer_reserve(target, 4), 4);
+        for byte in b"abcdef" {
+            assert!(actus_buffer_append(source, *byte));
+        }
+        assert_eq!(actus_buffered_write_stdout(target, source), 6);
+        assert_eq!(actus_flush_buffered_stdout(target), 2);
+        actus::runtime::actus_buffer_drop(source);
+        actus::runtime::actus_buffer_drop(target);
+    }
 }

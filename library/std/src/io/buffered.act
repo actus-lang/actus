@@ -8,9 +8,9 @@ open struct BufferedReader {
 
 /// A caller-owned output buffer used by buffered write operations.
 ///
-/// The `erg` field owns the reusable storage. Output operations inspect
-/// caller-provided storage with `abs` and never transfer ownership through the
-/// output call.
+/// The `erg` field owns the reusable storage. Output operations borrow that
+/// storage with `ins`, append `abs` source bytes, and never allocate after the
+/// caller has reserved the required capacity.
 open struct BufferedWriter {
     erg buffer: Buffer,
 }
@@ -39,10 +39,54 @@ open verb refill(ins reader: BufferedReader) -> Result[Int, IoError] {
     return read_line(buffer: ins reader.buffer);
 }
 
-/// Write a read-only view through the standard output stream.
+open unsafe extern "C" verb actus_buffer_reserve(
+    ins buffer: Buffer,
+    erg capacity: Int
+) -> Int;
+
+open unsafe extern "C" verb actus_buffered_write_stdout(
+    ins buffer: Buffer,
+    abs input: Buffer
+) -> Int;
+
+open unsafe extern "C" verb actus_flush_buffered_stdout(ins buffer: Buffer) -> Int;
+
+/// Reserve reusable storage for a buffered writer.
 ///
-/// The input is `abs`, so the source remains available to the caller. The
-/// caller supplies storage and the operation performs no buffer allocation.
-open verb buffered_write(abs input: Buffer) -> Result[Int, IoError] {
-    return write(buffer: abs input);
+/// The buffer length is preserved; only its backing capacity is increased.
+open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError] {
+    erg status = actus_buffer_reserve(buffer: ins buffer, capacity: capacity);
+    return case abs status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
+}
+
+/// Append an immutable source to a reusable stdout buffer.
+///
+/// Full storage is written automatically. `Result.Ok(count)` reports the
+/// number of source bytes accepted, while `Err(Failed)` reports a reserve or
+/// output failure. The source remains available because it is borrowed with
+/// `abs`; the destination is exclusively borrowed with `ins`.
+open verb buffered_write(
+    ins buffer: Buffer,
+    abs input: Buffer
+) -> Result[Int, IoError] {
+    erg status = actus_buffered_write_stdout(buffer: ins buffer, input: abs input);
+    return case abs status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
+}
+
+/// Write the pending bytes and reset the reusable stdout buffer.
+///
+/// `Result.Ok(count)` is the number of bytes flushed. The backing storage is
+/// retained for the next write, so repeated flush cycles do not allocate.
+open verb flush_buffer(ins buffer: Buffer) -> Result[Int, IoError] {
+    erg status = actus_flush_buffered_stdout(buffer: ins buffer);
+    return case abs status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }

@@ -17,6 +17,9 @@ pub const PRINT_LINE_BUFFER_STDERR_SYMBOL: &str = "actus_print_line_buffer_stder
 pub const READ_STDIN_LINE_SYMBOL: &str = "actus_read_stdin_line";
 pub const READ_BYTE_SYMBOL: &str = "actus_read_byte";
 pub const WRITE_BUFFER_STDOUT_SYMBOL: &str = "actus_write_buffer_stdout";
+pub const BUFFER_RESERVE_SYMBOL: &str = "actus_buffer_reserve";
+pub const BUFFERED_WRITE_STDOUT_SYMBOL: &str = "actus_buffered_write_stdout";
+pub const FLUSH_BUFFERED_STDOUT_SYMBOL: &str = "actus_flush_buffered_stdout";
 pub const ENUM_ALLOCATE_SYMBOL: &str = "actus_enum_allocate";
 pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
 
