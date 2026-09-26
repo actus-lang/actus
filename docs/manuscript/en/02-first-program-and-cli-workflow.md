@@ -218,7 +218,9 @@ No heap wrapper or lifetime annotation is added to the call.
 
 There are two useful workflows. `build` leaves a selected artifact on disk;
 `run` builds a temporary executable, runs it, returns its status, and removes
-the temporary artifact.
+the temporary artifact. When invoked from a project directory, both commands
+discover `Arca.toml` and use its configured entry source. An explicit `.act`
+path remains available when a different source is the intended input.
 
 Build an executable explicitly:
 
@@ -241,22 +243,23 @@ process's exit status.
 The same program can be compiled and run without retaining the executable:
 
 ```text
-$ actus run src/main.act
-built `/tmp/actus-run-...`
+$ actus run
+42
+process exited with status 0
 $ echo $?
 0
 ```
 
-The temporary path is platform-dependent. The build message is emitted by the
-compiler; the exit status comes from the Actus program. A program that calls
-an output intrinsic can write to stdout, while compiler diagnostics are sent
-to stderr so that build logs and program output remain distinguishable.
+`run` does not expose the temporary executable path. Program output is kept on
+stdout, while the process status and compiler diagnostics are sent to stderr.
+The status returned by `actus run` is the Actus program's status, so shell
+scripts can use it directly.
 
 Build profiles are selected at the command line:
 
 ```sh
-actus build src/main.act --release --emit exe
-actus run src/main.act --profile debug
+actus build --release --emit exe
+actus run --profile debug
 ```
 
 The debug profile uses the configured non-optimizing Cranelift level. The
@@ -267,12 +270,39 @@ Before generating native code, use `check` for a fast frontend-only
 validation:
 
 ```text
-$ actus check src/main.act
+$ actus check
 checked `src/main.act` successfully
 ```
 
 `check` reads the source, resolves modules, parses it, and runs semantic
 analysis without emitting an object file or executable.
+
+For a package that selects another source root or entry in `Arca.toml`, the
+same commands follow that manifest contract automatically:
+
+```toml
+[package]
+source_root = "app"
+entry = "start"
+```
+
+From the package root, `actus check`, `actus build`, and `actus run` resolve
+`app/main.act` as the source entry and use the configured entry contract. A
+profile affects native code generation only; checking, formatting, and test
+discovery remain semantic operations.
+
+Use `actus watch` when the command should remain active and re-check after a
+source or manifest change. It is intentionally separate from one-shot `run`:
+
+```text
+$ actus watch
+watching `src/main.act`
+checked `src/main.act` successfully
+```
+
+`actus watch --once` is a deterministic CI-friendly form. `--build` performs
+an executable build after each detected change, and Ctrl-C ends the watcher
+with status 130.
 
 ## 5. What Arca and the Compiler Actually Do
 
@@ -387,13 +417,15 @@ same frontend facts can later be used by the LSP server and editor clients.
 At the end of this chapter, the workflow is:
 
 ```text
-create project → edit src/main.act → check → build → run
+create project → edit the configured entry → check → build → run or watch
 ```
 
-`Arca.toml` describes the project and build contract. `src/main.act` contains
-the source. `actus check` validates without code generation. `actus build`
+`Arca.toml` describes the project and build contract, including source root,
+entry, target, and profile settings. The configured entry source contains the
+program. `actus check` validates without code generation. `actus build`
 produces an object or linked executable. `actus run` executes a temporary
-linked executable and returns its process status.
+linked executable and returns its process status. `actus watch` repeats
+checking or building after relevant source changes.
 
 In Chapter 03, we will examine the Actus lexicon and syntax in detail:
 keywords, identifiers, literals, declarations, parameters, types, punctuation,

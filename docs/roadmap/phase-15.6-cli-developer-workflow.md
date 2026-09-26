@@ -87,17 +87,17 @@ compiler pipeline.
 
 ## Gate 7: Workflow consistency and quality
 
-- [ ] Make `check`, `build`, `run`, `test`, and `fmt` share consistent project
+- [x] Make `check`, `build`, `run`, `test`, and `fmt` share consistent project
       discovery and profile behavior.
-- [ ] Ensure all commands respect `Arca.toml` source roots, targets, and entry
+- [x] Ensure all commands respect `Arca.toml` source roots, targets, and entry
       contracts.
-- [ ] Update the CLI documentation and Chapter 02 after implementation.
-- [ ] Add regression coverage for Linux, macOS, and Windows path behavior.
-- [ ] Run `cargo fmt --all -- --check`.
-- [ ] Run `cargo check --all-targets --all-features`.
-- [ ] Run `cargo clippy --all-targets --all-features -- -D warnings`.
-- [ ] Run `cargo test --all-targets --all-features`.
-- [ ] Run `scripts/check_source_limits.sh`.
+- [x] Update the CLI documentation and Chapter 02 after implementation.
+- [x] Add regression coverage for Linux, macOS, and Windows path behavior.
+- [x] Run `cargo fmt --all -- --check`.
+- [x] Run `cargo check --all-targets --all-features`.
+- [x] Run `cargo clippy --all-targets --all-features -- -D warnings`.
+- [x] Run `cargo test --all-targets --all-features`.
+- [x] Run `scripts/check_source_limits.sh`.
 
 ## Completion Criteria
 

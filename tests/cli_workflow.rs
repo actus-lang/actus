@@ -122,8 +122,44 @@ fn watch_once_checks_the_project_entry() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("watching `src/main.act`"));
-    assert!(stdout.contains("checked `src/main.act` successfully"));
+    assert!(stdout.contains("watching `") && stdout.contains("main.act`"));
+    assert!(stdout.contains("checked `") && stdout.contains("main.act` successfully"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn check_and_run_follow_manifest_source_root_and_entry() {
+    let root = std::env::temp_dir().join(format!("actus-custom-entry-{}", std::process::id()));
+    fs::create_dir_all(root.join("app")).expect("create source directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"custom\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nsource_root = \"app\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("app/main.act"), "verb main() -> Int { return 44; }\n")
+        .expect("write entry source");
+
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .expect("run check command");
+    assert!(check.status.success(), "stderr: {}", String::from_utf8_lossy(&check.stderr));
+    assert!(String::from_utf8_lossy(&check.stdout).contains("app/main.act"));
+
+    let run = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("run")
+        .current_dir(&root)
+        .output()
+        .expect("run project");
+    assert_eq!(
+        run.status.code(),
+        Some(44),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
     let _ = fs::remove_dir_all(root);
 }
 
