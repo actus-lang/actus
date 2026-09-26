@@ -1,41 +1,51 @@
-/// A reusable input adapter over a statically selected `Reader` source.
-///
-/// Both the source and storage are owned by the adapter. Refill borrows the
-/// adapter for one call and fills the existing storage without allocation.
+"""
+A reusable input adapter over a statically selected `Reader` source.
+
+Both the source and storage are owned by the adapter. Refill borrows the
+adapter for one call and fills the existing storage without allocation.
+"""
 open struct BufferedReader[Source: Reader] {
     erg source: Source,
     erg buffer: Buffer,
 }
 
-/// A reusable output adapter over a statically selected `Writer` target.
-///
-/// The target and storage are owned by the adapter. Output operations borrow
-/// the adapter with `ins` and pass source bytes as `abs` views.
+"""
+A reusable output adapter over a statically selected `Writer` target.
+
+The target and storage are owned by the adapter. Output operations borrow
+the adapter with `ins` and pass source bytes as `abs` views.
+"""
 open struct BufferedWriter[Target: Writer] {
     erg target: Target,
     erg buffer: Buffer,
 }
 
-/// Construct a buffered reader from an owned source and reusable buffer.
-///
-/// Both `dat` arguments transfer ownership into the reader, which performs
-/// deterministic cleanup for the source and buffer.
+"""
+Construct a buffered reader from an owned source and reusable buffer.
+
+Both `dat` arguments transfer ownership into the reader, which performs
+deterministic cleanup for the source and buffer.
+"""
 open verb buffered_reader[Source: Reader](dat source: Source, dat buffer: Buffer) -> BufferedReader[Source] {
     return BufferedReader[Source] { source: source, buffer: buffer, };
 }
 
-/// Construct a buffered writer from an owned target and reusable buffer.
-///
-/// Both `dat` arguments transfer ownership into the writer. No second
-/// allocation is performed by the constructor.
+"""
+Construct a buffered writer from an owned target and reusable buffer.
+
+Both `dat` arguments transfer ownership into the writer. No second
+allocation is performed by the constructor.
+"""
 open verb buffered_writer[Target: Writer](dat target: Target, dat buffer: Buffer) -> BufferedWriter[Target] {
     return BufferedWriter[Target] { target: target, buffer: buffer, };
 }
 
-/// Refill a reader's existing buffer from stdin until newline or EOF.
-///
-/// The `ins reader` loan is non-escaping and covers the complete call. The
-/// result reports the exact byte count or a typed I/O error.
+"""
+Refill a reader's existing buffer from stdin until newline or EOF.
+
+The `ins reader` loan is non-escaping and covers the complete call. The
+result reports the exact byte count or a typed I/O error.
+"""
 open verb refill[Source: Reader](ins reader: BufferedReader[Source]) -> Result[Int, IoError] {
     return reader.source.read(buffer: ins reader.buffer);
 }
@@ -45,9 +55,11 @@ open unsafe extern "C" verb actus_buffer_reserve(
     erg capacity: Int
 ) -> Int;
 
-/// Reserve reusable storage for a buffered writer.
-///
-/// The buffer length is preserved; only its backing capacity is increased.
+"""
+Reserve reusable storage for a buffered writer.
+
+The buffer length is preserved; only its backing capacity is increased.
+"""
 open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError] {
     erg status = actus_buffer_reserve(buffer: ins buffer, capacity: capacity);
     return case status {
@@ -56,11 +68,13 @@ open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError]
     };
 }
 
-/// Write an immutable source through the selected writer target.
-///
-/// `Result.Ok(count)` reports the number of source bytes accepted. The source
-/// remains available because it is borrowed with `abs`; the adapter is
-/// exclusively borrowed with `ins`.
+"""
+Write an immutable source through the selected writer target.
+
+`Result.Ok(count)` reports the number of source bytes accepted. The source
+remains available because it is borrowed with `abs`; the adapter is
+exclusively borrowed with `ins`.
+"""
 open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target],
     abs input: Buffer
@@ -68,10 +82,12 @@ open verb buffered_write[Target: Writer](
     return writer.target.write(buffer: abs input);
 }
 
-/// Flush the pending bytes through the selected writer target.
-///
-/// `Result.Ok(count)` is the number of bytes flushed. The backing storage is
-/// retained for the next write, so repeated flush cycles do not allocate.
+"""
+Flush the pending bytes through the selected writer target.
+
+`Result.Ok(count)` is the number of bytes flushed. The backing storage is
+retained for the next write, so repeated flush cycles do not allocate.
+"""
 open verb flush_buffer[Target: Writer](ins writer: BufferedWriter[Target]) -> Result[Int, IoError] {
     return writer.target.flush();
 }

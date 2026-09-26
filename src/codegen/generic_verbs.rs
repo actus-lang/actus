@@ -42,6 +42,7 @@ fn specialize_verb(
     .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?;
     Ok(Some(VerbDecl {
         is_open: verb.is_open,
+        doc: verb.doc.clone(),
         metadata: verb.metadata.clone(),
         name: verb.name.clone(),
         generic_parameters: Vec::new(),

@@ -9,6 +9,7 @@ pub fn render_lex_error(source: &str, error: &LexError) -> String {
             format!("unexpected character `{character}`")
         }
         LexErrorKind::UnterminatedString => "unterminated string literal".to_owned(),
+        LexErrorKind::UnterminatedDocString => "unterminated docstring literal".to_owned(),
     };
 
     format!("error[E000{code}] at {line}:{column}: {message}", code = lex_code(error))
@@ -44,6 +45,7 @@ fn lex_code(error: &LexError) -> u8 {
     match error.kind {
         LexErrorKind::UnexpectedCharacter(_) => 1,
         LexErrorKind::UnterminatedString => 2,
+        LexErrorKind::UnterminatedDocString => 3,
     }
 }
 

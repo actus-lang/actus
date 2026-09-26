@@ -1,14 +1,16 @@
-/// C ABI scalar output bridge. The `erg` role passes the integer value owned
-/// by the call; the runtime returns an integer status wrapped by `print_int`.
+"""
+C ABI scalar output bridge. The `erg` role passes the integer value owned
+by the call; the runtime returns an integer status wrapped by `print_int`.
+"""
 open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
-/// C ABI bridge that reads a borrowed buffer and writes it to stdout.
+"""C ABI bridge that reads a borrowed buffer and writes it to stdout."""
 open unsafe extern "C" verb actus_print_buffer_stdout(abs text: Buffer) -> Int;
-/// C ABI bridge that writes a borrowed buffer followed by a newline.
+"""C ABI bridge that writes a borrowed buffer followed by a newline."""
 open unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> Int;
-/// C ABI bridge that synchronizes stdout and returns zero or failure.
+"""C ABI bridge that synchronizes stdout and returns zero or failure."""
 open unsafe extern "C" verb actus_flush_stdout() -> Int;
 
-/// Print an integer value to stdout and return its typed I/O result.
+"""Print an integer value to stdout and return its typed I/O result."""
 open verb print_int(erg value: Int) -> Result[Int, IoError] {
     erg status = actus_print_int(value: value);
     return case status {
@@ -17,7 +19,7 @@ open verb print_int(erg value: Int) -> Result[Int, IoError] {
     };
 }
 
-/// Print a borrowed buffer without consuming or modifying it.
+"""Print a borrowed buffer without consuming or modifying it."""
 open verb print(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_buffer_stdout(text: abs text);
     return case status {
@@ -26,8 +28,10 @@ open verb print(abs text: Buffer) -> Result[Int, IoError] {
     };
 }
 
-/// Print a borrowed buffer, append a newline, and flush stdout immediately.
-/// The result contains the written byte count or `IoError.Failed`.
+"""
+Print a borrowed buffer, append a newline, and flush stdout immediately.
+The result contains the written byte count or `IoError.Failed`.
+"""
 open verb println(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_line_buffer_stdout(text: abs text);
     erg flushed = actus_flush_stdout();
@@ -40,8 +44,10 @@ open verb println(abs text: Buffer) -> Result[Int, IoError] {
     };
 }
 
-/// Flush pending stdout output and translate the native status into `Result`.
-/// A successful flush returns `Ok(0)`; any non-zero runtime status is `Failed`.
+"""
+Flush pending stdout output and translate the native status into `Result`.
+A successful flush returns `Ok(0)`; any non-zero runtime status is `Failed`.
+"""
 open verb flush() -> Result[Int, IoError] {
     erg status: Int = actus_flush_stdout();
     erg result: Result[Int, IoError] = case status {

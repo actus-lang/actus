@@ -32,6 +32,7 @@ pub(super) fn specialized_structs(
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(StructDef {
                 is_open: false,
+                doc: definition.doc.clone(),
                 name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
                 fields,

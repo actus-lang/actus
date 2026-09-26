@@ -1,7 +1,9 @@
-/// The static read contract used by buffered input adapters.
-///
-/// `self` identifies the concrete source selected during monomorphization;
-/// `ins buffer` is the caller-owned destination filled without allocation.
+"""
+The static read contract used by buffered input adapters.
+
+`self` identifies the concrete source selected during monomorphization;
+`ins buffer` is the caller-owned destination filled without allocation.
+"""
 open role Reader {
     verb read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError];
 }

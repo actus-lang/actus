@@ -3,6 +3,7 @@ Program {
         Verb(
             VerbDecl {
                 is_open: false,
+                doc: None,
                 metadata: [],
                 name: "transfer",
                 generic_parameters: [],

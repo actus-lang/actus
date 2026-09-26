@@ -1,18 +1,24 @@
-/// Native write bridge for the standard output stream.
-///
-/// The `abs` parameter is a read-only, non-owning view. Writing consumes the
-/// bytes presented by the view, not the buffer's ownership, so the caller can
-/// continue using its `erg` buffer after the call.
+"""
+Native write bridge for the standard output stream.
+
+The `abs` parameter is a read-only, non-owning view. Writing consumes the
+bytes presented by the view, not the buffer's ownership, so the caller can
+continue using its `erg` buffer after the call.
+"""
 open unsafe extern "C" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int;
 
-/// Write the complete available buffer to stdout when the runtime accepts it.
-///
-/// `Result.Ok(count)` contains the exact number of bytes reported by the C
-/// ABI. The raw `-1` and `-2` statuses are translated to `Failed` and
-/// `EndOfStream`; status encoding is never exposed to Actus callers.
+"""
+Write the complete available buffer to stdout when the runtime accepts it.
+
+`Result.Ok(count)` contains the exact number of bytes reported by the C
+ABI. The raw `-1` and `-2` statuses are translated to `Failed` and
+`EndOfStream`; status encoding is never exposed to Actus callers.
+"""
 open verb write(abs buffer: Buffer) -> Result[Int, IoError] {
-    /// Keep the native status in an owned scalar while the borrowed view is
-    /// still valid; no buffer or heap allocation is introduced here.
+    """
+    Keep the native status in an owned scalar while the borrowed view is
+    still valid; no buffer or heap allocation is introduced here.
+    """
     erg status: Int = actus_write_buffer_stdout(buffer: abs buffer);
     erg result: Result[Int, IoError] = case status {
         -1 => Err(IoError.Failed),

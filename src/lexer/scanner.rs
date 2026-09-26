@@ -4,6 +4,7 @@ use super::token::{SourceSpan, Token, TokenKind};
 pub enum LexErrorKind {
     UnexpectedCharacter(char),
     UnterminatedString,
+    UnterminatedDocString,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -79,6 +80,11 @@ impl<'source> Scanner<'source> {
             '/' => self.push_simple(TokenKind::Slash, start),
             '.' => self.push_simple(TokenKind::Dot, start),
             '?' => self.push_simple(TokenKind::Question, start),
+            '"' if self.peek() == Some('"') && self.peek_next() == Some('"') => {
+                self.advance();
+                self.advance();
+                self.scan_doc_string(start);
+            }
             '"' => self.scan_string(start),
             character if is_identifier_start(character) => self.scan_identifier(start),
             character if character.is_ascii_digit() => self.scan_integer(start),
@@ -189,6 +195,33 @@ impl<'source> Scanner<'source> {
         ));
     }
 
+    fn scan_doc_string(&mut self, start: usize) {
+        let content_start = self.cursor;
+
+        while !self.is_at_end() {
+            if self.peek() == Some('"')
+                && self.peek_next() == Some('"')
+                && self.source[self.cursor..].chars().nth(2) == Some('"')
+            {
+                let content = normalize_doc_string(&self.source[content_start..self.cursor]);
+                self.advance();
+                self.advance();
+                self.advance();
+                self.tokens.push(Token::new(
+                    TokenKind::DocString(content),
+                    SourceSpan::new(start, self.cursor),
+                ));
+                return;
+            }
+            self.advance();
+        }
+
+        self.errors.push(LexError::new(
+            LexErrorKind::UnterminatedDocString,
+            SourceSpan::new(start, self.cursor),
+        ));
+    }
+
     fn skip_whitespace_and_comments(&mut self) {
         loop {
             while self.peek().is_some_and(char::is_whitespace) {
@@ -243,4 +276,31 @@ fn is_identifier_start(character: char) -> bool {
 
 fn is_identifier_continue(character: char) -> bool {
     character == '_' || character.is_ascii_alphanumeric()
+}
+
+fn normalize_doc_string(content: &str) -> String {
+    let normalized = content.replace("\r\n", "\n").replace('\r', "\n");
+    let mut lines: Vec<&str> = normalized.split('\n').collect();
+    while lines.first().is_some_and(|line| line.trim().is_empty()) {
+        lines.remove(0);
+    }
+    while lines.last().is_some_and(|line| line.trim().is_empty()) {
+        lines.pop();
+    }
+    let indent = lines
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.chars().take_while(|character| character.is_whitespace()).count())
+        .min()
+        .unwrap_or(0);
+
+    lines.iter().map(|line| remove_indent(line, indent)).collect::<Vec<_>>().join("\n")
+}
+
+fn remove_indent(line: &str, indent: usize) -> &str {
+    let mut offset = 0;
+    for character in line.chars().take(indent) {
+        offset += character.len_utf8();
+    }
+    &line[offset..]
 }

@@ -1,12 +1,14 @@
-/// `IoError` is the typed error domain for the standard I/O surface.
-///
-/// Runtime bridges use signed status values at the C boundary, but callers
-/// receive these variants through `Result` rather than inspecting raw codes.
+"""
+`IoError` is the typed error domain for the standard I/O surface.
+
+Runtime bridges use signed status values at the C boundary, but callers
+receive these variants through `Result` rather than inspecting raw codes.
+"""
 open enum IoError {
-    /// The host or target stream rejected the operation.
+    """The host or target stream rejected the operation."""
     Failed,
-    /// The operation reached end-of-stream before producing more data.
+    """The operation reached end-of-stream before producing more data."""
     EndOfStream,
-    /// The supplied buffer, path, or stream argument is not valid.
+    """The supplied buffer, path, or stream argument is not valid."""
     InvalidInput,
 }

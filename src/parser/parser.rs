@@ -11,6 +11,7 @@ mod enums;
 mod expressions;
 mod generics;
 mod roles;
+mod spans;
 mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,12 +58,16 @@ impl Parser {
     }
 
     fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        let mut doc = self.take_doc_string();
         if self.check_simple(&TokenKind::Meta) {
             let metadata = self.parse_metadata()?;
+            if doc.is_none() {
+                doc = self.take_doc_string();
+            }
             if !self.check_simple(&TokenKind::Verb) {
                 return Err(self.error_at_current("`verb` after `meta test`"));
             }
-            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata)?));
+            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
         }
         if self.check_simple(&TokenKind::Import) {
             let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
@@ -88,7 +93,7 @@ impl Parser {
                 }));
             }
             self.expect_keyword(TokenKind::Open, "`open`")?;
-            return self.parse_open_declaration();
+            return self.parse_open_declaration(doc);
         }
         if self.check_simple(&TokenKind::Unsafe) {
             return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(true, false)?));
@@ -97,36 +102,50 @@ impl Parser {
             return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false, false)?));
         }
         if self.check_simple(&TokenKind::Struct) {
-            return Ok(TopLevelDecl::Struct(self.parse_struct_def(false)?));
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
         }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def(false)?));
         }
         if self.check_simple(&TokenKind::Role) {
-            return Ok(TopLevelDecl::Role(self.parse_role_decl(false)?));
+            return Ok(TopLevelDecl::Role(self.parse_role_decl(false, doc)?));
         }
         if self.check_simple(&TokenKind::Perform) {
             return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false)?));
         }
-        let declaration = self.parse_verb(false)?;
+        let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
         Ok(TopLevelDecl::Verb(declaration))
     }
 
-    fn parse_open_declaration(&mut self) -> Result<TopLevelDecl, ParseError> {
+    fn take_doc_string(&mut self) -> Option<String> {
+        let Some(Token { kind: TokenKind::DocString(doc), .. }) = self.peek().cloned() else {
+            return None;
+        };
+        self.cursor += 1;
+        Some(doc)
+    }
+
+    fn skip_doc_strings(&mut self) {
+        while self.peek().is_some_and(|token| matches!(token.kind, TokenKind::DocString(_))) {
+            self.cursor += 1;
+        }
+    }
+
+    fn parse_open_declaration(&mut self, doc: Option<String>) -> Result<TopLevelDecl, ParseError> {
         if self.check_simple(&TokenKind::Struct) {
-            return Ok(TopLevelDecl::Struct(self.parse_struct_def(true)?));
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def(true, doc)?));
         }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def(true)?));
         }
         if self.check_simple(&TokenKind::Role) {
-            return Ok(TopLevelDecl::Role(self.parse_role_decl(true)?));
+            return Ok(TopLevelDecl::Role(self.parse_role_decl(true, doc)?));
         }
         if self.check_simple(&TokenKind::Perform) {
             return Ok(TopLevelDecl::Perform(self.parse_perform_decl(true)?));
         }
         if self.check_simple(&TokenKind::Verb) {
-            return Ok(TopLevelDecl::Verb(self.parse_verb(true)?));
+            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(true, Vec::new(), doc)?));
         }
         if self.check_simple(&TokenKind::Extern) || self.check_simple(&TokenKind::Unsafe) {
             return Ok(TopLevelDecl::ExternalVerb(
@@ -184,13 +203,14 @@ impl Parser {
     }
 
     fn parse_verb(&mut self, is_open: bool) -> Result<VerbDecl, ParseError> {
-        self.parse_verb_with_metadata(is_open, Vec::new())
+        self.parse_verb_with_metadata(is_open, Vec::new(), None)
     }
 
     fn parse_verb_with_metadata(
         &mut self,
         is_open: bool,
         metadata: Vec<MetaAttribute>,
+        doc: Option<String>,
     ) -> Result<VerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
         let name_token = self.take_identifier("verb name")?;
@@ -208,6 +228,7 @@ impl Parser {
 
         Ok(VerbDecl {
             is_open,
+            doc,
             metadata,
             name,
             generic_parameters,
@@ -297,6 +318,10 @@ impl Parser {
         while !self.check_simple(&TokenKind::RightBrace) {
             if self.at_end() {
                 return Err(self.error_at_current("`}`"));
+            }
+            self.skip_doc_strings();
+            if self.check_simple(&TokenKind::RightBrace) {
+                break;
             }
             statements.push(self.parse_statement()?);
         }
@@ -462,22 +487,4 @@ fn binding_role_from_token(kind: &TokenKind) -> Option<Role> {
     }
 }
 
-fn expression_span(expression: &Expr) -> SourceSpan {
-    match expression {
-        Expr::Identifier { span, .. }
-        | Expr::Integer { span, .. }
-        | Expr::BufferLiteral { span, .. }
-        | Expr::FloatLiteral { span, .. }
-        | Expr::StringLiteral { span, .. }
-        | Expr::Grouping { span, .. }
-        | Expr::Unary { span, .. }
-        | Expr::Binary { span, .. }
-        | Expr::Borrow { span, .. }
-        | Expr::Try { span, .. }
-        | Expr::Call { span, .. }
-        | Expr::MethodCall { span, .. }
-        | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. }
-        | Expr::Case { span, .. } => *span,
-    }
-}
+pub(super) use spans::expression_span;

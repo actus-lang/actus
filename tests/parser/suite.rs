@@ -30,6 +30,35 @@ fn parses_a_verb_with_roles_and_return_type() {
 }
 
 #[test]
+fn attaches_block_docstrings_to_supported_declarations() {
+    let program = parse_source(
+        "\"\"\"Runs the entry action.\"\"\" verb main() { return 0; } \
+         \"\"\"Stores bytes.\"\"\" struct Packet { payload: Buffer, } \
+         \"\"\"Defines a reader contract.\"\"\" role Reader { verb read(ins buffer: Buffer); }",
+    );
+
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(verb.doc.as_deref(), Some("Runs the entry action."));
+    let TopLevelDecl::Struct(structure) = &program.declarations[1] else {
+        panic!("expected struct")
+    };
+    assert_eq!(structure.doc.as_deref(), Some("Stores bytes."));
+    let TopLevelDecl::Role(role) = &program.declarations[2] else { panic!("expected role") };
+    assert_eq!(role.doc.as_deref(), Some("Defines a reader contract."));
+}
+
+#[test]
+fn docstrings_inside_supported_bodies_are_consumed_as_documentation() {
+    let program = parse_source(
+        "struct Packet { \"\"\"Payload bytes.\"\"\" payload: Buffer, } \
+         enum Status { \"\"\"Ready state.\"\"\" Ready, } \
+         verb main() { \"\"\"This statement is documented.\"\"\" return 0; }",
+    );
+
+    assert_eq!(program.declarations.len(), 3);
+}
+
+#[test]
 fn parses_instrumental_parameters_and_call_site_roles() {
     let program = parse_source(
         "verb update(ins buffer: Buffer) { } verb main(erg buffer: Buffer) { update(buffer: ins buffer); }",
