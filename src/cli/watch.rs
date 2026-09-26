@@ -24,6 +24,7 @@ struct WatchOptions {
 struct FileStamp {
     modified: Option<SystemTime>,
     length: u64,
+    content_hash: Option<u64>,
 }
 
 type FileSnapshot = BTreeMap<PathBuf, FileStamp>;
@@ -219,10 +220,20 @@ fn snapshot_paths(paths: &[PathBuf]) -> FileSnapshot {
             let metadata = fs::metadata(path).ok()?;
             Some((
                 path.clone(),
-                FileStamp { modified: metadata.modified().ok(), length: metadata.len() },
+                FileStamp {
+                    modified: metadata.modified().ok(),
+                    length: metadata.len(),
+                    content_hash: fs::read(path).ok().map(|contents| hash_contents(&contents)),
+                },
             ))
         })
         .collect()
+}
+
+fn hash_contents(contents: &[u8]) -> u64 {
+    contents.iter().fold(0xcbf29ce484222325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+    })
 }
 
 #[cfg(test)]
