@@ -41,8 +41,16 @@ pub(super) fn lower_enum_constructor(
     let enum_layout = layouts
         .enum_layout(enum_id)
         .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
-    let slot = function.func.create_sized_stack_slot(layouts.enum_stack_slot(enum_layout));
-    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    let allocator = functions
+        .get("__actus_enum_allocate")
+        .ok_or_else(|| NativeEmitError("native enum allocator is unavailable".to_owned()))?;
+    let size = function.ins().iconst(layouts.pointer_type, i64::from(enum_layout.size));
+    let allocation = function.ins().call(allocator.reference, &[size]);
+    let address = function
+        .inst_results(allocation)
+        .first()
+        .copied()
+        .ok_or_else(|| NativeEmitError("native enum allocator returned no value".to_owned()))?;
     let discriminant = function.ins().iconst(types::I32, i64::from(variant_layout.discriminant));
     function.ins().store(
         MemFlagsData::new(),

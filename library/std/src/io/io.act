@@ -1,3 +1,6 @@
 open stdout;
 open stderr;
 open stdin;
+open error;
+open read;
+open write;

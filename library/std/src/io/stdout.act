@@ -17,6 +17,11 @@ open verb println(abs text: Buffer) -> Int {
     return status;
 }
 
-open verb flush() -> Int {
-    return actus_flush_stdout();
+open verb flush() -> Result[Int, IoError] {
+    erg status: Int = actus_flush_stdout();
+    erg result = case abs status {
+        0 => Result[Int, IoError].Ok(0),
+        _ => Result[Int, IoError].Err(IoError.Failed),
+    };
+    return result;
 }

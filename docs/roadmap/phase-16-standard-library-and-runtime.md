@@ -160,6 +160,7 @@ the hosted-runtime boundary, and deterministic status reporting.
 - [x] Define `read_line(ins buffer: Buffer)` and its capacity behavior.
 - [x] Define `read_byte` and end-of-input behavior.
 - [x] Define stdin status and error codes.
+- [x] Wrap stdin status codes in `Result[Int, IoError]` at the Actus API boundary.
 - [x] Add the runtime stdin bridge behind the approved C ABI.
 - [x] Enforce `ins` ownership and call-scope loan restoration.
 - [x] Add semantic positive and negative input tests.
@@ -167,13 +168,15 @@ the hosted-runtime boundary, and deterministic status reporting.
 
 ### Gate 2.3: Stream Abstractions (Read & Write)
 
-- [ ] Define `read(ins buffer: Buffer)` for stream consumers.
-- [ ] Define `write(abs buffer: Buffer)` for non-consuming output.
-- [ ] Define shared I/O status and error-code conventions.
-- [ ] Define short-read and short-write behavior.
-- [ ] Map stream operations to target-specific runtime capabilities.
-- [ ] Add ownership and aliasing tests for read/write calls.
-- [ ] Add native tests for complete and partial transfers.
+- [x] Define `read(ins buffer: Buffer)` for stream consumers.
+- [x] Define `write(abs buffer: Buffer)` for non-consuming output.
+- [x] Define shared I/O status and error-code conventions.
+- [x] Keep the C ABI at `>= 0` byte counts, `-1` failure, and `-2` end-of-stream.
+- [x] Wrap raw runtime statuses in `Result[Int, IoError]` without offset encoding.
+- [x] Define short-read and short-write behavior.
+- [x] Map stream operations to target-specific runtime capabilities.
+- [x] Add ownership and aliasing tests for read/write calls.
+- [x] Add native tests for complete and partial transfers.
 
 ### Gate 2.4: Buffering (`BufReader` & `BufWriter`)
 

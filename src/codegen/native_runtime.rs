@@ -6,8 +6,8 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::IntrinsicKind;
 use crate::runtime::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, PRINT_INT_SYMBOL,
-    PRINT_STRING_SYMBOL,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
+    ENUM_DROP_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
@@ -23,6 +23,8 @@ pub(super) fn declare_runtime_functions(
     let append_id = declare_append(module, pointer_type)?;
     let print_int_id = declare_print_int(module)?;
     let print_string_id = declare_print_string(module, pointer_type)?;
+    let enum_allocate_id = declare_enum_allocate(module, pointer_type)?;
+    let enum_drop_id = declare_enum_drop(module, pointer_type)?;
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
 
@@ -32,6 +34,14 @@ pub(super) fn declare_runtime_functions(
             named_meta(allocate_id, &["length"], NativeType::Buffer),
         ),
         (BUFFER_DROP_SYMBOL.to_owned(), named_meta(drop_id, &["handle"], NativeType::Int)),
+        (
+            format!("__{ENUM_ALLOCATE_SYMBOL}"),
+            named_meta(enum_allocate_id, &["size"], NativeType::Buffer),
+        ),
+        (
+            ENUM_DROP_SYMBOL.to_owned(),
+            named_meta(enum_drop_id, &["pointer", "size"], NativeType::Int),
+        ),
         (
             append_spec.name.to_owned(),
             intrinsic_meta(append_id, append_spec.parameters, NativeType::Int),
@@ -46,6 +56,30 @@ pub(super) fn declare_runtime_functions(
         functions.remove(print_spec.name);
     }
     Ok(functions)
+}
+
+fn declare_enum_allocate(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(pointer_type));
+    module
+        .declare_function(ENUM_ALLOCATE_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_enum_drop(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(pointer_type));
+    module
+        .declare_function(ENUM_DROP_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
 }
 
 fn intrinsic_meta(

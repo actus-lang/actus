@@ -1,0 +1,5 @@
+open enum IoError {
+    Failed,
+    EndOfStream,
+    InvalidInput,
+}

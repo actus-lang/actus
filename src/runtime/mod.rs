@@ -6,11 +6,12 @@ use std::path::Path;
 mod contract;
 
 pub use contract::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, FLUSH_STDOUT_SYMBOL,
-    PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
-    PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
-    PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
-    RUNTIME_ABI_VERSION, RuntimeCapability,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
+    ENUM_DROP_SYMBOL, FLUSH_STDOUT_SYMBOL, PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL,
+    PRINT_INT_STDERR_SYMBOL, PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL,
+    PRINT_LINE_BUFFER_STDOUT_SYMBOL, PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL,
+    READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
+    WRITE_BUFFER_STDOUT_SYMBOL,
 };
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
@@ -25,6 +26,29 @@ pub struct ActusBuffer {
 }
 
 pub type BufferHandle = *mut ActusBuffer;
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_enum_allocate(size: usize) -> *mut u8 {
+    let Ok(layout) = std::alloc::Layout::from_size_align(size, 8) else {
+        return std::ptr::null_mut();
+    };
+    unsafe { std::alloc::alloc_zeroed(layout) }
+}
+
+/// Releases storage returned by [`actus_enum_allocate`].
+///
+/// # Safety
+///
+/// `pointer` must be null or a live allocation returned by
+/// [`actus_enum_allocate`] with the same `size`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_enum_drop(pointer: *mut u8, size: usize) {
+    if pointer.is_null() {
+        return;
+    }
+    let Ok(layout) = std::alloc::Layout::from_size_align(size, 8) else { return };
+    unsafe { std::alloc::dealloc(pointer, layout) };
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_buffer_allocate(length: usize) -> BufferHandle {
@@ -204,6 +228,17 @@ unsafe fn write_buffer(handle: BufferHandle, stderr: bool, newline: bool) -> i32
         write_bytes(&mut stream, bytes, newline)
     };
     if result.is_err() { -1 } else { i32::try_from(bytes.len()).unwrap_or(-1) }
+}
+
+/// Encodes borrowed stdout writes for the Actus `Result` wrapper.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer handle whose byte range is
+/// valid for the declared length.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_write_buffer_stdout(handle: BufferHandle) -> i32 {
+    unsafe { write_buffer(handle, false, false) }
 }
 
 fn write_bytes(stream: &mut impl Write, bytes: &[u8], newline: bool) -> std::io::Result<()> {

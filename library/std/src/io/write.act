@@ -1,0 +1,11 @@
+open unsafe extern "C" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int;
+
+open verb write(abs buffer: Buffer) -> Result[Int, IoError] {
+    erg status: Int = actus_write_buffer_stdout(buffer: abs buffer);
+    erg result = case abs status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        -2 => Result[Int, IoError].Err(IoError.EndOfStream),
+        _ => Result[Int, IoError].Ok(status),
+    };
+    return result;
+}

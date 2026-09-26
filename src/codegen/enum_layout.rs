@@ -1,5 +1,3 @@
-use cranelift_codegen::ir::{StackSlotData, StackSlotKind};
-
 use crate::ast::{EnumDef, EnumPayload};
 
 use super::layout::LayoutRegistry;
@@ -26,7 +24,6 @@ pub(super) struct EnumLayout {
     pub(super) alignment: u32,
     pub(super) discriminant_offset: u32,
     pub(super) payload_offset: u32,
-    pub(super) max_payload_size: u32,
     pub(super) variants: Vec<EnumVariantLayout>,
 }
 
@@ -55,14 +52,6 @@ impl LayoutRegistry {
 
     pub(super) fn enum_variant(&self, enum_id: usize, variant: &str) -> Option<&EnumVariantLayout> {
         self.enum_layout(enum_id)?.variants.iter().find(|candidate| candidate.name == variant)
-    }
-
-    pub(super) fn enum_stack_slot(&self, layout: &EnumLayout) -> StackSlotData {
-        StackSlotData::new(
-            StackSlotKind::ExplicitSlot,
-            layout.size.max(layout.payload_offset + layout.max_payload_size),
-            layout.alignment.trailing_zeros() as u8,
-        )
     }
 
     pub(super) fn type_size(&self, ty: NativeType) -> Option<u32> {
@@ -121,7 +110,6 @@ impl LayoutRegistry {
             alignment,
             discriminant_offset: 0,
             payload_offset,
-            max_payload_size,
             variants,
         })
     }
@@ -163,7 +151,6 @@ mod tests {
 
         assert_eq!(layout.discriminant_offset, 0);
         assert_eq!(layout.payload_offset, 8);
-        assert_eq!(layout.max_payload_size, 8);
         assert_eq!(layout.alignment, 8);
         assert_eq!(layout.size, 16);
         assert_eq!(layout.variants[0].discriminant, 0);
@@ -184,6 +171,5 @@ mod tests {
 
         assert_eq!(layout.size, 4);
         assert_eq!(layout.alignment, 4);
-        assert_eq!(layout.max_payload_size, 0);
     }
 }

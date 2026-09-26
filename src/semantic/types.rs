@@ -1,4 +1,6 @@
-use crate::ast::{BuiltinType, Expr, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic};
+use crate::ast::{
+    BuiltinType, CaseBody, Expr, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic,
+};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -156,7 +158,10 @@ impl Analyzer {
                 .expression_struct_type(object)
                 .and_then(|name| self.struct_field(&name, field))
                 .and_then(|field| lookup_builtin_type(&field.ty.name)),
-            Expr::Case { .. } => None,
+            Expr::Case { branches, .. } => branches.iter().find_map(|branch| match &branch.body {
+                CaseBody::Expression(expression) => self.expression_type(expression),
+                CaseBody::Block(_) => None,
+            }),
         }
     }
 
@@ -165,6 +170,15 @@ impl Analyzer {
             .map(|ty| ty.spec().name.to_owned())
             .or_else(|| self.expression_struct_type(expression))
             .or_else(|| self.expression_enum_type_application(expression))
+            .or_else(|| self.expression_case_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))
+    }
+
+    fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Case { branches, .. } = expression else { return None };
+        branches.iter().find_map(|branch| match &branch.body {
+            CaseBody::Expression(expression) => self.expression_type_name(expression),
+            CaseBody::Block(_) => None,
+        })
     }
 }

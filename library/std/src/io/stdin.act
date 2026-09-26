@@ -1,10 +1,20 @@
 open unsafe extern "C" verb actus_read_stdin_line(ins buffer: Buffer) -> Int;
 open unsafe extern "C" verb actus_read_byte() -> Int;
 
-open verb read_line(ins buffer: Buffer) -> Int {
-    return actus_read_stdin_line(buffer: ins buffer);
+open verb read_line(ins buffer: Buffer) -> Result[Int, IoError] {
+    erg status: Int = actus_read_stdin_line(buffer: ins buffer);
+    return case abs status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        -2 => Result[Int, IoError].Err(IoError.EndOfStream),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }
 
-open verb read_byte() -> Int {
-    return actus_read_byte();
+open verb read_byte() -> Result[Int, IoError] {
+    erg status: Int = actus_read_byte();
+    return case abs status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        -2 => Result[Int, IoError].Err(IoError.EndOfStream),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }

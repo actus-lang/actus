@@ -1,0 +1,3 @@
+open verb read(ins buffer: Buffer) -> Result[Int, IoError] {
+    return read_line(buffer: ins buffer);
+}

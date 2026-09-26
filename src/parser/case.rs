@@ -85,6 +85,17 @@ impl Parser {
         let token = self.advance_required("case pattern")?;
         match token.kind {
             TokenKind::Underscore => Ok(Pattern::Wildcard { span: token.span }),
+            TokenKind::Minus
+                if matches!(self.peek().map(|token| &token.kind), Some(TokenKind::Integer(_))) =>
+            {
+                let integer = self.advance_required("negative integer pattern")?;
+                let TokenKind::Integer(mut value) = integer.kind else { unreachable!() };
+                value.insert(0, '-');
+                Ok(Pattern::Literal {
+                    value: LiteralPattern::Integer(value),
+                    span: SourceSpan::new(token.span.start, integer.span.end),
+                })
+            }
             TokenKind::Integer(value) => {
                 Ok(Pattern::Literal { value: LiteralPattern::Integer(value), span: token.span })
             }

@@ -4,7 +4,7 @@ mod lowering_body;
 mod lowering_loops;
 #[path = "lowering_scopes.rs"]
 mod lowering_scopes;
-#[path = "lowering_statements.rs"]
+#[path = "lowering_statements/mod.rs"]
 mod lowering_statements;
 
 pub(super) use super::model::NativeCleanupSchedule;

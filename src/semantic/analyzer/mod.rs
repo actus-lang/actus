@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, EnumDef, Expr, Program, ReturnAccess, Role, RoleDecl, Stmt, StructDef,
+    Block, BuiltinType, EnumDef, Expr, Program, ReturnAccess, RoleDecl, Stmt, StructDef,
     TopLevelDecl, lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
@@ -9,6 +9,9 @@ use crate::lexer::SourceSpan;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::Origin;
 use super::model::SemanticModel;
+
+mod expressions;
+mod statements;
 
 pub(super) struct ScopeFrame {
     pub(super) span: crate::lexer::SourceSpan,
@@ -253,150 +256,6 @@ impl Analyzer {
             });
         }
         self.leave_scope();
-        Ok(())
-    }
-
-    pub(super) fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
-        for statement in &block.statements {
-            self.visit_statement(statement)?;
-        }
-        Ok(())
-    }
-
-    fn visit_statement(&mut self, statement: &Stmt) -> Result<(), SemanticError> {
-        match statement {
-            Stmt::OwnerDecl { role, name, ty, initializer, span } => {
-                let binding_type = self.resolve_binding_type(ty.as_deref(), initializer, *span)?;
-                self.validate_declared_initializer(name, ty.as_deref(), initializer, *span)?;
-                self.visit_expression(initializer)?;
-                if *role == Role::Erg {
-                    self.initialize_owner(initializer, *span)?;
-                }
-                if *role == Role::Abs {
-                    self.register_borrow(initializer, *span)?;
-                }
-                self.bind(role.clone(), name.clone(), binding_type, *span)?;
-                if *role == Role::Abs
-                    && let Ok(index) = self.binding(name, *span)
-                {
-                    let origin = self.origin_of(initializer);
-                    self.binding_origins.insert(index, origin.clone());
-                    if is_origin_return_expression(initializer) {
-                        self.register_origin_borrow(&origin, *span)?;
-                    }
-                }
-                self.record_initializer_struct_type(name, initializer, *span)?;
-                self.record_initializer_enum_type(name, initializer, *span)
-            }
-            Stmt::Assignment { name, value, span } => {
-                let index = self.binding(name, *span)?;
-                self.ensure_mutable(index, name, *span)?;
-                self.validate_binding_assignment(index, name, value, *span)?;
-                self.visit_expression(value)
-            }
-            Stmt::FieldAssignment { object, field, value, span } => {
-                self.validate_field_assignment(object, field, value, *span)
-            }
-            Stmt::Expression { expression, .. } => self.visit_expression(expression),
-            Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
-            Stmt::Loop(block) => {
-                self.enter_scope(block.span);
-                self.loop_boundaries.push(self.scopes.len() - 1);
-                self.visit_block(block)?;
-                self.loop_boundaries.pop();
-                self.leave_scope();
-                Ok(())
-            }
-            Stmt::Break { span } => {
-                self.plan_loop_unwind(super::cleanup::LoopExitKind::Break, "break", *span)
-            }
-            Stmt::Continue { span } => {
-                self.plan_loop_unwind(super::cleanup::LoopExitKind::Continue, "continue", *span)
-            }
-            Stmt::Drop { name, span } => self.drop_binding(name, *span),
-            Stmt::Block(block) => {
-                self.enter_scope(block.span);
-                self.visit_block(block)?;
-                self.leave_scope();
-                Ok(())
-            }
-        }
-    }
-
-    pub(super) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
-        self.record_origin(expression);
-        match expression {
-            Expr::BufferLiteral { length, .. } => {
-                self.visit_expression(length)?;
-                self.require_buffer_length(length)
-            }
-            Expr::Identifier { name, span } => {
-                let index = self.binding(name, *span)?;
-                self.ensure_readable(index, name, *span)
-            }
-            Expr::Binary { left, right, .. } => {
-                self.visit_expression(left)?;
-                self.visit_expression(right)
-            }
-            Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-                self.visit_expression(expression)
-            }
-            Expr::Borrow { expression, .. } => self.visit_expression(expression),
-            Expr::Try { expression, span } => {
-                self.visit_expression(expression)?;
-                self.validate_try_expression(expression, *span)
-            }
-            Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
-            Expr::MethodCall { receiver, method, arguments, span } => {
-                self.visit_method_call(receiver, method, arguments, *span)
-            }
-            Expr::StructLit { name, type_arguments, fields, span } => {
-                self.validate_struct_literal(name, type_arguments, fields, *span)
-            }
-            Expr::FieldAccess { object, field, span } => {
-                if self.enum_receiver_name(object).is_some() {
-                    self.validate_enum_unit_variant(object, field, *span)
-                } else {
-                    self.validate_field_access(object, field, *span)?;
-                    self.ensure_field_access_readable(object, field, *span)
-                }
-            }
-            Expr::Case { mode, subject, branches, span } => {
-                self.visit_expression(subject)?;
-                self.validate_case_patterns(*mode, subject, branches, *span)
-            }
-            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
-        }
-    }
-
-    fn validate_try_expression(
-        &self,
-        expression: &Expr,
-        span: crate::lexer::SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Some(expected) = self.current_return_type_name.as_ref() else {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::TypeMismatch {
-                    callee: "?".to_owned(),
-                    parameter: "return type".to_owned(),
-                    expected: "Result[T, E]".to_owned(),
-                    found: "no return type".to_owned(),
-                },
-                span,
-            });
-        };
-        let Some(operand) = self.enum_type_application(expression) else {
-            return Err(try_type_mismatch(span, expected, "unknown"));
-        };
-        if expected.name != "Result"
-            || expected.arguments.len() != 2
-            || operand.name != "Result"
-            || operand.arguments.len() != 2
-            || canonical_type_name(&expected.arguments[1])
-                != canonical_type_name(&operand.arguments[1])
-        {
-            return Err(try_type_mismatch(span, expected, &canonical_type_name(&operand)));
-        }
         Ok(())
     }
 }

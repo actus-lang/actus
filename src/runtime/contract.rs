@@ -16,6 +16,9 @@ pub const PRINT_LINE_BUFFER_STDOUT_SYMBOL: &str = "actus_print_line_buffer_stdou
 pub const PRINT_LINE_BUFFER_STDERR_SYMBOL: &str = "actus_print_line_buffer_stderr";
 pub const READ_STDIN_LINE_SYMBOL: &str = "actus_read_stdin_line";
 pub const READ_BYTE_SYMBOL: &str = "actus_read_byte";
+pub const WRITE_BUFFER_STDOUT_SYMBOL: &str = "actus_write_buffer_stdout";
+pub const ENUM_ALLOCATE_SYMBOL: &str = "actus_enum_allocate";
+pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
 
 /// Runtime operations are explicit capabilities rather than implicit compiler
 /// services. Freestanding targets may provide none of these capabilities.

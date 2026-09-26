@@ -28,6 +28,9 @@ fn std_io_declarations_pass_semantic_validation() {
     assert!(exports.contains("verb", "flush"));
     assert!(exports.contains("verb", "read_line"));
     assert!(exports.contains("verb", "read_byte"));
+    assert!(exports.contains("verb", "read"));
+    assert!(exports.contains("verb", "write"));
+    assert!(exports.contains("enum", "IoError"));
     analyze_module(&resolver, "io").expect("std io declarations should be semantically valid");
 }
 
@@ -46,11 +49,11 @@ fn std_io_native_bridge_separates_stdout_and_stderr() {
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create std io fixture");
-    for file in ["io.act", "stdout.act", "stderr.act", "stdin.act"] {
+    for file in ["io.act", "stdout.act", "stderr.act", "stdin.act", "error.act"] {
         fs::write(
             io_root.join(file),
             if file == "io.act" {
-                "open stdout;\nopen stderr;\nopen stdin;\n".to_owned()
+                "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n".to_owned()
             } else {
                 library_source(file)
             },
@@ -95,9 +98,9 @@ fn std_io_native_bridge_prints_borrowed_buffer_text() {
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create std text fixture");
-    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\n")
+    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n")
         .expect("write io facade");
-    for file in ["stdout.act", "stderr.act", "stdin.act"] {
+    for file in ["stdout.act", "stderr.act", "stdin.act", "error.act"] {
         fs::write(io_root.join(file), library_source(file)).expect("copy std io source");
     }
     fs::write(
@@ -137,9 +140,9 @@ fn std_io_native_bridge_reads_line_into_exclusive_buffer() {
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create stdin fixture");
-    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\n")
+    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n")
         .expect("write io facade");
-    for file in ["stdout.act", "stderr.act", "stdin.act"] {
+    for file in ["stdout.act", "stderr.act", "stdin.act", "error.act"] {
         fs::write(io_root.join(file), library_source(file)).expect("copy std io source");
     }
     fs::write(
@@ -150,7 +153,7 @@ fn std_io_native_bridge_reads_line_into_exclusive_buffer() {
     let input = source_root.join("main.act");
     fs::write(
         &input,
-        "import io; verb main() -> Int { erg buffer = Buffer[0]; erg count = read_line(buffer: ins buffer); print(text: abs buffer); flush(); return count; }\n",
+        "import io; verb main() -> Int { erg buffer = Buffer[0]; read_line(buffer: ins buffer); print(text: abs buffer); flush(); return 0; }\n",
     )
     .expect("write stdin fixture entry");
     let output = root.join("std-stdin");
@@ -173,7 +176,7 @@ fn std_io_native_bridge_reads_line_into_exclusive_buffer() {
         .expect("stdin fixture should run");
     child.stdin.take().expect("stdin pipe should exist").write_all(b"hello\n").unwrap();
     let execution = child.wait_with_output().expect("wait for stdin fixture");
-    assert_eq!(execution.status.code(), Some(5));
+    assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"hello");
     let _ = fs::remove_dir_all(root);
 }
@@ -184,9 +187,9 @@ fn std_io_native_bridge_reports_eof_from_read_byte() {
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create byte fixture");
-    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\n")
+    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n")
         .expect("write io facade");
-    for file in ["stdout.act", "stderr.act", "stdin.act"] {
+    for file in ["stdout.act", "stderr.act", "stdin.act", "error.act"] {
         fs::write(io_root.join(file), library_source(file)).expect("copy std io source");
     }
     fs::write(
@@ -195,7 +198,10 @@ fn std_io_native_bridge_reports_eof_from_read_byte() {
     )
     .expect("write byte fixture manifest");
     let input = source_root.join("main.act");
-    fs::write(&input, "import io; verb main() -> Int { return read_byte(); }\n")
+    fs::write(
+        &input,
+        "import io; verb consume_byte() -> Result[Int, IoError] { read_byte()?; return Result[Int, IoError].Ok(0); } verb main() -> Int { consume_byte(); return 42; }\n",
+    )
         .expect("write byte fixture entry");
     let output = root.join("std-byte");
     assert_eq!(
@@ -213,6 +219,57 @@ fn std_io_native_bridge_reports_eof_from_read_byte() {
         0
     );
     let execution = Command::new(&output).output().expect("byte fixture should run");
-    assert_eq!(execution.status.code(), Some(254));
+    assert_eq!(execution.status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_stream_result_chain_propagates_success() {
+    let root = std::env::temp_dir().join(format!("actus-std-stream-{}", std::process::id()));
+    let source_root = root.join("src");
+    let io_root = source_root.join("io");
+    fs::create_dir_all(&io_root).expect("create stream fixture");
+    fs::write(
+        io_root.join("io.act"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\nopen read;\nopen write;\n",
+    )
+    .expect("write stream facade");
+    for file in ["stdout.act", "stderr.act", "stdin.act", "error.act", "read.act", "write.act"] {
+        fs::write(io_root.join(file), library_source(file)).expect("copy stream source");
+    }
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std-stream-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write stream manifest");
+    let input = source_root.join("main.act");
+    fs::write(
+        &input,
+        "import io; verb stream() -> Result[Int, IoError] { erg buffer = Buffer[0]; append(buffer, 115); append(buffer, 116); append(buffer, 114); append(buffer, 101); append(buffer, 97); append(buffer, 109); write(buffer: abs buffer)?; return Result[Int, IoError].Ok(0); } verb main() -> Int { stream(); return 42; }\n",
+    )
+    .expect("write stream entry");
+    let output = root.join("std-stream");
+    assert_eq!(
+        run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        ),
+        0
+    );
+    let mut child = Command::new(&output)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("stream fixture should run");
+    child.stdin.take().expect("stream stdin should exist").write_all(b"stream\n").unwrap();
+    let execution = child.wait_with_output().expect("wait for stream fixture");
+    assert_eq!(execution.status.code(), Some(42));
     let _ = fs::remove_dir_all(root);
 }
