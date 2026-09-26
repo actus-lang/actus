@@ -1,6 +1,17 @@
+/// C ABI bridge that fills an existing buffer until newline or EOF.
+///
+/// The `ins` role makes the mutation explicit and creates a temporary,
+/// exclusive loan for the duration of the call. The runtime writes into the
+/// caller's buffer and returns the byte count; it does not allocate a new
+/// Actus buffer or retain the handle.
 open unsafe extern "C" verb actus_read_stdin_line(ins buffer: Buffer) -> Int;
+/// C ABI bridge that returns one input byte, or a standard negative status.
 open unsafe extern "C" verb actus_read_byte() -> Int;
 
+/// Read one line into the caller-provided buffer.
+///
+/// A successful `Ok(count)` reports the exact number of bytes written. `-1`
+/// becomes `IoError.Failed`; `-2` becomes `IoError.EndOfStream`.
 open verb read_line(ins buffer: Buffer) -> Result[Int, IoError] {
     erg status: Int = actus_read_stdin_line(buffer: ins buffer);
     return case abs status {
@@ -10,6 +21,11 @@ open verb read_line(ins buffer: Buffer) -> Result[Int, IoError] {
     };
 }
 
+/// Read one byte without allocating a new buffer.
+///
+/// `Ok(byte)` contains the byte value as an integer. `Failed` and
+/// `EndOfStream` are typed results, so callers can use normal `Result`
+/// propagation instead of handling C status values directly.
 open verb read_byte() -> Result[Int, IoError] {
     erg status: Int = actus_read_byte();
     return case abs status {

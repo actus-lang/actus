@@ -1,22 +1,33 @@
+/// C ABI scalar output bridge. The `erg` role passes the integer value owned
+/// by the call; the runtime returns its status as an integer result.
 open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
+/// C ABI bridge that reads a borrowed buffer and writes it to stdout.
 open unsafe extern "C" verb actus_print_buffer_stdout(abs text: Buffer) -> Int;
+/// C ABI bridge that writes a borrowed buffer followed by a newline.
 open unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> Int;
+/// C ABI bridge that synchronizes stdout and returns zero or failure.
 open unsafe extern "C" verb actus_flush_stdout() -> Int;
 
+/// Print an integer value to stdout.
 open verb print_int(erg value: Int) -> Int {
     return actus_print_int(value: value);
 }
 
+/// Print a borrowed buffer without consuming or modifying it.
 open verb print(abs text: Buffer) -> Int {
     return actus_print_buffer_stdout(text: abs text);
 }
 
+/// Print a borrowed buffer, append a newline, and flush stdout immediately.
+/// The returned integer is the native output status.
 open verb println(abs text: Buffer) -> Int {
     erg status = actus_print_line_buffer_stdout(text: abs text);
     actus_flush_stdout();
     return status;
 }
 
+/// Flush pending stdout output and translate the native status into `Result`.
+/// A successful flush returns `Ok(0)`; any non-zero runtime status is `Failed`.
 open verb flush() -> Result[Int, IoError] {
     erg status: Int = actus_flush_stdout();
     erg result = case abs status {

@@ -1,6 +1,15 @@
+/// The `std::io` facade is the public gateway for console and stream I/O.
+///
+/// Each `open` declaration re-exports the public declarations from one
+/// sibling file. Implementation details remain private to this module.
 open stdout;
+/// Re-export stderr output operations.
 open stderr;
+/// Re-export stdin input operations.
 open stdin;
+/// Re-export the typed I/O error domain.
 open error;
+/// Re-export the stream read abstraction.
 open read;
+/// Re-export the stream write abstraction.
 open write;

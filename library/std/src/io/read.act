@@ -1,3 +1,12 @@
+/// Read bytes into a caller-owned buffer through the stdin line contract.
+///
+/// `ins buffer` is an exclusive call-scope loan. The callee may fill the
+/// existing allocation, but cannot retain it or return ownership. This keeps
+/// repeated reads allocation-free and restores the caller's `erg` binding
+/// when the call returns. The result is the exact number of bytes read, or a
+/// typed `IoError`.
 open verb read(ins buffer: Buffer) -> Result[Int, IoError] {
+    /// `read` shares the canonical line reader and therefore has identical
+    /// ownership, status, and end-of-stream semantics.
     return read_line(buffer: ins buffer);
 }
