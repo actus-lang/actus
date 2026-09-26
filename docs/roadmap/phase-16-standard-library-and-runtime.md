@@ -226,20 +226,20 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 ### ADR-0027: RAII scope drop
 
 - [ ] Register deterministic cleanup contracts for `File` and future sockets.
-- [ ] Emit LIFO cleanup for normal lexical scope exit.
-- [ ] Emit the same cleanup plan for `return`, `break`, and `continue`.
-- [ ] Emit cleanup before `?` early return.
-- [ ] Reject drop while an owner is `Frozen` or `Suspended`.
-- [ ] Ensure every live owned resource has exactly one drop action.
-- [ ] Add native exactly-once cleanup tests.
+- [x] Emit LIFO cleanup for normal lexical scope exit.
+- [x] Emit the same cleanup plan for `return`, `break`, and `continue`.
+- [x] Emit cleanup before `?` early return.
+- [x] Reject drop while an owner is `Frozen` or `Suspended`.
+- [x] Ensure every live owned resource has exactly one drop action.
+- [x] Add native exactly-once cleanup tests.
 
 ### ADR-0028: Try operator integration
 
-- [ ] Parse postfix `?` expressions.
-- [ ] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
-- [ ] Validate compatible error propagation.
-- [ ] Lower `Ok` unwrapping and `Err` early return natively.
-- [ ] Preserve cleanup and loan restoration on early return.
+- [x] Parse postfix `?` expressions.
+- [x] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
+- [x] Validate compatible error propagation.
+- [x] Lower `Ok` unwrapping and `Err` early return natively.
+- [x] Preserve cleanup and loan restoration on early return.
 - [ ] Extend `?` integration tests to filesystem operations.
 
 ### `std::fs` API and implementation

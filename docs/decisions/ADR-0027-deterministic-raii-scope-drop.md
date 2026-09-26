@@ -1,6 +1,6 @@
 # ADR-0027: Deterministic RAII Scope Drop Semantics
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-26
 - Scope: lexical cleanup and owned resource destruction
 
@@ -53,10 +53,10 @@ drop record at runtime.
 ## Constraints and verification
 
 - [ ] Define resource cleanup contracts for `std::fs::File` and sockets.
-- [ ] Verify LIFO cleanup across nested blocks and early returns.
-- [ ] Reject double drop, drop of a moved owner, and drop of a live view.
-- [ ] Verify cleanup on `?`, `break`, and `continue` paths.
-- [ ] Add native tests proving exactly-once release.
+- [x] Verify LIFO cleanup across nested blocks and early returns.
+- [x] Reject double drop, drop of a moved owner, and drop of a live view.
+- [x] Verify cleanup on `?`, `break`, and `continue` paths.
+- [x] Add native tests proving exactly-once release.
 
 This ADR defines lexical resource cleanup; it does not define finalization for
 non-owned values or a general destructor language feature.

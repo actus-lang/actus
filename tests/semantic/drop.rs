@@ -64,3 +64,14 @@ fn drop_receiver_uses_the_instrumental_role() {
     };
     assert_eq!(method.params[0].role, Role::Ins);
 }
+
+#[test]
+fn try_error_path_plans_drop_cleanup() {
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { } } verb fail() -> Result[Int, Int] { return Err(1); } verb worker() -> Result[Int, Int] { erg counter = Counter { value: 9, }; fail()?; return Ok(0); }";
+    let model = analyze_source(source).expect("try path should be valid");
+    assert!(model.return_unwind_plans.iter().any(|plan| {
+        plan.scopes.iter().any(|scope| {
+            scope.actions.iter().any(|action| matches!(action, CleanupAction::DropBinding { binding_index } if model.bindings[*binding_index].name == "counter"))
+        })
+    }));
+}
