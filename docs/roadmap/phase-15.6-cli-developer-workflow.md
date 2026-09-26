@@ -38,26 +38,26 @@ compiler pipeline.
 
 ## Gate 3: Project creation and Git defaults
 
-- [ ] Make `actus new` initialize the first branch as `main` when it creates a
+- [x] Make `actus new` initialize the first branch as `main` when it creates a
       repository.
-- [ ] Make `actus init` use the same branch policy when it initializes Git.
-- [ ] Preserve the no-VCS controls `--no-git` and `--vcs none`.
-- [ ] Avoid running `git init` inside an existing parent repository.
-- [ ] Ensure generated `.gitignore` contains `/capsula/`, `*.o`, and `*.bin`.
-- [ ] Add integration tests for new repositories, existing repositories, and
+- [x] Make `actus init` use the same branch policy when it initializes Git.
+- [x] Preserve the no-VCS controls `--no-git` and `--vcs none`.
+- [x] Avoid running `git init` inside an existing parent repository.
+- [x] Ensure generated `.gitignore` contains `/capsula/`, `*.o`, and `*.bin`.
+- [x] Add integration tests for new repositories, existing repositories, and
       disabled VCS initialization.
-- [ ] Keep Git failures deterministic and separate from project generation
+- [x] Keep Git failures deterministic and separate from project generation
       failures.
 
 ## Gate 4: Post-creation guidance
 
-- [ ] Print the created project path clearly.
-- [ ] Print actionable next steps after `actus new` and `actus init`.
-- [ ] Include `cd <project>`, `actus check`, `actus build`, and `actus run` in
+- [x] Print the created project path clearly.
+- [x] Print actionable next steps after `actus new` and `actus init`.
+- [x] Include `cd <project>`, `actus check`, `actus build`, and `actus run` in
       the generated guidance.
-- [ ] Include the release command when documenting the build workflow.
-- [ ] Ensure guidance is printed only after successful project initialization.
-- [ ] Add output assertions to CLI integration tests.
+- [x] Include the release command when documenting the build workflow.
+- [x] Ensure guidance is printed only after successful project initialization.
+- [x] Add output assertions to CLI integration tests.
 
 ## Gate 5: One-shot run experience
 

@@ -32,6 +32,7 @@ pub(super) fn new_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         return 1;
     }
     println!("created `{}`", path.display());
+    print_next_steps(&path, true);
     0
 }
 
@@ -48,7 +49,20 @@ pub(super) fn init_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         return 1;
     }
     println!("initialized `{}`", path.display());
+    print_next_steps(&path, false);
     0
+}
+
+fn print_next_steps(path: &Path, include_directory_change: bool) {
+    println!();
+    println!("Next steps:");
+    if include_directory_change {
+        println!("  cd {}", path.display());
+    }
+    println!("  actus check");
+    println!("  actus build --emit exe");
+    println!("  actus build --release --emit exe");
+    println!("  actus run");
 }
 
 fn parse_options(
@@ -108,7 +122,7 @@ fn initialize_vcs(path: &Path, requested: bool) -> Result<(), String> {
         return Ok(());
     }
     let status = Command::new("git")
-        .arg("init")
+        .args(["-c", "init.defaultBranch=main", "init"])
         .arg(path)
         .status()
         .map_err(|error| format!("cannot initialize git: {error}"))?;

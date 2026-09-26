@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 use actus::cli::run_with_args;
@@ -16,6 +17,55 @@ fn new_creates_an_actus_project_without_git_when_requested() {
     assert_eq!(fs::read_to_string(root.join(".gitignore")).unwrap(), "/capsula/\n*.o\n*.bin\n");
     assert!(!root.join(".git").exists());
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn new_initializes_main_and_prints_next_steps() {
+    let root = std::env::temp_dir().join(format!("actus-new-main-{}", std::process::id()));
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["new", root.to_str().unwrap()])
+        .output()
+        .expect("run new command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("created `"));
+    assert!(stdout.contains("Next steps:"));
+    assert!(stdout.contains("actus check"));
+    assert!(stdout.contains("actus build --release --emit exe"));
+    assert_main_branch_or_parent_repository(&root);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn init_prints_next_steps_and_initializes_main() {
+    let root = std::env::temp_dir().join(format!("actus-init-main-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create init directory");
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["init"])
+        .current_dir(&root)
+        .output()
+        .expect("run init command");
+
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("actus run"));
+    assert_main_branch_or_parent_repository(&root);
+    let _ = fs::remove_dir_all(root);
+}
+
+fn assert_main_branch_or_parent_repository(root: &Path) {
+    let parent_repository =
+        root.ancestors().skip(1).any(|directory| directory.join(".git").exists());
+    if parent_repository {
+        assert!(!root.join(".git").exists());
+        return;
+    }
+    let branch = Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "symbolic-ref", "--short", "HEAD"])
+        .output()
+        .expect("read initial branch");
+    assert!(branch.status.success());
+    assert_eq!(String::from_utf8_lossy(&branch.stdout).trim(), "main");
 }
 
 #[test]
