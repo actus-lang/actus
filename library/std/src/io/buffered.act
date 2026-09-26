@@ -56,7 +56,7 @@ open unsafe extern "C" verb actus_flush_buffered_stdout(ins buffer: Buffer) -> I
 /// The buffer length is preserved; only its backing capacity is increased.
 open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError] {
     erg status = actus_buffer_reserve(buffer: ins buffer, capacity: capacity);
-    return case abs status {
+    return case status {
         -1 => Result[Int, IoError].Err(IoError.Failed),
         _ => Result[Int, IoError].Ok(status),
     };
@@ -73,7 +73,7 @@ open verb buffered_write(
     abs input: Buffer
 ) -> Result[Int, IoError] {
     erg status = actus_buffered_write_stdout(buffer: ins buffer, input: abs input);
-    return case abs status {
+    return case status {
         -1 => Result[Int, IoError].Err(IoError.Failed),
         _ => Result[Int, IoError].Ok(status),
     };
@@ -85,7 +85,7 @@ open verb buffered_write(
 /// retained for the next write, so repeated flush cycles do not allocate.
 open verb flush_buffer(ins buffer: Buffer) -> Result[Int, IoError] {
     erg status = actus_flush_buffered_stdout(buffer: ins buffer);
-    return case abs status {
+    return case status {
         -1 => Result[Int, IoError].Err(IoError.Failed),
         _ => Result[Int, IoError].Ok(status),
     };

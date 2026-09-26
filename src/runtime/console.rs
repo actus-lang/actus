@@ -5,14 +5,12 @@ use super::types::BufferHandle;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_print_int(value: i32) -> i32 {
-    println!("{value}");
-    value
+    if writeln!(std::io::stdout(), "{value}").is_ok() { 0 } else { -1 }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_print_int_stderr(value: i32) -> i32 {
-    eprintln!("{value}");
-    value
+    if writeln!(std::io::stderr(), "{value}").is_ok() { 0 } else { -1 }
 }
 
 /// Prints a null-terminated UTF-8 string followed by a newline.
@@ -85,4 +83,10 @@ pub unsafe extern "C" fn actus_print_line_buffer_stderr(handle: BufferHandle) ->
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_flush_stdout() -> i32 {
     if std::io::stdout().flush().is_ok() { 0 } else { -1 }
+}
+
+/// Flushes stderr and returns zero on success or -1 on failure.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_flush_stderr() -> i32 {
+    if std::io::stderr().flush().is_ok() { 0 } else { -1 }
 }

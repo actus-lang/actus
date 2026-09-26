@@ -20,12 +20,13 @@ package facade exposes only the intended public verbs.
 The initial output API is:
 
 ```act
-open verb print_int(erg value: Int) -> Int;
-open verb eprint_int(erg value: Int) -> Int;
+open verb print_int(erg value: Int) -> Result[Int, IoError];
+open verb eprint_int(erg value: Int) -> Result[Int, IoError];
 ```
 
-Both operations return the printed scalar value. They do not transfer or
-allocate an Actus resource. The stdout implementation calls
+Both operations report a typed result. A successful call reports the runtime
+status value in `Ok`; a runtime failure is represented by `Err(Failed)`. They
+do not transfer or allocate an Actus resource. The stdout implementation calls
 `actus_print_int`; the stderr implementation calls
 `actus_print_int_stderr`. Those runtime declarations cross an explicit
 `unsafe extern "C"` boundary and are not compiler intrinsics.
@@ -34,11 +35,11 @@ Gate 2.1 extends the output API with borrowed, length-aware buffer
 operations:
 
 ```act
-open verb print(abs text: Buffer) -> Int;
-open verb println(abs text: Buffer) -> Int;
-open verb eprint(abs text: Buffer) -> Int;
-open verb eprintln(abs text: Buffer) -> Int;
-open verb flush() -> Int;
+open verb print(abs text: Buffer) -> Result[Int, IoError];
+open verb println(abs text: Buffer) -> Result[Int, IoError];
+open verb eprint(abs text: Buffer) -> Result[Int, IoError];
+open verb eprintln(abs text: Buffer) -> Result[Int, IoError];
+open verb flush() -> Result[Int, IoError];
 ```
 
 The buffer operations never consume, mutate, allocate, or drop the source
@@ -47,7 +48,8 @@ declared byte range. `println` and `eprintln` append one newline; `flush`
 flushes stdout explicitly. A successful output returns the byte count, while
 runtime failure returns `-1`.
 
-The runtime prints one newline per call. Output ordering between stdout and
+The runtime prints one newline per call. `println` and `eprintln` flush their
+corresponding stream before returning. Output ordering between stdout and
 stderr is determined by the host streams; each stream's bytes are otherwise
 deterministic for a successful call. Input, general stream abstractions,
 buffering, and cursor utilities remain separate Gate 2 increments.
@@ -55,8 +57,8 @@ buffering, and cursor utilities remain separate Gate 2 increments.
 Gate 2.2 adds stdin operations:
 
 ```act
-open verb read_line(ins buffer: Buffer) -> Int;
-open verb read_byte() -> Int;
+open verb read_line(ins buffer: Buffer) -> Result[Int, IoError];
+open verb read_byte() -> Result[Int, IoError];
 ```
 
 `read_line` consumes input through the next newline or EOF, excludes the

@@ -1,5 +1,5 @@
 /// C ABI scalar output bridge. The `erg` role passes the integer value owned
-/// by the call; the runtime returns its status as an integer result.
+/// by the call; the runtime returns an integer status wrapped by `print_int`.
 open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
 /// C ABI bridge that reads a borrowed buffer and writes it to stdout.
 open unsafe extern "C" verb actus_print_buffer_stdout(abs text: Buffer) -> Int;
@@ -8,29 +8,43 @@ open unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> 
 /// C ABI bridge that synchronizes stdout and returns zero or failure.
 open unsafe extern "C" verb actus_flush_stdout() -> Int;
 
-/// Print an integer value to stdout.
-open verb print_int(erg value: Int) -> Int {
-    return actus_print_int(value: value);
+/// Print an integer value to stdout and return its typed I/O result.
+open verb print_int(erg value: Int) -> Result[Int, IoError] {
+    erg status = actus_print_int(value: value);
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }
 
 /// Print a borrowed buffer without consuming or modifying it.
-open verb print(abs text: Buffer) -> Int {
-    return actus_print_buffer_stdout(text: abs text);
+open verb print(abs text: Buffer) -> Result[Int, IoError] {
+    erg status = actus_print_buffer_stdout(text: abs text);
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }
 
 /// Print a borrowed buffer, append a newline, and flush stdout immediately.
-/// The returned integer is the native output status.
-open verb println(abs text: Buffer) -> Int {
+/// The result contains the written byte count or `IoError.Failed`.
+open verb println(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_line_buffer_stdout(text: abs text);
-    actus_flush_stdout();
-    return status;
+    erg flushed = actus_flush_stdout();
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => case flushed {
+            0 => Result[Int, IoError].Ok(status),
+            _ => Result[Int, IoError].Err(IoError.Failed),
+        },
+    };
 }
 
 /// Flush pending stdout output and translate the native status into `Result`.
 /// A successful flush returns `Ok(0)`; any non-zero runtime status is `Failed`.
 open verb flush() -> Result[Int, IoError] {
     erg status: Int = actus_flush_stdout();
-    erg result = case abs status {
+    erg result = case status {
         0 => Result[Int, IoError].Ok(0),
         _ => Result[Int, IoError].Err(IoError.Failed),
     };

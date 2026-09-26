@@ -145,10 +145,11 @@ the hosted-runtime boundary, and deterministic status reporting.
 - [x] Define scalar output with `print_int` and `eprint_int`.
 - [x] Define borrowed buffer output with `print(abs text: Buffer)`.
 - [x] Define newline variants `println` and `eprintln`.
-- [x] Define explicit `flush()` for stdout.
+- [x] Define explicit `flush()` for stdout with a typed result contract.
 - [x] Add length-aware stdout and stderr buffer bridges.
 - [x] Add the stdout flush runtime bridge.
-- [x] Return an explicit byte-count or failure status from output calls.
+- [x] Return `Result[Int, IoError]` with byte counts or typed failure from
+      output calls.
 - [x] Preserve the source buffer; output never consumes or drops it.
 - [x] Keep output bridges behind `unsafe extern "C"` declarations.
 - [x] Add semantic facade/export tests for the text API.

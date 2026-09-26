@@ -14,7 +14,7 @@ open unsafe extern "C" verb actus_read_byte() -> Int;
 /// becomes `IoError.Failed`; `-2` becomes `IoError.EndOfStream`.
 open verb read_line(ins buffer: Buffer) -> Result[Int, IoError] {
     erg status: Int = actus_read_stdin_line(buffer: ins buffer);
-    return case abs status {
+    return case status {
         -1 => Result[Int, IoError].Err(IoError.Failed),
         -2 => Result[Int, IoError].Err(IoError.EndOfStream),
         _ => Result[Int, IoError].Ok(status),
@@ -28,7 +28,7 @@ open verb read_line(ins buffer: Buffer) -> Result[Int, IoError] {
 /// propagation instead of handling C status values directly.
 open verb read_byte() -> Result[Int, IoError] {
     erg status: Int = actus_read_byte();
-    return case abs status {
+    return case status {
         -1 => Result[Int, IoError].Err(IoError.Failed),
         -2 => Result[Int, IoError].Err(IoError.EndOfStream),
         _ => Result[Int, IoError].Ok(status),

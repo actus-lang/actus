@@ -12,6 +12,7 @@ pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";
 pub const PRINT_BUFFER_STDERR_SYMBOL: &str = "actus_print_buffer_stderr";
 pub const FLUSH_STDOUT_SYMBOL: &str = "actus_flush_stdout";
+pub const FLUSH_STDERR_SYMBOL: &str = "actus_flush_stderr";
 pub const PRINT_LINE_BUFFER_STDOUT_SYMBOL: &str = "actus_print_line_buffer_stdout";
 pub const PRINT_LINE_BUFFER_STDERR_SYMBOL: &str = "actus_print_line_buffer_stderr";
 pub const READ_STDIN_LINE_SYMBOL: &str = "actus_read_stdin_line";

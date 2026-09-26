@@ -4,19 +4,37 @@ open unsafe extern "C" verb actus_print_int_stderr(erg value: Int) -> Int;
 open unsafe extern "C" verb actus_print_buffer_stderr(abs text: Buffer) -> Int;
 /// C ABI bridge that writes a borrowed buffer followed by a newline to stderr.
 open unsafe extern "C" verb actus_print_line_buffer_stderr(abs text: Buffer) -> Int;
+open unsafe extern "C" verb actus_flush_stderr() -> Int;
 
-/// Print an integer to stderr without transferring buffer ownership.
-open verb eprint_int(erg value: Int) -> Int {
-    return actus_print_int_stderr(value: value);
+/// Print an integer to stderr and return its typed I/O result.
+open verb eprint_int(erg value: Int) -> Result[Int, IoError] {
+    erg status = actus_print_int_stderr(value: value);
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }
 
-/// Print a borrowed buffer to stderr without consuming it.
-open verb eprint(abs text: Buffer) -> Int {
-    return actus_print_buffer_stderr(text: abs text);
+/// Print a borrowed buffer to stderr without consuming it and return its
+/// typed byte-count or failure result.
+open verb eprint(abs text: Buffer) -> Result[Int, IoError] {
+    erg status = actus_print_buffer_stderr(text: abs text);
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
 }
 
-/// Print a borrowed buffer and append a newline on stderr.
-open verb eprintln(abs text: Buffer) -> Int {
+/// Print a borrowed buffer, append a newline, flush stderr, and return its
+/// typed byte-count or failure result.
+open verb eprintln(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_line_buffer_stderr(text: abs text);
-    return status;
+    erg flushed = actus_flush_stderr();
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => case flushed {
+            0 => Result[Int, IoError].Ok(status),
+            _ => Result[Int, IoError].Err(IoError.Failed),
+        },
+    };
 }
