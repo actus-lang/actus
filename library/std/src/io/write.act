@@ -14,10 +14,10 @@ open verb write(abs buffer: Buffer) -> Result[Int, IoError] {
     /// Keep the native status in an owned scalar while the borrowed view is
     /// still valid; no buffer or heap allocation is introduced here.
     erg status: Int = actus_write_buffer_stdout(buffer: abs buffer);
-    erg result = case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        -2 => Result[Int, IoError].Err(IoError.EndOfStream),
-        _ => Result[Int, IoError].Ok(status),
+    erg result: Result[Int, IoError] = case status {
+        -1 => Err(IoError.Failed),
+        -2 => Err(IoError.EndOfStream),
+        _ => Ok(status),
     };
     return result;
 }

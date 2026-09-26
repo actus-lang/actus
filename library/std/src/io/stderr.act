@@ -10,8 +10,8 @@ open unsafe extern "C" verb actus_flush_stderr() -> Int;
 open verb eprint_int(erg value: Int) -> Result[Int, IoError] {
     erg status = actus_print_int_stderr(value: value);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
 
@@ -20,8 +20,8 @@ open verb eprint_int(erg value: Int) -> Result[Int, IoError] {
 open verb eprint(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_buffer_stderr(text: abs text);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
 
@@ -31,10 +31,10 @@ open verb eprintln(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_line_buffer_stderr(text: abs text);
     erg flushed = actus_flush_stderr();
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
+        -1 => Err(IoError.Failed),
         _ => case flushed {
-            0 => Result[Int, IoError].Ok(status),
-            _ => Result[Int, IoError].Err(IoError.Failed),
+            0 => Ok(status),
+            _ => Err(IoError.Failed),
         },
     };
 }

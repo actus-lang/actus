@@ -12,8 +12,8 @@ open unsafe extern "C" verb actus_flush_stdout() -> Int;
 open verb print_int(erg value: Int) -> Result[Int, IoError] {
     erg status = actus_print_int(value: value);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
 
@@ -21,8 +21,8 @@ open verb print_int(erg value: Int) -> Result[Int, IoError] {
 open verb print(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_buffer_stdout(text: abs text);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
 
@@ -32,10 +32,10 @@ open verb println(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_line_buffer_stdout(text: abs text);
     erg flushed = actus_flush_stdout();
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
+        -1 => Err(IoError.Failed),
         _ => case flushed {
-            0 => Result[Int, IoError].Ok(status),
-            _ => Result[Int, IoError].Err(IoError.Failed),
+            0 => Ok(status),
+            _ => Err(IoError.Failed),
         },
     };
 }
@@ -44,9 +44,9 @@ open verb println(abs text: Buffer) -> Result[Int, IoError] {
 /// A successful flush returns `Ok(0)`; any non-zero runtime status is `Failed`.
 open verb flush() -> Result[Int, IoError] {
     erg status: Int = actus_flush_stdout();
-    erg result = case status {
-        0 => Result[Int, IoError].Ok(0),
-        _ => Result[Int, IoError].Err(IoError.Failed),
+    erg result: Result[Int, IoError] = case status {
+        0 => Ok(0),
+        _ => Err(IoError.Failed),
     };
     return result;
 }

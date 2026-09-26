@@ -57,8 +57,8 @@ open unsafe extern "C" verb actus_flush_buffered_stdout(ins buffer: Buffer) -> I
 open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError] {
     erg status = actus_buffer_reserve(buffer: ins buffer, capacity: capacity);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
 
@@ -74,8 +74,8 @@ open verb buffered_write(
 ) -> Result[Int, IoError] {
     erg status = actus_buffered_write_stdout(buffer: ins buffer, input: abs input);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
 
@@ -86,7 +86,7 @@ open verb buffered_write(
 open verb flush_buffer(ins buffer: Buffer) -> Result[Int, IoError] {
     erg status = actus_flush_buffered_stdout(buffer: ins buffer);
     return case status {
-        -1 => Result[Int, IoError].Err(IoError.Failed),
-        _ => Result[Int, IoError].Ok(status),
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
     };
 }
