@@ -1,17 +1,16 @@
-use crate::ast::{
-    Block, DispatchMode, Expr, ExternalVerbDecl, ForeignAbi, MetaAttribute, Param, Program, Role,
-    Stmt, TopLevelDecl, VerbDecl,
-};
+use crate::ast::{DispatchMode, MetaAttribute, Param, Program, Role, VerbDecl};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
 mod case;
 mod cursor;
+mod declarations;
 mod enums;
 mod expressions;
 mod generics;
 mod roles;
 mod spans;
+mod statements;
 mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,66 +56,6 @@ impl Parser {
         Ok(Program { declarations })
     }
 
-    fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
-        let mut doc = self.take_doc_string();
-        if self.check_simple(&TokenKind::Meta) {
-            let metadata = self.parse_metadata()?;
-            if doc.is_none() {
-                doc = self.take_doc_string();
-            }
-            if !self.check_simple(&TokenKind::Verb) {
-                return Err(self.error_at_current("`verb` after `meta test`"));
-            }
-            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
-        }
-        if self.check_simple(&TokenKind::Import) {
-            let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
-            let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
-            while self.match_simple(TokenKind::Colon) {
-                self.expect_simple(TokenKind::Colon, "`:`")?;
-                segments.push(identifier_text(&self.take_identifier("module name")?.kind));
-            }
-            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-            return Ok(TopLevelDecl::Import(crate::ast::ImportDecl {
-                path: segments.join("::"),
-                span: SourceSpan::new(start, end),
-            }));
-        }
-        if self.check_simple(&TokenKind::Open) {
-            if self.peek_next_is_identifier() {
-                let start = self.expect_keyword(TokenKind::Open, "`open`")?.span.start;
-                let name = identifier_text(&self.take_identifier("sibling module name")?.kind);
-                let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-                return Ok(TopLevelDecl::OpenSibling(crate::ast::OpenSiblingDecl {
-                    name,
-                    span: SourceSpan::new(start, end),
-                }));
-            }
-            self.expect_keyword(TokenKind::Open, "`open`")?;
-            return self.parse_open_declaration(doc);
-        }
-        if self.check_simple(&TokenKind::Unsafe) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(true, false)?));
-        }
-        if self.check_simple(&TokenKind::Extern) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false, false)?));
-        }
-        if self.check_simple(&TokenKind::Struct) {
-            return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
-        }
-        if self.check_simple(&TokenKind::Enum) {
-            return Ok(TopLevelDecl::Enum(self.parse_enum_def(false)?));
-        }
-        if self.check_simple(&TokenKind::Role) {
-            return Ok(TopLevelDecl::Role(self.parse_role_decl(false, doc)?));
-        }
-        if self.check_simple(&TokenKind::Perform) {
-            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false)?));
-        }
-        let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
-        Ok(TopLevelDecl::Verb(declaration))
-    }
-
     fn take_doc_string(&mut self) -> Option<String> {
         let Some(Token { kind: TokenKind::DocString(doc), .. }) = self.peek().cloned() else {
             return None;
@@ -129,77 +68,6 @@ impl Parser {
         while self.peek().is_some_and(|token| matches!(token.kind, TokenKind::DocString(_))) {
             self.cursor += 1;
         }
-    }
-
-    fn parse_open_declaration(&mut self, doc: Option<String>) -> Result<TopLevelDecl, ParseError> {
-        if self.check_simple(&TokenKind::Struct) {
-            return Ok(TopLevelDecl::Struct(self.parse_struct_def(true, doc)?));
-        }
-        if self.check_simple(&TokenKind::Enum) {
-            return Ok(TopLevelDecl::Enum(self.parse_enum_def(true)?));
-        }
-        if self.check_simple(&TokenKind::Role) {
-            return Ok(TopLevelDecl::Role(self.parse_role_decl(true, doc)?));
-        }
-        if self.check_simple(&TokenKind::Perform) {
-            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(true)?));
-        }
-        if self.check_simple(&TokenKind::Verb) {
-            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(true, Vec::new(), doc)?));
-        }
-        if self.check_simple(&TokenKind::Extern) || self.check_simple(&TokenKind::Unsafe) {
-            return Ok(TopLevelDecl::ExternalVerb(
-                self.parse_external_verb(self.check_simple(&TokenKind::Unsafe), true)?,
-            ));
-        }
-        Err(self.error_at_current("a declaration after `open`"))
-    }
-
-    fn parse_external_verb(
-        &mut self,
-        unsafe_boundary: bool,
-        is_open: bool,
-    ) -> Result<ExternalVerbDecl, ParseError> {
-        let start = if unsafe_boundary {
-            let start = self.expect_keyword(TokenKind::Unsafe, "`unsafe`")?.span.start;
-            self.expect_keyword(TokenKind::Extern, "`extern`")?;
-            start
-        } else {
-            self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start
-        };
-        let abi_token = self.advance_required("ABI string")?;
-        let abi = match &abi_token.kind {
-            TokenKind::StringLiteral(abi) if abi == "C" => ForeignAbi::C,
-            _ => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "supported ABI string (currently `\"C\"`)".to_owned(),
-                        found: abi_token.kind.clone(),
-                    },
-                    span: abi_token.span,
-                });
-            }
-        };
-        self.expect_keyword(TokenKind::Verb, "`verb`")?;
-        let name_token = self.take_identifier("external verb name")?;
-        let name = identifier_text(&name_token.kind);
-        let generic_parameters = self.parse_generic_parameters()?;
-        self.expect_simple(TokenKind::LeftParen, "`(`")?;
-        let params = self.parse_params()?;
-        self.expect_simple(TokenKind::RightParen, "`)`")?;
-        let return_type = self.parse_return_type()?;
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(ExternalVerbDecl {
-            is_open,
-            unsafe_boundary,
-            abi,
-            name,
-            generic_parameters,
-            params,
-            return_type,
-            span: SourceSpan::new(start, end),
-        })
     }
 
     fn parse_verb(&mut self, is_open: bool) -> Result<VerbDecl, ParseError> {
@@ -310,156 +178,6 @@ impl Parser {
             ty,
         })
     }
-
-    fn parse_block(&mut self) -> Result<Block, ParseError> {
-        let start = self.expect_simple(TokenKind::LeftBrace, "`{`")?.span.start;
-        let mut statements = Vec::new();
-
-        while !self.check_simple(&TokenKind::RightBrace) {
-            if self.at_end() {
-                return Err(self.error_at_current("`}`"));
-            }
-            self.skip_doc_strings();
-            if self.check_simple(&TokenKind::RightBrace) {
-                break;
-            }
-            statements.push(self.parse_statement()?);
-        }
-
-        let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(Block { statements, span: SourceSpan::new(start, end) })
-    }
-
-    fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
-        if self.check_simple(&TokenKind::LeftBrace) {
-            return Ok(Stmt::Block(self.parse_block()?));
-        }
-
-        if self.match_simple(TokenKind::Loop) {
-            return Ok(Stmt::Loop(self.parse_block()?));
-        }
-
-        if self.check_role(&TokenKind::Erg) || self.check_role(&TokenKind::Abs) {
-            return self.parse_owner_declaration();
-        }
-
-        if self.match_simple(TokenKind::Return) {
-            return self.parse_return_statement();
-        }
-
-        if self.match_simple(TokenKind::Break) {
-            return self.parse_loop_control_statement(true);
-        }
-
-        if self.match_simple(TokenKind::Continue) {
-            return self.parse_loop_control_statement(false);
-        }
-
-        if self.match_simple(TokenKind::Drop) {
-            return self.parse_drop_statement();
-        }
-
-        let expression = self.parse_expression()?;
-        if self.match_simple(TokenKind::Equals) {
-            let value = self.parse_expression()?;
-            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-            let span = SourceSpan::new(expression_span(&expression).start, end);
-            return match expression {
-                Expr::Identifier { name, .. } => Ok(Stmt::Assignment { name, value, span }),
-                Expr::FieldAccess { object, field, .. } => {
-                    Ok(Stmt::FieldAssignment { object: *object, field, value, span })
-                }
-                _ => Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "assignable binding or field".to_owned(),
-                        found: self
-                            .peek()
-                            .map(|token| token.kind.clone())
-                            .unwrap_or(TokenKind::Eof),
-                    },
-                    span,
-                }),
-            };
-        }
-
-        let start = expression_span(&expression).start;
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })
-    }
-
-    fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
-        let start = self.previous().span.start;
-        let value = (!self.check_simple(&TokenKind::Semicolon))
-            .then(|| self.parse_expression())
-            .transpose()?;
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(Stmt::Return { value, span: SourceSpan::new(start, end) })
-    }
-
-    fn parse_loop_control_statement(&mut self, is_break: bool) -> Result<Stmt, ParseError> {
-        let start = self.previous().span.start;
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        let span = SourceSpan::new(start, end);
-        Ok(if is_break { Stmt::Break { span } } else { Stmt::Continue { span } })
-    }
-
-    fn parse_drop_statement(&mut self) -> Result<Stmt, ParseError> {
-        let start = self.previous().span.start;
-        self.expect_simple(TokenKind::LeftParen, "`(`")?;
-        let name = identifier_text(&self.take_identifier("binding name")?.kind);
-        self.expect_simple(TokenKind::RightParen, "`)`")?;
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(Stmt::Drop { name, span: SourceSpan::new(start, end) })
-    }
-
-    fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
-        let role_token = self.advance_required("binding role")?;
-        let role = binding_role_from_token(&role_token.kind).ok_or_else(|| ParseError {
-            code: ParseErrorCode::UnexpectedToken,
-            kind: ParseErrorKind::UnexpectedToken {
-                expected: "`erg` or `abs`".to_owned(),
-                found: role_token.kind.clone(),
-            },
-            span: role_token.span,
-        })?;
-        let name_token = self.take_identifier("binding name")?;
-        let name = identifier_text(&name_token.kind);
-        let ty = if self.match_simple(TokenKind::Colon) {
-            Some(format_type_name(&self.parse_type_name()?))
-        } else {
-            None
-        };
-        self.expect_simple(TokenKind::Equals, "`=`")?;
-        let initializer = if role == Role::Abs {
-            self.expect_simple(TokenKind::Ref, "`ref`")?;
-            let expression = self.parse_expression()?;
-            let span = SourceSpan::new(role_token.span.start, expression_span(&expression).end);
-            Expr::Borrow { expression: Box::new(expression), span }
-        } else {
-            self.parse_expression()?
-        };
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-
-        Ok(Stmt::OwnerDecl {
-            role,
-            name,
-            ty,
-            initializer,
-            span: SourceSpan::new(role_token.span.start, end),
-        })
-    }
-}
-
-fn format_type_name(type_name: &crate::ast::TypeName) -> String {
-    if type_name.arguments.is_empty() {
-        return type_name.name.clone();
-    }
-    format!(
-        "{}[{}]",
-        type_name.name,
-        type_name.arguments.iter().map(format_type_name).collect::<Vec<_>>().join(",")
-    )
 }
 
 fn identifier_text(kind: &TokenKind) -> String {
@@ -475,14 +193,6 @@ fn parameter_role_from_token(kind: &TokenKind) -> Option<Role> {
         TokenKind::Abs => Some(Role::Abs),
         TokenKind::Dat => Some(Role::Dat),
         TokenKind::Ins => Some(Role::Ins),
-        _ => None,
-    }
-}
-
-fn binding_role_from_token(kind: &TokenKind) -> Option<Role> {
-    match kind {
-        TokenKind::Erg => Some(Role::Erg),
-        TokenKind::Abs => Some(Role::Abs),
         _ => None,
     }
 }

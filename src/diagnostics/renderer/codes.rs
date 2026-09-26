@@ -1,47 +1,8 @@
 use crate::lexer::{LexError, LexErrorKind};
-use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind};
-use crate::semantic::{SemanticError, SemanticErrorKind};
+use crate::parser::ParseErrorCode;
+use crate::semantic::SemanticErrorKind;
 
-pub fn render_lex_error(source: &str, error: &LexError) -> String {
-    let (line, column) = line_column(source, error.span.start);
-    let message = match &error.kind {
-        LexErrorKind::UnexpectedCharacter(character) => {
-            format!("unexpected character `{character}`")
-        }
-        LexErrorKind::UnterminatedString => "unterminated string literal".to_owned(),
-        LexErrorKind::UnterminatedDocString => "unterminated docstring literal".to_owned(),
-    };
-
-    format!("error[E000{code}] at {line}:{column}: {message}", code = lex_code(error))
-}
-
-pub fn render_parse_error(source: &str, error: &ParseError) -> String {
-    let (line, column) = line_column(source, error.span.start);
-    let message = match &error.kind {
-        ParseErrorKind::UnexpectedToken { expected, found } => {
-            format!("expected {expected}, found {found:?}")
-        }
-        ParseErrorKind::UnexpectedEndOfInput { expected } => {
-            format!("expected {expected}, found end of input")
-        }
-        ParseErrorKind::DuplicateName { kind, name } => {
-            format!("duplicate {kind} `{name}`")
-        }
-    };
-
-    format!("error[{}] at {line}:{column}: {message}", parse_code(error.code))
-}
-
-pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
-    let (line, column) = line_column(source, error.span.start);
-    format!(
-        "error[{}] at {line}:{column}: {}",
-        semantic_code(&error.kind),
-        semantic_message(&error.kind)
-    )
-}
-
-fn lex_code(error: &LexError) -> u8 {
+pub(super) fn lex_code(error: &LexError) -> u8 {
     match error.kind {
         LexErrorKind::UnexpectedCharacter(_) => 1,
         LexErrorKind::UnterminatedString => 2,
@@ -49,7 +10,7 @@ fn lex_code(error: &LexError) -> u8 {
     }
 }
 
-fn parse_code(code: ParseErrorCode) -> &'static str {
+pub(super) fn parse_code(code: ParseErrorCode) -> &'static str {
     match code {
         ParseErrorCode::UnexpectedToken => "E0003",
         ParseErrorCode::UnexpectedEndOfInput => "E0004",
@@ -57,7 +18,7 @@ fn parse_code(code: ParseErrorCode) -> &'static str {
     }
 }
 
-fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
+pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
     if let Some(code) = role_semantic_code(kind) {
         return code;
     }
@@ -158,7 +119,7 @@ fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
     })
 }
 
-fn semantic_message(kind: &SemanticErrorKind) -> String {
+pub(super) fn semantic_message(kind: &SemanticErrorKind) -> String {
     if let Some(message) = ownership_semantic_message(kind) {
         return message;
     }
@@ -271,9 +232,11 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
             parameter,
             expected,
             found,
-        } => format!(
-            "type mismatch for variant `{variant}` field `{parameter}`: expected `{expected}`, found `{found}`"
-        ),
+        } => {
+            format!(
+                "type mismatch for variant `{variant}` field `{parameter}`: expected `{expected}`, found `{found}`"
+            )
+        }
         SemanticErrorKind::RecursiveType { name } => {
             format!("recursive type `{name}` requires indirection")
         }
@@ -283,9 +246,7 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::UnreachablePattern { pattern } => {
             format!("unreachable pattern `{pattern}`")
         }
-        SemanticErrorKind::DuplicatePattern { pattern } => {
-            format!("duplicate pattern `{pattern}`")
-        }
+        SemanticErrorKind::DuplicatePattern { pattern } => format!("duplicate pattern `{pattern}`"),
         SemanticErrorKind::PatternTypeMismatch { expected, found } => {
             format!("pattern type mismatch: expected `{expected}`, found `{found}`")
         }
@@ -357,9 +318,11 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::UnknownTypeParameter { name } => {
             format!("undeclared generic type parameter `{name}`")
         }
-        SemanticErrorKind::GenericArityMismatch { name, expected, found } => format!(
-            "wrong number of type arguments for `{name}`: expected {expected}, found {found}"
-        ),
+        SemanticErrorKind::GenericArityMismatch { name, expected, found } => {
+            format!(
+                "wrong number of type arguments for `{name}`: expected {expected}, found {found}"
+            )
+        }
         SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } => {
             format!("generic parameter `{parameter}` requires `{constraint}`, found `{argument}`")
         }
@@ -407,12 +370,4 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         _ => return None,
     };
     Some(message)
-}
-
-fn line_column(source: &str, byte_offset: usize) -> (usize, usize) {
-    let offset = byte_offset.min(source.len());
-    let prefix = &source[..offset];
-    let line = prefix.bytes().filter(|byte| *byte == b'\n').count() + 1;
-    let column = prefix.rsplit('\n').next().map_or(1, |line| line.chars().count() + 1);
-    (line, column)
 }

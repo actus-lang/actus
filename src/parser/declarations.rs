@@ -1,0 +1,145 @@
+use crate::ast::{ExternalVerbDecl, ForeignAbi, TopLevelDecl};
+use crate::lexer::{SourceSpan, TokenKind};
+
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
+
+impl Parser {
+    pub(super) fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        let mut doc = self.take_doc_string();
+        if self.check_simple(&TokenKind::Meta) {
+            let metadata = self.parse_metadata()?;
+            if doc.is_none() {
+                doc = self.take_doc_string();
+            }
+            if !self.check_simple(&TokenKind::Verb) {
+                return Err(self.error_at_current("`verb` after `meta test`"));
+            }
+            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
+        }
+        if self.check_simple(&TokenKind::Import) {
+            return self.parse_import_decl();
+        }
+        if self.check_simple(&TokenKind::Open) {
+            return self.parse_open_top_level(doc);
+        }
+        if self.check_simple(&TokenKind::Unsafe) {
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(true, false)?));
+        }
+        if self.check_simple(&TokenKind::Extern) {
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(false, false)?));
+        }
+        if self.check_simple(&TokenKind::Struct) {
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
+        }
+        if self.check_simple(&TokenKind::Enum) {
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def(false)?));
+        }
+        if self.check_simple(&TokenKind::Role) {
+            return Ok(TopLevelDecl::Role(self.parse_role_decl(false, doc)?));
+        }
+        if self.check_simple(&TokenKind::Perform) {
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false)?));
+        }
+        let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
+        Ok(TopLevelDecl::Verb(declaration))
+    }
+
+    fn parse_import_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+        let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
+        let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
+        while self.match_simple(TokenKind::Colon) {
+            self.expect_simple(TokenKind::Colon, "`:`")?;
+            segments.push(identifier_text(&self.take_identifier("module name")?.kind));
+        }
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(TopLevelDecl::Import(crate::ast::ImportDecl {
+            path: segments.join("::"),
+            span: SourceSpan::new(start, end),
+        }))
+    }
+
+    fn parse_open_top_level(&mut self, doc: Option<String>) -> Result<TopLevelDecl, ParseError> {
+        self.expect_keyword(TokenKind::Open, "`open`")?;
+        if self.check_identifier() {
+            let start = self.previous().span.start;
+            let name = identifier_text(&self.take_identifier("sibling module name")?.kind);
+            let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+            return Ok(TopLevelDecl::OpenSibling(crate::ast::OpenSiblingDecl {
+                name,
+                span: SourceSpan::new(start, end),
+            }));
+        }
+        self.parse_open_declaration(doc)
+    }
+
+    fn parse_open_declaration(&mut self, doc: Option<String>) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Struct) {
+            return Ok(TopLevelDecl::Struct(self.parse_struct_def(true, doc)?));
+        }
+        if self.check_simple(&TokenKind::Enum) {
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def(true)?));
+        }
+        if self.check_simple(&TokenKind::Role) {
+            return Ok(TopLevelDecl::Role(self.parse_role_decl(true, doc)?));
+        }
+        if self.check_simple(&TokenKind::Perform) {
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(true)?));
+        }
+        if self.check_simple(&TokenKind::Verb) {
+            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(true, Vec::new(), doc)?));
+        }
+        if self.check_simple(&TokenKind::Extern) || self.check_simple(&TokenKind::Unsafe) {
+            return Ok(TopLevelDecl::ExternalVerb(
+                self.parse_external_verb(self.check_simple(&TokenKind::Unsafe), true)?,
+            ));
+        }
+        Err(self.error_at_current("a declaration after `open`"))
+    }
+
+    fn parse_external_verb(
+        &mut self,
+        unsafe_boundary: bool,
+        is_open: bool,
+    ) -> Result<ExternalVerbDecl, ParseError> {
+        let start = if unsafe_boundary {
+            let start = self.expect_keyword(TokenKind::Unsafe, "`unsafe`")?.span.start;
+            self.expect_keyword(TokenKind::Extern, "`extern`")?;
+            start
+        } else {
+            self.expect_keyword(TokenKind::Extern, "`extern`")?.span.start
+        };
+        let abi_token = self.advance_required("ABI string")?;
+        let abi = match &abi_token.kind {
+            TokenKind::StringLiteral(abi) if abi == "C" => ForeignAbi::C,
+            _ => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "supported ABI string (currently `\"C\"`)".to_owned(),
+                        found: abi_token.kind.clone(),
+                    },
+                    span: abi_token.span,
+                });
+            }
+        };
+        self.expect_keyword(TokenKind::Verb, "`verb`")?;
+        let name_token = self.take_identifier("external verb name")?;
+        let name = identifier_text(&name_token.kind);
+        let generic_parameters = self.parse_generic_parameters()?;
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let params = self.parse_params()?;
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let return_type = self.parse_return_type()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(ExternalVerbDecl {
+            is_open,
+            unsafe_boundary,
+            abi,
+            name,
+            generic_parameters,
+            params,
+            return_type,
+            span: SourceSpan::new(start, end),
+        })
+    }
+}

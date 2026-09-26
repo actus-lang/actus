@@ -1,0 +1,152 @@
+use crate::ast::{Block, Expr, Role, Stmt};
+use crate::lexer::{SourceSpan, TokenKind};
+
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
+
+impl Parser {
+    pub(super) fn parse_block(&mut self) -> Result<Block, ParseError> {
+        let start = self.expect_simple(TokenKind::LeftBrace, "`{`")?.span.start;
+        let mut statements = Vec::new();
+        while !self.check_simple(&TokenKind::RightBrace) {
+            if self.at_end() {
+                return Err(self.error_at_current("`}`"));
+            }
+            self.skip_doc_strings();
+            if self.check_simple(&TokenKind::RightBrace) {
+                break;
+            }
+            statements.push(self.parse_statement()?);
+        }
+        let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
+        Ok(Block { statements, span: SourceSpan::new(start, end) })
+    }
+
+    pub(super) fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.check_simple(&TokenKind::LeftBrace) {
+            return Ok(Stmt::Block(self.parse_block()?));
+        }
+        if self.match_simple(TokenKind::Loop) {
+            return Ok(Stmt::Loop(self.parse_block()?));
+        }
+        if self.check_role(&TokenKind::Erg) || self.check_role(&TokenKind::Abs) {
+            return self.parse_owner_declaration();
+        }
+        if self.match_simple(TokenKind::Return) {
+            return self.parse_return_statement();
+        }
+        if self.match_simple(TokenKind::Break) {
+            return self.parse_loop_control_statement(true);
+        }
+        if self.match_simple(TokenKind::Continue) {
+            return self.parse_loop_control_statement(false);
+        }
+        if self.match_simple(TokenKind::Drop) {
+            return self.parse_drop_statement();
+        }
+        let expression = self.parse_expression()?;
+        if self.match_simple(TokenKind::Equals) {
+            return self.parse_assignment(expression);
+        }
+        let start = expression_span(&expression).start;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_assignment(&mut self, expression: Expr) -> Result<Stmt, ParseError> {
+        let value = self.parse_expression()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        let span = SourceSpan::new(expression_span(&expression).start, end);
+        match expression {
+            Expr::Identifier { name, .. } => Ok(Stmt::Assignment { name, value, span }),
+            Expr::FieldAccess { object, field, .. } => {
+                Ok(Stmt::FieldAssignment { object: *object, field, value, span })
+            }
+            _ => Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
+                kind: ParseErrorKind::UnexpectedToken {
+                    expected: "assignable binding or field".to_owned(),
+                    found: self.peek().map(|token| token.kind.clone()).unwrap_or(TokenKind::Eof),
+                },
+                span,
+            }),
+        }
+    }
+
+    fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        let value = (!self.check_simple(&TokenKind::Semicolon))
+            .then(|| self.parse_expression())
+            .transpose()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Return { value, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_loop_control_statement(&mut self, is_break: bool) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        let span = SourceSpan::new(start, end);
+        Ok(if is_break { Stmt::Break { span } } else { Stmt::Continue { span } })
+    }
+
+    fn parse_drop_statement(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.previous().span.start;
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let name = identifier_text(&self.take_identifier("binding name")?.kind);
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::Drop { name, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let role_token = self.advance_required("binding role")?;
+        let role = match role_token.kind {
+            TokenKind::Erg => Role::Erg,
+            TokenKind::Abs => Role::Abs,
+            found => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "`erg` or `abs`".to_owned(),
+                        found,
+                    },
+                    span: role_token.span,
+                });
+            }
+        };
+        let name_token = self.take_identifier("binding name")?;
+        let name = identifier_text(&name_token.kind);
+        let ty = if self.match_simple(TokenKind::Colon) {
+            Some(format_type_name(&self.parse_type_name()?))
+        } else {
+            None
+        };
+        self.expect_simple(TokenKind::Equals, "`=`")?;
+        let initializer = if role == Role::Abs {
+            self.expect_simple(TokenKind::Ref, "`ref`")?;
+            let expression = self.parse_expression()?;
+            let span = SourceSpan::new(role_token.span.start, expression_span(&expression).end);
+            Expr::Borrow { expression: Box::new(expression), span }
+        } else {
+            self.parse_expression()?
+        };
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::OwnerDecl {
+            role,
+            name,
+            ty,
+            initializer,
+            span: SourceSpan::new(role_token.span.start, end),
+        })
+    }
+}
+
+fn format_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(format_type_name).collect::<Vec<_>>().join(",")
+    )
+}
