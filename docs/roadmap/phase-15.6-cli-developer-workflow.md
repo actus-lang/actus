@@ -25,16 +25,16 @@ compiler pipeline.
 
 ## Gate 2: Project-root input discovery
 
-- [ ] Make `actus build` discover `Arca.toml` from the current directory and
+- [x] Make `actus build` discover `Arca.toml` from the current directory and
       select its configured entry source.
-- [ ] Default to `src/main.act` when the manifest does not override the entry.
-- [ ] Preserve an explicit `.act` path as a command-line input override.
-- [ ] Make `actus build --emit exe` work without a positional input path.
-- [ ] Make `actus build --release` and `actus build --profile <name>` work
+- [x] Default to `src/main.act` when the manifest does not override the entry.
+- [x] Preserve an explicit `.act` path as a command-line input override.
+- [x] Make `actus build --emit exe` work without a positional input path.
+- [x] Make `actus build --release` and `actus build --profile <name>` work
       without a positional input path.
-- [ ] Preserve the existing option form `actus build src/main.act --emit exe`.
-- [ ] Report a deterministic diagnostic when no manifest or entry source exists.
-- [ ] Add integration tests from the project root and from nested directories.
+- [x] Preserve the existing option form `actus build src/main.act --emit exe`.
+- [x] Report a deterministic diagnostic when no manifest or entry source exists.
+- [x] Add integration tests from the project root and from nested directories.
 
 ## Gate 3: Project creation and Git defaults
 

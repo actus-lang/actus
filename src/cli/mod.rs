@@ -165,7 +165,7 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         "parse" => Some("usage: actus parse <file.act>\n\nParse a source file and print its AST."),
         "build" => Some(
-            "usage: actus build <file.act> [--release|--profile <name>] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file.",
+            "usage: actus build [file.act] [--release|--profile <name>] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Arca.toml.",
         ),
         "run" => Some(
             "usage: actus run [file.act] [--release|--profile <name>] [-- program-args...]\n\nBuild and execute an Actus program once.",

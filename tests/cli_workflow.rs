@@ -49,6 +49,69 @@ fn check_validates_source_without_emitting_code() {
 
 #[cfg(unix)]
 #[test]
+fn build_discovers_the_manifest_entry_without_an_input_path() {
+    let root = std::env::temp_dir().join(format!("actus-build-entry-{}", std::process::id()));
+    let output = root.join("hello");
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"entry\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main() -> Int { return 42; }\n")
+        .expect("write entry source");
+
+    let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&root)
+        .output()
+        .expect("run build command");
+
+    assert!(
+        result.status.success(),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(Command::new(&output).status().unwrap().code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn build_discovers_a_parent_manifest_from_a_nested_directory() {
+    let root = std::env::temp_dir().join(format!("actus-build-nested-{}", std::process::id()));
+    let nested = root.join("src").join("nested");
+    let output = nested.join("hello");
+    fs::create_dir_all(&nested).expect("create nested source directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"nested\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main() -> Int { return 43; }\n")
+        .expect("write entry source");
+
+    let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&nested)
+        .output()
+        .expect("run nested build command");
+
+    assert!(
+        result.status.success(),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(Command::new(&output).status().unwrap().code(), Some(43));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn run_accepts_release_profile_and_forwards_arguments() {
     let input = std::env::temp_dir().join(format!("actus-run-options-{}.act", std::process::id()));
     fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");

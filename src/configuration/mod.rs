@@ -192,6 +192,14 @@ impl CompilerConfiguration {
         &self.project_root
     }
 
+    pub fn has_manifest(&self) -> bool {
+        self.project_root.join(manifest::MANIFEST_FILE_NAME).is_file()
+    }
+
+    pub fn default_entry_path(&self) -> PathBuf {
+        self.source_root.join("main.act")
+    }
+
     pub fn dependency_roots(&self) -> &BTreeMap<String, PathBuf> {
         &self.dependency_roots
     }
