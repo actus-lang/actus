@@ -118,10 +118,13 @@ impl Formatter {
         self.output.push(')');
     }
 
-    fn return_type(&mut self, return_type: &Option<crate::ast::TypeName>) {
+    fn return_type(&mut self, return_type: &Option<crate::ast::ReturnType>) {
         if let Some(return_type) = return_type {
             self.output.push_str(" -> ");
-            self.output.push_str(&return_type.name);
+            if matches!(return_type.access, crate::ast::ReturnAccess::Abs) {
+                self.output.push_str("abs ");
+            }
+            self.output.push_str(&return_type.ty.name);
         }
     }
 
@@ -286,6 +289,11 @@ impl Formatter {
     fn expression(&mut self, expression: &Expr) {
         match expression {
             Expr::Identifier { name, .. } => self.output.push_str(name),
+            Expr::BufferLiteral { length, .. } => {
+                self.output.push_str("Buffer[");
+                self.expression(length);
+                self.output.push(']');
+            }
             Expr::Integer { value, .. } | Expr::FloatLiteral { value, .. } => {
                 self.output.push_str(value)
             }
@@ -399,5 +407,6 @@ fn role_name(role: &Role) -> &'static str {
         Role::Erg => "erg",
         Role::Abs => "abs",
         Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }

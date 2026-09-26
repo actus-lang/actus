@@ -52,7 +52,7 @@ fn executes_struct_field_assignment() {
 #[test]
 fn executes_nested_struct_access_and_owned_drop() {
     build_and_run(
-        "struct Inner { x: Int, y: Int, } struct Holder { inner: Inner, erg payload: Buffer, } verb main() -> Int { erg holder = Holder { inner: Inner { x: 40, y: 2, }, payload: allocate(4), }; return holder.inner.x + holder.inner.y; }\n",
+        "struct Inner { x: Int, y: Int, } struct Holder { inner: Inner, erg payload: Buffer, } verb main() -> Int { erg holder = Holder { inner: Inner { x: 40, y: 2, }, payload: Buffer[4], }; return holder.inner.x + holder.inner.y; }\n",
         "nested-struct",
         42,
     );
@@ -102,7 +102,7 @@ fn executes_dynamic_performance_dispatch() {
 #[test]
 fn cleans_up_owned_field_in_monomorphized_generic_struct() {
     build_and_run(
-        "struct Box[T] { erg item: T, } verb main() -> Int { erg boxed = Box[Buffer] { item: allocate(4), }; return 42; }\n",
+        "struct Box[T] { erg item: T, } verb main() -> Int { erg boxed = Box[Buffer] { item: Buffer[4], }; return 42; }\n",
         "generic-owned-field",
         42,
     );
@@ -112,7 +112,7 @@ fn cleans_up_owned_field_in_monomorphized_generic_struct() {
 #[test]
 fn executes_monomorphized_generic_enum_cleanup() {
     build_and_run(
-        "enum Box[T] { Some(T), None, } verb main() -> Int { erg item = Box[Buffer].Some(allocate(4)); return case dat item { Box.Some(payload) => { drop(payload); return 42; }, Box.None => 0, }; }\n",
+        "enum Box[T] { Some(T), None, } verb main() -> Int { erg item = Box[Buffer].Some(Buffer[4]); return case dat item { Box.Some(payload) => { drop(payload); return 42; }, Box.None => 0, }; }\n",
         "generic-enum-cleanup",
         42,
     );
@@ -142,7 +142,7 @@ fn executes_result_err_without_exception_propagation() {
 #[test]
 fn avoids_double_drop_after_moving_owned_field() {
     build_and_run(
-        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: allocate(4), value: 42, }; consume(payload: holder.payload); return 42; }\n",
+        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: Buffer[4], value: 42, }; consume(payload: holder.payload); return 42; }\n",
         "partial-move",
         42,
     );

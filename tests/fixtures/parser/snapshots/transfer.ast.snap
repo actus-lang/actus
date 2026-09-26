@@ -60,11 +60,18 @@ Program {
                     },
                 ],
                 return_type: Some(
-                    TypeName {
-                        name: "Int",
-                        arguments: [],
+                    ReturnType {
+                        access: Owned,
+                        ty: TypeName {
+                            name: "Int",
+                            arguments: [],
+                            span: SourceSpan {
+                                start: 75,
+                                end: 78,
+                            },
+                        },
                         span: SourceSpan {
-                            start: 75,
+                            start: 72,
                             end: 78,
                         },
                     },

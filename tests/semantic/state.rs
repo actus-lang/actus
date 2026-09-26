@@ -95,3 +95,18 @@ fn transition_matrix_rejects_failed_cleanup_and_ambiguous_access() {
     assert!(state.drop_owner());
     assert!(!state.thaw());
 }
+
+#[test]
+fn exclusive_loan_suspends_and_resumes_the_same_owner() {
+    let mut state = ResourceState::active();
+    assert!(state.suspend(7));
+    assert_eq!(state.access, AccessState::Suspended { loan_id: 7 });
+    assert_eq!(state.ownership, OwnershipState::Active);
+    assert!(!state.move_owner());
+    assert!(!state.partial_move("field"));
+    assert!(!state.drop_owner());
+    assert!(!state.freeze(1));
+    assert!(state.resume(7));
+    assert_eq!(state.access, AccessState::Mutable);
+    assert!(!state.resume(7));
+}

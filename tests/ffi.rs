@@ -92,7 +92,7 @@ fn models_external_c_declarations_without_a_definition_body() {
 
 #[test]
 fn marks_buffer_returns_as_owned_resources() {
-    let verb = parse_verb("verb allocate_buffer() -> Buffer { return allocate(4); }");
+    let verb = parse_verb("verb allocate_buffer() -> Buffer { return Buffer[4]; }");
     let signature = c_abi_signature(&verb).expect("Buffer return should map");
 
     assert_eq!(signature.return_ownership, CAbiReturnOwnership::OwnedResource);

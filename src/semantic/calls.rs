@@ -1,5 +1,5 @@
 use crate::ast::{
-    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, Role, VerbDecl,
+    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, ReturnAccess, Role, VerbDecl,
     lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
@@ -14,6 +14,7 @@ pub(super) struct VerbSignature {
     pub(super) params: Vec<(String, Role, String)>,
     pub(super) dynamic_params: Vec<DispatchMode>,
     pub(super) return_type: Option<BuiltinType>,
+    pub(super) return_access: Option<ReturnAccess>,
 }
 
 impl VerbDecl {
@@ -30,7 +31,8 @@ impl VerbDecl {
             return_type: self
                 .return_type
                 .as_ref()
-                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+                .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
+            return_access: self.return_type.as_ref().map(|return_type| return_type.access),
         }
     }
 }
@@ -49,7 +51,8 @@ impl ExternalVerbDecl {
             return_type: self
                 .return_type
                 .as_ref()
-                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+                .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
+            return_access: self.return_type.as_ref().map(|return_type| return_type.access),
         }
     }
 }
@@ -65,6 +68,7 @@ impl Analyzer {
             return Ok(());
         };
         let index = self.binding(name, object_span)?;
+        self.ensure_access_available(index, name, span)?;
         let field_path = format_field_path(object, field);
         match &self.model.bindings[index].ownership {
             OwnershipState::Active => Ok(()),
@@ -115,25 +119,52 @@ impl Analyzer {
         for argument in arguments {
             self.visit_expression(&argument.expression)?;
         }
-        for (argument, parameter_index) in arguments.iter().zip(parameter_indices) {
-            let (_, role, _) = &signature.params[parameter_index];
-            self.validate_argument_role(
-                callee,
-                &signature.params[parameter_index].0,
-                role,
-                &argument.expression,
-            )?;
+        for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
+            let (_, role, _) = &signature.params[*parameter_index];
+            if *role == Role::Ins && argument.role != Some(Role::Ins) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidArgumentRole {
+                        callee: callee.to_owned(),
+                        parameter: signature.params[*parameter_index].0.clone(),
+                    },
+                    span: argument_span(argument),
+                });
+            }
+            if argument.role.as_ref().is_some_and(|actual| actual != role) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidArgumentRole {
+                        callee: callee.to_owned(),
+                        parameter: signature.params[*parameter_index].0.clone(),
+                    },
+                    span: argument_span(argument),
+                });
+            }
+            let explicit_owner_view = *role == Role::Abs
+                && argument.role == Some(Role::Abs)
+                && self.is_readable_owner(&argument.expression);
+            if !explicit_owner_view {
+                self.validate_argument_role(
+                    callee,
+                    &signature.params[*parameter_index].0,
+                    role,
+                    &argument.expression,
+                )?;
+            }
             self.validate_argument_type(
                 callee,
-                &signature.params[parameter_index].0,
-                &signature.params[parameter_index].2,
-                signature.dynamic_params[parameter_index],
+                &signature.params[*parameter_index].0,
+                &signature.params[*parameter_index].2,
+                signature.dynamic_params[*parameter_index],
                 &argument.expression,
             )?;
-            if *role == Role::Dat {
+        }
+        self.validate_exclusive_aliases(arguments, &parameter_indices, signature)?;
+        for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
+            if signature.params[*parameter_index].1 == Role::Dat {
                 self.move_dat_argument(&argument.expression, argument_span(argument))?;
             }
         }
+        self.execute_exclusive_loans(callee, arguments, &parameter_indices, signature)?;
         Ok(())
     }
 
@@ -177,6 +208,7 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, *identifier_span)?;
+        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidDatArgument { name: name.clone() },
@@ -219,6 +251,7 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, object_span)?;
+        self.ensure_access_available(index, name, span)?;
         self.validate_struct_field_move(object, field, span)?;
         let field_path = format_field_path(object, field);
         if self.model.bindings[index].access.is_frozen() {

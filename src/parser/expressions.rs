@@ -66,6 +66,14 @@ impl Parser {
         name: String,
         span: SourceSpan,
     ) -> Result<Expr, ParseError> {
+        if name == "Buffer" && self.match_simple(TokenKind::LeftBracket) {
+            let length = self.parse_expression()?;
+            let end = self.expect_simple(TokenKind::RightBracket, "`]`")?.span.end;
+            return Ok(Expr::BufferLiteral {
+                length: Box::new(length),
+                span: SourceSpan::new(span.start, end),
+            });
+        }
         let type_arguments = if self.match_simple(TokenKind::LeftBracket) {
             self.parse_type_arguments()?
         } else {
@@ -147,12 +155,38 @@ impl Parser {
             } else {
                 None
             };
-            arguments.push(Argument { name, expression: self.parse_expression()? });
+            let (role, role_span) = self.parse_argument_role()?;
+            arguments.push(Argument {
+                name,
+                role,
+                role_span,
+                expression: self.parse_expression()?,
+            });
             if !self.match_simple(TokenKind::Comma) {
                 break;
             }
         }
         Ok(arguments)
+    }
+
+    fn parse_argument_role(
+        &mut self,
+    ) -> Result<(Option<crate::ast::Role>, Option<SourceSpan>), ParseError> {
+        let Some(token) = self.peek() else { return Ok((None, None)) };
+        let Some(role) = role_from_token(&token.kind) else { return Ok((None, None)) };
+        let span = token.span;
+        self.advance_required("argument role")?;
+        Ok((Some(role), Some(span)))
+    }
+}
+
+fn role_from_token(kind: &TokenKind) -> Option<crate::ast::Role> {
+    match kind {
+        TokenKind::Erg => Some(crate::ast::Role::Erg),
+        TokenKind::Abs => Some(crate::ast::Role::Abs),
+        TokenKind::Dat => Some(crate::ast::Role::Dat),
+        TokenKind::Ins => Some(crate::ast::Role::Ins),
+        _ => None,
     }
 }
 

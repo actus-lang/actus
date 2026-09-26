@@ -23,6 +23,37 @@ pub struct BorrowRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExclusiveLoan {
+    pub id: usize,
+    pub owner: String,
+    pub callee: String,
+    pub parameter: String,
+    pub origin_span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Origin {
+    None,
+    AbsParameter { parameter_index: usize },
+    Derived { root_parameter: usize },
+    Binding { binding_index: usize },
+    Unknown,
+    Multiple { roots: Vec<OriginRoot> },
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum OriginRoot {
+    Parameter(usize),
+    Binding(usize),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OriginRecord {
+    pub span: SourceSpan,
+    pub origin: Origin,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenericInstance {
     pub name: String,
     pub arguments: Vec<TypeName>,
@@ -59,6 +90,8 @@ pub struct DynamicRoleType {
 pub struct SemanticModel {
     pub bindings: Vec<Binding>,
     pub borrows: Vec<BorrowRecord>,
+    pub exclusive_loans: Vec<ExclusiveLoan>,
+    pub expression_origins: Vec<OriginRecord>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,

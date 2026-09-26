@@ -170,7 +170,11 @@ fn test_main(name: &str) -> TopLevelDecl {
         name: "main".to_owned(),
         generic_parameters: Vec::new(),
         params: Vec::new(),
-        return_type: Some(TypeName { name: "Int".to_owned(), arguments: Vec::new(), span }),
+        return_type: Some(crate::ast::ReturnType {
+            access: crate::ast::ReturnAccess::Owned,
+            ty: TypeName { name: "Int".to_owned(), arguments: Vec::new(), span },
+            span,
+        }),
         body: Block {
             statements: vec![
                 Stmt::Expression {

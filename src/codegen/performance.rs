@@ -130,7 +130,7 @@ pub(super) fn declare_performance_functions(
                     .map(|parameter| parameter.name.clone())
                     .collect(),
                 return_type: NativeType::from_type_name_with_layout(
-                    definition.method.return_type.as_ref(),
+                    definition.method.return_type.as_ref().map(|return_type| &return_type.ty),
                     layouts,
                 ),
                 dynamic_params: definition

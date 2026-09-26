@@ -1,6 +1,6 @@
 use actus::ast::{
-    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, MetaAttribute, Pattern, Role, Stmt,
-    StructFieldRole, TopLevelDecl, VariantPayload,
+    CaseBody, CaseMode, EnumPayload, Expr, LiteralPattern, MetaAttribute, Pattern, ReturnAccess,
+    Role, Stmt, StructFieldRole, TopLevelDecl, VariantPayload,
 };
 use actus::diagnostics::render_parse_error;
 use actus::lexer::scan;
@@ -24,8 +24,37 @@ fn parses_a_verb_with_roles_and_return_type() {
     assert_eq!(verb.params[0].role, Role::Erg);
     assert_eq!(verb.params[1].role, Role::Abs);
     assert_eq!(verb.params[2].role, Role::Dat);
-    assert_eq!(verb.return_type.as_ref().map(|ty| ty.name.as_str()), Some("Int"));
+    assert_eq!(verb.return_type.as_ref().map(|ty| ty.ty.name.as_str()), Some("Int"));
+    assert_eq!(verb.return_type.as_ref().map(|ty| ty.access), Some(ReturnAccess::Owned));
     assert!(matches!(verb.body.statements[0], Stmt::Return { .. }));
+}
+
+#[test]
+fn parses_instrumental_parameters_and_call_site_roles() {
+    let program = parse_source(
+        "verb update(ins buffer: Buffer) { } verb main(erg buffer: Buffer) { update(buffer: ins buffer); }",
+    );
+    let TopLevelDecl::Verb(update) = &program.declarations[0] else { panic!("expected update") };
+    assert_eq!(update.params[0].role, Role::Ins);
+    let TopLevelDecl::Verb(main) = &program.declarations[1] else { panic!("expected main") };
+    let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =
+        &main.body.statements[0]
+    else {
+        panic!("expected call expression")
+    };
+    assert_eq!(arguments[0].role, Some(Role::Ins));
+}
+
+#[test]
+fn parses_buffer_literal_construction() {
+    let program = parse_source("verb main() { erg buffer = Buffer[16]; }");
+    let TopLevelDecl::Verb(main) = &program.declarations[0] else { panic!("expected main") };
+    let Stmt::OwnerDecl { initializer: Expr::BufferLiteral { length, .. }, .. } =
+        &main.body.statements[0]
+    else {
+        panic!("expected Buffer literal")
+    };
+    assert!(matches!(length.as_ref(), Expr::Integer { value, .. } if value == "16"));
 }
 
 #[test]
@@ -60,8 +89,8 @@ fn parses_generic_parameters_and_type_applications() {
     };
     assert_eq!(verb.generic_parameters[0].name, "T");
     let return_type = verb.return_type.as_ref().expect("generic return type");
-    assert_eq!(return_type.name, "Box");
-    assert_eq!(return_type.arguments[0].name, "T");
+    assert_eq!(return_type.ty.name, "Box");
+    assert_eq!(return_type.ty.arguments[0].name, "T");
 }
 
 #[test]
@@ -253,6 +282,7 @@ fn rejects_abs_struct_fields() {
     for (source, role) in [
         ("struct Borrowed { abs view: Buffer, }", actus::lexer::TokenKind::Abs),
         ("struct Moved { dat payload: Buffer, }", actus::lexer::TokenKind::Dat),
+        ("struct Instrumented { ins buffer: Buffer, }", actus::lexer::TokenKind::Ins),
     ] {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
@@ -264,6 +294,20 @@ fn rejects_abs_struct_fields() {
             ParseErrorKind::UnexpectedToken { found, .. } if found == role
         ));
     }
+}
+
+#[test]
+fn rejects_instrumental_local_bindings() {
+    let (tokens, errors) = scan("verb main() { ins buffer = Buffer[1]; }");
+    assert!(errors.is_empty());
+    parse(tokens).expect_err("ins must not be a local binding role");
+}
+
+#[test]
+fn rejects_incomplete_call_site_roles() {
+    let (tokens, errors) = scan("verb main(erg buffer: Buffer) { consume(buffer: ins); }");
+    assert!(errors.is_empty());
+    parse(tokens).expect_err("a call-site role must precede an expression");
 }
 
 #[test]
@@ -305,14 +349,14 @@ fn parses_field_assignment() {
 #[test]
 fn parses_nested_borrow_and_named_call_arguments() {
     let program = parse_source(
-        "verb process() { erg buffer = allocate(10); { abs view = ref buffer; inspect(view, source: view); } }",
+        "verb process() { erg buffer = Buffer[10]; { abs view = ref buffer; inspect(view, source: view); } }",
     );
 
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     let Stmt::OwnerDecl { initializer, .. } = &verb.body.statements[0] else {
         panic!("expected owner declaration");
     };
-    assert!(matches!(initializer, Expr::Call { .. }));
+    assert!(matches!(initializer, Expr::BufferLiteral { .. }));
     assert!(matches!(verb.body.statements[1], Stmt::Block(_)));
 }
 

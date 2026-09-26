@@ -24,8 +24,7 @@ impl Parser {
         self.expect_simple(TokenKind::LeftParen, "`(`")?;
         let params = self.parse_params()?;
         self.expect_simple(TokenKind::RightParen, "`)`")?;
-        let return_type =
-            self.match_simple(TokenKind::Arrow).then(|| self.parse_type_name()).transpose()?;
+        let return_type = self.parse_return_type()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(RoleMethod { name, params, return_type, span: SourceSpan::new(start, end) })
     }

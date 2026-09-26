@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, EnumDef, Expr, Program, Role, RoleDecl, Stmt, StructDef, TopLevelDecl,
-    lookup_builtin_type,
+    Block, BuiltinType, EnumDef, Expr, Program, ReturnAccess, Role, RoleDecl, Stmt, StructDef,
+    TopLevelDecl, lookup_builtin_type,
 };
+use crate::lexer::SourceSpan;
 
 use super::errors::{SemanticError, SemanticErrorKind};
+use super::model::Origin;
 use super::model::SemanticModel;
 
 pub(super) struct ScopeFrame {
@@ -20,10 +22,14 @@ pub(super) struct Analyzer {
     pub(super) model: SemanticModel,
     pub(super) scopes: Vec<ScopeFrame>,
     pub(super) next_borrow_id: usize,
+    pub(super) next_loan_id: usize,
     pub(super) active_borrow_ids: HashSet<usize>,
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
     pub(super) loop_boundaries: Vec<usize>,
     pub(super) current_return_type: Option<BuiltinType>,
+    pub(super) current_return_access: Option<ReturnAccess>,
+    pub(super) current_abs_origins: HashMap<String, usize>,
+    pub(super) binding_origins: HashMap<usize, Origin>,
     pub(super) struct_types: HashMap<String, StructDef>,
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) role_types: HashMap<String, RoleDecl>,
@@ -45,11 +51,26 @@ pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
 }
 
 impl Analyzer {
+    fn require_buffer_length(&self, expression: &Expr) -> Result<(), SemanticError> {
+        if self.expression_type(expression) == Some(BuiltinType::Int) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                callee: "Buffer".to_owned(),
+                parameter: "length".to_owned(),
+            },
+            span: expression_span(expression),
+        })
+    }
+
     fn new() -> Self {
         Self {
             model: SemanticModel {
                 bindings: Vec::new(),
                 borrows: Vec::new(),
+                exclusive_loans: Vec::new(),
+                expression_origins: Vec::new(),
                 cleanup_plans: Vec::new(),
                 return_unwind_plans: Vec::new(),
                 loop_unwind_plans: Vec::new(),
@@ -59,10 +80,14 @@ impl Analyzer {
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
+            next_loan_id: 0,
             active_borrow_ids: HashSet::new(),
             signatures: HashMap::new(),
             loop_boundaries: Vec::new(),
             current_return_type: None,
+            current_return_access: None,
+            current_abs_origins: HashMap::new(),
+            binding_origins: HashMap::new(),
             struct_types: HashMap::new(),
             enum_types: HashMap::new(),
             role_types: HashMap::new(),
@@ -101,6 +126,7 @@ impl Analyzer {
             ))
         });
         self.current_return_type = None;
+        self.current_return_access = None;
         Ok(self.model)
     }
 
@@ -136,7 +162,7 @@ impl Analyzer {
                     }
                 }
                 if let Some(return_type) = return_type {
-                    analyzer.validate_type_reference(return_type)?;
+                    analyzer.validate_type_reference(&return_type.ty)?;
                 }
                 Ok(())
             })?;
@@ -178,8 +204,13 @@ impl Analyzer {
     }
 
     fn analyze_verb_body(&mut self, verb: &crate::ast::VerbDecl) -> Result<(), SemanticError> {
-        self.current_return_type =
-            verb.return_type.as_ref().and_then(|type_name| lookup_builtin_type(&type_name.name));
+        self.current_return_access =
+            verb.return_type.as_ref().map(|return_type| return_type.access);
+        self.current_return_type = verb
+            .return_type
+            .as_ref()
+            .and_then(|return_type| lookup_builtin_type(&return_type.ty.name));
+        self.initialize_origin_parameter_map(&verb.params);
         self.enter_scope(verb.body.span);
         for parameter in &verb.params {
             let ty = lookup_builtin_type(&parameter.ty.name);
@@ -190,6 +221,12 @@ impl Analyzer {
             }
             self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
             self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
+            if let Ok(index) = self.binding(&parameter.name, parameter.span)
+                && let Some(parameter_index) = self.current_abs_origins.get(&parameter.name)
+            {
+                self.binding_origins
+                    .insert(index, Origin::AbsParameter { parameter_index: *parameter_index });
+            }
         }
         self.visit_block(&verb.body)?;
         if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
@@ -222,6 +259,15 @@ impl Analyzer {
                     self.register_borrow(initializer, *span)?;
                 }
                 self.bind(role.clone(), name.clone(), binding_type, *span)?;
+                if *role == Role::Abs
+                    && let Ok(index) = self.binding(name, *span)
+                {
+                    let origin = self.origin_of(initializer);
+                    self.binding_origins.insert(index, origin.clone());
+                    if is_origin_return_expression(initializer) {
+                        self.register_origin_borrow(&origin, *span)?;
+                    }
+                }
                 self.record_initializer_struct_type(name, initializer, *span)?;
                 self.record_initializer_enum_type(name, initializer, *span)
             }
@@ -261,7 +307,12 @@ impl Analyzer {
     }
 
     pub(super) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+        self.record_origin(expression);
         match expression {
+            Expr::BufferLiteral { length, .. } => {
+                self.visit_expression(length)?;
+                self.require_buffer_length(length)
+            }
             Expr::Identifier { name, span } => {
                 let index = self.binding(name, *span)?;
                 self.ensure_readable(index, name, *span)
@@ -302,6 +353,16 @@ fn block_guarantees_return(block: &Block) -> bool {
     block.statements.iter().any(statement_guarantees_return)
 }
 
+fn is_origin_return_expression(expression: &Expr) -> bool {
+    match expression {
+        Expr::Borrow { expression, .. } | Expr::Grouping { expression, .. } => {
+            is_origin_return_expression(expression)
+        }
+        Expr::Call { .. } | Expr::MethodCall { .. } => true,
+        _ => false,
+    }
+}
+
 fn statement_guarantees_return(statement: &Stmt) -> bool {
     match statement {
         Stmt::Return { .. } => true,
@@ -322,4 +383,23 @@ fn contains_loop_exit(block: &Block) -> bool {
         Stmt::Loop(_) => false,
         _ => false,
     })
+}
+
+fn expression_span(expression: &Expr) -> SourceSpan {
+    match expression {
+        Expr::Identifier { span, .. }
+        | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
+        | Expr::FloatLiteral { span, .. }
+        | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Binary { span, .. }
+        | Expr::Borrow { span, .. }
+        | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. }
+        | Expr::Case { span, .. } => *span,
+    }
 }

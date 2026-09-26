@@ -211,6 +211,7 @@ fn argument_span(argument: &Argument) -> SourceSpan {
     match &argument.expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

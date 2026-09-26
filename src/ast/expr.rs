@@ -15,6 +15,10 @@ pub enum Expr {
         value: String,
         span: SourceSpan,
     },
+    BufferLiteral {
+        length: Box<Expr>,
+        span: SourceSpan,
+    },
     FloatLiteral {
         value: String,
         span: SourceSpan,
@@ -108,6 +112,8 @@ pub enum UnaryOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Argument {
     pub name: Option<String>,
+    pub role: Option<super::decl::Role>,
+    pub role_span: Option<SourceSpan>,
     pub expression: Expr,
 }
 

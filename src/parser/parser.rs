@@ -169,8 +169,7 @@ impl Parser {
         self.expect_simple(TokenKind::LeftParen, "`(`")?;
         let params = self.parse_params()?;
         self.expect_simple(TokenKind::RightParen, "`)`")?;
-        let return_type =
-            if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
+        let return_type = self.parse_return_type()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(ExternalVerbDecl {
             is_open,
@@ -202,8 +201,7 @@ impl Parser {
         let params = self.parse_params()?;
         self.expect_simple(TokenKind::RightParen, "`)`")?;
 
-        let return_type =
-            if self.match_simple(TokenKind::Arrow) { Some(self.parse_type_name()?) } else { None };
+        let return_type = self.parse_return_type()?;
 
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
@@ -218,6 +216,21 @@ impl Parser {
             body,
             span,
         })
+    }
+
+    fn parse_return_type(&mut self) -> Result<Option<crate::ast::ReturnType>, ParseError> {
+        if !self.match_simple(TokenKind::Arrow) {
+            return Ok(None);
+        }
+        let start = self.previous().span.start;
+        let access = if self.match_simple(TokenKind::Abs) {
+            crate::ast::ReturnAccess::Abs
+        } else {
+            crate::ast::ReturnAccess::Owned
+        };
+        let ty = self.parse_type_name()?;
+        let span = SourceSpan::new(start, ty.span.end);
+        Ok(Some(crate::ast::ReturnType { access, ty, span }))
     }
 
     fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
@@ -249,10 +262,10 @@ impl Parser {
 
     fn parse_param(&mut self) -> Result<Param, ParseError> {
         let role_token = self.advance_required("parameter role")?;
-        let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+        let role = parameter_role_from_token(&role_token.kind).ok_or_else(|| ParseError {
             code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
-                expected: "parameter role (`erg`, `abs`, or `dat`)".to_owned(),
+                expected: "parameter role (`erg`, `abs`, `dat`, or `ins`)".to_owned(),
                 found: role_token.kind.clone(),
             },
             span: role_token.span,
@@ -377,7 +390,7 @@ impl Parser {
 
     fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
         let role_token = self.advance_required("binding role")?;
-        let role = role_from_token(&role_token.kind).ok_or_else(|| ParseError {
+        let role = binding_role_from_token(&role_token.kind).ok_or_else(|| ParseError {
             code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "`erg` or `abs`".to_owned(),
@@ -420,11 +433,20 @@ fn identifier_text(kind: &TokenKind) -> String {
     }
 }
 
-fn role_from_token(kind: &TokenKind) -> Option<Role> {
+fn parameter_role_from_token(kind: &TokenKind) -> Option<Role> {
     match kind {
         TokenKind::Erg => Some(Role::Erg),
         TokenKind::Abs => Some(Role::Abs),
         TokenKind::Dat => Some(Role::Dat),
+        TokenKind::Ins => Some(Role::Ins),
+        _ => None,
+    }
+}
+
+fn binding_role_from_token(kind: &TokenKind) -> Option<Role> {
+    match kind {
+        TokenKind::Erg => Some(Role::Erg),
+        TokenKind::Abs => Some(Role::Abs),
         _ => None,
     }
 }
@@ -433,6 +455,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

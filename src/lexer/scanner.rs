@@ -101,6 +101,7 @@ impl<'source> Scanner<'source> {
             "erg" => TokenKind::Erg,
             "abs" => TokenKind::Abs,
             "dat" => TokenKind::Dat,
+            "ins" => TokenKind::Ins,
             "ref" => TokenKind::Ref,
             "drop" => TokenKind::Drop,
             "return" => TokenKind::Return,

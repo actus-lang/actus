@@ -36,7 +36,7 @@ Function results use value semantics by default:
 
 ```act
 verb create_buffer() -> Buffer {
-    erg buffer = allocate(512);
+    erg buffer = Buffer[512];
     return buffer;
 }
 ```
@@ -53,7 +53,7 @@ Actus uses explicit C-style braces and semicolons:
 
 ```act
 verb process() {
-    erg buffer = allocate(1024);
+    erg buffer = Buffer[1024];
     {
         abs view = ref buffer;
         inspect(view);

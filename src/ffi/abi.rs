@@ -119,7 +119,11 @@ impl std::fmt::Display for CAbiError {
 impl std::error::Error for CAbiError {}
 
 pub fn c_abi_signature(verb: &VerbDecl) -> Result<CAbiSignature, CAbiError> {
-    signature_parts(&verb.name, &verb.params, verb.return_type.as_ref())
+    signature_parts(
+        &verb.name,
+        &verb.params,
+        verb.return_type.as_ref().map(|return_type| &return_type.ty),
+    )
 }
 
 pub fn c_abi_external_signature(
@@ -131,7 +135,11 @@ pub fn c_abi_external_signature(
     match declaration.abi {
         ForeignAbi::C => {}
     }
-    signature_parts(&declaration.name, &declaration.params, declaration.return_type.as_ref())
+    signature_parts(
+        &declaration.name,
+        &declaration.params,
+        declaration.return_type.as_ref().map(|return_type| &return_type.ty),
+    )
 }
 
 fn signature_parts(
@@ -190,6 +198,7 @@ fn role_name(role: &Role) -> &'static str {
         Role::Erg => "erg",
         Role::Abs => "abs",
         Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }
 
@@ -198,6 +207,7 @@ fn map_ownership(role: &Role) -> CAbiOwnership {
         Role::Erg => CAbiOwnership::Exclusive,
         Role::Abs => CAbiOwnership::SharedBorrow,
         Role::Dat => CAbiOwnership::Consumed,
+        Role::Ins => CAbiOwnership::Exclusive,
     }
 }
 

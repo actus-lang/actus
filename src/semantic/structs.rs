@@ -25,6 +25,7 @@ impl Analyzer {
             });
         };
         let binding_index = self.binding(name, object_span)?;
+        self.ensure_access_available(binding_index, name, span)?;
         if self.model.bindings[binding_index].role != Role::Erg {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },

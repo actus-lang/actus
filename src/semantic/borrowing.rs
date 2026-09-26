@@ -3,7 +3,7 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::model::BorrowRecord;
+use super::model::{BorrowRecord, Origin};
 use super::state::AccessState;
 
 impl Analyzer {
@@ -33,6 +33,7 @@ impl Analyzer {
             return Ok(());
         };
         let owner_index = self.binding(name, *owner_span)?;
+        self.ensure_access_available(owner_index, name, span)?;
         if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidBorrowTarget { name: name.clone() },
@@ -66,6 +67,24 @@ impl Analyzer {
         Ok(())
     }
 
+    pub(super) fn register_origin_borrow(
+        &mut self,
+        origin: &Origin,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(owner_index) = self.origin_binding_index(origin) else { return Ok(()) };
+        let owner = self.model.bindings[owner_index].name.clone();
+        if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidBorrowTarget { name: owner },
+                span,
+            });
+        }
+        self.ensure_readable(owner_index, &owner, span)?;
+        self.add_borrow(&owner, None, owner_index, span);
+        Ok(())
+    }
+
     fn add_borrow(
         &mut self,
         owner: &str,
@@ -90,6 +109,7 @@ impl Analyzer {
                     AccessState::Frozen { borrow_ids: vec![borrow_id] }
             }
             AccessState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
+            AccessState::Suspended { .. } => return,
         }
         if !self.model.bindings[owner_index].ownership.is_live() {
             self.model.bindings[owner_index].access = AccessState::Mutable;

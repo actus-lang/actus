@@ -30,6 +30,16 @@ pub(super) fn lower_expression(
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
         Expr::Integer { value, .. } => lower_integer(function, value),
+        Expr::BufferLiteral { length, .. } => lower_buffer_literal(
+            function,
+            length,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
         Expr::FloatLiteral { .. } => {
             Err(NativeEmitError("floating-point expressions are not lowered yet".to_owned()))
         }
@@ -56,6 +66,43 @@ pub(super) fn lower_expression(
             layouts,
         ),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_buffer_literal(
+    function: &mut FunctionBuilder<'_>,
+    length: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let length = lower_expression(
+        function,
+        length,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let length = if function.func.dfg.value_type(length) == layouts.pointer_type {
+        length
+    } else {
+        function.ins().uextend(layouts.pointer_type, length)
+    };
+    let allocator = functions
+        .get("__actus_buffer_allocate")
+        .ok_or_else(|| NativeEmitError("native buffer allocator is unavailable".to_owned()))?;
+    let call = function.ins().call(allocator.reference, &[length]);
+    function
+        .inst_results(call)
+        .first()
+        .copied()
+        .ok_or_else(|| NativeEmitError("native buffer allocator returned no value".to_owned()))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -116,6 +163,7 @@ pub(super) fn initializer_type(
 ) -> NativeType {
     match expression {
         Expr::Identifier { name, .. } => types.get(name).copied().unwrap_or(NativeType::Int),
+        Expr::BufferLiteral { .. } => NativeType::Buffer,
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             initializer_type(expression, types, functions, layouts)
         }

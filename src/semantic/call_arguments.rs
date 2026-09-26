@@ -4,7 +4,7 @@ use crate::lexer::SourceSpan;
 use super::analyzer::Analyzer;
 use super::calls::VerbSignature;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::state::OwnershipState;
+use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
     pub(super) fn validate_argument_type(
@@ -131,6 +131,7 @@ impl Analyzer {
             Role::Dat => true,
             Role::Erg => self.is_owner_argument(expression),
             Role::Abs => self.is_borrow_argument(expression),
+            Role::Ins => self.is_exclusive_owner(expression),
         };
         if valid {
             return Ok(());
@@ -147,8 +148,9 @@ impl Analyzer {
     pub(super) fn is_owner_argument(&self, expression: &Expr) -> bool {
         let Expr::Identifier { name, span } = expression else { return false };
         let Ok(index) = self.binding(name, *span) else { return false };
-        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
+        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
+            && matches!(self.model.bindings[index].access, AccessState::Mutable)
     }
 
     fn is_borrow_argument(&self, expression: &Expr) -> bool {
@@ -168,14 +170,31 @@ impl Analyzer {
         }
     }
 
-    fn is_readable_owner(&self, expression: &Expr) -> bool {
-        let Expr::Identifier { name, span } = expression else { return false };
-        let Ok(index) = self.binding(name, *span) else { return false };
-        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
+    pub(super) fn is_readable_owner(&self, expression: &Expr) -> bool {
+        let Some(index) = self.root_binding_index(expression) else { return false };
+        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(
                 self.model.bindings[index].ownership,
                 OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
             )
+            && !self.model.bindings[index].access.is_suspended()
+    }
+
+    fn is_exclusive_owner(&self, expression: &Expr) -> bool {
+        let Some(index) = self.root_binding_index(expression) else { return false };
+        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
+            && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
+            && matches!(self.model.bindings[index].access, AccessState::Mutable)
+    }
+
+    pub(super) fn root_binding_index(&self, expression: &Expr) -> Option<usize> {
+        let (name, span) = match expression {
+            Expr::Identifier { name, span } => (name, span),
+            Expr::FieldAccess { object, .. } => return self.root_binding_index(object),
+            Expr::Borrow { expression, .. } => return self.root_binding_index(expression),
+            _ => return None,
+        };
+        self.binding(name, *span).ok()
     }
 }
 
@@ -187,6 +206,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

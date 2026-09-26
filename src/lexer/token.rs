@@ -31,6 +31,7 @@ pub enum TokenKind {
     Erg,
     Abs,
     Dat,
+    Ins,
     Ref,
     Drop,
     Return,

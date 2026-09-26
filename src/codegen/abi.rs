@@ -19,11 +19,11 @@ pub fn validate_native_signature(
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeAbiError> {
     if let Some(return_type) = &verb.return_type
-        && NativeType::from_name_with_layout(&return_type.name, layouts).is_none()
+        && NativeType::from_name_with_layout(&return_type.ty.name, layouts).is_none()
     {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` returns, found `{}`",
-            return_type.name
+            return_type.ty.name
         )));
     }
     if let Some(parameter) = verb.params.iter().find(|parameter| {
@@ -65,11 +65,11 @@ pub fn validate_external_native_signature(
         )));
     }
     if let Some(return_type) = &verb.return_type
-        && NativeType::from_name_with_layout(&return_type.name, layouts).is_none()
+        && NativeType::from_name_with_layout(&return_type.ty.name, layouts).is_none()
     {
         return Err(NativeAbiError(format!(
             "native backend supports `Int` and `Buffer` returns, found `{}`",
-            return_type.name
+            return_type.ty.name
         )));
     }
     Ok(())

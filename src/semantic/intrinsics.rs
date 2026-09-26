@@ -7,7 +7,7 @@ use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 pub(super) fn is_reserved_name(name: &str) -> bool {
-    lookup_intrinsic(name).is_some()
+    name == "allocate" || lookup_intrinsic(name).is_some()
 }
 
 impl Analyzer {
@@ -19,18 +19,6 @@ impl Analyzer {
     ) -> Result<bool, SemanticError> {
         let Some(kind) = lookup_call_intrinsic(callee) else { return Ok(false) };
         match kind {
-            IntrinsicKind::Allocate => {
-                let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
-                let argument = arguments[0];
-                self.visit_expression(&argument.expression)?;
-                self.require_intrinsic_type(
-                    callee,
-                    IntrinsicKind::Allocate.spec().parameters[0],
-                    crate::ast::BuiltinType::Int,
-                    &argument.expression,
-                )?;
-                Ok(true)
-            }
             IntrinsicKind::Append => {
                 let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
                 for argument in &arguments {
@@ -206,6 +194,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }

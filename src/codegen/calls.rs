@@ -29,8 +29,12 @@ pub(super) fn lower_method_call(
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let named = arguments.iter().any(|argument| argument.name.is_some());
     let mut combined = Vec::with_capacity(arguments.len() + 1);
-    combined
-        .push(Argument { name: named.then(|| "self".to_owned()), expression: receiver.clone() });
+    combined.push(Argument {
+        name: named.then(|| "self".to_owned()),
+        role: None,
+        role_span: None,
+        expression: receiver.clone(),
+    });
     combined.extend(arguments.iter().cloned());
     let receiver_type =
         super::expressions::initializer_type(receiver, local_types, functions, layouts);
@@ -172,32 +176,12 @@ fn normalize_call_arguments(
     callee: &str,
     values: &mut Vec<cranelift_codegen::ir::Value>,
 ) -> Result<(), NativeEmitError> {
-    match lookup_call_intrinsic(callee) {
-        Some(IntrinsicKind::Allocate) => {
-            let length = values
-                .pop()
-                .ok_or_else(|| NativeEmitError("allocate requires a length".to_owned()))?;
-            values.push(to_pointer_length(function, length));
-        }
-        Some(IntrinsicKind::Append) => {
-            let byte =
-                values.pop().ok_or_else(|| NativeEmitError("append requires a byte".to_owned()))?;
-            values.push(to_byte(function, byte));
-        }
-        _ => {}
+    if let Some(IntrinsicKind::Append) = lookup_call_intrinsic(callee) {
+        let byte =
+            values.pop().ok_or_else(|| NativeEmitError("append requires a byte".to_owned()))?;
+        values.push(to_byte(function, byte));
     }
     Ok(())
-}
-
-fn to_pointer_length(
-    function: &mut FunctionBuilder<'_>,
-    value: cranelift_codegen::ir::Value,
-) -> cranelift_codegen::ir::Value {
-    if function.func.dfg.value_type(value) == types::I64 {
-        value
-    } else {
-        function.ins().uextend(types::I64, value)
-    }
 }
 
 fn to_byte(

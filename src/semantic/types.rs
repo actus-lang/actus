@@ -124,6 +124,7 @@ impl Analyzer {
     pub(super) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
         match expression {
             Expr::Integer { .. } => Some(BuiltinType::Int),
+            Expr::BufferLiteral { .. } => Some(BuiltinType::Buffer),
             Expr::FloatLiteral { .. } => None,
             Expr::StringLiteral { .. } => Some(BuiltinType::String),
             Expr::Grouping { expression, .. }
@@ -134,12 +135,15 @@ impl Analyzer {
                 self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
             }
             Expr::Call { callee, .. } => match lookup_call_intrinsic(callee) {
-                Some(IntrinsicKind::Allocate) => Some(BuiltinType::Buffer),
                 Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
                 Some(IntrinsicKind::Print) => Some(BuiltinType::Int),
                 Some(IntrinsicKind::Drop) => None,
                 None => self.signatures.get(callee).and_then(|signature| signature.return_type),
             },
+            Expr::MethodCall { receiver, method, .. } if method == "raw_slice" => {
+                (self.expression_type(receiver) == Some(BuiltinType::Buffer))
+                    .then_some(BuiltinType::Buffer)
+            }
             Expr::MethodCall { method, .. } => {
                 self.signatures.get(method).and_then(|signature| signature.return_type)
             }

@@ -54,6 +54,16 @@ pub enum SemanticErrorKind {
         callee: String,
         parameter: String,
     },
+    InvalidAbsReturnOrigin {
+        reason: String,
+    },
+    SuspendedAccess {
+        name: String,
+        loan_id: usize,
+    },
+    ExclusiveLoanAlias {
+        name: String,
+    },
     InvalidIntrinsicArgument {
         callee: String,
         parameter: String,

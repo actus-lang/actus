@@ -10,6 +10,7 @@ pub enum OwnershipState {
 pub enum AccessState {
     Mutable,
     Frozen { borrow_ids: Vec<usize> },
+    Suspended { loan_id: usize },
 }
 
 impl OwnershipState {
@@ -29,6 +30,10 @@ impl OwnershipState {
 impl AccessState {
     pub fn is_frozen(&self) -> bool {
         matches!(self, Self::Frozen { .. })
+    }
+
+    pub fn is_suspended(&self) -> bool {
+        matches!(self, Self::Suspended { .. })
     }
 }
 
@@ -57,6 +62,24 @@ impl ResourceState {
         if !matches!(self.ownership, OwnershipState::Active | OwnershipState::PartiallyMoved { .. })
             || !self.access.is_frozen()
         {
+            return false;
+        }
+        self.access = AccessState::Mutable;
+        true
+    }
+
+    pub fn suspend(&mut self, loan_id: usize) -> bool {
+        if !matches!(self.ownership, OwnershipState::Active)
+            || !matches!(self.access, AccessState::Mutable)
+        {
+            return false;
+        }
+        self.access = AccessState::Suspended { loan_id };
+        true
+    }
+
+    pub fn resume(&mut self, loan_id: usize) -> bool {
+        if !matches!(self.access, AccessState::Suspended { loan_id: active } if active == loan_id) {
             return false;
         }
         self.access = AccessState::Mutable;

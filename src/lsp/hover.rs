@@ -191,8 +191,12 @@ fn parameters(params: &[Param]) -> String {
     format!("({})", values.join(", "))
 }
 
-fn return_type(return_type: Option<&TypeName>) -> String {
-    return_type.map_or_else(String::new, |ty| format!(" -> {}", type_name(ty)))
+fn return_type(return_type: Option<&crate::ast::ReturnType>) -> String {
+    return_type.map_or_else(String::new, |return_type| {
+        let access =
+            if matches!(return_type.access, crate::ast::ReturnAccess::Abs) { "abs " } else { "" };
+        format!(" -> {}{}", access, type_name(&return_type.ty))
+    })
 }
 
 fn type_name(ty: &TypeName) -> String {
@@ -209,6 +213,7 @@ fn role_name(role: &Role) -> &'static str {
         Role::Erg => "erg",
         Role::Abs => "abs",
         Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }
 
