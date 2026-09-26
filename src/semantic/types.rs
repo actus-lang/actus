@@ -158,9 +158,13 @@ impl Analyzer {
                 (self.expression_type(receiver) == Some(BuiltinType::Buffer))
                     .then_some(BuiltinType::Buffer)
             }
-            Expr::MethodCall { method, .. } => {
-                self.signatures.get(method).and_then(|signature| signature.return_type)
-            }
+            Expr::MethodCall { method, span, .. } => self
+                .inferred_expression_types
+                .get(&(span.start, span.end))
+                .and_then(|type_name| lookup_builtin_type(&type_name.name))
+                .or_else(|| {
+                    self.signatures.get(method).and_then(|signature| signature.return_type)
+                }),
             Expr::StructLit { .. } => None,
             Expr::FieldAccess { object, field, .. } => self
                 .expression_struct_type(object)
@@ -174,7 +178,7 @@ impl Analyzer {
     }
 
     pub(super) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
-        if let Expr::MethodCall { span, .. } = expression
+        if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
             && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
         {
             return Some(super::analyzer::canonical_type_name(type_name));

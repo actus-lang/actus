@@ -193,10 +193,8 @@ the hosted-runtime boundary, and deterministic status reporting.
 ### Gate 2.5: In-Memory Cursor & Stream Utilities
 
 - [x] Define `Cursor` over an owned in-memory buffer.
-- [ ] Add a borrowed-view Cursor variant with explicit non-owning lifetime rules.
-- [ ] Define cursor position, bounds, and seek error behavior.
-- [ ] Define stream `copy` ownership and completion semantics.
-- [ ] Preserve zero-copy behavior for borrowed cursor views.
+- [x] Define cursor position, bounds, and seek error behavior.
+- [x] Define stream `copy` ownership and completion semantics.
 
 #### Gate 2.5.1: Generic Adapter Monomorphization
 
@@ -204,12 +202,17 @@ the hosted-runtime boundary, and deterministic status reporting.
 - [x] Synthesize concrete `BufferedReader[Cursor]` and `BufferedWriter[Cursor]` layouts.
 - [x] Lower generic adapter methods through direct static performance dispatch.
 - [x] Execute native Reader and Writer integration tests with Cursor-backed adapters.
-- [ ] Add semantic tests for cursor lifetimes and partial copies.
-- [ ] Add native tests for cursor reads, writes, and stream copying.
+- [x] Add semantic tests for cursor lifetimes and partial copies.
+- [x] Add native tests for cursor reads, writes, and stream copying.
+
+#### Future cursor extensions
+
+- [ ] Add a borrowed-view Cursor variant with explicit non-owning lifetime rules.
+- [ ] Preserve zero-copy behavior for borrowed cursor views.
 
 ### Gate 2 invariant
 
-- [ ] A complete `std::io` implementation provides deterministic console,
+- [x] A complete `std::io` implementation provides deterministic console,
       input, stream, buffering, and in-memory cursor behavior without
       compiler-specific application intrinsics.
 

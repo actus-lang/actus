@@ -160,7 +160,7 @@ fn std_io_cursor_reader_uses_static_generic_dispatch() {
         "cursor-reader",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg payload = Buffer[0]; append(payload, 67); append(payload, 117); append(payload, 114); erg storage = Buffer[0]; actus_cursor_write(target: ins storage, source: abs payload); erg output = Buffer[0]; actus_cursor_read(source: abs storage, target: ins output); print(text: abs output); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg payload = Buffer[0]; append(payload, 67); append(payload, 117); append(payload, 114); erg storage = Buffer[0]; erg cursor = Cursor { buffer: storage, position: 0, }; cursor_write(self: ins cursor, buffer: abs payload); erg offset = 0; seek(self: ins cursor, offset: offset); erg output = Buffer[0]; cursor_read(self: ins cursor, buffer: ins output); print(text: abs output); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("cursor fixture should run");
@@ -175,7 +175,7 @@ fn std_io_native_buffered_reader_specializes_cursor() {
         "buffered-cursor",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg source_bytes = Buffer[0]; append(source_bytes, 72); append(source_bytes, 105); erg source = Cursor { buffer: source_bytes, }; erg storage = Buffer[0]; erg reader: BufferedReader[Cursor] = BufferedReader[Cursor] { source: source, buffer: storage, }; refill(reader: ins reader); print(text: abs reader.buffer); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg source_bytes = Buffer[0]; append(source_bytes, 72); append(source_bytes, 105); erg source = Cursor { buffer: source_bytes, position: 0, }; erg storage = Buffer[0]; erg reader: BufferedReader[Cursor] = BufferedReader[Cursor] { source: source, buffer: storage, }; refill(reader: ins reader); print(text: abs reader.buffer); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("buffered Cursor fixture should run");
@@ -190,12 +190,41 @@ fn std_io_native_buffered_writer_specializes_cursor() {
         "buffered-writer-cursor",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, }; erg scratch = Buffer[0]; erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); print(text: abs writer.target.buffer); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); print(text: abs writer.target.buffer); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution =
         Command::new(&output).output().expect("buffered Cursor writer fixture should run");
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"OK");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_cursor_seek_rejects_out_of_bounds_positions() {
+    let (root, input, output) = project(
+        "cursor-seek",
+        "open cursor;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
+        &["cursor.act", "reader.act", "writer.act", "stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg bytes = Buffer[0]; append(bytes, 88); erg cursor = Cursor { buffer: bytes, position: 0, }; erg offset = 2; erg result = seek(self: ins cursor, offset: offset); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("seek fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_copy_transfers_cursor_streams_until_eof() {
+    let (root, input, output) = project(
+        "cursor-copy",
+        "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
+        &["cursor.act", "copy.act", "reader.act", "writer.act", "stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg input = Buffer[0]; append(input, 65); append(input, 66); append(input, 67); erg source = Cursor { buffer: input, position: 0, }; erg output = Buffer[0]; erg target = Cursor { buffer: output, position: 0, }; copy(reader: ins source, writer: ins target); erg offset = 0; seek(self: ins target, offset: offset); erg result = Buffer[0]; cursor_read(self: ins target, buffer: ins result); print(text: abs result); flush(); return 0; }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("copy fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"ABC");
     let _ = fs::remove_dir_all(root);
 }

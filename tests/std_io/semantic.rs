@@ -35,6 +35,8 @@ fn std_io_declarations_pass_semantic_validation() {
         ("verb", "cursor_read"),
         ("verb", "cursor_write"),
         ("verb", "cursor_flush"),
+        ("verb", "seek"),
+        ("verb", "copy"),
         ("enum", "IoError"),
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");
@@ -67,4 +69,14 @@ fn std_io_read_line_requires_an_explicit_ins_argument() {
     assert!(errors.is_empty());
     let program = parse(tokens).expect("invalid ins call should parse");
     assert!(analyze(&program).is_err());
+}
+
+#[test]
+fn std_io_cursor_seek_and_copy_contracts_are_semantically_valid() {
+    let source_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src");
+    let resolver = ModuleResolver::new(source_root);
+    let exports = exports_module(&resolver, "io").expect("std io facade should resolve");
+    assert!(exports.contains("verb", "seek"));
+    assert!(exports.contains("verb", "copy"));
+    analyze_module(&resolver, "io").expect("cursor utility contracts should be valid");
 }

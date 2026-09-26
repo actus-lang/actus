@@ -1,46 +1,68 @@
 /// An in-memory stream backed by caller-provided storage.
 ///
-/// `buffer` is owned by the cursor. Reader and Writer implementations use
-/// the same storage without allocating a second stream object.
+/// `buffer` is owned by the cursor and `position` is its absolute byte offset.
 open struct Cursor {
     erg buffer: Buffer,
+    erg position: Int,
 }
 
-/// Construct a cursor by transferring ownership of an in-memory buffer.
+/// Construct a cursor at position zero by transferring buffer ownership.
 open verb cursor(dat buffer: Buffer) -> Cursor {
-    return Cursor { buffer: buffer, };
+    return Cursor { buffer: buffer, position: 0, };
 }
 
-/// Runtime bridge that copies cursor bytes into a caller-owned destination.
+/// Read bytes from a buffer position into a caller-owned destination.
 open unsafe extern "C" verb actus_cursor_read(
     abs source: Buffer,
+    erg position: Int,
     ins target: Buffer
 ) -> Int;
 
-/// Runtime bridge that appends a borrowed source to cursor storage.
+/// Write a borrowed source buffer at a buffer position.
 open unsafe extern "C" verb actus_cursor_write(
     ins target: Buffer,
+    erg position: Int,
     abs source: Buffer
 ) -> Int;
 
-/// Cursor flushing is an in-memory no-op with a typed success result.
+/// Validate an absolute position against a backing buffer.
+open unsafe extern "C" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int;
+
+/// Flush cursor state. In-memory cursors have no external stream to sync.
 open unsafe extern "C" verb actus_cursor_flush(ins target: Buffer) -> Int;
 
 /// Read from an in-memory cursor into an exclusive caller buffer.
-open verb cursor_read(abs self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
-    erg status = actus_cursor_read(source: abs self.buffer, target: ins buffer);
+open verb cursor_read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
+    erg status = actus_cursor_read(source: abs self.buffer, position: self.position, target: ins buffer);
+    case status {
+        -1 => { self.position = self.position; },
+        _ => { self.position = self.position + status; },
+    };
     return case status {
         -1 => Err(IoError.Failed),
         _ => Ok(status),
     };
 }
 
-/// Append an immutable source to an in-memory cursor.
+/// Write an immutable source at the cursor's current position.
 open verb cursor_write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError] {
-    erg status = actus_cursor_write(target: ins self.buffer, source: abs buffer);
+    erg status = actus_cursor_write(target: ins self.buffer, position: self.position, source: abs buffer);
+    case status {
+        -1 => { self.position = self.position; },
+        _ => { self.position = self.position + status; },
+    };
     return case status {
         -1 => Err(IoError.Failed),
         _ => Ok(status),
+    };
+}
+
+/// Move a cursor to an absolute byte position within its backing buffer.
+open verb seek(ins self: Cursor, erg offset: Int) -> Result[Int, IoError] {
+    erg status = actus_cursor_seek(buffer: ins self.buffer, position: offset);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => { self.position = offset; return Ok(status); },
     };
 }
 
@@ -55,8 +77,12 @@ open verb cursor_flush(ins self: Cursor) -> Result[Int, IoError] {
 
 /// Satisfy the static Reader contract for Cursor.
 perform Reader for Cursor {
-    verb read(abs self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
-        erg status = actus_cursor_read(source: abs self.buffer, target: ins buffer);
+    verb read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
+        erg status = actus_cursor_read(source: abs self.buffer, position: self.position, target: ins buffer);
+        case status {
+            -1 => { self.position = self.position; },
+            _ => { self.position = self.position + status; },
+        };
         return case status {
             -1 => Err(IoError.Failed),
             _ => Ok(status),
@@ -67,7 +93,11 @@ perform Reader for Cursor {
 /// Satisfy the static Writer contract for Cursor.
 perform Writer for Cursor {
     verb write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError] {
-        erg status = actus_cursor_write(target: ins self.buffer, source: abs buffer);
+        erg status = actus_cursor_write(target: ins self.buffer, position: self.position, source: abs buffer);
+        case status {
+            -1 => { self.position = self.position; },
+            _ => { self.position = self.position + status; },
+        };
         return case status {
             -1 => Err(IoError.Failed),
             _ => Ok(status),

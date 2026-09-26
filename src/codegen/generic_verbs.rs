@@ -17,8 +17,6 @@ pub(super) fn specialize_program(
             TopLevelDecl::Verb(verb) if !verb.generic_parameters.is_empty() => {
                 if let Some(specialized) = specialize_verb(verb, instances)? {
                     declarations.push(TopLevelDecl::Verb(specialized));
-                } else {
-                    declarations.push(declaration.clone());
                 }
             }
             other => declarations.push(other.clone()),
@@ -31,8 +29,8 @@ fn specialize_verb(
     verb: &VerbDecl,
     instances: &[GenericInstance],
 ) -> Result<Option<VerbDecl>, NativeEmitError> {
-    let Some(instance) = instances.iter().find(|instance| instance_matches_verb(instance, verb))
-    else {
+    let instance = instances.iter().find(|instance| instance_matches_verb(instance, verb));
+    let Some(instance) = instance else {
         return Ok(None);
     };
     let substitution = TypeSubstitution::for_type(
@@ -58,16 +56,11 @@ fn specialize_verb(
 }
 
 fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
-    instance.arguments.len() == verb.generic_parameters.len()
-        && (verb.params.iter().any(|param| type_contains_application(&param.ty, &instance.name))
-            || verb.return_type.as_ref().is_some_and(|return_type| {
-                type_contains_application(&return_type.ty, &instance.name)
-            }))
-}
-
-fn type_contains_application(type_name: &TypeName, name: &str) -> bool {
-    type_name.name == name
-        || type_name.arguments.iter().any(|argument| type_contains_application(argument, name))
+    instance.name == verb.name
+        && instance.arguments.len() == verb.generic_parameters.len()
+        && instance.arguments.iter().all(|argument| {
+            !verb.generic_parameters.iter().any(|parameter| parameter.name == argument.name)
+        })
 }
 
 fn specialize_param(param: &Param, substitution: &TypeSubstitution) -> Param {

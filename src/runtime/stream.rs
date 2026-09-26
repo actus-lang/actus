@@ -100,9 +100,10 @@ pub unsafe extern "C" fn actus_flush_buffered_stdout(handle: BufferHandle) -> i3
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_cursor_read(
     source_handle: BufferHandle,
+    position: i32,
     target_handle: BufferHandle,
 ) -> i32 {
-    unsafe { copy_buffer(source_handle, target_handle) }
+    unsafe { copy_buffer_at(source_handle, position, target_handle) }
 }
 
 /// Appends a borrowed source buffer to in-memory cursor storage.
@@ -113,9 +114,38 @@ pub unsafe extern "C" fn actus_cursor_read(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_cursor_write(
     target_handle: BufferHandle,
+    position: i32,
     source_handle: BufferHandle,
 ) -> i32 {
-    unsafe { copy_buffer(source_handle, target_handle) }
+    unsafe { write_buffer_at(target_handle, position, source_handle) }
+}
+
+/// Returns the current logical length of a valid buffer, or `-1` on failure.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_buffer_length(handle: BufferHandle) -> i32 {
+    if handle.is_null() {
+        return -1;
+    }
+    let buffer = unsafe { &*handle };
+    i32::try_from(buffer.length).unwrap_or(-1)
+}
+
+/// Validate an absolute cursor position against a backing buffer.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_cursor_seek(handle: BufferHandle, position: i32) -> i32 {
+    if handle.is_null() || position < 0 {
+        return -1;
+    }
+    let buffer = unsafe { &*handle };
+    if (position as usize) > buffer.length { -1 } else { position }
 }
 
 /// Flushes cursor state. In-memory cursors have no external stream to sync.
@@ -146,8 +176,16 @@ fn write_bytes(stream: &mut impl Write, bytes: &[u8], newline: bool) -> std::io:
     Ok(())
 }
 
-unsafe fn copy_buffer(source_handle: BufferHandle, target_handle: BufferHandle) -> i32 {
-    if source_handle.is_null() || target_handle.is_null() || source_handle == target_handle {
+unsafe fn copy_buffer_at(
+    source_handle: BufferHandle,
+    position: i32,
+    target_handle: BufferHandle,
+) -> i32 {
+    if source_handle.is_null()
+        || target_handle.is_null()
+        || source_handle == target_handle
+        || position < 0
+    {
         return -1;
     }
     let source = unsafe { &*source_handle };
@@ -158,13 +196,59 @@ unsafe fn copy_buffer(source_handle: BufferHandle, target_handle: BufferHandle) 
     {
         return -1;
     }
+    let position = position as usize;
+    if position > source.length {
+        return -1;
+    }
+    let source_bytes = unsafe { std::slice::from_raw_parts(source.data, source.length) };
+    let source_bytes = &source_bytes[position..];
+    let mut data = unsafe { Vec::from_raw_parts(target.data, target.length, target.capacity) };
+    data.clear();
+    if data.try_reserve(source_bytes.len()).is_err() {
+        super::types::restore_buffer(target, data);
+        return -1;
+    }
+    data.extend_from_slice(source_bytes);
+    let count = i32::try_from(source_bytes.len()).unwrap_or(-1);
+    super::types::restore_buffer(target, data);
+    count
+}
+
+unsafe fn write_buffer_at(
+    target_handle: BufferHandle,
+    position: i32,
+    source_handle: BufferHandle,
+) -> i32 {
+    if target_handle.is_null()
+        || source_handle.is_null()
+        || target_handle == source_handle
+        || position < 0
+    {
+        return -1;
+    }
+    let target = unsafe { &mut *target_handle };
+    let source = unsafe { &*source_handle };
+    if (source.length > 0 && source.data.is_null())
+        || target.length > target.capacity
+        || (target.length > 0 && target.data.is_null())
+    {
+        return -1;
+    }
+    let position = position as usize;
+    if position > target.length {
+        return -1;
+    }
     let source_bytes = unsafe { std::slice::from_raw_parts(source.data, source.length) };
     let mut data = unsafe { Vec::from_raw_parts(target.data, target.length, target.capacity) };
     if data.try_reserve(source_bytes.len()).is_err() {
         super::types::restore_buffer(target, data);
         return -1;
     }
-    data.extend_from_slice(source_bytes);
+    let required = position.saturating_add(source_bytes.len());
+    if required > data.len() {
+        data.resize(required, 0);
+    }
+    data[position..required].copy_from_slice(source_bytes);
     let count = i32::try_from(source_bytes.len()).unwrap_or(-1);
     super::types::restore_buffer(target, data);
     count

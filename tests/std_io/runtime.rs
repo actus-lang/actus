@@ -31,8 +31,8 @@ fn std_io_cursor_runtime_copies_in_memory_streams() {
         for byte in b"Cur" {
             assert!(actus_buffer_append(source, *byte));
         }
-        assert_eq!(actus_cursor_write(cursor, source), 3);
-        assert_eq!(actus_cursor_read(cursor, output), 3);
+        assert_eq!(actus_cursor_write(cursor, 0, source), 3);
+        assert_eq!(actus_cursor_read(cursor, 0, output), 3);
         let bytes = std::slice::from_raw_parts((*output).data, (*output).length);
         assert_eq!(bytes, b"Cur");
         actus::runtime::actus_buffer_drop(source);

@@ -65,7 +65,7 @@ impl Analyzer {
             return Ok(());
         };
         if !signature.generic_parameters.is_empty() {
-            signature = self.instantiate_generic_signature(&signature, arguments, span)?;
+            signature = self.instantiate_generic_signature(callee, &signature, arguments, span)?;
         }
         self.visit_call_with_signature(callee, arguments, span, &signature)
     }

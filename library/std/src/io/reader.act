@@ -3,5 +3,5 @@
 /// `self` identifies the concrete source selected during monomorphization;
 /// `ins buffer` is the caller-owned destination filled without allocation.
 open role Reader {
-    verb read(abs self: Cursor, ins buffer: Buffer) -> Result[Int, IoError];
+    verb read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError];
 }

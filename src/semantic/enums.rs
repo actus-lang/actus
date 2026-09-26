@@ -137,6 +137,7 @@ impl Analyzer {
                     crate::ast::CaseBody::Block(_) => None,
                 });
             }
+            Expr::Try { expression, .. } => return self.enum_type_application(expression),
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => object,
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => expression,
             _ => return None,

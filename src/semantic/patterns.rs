@@ -50,7 +50,7 @@ impl Analyzer {
             }
             self.validate_pattern(&branch.pattern, &subject_type, subject)?;
             self.enter_scope(branch.span);
-            self.bind_pattern_variables(&branch.pattern, mode)?;
+            self.bind_pattern_variables(&branch.pattern, mode, subject)?;
             if mode == crate::ast::CaseMode::Dat {
                 self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
             }
@@ -312,6 +312,7 @@ impl Analyzer {
         &mut self,
         pattern: &Pattern,
         mode: crate::ast::CaseMode,
+        subject: &Expr,
     ) -> Result<(), SemanticError> {
         match pattern {
             Pattern::Variant { enum_name, variant, payload, .. } => {
@@ -325,14 +326,18 @@ impl Analyzer {
                 match (candidate_payload, payload) {
                     (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
                         for (binding, ty) in bindings.iter().zip(types) {
-                            self.bind_pattern_binding(binding, &ty.name, mode)?;
+                            let type_name =
+                                self.specialize_pattern_type(enum_name, &ty.name, subject);
+                            self.bind_pattern_binding(binding, &type_name, mode)?;
                         }
                     }
                     (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
                         for pattern in patterns {
                             let field =
                                 fields.iter().find(|field| field.name == pattern.name).unwrap();
-                            self.bind_pattern_binding(&pattern.binding, &field.ty.name, mode)?;
+                            let type_name =
+                                self.specialize_pattern_type(enum_name, &field.ty.name, subject);
+                            self.bind_pattern_binding(&pattern.binding, &type_name, mode)?;
                         }
                     }
                     _ => {}
@@ -341,6 +346,24 @@ impl Analyzer {
             }
             Pattern::Literal { .. } | Pattern::Wildcard { .. } => Ok(()),
         }
+    }
+
+    fn specialize_pattern_type(&self, enum_name: &str, type_name: &str, subject: &Expr) -> String {
+        let Some(application) = self.resolved_type_name(subject) else {
+            return type_name.to_owned();
+        };
+        let Some(parameter) = self.enum_types[enum_name]
+            .generic_parameters
+            .iter()
+            .position(|parameter| parameter.name == type_name)
+        else {
+            return type_name.to_owned();
+        };
+        application
+            .arguments
+            .get(parameter)
+            .map(super::analyzer::canonical_type_name)
+            .unwrap_or_else(|| type_name.to_owned())
     }
 
     fn bind_pattern_binding(

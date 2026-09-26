@@ -18,5 +18,7 @@ open reader;
 open writer;
 /// Re-export the in-memory cursor stream.
 open cursor;
+/// Re-export generic stream copying.
+open copy;
 /// Re-export buffered reader and writer abstractions.
 open buffered;

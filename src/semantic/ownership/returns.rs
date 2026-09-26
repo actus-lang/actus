@@ -75,13 +75,7 @@ impl Analyzer {
                     .and_then(|type_name| crate::ast::lookup_builtin_type(&type_name.name))
                     == self.expression_type(expression)
             } else if let Expr::Case { branches, .. } = expression {
-                branches.iter().all(|branch| match &branch.body {
-                    crate::ast::CaseBody::Expression(expression) => {
-                        self.expression_type_name(expression).as_deref()
-                            == Some(super::super::analyzer::canonical_type_name(expected).as_str())
-                    }
-                    crate::ast::CaseBody::Block(_) => false,
-                })
+                branches.iter().all(|branch| self.case_branch_returns_result(branch, expected))
             } else {
                 let found = self.expression_type_name(expression);
                 found.as_deref()
@@ -113,6 +107,29 @@ impl Analyzer {
             },
             span: expression_span(expression),
         })
+    }
+
+    fn case_branch_returns_result(
+        &self,
+        branch: &crate::ast::CaseBranch,
+        expected: &crate::ast::TypeName,
+    ) -> bool {
+        let expected = super::super::analyzer::canonical_type_name(expected);
+        match &branch.body {
+            crate::ast::CaseBody::Expression(expression) => {
+                self.expression_type_name(expression).as_deref() == Some(expected.as_str())
+            }
+            crate::ast::CaseBody::Block(block) => {
+                block.statements.iter().rev().find_map(|statement| {
+                    let crate::ast::Stmt::Return { value: Some(expression), .. } = statement else {
+                        return None;
+                    };
+                    Some(
+                        self.expression_type_name(expression).as_deref() == Some(expected.as_str()),
+                    )
+                }) == Some(true)
+            }
+        }
     }
 }
 

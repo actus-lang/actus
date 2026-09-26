@@ -146,11 +146,18 @@ impl Analyzer {
     }
 
     pub(super) fn is_owner_argument(&self, expression: &Expr) -> bool {
-        let Expr::Identifier { name, span } = expression else { return false };
-        let Ok(index) = self.binding(name, *span) else { return false };
-        matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
+        let index = match expression {
+            Expr::Identifier { name, span } => self.binding(name, *span).ok(),
+            Expr::FieldAccess { .. } => self.root_binding_index(expression),
+            _ => None,
+        };
+        let Some(index) = index else { return false };
+        let owner = matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
-            && matches!(self.model.bindings[index].access, AccessState::Mutable)
+            && matches!(self.model.bindings[index].access, AccessState::Mutable);
+        owner
+            && (!matches!(expression, Expr::FieldAccess { .. })
+                || self.expression_type(expression).is_some())
     }
 
     fn is_borrow_argument(&self, expression: &Expr) -> bool {

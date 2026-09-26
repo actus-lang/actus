@@ -65,9 +65,9 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let declared_type_name =
             declared_type.and_then(|name| super::super::calls::parse_type_name_key(name, span));
+        self.visit_expression_with_expected(initializer, declared_type_name.as_ref())?;
         let binding_type =
             self.resolve_binding_type(declared_type_name.as_ref(), initializer, span)?;
-        self.visit_expression_with_expected(initializer, declared_type_name.as_ref())?;
         self.validate_declared_initializer(name, declared_type_name.as_ref(), initializer, span)?;
         if *role == Role::Erg {
             self.initialize_owner(initializer, span)?;

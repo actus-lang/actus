@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/runtime/mod.rs");
+    println!("cargo:rerun-if-changed=src/runtime");
 
     let output_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must provide OUT_DIR"));
     let archive = output_dir.join("libactus_runtime.a");

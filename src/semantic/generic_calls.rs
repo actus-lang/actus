@@ -10,13 +10,44 @@ use super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
     pub(super) fn instantiate_generic_signature(
-        &self,
+        &mut self,
+        name: &str,
         signature: &VerbSignature,
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<VerbSignature, SemanticError> {
         let bindings = self.infer_generic_bindings(signature, arguments);
+        self.record_generic_call_instance(name, signature, &bindings);
         self.specialize_signature(signature, bindings, span)
+    }
+
+    fn record_generic_call_instance(
+        &mut self,
+        name: &str,
+        signature: &VerbSignature,
+        bindings: &HashMap<String, TypeName>,
+    ) {
+        let arguments = signature
+            .generic_parameters
+            .iter()
+            .filter_map(|parameter| bindings.get(&parameter.name).cloned())
+            .collect::<Vec<_>>();
+        if arguments.len() != signature.generic_parameters.len() {
+            return;
+        }
+        let canonical_key = format!(
+            "{name}[{}]",
+            arguments
+                .iter()
+                .map(super::analyzer::canonical_type_name)
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        self.generic_instances.insert(super::model::GenericInstance {
+            name: name.to_owned(),
+            arguments,
+            canonical_key,
+        });
     }
 
     fn infer_generic_bindings(

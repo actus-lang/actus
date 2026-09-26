@@ -25,7 +25,7 @@ impl Analyzer {
         };
         let binding_index = self.binding(name, object_span)?;
         self.ensure_access_available(binding_index, name, span)?;
-        if self.model.bindings[binding_index].role != Role::Erg {
+        if !matches!(self.model.bindings[binding_index].role, Role::Erg | Role::Ins) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
                 span,
@@ -144,7 +144,7 @@ impl Analyzer {
     }
 
     pub(super) fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
-        if let Expr::Call { span, .. } = expression
+        if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
             && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
         {
             return Some(type_name.clone());
