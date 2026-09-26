@@ -120,6 +120,7 @@ fn visit_local_dependency(
             package_root.display()
         )));
     };
+    super::manifest::warn_if_legacy_manifest(&dependency_manifest);
     let child = super::manifest::read(&dependency_manifest)?;
     if let Some(constraint) = &table.version {
         let constraint = super::version::VersionConstraint::parse(constraint).map_err(|error| {

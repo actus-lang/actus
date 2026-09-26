@@ -140,6 +140,7 @@ impl CompilerConfiguration {
     }
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
+        manifest::warn_if_legacy_manifest(path);
         let manifest = manifest::read(path)?;
         let dependency_graph = dependencies::resolve(path)?;
         validate_lockfile(path)?;

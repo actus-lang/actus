@@ -102,7 +102,6 @@ pub enum LibraryKind {
 }
 
 pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
-    warn_if_legacy_manifest(path);
     let source = std::fs::read_to_string(path).map_err(|error| {
         ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
     })?;
@@ -174,7 +173,7 @@ pub(crate) fn manifest_in_directory(directory: &Path) -> Option<PathBuf> {
     legacy.is_file().then_some(legacy)
 }
 
-fn warn_if_legacy_manifest(path: &Path) {
+pub(crate) fn warn_if_legacy_manifest(path: &Path) {
     if path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME) {
         eprintln!("warning: 'Arca.toml' is deprecated, please rename to 'Actus.toml'");
     }
