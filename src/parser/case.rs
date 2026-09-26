@@ -11,9 +11,10 @@ impl Parser {
         let start = self.previous().span.start;
         let mode = if self.match_simple(TokenKind::Dat) {
             CaseMode::Dat
-        } else {
-            self.match_simple(TokenKind::Abs);
+        } else if self.match_simple(TokenKind::Abs) {
             CaseMode::Abs
+        } else {
+            CaseMode::Plain
         };
         let previous_case_subject = self.case_subject;
         self.case_subject = true;

@@ -113,11 +113,15 @@ impl Formatter {
         branches: &[crate::ast::CaseBranch],
     ) {
         self.output.push_str("case ");
-        self.output.push_str(match mode {
+        let mode_name = match mode {
+            crate::ast::CaseMode::Plain => "",
             crate::ast::CaseMode::Abs => "abs",
             crate::ast::CaseMode::Dat => "dat",
-        });
-        self.output.push(' ');
+        };
+        self.output.push_str(mode_name);
+        if !mode_name.is_empty() {
+            self.output.push(' ');
+        }
         self.expression(subject);
         self.output.push_str(" {");
         for branch in branches {

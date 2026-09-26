@@ -82,6 +82,7 @@ pub enum Expr {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CaseMode {
+    Plain,
     Abs,
     Dat,
 }

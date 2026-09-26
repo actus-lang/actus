@@ -27,6 +27,8 @@ impl Analyzer {
             self.expression_type_name(subject).unwrap_or_else(|| "unknown".to_owned());
         self.enter_scope(span);
         match mode {
+            crate::ast::CaseMode::Plain if is_plain_case_type(&subject_type) => {}
+            crate::ast::CaseMode::Plain => self.borrow_case_subject(subject, span)?,
             crate::ast::CaseMode::Abs => self.borrow_case_subject(subject, span)?,
             crate::ast::CaseMode::Dat => self.consume_case_subject(subject, span)?,
         }
@@ -358,6 +360,7 @@ impl Analyzer {
         }
         self.bind(
             match mode {
+                crate::ast::CaseMode::Plain => Role::Abs,
                 crate::ast::CaseMode::Abs => Role::Abs,
                 crate::ast::CaseMode::Dat => Role::Dat,
             },
@@ -381,4 +384,8 @@ impl Analyzer {
             CaseBody::Block(block) => self.visit_block(block),
         }
     }
+}
+
+fn is_plain_case_type(type_name: &str) -> bool {
+    matches!(type_name, "Int" | "Bool" | "String")
 }

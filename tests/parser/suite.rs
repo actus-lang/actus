@@ -169,7 +169,7 @@ fn parses_case_variants_literals_and_wildcard_with_spans() {
         panic!("expected case expression");
     };
     assert!(matches!(subject.as_ref(), Expr::Identifier { name, .. } if name == "value"));
-    assert_eq!(*mode, CaseMode::Abs);
+    assert_eq!(*mode, CaseMode::Plain);
     assert_eq!(branches.len(), 3);
     assert!(matches!(
         &branches[0].pattern,
