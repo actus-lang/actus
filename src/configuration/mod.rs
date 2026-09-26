@@ -353,10 +353,10 @@ fn resolve_manifest_target(
 
 fn default_linker(target: &TargetSpec) -> OsString {
     #[cfg(windows)]
-    if matches!(target.linker_flavor(), LinkerFlavor::Msvc) {
-        if let Some(path) = rust_lld_path() {
-            return path.into_os_string();
-        }
+    if matches!(target.linker_flavor(), LinkerFlavor::Msvc)
+        && let Some(path) = rust_lld_path()
+    {
+        return path.into_os_string();
     }
     OsString::from(target.default_linker())
 }
