@@ -8,7 +8,10 @@ This document records the guarantees implemented by the Alpha compiler.
   dropped.
 - `dat` transfers ownership. The caller binding becomes `Moved`, and the
   receiving function becomes responsible for cleanup.
+- `ins` creates an exclusive call-scope loan. The source owner becomes
+  `Suspended` during the call and returns to mutable access afterward.
 - Returning a value transfers ownership to the caller.
+- Returning `abs` is allowed only for a single-origin non-owning view.
 - Explicit `drop` changes an owned binding to `Dropped`; cleanup never drops
   the same binding twice.
 
@@ -19,7 +22,10 @@ This document records the guarantees implemented by the Alpha compiler.
   owner, scope, identity, and source span.
 - An owner with an active borrow is derived as `Frozen`.
 - Frozen owners cannot be mutated, moved, or dropped.
-- Borrows may be passed to nested calls but cannot be returned or stored in a
+- Suspended owners cannot be read, mutated, moved, dropped, or borrowed.
+- `ins` may be forwarded to nested helper calls, but never aliased in one
+  call.
+- Returned views create caller-scope borrow records and cannot be stored in a
   longer-lived structure.
 - Borrowed bindings end automatically at their lexical scope boundary.
 

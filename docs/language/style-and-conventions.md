@@ -181,14 +181,17 @@ Names must describe domain meaning. Generic names such as `data`, `thing`, and
 
 ## 6. Semantic Roles
 
-Actus uses three explicit roles for ownership and borrowing:
+Actus uses four explicit roles for ownership and borrowing:
 
 - `erg` owns a resource and is responsible for its deterministic cleanup;
 - `abs` is a non-owning lexical borrow with no destructor responsibility;
 - `dat` transfers ownership into another binding or function context.
+- `ins` grants a temporary exclusive call-scope loan. The source owner enters
+  `Suspended` access for the call and returns to mutable access afterward.
 
-`abs` does not create runtime reference counting. It is valid only within its
-lexical lifetime and cannot be returned or stored in a longer-lived owner.
+`abs` does not create runtime reference counting. Ordinary views are lexical;
+an `abs` return is allowed only under the single-origin rule and remains tied
+to the caller owner through a caller-scope borrow record.
 
 `perform Role for Type` is compile-time static dispatch. `abs dynamic Role` is
 explicit runtime dispatch and uses a borrowed two-word fat pointer in the

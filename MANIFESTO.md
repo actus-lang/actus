@@ -8,12 +8,14 @@ collection or user-written lifetime annotations.
 
 ## 1. The Core Idea
 
-Actus expresses how a value participates in an operation through three roles:
+Actus expresses how a value participates in an operation through four roles:
 
 - `erg` — an owned, exclusive binding that may read, mutate, borrow, move, or be dropped;
 - `abs` — a temporary shared, read-only borrow;
 - `dat` — an ownership transfer role: the caller binding becomes `Moved`, and
   the callee or task becomes the new owner.
+- `ins` — an exclusive call-scope loan: the caller keeps ownership while its
+  access is `Suspended`, then regains mutable access when the call returns.
 
 These roles are enforced by the compiler. They are not documentation conventions.
 
@@ -21,7 +23,9 @@ These roles are enforced by the compiler. They are not documentation conventions
 
 Actus Alpha uses lexical, non-escaping borrows only.
 
-- An `abs` borrow cannot be returned from a function.
+- An `abs` borrow passed directly to a call is lexical and non-escaping.
+- A verb may return `abs` when the result has exactly one known origin and the
+  caller records that origin as a live borrow.
 - An `abs` borrow cannot be stored in a struct or transferred into a longer-lived object.
 - An `abs` borrow may be passed to a nested function call for the duration of that call.
 - No lifetime annotations are exposed to the programmer.
@@ -41,7 +45,9 @@ verb create_buffer() -> Buffer {
 }
 ```
 
-Returning a value transfers ownership to the caller. Borrowed returns are not part of the Alpha language.
+Returning a value transfers ownership to the caller. An access-qualified
+`abs` return is a non-owning single-origin view and does not receive owned
+cleanup.
 
 `drop(value)` is a compiler intrinsic. It immediately destroys an owned resource and marks its binding as `Dropped`. Automatic cleanup never drops a resource twice. `drop(abs_borrow)` is invalid; borrows end automatically at their lexical scope boundary.
 
@@ -95,11 +101,10 @@ smaller and more explicit ownership model for low-level programs.
 
 ### Compared with Rust
 
-Actus uses lexical, non-escaping borrows and exposes no lifetime annotations
-in source code. This makes the initial ownership model easier to read and
-diagnose, but it is intentionally less expressive than Rust's lifetime
-system. Alpha Actus does not support borrowed returns or arbitrary lifetime
-relationships. Actus still provides explicit low-level escape hatches for raw
+Actus uses lexical borrows, explicit call-scope `ins` loans, and single-origin
+`abs` returns without exposing lifetime annotations in source code. The model
+does not permit arbitrary lifetime relationships. Actus still provides explicit
+low-level escape hatches for raw
 pointers, MMIO, exact layouts, and inline assembly, but these capabilities
 belong inside visible `unsafe` boundaries.
 
@@ -128,7 +133,7 @@ an explicit `unsafe` boundary.
 Actus Alpha deliberately chooses a restricted safety model instead of trying
 to reproduce every capability of mature systems languages.
 
-- Borrowed values cannot be returned from functions.
+- `abs` returns require exactly one statically known origin.
 - Borrows cannot be stored in longer-lived structures.
 - Complex lifetime relationships are not exposed to programmers.
 - Structured concurrency requires explicit task lifecycle handling.
@@ -140,8 +145,9 @@ to reproduce every capability of mature systems languages.
   dynamic Role` is explicit runtime dispatch through a two-word fat pointer;
   its Alpha cross-unit metadata contract is defined in
   [ADR-0017](docs/decisions/ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
-- Mutable borrowing, reborrow chains, advanced lifetime polymorphism, and
-  task-transfer failure semantics remain deferred to future phases.
+- Advanced lifetime polymorphism, shared mutable ownership, and task-transfer
+  failure semantics remain deferred to future phases. Exclusive call-scope
+  mutable borrowing through `ins` is implemented by ADR-0020.
 
 These restrictions are intentional. They keep the compiler model predictable
 while leaving room for future scoped views, richer task results, and other
@@ -168,4 +174,5 @@ Later versions may introduce explicitly scoped views or other zero-copy abstract
 
 Actus begins with a deliberately small core: predictable ownership, readable
 systems code, deterministic destruction, explicit task lifetimes, and safety
-rules that can be understood completely.
+rules that can be understood completely. The four ownership roles are
+`erg`, `abs`, `dat`, and `ins`.
