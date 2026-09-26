@@ -3,9 +3,6 @@ use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
-#[cfg(windows)]
-use std::process::Command;
-
 pub use crate::target::{EntryContract, LinkerFlavor};
 use crate::target::{TargetSpec, TargetSpecError};
 
@@ -352,35 +349,7 @@ fn resolve_manifest_target(
 }
 
 fn default_linker(target: &TargetSpec) -> OsString {
-    #[cfg(windows)]
-    if matches!(target.linker_flavor(), LinkerFlavor::Msvc)
-        && let Some(path) = rust_lld_path()
-    {
-        return path.into_os_string();
-    }
     OsString::from(target.default_linker())
-}
-
-#[cfg(windows)]
-fn rust_lld_path() -> Option<PathBuf> {
-    let sysroot = rustc_output(["--print", "sysroot"])?;
-    let version = rustc_output(["-vV"])?;
-    let host = version.lines().find_map(|line| line.strip_prefix("host: "))?;
-    let sysroot = PathBuf::from(sysroot.trim());
-    let candidates = [
-        sysroot.join("bin").join("rust-lld.exe"),
-        sysroot.join("lib").join("rustlib").join(host).join("bin").join("rust-lld.exe"),
-    ];
-    candidates.into_iter().find(|path| path.is_file())
-}
-
-#[cfg(windows)]
-fn rustc_output<const N: usize>(arguments: [&str; N]) -> Option<String> {
-    let output = Command::new("rustc").args(arguments).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8(output.stdout).ok()
 }
 
 impl LinkLibrary {

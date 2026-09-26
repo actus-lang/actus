@@ -83,7 +83,7 @@ impl LinkerFlavor {
     pub const fn default_executable(self) -> &'static str {
         match self {
             Self::Gnu | Self::Apple => "cc",
-            Self::Msvc => "rust-lld",
+            Self::Msvc => "link.exe",
         }
     }
 }
@@ -256,7 +256,7 @@ mod tests {
             TargetSpec::parse("x86_64-pc-windows-msvc")
                 .expect("MSVC target should parse")
                 .default_linker(),
-            "rust-lld"
+            "link.exe"
         );
     }
 }
