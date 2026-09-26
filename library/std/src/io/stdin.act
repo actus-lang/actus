@@ -1,0 +1,10 @@
+open unsafe extern "C" verb actus_read_stdin_line(ins buffer: Buffer) -> Int;
+open unsafe extern "C" verb actus_read_byte() -> Int;
+
+open verb read_line(ins buffer: Buffer) -> Int {
+    return actus_read_stdin_line(buffer: ins buffer);
+}
+
+open verb read_byte() -> Int {
+    return actus_read_byte();
+}

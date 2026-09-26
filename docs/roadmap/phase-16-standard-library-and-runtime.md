@@ -157,13 +157,13 @@ the hosted-runtime boundary, and deterministic status reporting.
 
 ### Gate 2.2: Console Input (Stdin)
 
-- [ ] Define `read_line(ins buffer: Buffer)` and its capacity behavior.
-- [ ] Define `read_byte` and end-of-input behavior.
-- [ ] Define stdin status and error codes.
-- [ ] Add the runtime stdin bridge behind the approved C ABI.
-- [ ] Enforce `ins` ownership and call-scope loan restoration.
-- [ ] Add semantic positive and negative input tests.
-- [ ] Add native tests for input, end-of-input, and failed reads.
+- [x] Define `read_line(ins buffer: Buffer)` and its capacity behavior.
+- [x] Define `read_byte` and end-of-input behavior.
+- [x] Define stdin status and error codes.
+- [x] Add the runtime stdin bridge behind the approved C ABI.
+- [x] Enforce `ins` ownership and call-scope loan restoration.
+- [x] Add semantic positive and negative input tests.
+- [x] Add native tests for input, end-of-input, and failed reads.
 
 ### Gate 2.3: Stream Abstractions (Read & Write)
 

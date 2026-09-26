@@ -52,6 +52,19 @@ stderr is determined by the host streams; each stream's bytes are otherwise
 deterministic for a successful call. Input, general stream abstractions,
 buffering, and cursor utilities remain separate Gate 2 increments.
 
+Gate 2.2 adds stdin operations:
+
+```act
+open verb read_line(ins buffer: Buffer) -> Int;
+open verb read_byte() -> Int;
+```
+
+`read_line` consumes input through the next newline or EOF, excludes the
+newline, and appends bytes into the caller-owned buffer under an `ins` loan.
+It returns the byte count, `-2` for immediate EOF, or `-1` for an input
+failure. `read_byte` returns an unsigned byte value, `-2` at EOF, or `-1` on
+failure. The runtime restores the caller's owner after `read_line` returns.
+
 ## Ownership and target behavior
 
 The scalar output operations use `erg` parameters and therefore do not create

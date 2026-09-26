@@ -1,2 +1,3 @@
 open stdout;
 open stderr;
+open stdin;

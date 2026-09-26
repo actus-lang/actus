@@ -1,9 +1,13 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use actus::cli::run_with_args;
+use actus::lexer::scan;
 use actus::modules::{ModuleResolver, analyze_module, exports_module};
+use actus::parser::parse;
+use actus::semantic::analyze;
 
 fn library_source(file: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src/io").join(file);
@@ -22,7 +26,18 @@ fn std_io_declarations_pass_semantic_validation() {
     assert!(exports.contains("verb", "eprint"));
     assert!(exports.contains("verb", "eprintln"));
     assert!(exports.contains("verb", "flush"));
+    assert!(exports.contains("verb", "read_line"));
+    assert!(exports.contains("verb", "read_byte"));
     analyze_module(&resolver, "io").expect("std io declarations should be semantically valid");
+}
+
+#[test]
+fn std_io_read_line_requires_an_explicit_ins_argument() {
+    let source = "verb read_line(ins buffer: Buffer) -> Int { return 0; } verb main() -> Int { erg buffer = Buffer[0]; return read_line(buffer: buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("invalid ins call should parse");
+    assert!(analyze(&program).is_err());
 }
 
 #[test]
@@ -31,11 +46,11 @@ fn std_io_native_bridge_separates_stdout_and_stderr() {
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create std io fixture");
-    for file in ["io.act", "stdout.act", "stderr.act"] {
+    for file in ["io.act", "stdout.act", "stderr.act", "stdin.act"] {
         fs::write(
             io_root.join(file),
             if file == "io.act" {
-                "open stdout;\nopen stderr;\n".to_owned()
+                "open stdout;\nopen stderr;\nopen stdin;\n".to_owned()
             } else {
                 library_source(file)
             },
@@ -80,8 +95,9 @@ fn std_io_native_bridge_prints_borrowed_buffer_text() {
     let source_root = root.join("src");
     let io_root = source_root.join("io");
     fs::create_dir_all(&io_root).expect("create std text fixture");
-    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\n").expect("write io facade");
-    for file in ["stdout.act", "stderr.act"] {
+    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\n")
+        .expect("write io facade");
+    for file in ["stdout.act", "stderr.act", "stdin.act"] {
         fs::write(io_root.join(file), library_source(file)).expect("copy std io source");
     }
     fs::write(
@@ -112,5 +128,91 @@ fn std_io_native_bridge_prints_borrowed_buffer_text() {
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"HiHi\n");
     assert_eq!(execution.stderr, b"HiHi\n");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_bridge_reads_line_into_exclusive_buffer() {
+    let root = std::env::temp_dir().join(format!("actus-std-stdin-{}", std::process::id()));
+    let source_root = root.join("src");
+    let io_root = source_root.join("io");
+    fs::create_dir_all(&io_root).expect("create stdin fixture");
+    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\n")
+        .expect("write io facade");
+    for file in ["stdout.act", "stderr.act", "stdin.act"] {
+        fs::write(io_root.join(file), library_source(file)).expect("copy std io source");
+    }
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std-stdin-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write stdin fixture manifest");
+    let input = source_root.join("main.act");
+    fs::write(
+        &input,
+        "import io; verb main() -> Int { erg buffer = Buffer[0]; erg count = read_line(buffer: ins buffer); print(text: abs buffer); flush(); return count; }\n",
+    )
+    .expect("write stdin fixture entry");
+    let output = root.join("std-stdin");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let mut child = Command::new(&output)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("stdin fixture should run");
+    child.stdin.take().expect("stdin pipe should exist").write_all(b"hello\n").unwrap();
+    let execution = child.wait_with_output().expect("wait for stdin fixture");
+    assert_eq!(execution.status.code(), Some(5));
+    assert_eq!(execution.stdout, b"hello");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_bridge_reports_eof_from_read_byte() {
+    let root = std::env::temp_dir().join(format!("actus-std-byte-{}", std::process::id()));
+    let source_root = root.join("src");
+    let io_root = source_root.join("io");
+    fs::create_dir_all(&io_root).expect("create byte fixture");
+    fs::write(io_root.join("io.act"), "open stdout;\nopen stderr;\nopen stdin;\n")
+        .expect("write io facade");
+    for file in ["stdout.act", "stderr.act", "stdin.act"] {
+        fs::write(io_root.join(file), library_source(file)).expect("copy std io source");
+    }
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std-byte-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write byte fixture manifest");
+    let input = source_root.join("main.act");
+    fs::write(&input, "import io; verb main() -> Int { return read_byte(); }\n")
+        .expect("write byte fixture entry");
+    let output = root.join("std-byte");
+    assert_eq!(
+        run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        ),
+        0
+    );
+    let execution = Command::new(&output).output().expect("byte fixture should run");
+    assert_eq!(execution.status.code(), Some(254));
     let _ = fs::remove_dir_all(root);
 }
