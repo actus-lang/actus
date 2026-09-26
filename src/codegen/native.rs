@@ -193,7 +193,9 @@ fn declare_all_functions(
         performance_definitions,
         layouts,
     )?);
-    metadata.extend(declare_runtime_functions(module)?);
+    let has_print_definition = verbs.iter().any(|verb| verb.name == "print")
+        || external_verbs.iter().any(|verb| verb.name == "print");
+    metadata.extend(declare_runtime_functions(module, has_print_definition)?);
     Ok(metadata)
 }
 

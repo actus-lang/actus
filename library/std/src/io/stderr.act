@@ -1,5 +1,16 @@
 open unsafe extern "C" verb actus_print_int_stderr(erg value: Int) -> Int;
+open unsafe extern "C" verb actus_print_buffer_stderr(abs text: Buffer) -> Int;
+open unsafe extern "C" verb actus_print_line_buffer_stderr(abs text: Buffer) -> Int;
 
 open verb eprint_int(erg value: Int) -> Int {
     return actus_print_int_stderr(value: value);
+}
+
+open verb eprint(abs text: Buffer) -> Int {
+    return actus_print_buffer_stderr(text: abs text);
+}
+
+open verb eprintln(abs text: Buffer) -> Int {
+    erg status = actus_print_line_buffer_stderr(text: abs text);
+    return status;
 }

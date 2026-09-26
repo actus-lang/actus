@@ -15,6 +15,7 @@ use super::types::NativeType;
 
 pub(super) fn declare_runtime_functions(
     module: &mut ObjectModule,
+    has_print_definition: bool,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let pointer_type = module.isa().pointer_type();
     let allocate_id = declare_allocate(module, pointer_type)?;
@@ -25,7 +26,7 @@ pub(super) fn declare_runtime_functions(
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
 
-    Ok(HashMap::from([
+    let mut functions = HashMap::from([
         (
             format!("__{BUFFER_ALLOCATE_SYMBOL}"),
             named_meta(allocate_id, &["length"], NativeType::Buffer),
@@ -40,7 +41,11 @@ pub(super) fn declare_runtime_functions(
             intrinsic_meta(print_int_id, print_spec.parameters, NativeType::Int),
         ),
         (PRINT_STRING_SYMBOL.to_owned(), named_meta(print_string_id, &["value"], NativeType::Int)),
-    ]))
+    ]);
+    if has_print_definition {
+        functions.remove(print_spec.name);
+    }
+    Ok(functions)
 }
 
 fn intrinsic_meta(

@@ -159,6 +159,7 @@ fn resolve_call_target<'a>(
     functions: &'a HashMap<String, FunctionRef>,
 ) -> Result<&'a FunctionRef, NativeEmitError> {
     if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print)
+        && target.parameter_names == ["value"]
         && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
     {
         functions.get("actus_print_string").ok_or_else(|| {

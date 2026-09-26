@@ -1,5 +1,22 @@
 open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
+open unsafe extern "C" verb actus_print_buffer_stdout(abs text: Buffer) -> Int;
+open unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> Int;
+open unsafe extern "C" verb actus_flush_stdout() -> Int;
 
 open verb print_int(erg value: Int) -> Int {
     return actus_print_int(value: value);
+}
+
+open verb print(abs text: Buffer) -> Int {
+    return actus_print_buffer_stdout(text: abs text);
+}
+
+open verb println(abs text: Buffer) -> Int {
+    erg status = actus_print_line_buffer_stdout(text: abs text);
+    actus_flush_stdout();
+    return status;
+}
+
+open verb flush() -> Int {
+    return actus_flush_stdout();
 }

@@ -30,16 +30,33 @@ allocate an Actus resource. The stdout implementation calls
 `actus_print_int_stderr`. Those runtime declarations cross an explicit
 `unsafe extern "C"` boundary and are not compiler intrinsics.
 
+Gate 2.1 extends the output API with borrowed, length-aware buffer
+operations:
+
+```act
+open verb print(abs text: Buffer) -> Int;
+open verb println(abs text: Buffer) -> Int;
+open verb eprint(abs text: Buffer) -> Int;
+open verb eprintln(abs text: Buffer) -> Int;
+open verb flush() -> Int;
+```
+
+The buffer operations never consume, mutate, allocate, or drop the source
+buffer. Their runtime bridges receive the existing buffer handle and write its
+declared byte range. `println` and `eprintln` append one newline; `flush`
+flushes stdout explicitly. A successful output returns the byte count, while
+runtime failure returns `-1`.
+
 The runtime prints one newline per call. Output ordering between stdout and
 stderr is determined by the host streams; each stream's bytes are otherwise
-deterministic for a successful call. Buffering and input behavior remain open
-for a later Gate 2 increment.
+deterministic for a successful call. Input, general stream abstractions,
+buffering, and cursor utilities remain separate Gate 2 increments.
 
 ## Ownership and target behavior
 
 The scalar output operations use `erg` parameters and therefore do not create
-borrow or transfer obligations. Buffer-oriented I/O will require an explicit
-role and ABI mapping when it is added. The public Actus API does not expose
+borrow or transfer obligations. The buffer output operations use `abs` and
+therefore preserve the caller's owner. The public Actus API does not expose
 Rust implementation types.
 
 `std::io` is available only when the selected target provides the hosted

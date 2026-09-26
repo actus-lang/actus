@@ -1,12 +1,14 @@
+use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::path::Path;
 
 mod contract;
 
 pub use contract::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, PRINT_INT_STDERR_SYMBOL,
-    PRINT_INT_SYMBOL, PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, RUNTIME_ABI_VERSION,
-    RuntimeCapability,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, FLUSH_STDOUT_SYMBOL,
+    PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
+    PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
+    PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
 };
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
@@ -82,6 +84,83 @@ pub unsafe extern "C" fn actus_print_string_stderr(value: *const u8) -> i32 {
     let text = String::from_utf8_lossy(bytes);
     eprintln!("{text}");
     i32::try_from(bytes.len()).unwrap_or(i32::MAX)
+}
+
+/// Writes the bytes in a borrowed buffer to stdout without adding a newline.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer handle whose byte range is
+/// valid for the declared length.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_print_buffer_stdout(handle: BufferHandle) -> i32 {
+    unsafe { write_buffer(handle, false, false) }
+}
+
+/// Writes the bytes in a borrowed buffer to stderr without adding a newline.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer handle whose byte range is
+/// valid for the declared length.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_print_buffer_stderr(handle: BufferHandle) -> i32 {
+    unsafe { write_buffer(handle, true, false) }
+}
+
+/// Writes the bytes in a borrowed buffer to stdout and adds a newline.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer handle whose byte range is
+/// valid for the declared length.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_print_line_buffer_stdout(handle: BufferHandle) -> i32 {
+    unsafe { write_buffer(handle, false, true) }
+}
+
+/// Writes the bytes in a borrowed buffer to stderr and adds a newline.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer handle whose byte range is
+/// valid for the declared length.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_print_line_buffer_stderr(handle: BufferHandle) -> i32 {
+    unsafe { write_buffer(handle, true, true) }
+}
+
+/// Flushes stdout and returns zero on success or -1 on failure.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_flush_stdout() -> i32 {
+    if std::io::stdout().flush().is_ok() { 0 } else { -1 }
+}
+
+unsafe fn write_buffer(handle: BufferHandle, stderr: bool, newline: bool) -> i32 {
+    if handle.is_null() {
+        return -1;
+    }
+    let buffer = unsafe { &*handle };
+    if buffer.length > 0 && buffer.data.is_null() {
+        return -1;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(buffer.data, buffer.length) };
+    let result = if stderr {
+        let mut stream = std::io::stderr().lock();
+        write_bytes(&mut stream, bytes, newline)
+    } else {
+        let mut stream = std::io::stdout().lock();
+        write_bytes(&mut stream, bytes, newline)
+    };
+    if result.is_err() { -1 } else { i32::try_from(bytes.len()).unwrap_or(-1) }
+}
+
+fn write_bytes(stream: &mut impl Write, bytes: &[u8], newline: bool) -> std::io::Result<()> {
+    stream.write_all(bytes)?;
+    if newline {
+        stream.write_all(b"\n")?;
+    }
+    Ok(())
 }
 
 #[unsafe(no_mangle)]

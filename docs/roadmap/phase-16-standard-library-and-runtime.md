@@ -135,36 +135,69 @@ moving operating-system behavior into the compiler core.
 
 ## Gate 2: `std::io`
 
-Deliver the first practical standard library surface for console and stream
-interaction.
+Deliver `std::io` as a sequence of independently verifiable console and
+stream capabilities. Each sub-gate must preserve explicit ownership roles,
+the hosted-runtime boundary, and deterministic status reporting.
 
-### API contract
+### Gate 2.1: Text & Buffer Console Output
 
-- [x] Define the `std::io` module layout and public facade.
-- [x] Define stdout output for supported scalar values.
-- [x] Define stderr output for diagnostics or explicit error reporting.
-- [ ] Define input behavior and its failure contract.
-- [x] Define whether output operations return a status or `Result` value.
-- [ ] Define buffering and flushing behavior.
-- [x] Define ownership roles for input and output buffers.
-- [x] Keep the public API independent of the host implementation language.
+- [x] Define the `std::io` directory facade and public output declarations.
+- [x] Define scalar output with `print_int` and `eprint_int`.
+- [x] Define borrowed buffer output with `print(abs text: Buffer)`.
+- [x] Define newline variants `println` and `eprintln`.
+- [x] Define explicit `flush()` for stdout.
+- [x] Add length-aware stdout and stderr buffer bridges.
+- [x] Add the stdout flush runtime bridge.
+- [x] Return an explicit byte-count or failure status from output calls.
+- [x] Preserve the source buffer; output never consumes or drops it.
+- [x] Keep output bridges behind `unsafe extern "C"` declarations.
+- [x] Add semantic facade/export tests for the text API.
+- [x] Add native stdout/stderr text execution tests.
+- [x] Verify no hidden allocation occurs in the buffer output bridge.
 
-### Implementation
+### Gate 2.2: Console Input (Stdin)
 
-- [x] Implement the public `std::io` declarations in Actus.
-- [x] Implement the minimal runtime bridge for stdout.
-- [x] Implement the minimal runtime bridge for stderr.
-- [ ] Implement the minimal runtime bridge for input.
-- [x] Keep host calls inside the approved FFI boundary.
-- [x] Avoid hidden heap allocation in scalar output operations.
-- [x] Add semantic tests for valid and invalid calls.
-- [x] Add native execution tests for stdout and exit status.
-- [ ] Add failure-path tests for unavailable or failed I/O.
+- [ ] Define `read_line(ins buffer: Buffer)` and its capacity behavior.
+- [ ] Define `read_byte` and end-of-input behavior.
+- [ ] Define stdin status and error codes.
+- [ ] Add the runtime stdin bridge behind the approved C ABI.
+- [ ] Enforce `ins` ownership and call-scope loan restoration.
+- [ ] Add semantic positive and negative input tests.
+- [ ] Add native tests for input, end-of-input, and failed reads.
+
+### Gate 2.3: Stream Abstractions (Read & Write)
+
+- [ ] Define `read(ins buffer: Buffer)` for stream consumers.
+- [ ] Define `write(abs buffer: Buffer)` for non-consuming output.
+- [ ] Define shared I/O status and error-code conventions.
+- [ ] Define short-read and short-write behavior.
+- [ ] Map stream operations to target-specific runtime capabilities.
+- [ ] Add ownership and aliasing tests for read/write calls.
+- [ ] Add native tests for complete and partial transfers.
+
+### Gate 2.4: Buffering (`BufReader` & `BufWriter`)
+
+- [ ] Define `BufReader` ownership and refill behavior.
+- [ ] Define `BufWriter` ownership, buffering, and flush behavior.
+- [ ] Define explicit close/flush failure handling.
+- [ ] Ensure internal buffers have deterministic cleanup paths.
+- [ ] Add semantic tests for nested views and exclusive refill/write loans.
+- [ ] Add native tests comparing buffered and direct stream behavior.
+
+### Gate 2.5: In-Memory Cursor & Stream Utilities
+
+- [ ] Define `Cursor` over an owned or borrowed buffer.
+- [ ] Define cursor position, bounds, and seek error behavior.
+- [ ] Define stream `copy` ownership and completion semantics.
+- [ ] Preserve zero-copy behavior for borrowed cursor views.
+- [ ] Add semantic tests for cursor lifetimes and partial copies.
+- [ ] Add native tests for cursor reads, writes, and stream copying.
 
 ### Gate 2 invariant
 
-- [x] A small Actus program can perform deterministic console I/O through
-      `std::io` without compiler-specific application intrinsics.
+- [ ] A complete `std::io` implementation provides deterministic console,
+      input, stream, buffering, and in-memory cursor behavior without
+      compiler-specific application intrinsics.
 
 ## Gate 3: `std::fs`
 

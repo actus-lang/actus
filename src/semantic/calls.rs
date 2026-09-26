@@ -96,7 +96,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if self.visit_intrinsic_call(callee, arguments, span)? {
+        if !self.signatures.contains_key(callee)
+            && self.visit_intrinsic_call(callee, arguments, span)?
+        {
             return Ok(());
         }
         let Some(signature) = self.signatures.get(callee).cloned() else {

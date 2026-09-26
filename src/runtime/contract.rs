@@ -9,6 +9,11 @@ pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
+pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";
+pub const PRINT_BUFFER_STDERR_SYMBOL: &str = "actus_print_buffer_stderr";
+pub const FLUSH_STDOUT_SYMBOL: &str = "actus_flush_stdout";
+pub const PRINT_LINE_BUFFER_STDOUT_SYMBOL: &str = "actus_print_line_buffer_stdout";
+pub const PRINT_LINE_BUFFER_STDERR_SYMBOL: &str = "actus_print_line_buffer_stderr";
 
 /// Runtime operations are explicit capabilities rather than implicit compiler
 /// services. Freestanding targets may provide none of these capabilities.
