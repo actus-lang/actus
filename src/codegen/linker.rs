@@ -31,6 +31,7 @@ pub fn link_object(
         && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
     {
         command.arg(runtime_archive);
+        command.args(configuration.linker_flavor().runtime_library_arguments());
     }
     for path in configuration.library_paths() {
         command.arg(configuration.linker_flavor().library_path_argument(path));
@@ -103,6 +104,15 @@ mod tests {
         assert_eq!(LinkerFlavor::Gnu.output_arguments(path), ["-o", "/tmp/actus-output"]);
         assert_eq!(LinkerFlavor::Apple.output_arguments(path), ["-o", "/tmp/actus-output"]);
         assert_eq!(LinkerFlavor::Msvc.output_arguments(path), ["/OUT:/tmp/actus-output"]);
+    }
+
+    #[test]
+    fn emits_msvc_runtime_library_arguments() {
+        let libraries = LinkerFlavor::Msvc.runtime_library_arguments();
+        assert!(libraries.contains(&"kernel32.lib"));
+        assert!(libraries.contains(&"libcmt.lib"));
+        assert!(libraries.contains(&"ws2_32.lib"));
+        assert!(LinkerFlavor::Gnu.runtime_library_arguments().is_empty());
     }
 
     #[test]

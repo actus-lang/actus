@@ -73,6 +73,34 @@ impl LinkerFlavor {
         }
     }
 
+    pub fn runtime_library_arguments(self) -> &'static [&'static str] {
+        match self {
+            Self::Msvc => &[
+                "advapi32.lib",
+                "bcrypt.lib",
+                "cfgmgr32.lib",
+                "combase.lib",
+                "crypt32.lib",
+                "gdi32.lib",
+                "iphlpapi.lib",
+                "kernel32.lib",
+                "libcmt.lib",
+                "mswsock.lib",
+                "ntdll.lib",
+                "ole32.lib",
+                "oleaut32.lib",
+                "oldnames.lib",
+                "psapi.lib",
+                "secur32.lib",
+                "shell32.lib",
+                "user32.lib",
+                "userenv.lib",
+                "ws2_32.lib",
+            ],
+            Self::Gnu | Self::Apple => &[],
+        }
+    }
+
     pub fn output_arguments(self, path: &std::path::Path) -> Vec<String> {
         match self {
             Self::Msvc => vec![format!("/OUT:{}", path.display())],
