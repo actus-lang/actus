@@ -44,7 +44,7 @@ pub(super) fn define_function(
         let (locals, local_types) =
             bind_parameters(&mut function, module, verb, &parameters, layouts);
         function.seal_block(block);
-        let result = lower_body(
+        let flow = lower_body(
             &mut function,
             &verb.body.statements,
             &locals,
@@ -54,13 +54,40 @@ pub(super) fn define_function(
             &string_values,
             layouts,
         )?;
-        function.ins().return_(&[result]);
+        emit_flow(&mut function, verb.return_type.is_some(), flow)?;
         function.finalize(frontend_config);
     }
     module
         .define_function(metadata.id, &mut context)
         .map_err(|error| NativeEmitError(error.to_string()))?;
     module.clear_context(&mut context);
+    Ok(())
+}
+
+fn emit_flow(
+    function: &mut FunctionBuilder<'_>,
+    returns_value: bool,
+    flow: super::lowering::Flow,
+) -> Result<(), NativeEmitError> {
+    match (returns_value, flow) {
+        (true, super::lowering::Flow::Return(result)) => {
+            function.ins().return_(&[result]);
+        }
+        (false, super::lowering::Flow::Fallthrough) => {
+            function.ins().return_(&[]);
+        }
+        (true, super::lowering::Flow::Fallthrough) => {
+            return Err(NativeEmitError("native function requires a return value".to_owned()));
+        }
+        (false, super::lowering::Flow::Return(_)) => {
+            return Err(NativeEmitError("void native function returned a value".to_owned()));
+        }
+        (_, super::lowering::Flow::Break | super::lowering::Flow::Continue) => {
+            return Err(NativeEmitError(
+                "loop control escaped its loop during native lowering".to_owned(),
+            ));
+        }
+    };
     Ok(())
 }
 

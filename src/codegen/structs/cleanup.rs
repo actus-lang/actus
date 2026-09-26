@@ -6,6 +6,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::expressions::emit_buffer_drop;
 use super::super::layout::LayoutRegistry;
 use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::performance::dispatch_key;
 use super::super::types::NativeType;
 
 pub(crate) fn emit_struct_drop(
@@ -118,6 +119,15 @@ pub(crate) fn emit_binding_drop(
     else {
         return Ok(());
     };
+    if let Some(drop_function) = functions.get(&dispatch_key(binding_type, "drop")) {
+        let address = locals
+            .iter()
+            .find(|(binding, _)| binding.as_str() == name)
+            .map(|(_, value)| *value)
+            .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+        function.ins().call(drop_function.reference, &[address]);
+        return Ok(());
+    }
     let address = locals
         .iter()
         .find(|(binding, _)| binding.as_str() == name)

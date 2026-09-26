@@ -224,6 +224,8 @@ mod tests {
             generic_instances: Vec::new(),
             reachable_performances: Vec::new(),
             dynamic_roles: Vec::new(),
+            drop_types: Vec::new(),
+            binding_type_names: std::collections::HashMap::new(),
         }
     }
 
@@ -263,6 +265,8 @@ mod tests {
             generic_instances: Vec::new(),
             reachable_performances: Vec::new(),
             dynamic_roles: Vec::new(),
+            drop_types: Vec::new(),
+            binding_type_names: std::collections::HashMap::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());

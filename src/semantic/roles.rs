@@ -77,6 +77,9 @@ impl Analyzer {
     }
 
     fn validate_performance(&mut self, perform: &PerformDecl) -> Result<(), SemanticError> {
+        if perform.role_name == "Drop" {
+            return self.validate_drop_performance(perform);
+        }
         let Some(role) = self.role_types.get(&perform.role_name).cloned() else {
             return Err(role_error(
                 SemanticErrorKind::UnknownRole { name: perform.role_name.clone() },
@@ -126,6 +129,38 @@ impl Analyzer {
             self.performance_roles
                 .insert((target_key.clone(), method.name.clone()), perform.role_name.clone());
         }
+        Ok(())
+    }
+
+    fn validate_drop_performance(&mut self, perform: &PerformDecl) -> Result<(), SemanticError> {
+        let Some(method) = perform.methods.iter().find(|method| method.name == "drop") else {
+            return Err(role_error(
+                SemanticErrorKind::MissingRoleMethod {
+                    role: "Drop".to_owned(),
+                    method: "drop".to_owned(),
+                },
+                perform.span,
+            ));
+        };
+        let valid = method.params.len() == 1
+            && method.params[0].role == crate::ast::Role::Ins
+            && method.params[0].name == "self"
+            && type_names_match(&method.params[0].ty, &perform.target)
+            && method.return_type.is_none();
+        if !valid {
+            return Err(role_error(
+                SemanticErrorKind::RoleMethodMismatch {
+                    role: "Drop".to_owned(),
+                    method: "drop".to_owned(),
+                },
+                method.span,
+            ));
+        }
+        let target_key = canonical_type_name(&perform.target);
+        self.drop_types.insert(target_key.clone());
+        self.performance_methods
+            .insert((target_key.clone(), "drop".to_owned()), method.signature());
+        self.performance_roles.insert((target_key, "drop".to_owned()), "Drop".to_owned());
         Ok(())
     }
 }

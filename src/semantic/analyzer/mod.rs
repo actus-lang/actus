@@ -42,6 +42,7 @@ pub(super) struct Analyzer {
     pub(super) performance_methods: HashMap<(String, String), super::calls::VerbSignature>,
     pub(super) performance_roles: HashMap<(String, String), String>,
     pub(super) reachable_performances: HashSet<super::model::ReachablePerformance>,
+    pub(super) drop_types: HashSet<String>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_type_names: HashMap<usize, crate::ast::TypeName>,
@@ -86,6 +87,8 @@ impl Analyzer {
                 generic_instances: Vec::new(),
                 reachable_performances: Vec::new(),
                 dynamic_roles: Vec::new(),
+                drop_types: Vec::new(),
+                binding_type_names: HashMap::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
@@ -106,6 +109,7 @@ impl Analyzer {
             performance_methods: HashMap::new(),
             performance_roles: HashMap::new(),
             reachable_performances: HashSet::new(),
+            drop_types: HashSet::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
             binding_type_names: HashMap::new(),
@@ -140,6 +144,9 @@ impl Analyzer {
                 &right.method_name,
             ))
         });
+        self.model.drop_types = self.drop_types.into_iter().collect();
+        self.model.drop_types.sort();
+        self.model.binding_type_names = self.binding_type_names.clone();
         self.current_return_type = None;
         self.current_return_type_name = None;
         self.current_return_access = None;

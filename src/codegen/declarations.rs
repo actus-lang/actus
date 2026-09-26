@@ -80,12 +80,16 @@ pub(super) fn native_signature_for_definition(
     verb: &VerbDecl,
     layouts: &LayoutRegistry,
 ) -> cranelift_codegen::ir::Signature {
-    signature_for(
+    let mut signature = signature_for(
         module,
         &verb.params,
         verb.return_type.as_ref().map(|return_type| &return_type.ty),
         layouts,
-    )
+    );
+    if verb.name == "drop" && verb.return_type.is_none() {
+        signature.returns.clear();
+    }
+    signature
 }
 
 fn external_native_signature(
