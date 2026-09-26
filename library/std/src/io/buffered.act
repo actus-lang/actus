@@ -1,0 +1,48 @@
+/// A caller-owned input buffer used by buffered read operations.
+///
+/// The `erg` field owns the reusable storage. Refill operations borrow the
+/// reader with `ins`, so the storage is filled in place without allocation.
+open struct BufferedReader {
+    erg buffer: Buffer,
+}
+
+/// A caller-owned output buffer used by buffered write operations.
+///
+/// The `erg` field owns the reusable storage. Output operations inspect
+/// caller-provided storage with `abs` and never transfer ownership through the
+/// output call.
+open struct BufferedWriter {
+    erg buffer: Buffer,
+}
+
+/// Construct a buffered reader from an owned reusable buffer.
+///
+/// `dat buffer` transfers ownership into the reader. The returned reader is
+/// responsible for the buffer's eventual cleanup.
+open verb buffered_reader(dat buffer: Buffer) -> BufferedReader {
+    return BufferedReader { buffer: buffer, };
+}
+
+/// Construct a buffered writer from an owned reusable buffer.
+///
+/// `dat buffer` transfers ownership into the writer. No second allocation is
+/// performed by the constructor.
+open verb buffered_writer(dat buffer: Buffer) -> BufferedWriter {
+    return BufferedWriter { buffer: buffer, };
+}
+
+/// Refill a reader's existing buffer from stdin until newline or EOF.
+///
+/// The `ins reader` loan is non-escaping and covers the complete call. The
+/// result reports the exact byte count or a typed I/O error.
+open verb refill(ins reader: BufferedReader) -> Result[Int, IoError] {
+    return read_line(buffer: ins reader.buffer);
+}
+
+/// Write a read-only view through the standard output stream.
+///
+/// The input is `abs`, so the source remains available to the caller. The
+/// caller supplies storage and the operation performs no buffer allocation.
+open verb buffered_write(abs input: Buffer) -> Result[Int, IoError] {
+    return write(buffer: abs input);
+}

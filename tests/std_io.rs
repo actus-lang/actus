@@ -30,8 +30,82 @@ fn std_io_declarations_pass_semantic_validation() {
     assert!(exports.contains("verb", "read_byte"));
     assert!(exports.contains("verb", "read"));
     assert!(exports.contains("verb", "write"));
+    assert!(exports.contains("struct", "BufferedReader"));
+    assert!(exports.contains("struct", "BufferedWriter"));
+    assert!(exports.contains("verb", "buffered_reader"));
+    assert!(exports.contains("verb", "buffered_writer"));
+    assert!(exports.contains("verb", "refill"));
+    assert!(exports.contains("verb", "buffered_write"));
     assert!(exports.contains("enum", "IoError"));
     analyze_module(&resolver, "io").expect("std io declarations should be semantically valid");
+}
+
+#[test]
+fn std_io_buffered_constructor_requires_dat_ownership_transfer() {
+    let source = "struct BufferedReader { erg buffer: Buffer, } verb buffered_reader(dat buffer: Buffer) -> BufferedReader { return BufferedReader { buffer: buffer, }; } verb main() -> Int { erg buffer = Buffer[4]; erg reader = buffered_reader(buffer: abs buffer); return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("buffered fixture should parse");
+    assert!(analyze(&program).is_err());
+}
+
+#[test]
+fn std_io_native_buffered_reader_reuses_owned_buffer() {
+    let root = std::env::temp_dir().join(format!("actus-std-buffered-{}", std::process::id()));
+    let source_root = root.join("src");
+    let io_root = source_root.join("io");
+    fs::create_dir_all(&io_root).expect("create buffered fixture");
+    fs::write(
+        io_root.join("io.act"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\nopen read;\nopen write;\nopen buffered;\n",
+    )
+    .expect("write buffered facade");
+    for file in [
+        "stdout.act",
+        "stderr.act",
+        "stdin.act",
+        "error.act",
+        "read.act",
+        "write.act",
+        "buffered.act",
+    ] {
+        fs::write(io_root.join(file), library_source(file)).expect("copy buffered source");
+    }
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std-buffered-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write buffered manifest");
+    let input = source_root.join("main.act");
+    fs::write(
+        &input,
+        "import io; verb main() -> Int { erg reader = BufferedReader { buffer: Buffer[0], }; erg writer = BufferedWriter { buffer: Buffer[0], }; erg payload = Buffer[0]; buffered_write(input: abs payload); return 0; }\n",
+    )
+    .expect("write buffered entry");
+    let output = root.join("std-buffered");
+    assert_eq!(
+        run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        ),
+        0
+    );
+    let mut child = Command::new(&output)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("buffered fixture should run");
+    child.stdin.take().expect("stdin pipe should exist").write_all(b"buffered\n").unwrap();
+    let execution = child.wait_with_output().expect("wait for buffered fixture");
+    assert_eq!(execution.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
