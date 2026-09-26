@@ -73,6 +73,13 @@ impl LinkerFlavor {
         }
     }
 
+    pub fn output_arguments(self, path: &std::path::Path) -> Vec<String> {
+        match self {
+            Self::Msvc => vec![format!("/OUT:{}", path.display())],
+            Self::Gnu | Self::Apple => vec!["-o".to_owned(), path.display().to_string()],
+        }
+    }
+
     pub const fn default_executable(self) -> &'static str {
         match self {
             Self::Gnu | Self::Apple => "cc",

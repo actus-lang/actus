@@ -37,8 +37,7 @@ pub fn link_object(
         ));
     }
     let output = command
-        .arg("-o")
-        .arg(executable)
+        .args(configuration.linker_flavor().output_arguments(executable))
         .output()
         .map_err(|error| NativeLinkError(format!("cannot execute linker: {error}")))?;
     if output.status.success() {
@@ -81,5 +80,13 @@ mod tests {
         assert_eq!(LinkerFlavor::Gnu.library_path_argument(path), "-L/tmp/actus-libs");
         assert_eq!(LinkerFlavor::Apple.library_path_argument(path), "-L/tmp/actus-libs");
         assert_eq!(LinkerFlavor::Msvc.library_path_argument(path), "/LIBPATH:/tmp/actus-libs");
+    }
+
+    #[test]
+    fn emits_platform_specific_output_arguments() {
+        let path = Path::new("/tmp/actus-output");
+        assert_eq!(LinkerFlavor::Gnu.output_arguments(path), ["-o", "/tmp/actus-output"]);
+        assert_eq!(LinkerFlavor::Apple.output_arguments(path), ["-o", "/tmp/actus-output"]);
+        assert_eq!(LinkerFlavor::Msvc.output_arguments(path), ["/OUT:/tmp/actus-output"]);
     }
 }
