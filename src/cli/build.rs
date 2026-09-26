@@ -122,6 +122,25 @@ pub(super) fn build_file(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> i32 {
+    build_file_with_report(input, output, emit, configuration, true)
+}
+
+pub(super) fn build_file_quiet(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+) -> i32 {
+    build_file_with_report(input, output, emit, configuration, false)
+}
+
+fn build_file_with_report(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+    report_output: bool,
+) -> i32 {
     let source = match fs::read_to_string(input) {
         Ok(source) => source,
         Err(error) => {
@@ -165,7 +184,7 @@ pub(super) fn build_file(
         .or_else(|| hosted_entry_symbol(configuration, fallback_symbol))
         .unwrap_or(fallback_symbol)
         .to_owned();
-    emit_and_write(input, output, emit, configuration, &program, &symbol)
+    emit_and_write(input, output, emit, configuration, &program, &symbol, report_output)
 }
 
 fn emit_and_write(
@@ -175,6 +194,7 @@ fn emit_and_write(
     configuration: &CompilerConfiguration,
     program: &crate::ast::Program,
     symbol: &str,
+    report_output: bool,
 ) -> i32 {
     if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
         eprintln!("error: {error}");
@@ -197,7 +217,9 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    println!("built `{}`", output.display());
+    if report_output {
+        println!("built `{}`", output.display());
+    }
     0
 }
 

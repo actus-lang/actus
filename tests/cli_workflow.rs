@@ -183,6 +183,46 @@ fn run_accepts_release_profile_and_forwards_arguments() {
 
 #[cfg(unix)]
 #[test]
+fn run_preserves_program_output_and_reports_status_without_temp_path() {
+    let input = std::env::temp_dir().join(format!("actus-run-output-{}.act", std::process::id()));
+    fs::write(&input, "verb main() -> Int { print(42); return 7; }\n").expect("write source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["run", input.to_str().unwrap()])
+        .output()
+        .expect("run source");
+
+    assert_eq!(output.status.code(), Some(7));
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "42");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("process exited with status 7"));
+    assert!(!stderr.contains("/tmp/actus-run-"));
+    assert!(!output.stdout.windows(5).any(|window| window == b"built"));
+    let _ = fs::remove_file(input);
+}
+
+#[cfg(unix)]
+#[test]
+fn run_reports_build_failures_without_exposing_temp_paths() {
+    let input =
+        std::env::temp_dir().join(format!("actus-invalid-source-{}.act", std::process::id()));
+    fs::write(&input, "verb main() -> Int { return ; }\n").expect("write invalid source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["run", input.to_str().unwrap()])
+        .output()
+        .expect("run invalid source");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("process exited with status"));
+    assert!(!stderr.contains("/tmp/actus-run-"));
+    assert!(!output.stdout.windows(5).any(|window| window == b"built"));
+    let _ = fs::remove_file(input);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_discovers_meta_test_verbs_and_reports_native_results() {
     let root = std::env::temp_dir().join(format!("actus-test-runner-{}", std::process::id()));
     fs::create_dir_all(root.join("tests")).expect("create test directory");

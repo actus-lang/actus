@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use super::build::{EmitKind, build_file};
+use super::build::{EmitKind, build_file_quiet};
 use crate::configuration::{BuildProfile, CompilerConfiguration};
 
 struct RunOptions {
@@ -32,13 +32,17 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         None => configuration,
     };
     let output = temporary_output(&configuration);
-    if build_file(&options.input, Some(&output), EmitKind::Executable, &configuration) != 0 {
+    if build_file_quiet(&options.input, Some(&output), EmitKind::Executable, &configuration) != 0 {
         return 1;
     }
     let result = Command::new(&output).args(options.program_arguments).status();
     let _ = fs::remove_file(&output);
     match result {
-        Ok(status) => status.code().unwrap_or(1),
+        Ok(status) => {
+            let code = status.code().unwrap_or(1);
+            eprintln!("process exited with status {code}");
+            code
+        }
         Err(error) => {
             eprintln!("error: cannot run `{}`: {error}", output.display());
             1

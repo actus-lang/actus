@@ -61,16 +61,16 @@ compiler pipeline.
 
 ## Gate 5: One-shot run experience
 
-- [ ] Keep `actus run` as a one-shot build-and-execute command by default.
-- [ ] Continue using a temporary executable without exposing implementation
+- [x] Keep `actus run` as a one-shot build-and-execute command by default.
+- [x] Continue using a temporary executable without exposing implementation
       paths as the primary user-facing result.
-- [ ] Replace the raw temporary `built /tmp/...` message with clear execution
+- [x] Replace the raw temporary `built /tmp/...` message with clear execution
       status output.
-- [ ] Preserve the program's stdout and stderr without mixing compiler output
+- [x] Preserve the program's stdout and stderr without mixing compiler output
       into either stream unexpectedly.
-- [ ] Return the executed program's exit code unchanged where the platform
+- [x] Return the executed program's exit code unchanged where the platform
       supports it.
-- [ ] Add integration tests for stdout, stderr, exit status, and build failure.
+- [x] Add integration tests for stdout, stderr, exit status, and build failure.
 
 ## Gate 6: Explicit watch mode
 
