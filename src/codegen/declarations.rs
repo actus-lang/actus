@@ -20,9 +20,13 @@ pub(super) fn declare_functions(
     let mut metadata = HashMap::new();
     for verb in verbs {
         let signature = native_signature_for_definition(module, verb, layouts);
-        let symbol = if verb.name == entry_symbol { entry_symbol } else { &verb.name };
+        let symbol = if verb.name == entry_symbol || !needs_private_symbol(&verb.name) {
+            verb.name.clone()
+        } else {
+            format!("__actus_verb_{}", verb.name)
+        };
         let id = module
-            .declare_function(symbol, Linkage::Export, &signature)
+            .declare_function(&symbol, Linkage::Export, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
         metadata.insert(
             verb.name.clone(),
@@ -50,6 +54,10 @@ pub(super) fn declare_functions(
         );
     }
     Ok(metadata)
+}
+
+fn needs_private_symbol(name: &str) -> bool {
+    matches!(name, "read" | "write" | "open" | "close" | "fsync")
 }
 
 fn function_meta(
@@ -80,16 +88,12 @@ pub(super) fn native_signature_for_definition(
     verb: &VerbDecl,
     layouts: &LayoutRegistry,
 ) -> cranelift_codegen::ir::Signature {
-    let mut signature = signature_for(
+    signature_for(
         module,
         &verb.params,
         verb.return_type.as_ref().map(|return_type| &return_type.ty),
         layouts,
-    );
-    if verb.name == "drop" && verb.return_type.is_none() {
-        signature.returns.clear();
-    }
-    signature
+    )
 }
 
 fn external_native_signature(
@@ -124,8 +128,10 @@ fn signature_for(
             signature.params.push(AbiParam::new(pointer_type));
         }
     }
-    signature.returns.push(AbiParam::new(
-        NativeType::from_type_name_with_layout(return_type, layouts).ir_type(pointer_type),
-    ));
+    if return_type.is_some() {
+        signature.returns.push(AbiParam::new(
+            NativeType::from_type_name_with_layout(return_type, layouts).ir_type(pointer_type),
+        ));
+    }
     signature
 }

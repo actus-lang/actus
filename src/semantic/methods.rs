@@ -211,10 +211,9 @@ impl Analyzer {
                 span,
             });
         };
-        let valid = signature
-            .params
-            .first()
-            .is_some_and(|(name, role, _)| name == "self" && matches!(role, Role::Erg | Role::Abs));
+        let valid = signature.params.first().is_some_and(|(name, role, _)| {
+            name == "self" && matches!(role, Role::Erg | Role::Abs | Role::Ins)
+        });
         if valid {
             Ok(signature)
         } else {

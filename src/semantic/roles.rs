@@ -172,12 +172,14 @@ fn method_matches(
 ) -> bool {
     required.name == implementation.name
         && required.params.len() == implementation.params.len()
-        && required.params.iter().zip(&implementation.params).all(|(left, right)| {
-            left.role == right.role
-                && left.dispatch == right.dispatch
-                && left.name == right.name
-                && type_names_match(&left.ty, &right.ty)
-        })
+        && required.params.iter().zip(&implementation.params).enumerate().all(
+            |(index, (left, right))| {
+                left.role == right.role
+                    && left.dispatch == right.dispatch
+                    && left.name == right.name
+                    && (index == 0 || type_names_match(&left.ty, &right.ty))
+            },
+        )
         && required.return_type.as_ref().zip(implementation.return_type.as_ref()).map_or(
             required.return_type.is_none() && implementation.return_type.is_none(),
             |(left, right)| left.access == right.access && type_names_match(&left.ty, &right.ty),

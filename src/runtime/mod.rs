@@ -3,6 +3,7 @@ use std::path::Path;
 mod allocation;
 mod console;
 mod contract;
+mod fs;
 mod input;
 mod stream;
 mod types;
@@ -24,6 +25,11 @@ pub use contract::{
     PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
     PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
     RUNTIME_ABI_VERSION, RuntimeCapability, WRITE_BUFFER_STDOUT_SYMBOL,
+};
+pub use fs::{
+    actus_file_close, actus_file_close_buffer, actus_file_flush, actus_file_flush_buffer,
+    actus_file_open, actus_file_open_buffer, actus_file_read, actus_file_read_buffer,
+    actus_file_write, actus_file_write_buffer,
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use stream::{
