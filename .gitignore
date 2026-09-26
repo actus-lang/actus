@@ -1,7 +1,7 @@
 # Rust build output
 /target/
 
-# Arca generated build artifacts
+# Actus generated build artifacts
 /capsula/
 
 # Native compiler artifacts

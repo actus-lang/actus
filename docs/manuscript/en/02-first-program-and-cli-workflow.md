@@ -4,11 +4,11 @@ Chapter 01 established the central Actus model: a `verb` describes an action,
 and `erg`, `abs`, `dat`, and `ins` describe how values participate in it. This chapter
 turns that model into a working project.
 
-You will build the reference compiler, create an Arca project, inspect the
+You will build the reference compiler, create an Actus project, inspect the
 files that the project contains, compile a native executable, run it, and read
 a compiler diagnostic when the source is invalid. The examples use the
 current command-line interface exactly as it exists today. The compiler binary
-is named `actus`; Arca is the project, manifest, dependency, and build
+is named `actus`; Actus is the project, manifest, dependency, and build
 workflow managed by that binary.
 
 ## 1. Toolchain and Installation
@@ -61,9 +61,9 @@ The command after `--` belongs to the Actus binary rather than to Cargo.
 For example, in `cargo run --bin actus -- build ...`, Cargo starts the
 compiler and passes `build` and its arguments to it.
 
-## 2. Arca Project Anatomy
+## 2. Actus Project Anatomy
 
-Arca is Actus's project and package workflow. A project has a manifest that
+Actus is Actus's project and package workflow. A project has a manifest that
 describes its package identity and build contract, and a source root containing
 Actus modules.
 
@@ -90,13 +90,13 @@ The generated project has this shape:
 
 ```text
 hello/
-├── Arca.toml
+├── Actus.toml
 ├── .gitignore
 └── src/
     └── main.act
 ```
 
-The generated `Arca.toml` is:
+The generated `Actus.toml` is:
 
 ```toml
 [package]
@@ -141,7 +141,7 @@ verb main() -> Int {
 ```
 
 The default source root is `src/`. When the compiler receives an input file,
-it searches upward for `Arca.toml`, reads `package.source_root` when one is
+it searches upward for `Actus.toml`, reads `package.source_root` when one is
 configured, and otherwise uses `src/`. Directory modules and their facade
 rules are described in Chapter 08.
 
@@ -219,7 +219,7 @@ No heap wrapper or lifetime annotation is added to the call.
 There are two useful workflows. `build` leaves a selected artifact on disk;
 `run` builds a temporary executable, runs it, returns its status, and removes
 the temporary artifact. When invoked from a project directory, both commands
-discover `Arca.toml` and use its configured entry source. An explicit `.act`
+discover `Actus.toml` and use its configured entry source. An explicit `.act`
 path remains available when a different source is the intended input.
 
 Build an executable explicitly:
@@ -277,7 +277,7 @@ checked `src/main.act` successfully
 `check` reads the source, resolves modules, parses it, and runs semantic
 analysis without emitting an object file or executable.
 
-For a package that selects another source root or entry in `Arca.toml`, the
+For a package that selects another source root or entry in `Actus.toml`, the
 same commands follow that manifest contract automatically:
 
 ```toml
@@ -304,11 +304,11 @@ checked `src/main.act` successfully
 an executable build after each detected change, and Ctrl-C ends the watcher
 with status 130.
 
-## 5. What Arca and the Compiler Actually Do
+## 5. What Actus and the Compiler Actually Do
 
 When `actus build` starts, it first identifies the input file and discovers
 the project configuration. The configuration search walks from the input
-directory toward its ancestors until it finds `Arca.toml`. The manifest
+directory toward its ancestors until it finds `Actus.toml`. The manifest
 selects the package source root, target specification, entry contract, and
 profile.
 
@@ -346,7 +346,7 @@ The final file format is target-dependent:
 Actus source
     │
     ▼
-Arca.toml + source discovery
+Actus.toml + source discovery
     │
     ▼
 lexer → parser → AST
@@ -420,7 +420,7 @@ At the end of this chapter, the workflow is:
 create project → edit the configured entry → check → build → run or watch
 ```
 
-`Arca.toml` describes the project and build contract, including source root,
+`Actus.toml` describes the project and build contract, including source root,
 entry, target, and profile settings. The configured entry source contains the
 program. `actus check` validates without code generation. `actus build`
 produces an object or linked executable. `actus run` executes a temporary

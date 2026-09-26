@@ -181,7 +181,7 @@ fn execute_once(options: &WatchOptions, configuration: &CompilerConfiguration) -
 }
 
 fn watched_paths(configuration: &CompilerConfiguration, input: &str) -> Vec<PathBuf> {
-    let mut paths = vec![PathBuf::from(input), configuration.project_root().join("Arca.toml")];
+    let mut paths = vec![PathBuf::from(input), configuration.project_root().join("Actus.toml")];
     collect_act_files(configuration.source_root(), &mut paths);
     for source_root in configuration.dependency_roots().values() {
         collect_act_files(source_root, &mut paths);

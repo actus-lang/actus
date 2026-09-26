@@ -110,7 +110,7 @@ these fields match:
 - dynamic role name and method signatures;
 - fat-pointer layout and vtable slot map.
 
-The compiler or Arca must reject an incompatible `.actmeta` before binary
+The compiler or Actus must reject an incompatible `.actmeta` before binary
 linking. When source is available, the unit is rebuilt with the current
 toolchain. When source is unavailable, the build fails with a deterministic
 diagnostic identifying the mismatched field. A stale vtable must never be
@@ -121,7 +121,7 @@ role object unless a separate explicit C adapter contract is defined.
 
 ## Implementation Gate
 
-Cross-unit dynamic linking remains disabled until the compiler and Arca
+Cross-unit dynamic linking remains disabled until the compiler and Actus
 implement the metadata records, import/export validation, vtable symbol
 visibility, and incompatible-unit rejection described here. The current
 single-build native implementation is valid for Alpha internal testing.

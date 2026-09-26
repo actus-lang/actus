@@ -161,7 +161,7 @@ server, and every accepted change produces a current diagnostic snapshot.
 Scope:
 
 - implement `textDocument/definition`;
-- reuse Directory Module Resolver and Arca source roots;
+- reuse Directory Module Resolver and Actus source roots;
 - resolve facade exports and cross-file sibling declarations; and
 - return source locations through the position adapter.
 

@@ -60,5 +60,5 @@
 - [x] P0: Select targets from `TargetSpec`, emit target-hashed `.actmeta`,
   and invalidate stale capsula artifacts.
 - [x] P1: Derive linker flavor and executable from the target, generate
-  target-owned linker arguments, support Arca linker overrides, and separate
+  target-owned linker arguments, support Actus linker overrides, and separate
   hosted `main` from freestanding entry contracts.

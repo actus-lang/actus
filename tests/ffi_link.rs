@@ -10,7 +10,7 @@ use actus::lexer::scan;
 use actus::parser::parse;
 
 #[test]
-fn links_static_and_shared_c_libraries_from_an_arca_manifest() {
+fn links_static_and_shared_c_libraries_from_an_actus_manifest() {
     for kind in [LibraryKind::Static, LibraryKind::Shared] {
         link_fixture(kind);
     }
@@ -33,7 +33,7 @@ fn link_fixture(kind: LibraryKind) {
     let executable = root.join("main");
     fs::write(&object_path, emit_program_object(&program, "main").expect("object should emit"))
         .expect("object should be written");
-    let configuration = CompilerConfiguration::from_manifest(&root.join("Arca.toml"))
+    let configuration = CompilerConfiguration::from_manifest(&root.join("Actus.toml"))
         .expect("fixture manifest should load");
     link_object(&object_path, &executable, &configuration).expect("C library should link");
 
@@ -81,7 +81,7 @@ fn write_manifest(root: &Path, kind: LibraryKind) {
     let manifest = format!(
         "[package]\nname = \"ffi_fixture\"\nversion = \"0.1.0\"\nentry = \"main\"\n\n[build]\nlibrary_paths = [\".\"]\n\n[[build.libraries]]\nname = \"actus_fixture\"\nkind = \"{kind}\"\n"
     );
-    fs::write(root.join("Arca.toml"), manifest).expect("fixture manifest should be written");
+    fs::write(root.join("Actus.toml"), manifest).expect("fixture manifest should be written");
 }
 
 fn run_command(command: &mut Command) {

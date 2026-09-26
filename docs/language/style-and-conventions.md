@@ -5,7 +5,7 @@ Version: 0.1
 Status: Accepted language design
 
 This document defines the canonical style, visibility, import, naming, and
-documentation conventions for Actus and the Arca ecosystem.
+documentation conventions for Actus and the Actus ecosystem.
 
 The compiler is still under active development. Rules marked as planned are
 part of the accepted design but are not necessarily implemented in the alpha
@@ -39,7 +39,7 @@ open verb configure_interrupt() {
 }
 ```
 
-The `///` documentation model and `arca doc` generation are planned tooling
+The `///` documentation model and `actus doc` generation are planned tooling
 features. They must preserve source spans and remain separate from ordinary
 compiler diagnostics.
 
@@ -85,7 +85,7 @@ The following rules apply:
 
 - grouped and single imports have identical semantic behavior;
 - duplicate namespace names and alias collisions are compile errors;
-- module resolution is controlled by `Arca.toml` and the package graph;
+- module resolution is controlled by `Actus.toml` and the package graph;
 - imports must not depend on arbitrary unresolved filesystem paths;
 - circular imports must produce a deterministic diagnostic;
 - only `open` declarations are visible across module boundaries.
@@ -141,7 +141,7 @@ implicitly included in its parent module.
 
 This model keeps implementation logic easy to split across focused files
 while giving external consumers and language servers one deterministic facade
-to inspect. Arca controls which directory is a module root; the compiler
+to inspect. Actus controls which directory is a module root; the compiler
 does not infer modules from arbitrary filesystem paths.
 
 ## 4. Visibility

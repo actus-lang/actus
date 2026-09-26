@@ -1,14 +1,14 @@
-# Actus and Arca Trademark Policy
+# Actus Trademark Policy
 
 ## Purpose
 
-Actus and Arca identify the official language, compiler, package ecosystem,
+Actus identifies the official language, compiler, package ecosystem,
 documentation, and related services maintained by the Actus project. This
 policy separates trademark usage from the copyright licenses covering the
 source code.
 
 The source code is available under the MIT License or Apache License 2.0.
-Those copyright licenses do not grant permission to use the Actus or Arca
+Those copyright licenses do not grant permission to use the Actus
 names, logos, or other project marks in a way that suggests official origin,
 endorsement, or sponsorship.
 
@@ -17,8 +17,7 @@ endorsement, or sponsorship.
 The protected project identifiers include:
 
 - Actus;
-- Arca;
-- official Actus and Arca logos;
+- official Actus logos;
 - names or logos that are confusingly similar to the official marks for
   compilers, packages, documentation, or related developer services.
 
@@ -26,7 +25,7 @@ The project may update this list as its public brand system develops.
 
 ## Permitted descriptive use
 
-You may use Actus or Arca accurately to:
+You may use Actus accurately to:
 
 - state that software is compatible with Actus;
 - identify an unmodified Actus release or package;
@@ -42,12 +41,12 @@ certified, or maintains the work.
 Without written permission from the project maintainer, do not:
 
 - name a modified compiler, language distribution, package registry, or
-  developer service Actus or Arca;
+  developer service Actus;
 - use official logos on an unofficial product or distribution;
 - use the marks in a domain name, package namespace, or repository name that
   implies official status;
 - describe an unofficial fork or modified distribution as the official Actus
-  language or Arca ecosystem;
+  language or Actus ecosystem;
 - register or claim a confusingly similar mark for related software services.
 
 Forks may use the source code under the applicable copyright license, but must

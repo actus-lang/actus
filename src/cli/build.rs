@@ -58,7 +58,7 @@ fn configuration_for_build(input: Option<&str>) -> Result<CompilerConfiguration,
     }
     .map_err(|error| error.to_string())?;
     if input.is_none() && !configuration.has_manifest() {
-        return Err("cannot discover Arca.toml from the current directory".to_owned());
+        return Err("cannot discover Actus.toml from the current directory".to_owned());
     }
     Ok(configuration)
 }

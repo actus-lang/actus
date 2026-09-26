@@ -16,7 +16,7 @@ impl PackageCache {
     }
 
     pub fn archive_path(&self, checksum: &str) -> PathBuf {
-        self.root.join(format!("{checksum}.arca"))
+        self.root.join(format!("{checksum}.actus"))
     }
 
     pub fn store(&self, archive: &Path, checksum: &str) -> Result<PathBuf, RegistryError> {

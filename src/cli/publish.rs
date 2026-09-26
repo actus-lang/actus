@@ -65,18 +65,18 @@ fn publish_archive(
         name: name.to_owned(),
         version: version.to_owned(),
         checksum: archive.checksum.clone(),
-        archive: format!("{name}-{version}.arca"),
+        archive: format!("{name}-{version}.actus"),
     };
     let registry_path = options
         .registry
         .clone()
-        .unwrap_or_else(|| configuration.project_root().join(".arca/registry"));
+        .unwrap_or_else(|| configuration.project_root().join(".actus/registry"));
     let registry = LocalRegistry::open(&registry_path);
     let destination = registry
         .publish(output, record, &TrustPolicy::integrity_only())
         .map_err(|error| format!("cannot publish package: {error}"))?;
     let cache_path =
-        options.cache.clone().unwrap_or_else(|| configuration.project_root().join(".arca/cache"));
+        options.cache.clone().unwrap_or_else(|| configuration.project_root().join(".actus/cache"));
     PackageCache::new(cache_path)
         .store(output, &archive.checksum)
         .map_err(|error| format!("cannot update package cache: {error}"))?;
@@ -89,14 +89,14 @@ fn publish_archive(
 }
 
 fn parse_options(mut arguments: impl Iterator<Item = String>) -> Result<PublishOptions, String> {
-    let mut input = PathBuf::from("Arca.toml");
+    let mut input = PathBuf::from("Actus.toml");
     let mut registry = None;
     let mut cache = None;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--registry" => registry = Some(next_path(&mut arguments, "--registry")?),
             "--cache" => cache = Some(next_path(&mut arguments, "--cache")?),
-            _ if input == Path::new("Arca.toml") => input = PathBuf::from(argument),
+            _ if input == Path::new("Actus.toml") => input = PathBuf::from(argument),
             _ => return Err(format!("unexpected argument `{argument}`")),
         }
     }
@@ -117,16 +117,21 @@ fn manifest_path(input: &Path) -> PathBuf {
         std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join(input)
     };
     if input.is_dir() {
-        input.join("Arca.toml")
-    } else if input.file_name().and_then(|name| name.to_str()) == Some("Arca.toml") {
+        crate::configuration::manifest_path_in_directory(&input)
+            .unwrap_or_else(|| input.join("Actus.toml"))
+    } else if input.file_name().and_then(|name| name.to_str()) == Some("Actus.toml")
+        || input.file_name().and_then(|name| name.to_str()) == Some("Arca.toml")
+    {
         input
     } else {
-        input.parent().unwrap_or_else(|| Path::new(".")).join("Arca.toml")
+        let parent = input.parent().unwrap_or_else(|| Path::new("."));
+        crate::configuration::manifest_path_in_directory(parent)
+            .unwrap_or_else(|| parent.join("Actus.toml"))
     }
 }
 
 fn temporary_archive(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("actus-publish-{name}-{}.arca", std::process::id()))
+    std::env::temp_dir().join(format!("actus-publish-{name}-{}.actus", std::process::id()))
 }
 
 fn remove_temporary_archive(path: &Path) {

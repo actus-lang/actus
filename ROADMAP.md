@@ -5,7 +5,7 @@ Actus is developed in small, verifiable stages. Each phase has a dedicated docum
 ## Current Focus
 
 **Phase 16: Self-Hosting and Future Language Extensions.** Phase 15's local
-Arca package infrastructure is closed for Alpha; remote registry services and
+Actus package infrastructure is closed for Alpha; remote registry services and
 web authentication are explicitly deferred to a separate platform project.
 
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
@@ -35,7 +35,7 @@ gated implementation roadmaps:
 - [x] [Phase 12: Enums and Pattern Matching](docs/roadmap/phase-12-enums-and-pattern-matching.md)
 - [x] [Phase 13: Generic Types and Polymorphism](docs/roadmap/phase-13-generic-types-and-polymorphism.md)
 - [x] [Phase 14: Roles and Performance](docs/roadmap/phase-14-roles-and-performance.md)
-- [x] [Phase 15: Arca Ecosystem, I/O and Core Runtime](docs/roadmap/phase-15-arca-ecosystem.md)
+- [x] [Phase 15: Actus Ecosystem and Packaging](docs/roadmap/phase-15-actus-ecosystem-and-packaging.md)
 - [x] [Phase 15.5: Language Server and Editor Tooling](docs/roadmap/phase-15.5-language-server-and-tooling.md)
 - [x] [Phase 15.6: CLI Developer Workflow Polish](docs/roadmap/phase-15.6-cli-developer-workflow.md)
 - [ ] [Phase 16: Self-Hosting and Future Language Extensions](docs/roadmap/phase-16-self-hosting-and-future-extensions.md)

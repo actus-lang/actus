@@ -461,5 +461,5 @@ When reading Actus, ask three questions:
    plans deterministic cleanup before generating native code.
 
 In Chapter 02, we will turn this mental model into a real project. We will
-install the compiler, create an Arca project, inspect its source layout, run
+install the compiler, create an Actus project, inspect its source layout, run
 `verb main() -> Int`, and build a native executable from the command line.

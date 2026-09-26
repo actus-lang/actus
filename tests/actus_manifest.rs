@@ -14,7 +14,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let root = std::env::temp_dir().join(format!("actus-arca-manifest-{stamp}"));
+        let root = std::env::temp_dir().join(format!("actus-actus-manifest-{stamp}"));
         fs::create_dir_all(&root).expect("create fixture root");
         Self { root }
     }
@@ -28,12 +28,16 @@ impl Fixture {
     fn manifest(&self, source_root: Option<&str>) {
         let source_root = source_root.map(|root| format!("source_root = \"{root}\"\n"));
         self.write(
-            "Arca.toml",
+            "Actus.toml",
             &format!(
                 "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n{}",
                 source_root.unwrap_or_default()
             ),
         );
+    }
+
+    fn legacy_manifest(&self) {
+        self.write("Arca.toml", "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n");
     }
 }
 
@@ -93,4 +97,18 @@ fn rejects_missing_custom_source_root() {
     let error = CompilerConfiguration::from_input_path(&fixture.root.join("main.act"))
         .expect_err("missing source root must fail");
     assert!(error.to_string().contains("InvalidSourceRoot"));
+}
+
+#[test]
+fn resolves_legacy_manifest_with_compatibility_fallback() {
+    let fixture = Fixture::new();
+    fixture.legacy_manifest();
+    fixture.write("main.act", "");
+    fixture.write("src/calc/calc.act", "open ops;");
+    fixture.write(
+        "src/calc/ops.act",
+        "open verb add(erg left: Int, erg right: Int) -> Int { return left + right; }",
+    );
+
+    assert_import_resolves(&fixture, &fixture.root.join("src"));
 }

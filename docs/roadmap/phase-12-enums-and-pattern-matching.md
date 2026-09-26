@@ -1,6 +1,6 @@
 # Phase 12: Enums and Pattern Matching
 
-Enums and exhaustive pattern matching are required before self-hosting work and the Arca package ecosystem. They provide the representation and control flow needed for `Option`, `Result`, compiler AST nodes, and structured diagnostics.
+Enums and exhaustive pattern matching are required before self-hosting work and the Actus package ecosystem. They provide the representation and control flow needed for `Option`, `Result`, compiler AST nodes, and structured diagnostics.
 
 ## Enum Syntax and AST
 

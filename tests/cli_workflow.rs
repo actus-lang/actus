@@ -16,9 +16,12 @@ fn new_creates_an_actus_project_without_git_when_requested() {
     );
 
     assert_eq!(result, 0);
-    assert!(root.join("Arca.toml").is_file());
+    assert!(root.join("Actus.toml").is_file());
     assert!(root.join("src/main.act").is_file());
-    assert_eq!(fs::read_to_string(root.join(".gitignore")).unwrap(), "/capsula/\n*.o\n*.bin\n");
+    assert_eq!(
+        fs::read_to_string(root.join(".gitignore")).unwrap(),
+        "/capsula/\nActus.lock\n*.o\n*.bin\n*.actus\n"
+    );
     assert!(!root.join(".git").exists());
     let _ = fs::remove_dir_all(root);
 }
@@ -83,7 +86,7 @@ fn init_creates_an_existing_directory_project_without_git() {
         .expect("run init command");
 
     assert!(status.success());
-    assert!(root.join("Arca.toml").is_file());
+    assert!(root.join("Actus.toml").is_file());
     assert!(root.join("src/main.act").is_file());
     assert!(!root.join(".git").exists());
     let _ = fs::remove_dir_all(root);
@@ -107,7 +110,7 @@ fn watch_once_checks_the_project_entry() {
     let root = std::env::temp_dir().join(format!("actus-watch-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"watcher\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
@@ -133,7 +136,7 @@ fn check_and_run_follow_manifest_source_root_and_entry() {
     let root = std::env::temp_dir().join(format!("actus-custom-entry-{}", std::process::id()));
     fs::create_dir_all(root.join("app")).expect("create source directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"custom\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nsource_root = \"app\"\n",
     )
     .expect("write manifest");
@@ -169,7 +172,7 @@ fn watch_rechecks_after_a_source_change_and_surfaces_failure() {
     let root = std::env::temp_dir().join(format!("actus-watch-change-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"watcher\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
@@ -203,7 +206,7 @@ fn build_discovers_the_manifest_entry_without_an_input_path() {
     let output = root.join("hello");
     fs::create_dir_all(root.join("src")).expect("create source directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"entry\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
@@ -235,7 +238,7 @@ fn build_discovers_a_parent_manifest_from_a_nested_directory() {
     let output = nested.join("hello");
     fs::create_dir_all(&nested).expect("create nested source directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"nested\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
@@ -326,7 +329,7 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
     let root = std::env::temp_dir().join(format!("actus-test-runner-{}", std::process::id()));
     fs::create_dir_all(root.join("tests")).expect("create test directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"runner\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
@@ -357,7 +360,7 @@ fn fmt_check_reports_drift_then_accepts_canonical_output() {
     let root = std::env::temp_dir().join(format!("actus-fmt-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"formatter\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");

@@ -2,7 +2,7 @@
 
 This phase closes the remaining ergonomics gaps in the local Actus developer
 workflow before Phase 16 work expands the compiler and toolchain. It does not
-change language semantics, ownership rules, Arca manifest meaning, or the
+change language semantics, ownership rules, Actus manifest meaning, or the
 compiler pipeline.
 
 ## Goals
@@ -25,7 +25,7 @@ compiler pipeline.
 
 ## Gate 2: Project-root input discovery
 
-- [x] Make `actus build` discover `Arca.toml` from the current directory and
+- [x] Make `actus build` discover `Actus.toml` from the current directory and
       select its configured entry source.
 - [x] Default to `src/main.act` when the manifest does not override the entry.
 - [x] Preserve an explicit `.act` path as a command-line input override.
@@ -89,7 +89,7 @@ compiler pipeline.
 
 - [x] Make `check`, `build`, `run`, `test`, and `fmt` share consistent project
       discovery and profile behavior.
-- [x] Ensure all commands respect `Arca.toml` source roots, targets, and entry
+- [x] Ensure all commands respect `Actus.toml` source roots, targets, and entry
       contracts.
 - [x] Update the CLI documentation and Chapter 02 after implementation.
 - [x] Add regression coverage for Linux, macOS, and Windows path behavior.

@@ -58,7 +58,7 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
     let root = temp_root();
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(
-        root.join("Arca.toml"),
+        root.join("Actus.toml"),
         "[package]\nname = \"lsp-demo\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");

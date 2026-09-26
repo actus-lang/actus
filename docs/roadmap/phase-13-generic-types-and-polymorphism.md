@@ -2,7 +2,7 @@
 
 Generic types are a prerequisite for compiler-defined `Option[T]` and
 `Result[T, E]`, reusable AST data structures, and a self-hosted compiler.
-This phase must establish one coherent type system before the Arca ecosystem
+This phase must establish one coherent type system before the Actus ecosystem
 is expanded.
 
 ## Generic Type Representation

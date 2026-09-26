@@ -62,7 +62,7 @@ The example returns `42`. Object files and native executables are local build ar
 
 ### Toolchain configuration
 
-Basic project build settings are read from the root `Arca.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
+Basic project build settings are read from the root `Actus.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
 
 ```toml
 [package]
@@ -75,7 +75,7 @@ entry = "main"
 ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
 ```
 
-The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
+The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Actus project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
 Native libraries can be supplied through manifest-relative search paths:
 
@@ -127,4 +127,4 @@ Copyright (c) 2026 Giorgi Magradze
 
 Licensed under either the [MIT License](LICENSE-MIT) or the
 [Apache License 2.0](LICENSE-APACHE), at the recipient's option. The Actus and
-Arca names and logos are governed separately by [TRADEMARKS.md](TRADEMARKS.md).
+Actus names and logos are governed separately by [TRADEMARKS.md](TRADEMARKS.md).
