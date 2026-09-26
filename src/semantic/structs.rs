@@ -157,13 +157,17 @@ impl Analyzer {
                 span: *span,
             }),
             Expr::Identifier { name, span } => self.binding(name, *span).ok().and_then(|index| {
-                self.binding_struct_type_applications.get(&index).cloned().or_else(|| {
-                    self.binding_struct_types.get(&index).map(|name| TypeName {
-                        name: name.clone(),
-                        arguments: Vec::new(),
-                        span: *span,
+                self.binding_type_names
+                    .get(&index)
+                    .cloned()
+                    .or_else(|| self.binding_struct_type_applications.get(&index).cloned())
+                    .or_else(|| {
+                        self.binding_struct_types.get(&index).map(|name| TypeName {
+                            name: name.clone(),
+                            arguments: Vec::new(),
+                            span: *span,
+                        })
                     })
-                })
             }),
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
                 self.resolved_type_name(expression)

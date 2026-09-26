@@ -44,10 +44,12 @@ pub(super) struct Analyzer {
     pub(super) reachable_performances: HashSet<super::model::ReachablePerformance>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
+    pub(super) binding_type_names: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_dynamic_roles: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
+    pub(super) generic_bounds: HashMap<String, Vec<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
     pub(super) expected_expression_type: Option<crate::ast::TypeName>,
     pub(super) inferred_expression_types: HashMap<(usize, usize), crate::ast::TypeName>,
@@ -106,10 +108,12 @@ impl Analyzer {
             reachable_performances: HashSet::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
+            binding_type_names: HashMap::new(),
             binding_enum_types: HashMap::new(),
             binding_enum_type_applications: HashMap::new(),
             binding_dynamic_roles: HashMap::new(),
             generic_scopes: Vec::new(),
+            generic_bounds: HashMap::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
             expected_expression_type: None,
             inferred_expression_types: HashMap::new(),
@@ -202,13 +206,17 @@ impl Analyzer {
     fn analyze_verbs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             if let TopLevelDecl::Verb(verb) = declaration {
-                self.analyze_verb_body(verb)?;
+                let parameters = verb.generic_parameters.clone();
+                self.with_generic_scope(&parameters, |analyzer| analyzer.analyze_verb_body(verb))?;
             }
         }
         for declaration in &program.declarations {
             if let TopLevelDecl::Perform(perform) = declaration {
                 for method in &perform.methods {
-                    self.analyze_verb_body(method)?;
+                    let parameters = method.generic_parameters.clone();
+                    self.with_generic_scope(&parameters, |analyzer| {
+                        analyzer.analyze_verb_body(method)
+                    })?;
                 }
             }
         }
@@ -237,6 +245,8 @@ impl Analyzer {
         for parameter in &verb.params {
             let ty = lookup_builtin_type(&parameter.ty.name);
             self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
+            let index = self.binding(&parameter.name, parameter.span)?;
+            self.binding_type_names.insert(index, parameter.ty.clone());
             if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
                 let index = self.binding(&parameter.name, parameter.span)?;
                 self.binding_dynamic_roles.insert(index, parameter.ty.name.clone());

@@ -174,12 +174,24 @@ impl Analyzer {
     }
 
     pub(super) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
+        if let Expr::MethodCall { span, .. } = expression
+            && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
+        {
+            return Some(super::analyzer::canonical_type_name(type_name));
+        }
         self.expression_type(expression)
             .map(|ty| ty.spec().name.to_owned())
+            .or_else(|| self.binding_type_name(expression))
             .or_else(|| self.expression_struct_type(expression))
             .or_else(|| self.expression_enum_type_application(expression))
             .or_else(|| self.expression_case_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))
+    }
+
+    fn binding_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Identifier { name, span } = expression else { return None };
+        let index = self.binding(name, *span).ok()?;
+        self.binding_type_names.get(&index).map(super::analyzer::canonical_type_name)
     }
 
     fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {

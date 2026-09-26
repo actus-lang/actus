@@ -1,0 +1,7 @@
+/// The static read contract used by buffered input adapters.
+///
+/// `self` identifies the concrete source selected during monomorphization;
+/// `ins buffer` is the caller-owned destination filled without allocation.
+open role Reader {
+    verb read(abs self: Buffer, ins buffer: Buffer) -> Result[Int, IoError];
+}

@@ -1,0 +1,8 @@
+/// The static write contract used by buffered output adapters.
+///
+/// The concrete `self` target is selected statically. Source bytes are an
+/// `abs` view and flushing reports a typed I/O result.
+open role Writer {
+    verb write(abs self: Buffer, abs buffer: Buffer) -> Result[Int, IoError];
+    verb flush(abs self: Buffer) -> Result[Int, IoError];
+}

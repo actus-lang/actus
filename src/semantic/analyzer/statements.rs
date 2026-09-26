@@ -76,6 +76,10 @@ impl Analyzer {
             self.register_borrow(initializer, span)?;
         }
         self.bind(role.clone(), name.to_owned(), binding_type, span)?;
+        let binding_index = self.binding(name, span)?;
+        if let Some(type_name) = declared_type_name.as_ref() {
+            self.binding_type_names.insert(binding_index, type_name.clone());
+        }
         if *role == Role::Abs
             && let Ok(index) = self.binding(name, span)
         {
