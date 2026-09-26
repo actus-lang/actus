@@ -1,0 +1,22 @@
+// Caller-scope propagation for a single-origin abs Buffer view.
+
+verb identity(abs input: Buffer) -> abs Buffer {
+    return input;
+}
+
+verb inspect(abs input: Buffer) -> Int {
+    return 1;
+}
+
+verb main() -> Int {
+    erg buffer = Buffer[4];
+
+    {
+        abs view = ref identity(input: abs buffer);
+        inspect(input: view);
+    }
+
+    append(buffer, 41);
+    print(42);
+    return 42;
+}
