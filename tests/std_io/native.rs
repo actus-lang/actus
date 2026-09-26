@@ -55,12 +55,8 @@ fn std_io_native_buffer_flushes_pending_bytes() {
         "import io; verb main() -> Int { erg storage = Buffer[0]; append(storage, 97); append(storage, 98); append(storage, 99); append(storage, 100); append(storage, 101); append(storage, 102); print(text: abs storage); flush(); return 0; }\n",
     );
     build(&input, &output);
-    let mut child = Command::new(&output)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("buffered fixture should run");
-    child.stdin.take().expect("stdin pipe should exist").write_all(b"buffered\n").unwrap();
+    let child =
+        Command::new(&output).stdout(Stdio::piped()).spawn().expect("buffered fixture should run");
     let execution = child.wait_with_output().expect("wait for buffered fixture");
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"abcdef");
