@@ -15,13 +15,13 @@ compiler pipeline.
 
 ## Gate 1: Help and command contracts
 
-- [ ] Add `actus --help` with the complete command list and examples.
-- [ ] Add `actus -h` as an alias for top-level help.
-- [ ] Add help output for each subcommand, including options and defaults.
-- [ ] Return a successful exit status for help requests.
-- [ ] Keep unknown commands and malformed options on stderr with non-zero exits.
-- [ ] Keep usage text synchronized with the actual parser implementation.
-- [ ] Add positive and negative CLI tests for top-level and subcommand help.
+- [x] Add `actus --help` with the complete command list and examples.
+- [x] Add `actus -h` as an alias for top-level help.
+- [x] Add help output for each subcommand, including options and defaults.
+- [x] Return a successful exit status for help requests.
+- [x] Keep unknown commands and malformed options on stderr with non-zero exits.
+- [x] Keep usage text synchronized with the actual parser implementation.
+- [x] Add positive and negative CLI tests for top-level and subcommand help.
 
 ## Gate 2: Project-root input discovery
 
