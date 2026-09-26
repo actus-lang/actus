@@ -363,13 +363,20 @@ fn default_linker(target: &TargetSpec) -> OsString {
 
 #[cfg(windows)]
 fn rust_lld_path() -> Option<PathBuf> {
-    let output = Command::new("rustc").args(["--print", "sysroot"]).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let sysroot = String::from_utf8(output.stdout).ok()?;
-    let path = PathBuf::from(sysroot.trim()).join("bin").join("rust-lld.exe");
-    path.is_file().then_some(path)
+    let sysroot = rustc_output(["--print", "sysroot"])?;
+    let host = rustc_output(["-vV"])?.lines().find_map(|line| line.strip_prefix("host: "))?;
+    let sysroot = PathBuf::from(sysroot.trim());
+    let candidates = [
+        sysroot.join("bin").join("rust-lld.exe"),
+        sysroot.join("lib").join("rustlib").join(host).join("bin").join("rust-lld.exe"),
+    ];
+    candidates.into_iter().find(|path| path.is_file())
+}
+
+#[cfg(windows)]
+fn rustc_output<const N: usize>(arguments: [&str; N]) -> Option<String> {
+    let output = Command::new("rustc").args(arguments).output().ok()?;
+    output.status.success().then(|| String::from_utf8(output.stdout).ok()?)
 }
 
 impl LinkLibrary {
