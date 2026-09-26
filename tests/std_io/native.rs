@@ -168,3 +168,34 @@ fn std_io_cursor_reader_uses_static_generic_dispatch() {
     assert_eq!(execution.stdout, b"Cur");
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn std_io_native_buffered_reader_specializes_cursor() {
+    let (root, input, output) = project(
+        "buffered-cursor",
+        "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
+        &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg source_bytes = Buffer[0]; append(source_bytes, 72); append(source_bytes, 105); erg source = Cursor { buffer: source_bytes, }; erg storage = Buffer[0]; erg reader: BufferedReader[Cursor] = BufferedReader[Cursor] { source: source, buffer: storage, }; refill(reader: ins reader); print(text: abs reader.buffer); flush(); return 0; }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("buffered Cursor fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"Hi");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_buffered_writer_specializes_cursor() {
+    let (root, input, output) = project(
+        "buffered-writer-cursor",
+        "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
+        &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, }; erg scratch = Buffer[0]; erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); print(text: abs writer.target.buffer); flush(); return 0; }\n",
+    );
+    build(&input, &output);
+    let execution =
+        Command::new(&output).output().expect("buffered Cursor writer fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"OK");
+    let _ = fs::remove_dir_all(root);
+}

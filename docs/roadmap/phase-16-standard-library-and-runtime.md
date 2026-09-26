@@ -192,10 +192,18 @@ the hosted-runtime boundary, and deterministic status reporting.
 
 ### Gate 2.5: In-Memory Cursor & Stream Utilities
 
-- [ ] Define `Cursor` over an owned or borrowed buffer.
+- [x] Define `Cursor` over an owned in-memory buffer.
+- [ ] Add a borrowed-view Cursor variant with explicit non-owning lifetime rules.
 - [ ] Define cursor position, bounds, and seek error behavior.
 - [ ] Define stream `copy` ownership and completion semantics.
 - [ ] Preserve zero-copy behavior for borrowed cursor views.
+
+#### Gate 2.5.1: Generic Adapter Monomorphization
+
+- [x] Infer concrete generic call arguments from argument and return contexts.
+- [x] Synthesize concrete `BufferedReader[Cursor]` and `BufferedWriter[Cursor]` layouts.
+- [x] Lower generic adapter methods through direct static performance dispatch.
+- [x] Execute native Reader and Writer integration tests with Cursor-backed adapters.
 - [ ] Add semantic tests for cursor lifetimes and partial copies.
 - [ ] Add native tests for cursor reads, writes, and stream copying.
 

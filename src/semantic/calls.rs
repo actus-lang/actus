@@ -1,6 +1,6 @@
 use crate::ast::{
-    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, ReturnAccess, Role, VerbDecl,
-    lookup_builtin_type,
+    Argument, BuiltinType, DispatchMode, Expr, ExternalVerbDecl, GenericParam, ReturnAccess, Role,
+    VerbDecl, lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
 
@@ -16,6 +16,7 @@ pub(super) struct VerbSignature {
     pub(super) return_type: Option<BuiltinType>,
     pub(super) return_type_name: Option<crate::ast::TypeName>,
     pub(super) return_access: Option<ReturnAccess>,
+    pub(super) generic_parameters: Vec<GenericParam>,
 }
 
 impl VerbDecl {
@@ -39,6 +40,7 @@ impl VerbDecl {
                 .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
             return_type_name: self.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
+            generic_parameters: self.generic_parameters.clone(),
         }
     }
 }
@@ -64,6 +66,7 @@ impl ExternalVerbDecl {
                 .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
             return_type_name: self.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
+            generic_parameters: self.generic_parameters.clone(),
         }
     }
 }
@@ -115,12 +118,15 @@ impl Analyzer {
         {
             return Ok(());
         }
-        let Some(signature) = self.signatures.get(callee).cloned() else {
+        let Some(mut signature) = self.signatures.get(callee).cloned() else {
             for argument in arguments {
                 self.visit_expression(&argument.expression)?;
             }
             return Ok(());
         };
+        if !signature.generic_parameters.is_empty() {
+            signature = self.instantiate_generic_signature(&signature, arguments, span)?;
+        }
         self.visit_call_with_signature(callee, arguments, span, &signature)
     }
 

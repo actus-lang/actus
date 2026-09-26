@@ -49,6 +49,25 @@ impl PerformanceRegistry {
         Self { implementations }
     }
 
+    pub(super) fn from_program(program: &Program, reachable: &[ReachablePerformance]) -> Self {
+        let mut registry = Self::from_reachable(reachable);
+        for declaration in &program.declarations {
+            let TopLevelDecl::Perform(perform) = declaration else { continue };
+            let target_type = canonical_type_name(&perform.target);
+            for method in &perform.methods {
+                registry.implementations.push(PerformanceImplementation {
+                    role_name: perform.role_name.clone(),
+                    target_type: target_type.clone(),
+                    method_name: method.name.clone(),
+                    symbol: performance_symbol(&perform.role_name, &target_type, &method.name),
+                });
+            }
+        }
+        registry.implementations.sort_by(|left, right| left.symbol.cmp(&right.symbol));
+        registry.implementations.dedup_by(|left, right| left.symbol == right.symbol);
+        registry
+    }
+
     pub(super) fn validate(&self) -> Result<(), String> {
         let mut symbols = HashSet::new();
         for implementation in &self.implementations {

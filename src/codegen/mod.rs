@@ -17,6 +17,7 @@ mod generic_definitions;
 mod generic_enum_layout;
 mod generic_layout;
 mod generic_struct_layout;
+mod generic_verbs;
 mod layout;
 mod linker;
 mod literals;

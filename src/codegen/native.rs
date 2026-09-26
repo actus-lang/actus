@@ -79,11 +79,14 @@ pub fn emit_program_object_for_target(
     let program = &normalized_program;
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
+    let codegen_program =
+        super::generic_verbs::specialize_program(program, &semantic.generic_instances)?;
+    let program = &codegen_program;
     validate_cleanup_plans(&semantic)
         .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
     let performance_registry =
-        PerformanceRegistry::from_reachable(&semantic.reachable_performances);
+        PerformanceRegistry::from_program(program, &semantic.reachable_performances);
     performance_registry.validate().map_err(NativeEmitError)?;
     let performance_definitions = performance_registry.definitions(program)?;
     let verbs = program.declarations.iter().filter_map(declaration_verb).collect::<Vec<_>>();

@@ -254,6 +254,9 @@ impl Analyzer {
                 &initializer.value,
                 initializer.span,
             )?;
+            if matches!(field.role, crate::ast::StructFieldRole::Erg) {
+                self.initialize_owner(&initializer.value, initializer.span)?;
+            }
         }
         for field in &definition.fields {
             if !initialized.contains(&field.name) {
