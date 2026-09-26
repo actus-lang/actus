@@ -171,6 +171,9 @@ pub fn resolve_imports(
         let imported = parse_module(resolver, &import.path)?;
         let exports = exports_module(resolver, &import.path)?;
         declarations.extend(imported.declarations.into_iter().filter(|candidate| {
+            if matches!(candidate, TopLevelDecl::Perform(_)) {
+                return true;
+            }
             let Some((kind, name, _)) = declaration_identity(candidate) else { return false };
             exports.contains(kind, name)
         }));

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Block, BuiltinType, EnumDef, Expr, Program, ReturnAccess, Role, RoleDecl, Stmt, StructDef,
+    Block, BuiltinType, EnumDef, Expr, Program, ReturnAccess, RoleDecl, Stmt, StructDef,
     TopLevelDecl, lookup_builtin_type,
 };
 use crate::lexer::SourceSpan;
@@ -9,6 +9,9 @@ use crate::lexer::SourceSpan;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::Origin;
 use super::model::SemanticModel;
+
+mod expressions;
+mod statements;
 
 pub(super) struct ScopeFrame {
     pub(super) span: crate::lexer::SourceSpan,
@@ -27,6 +30,8 @@ pub(super) struct Analyzer {
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
     pub(super) loop_boundaries: Vec<usize>,
     pub(super) current_return_type: Option<BuiltinType>,
+    pub(super) current_return_type_name: Option<crate::ast::TypeName>,
+    pub(super) current_return_is_builtin_result: bool,
     pub(super) current_return_access: Option<ReturnAccess>,
     pub(super) current_abs_origins: HashMap<String, usize>,
     pub(super) binding_origins: HashMap<usize, Origin>,
@@ -39,11 +44,15 @@ pub(super) struct Analyzer {
     pub(super) reachable_performances: HashSet<super::model::ReachablePerformance>,
     pub(super) binding_struct_types: HashMap<usize, String>,
     pub(super) binding_struct_type_applications: HashMap<usize, crate::ast::TypeName>,
+    pub(super) binding_type_names: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_dynamic_roles: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
+    pub(super) generic_bounds: HashMap<String, Vec<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
+    pub(super) expected_expression_type: Option<crate::ast::TypeName>,
+    pub(super) inferred_expression_types: HashMap<(usize, usize), crate::ast::TypeName>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -85,6 +94,8 @@ impl Analyzer {
             signatures: HashMap::new(),
             loop_boundaries: Vec::new(),
             current_return_type: None,
+            current_return_type_name: None,
+            current_return_is_builtin_result: false,
             current_return_access: None,
             current_abs_origins: HashMap::new(),
             binding_origins: HashMap::new(),
@@ -97,11 +108,15 @@ impl Analyzer {
             reachable_performances: HashSet::new(),
             binding_struct_types: HashMap::new(),
             binding_struct_type_applications: HashMap::new(),
+            binding_type_names: HashMap::new(),
             binding_enum_types: HashMap::new(),
             binding_enum_type_applications: HashMap::new(),
             binding_dynamic_roles: HashMap::new(),
             generic_scopes: Vec::new(),
+            generic_bounds: HashMap::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
+            expected_expression_type: None,
+            inferred_expression_types: HashMap::new(),
         }
     }
 
@@ -126,6 +141,7 @@ impl Analyzer {
             ))
         });
         self.current_return_type = None;
+        self.current_return_type_name = None;
         self.current_return_access = None;
         Ok(self.model)
     }
@@ -190,13 +206,17 @@ impl Analyzer {
     fn analyze_verbs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             if let TopLevelDecl::Verb(verb) = declaration {
-                self.analyze_verb_body(verb)?;
+                let parameters = verb.generic_parameters.clone();
+                self.with_generic_scope(&parameters, |analyzer| analyzer.analyze_verb_body(verb))?;
             }
         }
         for declaration in &program.declarations {
             if let TopLevelDecl::Perform(perform) = declaration {
                 for method in &perform.methods {
-                    self.analyze_verb_body(method)?;
+                    let parameters = method.generic_parameters.clone();
+                    self.with_generic_scope(&parameters, |analyzer| {
+                        analyzer.analyze_verb_body(method)
+                    })?;
                 }
             }
         }
@@ -210,11 +230,23 @@ impl Analyzer {
             .return_type
             .as_ref()
             .and_then(|return_type| lookup_builtin_type(&return_type.ty.name));
+        self.current_return_type_name =
+            verb.return_type.as_ref().map(|return_type| return_type.ty.clone());
+        self.current_return_is_builtin_result =
+            verb.return_type.as_ref().is_some_and(|return_type| {
+                return_type.ty.name == "Result"
+                    && self
+                        .enum_types
+                        .get("Result")
+                        .is_some_and(|definition| definition.span.start == 0)
+            });
         self.initialize_origin_parameter_map(&verb.params);
         self.enter_scope(verb.body.span);
         for parameter in &verb.params {
             let ty = lookup_builtin_type(&parameter.ty.name);
             self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
+            let index = self.binding(&parameter.name, parameter.span)?;
+            self.binding_type_names.insert(index, parameter.ty.clone());
             if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
                 let index = self.binding(&parameter.name, parameter.span)?;
                 self.binding_dynamic_roles.insert(index, parameter.ty.name.clone());
@@ -229,7 +261,9 @@ impl Analyzer {
             }
         }
         self.visit_block(&verb.body)?;
-        if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
+        let requires_return_value =
+            self.current_return_type.is_some() || self.current_return_is_builtin_result;
+        if requires_return_value && !block_guarantees_return(&verb.body) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MissingReturnValue,
                 span: verb.body.span,
@@ -238,115 +272,33 @@ impl Analyzer {
         self.leave_scope();
         Ok(())
     }
+}
 
-    pub(super) fn visit_block(&mut self, block: &Block) -> Result<(), SemanticError> {
-        for statement in &block.statements {
-            self.visit_statement(statement)?;
-        }
-        Ok(())
+fn try_type_mismatch(
+    span: crate::lexer::SourceSpan,
+    expected: &crate::ast::TypeName,
+    found: &str,
+) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::TypeMismatch {
+            callee: "?".to_owned(),
+            parameter: "Result".to_owned(),
+            expected: canonical_type_name(expected),
+            found: found.to_owned(),
+        },
+        span,
     }
+}
 
-    fn visit_statement(&mut self, statement: &Stmt) -> Result<(), SemanticError> {
-        match statement {
-            Stmt::OwnerDecl { role, name, ty, initializer, span } => {
-                let binding_type = self.resolve_binding_type(ty.as_deref(), initializer, *span)?;
-                self.validate_declared_initializer(name, ty.as_deref(), initializer, *span)?;
-                self.visit_expression(initializer)?;
-                if *role == Role::Erg {
-                    self.initialize_owner(initializer, *span)?;
-                }
-                if *role == Role::Abs {
-                    self.register_borrow(initializer, *span)?;
-                }
-                self.bind(role.clone(), name.clone(), binding_type, *span)?;
-                if *role == Role::Abs
-                    && let Ok(index) = self.binding(name, *span)
-                {
-                    let origin = self.origin_of(initializer);
-                    self.binding_origins.insert(index, origin.clone());
-                    if is_origin_return_expression(initializer) {
-                        self.register_origin_borrow(&origin, *span)?;
-                    }
-                }
-                self.record_initializer_struct_type(name, initializer, *span)?;
-                self.record_initializer_enum_type(name, initializer, *span)
-            }
-            Stmt::Assignment { name, value, span } => {
-                let index = self.binding(name, *span)?;
-                self.ensure_mutable(index, name, *span)?;
-                self.validate_binding_assignment(index, name, value, *span)?;
-                self.visit_expression(value)
-            }
-            Stmt::FieldAssignment { object, field, value, span } => {
-                self.validate_field_assignment(object, field, value, *span)
-            }
-            Stmt::Expression { expression, .. } => self.visit_expression(expression),
-            Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
-            Stmt::Loop(block) => {
-                self.enter_scope(block.span);
-                self.loop_boundaries.push(self.scopes.len() - 1);
-                self.visit_block(block)?;
-                self.loop_boundaries.pop();
-                self.leave_scope();
-                Ok(())
-            }
-            Stmt::Break { span } => {
-                self.plan_loop_unwind(super::cleanup::LoopExitKind::Break, "break", *span)
-            }
-            Stmt::Continue { span } => {
-                self.plan_loop_unwind(super::cleanup::LoopExitKind::Continue, "continue", *span)
-            }
-            Stmt::Drop { name, span } => self.drop_binding(name, *span),
-            Stmt::Block(block) => {
-                self.enter_scope(block.span);
-                self.visit_block(block)?;
-                self.leave_scope();
-                Ok(())
-            }
-        }
+pub(super) fn canonical_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
     }
-
-    pub(super) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
-        self.record_origin(expression);
-        match expression {
-            Expr::BufferLiteral { length, .. } => {
-                self.visit_expression(length)?;
-                self.require_buffer_length(length)
-            }
-            Expr::Identifier { name, span } => {
-                let index = self.binding(name, *span)?;
-                self.ensure_readable(index, name, *span)
-            }
-            Expr::Binary { left, right, .. } => {
-                self.visit_expression(left)?;
-                self.visit_expression(right)
-            }
-            Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-                self.visit_expression(expression)
-            }
-            Expr::Borrow { expression, .. } => self.visit_expression(expression),
-            Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
-            Expr::MethodCall { receiver, method, arguments, span } => {
-                self.visit_method_call(receiver, method, arguments, *span)
-            }
-            Expr::StructLit { name, type_arguments, fields, span } => {
-                self.validate_struct_literal(name, type_arguments, fields, *span)
-            }
-            Expr::FieldAccess { object, field, span } => {
-                if self.enum_receiver_name(object).is_some() {
-                    self.validate_enum_unit_variant(object, field, *span)
-                } else {
-                    self.validate_field_access(object, field, *span)?;
-                    self.ensure_field_access_readable(object, field, *span)
-                }
-            }
-            Expr::Case { mode, subject, branches, span } => {
-                self.visit_expression(subject)?;
-                self.validate_case_patterns(*mode, subject, branches, *span)
-            }
-            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
-        }
-    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }
 
 fn block_guarantees_return(block: &Block) -> bool {
@@ -396,6 +348,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

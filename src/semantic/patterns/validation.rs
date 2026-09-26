@@ -1,117 +1,20 @@
 use std::collections::HashSet;
 
-use crate::ast::{
-    CaseBody, CaseBranch, EnumPayload, Expr, LiteralPattern, Pattern, PatternBinding, Role,
-    VariantPayload,
-};
+use crate::ast::{CaseBranch, EnumPayload, Expr, LiteralPattern, Pattern, VariantPayload};
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
-use super::pattern_support::{
-    duplicate_pattern, is_wildcard, non_exhaustive, pattern_name, pattern_span,
-    pattern_type_mismatch, unreachable_pattern, variant_key,
+use super::super::analyzer::Analyzer;
+use super::super::errors::{SemanticError, SemanticErrorKind};
+use super::super::pattern_support::{
+    duplicate_pattern, is_wildcard, non_exhaustive, pattern_type_mismatch, variant_key,
 };
-use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
-    pub(super) fn validate_case_patterns(
+    pub(super) fn validate_case_guard(
         &mut self,
-        mode: crate::ast::CaseMode,
-        subject: &Expr,
-        branches: &[CaseBranch],
+        guard: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.validate_pattern_coverage(subject, branches, span)?;
-        let subject_type =
-            self.expression_type_name(subject).unwrap_or_else(|| "unknown".to_owned());
-        self.enter_scope(span);
-        match mode {
-            crate::ast::CaseMode::Abs => self.borrow_case_subject(subject, span)?,
-            crate::ast::CaseMode::Dat => self.consume_case_subject(subject, span)?,
-        }
-        let branch_state = self.snapshot_binding_states();
-        let branch_count = branch_state.len();
-        let mut branch_results = Vec::new();
-        let mut seen = HashSet::new();
-        let mut wildcard_seen = false;
-        for branch in branches {
-            self.restore_binding_states(&branch_state);
-            let pattern_name = pattern_name(&branch.pattern);
-            if wildcard_seen {
-                return Err(unreachable_pattern(pattern_name, pattern_span(&branch.pattern)));
-            }
-            if is_wildcard(&branch.pattern) {
-                wildcard_seen = true;
-            } else if !seen.insert(pattern_name.clone()) {
-                return Err(duplicate_pattern(pattern_name, pattern_span(&branch.pattern)));
-            }
-            self.validate_pattern(&branch.pattern, &subject_type, subject)?;
-            self.enter_scope(branch.span);
-            self.bind_pattern_variables(&branch.pattern, mode)?;
-            if mode == crate::ast::CaseMode::Dat {
-                self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
-            }
-            if let Some(guard) = &branch.guard {
-                self.validate_case_guard(guard, branch.span)?;
-            }
-            self.visit_case_body(&branch.body)?;
-            self.leave_scope();
-            branch_results.push(self.snapshot_binding_prefix(branch_count));
-            self.restore_binding_states(&branch_state);
-        }
-        self.validate_branch_join(&branch_results, span)?;
-        if let Some(joined_state) = branch_results.first() {
-            self.restore_binding_states(joined_state);
-        }
-        self.leave_scope();
-        Ok(())
-    }
-
-    fn snapshot_binding_states(&self) -> Vec<(OwnershipState, AccessState)> {
-        self.model
-            .bindings
-            .iter()
-            .map(|binding| (binding.ownership.clone(), binding.access.clone()))
-            .collect()
-    }
-
-    fn restore_binding_states(&mut self, snapshot: &[(OwnershipState, AccessState)]) {
-        for (binding, (ownership, access)) in self.model.bindings.iter_mut().zip(snapshot.iter()) {
-            binding.ownership = ownership.clone();
-            binding.access = access.clone();
-        }
-    }
-
-    fn snapshot_binding_prefix(&self, count: usize) -> Vec<(OwnershipState, AccessState)> {
-        self.snapshot_binding_states().into_iter().take(count).collect()
-    }
-
-    fn validate_branch_join(
-        &self,
-        branch_results: &[Vec<(OwnershipState, AccessState)>],
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Some(expected_states) = branch_results.first() else { return Ok(()) };
-        for states in branch_results.iter().skip(1) {
-            for (index, (expected, found)) in expected_states.iter().zip(states).enumerate() {
-                if expected != found {
-                    let name = self.model.bindings[index].name.clone();
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::BranchStateMismatch {
-                            name,
-                            expected: format!("{expected:?}"),
-                            found: format!("{found:?}"),
-                        },
-                        span,
-                    });
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn validate_case_guard(&mut self, guard: &Expr, span: SourceSpan) -> Result<(), SemanticError> {
         let state = self.snapshot_binding_states();
         self.validate_guard_access(guard)?;
         self.visit_expression(guard)?;
@@ -146,6 +49,7 @@ impl Analyzer {
             }
             Expr::Grouping { expression, .. }
             | Expr::Borrow { expression, .. }
+            | Expr::Try { expression, .. }
             | Expr::Unary { expression, .. } => self.validate_guard_access(expression),
             Expr::Binary { left, right, .. } => {
                 self.validate_guard_access(left)?;
@@ -172,7 +76,7 @@ impl Analyzer {
         }
     }
 
-    fn validate_pattern_coverage(
+    pub(super) fn validate_pattern_coverage(
         &self,
         subject: &Expr,
         branches: &[CaseBranch],
@@ -201,7 +105,7 @@ impl Analyzer {
         if missing.is_empty() { Ok(()) } else { Err(non_exhaustive(&enum_name, missing, span)) }
     }
 
-    fn validate_pattern(
+    pub(super) fn validate_pattern(
         &self,
         pattern: &Pattern,
         subject_type: &str,
@@ -302,82 +206,6 @@ impl Analyzer {
                 Ok(())
             }
             _ => Err(pattern_type_mismatch("matching payload", "different payload", span)),
-        }
-    }
-
-    fn bind_pattern_variables(
-        &mut self,
-        pattern: &Pattern,
-        mode: crate::ast::CaseMode,
-    ) -> Result<(), SemanticError> {
-        match pattern {
-            Pattern::Variant { enum_name, variant, payload, .. } => {
-                let candidate_payload = self.enum_types[enum_name]
-                    .variants
-                    .iter()
-                    .find(|item| item.name == *variant)
-                    .unwrap()
-                    .payload
-                    .clone();
-                match (candidate_payload, payload) {
-                    (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
-                        for (binding, ty) in bindings.iter().zip(types) {
-                            self.bind_pattern_binding(binding, &ty.name, mode)?;
-                        }
-                    }
-                    (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
-                        for pattern in patterns {
-                            let field =
-                                fields.iter().find(|field| field.name == pattern.name).unwrap();
-                            self.bind_pattern_binding(&pattern.binding, &field.ty.name, mode)?;
-                        }
-                    }
-                    _ => {}
-                }
-                Ok(())
-            }
-            Pattern::Literal { .. } | Pattern::Wildcard { .. } => Ok(()),
-        }
-    }
-
-    fn bind_pattern_binding(
-        &mut self,
-        binding: &PatternBinding,
-        type_name: &str,
-        mode: crate::ast::CaseMode,
-    ) -> Result<(), SemanticError> {
-        if binding.name == "_" {
-            return Ok(());
-        }
-        let is_generic_payload = self.enum_types.values().any(|definition| {
-            definition.generic_parameters.iter().any(|parameter| parameter.name == type_name)
-        });
-        if !self.is_generic_parameter(type_name) && !is_generic_payload {
-            self.validate_type_name(type_name, binding.span)?;
-        }
-        self.bind(
-            match mode {
-                crate::ast::CaseMode::Abs => Role::Abs,
-                crate::ast::CaseMode::Dat => Role::Dat,
-            },
-            binding.name.clone(),
-            crate::ast::lookup_builtin_type(type_name),
-            binding.span,
-        )?;
-        let index = self.binding(&binding.name, binding.span)?;
-        if self.struct_types.contains_key(type_name) {
-            self.binding_struct_types.insert(index, type_name.to_owned());
-        }
-        if self.enum_types.contains_key(type_name) {
-            self.binding_enum_types.insert(index, type_name.to_owned());
-        }
-        Ok(())
-    }
-
-    fn visit_case_body(&mut self, body: &CaseBody) -> Result<(), SemanticError> {
-        match body {
-            CaseBody::Expression(expression) => self.visit_expression(expression),
-            CaseBody::Block(block) => self.visit_block(block),
         }
     }
 }

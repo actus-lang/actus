@@ -102,7 +102,7 @@ fn bind_parameters<'a>(
             let ty = if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
                 NativeType::FatPointer
             } else {
-                NativeType::from_name_with_layout(&parameter.ty.name, layouts).unwrap()
+                NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
             };
             (&parameter.name, ty)
         })

@@ -18,10 +18,33 @@ impl Analyzer {
         parameters: &[GenericParam],
         validate: impl FnOnce(&mut Analyzer) -> Result<T, SemanticError>,
     ) -> Result<T, SemanticError> {
+        let previous = parameters
+            .iter()
+            .map(|parameter| {
+                (parameter.name.clone(), self.generic_bounds.get(&parameter.name).cloned())
+            })
+            .collect::<Vec<_>>();
+        for parameter in parameters {
+            let bounds = parameter_bounds(parameter)
+                .into_iter()
+                .map(canonical_type_name)
+                .collect::<Vec<_>>();
+            self.generic_bounds.insert(parameter.name.clone(), bounds);
+        }
         self.generic_scopes
             .push(parameters.iter().map(|parameter| parameter.name.clone()).collect());
         let result = self.validate_generic_bounds(parameters).and_then(|()| validate(self));
         self.generic_scopes.pop();
+        for (name, bound) in previous {
+            match bound {
+                Some(bound) => {
+                    self.generic_bounds.insert(name, bound);
+                }
+                None => {
+                    self.generic_bounds.remove(&name);
+                }
+            }
+        }
         result
     }
 

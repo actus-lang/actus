@@ -9,6 +9,7 @@ mod enum_registry;
 mod enums;
 mod errors;
 mod generic_cache;
+mod generic_calls;
 mod generics;
 mod intrinsics;
 mod loans;

@@ -1,0 +1,27 @@
+"""
+Copy the next available chunk from a statically selected reader to writer.
+
+The reusable scratch buffer is allocated once for this operation. Concrete
+Reader and Writer implementations are selected by generic monomorphization.
+"""
+open verb copy[R: Reader, W: Writer](
+    ins reader: R,
+    ins writer: W
+) -> Result[Int, IoError] {
+    erg scratch = Buffer[0];
+    erg total = 0;
+    loop {
+        erg read_result: Result[Int, IoError] = reader.read(buffer: ins scratch);
+        case dat read_result {
+            Result.Ok(count) => case count {
+                0 => { return Result[Int, IoError].Ok(total); },
+                _ => {
+                    writer.write(buffer: abs scratch);
+                    total = total + count;
+                },
+            },
+            _ => { return Result[Int, IoError].Ok(total); },
+        };
+    }
+    return Result[Int, IoError].Ok(total);
+}

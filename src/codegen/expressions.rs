@@ -151,6 +151,9 @@ fn lower_complex_expression(
             string_data,
             layouts,
         ),
+        Expr::Try { .. } => {
+            Err(NativeEmitError("try operator lowering is not implemented yet".to_owned()))
+        }
         _ => Err(NativeEmitError("unsupported native expression".to_owned())),
     }
 }

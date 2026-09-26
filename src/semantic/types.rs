@@ -1,4 +1,6 @@
-use crate::ast::{BuiltinType, Expr, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic};
+use crate::ast::{
+    BuiltinType, CaseBody, Expr, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic,
+};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -20,14 +22,14 @@ impl Analyzer {
     }
 
     pub(super) fn resolve_binding_type(
-        &self,
-        declared_type: Option<&str>,
+        &mut self,
+        declared_type: Option<&crate::ast::TypeName>,
         initializer: &Expr,
-        span: SourceSpan,
+        _span: SourceSpan,
     ) -> Result<Option<BuiltinType>, SemanticError> {
-        if let Some(name) = declared_type {
-            self.validate_type_name(name, span)?;
-            return Ok(lookup_builtin_type(name));
+        if let Some(type_name) = declared_type {
+            self.validate_type_reference(type_name)?;
+            return Ok(lookup_builtin_type(&type_name.name));
         }
         Ok(self.expression_type(initializer))
     }
@@ -35,19 +37,20 @@ impl Analyzer {
     pub(super) fn validate_declared_initializer(
         &self,
         name: &str,
-        declared_type: Option<&str>,
+        declared_type: Option<&crate::ast::TypeName>,
         initializer: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let Some(expected_name) = declared_type else { return Ok(()) };
-        if self.struct_types.contains_key(expected_name) {
+        let Some(expected_type) = declared_type else { return Ok(()) };
+        let expected_name = crate::semantic::analyzer::canonical_type_name(expected_type);
+        if self.struct_types.contains_key(&expected_type.name) {
             let found =
                 self.expression_struct_type(initializer).unwrap_or_else(|| "unknown".to_owned());
             if found != expected_name {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::BindingTypeMismatch {
                         binding: name.to_owned(),
-                        expected: expected_name.to_owned(),
+                        expected: expected_name.clone(),
                         found,
                     },
                     span,
@@ -55,14 +58,14 @@ impl Analyzer {
             }
             return Ok(());
         }
-        if self.enum_types.contains_key(expected_name) {
+        if self.enum_types.contains_key(&expected_type.name) {
             let found =
                 self.expression_type_name(initializer).unwrap_or_else(|| "unknown".to_owned());
             if found != expected_name {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::BindingTypeMismatch {
                         binding: name.to_owned(),
-                        expected: expected_name.to_owned(),
+                        expected: expected_name.clone(),
                         found,
                     },
                     span,
@@ -71,7 +74,8 @@ impl Analyzer {
             return Ok(());
         }
         let Some(found) = self.expression_type(initializer) else { return Ok(()) };
-        let expected = lookup_builtin_type(expected_name).expect("declared type was validated");
+        let expected =
+            lookup_builtin_type(&expected_type.name).expect("declared type was validated");
         self.ensure_binding_type(name, expected, found, span)
     }
 
@@ -130,37 +134,75 @@ impl Analyzer {
             Expr::Grouping { expression, .. }
             | Expr::Borrow { expression, .. }
             | Expr::Unary { expression, .. } => self.expression_type(expression),
+            Expr::Try { expression, .. } => self
+                .enum_type_application(expression)
+                .and_then(|type_name| type_name.arguments.first().cloned())
+                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
             Expr::Binary { .. } => Some(BuiltinType::Int),
             Expr::Identifier { name, span } => {
                 self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
             }
-            Expr::Call { callee, .. } => match lookup_call_intrinsic(callee) {
+            Expr::Call { callee, span, .. } => match lookup_call_intrinsic(callee) {
                 Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
                 Some(IntrinsicKind::Print) => Some(BuiltinType::Int),
                 Some(IntrinsicKind::Drop) => None,
-                None => self.signatures.get(callee).and_then(|signature| signature.return_type),
+                None => self
+                    .inferred_expression_types
+                    .get(&(span.start, span.end))
+                    .and_then(|type_name| lookup_builtin_type(&type_name.name))
+                    .or_else(|| {
+                        self.signatures.get(callee).and_then(|signature| signature.return_type)
+                    }),
             },
             Expr::MethodCall { receiver, method, .. } if method == "raw_slice" => {
                 (self.expression_type(receiver) == Some(BuiltinType::Buffer))
                     .then_some(BuiltinType::Buffer)
             }
-            Expr::MethodCall { method, .. } => {
-                self.signatures.get(method).and_then(|signature| signature.return_type)
-            }
+            Expr::MethodCall { method, span, .. } => self
+                .inferred_expression_types
+                .get(&(span.start, span.end))
+                .and_then(|type_name| lookup_builtin_type(&type_name.name))
+                .or_else(|| {
+                    self.signatures.get(method).and_then(|signature| signature.return_type)
+                }),
             Expr::StructLit { .. } => None,
             Expr::FieldAccess { object, field, .. } => self
                 .expression_struct_type(object)
                 .and_then(|name| self.struct_field(&name, field))
                 .and_then(|field| lookup_builtin_type(&field.ty.name)),
-            Expr::Case { .. } => None,
+            Expr::Case { branches, .. } => branches.iter().find_map(|branch| match &branch.body {
+                CaseBody::Expression(expression) => self.expression_type(expression),
+                CaseBody::Block(_) => None,
+            }),
         }
     }
 
     pub(super) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
+        if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
+            && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
+        {
+            return Some(super::analyzer::canonical_type_name(type_name));
+        }
         self.expression_type(expression)
             .map(|ty| ty.spec().name.to_owned())
+            .or_else(|| self.binding_type_name(expression))
             .or_else(|| self.expression_struct_type(expression))
             .or_else(|| self.expression_enum_type_application(expression))
+            .or_else(|| self.expression_case_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))
+    }
+
+    fn binding_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Identifier { name, span } = expression else { return None };
+        let index = self.binding(name, *span).ok()?;
+        self.binding_type_names.get(&index).map(super::analyzer::canonical_type_name)
+    }
+
+    fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Case { branches, .. } = expression else { return None };
+        branches.iter().find_map(|branch| match &branch.body {
+            CaseBody::Expression(expression) => self.expression_type_name(expression),
+            CaseBody::Block(_) => None,
+        })
     }
 }

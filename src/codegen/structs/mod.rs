@@ -5,13 +5,15 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, StructFieldInit, TypeName};
 
-use super::expressions::emit_buffer_drop;
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
+
+mod cleanup;
+pub(crate) use cleanup::{emit_binding_drop, emit_partial_binding_drop, emit_struct_drop};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_struct_literal(
@@ -206,126 +208,6 @@ fn copy_bytes(
         );
         function.ins().store(MemFlagsData::new(), byte, destination_address, 0);
     }
-}
-
-pub(super) fn emit_struct_drop(
-    function: &mut FunctionBuilder<'_>,
-    address: cranelift_codegen::ir::Value,
-    id: usize,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    emit_struct_drop_except(function, address, id, &[], functions, layouts)
-}
-
-fn emit_struct_drop_except(
-    function: &mut FunctionBuilder<'_>,
-    address: cranelift_codegen::ir::Value,
-    id: usize,
-    moved_fields: &[String],
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    let layout =
-        layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing drop layout `{id}`")))?;
-    for field in layout.fields.iter().rev().filter(|field| field.owned) {
-        let nested_paths = moved_field_suffixes(moved_fields, &field.name);
-        if nested_paths.iter().any(String::is_empty) {
-            continue;
-        }
-        let field_address = function.ins().iadd_imm_s(address, i64::from(field.offset));
-        match field.ty {
-            NativeType::Buffer => {
-                let handle = function.ins().load(
-                    layouts.pointer_type,
-                    MemFlagsData::new(),
-                    field_address,
-                    0,
-                );
-                let target = functions.get("actus_buffer_drop").ok_or_else(|| {
-                    NativeEmitError(
-                        "native runtime function `actus_buffer_drop` is unavailable".to_owned(),
-                    )
-                })?;
-                function.ins().call(target.reference, &[handle]);
-            }
-            NativeType::Struct(nested_id) => {
-                emit_struct_drop_except(
-                    function,
-                    field_address,
-                    nested_id,
-                    &nested_paths,
-                    functions,
-                    layouts,
-                )?;
-            }
-            NativeType::Enum(_) | NativeType::Int | NativeType::String | NativeType::FatPointer => {
-            }
-        }
-    }
-    Ok(())
-}
-
-fn moved_field_suffixes(moved_fields: &[String], field_name: &str) -> Vec<String> {
-    moved_fields
-        .iter()
-        .filter_map(|moved| {
-            moved.strip_prefix(field_name).and_then(|suffix| {
-                suffix
-                    .strip_prefix('.')
-                    .map(str::to_owned)
-                    .or_else(|| (suffix.is_empty()).then(String::new))
-            })
-        })
-        .collect()
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn emit_partial_binding_drop(
-    function: &mut FunctionBuilder<'_>,
-    name: &str,
-    moved_fields: &[String],
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    let Some(NativeType::Struct(id)) =
-        types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
-    else {
-        return Ok(());
-    };
-    let address = locals
-        .iter()
-        .find(|(binding, _)| binding.as_str() == name)
-        .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
-    emit_struct_drop_except(function, address, id, moved_fields, functions, layouts)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn emit_binding_drop(
-    function: &mut FunctionBuilder<'_>,
-    name: &str,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    if types.iter().any(|(binding, ty)| binding.as_str() == name && *ty == NativeType::Buffer) {
-        return emit_buffer_drop(function, name, locals, functions);
-    }
-    let Some(NativeType::Struct(id)) =
-        types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
-    else {
-        return Ok(());
-    };
-    let address = locals
-        .iter()
-        .find(|(binding, _)| binding.as_str() == name)
-        .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
-    emit_struct_drop(function, address, id, functions, layouts)
 }
 
 pub(super) fn expression_native_type(

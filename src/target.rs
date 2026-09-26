@@ -24,6 +24,9 @@ pub enum EntryContract {
 
 impl LinkerFlavor {
     pub fn from_target(triple: &Triple) -> Result<Self, TargetSpecError> {
+        if is_freestanding_target(triple) {
+            return Ok(Self::Gnu);
+        }
         let flavor = match triple.environment {
             Environment::Msvc => Self::Msvc,
             Environment::Gnu
@@ -70,10 +73,33 @@ impl LinkerFlavor {
         }
     }
 
+    pub fn runtime_library_arguments(self) -> &'static [&'static str] {
+        match self {
+            Self::Msvc => &[
+                "advapi32.lib",
+                "bcrypt.lib",
+                "kernel32.lib",
+                "libcmt.lib",
+                "ntdll.lib",
+                "oldnames.lib",
+                "userenv.lib",
+                "ws2_32.lib",
+            ],
+            Self::Gnu | Self::Apple => &[],
+        }
+    }
+
+    pub fn output_arguments(self, path: &std::path::Path) -> Vec<String> {
+        match self {
+            Self::Msvc => vec![format!("/OUT:{}", path.display())],
+            Self::Gnu | Self::Apple => vec!["-o".to_owned(), path.display().to_string()],
+        }
+    }
+
     pub const fn default_executable(self) -> &'static str {
         match self {
             Self::Gnu | Self::Apple => "cc",
-            Self::Msvc => "link.exe",
+            Self::Msvc => "lld-link.exe",
         }
     }
 }
@@ -120,6 +146,13 @@ impl TargetSpec {
         })?;
         let abi = triple
             .default_calling_convention()
+            .or_else(|()| {
+                if is_freestanding_target(&triple) {
+                    Ok(CallingConvention::SystemV)
+                } else {
+                    Err(())
+                }
+            })
             .map_err(|()| TargetSpecError(format!("target `{triple}` has no default ABI")))?;
         let linker_flavor = LinkerFlavor::from_target(&triple)?;
         Ok(Self {
@@ -185,6 +218,17 @@ impl TargetSpec {
     }
 }
 
+fn is_freestanding_target(triple: &Triple) -> bool {
+    matches!(
+        triple.operating_system,
+        OperatingSystem::Unknown
+            | OperatingSystem::None_
+            | OperatingSystem::Uefi
+            | OperatingSystem::Espidf
+            | OperatingSystem::VxWorks
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use target_lexicon::{CallingConvention, Endianness, PointerWidth};
@@ -228,7 +272,7 @@ mod tests {
             TargetSpec::parse("x86_64-pc-windows-msvc")
                 .expect("MSVC target should parse")
                 .default_linker(),
-            "link.exe"
+            "lld-link.exe"
         );
     }
 }

@@ -1,0 +1,6 @@
+[package]
+name = "std"
+version = "0.1.0"
+edition = "alpha"
+entry = "lib"
+source_root = "src"

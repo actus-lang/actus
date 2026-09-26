@@ -21,9 +21,17 @@ pub fn link_object(
 ) -> Result<(), NativeLinkError> {
     let linker = configuration.linker();
     let mut command = Command::new(linker);
+    if configuration.linker_flavor() == crate::configuration::LinkerFlavor::Msvc
+        && is_rust_lld(linker)
+    {
+        command.args(["-flavor", "link"]);
+    }
     command.arg(object);
-    if let Some(runtime_archive) = crate::runtime::runtime_archive_path() {
+    if configuration.host_runtime_enabled()
+        && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
+    {
         command.arg(runtime_archive);
+        command.args(configuration.linker_flavor().runtime_library_arguments());
     }
     for path in configuration.library_paths() {
         command.arg(configuration.linker_flavor().library_path_argument(path));
@@ -35,8 +43,7 @@ pub fn link_object(
         ));
     }
     let output = command
-        .arg("-o")
-        .arg(executable)
+        .args(configuration.linker_flavor().output_arguments(executable))
         .output()
         .map_err(|error| NativeLinkError(format!("cannot execute linker: {error}")))?;
     if output.status.success() {
@@ -50,8 +57,18 @@ pub fn link_object(
     )))
 }
 
+fn is_rust_lld(linker: &std::ffi::OsStr) -> bool {
+    linker
+        .to_string_lossy()
+        .rsplit(['/', '\\'])
+        .next()
+        .and_then(|name| name.strip_suffix(".exe").or(Some(name)))
+        .is_some_and(|name| name.eq_ignore_ascii_case("rust-lld"))
+}
+
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
     use std::path::Path;
 
     use crate::target::LinkerFlavor;
@@ -79,5 +96,29 @@ mod tests {
         assert_eq!(LinkerFlavor::Gnu.library_path_argument(path), "-L/tmp/actus-libs");
         assert_eq!(LinkerFlavor::Apple.library_path_argument(path), "-L/tmp/actus-libs");
         assert_eq!(LinkerFlavor::Msvc.library_path_argument(path), "/LIBPATH:/tmp/actus-libs");
+    }
+
+    #[test]
+    fn emits_platform_specific_output_arguments() {
+        let path = Path::new("/tmp/actus-output");
+        assert_eq!(LinkerFlavor::Gnu.output_arguments(path), ["-o", "/tmp/actus-output"]);
+        assert_eq!(LinkerFlavor::Apple.output_arguments(path), ["-o", "/tmp/actus-output"]);
+        assert_eq!(LinkerFlavor::Msvc.output_arguments(path), ["/OUT:/tmp/actus-output"]);
+    }
+
+    #[test]
+    fn emits_msvc_runtime_library_arguments() {
+        let libraries = LinkerFlavor::Msvc.runtime_library_arguments();
+        assert!(libraries.contains(&"kernel32.lib"));
+        assert!(libraries.contains(&"libcmt.lib"));
+        assert!(libraries.contains(&"ws2_32.lib"));
+        assert!(LinkerFlavor::Gnu.runtime_library_arguments().is_empty());
+    }
+
+    #[test]
+    fn identifies_the_rust_lld_driver() {
+        assert!(super::is_rust_lld(OsStr::new("rust-lld.exe")));
+        assert!(super::is_rust_lld(OsStr::new("C:\\Rust\\rust-lld.exe")));
+        assert!(!super::is_rust_lld(OsStr::new("lld-link.exe")));
     }
 }

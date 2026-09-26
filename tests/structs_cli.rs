@@ -140,6 +140,22 @@ fn executes_result_err_without_exception_propagation() {
 
 #[cfg(unix)]
 #[test]
+fn executes_try_result_success_and_error_paths() {
+    build_and_run(include_str!("../examples/try_result.act"), "try-result", 42);
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_short_result_constructors_natively() {
+    build_and_run(
+        "enum IoError { Failed, } verb produce() -> Result[Int, IoError] { return Ok(42); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }\n",
+        "short-result",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn avoids_double_drop_after_moving_owned_field() {
     build_and_run(
         "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: Buffer[4], value: 42, }; consume(payload: holder.payload); return 42; }\n",

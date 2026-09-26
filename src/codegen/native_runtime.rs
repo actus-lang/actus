@@ -5,12 +5,17 @@ use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
 use crate::ast::IntrinsicKind;
+use crate::runtime::{
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
+    ENUM_DROP_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
+};
 
 use super::native::{FunctionMeta, NativeEmitError};
 use super::types::NativeType;
 
 pub(super) fn declare_runtime_functions(
     module: &mut ObjectModule,
+    has_print_definition: bool,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let pointer_type = module.isa().pointer_type();
     let allocate_id = declare_allocate(module, pointer_type)?;
@@ -18,15 +23,25 @@ pub(super) fn declare_runtime_functions(
     let append_id = declare_append(module, pointer_type)?;
     let print_int_id = declare_print_int(module)?;
     let print_string_id = declare_print_string(module, pointer_type)?;
+    let enum_allocate_id = declare_enum_allocate(module, pointer_type)?;
+    let enum_drop_id = declare_enum_drop(module, pointer_type)?;
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
 
-    Ok(HashMap::from([
+    let mut functions = HashMap::from([
         (
-            "__actus_buffer_allocate".to_owned(),
+            format!("__{BUFFER_ALLOCATE_SYMBOL}"),
             named_meta(allocate_id, &["length"], NativeType::Buffer),
         ),
-        ("actus_buffer_drop".to_owned(), named_meta(drop_id, &["handle"], NativeType::Int)),
+        (BUFFER_DROP_SYMBOL.to_owned(), named_meta(drop_id, &["handle"], NativeType::Int)),
+        (
+            format!("__{ENUM_ALLOCATE_SYMBOL}"),
+            named_meta(enum_allocate_id, &["size"], NativeType::Buffer),
+        ),
+        (
+            ENUM_DROP_SYMBOL.to_owned(),
+            named_meta(enum_drop_id, &["pointer", "size"], NativeType::Int),
+        ),
         (
             append_spec.name.to_owned(),
             intrinsic_meta(append_id, append_spec.parameters, NativeType::Int),
@@ -35,8 +50,36 @@ pub(super) fn declare_runtime_functions(
             print_spec.name.to_owned(),
             intrinsic_meta(print_int_id, print_spec.parameters, NativeType::Int),
         ),
-        ("actus_print_string".to_owned(), named_meta(print_string_id, &["value"], NativeType::Int)),
-    ]))
+        (PRINT_STRING_SYMBOL.to_owned(), named_meta(print_string_id, &["value"], NativeType::Int)),
+    ]);
+    if has_print_definition {
+        functions.remove(print_spec.name);
+    }
+    Ok(functions)
+}
+
+fn declare_enum_allocate(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(pointer_type));
+    module
+        .declare_function(ENUM_ALLOCATE_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_enum_drop(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(pointer_type));
+    module
+        .declare_function(ENUM_DROP_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
 }
 
 fn intrinsic_meta(
@@ -69,7 +112,7 @@ fn declare_allocate(
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(pointer_type));
     module
-        .declare_function("actus_buffer_allocate", Linkage::Import, &signature)
+        .declare_function(BUFFER_ALLOCATE_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 
@@ -80,7 +123,7 @@ fn declare_drop(
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     module
-        .declare_function("actus_buffer_drop", Linkage::Import, &signature)
+        .declare_function(BUFFER_DROP_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 
@@ -93,7 +136,7 @@ fn declare_append(
     signature.params.push(AbiParam::new(types::I8));
     signature.returns.push(AbiParam::new(types::I8));
     module
-        .declare_function("actus_buffer_append", Linkage::Import, &signature)
+        .declare_function(BUFFER_APPEND_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 
@@ -104,7 +147,7 @@ fn declare_print_int(
     signature.params.push(AbiParam::new(types::I32));
     signature.returns.push(AbiParam::new(types::I32));
     module
-        .declare_function("actus_print_int", Linkage::Import, &signature)
+        .declare_function(PRINT_INT_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 
@@ -116,6 +159,6 @@ fn declare_print_string(
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
-        .declare_function("actus_print_string", Linkage::Import, &signature)
+        .declare_function(PRINT_STRING_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }

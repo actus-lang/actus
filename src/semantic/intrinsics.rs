@@ -7,7 +7,7 @@ use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 pub(super) fn is_reserved_name(name: &str) -> bool {
-    name == "allocate" || lookup_intrinsic(name).is_some()
+    name == "allocate" || (lookup_intrinsic(name).is_some() && name != "print")
 }
 
 impl Analyzer {
@@ -201,6 +201,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

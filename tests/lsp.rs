@@ -108,7 +108,7 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
 #[test]
 fn lsp_hover_and_formatting_return_compiler_information() {
     let uri = "file:///tmp/actus-lsp-hover.act";
-    let source = "/// Adds a value.\nverb add(abs value: Int) -> Int { return value; }\n";
+    let source = "\"\"\"Adds a value.\nThe value is inspected without ownership transfer.\n\"\"\"\nverb add(abs value: Int) -> Int { return value; }\n";
     let verb_position = position_after(source, "verb add");
     let parameter_position = position_after(source, "return value");
     let messages = [
@@ -146,8 +146,81 @@ fn lsp_hover_and_formatting_return_compiler_information() {
     assert!(stdout.contains("markdown"));
     assert!(stdout.contains("abs value: Int"));
     assert!(stdout.contains("Adds a value."));
+    assert!(stdout.contains("The value is inspected without ownership transfer."));
     assert!(stdout.contains("newText"));
     assert!(stdout.contains("verb add(abs value: Int) -> Int"));
+}
+
+#[test]
+fn lsp_covers_current_ownership_surface_and_diagnostics() {
+    assert_lsp_surface_support();
+    assert_lsp_ownership_diagnostics();
+}
+
+fn assert_lsp_surface_support() {
+    let uri = "file:///tmp/actus-lsp-surface.act";
+    let source = "/// Mutates a buffer.\nverb mutate(ins buffer: Buffer) { }\nverb slice(abs input: Buffer) -> abs Buffer { return input; }\nunsafe extern \"C\" verb host(erg code: Int) -> Int;\nverb main(abs ready: Bool) -> Int { erg buffer = Buffer[4]; erg code = 0; mutate(buffer: ins buffer); abs view = ref slice(input: abs buffer); return case abs ready { true if ready => host(code: erg code), _ => 1, }; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({
+            "jsonrpc":"2.0","method":"textDocument/didOpen",
+            "params":{"textDocument":{"uri":uri,"version":1,"text":source}}
+        }),
+        json!({
+            "jsonrpc":"2.0","id":2,"method":"textDocument/hover",
+            "params":{"textDocument":{"uri":uri},"position":position_after(source, "verb mutate")}
+        }),
+        json!({
+            "jsonrpc":"2.0","id":3,"method":"textDocument/hover",
+            "params":{"textDocument":{"uri":uri},"position":position_after(source, "verb slice")}
+        }),
+        json!({
+            "jsonrpc":"2.0","id":4,"method":"textDocument/hover",
+            "params":{"textDocument":{"uri":uri},"position":position_after(source, "verb host")}
+        }),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(stdout.contains("ins buffer: Buffer"), "stdout: {stdout}");
+    assert!(stdout.contains("verb slice(abs input: Buffer) -> abs Buffer"), "stdout: {stdout}");
+    assert!(stdout.contains("extern verb host(erg code: Int) -> Int"), "stdout: {stdout}");
+    assert!(stdout.contains("\"newText\""), "stdout: {stdout}");
+}
+
+fn assert_lsp_ownership_diagnostics() {
+    let diagnostics = [
+        (
+            "file:///tmp/actus-lsp-ins-alias.act",
+            "verb merge(ins left: Buffer, abs view: Buffer) { } verb main() { erg buffer = Buffer[1]; merge(left: ins buffer, view: abs buffer); }",
+            "E1065",
+        ),
+        (
+            "file:///tmp/actus-lsp-abs-origin.act",
+            "verb invalid(abs input: Buffer) -> abs Buffer { erg temporary = Buffer[4]; return temporary; }",
+            "E1066",
+        ),
+        (
+            "file:///tmp/actus-lsp-frozen-owner.act",
+            "extern \"C\" verb slice(abs input: Buffer) -> abs Buffer; verb consume(dat input: Buffer) { drop(input); } verb main() -> Int { erg buffer = Buffer[8]; abs view = ref slice(input: abs buffer); consume(input: dat buffer); return 0; }",
+            "E1011",
+        ),
+    ];
+    let messages = std::iter::once(json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}))
+        .chain(diagnostics.iter().map(|(uri, text, _)| {
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":text}}})
+        }))
+        .chain([
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+            json!({"jsonrpc":"2.0","method":"exit","params":null}),
+        ])
+        .collect::<Vec<_>>();
+    let stdout = run_lsp(messages);
+    for (_, _, code) in diagnostics {
+        assert!(stdout.contains(code), "missing {code} in {stdout}");
+    }
 }
 
 #[test]
@@ -207,4 +280,18 @@ fn file_uri(path: &Path) -> String {
     } else {
         format!("file://{normalized}")
     }
+}
+
+fn run_lsp(messages: Vec<Value>) -> String {
+    let input = messages.into_iter().flat_map(frame).collect::<Vec<_>>();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("lsp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("start lsp");
+    child.stdin.take().unwrap().write_all(&input).expect("write lsp input");
+    let output = child.wait_with_output().expect("wait for lsp");
+    assert!(output.status.success());
+    String::from_utf8(output.stdout).expect("utf8 protocol output")
 }

@@ -56,6 +56,9 @@ impl Analyzer {
             return Some(type_name.name);
         }
         match expression {
+            Expr::Call { callee, .. } => self.signatures.get(callee).and_then(|signature| {
+                (signature.return_type_name.as_ref()?.name == "Result").then(|| "Result".to_owned())
+            }),
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => {
                 self.enum_receiver_name(object).map(str::to_owned)
             }
@@ -66,6 +69,12 @@ impl Analyzer {
                 .binding(name, *span)
                 .ok()
                 .and_then(|index| self.binding_enum_types.get(&index).cloned()),
+            Expr::Case { branches, .. } => branches.iter().find_map(|branch| match &branch.body {
+                crate::ast::CaseBody::Expression(expression) => {
+                    self.expression_enum_type(expression)
+                }
+                crate::ast::CaseBody::Block(_) => None,
+            }),
             _ => None,
         }
     }
@@ -106,13 +115,29 @@ impl Analyzer {
         Ok(())
     }
 
-    fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
+    pub(super) fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
         if let Some(type_name) = self.resolved_type_name(expression)
             && self.enum_types.contains_key(&type_name.name)
         {
             return Some(type_name);
         }
         let receiver = match expression {
+            Expr::Call { callee, .. } => {
+                return self.signatures.get(callee).and_then(|signature| {
+                    (signature.return_type_name.as_ref()?.name == "Result")
+                        .then(|| signature.return_type_name.clone())
+                        .flatten()
+                });
+            }
+            Expr::Case { branches, .. } => {
+                return branches.iter().find_map(|branch| match &branch.body {
+                    crate::ast::CaseBody::Expression(expression) => {
+                        self.enum_type_application(expression)
+                    }
+                    crate::ast::CaseBody::Block(_) => None,
+                });
+            }
+            Expr::Try { expression, .. } => return self.enum_type_application(expression),
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => object,
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => expression,
             _ => return None,

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::Block;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
@@ -54,14 +53,14 @@ pub(super) fn emit_loop_cleanup(
 pub(super) fn emit_scope_cleanup(
     function: &mut FunctionBuilder<'_>,
     schedule: &NativeCleanupSchedule,
-    block: &Block,
+    span: SourceSpan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
-    let plan = schedule.scope(block.span).ok_or_else(|| {
-        NativeEmitError(format!("missing native scope cleanup plan at {:?}", block.span))
+    let plan = schedule.scope(span).ok_or_else(|| {
+        NativeEmitError(format!("missing native scope cleanup plan at {:?}", span))
     })?;
     emit_scope_instructions(function, plan, locals, types, functions, layouts)?;
     Ok(())

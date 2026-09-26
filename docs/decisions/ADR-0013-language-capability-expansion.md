@@ -143,6 +143,11 @@ case status {
 }
 ```
 
+For scalar subjects, an unqualified `case` uses the plain mode: it performs
+pattern selection without creating an ownership borrow. Structured subjects
+retain the existing inspection default unless `abs` or `dat` is written
+explicitly.
+
 Matching has no fallthrough and no implicit `break`. The `_` wildcard handles
 the remaining cases. Enum matches must be exhaustive; primitive matches must
 either cover all required values or provide `_`.
@@ -278,4 +283,3 @@ self-hosting without adding a garbage collector or weakening deterministic
 ownership. Robotics programs receive fixed-size mathematical values and
 zero-copy views, while low-level memory access remains explicitly separated
 behind the unsafe boundary defined by ADR-0012.
-

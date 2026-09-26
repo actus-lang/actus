@@ -4,17 +4,22 @@ use crate::lexer::{SourceSpan, TokenKind};
 use super::{ParseError, Parser, identifier_text};
 
 impl Parser {
-    pub(super) fn parse_role_decl(&mut self, is_open: bool) -> Result<RoleDecl, ParseError> {
+    pub(super) fn parse_role_decl(
+        &mut self,
+        is_open: bool,
+        doc: Option<String>,
+    ) -> Result<RoleDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Role, "`role`")?.span.start;
         let name_token = self.take_identifier("role name")?;
         let name = identifier_text(&name_token.kind);
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
         let mut methods = Vec::new();
         while !self.check_simple(&TokenKind::RightBrace) {
+            self.skip_doc_strings();
             methods.push(self.parse_role_method()?);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(RoleDecl { is_open, name, methods, span: SourceSpan::new(start, end) })
+        Ok(RoleDecl { is_open, doc, name, methods, span: SourceSpan::new(start, end) })
     }
 
     fn parse_role_method(&mut self) -> Result<RoleMethod, ParseError> {

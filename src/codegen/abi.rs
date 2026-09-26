@@ -19,20 +19,20 @@ pub fn validate_native_signature(
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeAbiError> {
     if let Some(return_type) = &verb.return_type
-        && NativeType::from_name_with_layout(&return_type.ty.name, layouts).is_none()
+        && NativeType::try_from_type_name_with_layout(Some(&return_type.ty), layouts).is_none()
     {
         return Err(NativeAbiError(format!(
-            "native backend supports `Int` and `Buffer` returns, found `{}`",
+            "native backend cannot lower return type `{}`",
             return_type.ty.name
         )));
     }
     if let Some(parameter) = verb.params.iter().find(|parameter| {
         parameter.dispatch != DispatchMode::Dynamic
-            && NativeType::from_name_with_layout(&parameter.ty.name, layouts).is_none()
+            && NativeType::try_from_type_name_with_layout(Some(&parameter.ty), layouts).is_none()
     }) {
         return Err(NativeAbiError(format!(
-            "native backend supports `Int` and `Buffer` parameters, found `{}` for `{}`",
-            parameter.ty.name, parameter.name
+            "native backend cannot lower parameter `{}` of type `{}`",
+            parameter.name, parameter.ty.name
         )));
     }
     Ok(())
@@ -54,21 +54,19 @@ pub fn validate_external_native_signature(
             verb.name
         )));
     }
-    if let Some(parameter) = verb
-        .params
-        .iter()
-        .find(|parameter| NativeType::from_name_with_layout(&parameter.ty.name, layouts).is_none())
-    {
+    if let Some(parameter) = verb.params.iter().find(|parameter| {
+        NativeType::try_from_type_name_with_layout(Some(&parameter.ty), layouts).is_none()
+    }) {
         return Err(NativeAbiError(format!(
-            "native backend supports `Int` and `Buffer` parameters, found `{}` for `{}`",
-            parameter.ty.name, parameter.name
+            "native backend cannot lower parameter `{}` of type `{}`",
+            parameter.name, parameter.ty.name
         )));
     }
     if let Some(return_type) = &verb.return_type
-        && NativeType::from_name_with_layout(&return_type.ty.name, layouts).is_none()
+        && NativeType::try_from_type_name_with_layout(Some(&return_type.ty), layouts).is_none()
     {
         return Err(NativeAbiError(format!(
-            "native backend supports `Int` and `Buffer` returns, found `{}`",
+            "native backend cannot lower return type `{}`",
             return_type.ty.name
         )));
     }

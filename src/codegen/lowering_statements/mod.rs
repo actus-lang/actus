@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, Role, Stmt};
 use crate::semantic::LoopExitKind;
 
-use super::super::cleanup::{emit_loop_cleanup, emit_return_cleanup};
+use super::super::cleanup::emit_loop_cleanup;
 use super::super::expressions::{initializer_type, lower_expression};
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
@@ -13,6 +13,8 @@ use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::structs::{emit_binding_drop, lower_field_assignment};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
+
+mod try_lowering;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_statements<'source>(
@@ -65,10 +67,18 @@ fn lower_statement<'source>(
         Stmt::FieldAssignment { object, field, value, .. } => lower_field_assignment(
             function, object, field, value, locals, types, functions, cleanup_schedule, string_data, layouts,
         ).map(|()| Flow::Fallthrough),
-        Stmt::Return { value: Some(expression), span } =>
-            lower_return(function, expression, *span, locals, types, functions, cleanup_schedule, string_data, layouts),
+        Stmt::Return { value: Some(expression), span } => try_lowering::lower_return(
+            function, expression, *span, locals, types, functions, cleanup_schedule, string_data,
+            layouts,
+        ),
         Stmt::Return { value: None, .. } => {
             Err(NativeEmitError("native function requires a return value".to_owned()))
+        }
+        Stmt::Expression { expression, span } if matches!(expression, Expr::Try { .. }) => {
+            try_lowering::lower_try_statement(
+                function, expression, *span, locals, types, functions, cleanup_schedule,
+                string_data, layouts,
+            )
         }
         Stmt::Expression { expression, .. } => {
             lower_expression(function, expression, locals, types, functions, cleanup_schedule, string_data, layouts)?;
@@ -150,32 +160,6 @@ fn lower_assignment<'source>(
     )?;
     locals.insert(name, value);
     Ok(Flow::Fallthrough)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn lower_return(
-    function: &mut FunctionBuilder<'_>,
-    expression: &Expr,
-    span: crate::lexer::SourceSpan,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
-    let value = lower_expression(
-        function,
-        expression,
-        locals,
-        types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-    )?;
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
-    Ok(Flow::Return(value))
 }
 
 fn lower_drop(

@@ -49,6 +49,7 @@ pub(crate) fn lower_body(
 pub(crate) fn lower_case_block<'source>(
     function: &mut FunctionBuilder<'_>,
     block: &'source crate::ast::Block,
+    cleanup_span: crate::lexer::SourceSpan,
     locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
@@ -73,7 +74,7 @@ pub(crate) fn lower_case_block<'source>(
         emit_scope_cleanup(
             function,
             cleanup_schedule,
-            block,
+            cleanup_span,
             &branch_locals,
             &branch_types,
             functions,

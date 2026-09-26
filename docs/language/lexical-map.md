@@ -15,45 +15,42 @@ assigns them meaning:
 
 | Area | Keywords |
 | --- | --- |
-| Declarations | `verb`, `struct`, `enum` |
+| Declarations | `verb`, `struct`, `enum`, `role`, `perform` |
 | FFI and safety boundary | `extern`, `unsafe` |
-| Ownership roles | `erg`, `abs`, `dat` |
+| Ownership roles | `erg`, `abs`, `dat`, `ins` |
 | Resource operations | `ref`, `drop` |
 | Control flow | `return`, `loop`, `break`, `continue`, `case` |
+| Pattern guards | `if` (only after a case pattern) |
+| Modules and visibility | `import`, `open` |
+| Dispatch and metadata | `dynamic`, `meta` |
 | Boolean and wildcard literals | `true`, `false`, `_` |
 
-`case` is the Actus pattern-matching construct. It is not named `match`.
-The current lexer also recognizes the implemented punctuation and operators,
-including `->`, `=>`, comparisons, equality, `!`, arithmetic operators, and
-field access with `.`.
+`case` is the Actus pattern-matching construct. A general conditional statement
+is not part of the language; `if` is valid only as a boolean pattern guard in
+the form `Pattern if condition => body`. The current lexer also recognizes the
+implemented punctuation and operators, including `->`, `=>`, comparisons,
+equality, `!`, arithmetic operators, and field access with `.`.
 
-The following are deliberately not active keywords yet: `import`, `open`,
-`meta`, `if`, `else`, `while`, `for`, `in`, and `self`.
+`for` is reserved by the lexer but has no parser construct. `else`, `while`,
+and `in` are not active language constructs. `self` remains an identifier; a
+receiver role is expressed by an ordinary parameter in the current syntax.
 
-## 2. Approved but Not Implemented Keywords and Operations
+## 2. Reserved and Future Vocabulary
 
-These names are accepted by architecture decisions or the roadmap, but are
-not currently emitted as keyword tokens:
+These names are reserved by design documents or future work, but are not
+implemented language constructs:
 
 | Name | Planned meaning | Design location |
 | --- | --- | --- |
-| `role` | Contract declaration | Phase 14 / ADR-0014 |
-| `perform` | Compile-time role realization | Phase 14 / ADR-0014 |
-| `dynamic` | Explicit runtime role dispatch | Phase 14 / ADR-0014 |
 | `act` | Owned structured task creation | ADR-0005 |
 | `join` | Consume and await an owned task | ADR-0005 |
 | `detach` | Explicitly transfer task responsibility | ADR-0005 |
-| `import` | Module import | Language conventions |
-| `open` | Cross-module visibility | Language conventions |
-| `meta` | Compile-time declaration metadata | ADR-0015 |
 
 `actor` is not a language keyword. The future `std::actor` design is an
 official library specification and must use ordinary Actus declarations.
 
-The conditional and iteration vocabulary is also future language work. The
-canonical conditional spelling is `else if`; `elif` is not part of Actus.
-
-`self` remains an identifier until method syntax and receiver semantics are
+General conditional and iteration statements remain outside the current
+language surface. Pattern guards are the only conditional form currently
 implemented.
 
 ## 3. Reserved Future Keywords
@@ -67,10 +64,8 @@ const  static  pragma
 Self
 ```
 
-`dynamic` is listed in Section 2 because its Phase 14 syntax is already
-specified. Once implemented, it moves from the approved-future set into the
-active keyword set. `unsafe` and `extern` are already active and therefore do
-not belong in this reserved list.
+`unsafe`, `extern`, `role`, `perform`, `dynamic`, `import`, `open`, and `meta`
+are active and therefore do not belong in this reserved list.
 
 The current compiler has not yet rejected every reserved name as an
 identifier. Adding that enforcement is a separate lexer/diagnostics change.

@@ -40,7 +40,7 @@ pub(super) fn lower_scoped_block<'source>(
         emit_scope_cleanup(
             function,
             cleanup_schedule,
-            block,
+            block.span,
             &nested_locals,
             &nested_types,
             functions,

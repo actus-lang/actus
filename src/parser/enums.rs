@@ -33,6 +33,10 @@ impl Parser {
             if self.at_end() {
                 return Err(self.error_at_current("`}`"));
             }
+            self.skip_doc_strings();
+            if self.check_simple(&TokenKind::RightBrace) {
+                break;
+            }
             let variant = self.parse_enum_variant()?;
             if !names.insert(variant.name.clone()) {
                 return Err(duplicate_name("enum variant", variant.name, variant.span));
@@ -75,6 +79,10 @@ impl Parser {
         let mut fields = Vec::new();
         let mut names = HashSet::new();
         while !self.check_simple(&TokenKind::RightBrace) {
+            self.skip_doc_strings();
+            if self.check_simple(&TokenKind::RightBrace) {
+                break;
+            }
             let name_token = self.take_identifier("enum payload field name")?;
             let name = identifier_text(&name_token.kind);
             if !names.insert(name.clone()) {

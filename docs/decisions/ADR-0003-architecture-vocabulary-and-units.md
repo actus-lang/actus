@@ -74,7 +74,7 @@ actus/
 │       └── codegen/
 ├── stdlib/
 │   ├── core/
-│   ├── alloc/
+│   ├── runtime/
 │   └── std/
 └── targets/
     ├── hosted/
@@ -89,7 +89,7 @@ This future layout is descriptive, not an immediate implementation task.
 - Use `package` for Actus-managed distribution units.
 - Use `module` for language-level source imports and namespaces.
 - Use `unit` for compiler-level independently compiled components.
-- Use `stdlib` for the official library family and `core`, `alloc`, and `std`
+- Use `stdlib` for the official library family and `core`, `runtime`, and `std`
   for its layers.
 - Use `target` for compilation platform configuration and runtime contracts.
 - Keep platform-specific implementation outside the language frontend.

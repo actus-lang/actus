@@ -46,6 +46,10 @@ pub enum Expr {
         expression: Box<Expr>,
         span: SourceSpan,
     },
+    Try {
+        expression: Box<Expr>,
+        span: SourceSpan,
+    },
     Call {
         callee: String,
         arguments: Vec<Argument>,
@@ -78,6 +82,7 @@ pub enum Expr {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CaseMode {
+    Plain,
     Abs,
     Dat,
 }

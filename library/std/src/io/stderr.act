@@ -1,0 +1,44 @@
+"""C ABI scalar output bridge for stderr."""
+open unsafe extern "C" verb actus_print_int_stderr(erg value: Int) -> Int;
+"""C ABI bridge that reads a borrowed buffer and writes it to stderr."""
+open unsafe extern "C" verb actus_print_buffer_stderr(abs text: Buffer) -> Int;
+"""C ABI bridge that writes a borrowed buffer followed by a newline to stderr."""
+open unsafe extern "C" verb actus_print_line_buffer_stderr(abs text: Buffer) -> Int;
+open unsafe extern "C" verb actus_flush_stderr() -> Int;
+
+"""Print an integer to stderr and return its typed I/O result."""
+open verb eprint_int(erg value: Int) -> Result[Int, IoError] {
+    erg status = actus_print_int_stderr(value: value);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Print a borrowed buffer to stderr without consuming it and return its
+typed byte-count or failure result.
+"""
+open verb eprint(abs text: Buffer) -> Result[Int, IoError] {
+    erg status = actus_print_buffer_stderr(text: abs text);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Print a borrowed buffer, append a newline, flush stderr, and return its
+typed byte-count or failure result.
+"""
+open verb eprintln(abs text: Buffer) -> Result[Int, IoError] {
+    erg status = actus_print_line_buffer_stderr(text: abs text);
+    erg flushed = actus_flush_stderr();
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => case flushed {
+            0 => Ok(status),
+            _ => Err(IoError.Failed),
+        },
+    };
+}

@@ -164,3 +164,23 @@ fn rejects_unterminated_strings() {
     assert_eq!(errors[0].kind, LexErrorKind::UnterminatedString);
     assert_eq!(errors[0].span, SourceSpan::new(0, 13));
 }
+
+#[test]
+fn scans_docstrings_and_strips_common_markdown_indentation() {
+    let source = "\"\"\"\n        Summary.\n\n        More detail.\n        \"\"\"";
+    let (tokens, errors) = scan(source);
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].kind, TokenKind::DocString("Summary.\n\nMore detail.".to_owned()));
+    assert_eq!(tokens[0].span.start, 0);
+    assert_eq!(tokens[0].span.end, source.len());
+}
+
+#[test]
+fn rejects_unterminated_docstrings() {
+    let (tokens, errors) = scan("\"\"\"missing terminator");
+
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].kind, LexErrorKind::UnterminatedDocString);
+}

@@ -1,4 +1,6 @@
-use crate::ast::{Argument, Block, Expr, Program, Role, Stmt, TopLevelDecl};
+use crate::ast::{Block, Program, Role, Stmt, TopLevelDecl};
+
+mod expressions;
 
 pub fn format_program(program: &Program) -> String {
     let mut formatter = Formatter { output: String::new(), indent: 0 };
@@ -284,111 +286,6 @@ impl Formatter {
             }
             Stmt::Block(block) => self.block(block),
         }
-    }
-
-    fn expression(&mut self, expression: &Expr) {
-        match expression {
-            Expr::Identifier { name, .. } => self.output.push_str(name),
-            Expr::BufferLiteral { length, .. } => {
-                self.output.push_str("Buffer[");
-                self.expression(length);
-                self.output.push(']');
-            }
-            Expr::Integer { value, .. } | Expr::FloatLiteral { value, .. } => {
-                self.output.push_str(value)
-            }
-            Expr::StringLiteral { value, .. } => self.string_literal(value),
-            Expr::Grouping { expression, .. } => self.grouping(expression),
-            Expr::Unary { expression, .. } => self.unary(expression),
-            Expr::Binary { left, operator, right, .. } => self.binary(left, operator, right),
-            Expr::Borrow { expression, .. } => self.borrow(expression),
-            Expr::Call { callee, arguments, .. } => self.call(callee, arguments),
-            Expr::MethodCall { receiver, method, arguments, .. } => {
-                self.method_call(receiver, method, arguments)
-            }
-            Expr::StructLit { name, fields, .. } => self.struct_literal(name, fields),
-            Expr::FieldAccess { object, field, .. } => self.field_access(object, field),
-            Expr::Case { .. } => self.output.push_str("case"),
-        }
-    }
-
-    fn string_literal(&mut self, value: &str) {
-        self.output.push('"');
-        self.output.push_str(value);
-        self.output.push('"');
-    }
-
-    fn grouping(&mut self, expression: &Expr) {
-        self.output.push('(');
-        self.expression(expression);
-        self.output.push(')');
-    }
-
-    fn unary(&mut self, expression: &Expr) {
-        self.output.push('-');
-        self.expression(expression);
-    }
-
-    fn binary(&mut self, left: &Expr, operator: &crate::ast::BinaryOp, right: &Expr) {
-        self.expression(left);
-        self.output.push_str(match operator {
-            crate::ast::BinaryOp::Add => " + ",
-            crate::ast::BinaryOp::Subtract => " - ",
-            crate::ast::BinaryOp::Multiply => " * ",
-            crate::ast::BinaryOp::Divide => " / ",
-        });
-        self.expression(right);
-    }
-
-    fn borrow(&mut self, expression: &Expr) {
-        self.output.push_str("ref ");
-        self.expression(expression);
-    }
-
-    fn call(&mut self, callee: &str, arguments: &[Argument]) {
-        self.output.push_str(callee);
-        self.output.push('(');
-        for (index, argument) in arguments.iter().enumerate() {
-            if index > 0 {
-                self.output.push_str(", ");
-            }
-            self.argument(argument);
-        }
-        self.output.push(')');
-    }
-
-    fn struct_literal(&mut self, name: &str, fields: &[crate::ast::StructFieldInit]) {
-        self.output.push_str(name);
-        self.output.push_str(" {");
-        for (index, field) in fields.iter().enumerate() {
-            if index > 0 {
-                self.output.push_str(", ");
-            }
-            self.output.push_str(&field.name);
-            self.output.push_str(": ");
-            self.expression(&field.value);
-        }
-        self.output.push('}');
-    }
-
-    fn field_access(&mut self, object: &Expr, field: &str) {
-        self.expression(object);
-        self.output.push('.');
-        self.output.push_str(field);
-    }
-
-    fn method_call(&mut self, receiver: &Expr, method: &str, arguments: &[Argument]) {
-        self.expression(receiver);
-        self.output.push('.');
-        self.call(method, arguments);
-    }
-
-    fn argument(&mut self, argument: &Argument) {
-        if let Some(name) = &argument.name {
-            self.output.push_str(name);
-            self.output.push_str(": ");
-        }
-        self.expression(&argument.expression);
     }
 
     fn line_indent(&mut self) {

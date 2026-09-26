@@ -119,7 +119,7 @@ impl CompilerConfiguration {
         let linker_flavor = target.linker_flavor();
         let entry_contract = target.entry_contract();
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
-            .unwrap_or_else(|| OsString::from(target.default_linker()));
+            .unwrap_or_else(|| default_linker(&target));
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
@@ -221,6 +221,10 @@ impl CompilerConfiguration {
 
     pub const fn entry_contract(&self) -> EntryContract {
         self.entry_contract
+    }
+
+    pub const fn host_runtime_enabled(&self) -> bool {
+        matches!(self.entry_contract, EntryContract::Hosted)
     }
 
     pub fn run_artifact_prefix(&self) -> &str {
@@ -340,8 +344,12 @@ fn resolve_manifest_target(
     let entry_contract = manifest.build.entry_contract.unwrap_or_else(|| target.entry_contract());
     let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
         .or_else(|| manifest.build.linker.as_deref().map(OsString::from))
-        .unwrap_or_else(|| OsString::from(target.default_linker()));
+        .unwrap_or_else(|| default_linker(&target));
     Ok((target, linker_flavor, entry_contract, linker))
+}
+
+fn default_linker(target: &TargetSpec) -> OsString {
+    OsString::from(target.default_linker())
 }
 
 impl LinkLibrary {

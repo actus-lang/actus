@@ -15,7 +15,7 @@ impl Analyzer {
             if receiver.name != "self" {
                 continue;
             }
-            if !matches!(receiver.role, Role::Erg | Role::Abs)
+            if !matches!(receiver.role, Role::Erg | Role::Abs | Role::Ins)
                 || !self.struct_types.contains_key(&receiver.ty.name)
             {
                 return Err(SemanticError {
@@ -36,6 +36,10 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         if let Some(role_name) = self.dynamic_role_for_expression(receiver) {
             return self.visit_dynamic_method_call(receiver, &role_name, method, arguments, span);
+        }
+        if let Some(role_name) = self.generic_role_for_expression(receiver) {
+            return self
+                .visit_generic_bound_method_call(receiver, &role_name, method, arguments, span);
         }
         if self.enum_receiver_name(receiver).is_some() {
             return self.validate_enum_constructor(receiver, method, arguments, span);
@@ -78,6 +82,64 @@ impl Analyzer {
         } else {
             self.visit_call(method, &combined, span)
         }
+    }
+
+    fn generic_role_for_expression(&self, expression: &Expr) -> Option<String> {
+        let type_name = super::analyzer::canonical_type_name(&self.resolved_type_name(expression)?);
+        self.generic_bounds
+            .get(&type_name)
+            .and_then(|bounds| bounds.iter().find(|bound| self.role_types.contains_key(*bound)))
+            .cloned()
+    }
+
+    fn visit_generic_bound_method_call(
+        &mut self,
+        receiver: &Expr,
+        role_name: &str,
+        method: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let role = self.role_types.get(role_name).cloned().ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::UnknownRole { name: role_name.to_owned() },
+            span,
+        })?;
+        let method_decl =
+            role.methods.iter().find(|candidate| candidate.name == method).ok_or_else(|| {
+                SemanticError {
+                    kind: SemanticErrorKind::UnknownMethod { method: method.to_owned() },
+                    span,
+                }
+            })?;
+        let receiver_role =
+            method_decl.params.first().map(|parameter| parameter.role.clone()).ok_or_else(
+                || SemanticError {
+                    kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
+                    span,
+                },
+            )?;
+        let signature = super::dynamic::role_method_signature(method_decl);
+        self.visit_expression(receiver)?;
+        if receiver_role == Role::Ins && !self.is_exclusive_owner(receiver) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
+                span,
+            });
+        }
+        let mut parameters = signature.params;
+        let mut dispatch = signature.dynamic_params;
+        parameters.remove(0);
+        dispatch.remove(0);
+        let signature = super::calls::VerbSignature {
+            params: parameters,
+            dynamic_params: dispatch,
+            ..signature
+        };
+        self.visit_call_with_signature(method, arguments, span, &signature)?;
+        if let Some(return_type) = &signature.return_type_name {
+            self.inferred_expression_types.insert((span.start, span.end), return_type.clone());
+        }
+        Ok(())
     }
 
     fn visit_raw_slice_call(
@@ -183,7 +245,7 @@ impl Analyzer {
         let mut combined = Vec::with_capacity(arguments.len() + 1);
         combined.push(Argument {
             name: named.then(|| receiver_name.to_owned()),
-            role: None,
+            role: matches!(role, Role::Ins).then_some(Role::Ins),
             role_span: None,
             expression: receiver_expression,
         });
@@ -210,6 +272,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

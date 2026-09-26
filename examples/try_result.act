@@ -1,0 +1,27 @@
+enum IoError {
+    Failed,
+}
+
+verb success_source() -> Result[Int, IoError] {
+    return Result[Int, IoError].Ok(7);
+}
+
+verb failure_source() -> Result[Int, IoError] {
+    return Result[Int, IoError].Err(IoError.Failed);
+}
+
+verb forward_success() -> Result[Int, IoError] {
+    return success_source()?;
+}
+
+verb forward_failure() -> Result[Int, IoError] {
+    return failure_source()?;
+}
+
+verb main() -> Int {
+    erg success = forward_success();
+    erg failure = forward_failure();
+    drop(success);
+    drop(failure);
+    return 42;
+}

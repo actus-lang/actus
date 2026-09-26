@@ -1,8 +1,8 @@
 use actus::runtime::{ActusBuffer, actus_buffer_allocate, actus_buffer_append, actus_buffer_drop};
 
 #[test]
-fn returns_printed_integer_value() {
-    assert_eq!(actus::runtime::actus_print_int(42), 42);
+fn reports_success_after_printing_an_integer() {
+    assert_eq!(actus::runtime::actus_print_int(42), 0);
 }
 
 #[test]
@@ -45,4 +45,12 @@ fn preserves_the_c_layout_fields_in_declaration_order() {
 fn exposes_the_cargo_built_runtime_archive() {
     let archive = actus::runtime::runtime_archive_path().expect("runtime archive should exist");
     assert!(archive.is_file(), "runtime archive path should point to a file");
+}
+
+#[test]
+fn exposes_the_versioned_runtime_contract_symbols() {
+    assert_eq!(actus::runtime::RUNTIME_ABI_VERSION, 1);
+    assert_eq!(actus::runtime::BUFFER_ALLOCATE_SYMBOL, "actus_buffer_allocate");
+    assert_eq!(actus::runtime::BUFFER_APPEND_SYMBOL, "actus_buffer_append");
+    assert_eq!(actus::runtime::BUFFER_DROP_SYMBOL, "actus_buffer_drop");
 }

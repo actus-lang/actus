@@ -127,6 +127,15 @@ fn rejects_non_exhaustive_enum_and_primitive_patterns() {
 }
 
 #[test]
+fn accepts_plain_scalar_case_without_ownership_annotation() {
+    let model = analyze_source(
+        "verb choose(erg status: Int) -> Int { return case status { 0 => 1, _ => 2, }; }",
+    )
+    .expect("plain scalar case should not create a borrow requirement");
+    assert!(model.borrows.is_empty());
+}
+
+#[test]
 fn rejects_duplicate_and_unreachable_patterns() {
     let duplicate = analyze_source(
         "enum Color { Red, Green, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Red => 2, _ => 0, }; }",

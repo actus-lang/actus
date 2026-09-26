@@ -1,0 +1,10 @@
+"""
+The static write contract used by buffered output adapters.
+
+The concrete `self` target is selected statically. The `ins` receiver owns
+the mutable cursor state; source bytes are an `abs` view.
+"""
+open role Writer {
+    verb write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError];
+    verb flush(ins self: Cursor) -> Result[Int, IoError];
+}

@@ -23,6 +23,7 @@ impl Analyzer {
             Expr::Borrow { expression, .. } | Expr::Grouping { expression, .. } => {
                 self.origin_of(expression)
             }
+            Expr::Try { expression, .. } => self.origin_of(expression),
             Expr::FieldAccess { object, .. } => derive_from(self.origin_of(object)),
             Expr::MethodCall { receiver, method, .. } => {
                 if method == "raw_slice" {
@@ -181,6 +182,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

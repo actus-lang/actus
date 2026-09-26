@@ -35,6 +35,7 @@ pub struct ImportDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleDecl {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub name: String,
     pub methods: Vec<RoleMethod>,
     pub span: SourceSpan,
@@ -90,6 +91,7 @@ pub struct EnumField {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructDef {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub fields: Vec<StructField>,
@@ -125,6 +127,7 @@ pub struct ExternalVerbDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerbDecl {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub metadata: Vec<MetaAttribute>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,

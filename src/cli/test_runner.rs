@@ -166,6 +166,7 @@ fn test_main(name: &str) -> TopLevelDecl {
     let span = SourceSpan::new(0, 0);
     TopLevelDecl::Verb(VerbDecl {
         is_open: false,
+        doc: None,
         metadata: Vec::new(),
         name: "main".to_owned(),
         generic_parameters: Vec::new(),

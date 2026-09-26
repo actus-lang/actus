@@ -19,6 +19,7 @@ use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
 use super::performance::PerformanceRegistry;
 use super::performance_emit::define_performances;
+use super::result_constructors::normalize_program;
 use super::target::build_isa_with_optimization;
 use super::types::NativeType;
 use crate::target::TargetSpec;
@@ -74,13 +75,18 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
+    let normalized_program = normalize_program(program);
+    let program = &normalized_program;
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
+    let codegen_program =
+        super::generic_verbs::specialize_program(program, &semantic.generic_instances)?;
+    let program = &codegen_program;
     validate_cleanup_plans(&semantic)
         .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
     let performance_registry =
-        PerformanceRegistry::from_reachable(&semantic.reachable_performances);
+        PerformanceRegistry::from_program(program, &semantic.reachable_performances);
     performance_registry.validate().map_err(NativeEmitError)?;
     let performance_definitions = performance_registry.definitions(program)?;
     let verbs = program.declarations.iter().filter_map(declaration_verb).collect::<Vec<_>>();
@@ -107,7 +113,7 @@ pub fn emit_program_object_for_target(
 
 fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
     match declaration {
-        TopLevelDecl::Verb(verb) => Some(verb),
+        TopLevelDecl::Verb(verb) if verb.generic_parameters.is_empty() => Some(verb),
         _ => None,
     }
 }
@@ -193,7 +199,9 @@ fn declare_all_functions(
         performance_definitions,
         layouts,
     )?);
-    metadata.extend(declare_runtime_functions(module)?);
+    let has_print_definition = verbs.iter().any(|verb| verb.name == "print")
+        || external_verbs.iter().any(|verb| verb.name == "print");
+    metadata.extend(declare_runtime_functions(module, has_print_definition)?);
     Ok(metadata)
 }
 

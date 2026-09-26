@@ -103,8 +103,10 @@ fn emit_case_branches(
             string_data,
             layouts,
         )?;
-        let argument = cranelift_codegen::ir::BlockArg::Value(branch_value);
-        function.ins().jump(merge, [&argument]);
+        if let Some(branch_value) = branch_value {
+            let argument = cranelift_codegen::ir::BlockArg::Value(branch_value);
+            function.ins().jump(merge, [&argument]);
+        }
         if branch.guard.is_none() {
             function.seal_block(matched);
         }
@@ -189,7 +191,7 @@ fn lower_case_branch<'a>(
     cleanup_schedule: &super::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     let branch_locals =
         bind_payload(function, subject, subject_type, branch, locals, local_types, layouts)?;
     if let Some(guard) = &branch.guard {
@@ -212,6 +214,7 @@ fn lower_case_branch<'a>(
             branch,
             &branch_locals,
             functions,
+            result_type,
             cleanup_schedule,
             string_data,
             layouts,
@@ -224,6 +227,7 @@ fn lower_case_branch<'a>(
         branch,
         &branch_locals,
         functions,
+        result_type,
         cleanup_schedule,
         string_data,
         layouts,
@@ -248,15 +252,17 @@ fn emit_guard_branch(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_case_body<'a>(
     function: &mut FunctionBuilder<'_>,
     branch: &'a crate::ast::CaseBranch,
     branch_locals: &BranchLocals<'a>,
     functions: &HashMap<String, FunctionRef>,
+    result_type: NativeType,
     cleanup_schedule: &super::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     let branch_value = match &branch.body {
         CaseBody::Expression(expression) => lower_expression(
             function,
@@ -271,6 +277,7 @@ fn lower_case_body<'a>(
         CaseBody::Block(block) => match lower_case_block(
             function,
             block,
+            branch.span,
             &branch_locals.0,
             &branch_locals.1,
             functions,
@@ -278,16 +285,17 @@ fn lower_case_body<'a>(
             string_data,
             layouts,
         )? {
-            Flow::Return(value) => value,
+            Flow::Return(value) => {
+                function.ins().return_(&[value]);
+                return Ok(None);
+            }
             Flow::Fallthrough => {
-                return Err(NativeEmitError(
-                    "case block must produce a value with return".to_owned(),
-                ));
+                function.ins().iconst(result_type.ir_type(layouts.pointer_type), 0)
             }
             Flow::Break | Flow::Continue => {
                 return Err(NativeEmitError("loop control escaped case block".to_owned()));
             }
         },
     };
-    Ok(branch_value)
+    Ok(Some(branch_value))
 }

@@ -87,6 +87,40 @@ fn accepts_generic_role_bound_for_a_performed_type() {
 }
 
 #[test]
+fn resolves_static_reader_method_calls_through_a_generic_bound() {
+    analyze_source(
+        "enum IoError { Failed, } struct Input { state: Int, } role Reader { verb read(abs self: Input, ins buffer: Buffer) -> Result[Int, IoError]; } perform Reader for Input { verb read(abs self: Input, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Ok(0); } } struct Adapter[Source: Reader] { erg source: Source, erg buffer: Buffer, } verb refill[Source: Reader](ins adapter: Adapter[Source]) -> Result[Int, IoError] { return adapter.source.read(buffer: ins adapter.buffer); }",
+    )
+    .expect("generic Reader calls should resolve to a static role contract");
+}
+
+#[test]
+fn rejects_non_reader_type_in_generic_stream_adapter() {
+    let error = analyze_source(
+        "struct Input { state: Int, } struct Other { state: Int, } role Reader { verb read(abs self: Input, ins buffer: Buffer); } struct Adapter[Source: Reader] { erg source: Source, erg buffer: Buffer, } verb main(erg adapter: Adapter[Other]) { }",
+    )
+    .expect_err("an adapter must reject a type without the required Reader performance");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument }
+            if parameter == "Source" && constraint == "Reader" && argument == "Other"
+    ));
+}
+
+#[test]
+fn rejects_non_writer_type_in_generic_stream_adapter() {
+    let error = analyze_source(
+        "struct Output { state: Int, } struct Other { state: Int, } role Writer { verb write(abs self: Output, abs buffer: Buffer) -> Int; verb flush(abs self: Output) -> Int; } struct Adapter[Target: Writer] { erg target: Target, erg buffer: Buffer, } verb main(erg adapter: Adapter[Other]) { }",
+    )
+    .expect_err("an adapter must reject a type without the required Writer performance");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument }
+            if parameter == "Target" && constraint == "Writer" && argument == "Other"
+    ));
+}
+
+#[test]
 fn rejects_generic_role_bound_without_a_performance() {
     let error = analyze_source("struct File { value: Int, } role Writer { verb write(abs self: File); } struct Box[T: Writer] { item: T, } verb main(erg item: Box[File]) { }")
         .expect_err("a type without a performance must fail its role bound");

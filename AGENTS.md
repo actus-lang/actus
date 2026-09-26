@@ -234,3 +234,92 @@ A change is ready for review only when:
 - documentation reflects the implemented behavior.
 
 When a design appears to require a large file, a large function, a generic utility module, or a reverse dependency, stop and revisit the architecture before adding code.
+
+## Actus Language & Standard Library Coding Standards
+
+These rules apply specifically to Actus source files and the Actus standard
+library.
+
+### 1. Actus Module Facades and Modularity
+
+- A directory module has one canonical facade file whose name matches the
+  module directory. For example, `library/std/src/io/io.act` is the facade
+  for the `io` module.
+- The facade is the public gateway. It re-exports sibling declarations with
+  extensionless `open` declarations such as `open stdin;` and `open stdout;`.
+- Sibling `.act` files share the module's internal scope and may use one
+  another's declarations without import boilerplate.
+- Only declarations exposed through the facade are visible to external
+  consumers.
+- Sibling discovery and facade exports must be deterministic and duplicate
+  declarations must be rejected at compile time.
+- Actus source and standard-library modules must follow Actus facade and
+  sibling rules; no unrelated language's module conventions belong here.
+
+### 2. File Size and Proactive Modularity
+
+- Actus source files and standard-library modules must remain below the
+  repository's 500-line hard limit.
+- At approximately 400 lines, decomposition must be planned before further
+  feature growth.
+- Decompose by domain responsibility: facade, error types, ownership-aware
+  input, output bridges, and stream operations belong in separate sibling
+  files when they are independently understandable.
+- Do not create monolithic standard-library modules merely to avoid defining
+  a clear facade boundary.
+
+### 3. C ABI and Typed Error Boundaries
+
+- C ABI bridges must use explicit, documented status contracts. Arithmetic
+  encodings such as `status - 2` or `status - 1` are forbidden.
+- A byte-oriented bridge returns a non-negative actual byte count on success,
+  `-1` for failure, and `-2` for end-of-stream where that status applies.
+- Actus public APIs must translate raw C statuses into `Result[T, E]` before
+  exposing them to application code.
+- Callers should use the `?` operator for compatible error propagation.
+- Ownership roles must be checked before crossing the ABI boundary, and the
+  bridge must not hide allocation, ownership transfer, or cleanup behavior.
+
+### 4. Ownership Roles and Zero-Allocation I/O
+
+- `erg` identifies the active owner and the binding permitted to mutate its
+  resource.
+- `abs` identifies a read-only, non-owning view; it does not consume or drop
+  the source resource.
+- `ins` identifies an exclusive call-scope loan. An `ins Buffer` may be filled
+  in place and is restored to the caller after the call without a new buffer
+  allocation.
+- `dat` identifies a terminal ownership transfer to the callee.
+- Streaming input should accept caller-provided `ins Buffer` storage so loops
+  can reuse the same allocation and remain zero-allocation.
+- Output operations should accept `abs Buffer` when they only inspect bytes.
+
+### 5. Public Actus Documentation
+
+- Every public Actus type, enum, external bridge, and verb must have a `///`
+  documentation comment.
+- Documentation must state the relevant ownership role, return value, error
+  variants, side effects, and C ABI relationship where applicable.
+- `Result.Ok(count)` must be documented as the exact number of processed
+  bytes, not as a success flag or encoded status.
+- Comments must describe implemented behavior and must not promise hidden
+  runtime guarantees that the implementation does not provide.
+
+### 6. Actus Quality Gates
+
+Before committing Actus compiler or standard-library changes, run the required
+repository checks and any relevant native or semantic integration tests:
+
+```sh
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+scripts/check_source_limits.sh
+git diff --check
+```
+
+Public API changes require documentation and tests. Ownership, borrowing, C
+ABI, and standard-library changes require both accepted and rejected cases;
+native runtime behavior must be verified with an execution test where the
+change crosses the code-generation boundary.

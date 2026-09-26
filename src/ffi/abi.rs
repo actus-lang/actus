@@ -1,4 +1,7 @@
-use crate::ast::{BuiltinType, ExternalVerbDecl, ForeignAbi, Role, VerbDecl, lookup_builtin_type};
+use crate::ast::{
+    BuiltinType, ExternalVerbDecl, ForeignAbi, ReturnAccess, ReturnType, Role, VerbDecl,
+    lookup_builtin_type,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CAbiType {
@@ -25,6 +28,7 @@ pub enum CAbiOwnership {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CAbiReturnOwnership {
     Value,
+    Borrowed,
     OwnedResource,
 }
 
@@ -91,6 +95,7 @@ pub enum CAbiError {
     MissingReturnType { verb: String },
     MissingUnsafeBoundary { verb: String },
     InvalidOwnership { parameter: String, role: String, ty: String },
+    InvalidReturnOwnership { access: String, ty: String },
     UnsupportedType { name: String },
 }
 
@@ -109,6 +114,9 @@ impl std::fmt::Display for CAbiError {
                     "C ABI parameter `{parameter}` cannot use role `{role}` with type `{ty}`"
                 )
             }
+            Self::InvalidReturnOwnership { access, ty } => {
+                write!(formatter, "C ABI return cannot use access `{access}` with type `{ty}")
+            }
             Self::UnsupportedType { name } => {
                 write!(formatter, "type `{name}` has no C ABI mapping")
             }
@@ -119,11 +127,7 @@ impl std::fmt::Display for CAbiError {
 impl std::error::Error for CAbiError {}
 
 pub fn c_abi_signature(verb: &VerbDecl) -> Result<CAbiSignature, CAbiError> {
-    signature_parts(
-        &verb.name,
-        &verb.params,
-        verb.return_type.as_ref().map(|return_type| &return_type.ty),
-    )
+    signature_parts(&verb.name, &verb.params, verb.return_type.as_ref())
 }
 
 pub fn c_abi_external_signature(
@@ -135,17 +139,13 @@ pub fn c_abi_external_signature(
     match declaration.abi {
         ForeignAbi::C => {}
     }
-    signature_parts(
-        &declaration.name,
-        &declaration.params,
-        declaration.return_type.as_ref().map(|return_type| &return_type.ty),
-    )
+    signature_parts(&declaration.name, &declaration.params, declaration.return_type.as_ref())
 }
 
 fn signature_parts(
     name: &str,
     params: &[crate::ast::Param],
-    return_type: Option<&crate::ast::TypeName>,
+    return_type: Option<&ReturnType>,
 ) -> Result<CAbiSignature, CAbiError> {
     let return_type =
         return_type.ok_or_else(|| CAbiError::MissingReturnType { verb: name.to_owned() })?;
@@ -164,8 +164,8 @@ fn signature_parts(
     Ok(CAbiSignature {
         name: name.to_owned(),
         parameters,
-        return_type: map_type(&return_type.name)?,
-        return_ownership: return_ownership(&return_type.name)?,
+        return_type: map_type(&return_type.ty.name)?,
+        return_ownership: return_ownership(return_type)?,
         calling_convention: CallingConvention::C,
     })
 }
@@ -211,9 +211,18 @@ fn map_ownership(role: &Role) -> CAbiOwnership {
     }
 }
 
-fn return_ownership(name: &str) -> Result<CAbiReturnOwnership, CAbiError> {
-    match map_type(name)? {
-        CAbiType::Int32 => Ok(CAbiReturnOwnership::Value),
-        CAbiType::OpaquePointer => Ok(CAbiReturnOwnership::OwnedResource),
+fn return_ownership(return_type: &ReturnType) -> Result<CAbiReturnOwnership, CAbiError> {
+    let mapped = map_type(&return_type.ty.name)?;
+    if return_type.access == ReturnAccess::Abs && mapped != CAbiType::OpaquePointer {
+        return Err(CAbiError::InvalidReturnOwnership {
+            access: "abs".to_owned(),
+            ty: return_type.ty.name.clone(),
+        });
+    }
+    match (return_type.access, mapped) {
+        (ReturnAccess::Owned, CAbiType::OpaquePointer) => Ok(CAbiReturnOwnership::OwnedResource),
+        (ReturnAccess::Abs, CAbiType::OpaquePointer) => Ok(CAbiReturnOwnership::Borrowed),
+        (ReturnAccess::Owned, _) => Ok(CAbiReturnOwnership::Value),
+        (ReturnAccess::Abs, _) => unreachable!("scalar abs returns are rejected above"),
     }
 }

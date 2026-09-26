@@ -54,3 +54,16 @@ fn diagnostic_code(message: &str) -> Option<String> {
     let end = message[start..].find(']')? + start;
     Some(message[start..end].to_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::diagnostic_code;
+
+    #[test]
+    fn preserves_ownership_diagnostic_codes_for_lsp() {
+        for code in ["E1064", "E1065", "E1066", "E1009", "E1011"] {
+            let message = format!("error[{code}] at 1:1: ownership violation");
+            assert_eq!(diagnostic_code(&message).as_deref(), Some(code));
+        }
+    }
+}
