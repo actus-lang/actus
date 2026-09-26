@@ -21,6 +21,11 @@ pub fn link_object(
 ) -> Result<(), NativeLinkError> {
     let linker = configuration.linker();
     let mut command = Command::new(linker);
+    if configuration.linker_flavor() == crate::configuration::LinkerFlavor::Msvc
+        && is_rust_lld(linker)
+    {
+        command.args(["-flavor", "link"]);
+    }
     command.arg(object);
     if configuration.host_runtime_enabled()
         && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
@@ -51,8 +56,18 @@ pub fn link_object(
     )))
 }
 
+fn is_rust_lld(linker: &std::ffi::OsStr) -> bool {
+    linker
+        .to_string_lossy()
+        .rsplit(['/', '\\'])
+        .next()
+        .and_then(|name| name.strip_suffix(".exe").or(Some(name)))
+        .is_some_and(|name| name.eq_ignore_ascii_case("rust-lld"))
+}
+
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
     use std::path::Path;
 
     use crate::target::LinkerFlavor;
@@ -88,5 +103,12 @@ mod tests {
         assert_eq!(LinkerFlavor::Gnu.output_arguments(path), ["-o", "/tmp/actus-output"]);
         assert_eq!(LinkerFlavor::Apple.output_arguments(path), ["-o", "/tmp/actus-output"]);
         assert_eq!(LinkerFlavor::Msvc.output_arguments(path), ["/OUT:/tmp/actus-output"]);
+    }
+
+    #[test]
+    fn identifies_the_rust_lld_driver() {
+        assert!(super::is_rust_lld(OsStr::new("rust-lld.exe")));
+        assert!(super::is_rust_lld(OsStr::new("C:\\Rust\\rust-lld.exe")));
+        assert!(!super::is_rust_lld(OsStr::new("lld-link.exe")));
     }
 }
