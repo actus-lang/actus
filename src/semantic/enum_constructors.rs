@@ -218,6 +218,7 @@ fn argument_span(argument: &Argument) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

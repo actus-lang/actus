@@ -27,6 +27,8 @@ pub(super) struct Analyzer {
     pub(super) signatures: HashMap<String, super::calls::VerbSignature>,
     pub(super) loop_boundaries: Vec<usize>,
     pub(super) current_return_type: Option<BuiltinType>,
+    pub(super) current_return_type_name: Option<crate::ast::TypeName>,
+    pub(super) current_return_is_builtin_result: bool,
     pub(super) current_return_access: Option<ReturnAccess>,
     pub(super) current_abs_origins: HashMap<String, usize>,
     pub(super) binding_origins: HashMap<usize, Origin>,
@@ -85,6 +87,8 @@ impl Analyzer {
             signatures: HashMap::new(),
             loop_boundaries: Vec::new(),
             current_return_type: None,
+            current_return_type_name: None,
+            current_return_is_builtin_result: false,
             current_return_access: None,
             current_abs_origins: HashMap::new(),
             binding_origins: HashMap::new(),
@@ -126,6 +130,7 @@ impl Analyzer {
             ))
         });
         self.current_return_type = None;
+        self.current_return_type_name = None;
         self.current_return_access = None;
         Ok(self.model)
     }
@@ -210,6 +215,16 @@ impl Analyzer {
             .return_type
             .as_ref()
             .and_then(|return_type| lookup_builtin_type(&return_type.ty.name));
+        self.current_return_type_name =
+            verb.return_type.as_ref().map(|return_type| return_type.ty.clone());
+        self.current_return_is_builtin_result =
+            verb.return_type.as_ref().is_some_and(|return_type| {
+                return_type.ty.name == "Result"
+                    && self
+                        .enum_types
+                        .get("Result")
+                        .is_some_and(|definition| definition.span.start == 0)
+            });
         self.initialize_origin_parameter_map(&verb.params);
         self.enter_scope(verb.body.span);
         for parameter in &verb.params {
@@ -229,7 +244,9 @@ impl Analyzer {
             }
         }
         self.visit_block(&verb.body)?;
-        if self.current_return_type.is_some() && !block_guarantees_return(&verb.body) {
+        let requires_return_value =
+            self.current_return_type.is_some() || self.current_return_is_builtin_result;
+        if requires_return_value && !block_guarantees_return(&verb.body) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MissingReturnValue,
                 span: verb.body.span,
@@ -325,6 +342,10 @@ impl Analyzer {
                 self.visit_expression(expression)
             }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
+            Expr::Try { expression, span } => {
+                self.visit_expression(expression)?;
+                self.validate_try_expression(expression, *span)
+            }
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
             Expr::MethodCall { receiver, method, arguments, span } => {
                 self.visit_method_call(receiver, method, arguments, *span)
@@ -347,6 +368,64 @@ impl Analyzer {
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
     }
+
+    fn validate_try_expression(
+        &self,
+        expression: &Expr,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(expected) = self.current_return_type_name.as_ref() else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::TypeMismatch {
+                    callee: "?".to_owned(),
+                    parameter: "return type".to_owned(),
+                    expected: "Result[T, E]".to_owned(),
+                    found: "no return type".to_owned(),
+                },
+                span,
+            });
+        };
+        let Some(operand) = self.enum_type_application(expression) else {
+            return Err(try_type_mismatch(span, expected, "unknown"));
+        };
+        if expected.name != "Result"
+            || expected.arguments.len() != 2
+            || operand.name != "Result"
+            || operand.arguments.len() != 2
+            || canonical_type_name(&expected.arguments[1])
+                != canonical_type_name(&operand.arguments[1])
+        {
+            return Err(try_type_mismatch(span, expected, &canonical_type_name(&operand)));
+        }
+        Ok(())
+    }
+}
+
+fn try_type_mismatch(
+    span: crate::lexer::SourceSpan,
+    expected: &crate::ast::TypeName,
+    found: &str,
+) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::TypeMismatch {
+            callee: "?".to_owned(),
+            parameter: "Result".to_owned(),
+            expected: canonical_type_name(expected),
+            found: found.to_owned(),
+        },
+        span,
+    }
+}
+
+pub(super) fn canonical_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }
 
 fn block_guarantees_return(block: &Block) -> bool {
@@ -396,6 +475,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

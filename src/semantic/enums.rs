@@ -106,13 +106,20 @@ impl Analyzer {
         Ok(())
     }
 
-    fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
+    pub(super) fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
         if let Some(type_name) = self.resolved_type_name(expression)
             && self.enum_types.contains_key(&type_name.name)
         {
             return Some(type_name);
         }
         let receiver = match expression {
+            Expr::Call { callee, .. } => {
+                return self.signatures.get(callee).and_then(|signature| {
+                    (signature.return_type_name.as_ref()?.name == "Result")
+                        .then(|| signature.return_type_name.clone())
+                        .flatten()
+                });
+            }
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => object,
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => expression,
             _ => return None,

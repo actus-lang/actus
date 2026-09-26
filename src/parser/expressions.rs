@@ -105,7 +105,16 @@ impl Parser {
     }
 
     fn parse_field_access(&mut self, mut expression: Expr) -> Result<Expr, ParseError> {
-        while self.match_simple(TokenKind::Dot) {
+        loop {
+            if self.match_simple(TokenKind::Question) {
+                let span =
+                    SourceSpan::new(expression_span(&expression).start, self.previous().span.end);
+                expression = Expr::Try { expression: Box::new(expression), span };
+                continue;
+            }
+            if !self.match_simple(TokenKind::Dot) {
+                break;
+            }
             let field_token = self.take_identifier("field name after `.`")?;
             let field = identifier_text(&field_token.kind);
             if self.match_simple(TokenKind::LeftParen) {

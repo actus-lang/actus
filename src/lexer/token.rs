@@ -80,5 +80,6 @@ pub enum TokenKind {
     Arrow,
     FatArrow,
     Dot,
+    Question,
     Eof,
 }

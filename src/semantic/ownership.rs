@@ -152,6 +152,32 @@ impl Analyzer {
     }
 
     fn validate_return_type(&self, expression: &Expr) -> Result<(), SemanticError> {
+        if let Some(expected) = self.current_return_type_name.as_ref()
+            && expected.name == "Result"
+        {
+            let valid = if matches!(expression, Expr::Try { .. }) {
+                expected
+                    .arguments
+                    .first()
+                    .and_then(|type_name| crate::ast::lookup_builtin_type(&type_name.name))
+                    == self.expression_type(expression)
+            } else {
+                self.expression_type_name(expression).as_deref()
+                    == Some(super::analyzer::canonical_type_name(expected).as_str())
+            };
+            if valid {
+                return Ok(());
+            }
+            return Err(SemanticError {
+                kind: SemanticErrorKind::ReturnTypeMismatch {
+                    expected: super::analyzer::canonical_type_name(expected),
+                    found: self
+                        .expression_type_name(expression)
+                        .unwrap_or_else(|| "unknown".to_owned()),
+                },
+                span: expression_span(expression),
+            });
+        }
         let Some(expected) = self.current_return_type else { return Ok(()) };
         let Some(found) = self.expression_type(expression) else { return Ok(()) };
         if found == expected {
@@ -276,6 +302,7 @@ fn contains_returned_borrow(expression: &Expr) -> bool {
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
             contains_returned_borrow(expression)
         }
+        Expr::Try { expression, .. } => contains_returned_borrow(expression),
         Expr::Binary { left, right, .. } => {
             contains_returned_borrow(left) || contains_returned_borrow(right)
         }
@@ -319,6 +346,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

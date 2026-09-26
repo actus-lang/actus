@@ -213,6 +213,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Unary { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
         | Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }

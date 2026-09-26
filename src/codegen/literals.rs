@@ -75,7 +75,8 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
         }
         Expr::Grouping { expression, .. }
         | Expr::Unary { expression, .. }
-        | Expr::Borrow { expression, .. } => collect_expression(expression, values),
+        | Expr::Borrow { expression, .. }
+        | Expr::Try { expression, .. } => collect_expression(expression, values),
         Expr::Binary { left, right, .. } => {
             collect_expression(left, values);
             collect_expression(right, values);

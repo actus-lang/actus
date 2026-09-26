@@ -19,6 +19,10 @@ impl Formatter {
             Expr::Unary { expression, .. } => self.unary(expression),
             Expr::Binary { left, operator, right, .. } => self.binary(left, operator, right),
             Expr::Borrow { expression, .. } => self.borrow(expression),
+            Expr::Try { expression, .. } => {
+                self.expression(expression);
+                self.output.push('?');
+            }
             Expr::Call { callee, arguments, .. } => self.call(callee, arguments),
             Expr::MethodCall { receiver, method, arguments, .. } => {
                 self.method_call(receiver, method, arguments)

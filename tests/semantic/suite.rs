@@ -317,3 +317,15 @@ fn rejects_loop_control_outside_a_loop() {
         matches!(continue_error.kind, SemanticErrorKind::LoopControlOutsideLoop { keyword } if keyword == "continue")
     );
 }
+
+#[test]
+fn validates_result_returns_and_try_propagation() {
+    let source = "enum IoError { Eof, Failed, } verb read() -> Result[Int, IoError] { return Result[Int, IoError].Ok(1); } verb caller() -> Result[Int, IoError] { return read()?; }";
+    analyze_source(source).expect("compatible Result values should support try propagation");
+
+    let invalid = "enum IoError { Eof, Failed, } verb read() -> Result[Int, IoError] { return Result[Int, IoError].Ok(1); } verb caller() -> Int { return read()?; }";
+    analyze_source(invalid).expect_err("try requires a Result-returning caller");
+
+    let wrong_result = "enum IoError { Eof, Failed, } enum OtherError { Failed, } verb broken() -> Result[Int, IoError] { return Result[Int, OtherError].Ok(1); }";
+    analyze_source(wrong_result).expect_err("Result error types must match");
+}

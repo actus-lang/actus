@@ -46,6 +46,10 @@ pub enum Expr {
         expression: Box<Expr>,
         span: SourceSpan,
     },
+    Try {
+        expression: Box<Expr>,
+        span: SourceSpan,
+    },
     Call {
         callee: String,
         arguments: Vec<Argument>,

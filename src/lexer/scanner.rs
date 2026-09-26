@@ -78,6 +78,7 @@ impl<'source> Scanner<'source> {
             '*' => self.push_simple(TokenKind::Star, start),
             '/' => self.push_simple(TokenKind::Slash, start),
             '.' => self.push_simple(TokenKind::Dot, start),
+            '?' => self.push_simple(TokenKind::Question, start),
             '"' => self.scan_string(start),
             character if is_identifier_start(character) => self.scan_identifier(start),
             character if character.is_ascii_digit() => self.scan_integer(start),

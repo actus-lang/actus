@@ -14,6 +14,7 @@ pub(super) struct VerbSignature {
     pub(super) params: Vec<(String, Role, String)>,
     pub(super) dynamic_params: Vec<DispatchMode>,
     pub(super) return_type: Option<BuiltinType>,
+    pub(super) return_type_name: Option<crate::ast::TypeName>,
     pub(super) return_access: Option<ReturnAccess>,
 }
 
@@ -32,6 +33,7 @@ impl VerbDecl {
                 .return_type
                 .as_ref()
                 .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
+            return_type_name: self.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
         }
     }
@@ -52,6 +54,7 @@ impl ExternalVerbDecl {
                 .return_type
                 .as_ref()
                 .and_then(|return_type| lookup_builtin_type(&return_type.ty.name)),
+            return_type_name: self.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
         }
     }

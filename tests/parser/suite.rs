@@ -429,3 +429,14 @@ fn renders_parser_errors_with_stable_codes_and_locations() {
         "error[E0003] at 3:1: expected `;`, found RightBrace"
     );
 }
+
+#[test]
+fn parses_try_operator_as_a_postfix_expression() {
+    let program = parse_source(
+        "enum IoError { Eof, Failed, } verb read() -> Result[Int, IoError] { return Result[Int, IoError].Ok(1); } verb main() -> Result[Int, IoError] { return read()?; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[2] else { panic!("expected main") };
+    let Stmt::Return { value: Some(Expr::Try { .. }), .. } = &verb.body.statements[0] else {
+        panic!("expected try expression")
+    };
+}
