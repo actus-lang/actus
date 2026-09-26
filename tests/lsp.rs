@@ -108,7 +108,7 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
 #[test]
 fn lsp_hover_and_formatting_return_compiler_information() {
     let uri = "file:///tmp/actus-lsp-hover.act";
-    let source = "/// Adds a value.\nverb add(abs value: Int) -> Int { return value; }\n";
+    let source = "\"\"\"Adds a value.\nThe value is inspected without ownership transfer.\n\"\"\"\nverb add(abs value: Int) -> Int { return value; }\n";
     let verb_position = position_after(source, "verb add");
     let parameter_position = position_after(source, "return value");
     let messages = [
@@ -146,6 +146,7 @@ fn lsp_hover_and_formatting_return_compiler_information() {
     assert!(stdout.contains("markdown"));
     assert!(stdout.contains("abs value: Int"));
     assert!(stdout.contains("Adds a value."));
+    assert!(stdout.contains("The value is inspected without ownership transfer."));
     assert!(stdout.contains("newText"));
     assert!(stdout.contains("verb add(abs value: Int) -> Int"));
 }

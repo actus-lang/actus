@@ -32,6 +32,7 @@ pub fn find_hover(uri: &str, source: &str, position: &LspPosition) -> Option<Hov
 struct SymbolInfo {
     signature: String,
     span: SourceSpan,
+    documentation: Option<String>,
 }
 
 fn local_info(source: &str, program: &Program, name: &str, offset: usize) -> Option<SymbolInfo> {
@@ -59,22 +60,28 @@ fn declaration_info(source: &str, declaration: &TopLevelDecl, name: &str) -> Opt
         TopLevelDecl::Verb(verb) if verb.name == name => Some(SymbolInfo {
             signature: format!("verb {}{}", verb.name, verb_signature(verb)),
             span: verb.span,
+            documentation: verb.doc.clone(),
         }),
         TopLevelDecl::ExternalVerb(verb) if verb.name == name => Some(SymbolInfo {
             signature: format!("extern verb {}{}", verb.name, external_signature(verb)),
             span: verb.span,
+            documentation: None,
         }),
         TopLevelDecl::Struct(definition) if definition.name == name => Some(SymbolInfo {
             signature: format!("struct {}", definition.name),
             span: definition.span,
+            documentation: definition.doc.clone(),
         }),
         TopLevelDecl::Enum(definition) if definition.name == name => Some(SymbolInfo {
             signature: format!("enum {}", definition.name),
             span: definition.span,
+            documentation: None,
         }),
-        TopLevelDecl::Role(role) if role.name == name => {
-            Some(SymbolInfo { signature: format!("role {}", role.name), span: role.span })
-        }
+        TopLevelDecl::Role(role) if role.name == name => Some(SymbolInfo {
+            signature: format!("role {}", role.name),
+            span: role.span,
+            documentation: role.doc.clone(),
+        }),
         _ => None,
     }
     .map(|mut info| {
@@ -87,6 +94,7 @@ fn parameter_info(source: &str, params: &[Param], name: &str) -> Option<SymbolIn
     params.iter().find(|param| param.name == name).map(|param| SymbolInfo {
         signature: format!("{} {}: {}", role_name(&param.role), name, type_name(&param.ty)),
         span: identifier_span(source, param.span, name).unwrap_or(param.span),
+        documentation: None,
     })
 }
 
@@ -98,6 +106,7 @@ fn block_info(source: &str, statements: &[Stmt], name: &str) -> Option<SymbolInf
                 return Some(SymbolInfo {
                     signature: format!("{} {}: {}", role_name(role), name, ty),
                     span: identifier_span(source, *span, name).unwrap_or(*span),
+                    documentation: None,
                 });
             }
             Stmt::Loop(block) | Stmt::Block(block) => {
@@ -151,7 +160,12 @@ fn declaration_name(declaration: &TopLevelDecl) -> Option<&str> {
 }
 
 fn format_markdown(info: &SymbolInfo, source: &str, offset: usize) -> String {
-    let documentation = documentation_before(source, offset);
+    let documentation = info
+        .documentation
+        .as_deref()
+        .filter(|documentation| !documentation.trim().is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| documentation_before(source, offset));
     if documentation.is_empty() {
         format!("```actus\n{}\n```", info.signature)
     } else {
