@@ -16,8 +16,8 @@ The following accepted architecture decisions extend the ownership model after
 the original Roles and Performance phase. They are tracked as separate,
 gated implementation roadmaps:
 
-- [ ] [ADR-0020: Exclusive Call-Scope Loans and the Instrumental Role](docs/roadmap/adr-0020-exclusive-call-scope-loans.md)
-- [ ] [ADR-0021: Single-Origin Views and Caller-Scope Borrow Propagation](docs/roadmap/adr-0021-single-origin-views.md)
+- [x] [ADR-0020: Exclusive Call-Scope Loans and the Instrumental Role](docs/roadmap/adr-0020-exclusive-call-scope-loans.md)
+- [x] [ADR-0021: Single-Origin Views and Caller-Scope Borrow Propagation](docs/roadmap/adr-0021-single-origin-views.md)
 
 ## Phases
 
