@@ -46,3 +46,11 @@ fn exposes_the_cargo_built_runtime_archive() {
     let archive = actus::runtime::runtime_archive_path().expect("runtime archive should exist");
     assert!(archive.is_file(), "runtime archive path should point to a file");
 }
+
+#[test]
+fn exposes_the_versioned_runtime_contract_symbols() {
+    assert_eq!(actus::runtime::RUNTIME_ABI_VERSION, 1);
+    assert_eq!(actus::runtime::BUFFER_ALLOCATE_SYMBOL, "actus_buffer_allocate");
+    assert_eq!(actus::runtime::BUFFER_APPEND_SYMBOL, "actus_buffer_append");
+    assert_eq!(actus::runtime::BUFFER_DROP_SYMBOL, "actus_buffer_drop");
+}

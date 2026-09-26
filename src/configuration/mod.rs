@@ -223,6 +223,10 @@ impl CompilerConfiguration {
         self.entry_contract
     }
 
+    pub const fn host_runtime_enabled(&self) -> bool {
+        matches!(self.entry_contract, EntryContract::Hosted)
+    }
+
     pub fn run_artifact_prefix(&self) -> &str {
         &self.run_artifact_prefix
     }

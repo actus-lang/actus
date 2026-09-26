@@ -24,6 +24,9 @@ pub enum EntryContract {
 
 impl LinkerFlavor {
     pub fn from_target(triple: &Triple) -> Result<Self, TargetSpecError> {
+        if is_freestanding_target(triple) {
+            return Ok(Self::Gnu);
+        }
         let flavor = match triple.environment {
             Environment::Msvc => Self::Msvc,
             Environment::Gnu
@@ -120,6 +123,13 @@ impl TargetSpec {
         })?;
         let abi = triple
             .default_calling_convention()
+            .or_else(|()| {
+                if is_freestanding_target(&triple) {
+                    Ok(CallingConvention::SystemV)
+                } else {
+                    Err(())
+                }
+            })
             .map_err(|()| TargetSpecError(format!("target `{triple}` has no default ABI")))?;
         let linker_flavor = LinkerFlavor::from_target(&triple)?;
         Ok(Self {
@@ -183,6 +193,17 @@ impl TargetSpec {
         }
         format!("{hash:016x}")
     }
+}
+
+fn is_freestanding_target(triple: &Triple) -> bool {
+    matches!(
+        triple.operating_system,
+        OperatingSystem::Unknown
+            | OperatingSystem::None_
+            | OperatingSystem::Uefi
+            | OperatingSystem::Espidf
+            | OperatingSystem::VxWorks
+    )
 }
 
 #[cfg(test)]

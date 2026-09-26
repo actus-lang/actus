@@ -41,6 +41,15 @@ fn maps_actus_roles_and_types_to_a_c_abi_signature() {
 }
 
 #[test]
+fn maps_instrumental_buffers_to_exclusive_c_pointers() {
+    let verb = parse_verb("verb append(ins buffer: Buffer) -> Int { return 0; }");
+    let signature = c_abi_signature(&verb).expect("instrumental buffer should map");
+
+    assert_eq!(signature.parameters[0].ty, CAbiType::OpaquePointer);
+    assert_eq!(signature.parameters[0].ownership, CAbiOwnership::Exclusive);
+}
+
+#[test]
 fn rejects_implicit_returns_at_the_c_abi_boundary() {
     let verb = parse_verb("verb exchange(erg target: Buffer) { drop(target); }");
     let error = c_abi_signature(&verb).expect_err("C exports require explicit return types");
@@ -91,11 +100,49 @@ fn models_external_c_declarations_without_a_definition_body() {
 }
 
 #[test]
+fn validates_ins_ownership_before_an_external_c_call() {
+    let source = "unsafe extern \"C\" verb mutate(ins buffer: Buffer) -> Int; verb main() -> Int { erg buffer = Buffer[4]; return mutate(buffer: ins buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+
+    analyze(&program).expect("ins ownership should be valid at the C boundary");
+}
+
+#[test]
+fn rejects_ffi_aliasing_before_native_lowering() {
+    let source = "unsafe extern \"C\" verb merge(ins target: Buffer, abs view: Buffer) -> Int; verb main() -> Int { erg buffer = Buffer[4]; return merge(target: ins buffer, view: abs buffer); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = analyze(&program).expect_err("aliased FFI arguments must be rejected");
+
+    assert!(matches!(error.kind, actus::semantic::SemanticErrorKind::ExclusiveLoanAlias { .. }));
+}
+
+#[test]
 fn marks_buffer_returns_as_owned_resources() {
     let verb = parse_verb("verb allocate_buffer() -> Buffer { return Buffer[4]; }");
     let signature = c_abi_signature(&verb).expect("Buffer return should map");
 
     assert_eq!(signature.return_ownership, CAbiReturnOwnership::OwnedResource);
+}
+
+#[test]
+fn marks_abs_buffer_returns_as_borrowed_pointers() {
+    let verb = parse_verb("verb view(abs source: Buffer) -> abs Buffer { return source; }");
+    let signature = c_abi_signature(&verb).expect("borrowed buffer return should map");
+
+    assert_eq!(signature.return_ownership, CAbiReturnOwnership::Borrowed);
+}
+
+#[test]
+fn rejects_abs_scalar_returns_at_the_c_abi_boundary() {
+    let verb = parse_verb("verb view(erg source: Int) -> abs Int { return source; }");
+    let error = c_abi_signature(&verb).expect_err("scalar abs return must be rejected");
+
+    assert!(matches!(error, CAbiError::InvalidReturnOwnership { access, ty }
+        if access == "abs" && ty == "Int"));
 }
 
 #[test]

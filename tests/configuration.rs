@@ -51,6 +51,24 @@ fn loads_target_profile_and_hash_for_capsula_artifacts() {
 }
 
 #[test]
+fn excludes_host_runtime_for_freestanding_targets() {
+    let root = std::env::temp_dir().join(format!("actus-freestanding-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create project directory");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"bare\"\nversion = \"0.1.0\"\n\n[build]\ntarget = \"x86_64-unknown-none\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest(&path).expect("freestanding manifest should load");
+    assert_eq!(configuration.entry_contract(), actus::configuration::EntryContract::Freestanding);
+    assert!(!configuration.host_runtime_enabled());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn loads_profile_tables_and_maps_release_to_speed_optimization() {
     let path = std::env::temp_dir().join(format!("actus-profiles-{}.toml", std::process::id()));
     fs::write(

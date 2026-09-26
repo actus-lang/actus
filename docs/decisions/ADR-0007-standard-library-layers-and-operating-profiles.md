@@ -16,7 +16,7 @@ requirements and a one-way dependency graph.
 Actus standard functionality is divided into three layers:
 
 ```text
-core -> alloc -> std
+core -> runtime -> std
 ```
 
 Each layer may use only layers to its left. A higher layer must not be required
@@ -49,26 +49,28 @@ or process termination in a hosted environment.
 The core API must not assume a specific panic reaction. Panic behavior belongs
 to the target/runtime boundary and must remain deterministic for that target.
 
-## `alloc`
+## `runtime`
 
-`alloc` adds heap-backed functionality while remaining independent of any
-specific operating system.
+`runtime` supplies target-selected capabilities while remaining outside the
+language foundation. A hosted runtime may provide heap-backed buffers and
+operating-system bridges; a bare-metal runtime may provide static memory or
+target-specific device services.
 
-It may provide:
+It may provide explicit contracts for:
 
-- an allocator interface;
-- owned heap containers;
-- dynamic arrays;
-- strings and other heap-backed values.
+- allocation and release;
+- owned resource layouts;
+- console or device I/O;
+- panic, startup, and target hooks.
 
-`alloc` depends only on `core`. It requires an allocator contract supplied by
-the selected program, target, or runtime. A freestanding program may provide
-a custom allocator, static memory pool, or RTOS allocator; allocation is not
-implicitly guaranteed merely because `alloc` is available.
+`runtime` depends on `core` contracts and must expose its operations through
+explicit ABI boundaries. A freestanding target may omit host-only runtime
+capabilities entirely.
 
 ## `std`
 
-`std` is the hosted system layer and depends on both `core` and `alloc`.
+`std` is the hosted system layer and depends on `core` and selected `runtime`
+capabilities.
 
 Its initial responsibilities include:
 
@@ -90,9 +92,9 @@ Library availability is selected by the package manifest and target profile,
 not by source-level magic annotations:
 
 ```text
-freestanding: core
-alloc-enabled: core + alloc
-hosted:        core + alloc + std
+freestanding:    core
+runtime-enabled: core + runtime
+hosted:          core + runtime + std
 ```
 
 The exact Actus manifest spelling is a separate build-system decision, but the
@@ -105,8 +107,8 @@ before code generation.
 
 The compiler binary must not contain implementations of standard-library
 services. It may know about intrinsic names, types, and semantic contracts,
-but their implementations belong to `core`, `alloc`, `std`, or the selected
-target runtime.
+but their implementations belong to `core`, `runtime`, `std`, or the selected
+target.
 
 Lowering to an intrinsic or runtime operation is valid only after the
 frontend has verified the selected profile and required layer.
@@ -118,4 +120,3 @@ while hosted programs receive richer services through explicit layers. The
 one-way dependency graph prevents platform functionality from leaking into
 the language foundation and keeps the compiler independent of library
 implementations.
-

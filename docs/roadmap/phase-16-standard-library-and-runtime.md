@@ -106,32 +106,32 @@ moving operating-system behavior into the compiler core.
 
 ### Layer architecture
 
-- [ ] Define the public `core` contract and its dependency restrictions.
-- [ ] Define the `runtime` contract for host services.
-- [ ] Define the `std` contract over runtime services.
-- [ ] Document the dependency direction:
+- [x] Define the public `core` contract and its dependency restrictions.
+- [x] Define the `runtime` contract for host services.
+- [x] Define the `std` contract over runtime services.
+- [x] Document the dependency direction:
       `core -> runtime -> std`.
-- [ ] Separate host-only services from bare-metal-compatible primitives.
-- [ ] Define the profile/target behavior for excluding host-only modules.
+- [x] Separate host-only services from bare-metal-compatible primitives.
+- [x] Define the profile/target behavior for excluding host-only modules.
 
 ### FFI boundary
 
-- [ ] Define the supported `unsafe extern "C"` ABI surface for runtime calls.
-- [ ] Define C-compatible scalar and pointer representations.
-- [ ] Define error/status return conventions at the runtime boundary.
-- [ ] Define ownership behavior for buffers crossing the boundary.
-- [ ] Reject hidden allocation at the FFI boundary.
-- [ ] Reject implicit ownership transfer at the FFI boundary.
-- [ ] Add positive FFI declaration tests.
-- [ ] Add negative tests for invalid ABI and ownership combinations.
-- [ ] Add native linking tests for the runtime bridge.
-- [ ] Document the host and `no_std` boundary explicitly.
+- [x] Define the supported `unsafe extern "C"` ABI surface for runtime calls.
+- [x] Define C-compatible scalar and pointer representations.
+- [x] Define error/status return conventions at the runtime boundary.
+- [x] Define ownership behavior for buffers crossing the boundary.
+- [x] Reject hidden allocation at the FFI boundary.
+- [x] Reject implicit ownership transfer at the FFI boundary.
+- [x] Add positive FFI declaration tests.
+- [x] Add negative tests for invalid ABI and ownership combinations.
+- [x] Add native linking tests for the runtime bridge.
+- [x] Document the host and `no_std` boundary explicitly.
 
 ### Gate 1 invariant
 
-- [ ] Compiler core remains independent of OS services.
-- [ ] Every host operation crosses an explicit, typed runtime boundary.
-- [ ] The same ownership rules apply before and after an FFI call.
+- [x] Compiler core remains independent of OS services.
+- [x] Every host operation crosses an explicit, typed runtime boundary.
+- [x] The same ownership rules apply before and after an FFI call.
 
 ## Gate 2: `std::io`
 

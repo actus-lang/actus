@@ -22,7 +22,9 @@ pub fn link_object(
     let linker = configuration.linker();
     let mut command = Command::new(linker);
     command.arg(object);
-    if let Some(runtime_archive) = crate::runtime::runtime_archive_path() {
+    if configuration.host_runtime_enabled()
+        && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
+    {
         command.arg(runtime_archive);
     }
     for path in configuration.library_paths() {

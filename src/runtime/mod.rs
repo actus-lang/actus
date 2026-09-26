@@ -1,6 +1,13 @@
 use std::mem::ManuallyDrop;
 use std::path::Path;
 
+mod contract;
+
+pub use contract::{
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, PRINT_INT_SYMBOL,
+    PRINT_STRING_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
+};
+
 pub fn runtime_archive_path() -> Option<&'static Path> {
     option_env!("ACTUS_RUNTIME_ARCHIVE").map(Path::new)
 }
