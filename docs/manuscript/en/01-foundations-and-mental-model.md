@@ -8,7 +8,8 @@ cleanup path can become a real failure.
 
 This chapter builds the mental model used throughout the Manuscript. We begin
 with the physical problem, introduce Actus's linguistic idea, and learn the
-three words that describe participation in an action: `erg`, `abs`, and `dat`.
+four words that describe participation in an action: `erg`, `abs`, `dat`, and
+`ins`.
 
 The examples are small so we can see what the compiler proves and what the
 machine does.
@@ -124,9 +125,9 @@ roles.
 This metaphor makes ownership precise: instead of inferring it from a function
 name or comment, the reader can inspect each parameter's role in the action.
 
-## 3. The Three Foundational Roles
+## 3. The Four Foundational Roles
 
-Actus begins with three roles. They describe capabilities and ownership
+Actus uses four roles. They describe capabilities and ownership
 transitions; they are not runtime objects and do not create wrapper values.
 
 ### `erg`: the exclusive owner and mutator
@@ -180,9 +181,59 @@ Caller frame                 Callee frame
                               └──────────────────┘
 ```
 
-The callee's view is temporary. It cannot outlive the owner or become an owned
-resource by being returned. When the call ends, the view disappears and the
-owner remains live.
+The callee's ordinary view is temporary. It cannot outlive the owner or become
+an owned resource. A separate, explicit return contract may produce a
+non-owning `abs` view, but only under the Single-Origin rule described later in
+the Manuscript. In that case, the caller records the view and keeps the source
+owner frozen until the view's scope ends.
+
+### `ins`: the exclusive call-scope instrument
+
+`ins` identifies a temporary exclusive loan. It gives a called operation the
+right to mutate an existing owner without transferring ownership permanently.
+The loan is limited to the call. It cannot be stored in a field, returned as an
+owned value, or allowed to escape the call boundary.
+
+The parameter declares the requirement:
+
+```actus
+verb append_marker(ins buffer: Buffer) -> Int {
+    append(buffer, 41);
+    return 0;
+}
+```
+
+The call site makes the mutation visible:
+
+```actus
+verb main() -> Int {
+    erg buffer = Buffer[4];
+    append_marker(buffer: ins buffer);
+    append(buffer, 1);
+    return 0;
+}
+```
+
+At the call boundary, `buffer` remains the caller's owner but its access state
+changes from `Mutable` to `Suspended` for the duration of the call. The callee
+may mutate the same bytes. When the call returns, the compiler restores the
+owner to `Active + Mutable`:
+
+```text
+caller                         callee
+┌──────────────────────┐       ┌──────────────────────┐
+│ buffer: owner        │       │ buffer: ins loan     │
+│ Active + Mutable     │──────▶│ exclusive mutation   │
+└──────────────────────┘       └──────────────────────┘
+          ▲                              │
+          └────── loan returns ──────────┘
+                 Active + Mutable
+```
+
+Nested helpers may forward an `ins` loan. Each inner call suspends the same
+root owner for its own call scope; forwarding does not create a second owner.
+The compiler rejects two simultaneous loans of one root resource, including an
+`ins` loan combined with an `abs` view in the same call.
 
 ### `dat`: the consumer and terminal receiver
 
@@ -201,7 +252,7 @@ transfer changes who is responsible for the same value.
 
 ### The complete lifecycle
 
-The three roles form a readable lifecycle:
+The roles form a readable ownership lifecycle:
 
 ```text
 1. Creation                 2. Inspection
@@ -219,8 +270,9 @@ The three roles form a readable lifecycle:
 └──────────────────────┘    └──────────────────────┘
 ```
 
-An `abs` view temporarily changes access, not ownership. A `dat` transfer
-changes ownership and invalidates the source binding.
+An `abs` view temporarily changes access, not ownership. An `ins` loan changes
+access to `Suspended`, not ownership. A `dat` transfer changes ownership and
+invalidates the source binding.
 
 ## 4. Dissecting Your First Actus Programs
 
@@ -336,7 +388,7 @@ and no opportunity for undefined behavior.
 
 Actus follows a one-directional compilation pipeline. First, the **lexer**
 reads characters and groups them into tokens: keywords such as `verb`, `erg`,
-`abs`, and `dat`; identifiers such as `main`; literals such as `42`; and
+`abs`, `dat`, and `ins`; identifiers such as `main`; literals such as `42`; and
 punctuation such as `(`, `)`, `{`, `}`, `:`, `;`, and `->`.
 
 The **parser** consumes those tokens and constructs an **abstract syntax tree
@@ -347,9 +399,9 @@ retained so that later diagnostics can point back to the original characters.
 The **semantic analyzer** asks questions syntax alone cannot answer: does
 `inspect` exist, is `input` an `Int`, does the role correspond to the argument, and is
 `value` still available? It tracks uninitialized, active, moved, partially
-moved, and dropped ownership states, while access state distinguishes mutable
-access from temporary frozen inspection. It validates exits and builds a
-deterministic cleanup plan.
+moved, and dropped ownership states, while access state distinguishes mutable,
+frozen, and suspended access. It validates exits, origin-qualified views, and
+builds a deterministic cleanup plan.
 
 Only a semantically valid program reaches **Cranelift IR**. Cranelift uses an
 SSA-style intermediate representation: a computed value is assigned a stable

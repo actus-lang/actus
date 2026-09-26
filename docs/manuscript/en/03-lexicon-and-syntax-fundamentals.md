@@ -6,8 +6,8 @@ project without opening that layer. This chapter opens it.
 
 We move from source bytes to tokens, from tokens to declarations and
 expressions, and from expressions to diagnostics. The current Actus Alpha
-syntax is the authority here: Actus uses `verb`, `erg`, `abs`, `dat`, and
-`case`.
+syntax is the authority here: Actus uses `verb`, `erg`, `abs`, `dat`, `ins`,
+and `case`.
 
 ## 1. Lexical Anatomy and Source Encoding
 
@@ -77,9 +77,9 @@ Declaration and module keywords include `verb`, `struct`, `enum`, `role`,
 `perform`, `import`, and `open`. They introduce actions, data types,
 contracts, implementations, modules, and facade exports.
 
-Ownership and low-level boundary keywords include `erg`, `abs`, `dat`,
-`ref`, `drop`, `unsafe`, and `extern`. `erg`, `abs`, and `dat` describe value
-roles. `ref` constructs a borrow expression for an `abs` binding or expression;
+Ownership and low-level boundary keywords include `erg`, `abs`, `dat`, `ins`,
+`ref`, `drop`, `unsafe`, and `extern`. `erg`, `abs`, `dat`, and `ins` describe
+value roles. `ref` constructs a borrow expression for an `abs` binding or expression;
 it does not create an owner or a raw pointer. `drop` is a dedicated statement
 with the form `drop(name);` that explicitly ends an owned resource.
 `unsafe extern "C"` declares a foreign C ABI boundary and keeps that boundary
@@ -101,7 +101,7 @@ The literals `true` and `false` are boolean tokens. `_` is the wildcard token
 used in patterns.
 
 Actus's vocabulary is deliberately small and orthogonal. Actus defines actions
-with `verb`, bindings through roles (`erg`, `abs`, `dat`), and pattern
+with `verb`, bindings through roles (`erg`, `abs`, `dat`, `ins`), and pattern
 branching with `case`.
 
 ## 3. Identifiers, Literals, and Primitive Formats
@@ -234,8 +234,27 @@ analyzer rejects later use of a moved or dropped binding and rejects cleanup
 that would occur twice.
 
 A binding's spelling does not make it mutable. `erg` supplies exclusive
-mutation capability, `abs` supplies read-only access, and `dat` transfers
-ownership.
+mutation capability, `abs` supplies read-only access, `dat` transfers
+ownership, and `ins` supplies an exclusive loan only at a parameter and call
+boundary. `ins` is not a local binding role and cannot be used for a struct
+field:
+
+```actus
+verb append_marker(ins buffer: Buffer) -> Int {
+    append(buffer, 41);
+    return 0;
+}
+
+verb main() -> Int {
+    erg buffer = Buffer[4];
+    append_marker(buffer: ins buffer);
+    return 0;
+}
+```
+
+The call-site marker is part of the ownership proof. It makes the temporary
+exclusive mutation visible and lets the analyzer suspend the root owner for
+exactly the duration of the call.
 
 ## 5. Anatomy of a Verb Declaration
 
@@ -251,16 +270,24 @@ verb name(role parameter: Type) -> ReturnType {
 the parameters. Each parameter has a role, name, colon, and type. `->` and
 `ReturnType` declare the result contract. Braces delimit the body.
 
-A concrete declaration may contain several role-bearing parameters:
+A concrete declaration may contain several role-bearing parameters and an
+access-qualified return:
 
 ```actus
 verb transfer(erg target: Buffer, abs view: Buffer, dat item: Item) -> Int {
     return 0;
 }
+
+verb sub_view(abs input: Buffer) -> abs Buffer {
+    return input.raw_slice(0, 1);
+}
 ```
 
 `target` is exclusive and owned, `view` is read-only, and `item` is consumed.
-The compiler checks every call against those roles and types.
+An `ins` parameter would request a temporary exclusive loan instead of a
+permanent transfer. The `abs` before `Buffer` in `-> abs Buffer` says that the
+result is a non-owning view. The compiler checks every call against those roles,
+types, and origin rules.
 
 Calls use argument labels:
 
@@ -393,7 +420,8 @@ those tokens into declarations, statements, expressions, and source spans.
 The current lexical contract is explicit:
 
 - actions use `verb`;
-- ownership uses `erg`, `abs`, and `dat`;
+- ownership and access use `erg`, `abs`, `dat`, and `ins`;
+- non-owning returned views use an access-qualified return such as `-> abs Buffer`;
 - pattern branching uses `case`;
 - statements end with semicolons;
 - hexadecimal and binary integer literals, and byte literals, are outside the

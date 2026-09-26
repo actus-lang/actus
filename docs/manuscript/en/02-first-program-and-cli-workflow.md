@@ -1,7 +1,7 @@
 # Chapter 02: First Program and CLI Workflow
 
 Chapter 01 established the central Actus model: a `verb` describes an action,
-and `erg`, `abs`, and `dat` describe how values participate in it. This chapter
+and `erg`, `abs`, `dat`, and `ins` describe how values participate in it. This chapter
 turns that model into a working project.
 
 You will build the reference compiler, create an Arca project, inspect the
@@ -189,6 +189,31 @@ The operating system does not receive an Actus object or a pointer to the
 source variable. It receives the target ABI's integer return value after the
 native entry code has completed.
 
+### Role-qualified calls in a project
+
+The same source file can make a temporary mutation explicit at the call site:
+
+```actus
+verb append_marker(ins buffer: Buffer) -> Int {
+    append(buffer, 41);
+    return 0;
+}
+
+verb main() -> Int {
+    erg buffer = Buffer[4];
+    append_marker(buffer: ins buffer);
+    append(buffer, 1);
+    return 0;
+}
+```
+
+`Buffer[4]` creates the owned buffer binding. The `ins` marker after the
+argument label is required because the callee requests an exclusive call-scope
+loan. During `append_marker`, the caller cannot read, move, drop, or create
+another borrow of `buffer`. The call returns the loan and restores the same
+owner, so the following `append` is checked against the restored mutable state.
+No heap wrapper or lifetime annotation is added to the call.
+
 ## 4. Compilation and Execution
 
 There are two useful workflows. `build` leaves a selected artifact on disk;
@@ -267,9 +292,16 @@ export boundary.
 
 Semantic analysis receives the resulting program. It registers types and
 verbs, resolves names and imports, checks parameter and return types, and
-validates `erg`, `abs`, and `dat` transitions. It rejects use-after-move,
-invalid borrows, unknown types, incompatible returns, and invalid entry
-contracts before the backend is invoked.
+validates `erg`, `abs`, `dat`, and `ins` transitions. It rejects
+use-after-move, invalid borrows, aliased exclusive loans, unknown types,
+incompatible returns, and invalid entry contracts before the backend is
+invoked. For an `ins` call, the caller's owner becomes `Suspended` only for
+the call and returns to `Active + Mutable` when the call completes.
+
+An access-qualified return is checked as part of the same contract. A verb
+declared with `-> abs Type` returns a non-owning view, not a new owner. The
+semantic analyzer requires one unambiguous `abs` origin and records the view in
+the caller's scope so the source remains frozen until the view ends.
 
 The validated AST and semantic model are passed to the reference Rust
 bootstrap compiler's Cranelift backend. Cranelift lowers the program into
