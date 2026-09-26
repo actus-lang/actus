@@ -159,6 +159,19 @@ Reverse dependencies are not allowed. Avoid generic modules such as `utils.rs`, 
 
 Do not open a public issue for an undisclosed security vulnerability. Follow the private reporting process described in [SECURITY.md](SECURITY.md) when it becomes available.
 
-## License
+## License and contribution sign-off
 
-By contributing to Actus, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+By contributing to Actus, you agree that your contributions are submitted for
+licensing under the project's MIT OR Apache-2.0 licensing policy, subject to
+your authority to grant those rights.
+
+Contributors should sign commits with the Developer Certificate of Origin:
+
+```sh
+git commit -s
+```
+
+The sign-off records that the contributor has the right to submit the work
+under the project contribution terms. It does not transfer copyright or grant
+trademark rights. See [LICENSE-MIT](LICENSE-MIT) and
+[LICENSE-APACHE](LICENSE-APACHE).

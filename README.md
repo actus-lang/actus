@@ -117,10 +117,14 @@ See [MANIFESTO.md](MANIFESTO.md) for the ownership model, borrow rules, cleanup 
 
 ## Open source
 
-Actus is open-source software released under the MIT License. Contributions, design discussions, and implementation feedback are welcome as the language evolves.
+Actus is open-source software released under either the MIT License or the
+Apache License, Version 2.0, at the recipient's option. Contributions, design
+discussions, and implementation feedback are welcome as the language evolves.
 
 ## License
 
-Copyright (c) 2026 Actus contributors
+Copyright (c) 2026 Giorgi Magradze
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for the full text.
+Licensed under either the [MIT License](LICENSE-MIT) or the
+[Apache License 2.0](LICENSE-APACHE), at the recipient's option. The Actus and
+Arca names and logos are governed separately by [TRADEMARKS.md](TRADEMARKS.md).
