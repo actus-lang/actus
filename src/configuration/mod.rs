@@ -3,6 +3,9 @@ use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
+#[cfg(windows)]
+use std::process::Command;
+
 pub use crate::target::{EntryContract, LinkerFlavor};
 use crate::target::{TargetSpec, TargetSpecError};
 
@@ -119,7 +122,7 @@ impl CompilerConfiguration {
         let linker_flavor = target.linker_flavor();
         let entry_contract = target.entry_contract();
         let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
-            .unwrap_or_else(|| OsString::from(target.default_linker()));
+            .unwrap_or_else(|| default_linker(&target));
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
@@ -344,8 +347,29 @@ fn resolve_manifest_target(
     let entry_contract = manifest.build.entry_contract.unwrap_or_else(|| target.entry_contract());
     let linker = std::env::var_os(LINKER_ENVIRONMENT_VARIABLE)
         .or_else(|| manifest.build.linker.as_deref().map(OsString::from))
-        .unwrap_or_else(|| OsString::from(target.default_linker()));
+        .unwrap_or_else(|| default_linker(&target));
     Ok((target, linker_flavor, entry_contract, linker))
+}
+
+fn default_linker(target: &TargetSpec) -> OsString {
+    #[cfg(windows)]
+    if matches!(target.linker_flavor(), LinkerFlavor::Msvc) {
+        if let Some(path) = rust_lld_path() {
+            return path.into_os_string();
+        }
+    }
+    OsString::from(target.default_linker())
+}
+
+#[cfg(windows)]
+fn rust_lld_path() -> Option<PathBuf> {
+    let output = Command::new("rustc").args(["--print", "sysroot"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let sysroot = String::from_utf8(output.stdout).ok()?;
+    let path = PathBuf::from(sysroot.trim()).join("bin").join("rust-lld.exe");
+    path.is_file().then_some(path)
 }
 
 impl LinkLibrary {
