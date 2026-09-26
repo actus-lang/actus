@@ -58,27 +58,27 @@ to the same language contract.
 
 ### Tree-sitter synchronization
 
-- [ ] Update the grammar for `ins` parameters and explicit `ins` arguments.
-- [ ] Update the grammar for `abs` access-qualified return types.
-- [ ] Update grammar rules for modules, imports, and facade exports.
-- [ ] Update grammar rules for pattern guards and ownership patterns.
-- [ ] Update `highlights.scm` for all four ownership roles.
-- [ ] Update `locals.scm` for role parameters, bindings, and pattern names.
-- [ ] Update `folds.scm` for every supported declaration and case body.
-- [ ] Update `indents.scm` for blocks, declarations, and patterns.
-- [ ] Add corpus cases for accepted syntax.
-- [ ] Add corpus cases for rejected or incomplete syntax.
-- [ ] Run Tree-sitter generation and corpus tests.
+- [x] Update the grammar for `ins` parameters and explicit `ins` arguments.
+- [x] Update the grammar for `abs` access-qualified return types.
+- [x] Update grammar rules for modules, imports, and facade exports.
+- [x] Update grammar rules for pattern guards and ownership patterns.
+- [x] Update `highlights.scm` for all four ownership roles.
+- [x] Update `locals.scm` for role parameters, bindings, and pattern names.
+- [x] Update `folds.scm` for every supported declaration and case body.
+- [x] Update `indents.scm` for blocks, declarations, and patterns.
+- [x] Add corpus cases for accepted syntax.
+- [x] Add corpus cases for rejected or incomplete syntax.
+- [x] Run Tree-sitter generation and corpus tests.
 
 ### VS Code synchronization
 
-- [ ] Update TextMate grammar scopes for `ins`, `abs`, `dat`, and `erg`.
-- [ ] Update scopes for `Buffer[...]`, `case`, `open`, and `import`.
-- [ ] Update scopes for `unsafe extern "C"` declarations.
-- [ ] Verify `.act` language registration and file associations.
-- [ ] Verify dark-theme and light-theme readability.
-- [ ] Rebuild and package the extension.
-- [ ] Verify installation from the generated `.vsix`.
+- [x] Update TextMate grammar scopes for `ins`, `abs`, `dat`, and `erg`.
+- [x] Update scopes for `Buffer[...]`, `case`, `open`, and `import`.
+- [x] Update scopes for `unsafe extern "C"` declarations.
+- [x] Verify `.act` language registration and file associations.
+- [x] Verify dark-theme and light-theme readability.
+- [x] Rebuild and package the extension.
+- [x] Verify installation from the generated `.vsix`.
 
 ### LSP synchronization
 
@@ -96,7 +96,7 @@ to the same language contract.
 
 ### Gate 0 invariant
 
-- [ ] A valid Actus source file receives consistent results from the compiler,
+- [x] A valid Actus source file receives consistent results from the compiler,
       Tree-sitter, LSP, formatter, and VS Code grammar.
 
 ## Gate 1: Core, Runtime, and FFI Boundary
