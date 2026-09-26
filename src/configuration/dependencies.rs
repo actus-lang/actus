@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use super::ConfigurationError;
-use super::manifest::{ArcaManifest, source_root};
+use super::manifest::{ActusManifest, source_root};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
@@ -83,7 +83,7 @@ fn visit_manifest(
 }
 
 fn dependency_specs(
-    manifest: &ArcaManifest,
+    manifest: &ActusManifest,
 ) -> Result<BTreeMap<String, DependencySpec>, ConfigurationError> {
     let mut dependencies = BTreeMap::new();
     for (name, version) in &manifest.package.dependencies {
@@ -114,13 +114,13 @@ fn visit_local_dependency(
     })?;
     let package_root =
         parent_manifest.parent().unwrap_or_else(|| Path::new(".")).join(&relative_path);
-    let dependency_manifest = package_root.join("Arca.toml");
-    if !dependency_manifest.is_file() {
+    let Some(dependency_manifest) = super::manifest::manifest_in_directory(&package_root) else {
         return Err(ConfigurationError(format!(
-            "InvalidDependencyPath: dependency `{name}` has no Arca.toml at `{}`",
+            "InvalidDependencyPath: dependency `{name}` has no Actus.toml at `{}`",
             package_root.display()
         )));
-    }
+    };
+    super::manifest::warn_if_legacy_manifest(&dependency_manifest);
     let child = super::manifest::read(&dependency_manifest)?;
     if let Some(constraint) = &table.version {
         let constraint = super::version::VersionConstraint::parse(constraint).map_err(|error| {

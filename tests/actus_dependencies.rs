@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use actus::configuration::{ArcaLock, CompilerConfiguration};
+use actus::configuration::{ActusLock, CompilerConfiguration};
 use actus::lexer::scan;
 use actus::modules::{ModuleResolver, resolve_imports};
 use actus::parser::parse;
@@ -35,14 +35,14 @@ impl Drop for Fixture {
 fn dependency_fixture() -> Fixture {
     let fixture = Fixture::new();
     fixture.write(
-        "app/Arca.toml",
+        "app/Actus.toml",
         "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nfoo = { path = \"../foo\" }\n",
     );
     fixture.write(
         "app/src/main.act",
         "import foo; verb main() -> Int { return add(left: 40, right: 2); }\n",
     );
-    fixture.write("foo/Arca.toml", "[package]\nname = \"foo\"\nversion = \"1.2.0\"\n");
+    fixture.write("foo/Actus.toml", "[package]\nname = \"foo\"\nversion = \"1.2.0\"\n");
     fixture.write("foo/src/foo/foo.act", "open ops;");
     fixture.write(
         "foo/src/foo/ops.act",
@@ -52,9 +52,9 @@ fn dependency_fixture() -> Fixture {
 }
 
 #[test]
-fn resolves_a_local_package_namespace_from_arca_manifest() {
+fn resolves_a_local_package_namespace_from_actus_manifest() {
     let fixture = dependency_fixture();
-    let manifest = fixture.root.join("app/Arca.toml");
+    let manifest = fixture.root.join("app/Actus.toml");
     let configuration = CompilerConfiguration::from_manifest(&manifest).expect("load manifest");
     let source = fs::read_to_string(fixture.root.join("app/src/main.act")).expect("read source");
     let (tokens, errors) = scan(&source);
@@ -76,8 +76,8 @@ fn resolves_a_local_package_namespace_from_arca_manifest() {
 #[test]
 fn records_local_dependency_path_and_content_checksum_in_lockfile() {
     let fixture = dependency_fixture();
-    let manifest = fixture.root.join("app/Arca.toml");
-    let lock = ArcaLock::generate_from_manifest(&manifest).expect("generate lockfile");
+    let manifest = fixture.root.join("app/Actus.toml");
+    let lock = ActusLock::generate_from_manifest(&manifest).expect("generate lockfile");
     let package =
         lock.packages.iter().find(|package| package.name == "foo").expect("foo lock entry");
     assert_eq!(package.source.as_deref(), Some("path"));
@@ -89,10 +89,10 @@ fn records_local_dependency_path_and_content_checksum_in_lockfile() {
 fn rejects_a_missing_local_dependency_manifest() {
     let fixture = Fixture::new();
     fixture.write(
-        "app/Arca.toml",
+        "app/Actus.toml",
         "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nmissing = { path = \"../missing\" }\n",
     );
-    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Actus.toml"))
         .expect_err("missing dependency must fail");
     assert!(error.to_string().contains("InvalidDependencyPath"));
 }
@@ -101,16 +101,16 @@ fn rejects_a_missing_local_dependency_manifest() {
 fn enforces_a_local_dependency_version_constraint() {
     let fixture = dependency_fixture();
     fixture.write(
-        "app/Arca.toml",
+        "app/Actus.toml",
         "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nfoo = { path = \"../foo\", version = \"^1.0.0\" }\n",
     );
-    CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+    CompilerConfiguration::from_manifest(&fixture.root.join("app/Actus.toml"))
         .expect("compatible local dependency should resolve");
     fixture.write(
-        "app/Arca.toml",
+        "app/Actus.toml",
         "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nfoo = { path = \"../foo\", version = \"^2.0.0\" }\n",
     );
-    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Actus.toml"))
         .expect_err("incompatible local dependency must fail");
     assert!(error.to_string().contains("VersionConflict"));
 }
@@ -119,10 +119,10 @@ fn enforces_a_local_dependency_version_constraint() {
 fn rejects_conflicting_dependency_declarations() {
     let fixture = dependency_fixture();
     fixture.write(
-        "app/Arca.toml",
+        "app/Actus.toml",
         "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[package.dependencies]\nfoo = \"1.0.0\"\n\n[dependencies]\nfoo = \"2.0.0\"\n",
     );
-    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Arca.toml"))
+    let error = CompilerConfiguration::from_manifest(&fixture.root.join("app/Actus.toml"))
         .expect_err("conflicting declarations must fail");
     assert!(error.to_string().contains("VersionConflict"));
 }

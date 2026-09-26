@@ -44,7 +44,7 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 ## Gate 2: Navigation and Modules
 
 - [x] Implement `textDocument/definition`.
-- [x] Reuse Arca manifest/source-root discovery.
+- [x] Reuse Actus manifest/source-root discovery.
 - [x] Reuse Directory Module Resolver and facade export filtering.
 - [x] Resolve local symbols, sibling symbols, and cross-file imports.
 - [x] Reject definition results for private or unlisted declarations.

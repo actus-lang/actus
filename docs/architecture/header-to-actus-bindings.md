@@ -2,7 +2,7 @@
 
 Actus does not treat C source generation as a compiler phase. Header binding
 is an explicit FFI preparation workflow that produces reviewed Actus
-declarations and an Arca build configuration.
+declarations and an Actus build configuration.
 
 ## Workflow
 
@@ -15,7 +15,7 @@ declarations and an Arca build configuration.
 5. Record pointer ownership, nullability, layout, calling convention, and
    library linkage in the binding manifest.
 6. Compile the declarations through Actus semantic checks and link them using
-   the existing Arca native library settings.
+   the existing Actus native library settings.
 7. Test the binding with a target-specific link smoke test and an ABI/layout
    regression test.
 
@@ -28,5 +28,5 @@ the declaration and manifest.
 
 The compiler validates Actus declarations and ABI contracts; it does not
 parse arbitrary C headers, choose platform libraries, or provide hardware
-drivers. A future `arca bind` command may automate this workflow without
+drivers. A future `actus bind` command may automate this workflow without
 moving those responsibilities into `actusc`.

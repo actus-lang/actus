@@ -17,7 +17,7 @@ pub struct LockedPackage {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ArcaLock {
+pub struct ActusLock {
     pub lockfile_version: u32,
     #[serde(rename = "package")]
     pub packages: Vec<LockedPackage>,
@@ -34,7 +34,7 @@ impl std::fmt::Display for LockfileError {
 
 impl std::error::Error for LockfileError {}
 
-impl ArcaLock {
+impl ActusLock {
     pub fn from_packages(mut packages: Vec<LockedPackage>) -> Self {
         packages.sort_by(|left, right| {
             (&left.name, &left.version, &left.source, &left.path).cmp(&(
@@ -53,7 +53,7 @@ impl ArcaLock {
 
     pub fn parse(source: &str) -> Result<Self, LockfileError> {
         let lockfile = toml::from_str::<Self>(source)
-            .map_err(|error| LockfileError(format!("cannot parse Arca.lock: {error}")))?;
+            .map_err(|error| LockfileError(format!("cannot parse Actus.lock: {error}")))?;
         lockfile.validate_shape()?;
         Ok(lockfile)
     }
@@ -79,14 +79,14 @@ impl ArcaLock {
         let expected = Self::generate_from_manifest(path)?;
         if self.packages != expected.packages {
             return Err(LockfileError(
-                "LockfileOutOfDate: Arca.lock does not match Arca.toml dependencies".to_owned(),
+                "LockfileOutOfDate: Actus.lock does not match Actus.toml dependencies".to_owned(),
             ));
         }
         Ok(())
     }
 
     pub fn sync(manifest_path: &Path) -> Result<PathBuf, LockfileError> {
-        let lock_path = manifest_path.with_file_name("Arca.lock");
+        let lock_path = manifest_path.with_file_name("Actus.lock");
         let lockfile = Self::generate_from_manifest(manifest_path)?;
         let serialized = lockfile.serialize()?;
         std::fs::write(&lock_path, serialized).map_err(|error| {
@@ -98,7 +98,7 @@ impl ArcaLock {
     fn validate_shape(&self) -> Result<(), LockfileError> {
         if self.lockfile_version != LOCKFILE_VERSION {
             return Err(LockfileError(format!(
-                "unsupported Arca.lock version {}; expected {}",
+                "unsupported Actus.lock version {}; expected {}",
                 self.lockfile_version, LOCKFILE_VERSION
             )));
         }
@@ -108,7 +108,7 @@ impl ArcaLock {
             .any(|packages| package_key(&packages[0]) > package_key(&packages[1]))
         {
             return Err(LockfileError(
-                "Arca.lock packages must be sorted deterministically".to_owned(),
+                "Actus.lock packages must be sorted deterministically".to_owned(),
             ));
         }
         Ok(())

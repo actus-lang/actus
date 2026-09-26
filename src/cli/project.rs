@@ -4,7 +4,7 @@ use std::process::Command;
 
 const MANIFEST: &str = "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\ntarget = \"host\"\nprofile = \"debug\"\n";
 const MAIN_SOURCE: &str = "verb main() -> Int { return 0; }\n";
-const GITIGNORE: &str = "/capsula/\n*.o\n*.bin\n";
+const GITIGNORE: &str = "/capsula/\nActus.lock\n*.o\n*.bin\n*.actus\n";
 
 pub(super) fn new_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let Some(name) = arguments.next() else {
@@ -32,6 +32,7 @@ pub(super) fn new_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         return 1;
     }
     println!("created `{}`", path.display());
+    print_next_steps(&path, true);
     0
 }
 
@@ -48,7 +49,20 @@ pub(super) fn init_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         return 1;
     }
     println!("initialized `{}`", path.display());
+    print_next_steps(&path, false);
     0
+}
+
+fn print_next_steps(path: &Path, include_directory_change: bool) {
+    println!();
+    println!("Next steps:");
+    if include_directory_change {
+        println!("  cd {}", path.display());
+    }
+    println!("  actus check");
+    println!("  actus build --emit exe");
+    println!("  actus build --release --emit exe");
+    println!("  actus run");
 }
 
 fn parse_options(
@@ -85,7 +99,10 @@ fn create_project(path: &Path, name: &str, vcs: bool) -> Result<(), String> {
 }
 
 fn initialize_project(path: &Path, vcs: bool) -> Result<(), String> {
-    if path.join("Arca.toml").exists() {
+    if path.join("Actus.toml").exists() || path.join("Arca.toml").exists() {
+        if path.join("Arca.toml").exists() {
+            eprintln!("warning: 'Arca.toml' is deprecated, please rename to 'Actus.toml'");
+        }
         return Err(format!("`{}` is already an Actus project", path.display()));
     }
     initialize_project_files(path, "project")?;
@@ -95,8 +112,8 @@ fn initialize_project(path: &Path, vcs: bool) -> Result<(), String> {
 fn initialize_project_files(path: &Path, name: &str) -> Result<(), String> {
     let source = path.join("src");
     fs::create_dir_all(&source).map_err(|error| format!("cannot create src/: {error}"))?;
-    fs::write(path.join("Arca.toml"), MANIFEST.replace("{name}", name))
-        .map_err(|error| format!("cannot write Arca.toml: {error}"))?;
+    fs::write(path.join("Actus.toml"), MANIFEST.replace("{name}", name))
+        .map_err(|error| format!("cannot write Actus.toml: {error}"))?;
     fs::write(source.join("main.act"), MAIN_SOURCE)
         .map_err(|error| format!("cannot write src/main.act: {error}"))?;
     fs::write(path.join(".gitignore"), GITIGNORE)
@@ -108,7 +125,7 @@ fn initialize_vcs(path: &Path, requested: bool) -> Result<(), String> {
         return Ok(());
     }
     let status = Command::new("git")
-        .arg("init")
+        .args(["-c", "init.defaultBranch=main", "init"])
         .arg(path)
         .status()
         .map_err(|error| format!("cannot initialize git: {error}"))?;

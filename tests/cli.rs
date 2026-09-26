@@ -321,3 +321,23 @@ fn check_command_rejects_semantically_invalid_source() {
     assert_eq!(result, 1);
     let _ = fs::remove_file(input);
 }
+
+#[test]
+fn top_level_help_flags_succeed() {
+    assert_eq!(run_with_args(vec!["--help".to_owned()].into_iter()), 0);
+    assert_eq!(run_with_args(vec!["-h".to_owned()].into_iter()), 0);
+}
+
+#[test]
+fn build_help_does_not_require_an_input_file() {
+    let result = run_with_args(vec!["build".to_owned(), "--help".to_owned()].into_iter());
+
+    assert_eq!(result, 0);
+}
+
+#[test]
+fn unknown_command_help_returns_an_error() {
+    let result = run_with_args(vec!["unknown".to_owned(), "--help".to_owned()].into_iter());
+
+    assert_eq!(result, 2);
+}

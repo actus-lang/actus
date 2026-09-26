@@ -1,0 +1,117 @@
+# Phase 15.6: CLI Developer Workflow Polish
+
+This phase closes the remaining ergonomics gaps in the local Actus developer
+workflow before Phase 16 work expands the compiler and toolchain. It does not
+change language semantics, ownership rules, Actus manifest meaning, or the
+compiler pipeline.
+
+## Goals
+
+- Make project-root commands work without repetitive file-path arguments.
+- Make command failures and help output self-explanatory.
+- Keep one-shot execution distinct from explicit file watching.
+- Make generated projects start on `main` and explain the next commands.
+- Verify the workflow through platform-aware CLI integration tests.
+
+## Gate 1: Help and command contracts
+
+- [x] Add `actus --help` with the complete command list and examples.
+- [x] Add `actus -h` as an alias for top-level help.
+- [x] Add help output for each subcommand, including options and defaults.
+- [x] Return a successful exit status for help requests.
+- [x] Keep unknown commands and malformed options on stderr with non-zero exits.
+- [x] Keep usage text synchronized with the actual parser implementation.
+- [x] Add positive and negative CLI tests for top-level and subcommand help.
+
+## Gate 2: Project-root input discovery
+
+- [x] Make `actus build` discover `Actus.toml` from the current directory and
+      select its configured entry source.
+- [x] Default to `src/main.act` when the manifest does not override the entry.
+- [x] Preserve an explicit `.act` path as a command-line input override.
+- [x] Make `actus build --emit exe` work without a positional input path.
+- [x] Make `actus build --release` and `actus build --profile <name>` work
+      without a positional input path.
+- [x] Preserve the existing option form `actus build src/main.act --emit exe`.
+- [x] Report a deterministic diagnostic when no manifest or entry source exists.
+- [x] Add integration tests from the project root and from nested directories.
+
+## Gate 3: Project creation and Git defaults
+
+- [x] Make `actus new` initialize the first branch as `main` when it creates a
+      repository.
+- [x] Make `actus init` use the same branch policy when it initializes Git.
+- [x] Preserve the no-VCS controls `--no-git` and `--vcs none`.
+- [x] Avoid running `git init` inside an existing parent repository.
+- [x] Ensure generated `.gitignore` contains `/capsula/`, `*.o`, and `*.bin`.
+- [x] Add integration tests for new repositories, existing repositories, and
+      disabled VCS initialization.
+- [x] Keep Git failures deterministic and separate from project generation
+      failures.
+
+## Gate 4: Post-creation guidance
+
+- [x] Print the created project path clearly.
+- [x] Print actionable next steps after `actus new` and `actus init`.
+- [x] Include `cd <project>`, `actus check`, `actus build`, and `actus run` in
+      the generated guidance.
+- [x] Include the release command when documenting the build workflow.
+- [x] Ensure guidance is printed only after successful project initialization.
+- [x] Add output assertions to CLI integration tests.
+
+## Gate 5: One-shot run experience
+
+- [x] Keep `actus run` as a one-shot build-and-execute command by default.
+- [x] Continue using a temporary executable without exposing implementation
+      paths as the primary user-facing result.
+- [x] Replace the raw temporary `built /tmp/...` message with clear execution
+      status output.
+- [x] Preserve the program's stdout and stderr without mixing compiler output
+      into either stream unexpectedly.
+- [x] Return the executed program's exit code unchanged where the platform
+      supports it.
+- [x] Add integration tests for stdout, stderr, exit status, and build failure.
+
+## Gate 6: Explicit watch mode
+
+- [x] Add an explicit `actus watch` command rather than making `actus run`
+      monitor files implicitly.
+- [x] Watch the project entry and all resolved module source files.
+- [x] Re-run checking/building only after a relevant source or manifest change.
+- [x] Keep diagnostics visible between rebuilds and clear stale diagnostics
+      deterministically.
+- [x] Provide a clean interrupt path and return a meaningful process status.
+- [x] Avoid busy polling; use the target platform's filesystem notification
+      mechanism or a bounded fallback.
+- [x] Add tests for change detection, ignored files, rebuild failure, and exit.
+
+## Gate 7: Workflow consistency and quality
+
+- [x] Make `check`, `build`, `run`, `test`, and `fmt` share consistent project
+      discovery and profile behavior.
+- [x] Ensure all commands respect `Actus.toml` source roots, targets, and entry
+      contracts.
+- [x] Update the CLI documentation and Chapter 02 after implementation.
+- [x] Add regression coverage for Linux, macOS, and Windows path behavior.
+- [x] Run `cargo fmt --all -- --check`.
+- [x] Run `cargo check --all-targets --all-features`.
+- [x] Run `cargo clippy --all-targets --all-features -- -D warnings`.
+- [x] Run `cargo test --all-targets --all-features`.
+- [x] Run `scripts/check_source_limits.sh`.
+
+## Completion Criteria
+
+Phase 15.6 is complete when a user can run the following from a newly created
+project without supplying `src/main.act` manually:
+
+```text
+actus new hello
+cd hello
+actus check
+actus build --emit exe
+actus run
+```
+
+The project starts on `main`, the commands provide accurate guidance, one-shot
+execution has clear output, and file watching is available only through the
+explicit watch command.

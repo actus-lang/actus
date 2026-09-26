@@ -48,13 +48,13 @@ fn rejects_invalid_semver_constraints() {
 #[test]
 fn creates_deterministic_archive_without_build_outputs() {
     let fixture = Fixture::new();
-    fixture.write("Arca.toml", "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n");
+    fixture.write("Actus.toml", "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n");
     fixture.write("src/main.act", "verb main() -> Int { return 0; }\n");
     fixture.write("capsula/debug/host/object.o", "generated");
     fixture.write(".git/config", "metadata");
-    let output = fixture.root.join("demo.arca");
+    let output = fixture.root.join("demo.actus");
     let archive = create_package_archive(&fixture.root, &output).expect("create archive");
-    assert_eq!(archive.files, vec!["Arca.toml", "src/main.act"]);
+    assert_eq!(archive.files, vec!["Actus.toml", "src/main.act"]);
     verify_archive_checksum(&output, &archive.checksum).expect("checksum validates");
 }
 
@@ -62,7 +62,7 @@ fn creates_deterministic_archive_without_build_outputs() {
 fn archive_checksum_detects_tampering() {
     let fixture = Fixture::new();
     fixture.write("src/main.act", "verb main() -> Int { return 0; }\n");
-    let output = fixture.root.join("demo.arca");
+    let output = fixture.root.join("demo.actus");
     let archive = create_package_archive(&fixture.root, &output).expect("create archive");
     fs::write(&output, b"tampered").expect("tamper archive");
     assert!(verify_archive_checksum(&output, &archive.checksum).is_err());

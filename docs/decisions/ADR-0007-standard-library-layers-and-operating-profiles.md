@@ -95,7 +95,7 @@ alloc-enabled: core + alloc
 hosted:        core + alloc + std
 ```
 
-The exact Arca manifest spelling is a separate build-system decision, but the
+The exact Actus manifest spelling is a separate build-system decision, but the
 selected profile must be explicit and recorded in build metadata.
 
 The compiler must reject imports or operations requiring unavailable layers

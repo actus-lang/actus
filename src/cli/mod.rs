@@ -8,11 +8,13 @@ use crate::parser::parse;
 mod build;
 mod check;
 mod fmt;
+mod input;
 mod lsp;
 mod project;
 mod publish;
 mod run;
 mod test_runner;
+mod watch;
 
 pub fn run() -> i32 {
     run_with_args(env::args().skip(1))
@@ -23,6 +25,19 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
         print_usage();
         return 2;
     };
+    if is_help_flag(&command) {
+        print_help();
+        return 0;
+    }
+    let remaining: Vec<String> = arguments.collect();
+    if remaining.first().is_some_and(|argument| is_help_flag(argument)) {
+        return print_command_help(&command);
+    }
+    dispatch_command(&command, remaining)
+}
+
+fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
+    let arguments = arguments.into_iter();
     if command == "build" {
         return build::build_command(arguments);
     }
@@ -50,28 +65,29 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
     if command == "publish" {
         return publish::publish_command(arguments);
     }
+    if command == "watch" {
+        return watch::watch_command(arguments);
+    }
 
-    let Some(first_argument) = arguments.next() else {
+    if command != "parse" {
+        eprintln!("error: unknown command `{command}`");
+        print_usage();
+        return 2;
+    }
+    parse_command(arguments)
+}
+
+fn parse_command(mut arguments: impl Iterator<Item = String>) -> i32 {
+    let Some(path) = arguments.next() else {
         eprintln!("error: missing input file");
         print_usage();
         return 2;
     };
-
-    let path = first_argument;
-
     if arguments.next().is_some() {
         eprintln!("error: unexpected extra argument");
         return 2;
     }
-
-    match command.as_str() {
-        "parse" => parse_file(&path, true),
-        _ => {
-            eprintln!("error: unknown command `{command}`");
-            print_usage();
-            2
-        }
-    }
+    parse_file(&path, true)
 }
 
 fn parse_file(path: &str, print_ast: bool) -> i32 {
@@ -114,8 +130,90 @@ fn parse_file(path: &str, print_ast: bool) -> i32 {
 }
 
 fn print_usage() {
-    eprintln!("usage: actus <new|init|check|parse|run|test|fmt|lsp|publish> [options] [file.act]");
-    eprintln!(
-        "       actus build <file.act> [--release|--profile <name>] [--emit obj|exe] [-o <output>]"
-    );
+    eprintln!("{}", usage_text());
+}
+
+fn print_help() {
+    println!("{}", usage_text());
+}
+
+fn print_command_help(command: &str) -> i32 {
+    let Some(text) = command_help_text(command) else {
+        eprintln!("error: unknown command `{command}`");
+        print_usage();
+        return 2;
+    };
+    println!("{text}");
+    0
+}
+
+fn is_help_flag(argument: &str) -> bool {
+    matches!(argument, "--help" | "-h")
+}
+
+fn usage_text() -> &'static str {
+    "usage: actus <command> [options]\n\nCommands:\n  new      Create a new Actus project.\n  init     Initialize an existing directory as an Actus project.\n  check    Parse, resolve, and validate without code generation.\n  parse    Parse one source file and print its AST.\n  build    Compile an object or executable from a file or project.\n  run      Build and execute a program once.\n  watch    Re-check or rebuild after source changes.\n  test     Discover and run `meta test` verbs.\n  fmt      Format Actus sources, or check formatting.\n  lsp      Serve the Language Server Protocol over stdio.\n  publish  Validate and publish a local package archive.\n\nRun `actus <command> --help` for command-specific options."
+}
+
+fn command_help_text(command: &str) -> Option<&'static str> {
+    match command {
+        "new" => {
+            Some("usage: actus new <name> [--no-git|--vcs none]\n\nCreate a new Actus project.")
+        }
+        "init" => Some(
+            "usage: actus init [--no-git|--vcs none]\n\nInitialize the current directory as an Actus project.",
+        ),
+        "check" => Some(
+            "usage: actus check [file.act]\n\nParse, resolve, and validate an Actus project without code generation.",
+        ),
+        "parse" => Some("usage: actus parse <file.act>\n\nParse a source file and print its AST."),
+        "build" => Some(
+            "usage: actus build [file.act] [--release|--profile <name>] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.",
+        ),
+        "run" => Some(
+            "usage: actus run [file.act] [--release|--profile <name>] [-- program-args...]\n\nBuild and execute an Actus program once.",
+        ),
+        "watch" => Some(
+            "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",
+        ),
+        "test" => Some("usage: actus test [path]\n\nCollect and run Actus meta tests."),
+        "fmt" => Some(
+            "usage: actus fmt [path] [--check]\n\nFormat Actus source files with canonical rules.",
+        ),
+        "lsp" => Some("usage: actus lsp\n\nServe the Language Server Protocol over stdio."),
+        "publish" => Some(
+            "usage: actus publish [path]\n\nValidate and publish a local deterministic package archive.",
+        ),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{command_help_text, run_with_args, usage_text};
+
+    #[test]
+    fn top_level_help_returns_success() {
+        assert_eq!(run_with_args(vec!["--help".to_owned()].into_iter()), 0);
+        assert_eq!(run_with_args(vec!["-h".to_owned()].into_iter()), 0);
+    }
+
+    #[test]
+    fn every_command_has_help_text() {
+        for command in [
+            "new", "init", "check", "parse", "build", "run", "watch", "test", "fmt", "lsp",
+            "publish",
+        ] {
+            assert!(command_help_text(command).is_some(), "missing help for {command}");
+        }
+        let help = usage_text();
+        assert!(help.contains("Commands:"));
+        assert!(help.contains("build    Compile"));
+        assert!(help.contains("watch    Re-check"));
+    }
+
+    #[test]
+    fn subcommand_help_returns_success() {
+        assert_eq!(run_with_args(vec!["build".to_owned(), "--help".to_owned()].into_iter()), 0);
+    }
 }

@@ -5,12 +5,13 @@ use serde::Deserialize;
 use super::ConfigurationError;
 use super::dependencies::DependencySpec;
 
-pub(crate) const MANIFEST_FILE_NAME: &str = "Arca.toml";
+pub(crate) const MANIFEST_FILE_NAME: &str = "Actus.toml";
+pub(crate) const LEGACY_MANIFEST_FILE_NAME: &str = "Arca.toml";
 pub(crate) const DEFAULT_EDITION: &str = "alpha";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ArcaManifest {
+pub(crate) struct ActusManifest {
     pub(crate) package: PackageManifest,
     #[serde(default)]
     pub(crate) dependencies: std::collections::BTreeMap<String, DependencySpec>,
@@ -100,21 +101,21 @@ pub enum LibraryKind {
     Shared,
 }
 
-pub(crate) fn read(path: &Path) -> Result<ArcaManifest, ConfigurationError> {
+pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
     let source = std::fs::read_to_string(path).map_err(|error| {
         ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
     })?;
-    let manifest = toml::from_str::<ArcaManifest>(&source).map_err(|error| {
+    let manifest = toml::from_str::<ActusManifest>(&source).map_err(|error| {
         ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
     })?;
     validate(&manifest)?;
     Ok(manifest)
 }
 
-pub(crate) fn validate(manifest: &ArcaManifest) -> Result<(), ConfigurationError> {
+pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
         return Err(ConfigurationError(
-            "Arca.toml package name and version must not be empty".to_owned(),
+            "Actus.toml package name and version must not be empty".to_owned(),
         ));
     }
     if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
@@ -123,22 +124,22 @@ pub(crate) fn validate(manifest: &ArcaManifest) -> Result<(), ConfigurationError
         )));
     }
     if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Arca.toml entry must not be empty".to_owned()));
+        return Err(ConfigurationError("Actus.toml entry must not be empty".to_owned()));
     }
     if manifest.package.source_root.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError(
-            "Arca.toml package.source_root must not be empty".to_owned(),
+            "Actus.toml package.source_root must not be empty".to_owned(),
         ));
     }
     if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Arca.toml linker must not be empty".to_owned()));
+        return Err(ConfigurationError("Actus.toml linker must not be empty".to_owned()));
     }
     if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Arca.toml native_module must not be empty".to_owned()));
+        return Err(ConfigurationError("Actus.toml native_module must not be empty".to_owned()));
     }
     if manifest.build.library_paths.iter().any(|path| path.trim().is_empty()) {
         return Err(ConfigurationError(
-            "Arca.toml library_paths must not contain empty paths".to_owned(),
+            "Actus.toml library_paths must not contain empty paths".to_owned(),
         ));
     }
     if let Some(library) = manifest
@@ -148,20 +149,32 @@ pub(crate) fn validate(manifest: &ArcaManifest) -> Result<(), ConfigurationError
         .find(|library| library.name.trim().is_empty() || library.name.starts_with('-'))
     {
         return Err(ConfigurationError(format!(
-            "Arca.toml library name `{}` must be non-empty and must not start with `-`",
+            "Actus.toml library name `{}` must be non-empty and must not start with `-`",
             library.name
         )));
     }
     Ok(())
 }
 
-pub(crate) fn source_root(manifest: &ArcaManifest, directory: &Path) -> PathBuf {
+pub(crate) fn source_root(manifest: &ActusManifest, directory: &Path) -> PathBuf {
     directory.join(manifest.package.source_root.as_deref().unwrap_or("src"))
 }
 
 pub(crate) fn find_manifest(start: &Path) -> Option<PathBuf> {
-    start
-        .ancestors()
-        .map(|directory| directory.join(MANIFEST_FILE_NAME))
-        .find(|path| path.is_file())
+    start.ancestors().find_map(manifest_in_directory)
+}
+
+pub(crate) fn manifest_in_directory(directory: &Path) -> Option<PathBuf> {
+    let canonical = directory.join(MANIFEST_FILE_NAME);
+    if canonical.is_file() {
+        return Some(canonical);
+    }
+    let legacy = directory.join(LEGACY_MANIFEST_FILE_NAME);
+    legacy.is_file().then_some(legacy)
+}
+
+pub(crate) fn warn_if_legacy_manifest(path: &Path) {
+    if path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME) {
+        eprintln!("warning: 'Arca.toml' is deprecated, please rename to 'Actus.toml'");
+    }
 }

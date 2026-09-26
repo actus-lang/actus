@@ -147,9 +147,9 @@ Actus separates compile-time mechanisms by scope:
 | --- | --- | --- |
 | `meta` | Declaration or field | Layout, ABI, optimization, and derivation metadata |
 | `pragma` | Source or module | Explicit source-level compiler directives |
-| `Arca.toml` | Project and build | Target, linker, profile, dependency, and build configuration |
+| `Actus.toml` | Project and build | Target, linker, profile, dependency, and build configuration |
 
-Target selection, linker choice, and build profiles belong in `Arca.toml`, not
+Target selection, linker choice, and build profiles belong in `Actus.toml`, not
 in declaration metadata. A future `pragma` system must not become a substitute
 for project configuration.
 

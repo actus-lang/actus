@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-22
-- Scope: Actus language and Arca package model
+- Scope: Actus language and Actus package model
 
 ## Context
 
@@ -17,8 +17,8 @@ Actus defines three distinct boundaries:
 
 ### Package
 
-A `package` is a complete Actus project managed and published by Arca. It has
-an `Arca.toml` manifest, package identity, version, dependencies, build
+A `package` is a complete Actus project managed and published by Actus. It has
+an `Actus.toml` manifest, package identity, version, dependencies, build
 configuration, and one or more declared compilation units.
 
 ### Module
@@ -36,7 +36,7 @@ declaration into the current scope.
 A `unit` is an independently compiled Actus component with its own public
 interface, dependency metadata, compilation result, and cache boundary. A
 unit is the Actus concept closest to a Rust crate, but `crate` is not an
-Actus or Arca term.
+Actus or Actus term.
 
 One package may contain multiple modules and multiple units. A module is not
 implicitly promoted to a unit merely because it has its own directory.
@@ -70,7 +70,7 @@ imports are compile errors with deterministic diagnostics.
 
 ## Unit Declaration
 
-`Arca.toml` is the authoritative source for a package's compilation units.
+`Actus.toml` is the authoritative source for a package's compilation units.
 Directory names alone must not implicitly create units.
 
 ```toml
@@ -91,7 +91,7 @@ root = "units/boot.act"
 
 Each unit has a unique name and one root source entry point. A root may be a
 single source file or a module directory entry point. Only units declared in
-`Arca.toml` participate in the package build graph.
+`Actus.toml` participate in the package build graph.
 
 The `units/` directory is a recommended layout convention, not an automatic
 discovery rule. The initial unit kinds are `library` and `executable`; new
@@ -107,5 +107,5 @@ compiler is self-hosting and an independent compilation boundary is useful.
 ## Consequences
 
 Explicit manifest declarations make the build graph predictable and prevent
-accidental units. The separate terms also allow Actus imports, Arca package
+accidental units. The separate terms also allow Actus imports, Actus package
 publishing, and future compiler decomposition to evolve independently.

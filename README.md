@@ -2,13 +2,19 @@
 
 Actus is an experimental low-level systems programming language focused on explicit semantic roles, deterministic ownership, and a small compile-time safety core.
 
-The project is in an early alpha stage. The current architecture is being developed around three roles:
+The project is in an early alpha stage. The current architecture is built around four roles:
 
 - `erg` — an exclusive owned binding that may read, mutate, borrow, move, or be dropped;
 - `abs` — a temporary shared read-only borrow;
 - `dat` — a linear ownership transfer into a callee.
+- `ins` — an exclusive call-scope loan that temporarily suspends the owner and
+  returns exclusive mutation access when the call ends.
 
-Actus Alpha supports lexical, non-escaping borrows only. Borrowed values cannot be returned or stored in longer-lived structures. The compiler tracks borrow records, derives the `Frozen` owner state from active borrows, and inserts deterministic cleanup at scope boundaries.
+Actus Alpha supports lexical borrows and single-origin `abs` returns. A
+returned view is non-owning and remains tied to one caller owner; it cannot be
+stored in a longer-lived structure. The compiler tracks borrow records,
+derives `Frozen` and `Suspended` access states, and inserts deterministic
+cleanup at scope boundaries.
 
 ## Project status
 
@@ -56,7 +62,7 @@ The example returns `42`. Object files and native executables are local build ar
 
 ### Toolchain configuration
 
-Basic project build settings are read from the root `Arca.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
+Basic project build settings are read from the root `Actus.toml` manifest. The linker can be overridden without changing source code by setting `ACTUS_LINKER`:
 
 ```toml
 [package]
@@ -69,7 +75,7 @@ entry = "main"
 ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
 ```
 
-The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Arca project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
+The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Actus project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
 Native libraries can be supplied through manifest-relative search paths:
 
@@ -89,8 +95,15 @@ unsafe extern "C" verb rand() -> Int;
 ```
 
 The initial C boundary supports `Int` values and `Buffer` pointers. `abs` and
-`dat` are restricted to opaque resource pointers; foreign pointer returns are
-owned by the Actus caller. Unsupported layouts are rejected before linking.
+`dat` are restricted to opaque resource pointers; `ins` uses the same native
+pointer representation while its exclusive-loan contract is enforced before
+code generation. Foreign pointer returns are owned by the Actus caller.
+Unsupported layouts are rejected before linking.
+
+The ownership extensions are specified in
+[ADR-0020](docs/decisions/ADR-0020-exclusive-call-scope-loans-and-instrumental-role.md)
+and
+[ADR-0021](docs/decisions/ADR-0021-single-origin-views-and-caller-scope-borrow-propagation.md).
 
 Run the complete test suite with:
 
@@ -104,10 +117,14 @@ See [MANIFESTO.md](MANIFESTO.md) for the ownership model, borrow rules, cleanup 
 
 ## Open source
 
-Actus is open-source software released under the MIT License. Contributions, design discussions, and implementation feedback are welcome as the language evolves.
+Actus is open-source software released under either the MIT License or the
+Apache License, Version 2.0, at the recipient's option. Contributions, design
+discussions, and implementation feedback are welcome as the language evolves.
 
 ## License
 
-Copyright (c) 2026 Actus contributors
+Copyright (c) 2026 Giorgi Magradze
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for the full text.
+Licensed under either the [MIT License](LICENSE-MIT) or the
+[Apache License 2.0](LICENSE-APACHE), at the recipient's option. The Actus and
+Actus names and logos are governed separately by [TRADEMARKS.md](TRADEMARKS.md).

@@ -5,7 +5,7 @@ Version: 0.1
 Status: Accepted language design
 
 This document defines the canonical style, visibility, import, naming, and
-documentation conventions for Actus and the Arca ecosystem.
+documentation conventions for Actus and the Actus ecosystem.
 
 The compiler is still under active development. Rules marked as planned are
 part of the accepted design but are not necessarily implemented in the alpha
@@ -39,7 +39,7 @@ open verb configure_interrupt() {
 }
 ```
 
-The `///` documentation model and `arca doc` generation are planned tooling
+The `///` documentation model and `actus doc` generation are planned tooling
 features. They must preserve source spans and remain separate from ordinary
 compiler diagnostics.
 
@@ -85,7 +85,7 @@ The following rules apply:
 
 - grouped and single imports have identical semantic behavior;
 - duplicate namespace names and alias collisions are compile errors;
-- module resolution is controlled by `Arca.toml` and the package graph;
+- module resolution is controlled by `Actus.toml` and the package graph;
 - imports must not depend on arbitrary unresolved filesystem paths;
 - circular imports must produce a deterministic diagnostic;
 - only `open` declarations are visible across module boundaries.
@@ -141,7 +141,7 @@ implicitly included in its parent module.
 
 This model keeps implementation logic easy to split across focused files
 while giving external consumers and language servers one deterministic facade
-to inspect. Arca controls which directory is a module root; the compiler
+to inspect. Actus controls which directory is a module root; the compiler
 does not infer modules from arbitrary filesystem paths.
 
 ## 4. Visibility
@@ -181,14 +181,17 @@ Names must describe domain meaning. Generic names such as `data`, `thing`, and
 
 ## 6. Semantic Roles
 
-Actus uses three explicit roles for ownership and borrowing:
+Actus uses four explicit roles for ownership and borrowing:
 
 - `erg` owns a resource and is responsible for its deterministic cleanup;
 - `abs` is a non-owning lexical borrow with no destructor responsibility;
 - `dat` transfers ownership into another binding or function context.
+- `ins` grants a temporary exclusive call-scope loan. The source owner enters
+  `Suspended` access for the call and returns to mutable access afterward.
 
-`abs` does not create runtime reference counting. It is valid only within its
-lexical lifetime and cannot be returned or stored in a longer-lived owner.
+`abs` does not create runtime reference counting. Ordinary views are lexical;
+an `abs` return is allowed only under the single-origin rule and remains tied
+to the caller owner through a caller-scope borrow record.
 
 `perform Role for Type` is compile-time static dispatch. `abs dynamic Role` is
 explicit runtime dispatch and uses a borrowed two-word fat pointer in the

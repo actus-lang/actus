@@ -21,7 +21,7 @@ impl Fixture {
 
     fn write_project(&self) {
         fs::write(
-            self.root.join("Arca.toml"),
+            self.root.join("Actus.toml"),
             "[package]\nname = \"demo\"\nversion = \"1.2.3\"\nedition = \"alpha\"\n",
         )
         .expect("write manifest");
@@ -40,14 +40,14 @@ impl Drop for Fixture {
 fn publishes_archive_to_index_and_checksum_cache() {
     let fixture = Fixture::new();
     fixture.write_project();
-    let archive_path = fixture.root.join("demo.arca");
+    let archive_path = fixture.root.join("demo.actus");
     let archive = create_package_archive(&fixture.root, &archive_path).expect("create archive");
     let registry_path = fixture.root.join("registry");
     let record = PackageRecord {
         name: "demo".to_owned(),
         version: "1.2.3".to_owned(),
         checksum: archive.checksum.clone(),
-        archive: "demo-1.2.3.arca".to_owned(),
+        archive: "demo-1.2.3.actus".to_owned(),
     };
     let registry = LocalRegistry::open(&registry_path);
     let published = registry
@@ -66,14 +66,14 @@ fn publishes_archive_to_index_and_checksum_cache() {
 fn rejects_untrusted_checksum_under_strict_policy() {
     let fixture = Fixture::new();
     fixture.write_project();
-    let archive_path = fixture.root.join("demo.arca");
+    let archive_path = fixture.root.join("demo.actus");
     let archive = create_package_archive(&fixture.root, &archive_path).expect("create archive");
     let trust = TrustPolicy::trusted_checksums(vec!["different-checksum".to_owned()]);
     let record = PackageRecord {
         name: "demo".to_owned(),
         version: "1.2.3".to_owned(),
         checksum: archive.checksum,
-        archive: "demo-1.2.3.arca".to_owned(),
+        archive: "demo-1.2.3.actus".to_owned(),
     };
     let error = LocalRegistry::open(fixture.root.join("registry"))
         .publish(&archive_path, record, &trust)

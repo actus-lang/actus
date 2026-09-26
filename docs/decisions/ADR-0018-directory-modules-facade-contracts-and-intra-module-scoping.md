@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-25
-- Scope: Actus module resolution and Arca package source layout
+- Scope: Actus module resolution and Actus package source layout
 
 ## Context
 
@@ -16,7 +16,7 @@ source layout and resolver rules for directory-backed modules.
 
 ### Directory module and canonical facade
 
-A directory is one cohesive Actus module namespace within its enclosing Arca
+A directory is one cohesive Actus module namespace within its enclosing Actus
 unit. A multi-file module must contain a root entry file whose name exactly
 matches the directory name:
 
@@ -30,7 +30,7 @@ src/
         └── ops.act        // internal verb implementations
 ```
 
-For module path `driver::gpio`, Arca resolves the directory and requires
+For module path `driver::gpio`, Actus resolves the directory and requires
 `driver/gpio/gpio.act` as its canonical entry point. A missing or ambiguous
 facade is a compile-time module resolution error.
 
@@ -72,7 +72,7 @@ parent.
 Discovery is independent of operating-system directory enumeration order. The
 resolver must:
 
-1. resolve the module root from the `Arca.toml` package source root;
+1. resolve the module root from the `Actus.toml` package source root;
 2. verify the exact canonical facade filename;
 3. collect only direct `.act` children of the module directory;
 4. sort source paths by normalized relative path before parsing;
@@ -86,9 +86,9 @@ name resolution or generated output.
 
 ### Package and unit boundary
 
-Arca remains authoritative for package source roots and unit entry points.
+Actus remains authoritative for package source roots and unit entry points.
 Directory discovery must not create an independent unit or bypass the
-`Arca.toml` build graph. A module may be part of a unit, while a unit may
+`Actus.toml` build graph. A module may be part of a unit, while a unit may
 contain multiple modules. Independent binary linking still follows the unit
 metadata and ABI rules in ADR-0006 and ADR-0017.
 
@@ -113,7 +113,7 @@ visibility validation.
   developers and language tooling.
 - Deterministic discovery prevents host filesystem behavior from affecting
   builds or diagnostics.
-- Arca must implement module-root resolution before directory modules can be
+- Actus must implement module-root resolution before directory modules can be
   used by package builds.
 - Zero-import scope is intentionally limited to direct siblings; it does not
   weaken package, unit, or external visibility boundaries.

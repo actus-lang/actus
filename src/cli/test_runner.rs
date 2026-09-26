@@ -12,7 +12,7 @@ use crate::parser::parse;
 
 pub(super) fn test_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     if arguments.next().is_some() {
-        eprintln!("error: `arca test` does not accept positional arguments yet");
+        eprintln!("error: `actus test` does not accept positional arguments yet");
         return 2;
     }
     let configuration = match CompilerConfiguration::from_current_manifest() {

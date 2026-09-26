@@ -11,11 +11,15 @@ mod lockfile;
 mod manifest;
 mod version;
 
-pub use lockfile::{ArcaLock, LockedPackage, LockfileError};
-use manifest::ArcaManifest;
+pub use lockfile::{ActusLock, LockedPackage, LockfileError};
+use manifest::ActusManifest;
 pub use manifest::OptimizationLevel;
 pub use manifest::{BuildProfile, LibraryKind};
 pub use version::{Version, VersionConstraint, VersionError};
+
+pub(crate) fn manifest_path_in_directory(path: &std::path::Path) -> Option<std::path::PathBuf> {
+    manifest::manifest_in_directory(path)
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PackageIdentity {
@@ -136,6 +140,7 @@ impl CompilerConfiguration {
     }
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
+        manifest::warn_if_legacy_manifest(path);
         let manifest = manifest::read(path)?;
         let dependency_graph = dependencies::resolve(path)?;
         validate_lockfile(path)?;
@@ -146,7 +151,7 @@ impl CompilerConfiguration {
         let source_root = manifest::source_root(&manifest, manifest_directory);
         if manifest.package.source_root.is_some() && !source_root.is_dir() {
             return Err(ConfigurationError(format!(
-                "InvalidSourceRoot: Arca.toml package.source_root `{}` does not exist",
+                "InvalidSourceRoot: Actus.toml package.source_root `{}` does not exist",
                 source_root.display()
             )));
         }
@@ -172,8 +177,10 @@ impl CompilerConfiguration {
     }
 
     pub fn from_current_manifest() -> Result<Self, ConfigurationError> {
-        let path = Path::new(manifest::MANIFEST_FILE_NAME);
-        if path.exists() { Self::from_manifest(path) } else { Ok(Self::from_environment()) }
+        let Some(path) = manifest::manifest_in_directory(Path::new(".")) else {
+            return Ok(Self::from_environment());
+        };
+        Self::from_manifest(&path)
     }
 
     pub fn from_input_path(path: &Path) -> Result<Self, ConfigurationError> {
@@ -190,6 +197,14 @@ impl CompilerConfiguration {
 
     pub fn project_root(&self) -> &Path {
         &self.project_root
+    }
+
+    pub fn has_manifest(&self) -> bool {
+        self.project_root.join(manifest::MANIFEST_FILE_NAME).is_file()
+    }
+
+    pub fn default_entry_path(&self) -> PathBuf {
+        self.source_root.join("main.act")
     }
 
     pub fn dependency_roots(&self) -> &BTreeMap<String, PathBuf> {
@@ -261,15 +276,15 @@ pub fn package_identity(path: &Path) -> Result<PackageIdentity, ConfigurationErr
 }
 
 fn validate_lockfile(path: &Path) -> Result<(), ConfigurationError> {
-    let lock_path = path.with_file_name("Arca.lock");
+    let lock_path = path.with_file_name("Actus.lock");
     if !lock_path.is_file() {
-        ArcaLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
+        ActusLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
         return Ok(());
     }
     let lock_source = std::fs::read_to_string(&lock_path).map_err(|error| {
         ConfigurationError(format!("cannot read `{}`: {error}", lock_path.display()))
     })?;
-    ArcaLock::parse(&lock_source)
+    ActusLock::parse(&lock_source)
         .and_then(|lock| lock.validate_against_manifest(path))
         .map_err(|error| ConfigurationError(error.to_string()))
 }
@@ -310,7 +325,7 @@ fn optimization_level(
 }
 
 fn resolve_manifest_target(
-    manifest: &ArcaManifest,
+    manifest: &ActusManifest,
     environment: &CompilerConfiguration,
 ) -> Result<(TargetSpec, LinkerFlavor, EntryContract, OsString), ConfigurationError> {
     let target = manifest

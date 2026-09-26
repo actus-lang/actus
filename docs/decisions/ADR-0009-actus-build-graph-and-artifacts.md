@@ -1,18 +1,18 @@
-# ADR-0009: Arca Build Graph and Generated Artifacts
+# ADR-0009: Actus Build Graph and Generated Artifacts
 
 - Status: Accepted
 - Date: 2026-09-22
-- Scope: Arca dependency resolution, unit builds, caching, and artifacts
+- Scope: Actus dependency resolution, unit builds, caching, and artifacts
 
 Implementation status: The P0/P1 artifact boundary is implemented. Builds
-select targets from Arca configuration, place generated files under
+select targets from Actus configuration, place generated files under
 `capsula/`, emit `.actmeta` with the target specification hash, and invalidate
 stale artifacts when the target contract changes. Full lockfile resolution,
 multi-unit graph reuse, and package caching remain Phase 15 scope.
 
 ## Context
 
-Arca needs a deterministic build graph for packages, units, and modules. It
+Actus needs a deterministic build graph for packages, units, and modules. It
 must resolve dependencies reproducibly, reject incompatible precompiled units,
 and keep generated artifacts separate from source files.
 
@@ -22,7 +22,7 @@ must use a different directory name.
 
 ## Decision
 
-Arca models builds through three levels:
+Actus models builds through three levels:
 
 ```text
 package
@@ -40,7 +40,7 @@ exactly matching inputs. Cyclic dependencies are rejected.
 
 ## Dependency Declaration
 
-Package dependencies are declared in `Arca.toml`:
+Package dependencies are declared in `Actus.toml`:
 
 ```toml
 [package]
@@ -67,7 +67,7 @@ The manifest is the authoritative source for declared dependencies and units.
 
 ## Dependency Resolution
 
-Arca resolves:
+Actus resolves:
 
 - package versions and sources;
 - required units;
@@ -86,7 +86,7 @@ Cycle diagnostics must be deterministic and identify the complete cycle.
 
 ## Lockfile
 
-`Arca.lock` records the exact dependency solution, including:
+`Actus.lock` records the exact dependency solution, including:
 
 - resolved package versions;
 - package sources and content hashes;
@@ -96,7 +96,7 @@ Cycle diagnostics must be deterministic and identify the complete cycle.
 - compilation target and profile;
 - relevant ABI metadata.
 
-`Arca.toml` expresses version and configuration requirements. `Arca.lock`
+`Actus.toml` expresses version and configuration requirements. `Actus.lock`
 records the exact reproducible resolution used for a build.
 
 ## Cache Identity
@@ -148,14 +148,14 @@ artifacts are isolated by target triple.
 
 ## Precompiled Units and Source Fallback
 
-Arca may reuse a precompiled unit only when its interface metadata and cache
+Actus may reuse a precompiled unit only when its interface metadata and cache
 identity match the current build.
 
 When metadata is incompatible:
 
-1. Arca rejects the stale binary before linking;
-2. if compatible source is available, Arca recompiles the unit;
-3. Arca regenerates metadata and artifacts;
+1. Actus rejects the stale binary before linking;
+2. if compatible source is available, Actus recompiles the unit;
+3. Actus regenerates metadata and artifacts;
 4. linking continues only after compatibility checks pass.
 
 If source is unavailable, the build fails with a deterministic diagnostic.
@@ -169,7 +169,7 @@ artifacts. Artifact naming and metadata emission must be deterministic.
 
 ## Consequences
 
-Arca gains an explicit and reproducible package build model. `capsula/`
+Actus gains an explicit and reproducible package build model. `capsula/`
 separates generated state from source and removes ambiguity between artifact
 storage and compilation targets. Exact cache identity and source fallback
 prevent stale or incompatible units from entering a build silently.

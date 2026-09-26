@@ -20,7 +20,7 @@ Actus has two clearly separated low-level modes:
 
 ```text
 safe Actus
-    erg / abs / dat
+    erg / abs / dat / ins
     ownership and borrowing
     deterministic cleanup
 

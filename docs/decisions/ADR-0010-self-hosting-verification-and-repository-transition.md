@@ -58,8 +58,8 @@ Repository transition is permitted only when all conditions below are met.
 
 - `package`, `module`, and `unit` boundaries are implemented.
 - `::` imports, `open` visibility, and module resolution are implemented.
-- `Arca.toml` declares packages and units.
-- `Arca.lock` records exact dependency resolution.
+- `Actus.toml` declares packages and units.
+- `Actus.lock` records exact dependency resolution.
 - Unit interface metadata such as `.actmeta` is generated and validated.
 - Unit cache invalidation rejects incompatible toolchains and targets.
 - Dependency cycles are rejected deterministically.
@@ -88,7 +88,7 @@ Once the checklist is complete, migration proceeds incrementally:
 1. Introduce Actus compiler units while preserving the Rust bootstrap path.
 2. Build those units through the verified Actus compiler.
 3. Move standard-library layers into independently managed Actus units.
-4. Move Arca build integration to the Actus unit graph.
+4. Move Actus build integration to the Actus unit graph.
 5. Retain the Rust compiler as a temporary fallback during a documented
    deprecation period.
 6. Remove or archive the Rust bootstrap only after an additional release

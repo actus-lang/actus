@@ -39,7 +39,7 @@ Actus syntax.
   response, and the `no_std` direction.
 - [ ] [Chapter 02: First Program and CLI Workflow](en/02-first-program-and-cli-workflow.md)
   — Installation, project layout, `verb main() -> Int`, compilation, and
-  execution with Arca.
+  execution with Actus.
 - [ ] [Chapter 03: Lexicon and Syntax Fundamentals](en/03-lexicon-and-syntax-fundamentals.md)
   — Keywords, bindings, verbs, parameters, roles, and types.
 - [ ] [Chapter 04: Types, Structs, Enums, Option, and Result](en/04-types-structs-enums-option-result.md)
@@ -54,8 +54,8 @@ Actus syntax.
   — Role contracts, generic bounds, static performance, and dispatch.
 - [ ] [Chapter 08: Modules, Facades, and Imports](en/08-modules-facades-and-imports.md)
   — Directory modules, facade boundaries, sibling scope, and `import`.
-- [ ] [Chapter 09: The Arca Ecosystem and Workflows](en/09-arca-ecosystem-and-workflows.md)
-  — `Arca.toml`, dependencies, profiles, lockfiles, and testing.
+- [ ] [Chapter 09: The Actus Ecosystem and Workflows](en/09-actus-ecosystem-and-workflows.md)
+  — `Actus.toml`, dependencies, profiles, lockfiles, and testing.
 - [ ] [Chapter 10: Unsafe, `extern "C"`, and FFI](en/10-unsafe-extern-c-and-ffi.md)
   — C ABI declarations, unsafe boundaries, ABI compatibility, and linking.
 - [ ] [Chapter 11: Tooling, LSP, and Editors](en/11-tooling-lsp-and-editors.md)

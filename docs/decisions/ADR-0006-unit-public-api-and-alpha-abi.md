@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-22
-- Scope: Actus unit interfaces and Arca compilation artifacts
+- Scope: Actus unit interfaces and Actus compilation artifacts
 
 ## Context
 
@@ -103,13 +103,13 @@ deterministic vtable symbol, method slot, complete semantic signature, and
 native calling convention. The dynamic cross-unit contract is defined in
 [ADR-0017](ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
 
-The exact serialized encoding may be selected during Arca implementation,
+The exact serialized encoding may be selected during Actus implementation,
 but it must remain versioned and independently parseable by the compiler and
 package tooling.
 
 ## Incompatible Unit Handling
 
-Arca or the compiler must reject a precompiled Actus unit before binary
+Actus or the compiler must reject a precompiled Actus unit before binary
 linking when its `toolchain_hash` or `target_triple` does not match the
 current build.
 
@@ -138,5 +138,5 @@ existing native backend and C FFI boundary.
 
 Actus can evolve its compiler and internal representation without prematurely
 freezing a binary contract. Public APIs remain explicit and type-safe, C
-interoperability has a clear stable boundary, and Arca can reject stale
+interoperability has a clear stable boundary, and Actus can reject stale
 artifacts deterministically instead of producing unreliable links.

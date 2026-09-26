@@ -4,7 +4,7 @@ use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind, Opt
 use actus::target::TargetSpec;
 
 #[test]
-fn loads_build_settings_from_an_arca_manifest() {
+fn loads_build_settings_from_an_actus_manifest() {
     let path = std::env::temp_dir().join(format!("actus-config-{}.toml", std::process::id()));
     fs::write(
         &path,
@@ -29,7 +29,7 @@ fn loads_build_settings_from_an_arca_manifest() {
 fn loads_target_profile_and_hash_for_capsula_artifacts() {
     let root = std::env::temp_dir().join(format!("actus-target-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create project directory");
-    let path = root.join("Arca.toml");
+    let path = root.join("Actus.toml");
     fs::write(
         &path,
         "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"x86_64-unknown-linux-gnu\"\nprofile = \"release\"\n",
@@ -69,10 +69,10 @@ fn loads_profile_tables_and_maps_release_to_speed_optimization() {
 }
 
 #[test]
-fn derives_target_linker_unless_arca_overrides_it() {
+fn derives_target_linker_unless_actus_overrides_it() {
     let root = std::env::temp_dir().join(format!("actus-linker-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create project directory");
-    let path = root.join("Arca.toml");
+    let path = root.join("Actus.toml");
     fs::write(
         &path,
         "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"x86_64-pc-windows-msvc\"\nlinker = \"custom-linker\"\n",

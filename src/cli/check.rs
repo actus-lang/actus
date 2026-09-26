@@ -1,25 +1,24 @@
-use std::fs;
-use std::path::Path;
-
-use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::lexer::scan;
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
+use std::fs;
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
-    let input = arguments.next().unwrap_or_else(|| "src/main.act".to_owned());
+    let explicit_input = arguments.next();
     if arguments.next().is_some() {
         eprintln!("error: unexpected extra argument");
         return 2;
     }
-    let configuration = match CompilerConfiguration::from_input_path(Path::new(&input)) {
+    let configuration = match super::input::configuration_for_input(explicit_input.as_deref()) {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
             return 1;
         }
     };
+    let input_path = super::input::entry_path(&configuration, explicit_input.as_deref());
+    let input = super::input::source_path(&input_path);
     let source = match fs::read_to_string(&input) {
         Ok(source) => source,
         Err(error) => {

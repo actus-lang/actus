@@ -4,12 +4,12 @@
 
 Accepted. Phase 14 now implements and verifies the ownership/access state
 model, case branch isolation, branch joins, nested partial moves, pattern
-guards, and native guard branching. Remaining Phase 14 work is listed in the
-roadmap and must not weaken these rules.
+guards, and native guard branching. Later ownership extensions are specified
+by ADR-0020 and ADR-0021.
 
 ## Context
 
-Actus uses `erg`, `abs`, and `dat` as its ownership vocabulary. Existing
+Actus uses `erg`, `abs`, `dat`, and `ins` as its ownership vocabulary. Existing
 ownership checking also needs to model temporary read-only access, partial
 moves, pattern matching, control-flow exits, and deterministic cleanup.
 
@@ -39,6 +39,8 @@ cannot be made mutable by changing its access state.
 - `abs` creates a temporary read-only view without transferring ownership.
 - `dat` transfers ownership to exactly one destination; the source becomes
   `Moved` and receives no cleanup for the transferred resource.
+- `ins` creates an exclusive call-scope loan. The owner becomes `Suspended`
+  during the call and returns to `Active + Mutable` afterward.
 
 An `erg` owner or a received `dat` value may create a temporary `abs` view:
 
@@ -46,9 +48,9 @@ An `erg` owner or a received `dat` value may create a temporary `abs` view:
 Active + Mutable -> Active + Frozen -> Active + Mutable
 ```
 
-This is the only initial reborrow/coercion rule. Mutable borrowing,
-reborrowing chains, and lifetime polymorphism remain deferred until a concrete
-Actus use case proves they are necessary.
+This remains the rule for temporary `abs` access. Exclusive mutable borrowing
+is specified separately by ADR-0020; advanced reborrowing chains and lifetime
+polymorphism remain deferred.
 
 ### `case abs` lifecycle
 

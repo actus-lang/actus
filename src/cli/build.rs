@@ -16,17 +16,13 @@ pub(super) enum EmitKind {
 }
 
 struct BuildOptions {
+    input: Option<String>,
     output: Option<String>,
     emit: EmitKind,
     profile: Option<BuildProfile>,
 }
 
-pub(super) fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 {
-    let Some(input) = arguments.next() else {
-        eprintln!("error: missing input file");
-        super::print_usage();
-        return 2;
-    };
+pub(super) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_build_options(arguments) {
         Ok(options) => options,
         Err(error) => {
@@ -34,7 +30,7 @@ pub(super) fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 
             return 2;
         }
     };
-    let input_configuration = match CompilerConfiguration::from_input_path(Path::new(&input)) {
+    let input_configuration = match configuration_for_build(options.input.as_deref()) {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
@@ -45,12 +41,32 @@ pub(super) fn build_command(mut arguments: impl Iterator<Item = String>) -> i32 
         Some(profile) => input_configuration.with_profile(profile),
         None => input_configuration,
     };
+    let input = options
+        .input
+        .unwrap_or_else(|| input_configuration.default_entry_path().display().to_string());
     build_file(&input, options.output.as_deref().map(Path::new), options.emit, &input_configuration)
+}
+
+fn configuration_for_build(input: Option<&str>) -> Result<CompilerConfiguration, String> {
+    let configuration = match input {
+        Some(path) => CompilerConfiguration::from_input_path(Path::new(path)),
+        None => {
+            let current = std::env::current_dir()
+                .map_err(|error| format!("cannot read current directory: {error}"))?;
+            CompilerConfiguration::from_input_path(&current)
+        }
+    }
+    .map_err(|error| error.to_string())?;
+    if input.is_none() && !configuration.has_manifest() {
+        return Err("cannot discover Actus.toml from the current directory".to_owned());
+    }
+    Ok(configuration)
 }
 
 fn parse_build_options(
     mut arguments: impl Iterator<Item = String>,
 ) -> Result<BuildOptions, String> {
+    let mut input = None;
     let mut output = None;
     let mut emit = EmitKind::Object;
     let mut profile = None;
@@ -93,10 +109,11 @@ fn parse_build_options(
                     _ => return Err(format!("unsupported emission kind `{kind}`")),
                 };
             }
+            _ if input.is_none() && !argument.starts_with('-') => input = Some(argument),
             _ => return Err(format!("unexpected build argument `{argument}`")),
         }
     }
-    Ok(BuildOptions { output, emit, profile })
+    Ok(BuildOptions { input, output, emit, profile })
 }
 
 pub(super) fn build_file(
@@ -104,6 +121,25 @@ pub(super) fn build_file(
     output: Option<&Path>,
     emit: EmitKind,
     configuration: &CompilerConfiguration,
+) -> i32 {
+    build_file_with_report(input, output, emit, configuration, true)
+}
+
+pub(super) fn build_file_quiet(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+) -> i32 {
+    build_file_with_report(input, output, emit, configuration, false)
+}
+
+fn build_file_with_report(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+    report_output: bool,
 ) -> i32 {
     let source = match fs::read_to_string(input) {
         Ok(source) => source,
@@ -148,7 +184,7 @@ pub(super) fn build_file(
         .or_else(|| hosted_entry_symbol(configuration, fallback_symbol))
         .unwrap_or(fallback_symbol)
         .to_owned();
-    emit_and_write(input, output, emit, configuration, &program, &symbol)
+    emit_and_write(input, output, emit, configuration, &program, &symbol, report_output)
 }
 
 fn emit_and_write(
@@ -158,6 +194,7 @@ fn emit_and_write(
     configuration: &CompilerConfiguration,
     program: &crate::ast::Program,
     symbol: &str,
+    report_output: bool,
 ) -> i32 {
     if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
         eprintln!("error: {error}");
@@ -180,7 +217,9 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    println!("built `{}`", output.display());
+    if report_output {
+        println!("built `{}`", output.display());
+    }
     0
 }
 

@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-22
-- Scope: Actus repository and Arca ecosystem
+- Scope: Actus repository and Actus ecosystem
 
 ## Context
 
@@ -21,13 +21,13 @@ Actus uses the following canonical vocabulary:
 
 | Term | Meaning |
 | --- | --- |
-| `package` | A complete Actus project managed and published by Arca. |
+| `package` | A complete Actus project managed and published by Actus. |
 | `module` | An importable Actus source namespace. |
 | `unit` | An independently compiled Actus component; the closest Actus concept to a Rust crate. |
 | `stdlib` | The official standard library distribution. |
 | `target` | A compilation platform profile and its ABI, linker, and runtime requirements. |
 
-The term `crate` must not appear in Actus language, Arca, or architecture
+The term `crate` must not appear in Actus language, Actus, or architecture
 documentation unless it is specifically describing Rust bootstrap internals.
 
 ## Repository Structure
@@ -86,7 +86,7 @@ This future layout is descriptive, not an immediate implementation task.
 
 ## Naming Rules
 
-- Use `package` for Arca-managed distribution units.
+- Use `package` for Actus-managed distribution units.
 - Use `module` for language-level source imports and namespaces.
 - Use `unit` for compiler-level independently compiled components.
 - Use `stdlib` for the official library family and `core`, `alloc`, and `std`
