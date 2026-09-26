@@ -1,6 +1,10 @@
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+#[cfg(unix)]
+use std::thread;
+#[cfg(unix)]
+use std::time::Duration;
 
 use actus::cli::run_with_args;
 
@@ -95,6 +99,65 @@ fn check_validates_source_without_emitting_code() {
     assert_eq!(result, 0);
     assert!(!input.with_extension("o").exists());
     let _ = fs::remove_file(input);
+}
+
+#[cfg(unix)]
+#[test]
+fn watch_once_checks_the_project_entry() {
+    let root = std::env::temp_dir().join(format!("actus-watch-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"watcher\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+        .expect("write entry source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["watch", "--once"])
+        .current_dir(&root)
+        .output()
+        .expect("run watch command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("watching `src/main.act`"));
+    assert!(stdout.contains("checked `src/main.act` successfully"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn watch_rechecks_after_a_source_change_and_surfaces_failure() {
+    let root = std::env::temp_dir().join(format!("actus-watch-change-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Arca.toml"),
+        "[package]\nname = \"watcher\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let source = root.join("src/main.act");
+    fs::write(&source, "verb main() -> Int { return 0; }\n").expect("write entry source");
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["watch", "--interval", "20"])
+        .current_dir(&root)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("start watch command");
+    thread::sleep(Duration::from_millis(100));
+    fs::write(&source, "verb main() -> Int { return ; }\n").expect("write invalid source");
+    thread::sleep(Duration::from_millis(150));
+    let _ = child.kill();
+    let output = child.wait_with_output().expect("collect watch output");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stdout.contains("change detected"), "stdout: {stdout}");
+    assert!(stderr.contains("error[") || stderr.contains("expected"), "stderr: {stderr}");
+    let _ = fs::remove_dir_all(root);
 }
 
 #[cfg(unix)]

@@ -5,6 +5,7 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+ctrlc = "3.4.6"
 cranelift-codegen = "0.135.2"
 cranelift-frontend = "0.135.2"
 cranelift-module = "0.135.2"

@@ -13,6 +13,7 @@ mod project;
 mod publish;
 mod run;
 mod test_runner;
+mod watch;
 
 pub fn run() -> i32 {
     run_with_args(env::args().skip(1))
@@ -62,6 +63,9 @@ fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
     }
     if command == "publish" {
         return publish::publish_command(arguments);
+    }
+    if command == "watch" {
+        return watch::watch_command(arguments);
     }
 
     if command != "parse" {
@@ -149,7 +153,7 @@ fn is_help_flag(argument: &str) -> bool {
 }
 
 fn usage_text() -> &'static str {
-    "usage: actus <new|init|check|parse|build|run|test|fmt|lsp|publish> [options] [file.act]"
+    "usage: actus <new|init|check|parse|build|run|watch|test|fmt|lsp|publish> [options] [file.act]"
 }
 
 fn command_help_text(command: &str) -> Option<&'static str> {
@@ -169,6 +173,9 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         "run" => Some(
             "usage: actus run [file.act] [--release|--profile <name>] [-- program-args...]\n\nBuild and execute an Actus program once.",
+        ),
+        "watch" => Some(
+            "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",
         ),
         "test" => Some("usage: actus test [path]\n\nCollect and run Actus meta tests."),
         "fmt" => Some(
@@ -194,9 +201,10 @@ mod tests {
 
     #[test]
     fn every_command_has_help_text() {
-        for command in
-            ["new", "init", "check", "parse", "build", "run", "test", "fmt", "lsp", "publish"]
-        {
+        for command in [
+            "new", "init", "check", "parse", "build", "run", "watch", "test", "fmt", "lsp",
+            "publish",
+        ] {
             assert!(command_help_text(command).is_some(), "missing help for {command}");
         }
         assert!(usage_text().contains("build"));

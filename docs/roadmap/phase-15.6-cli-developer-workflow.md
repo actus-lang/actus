@@ -74,16 +74,16 @@ compiler pipeline.
 
 ## Gate 6: Explicit watch mode
 
-- [ ] Add an explicit `actus watch` command rather than making `actus run`
+- [x] Add an explicit `actus watch` command rather than making `actus run`
       monitor files implicitly.
-- [ ] Watch the project entry and all resolved module source files.
-- [ ] Re-run checking/building only after a relevant source or manifest change.
-- [ ] Keep diagnostics visible between rebuilds and clear stale diagnostics
+- [x] Watch the project entry and all resolved module source files.
+- [x] Re-run checking/building only after a relevant source or manifest change.
+- [x] Keep diagnostics visible between rebuilds and clear stale diagnostics
       deterministically.
-- [ ] Provide a clean interrupt path and return a meaningful process status.
-- [ ] Avoid busy polling; use the target platform's filesystem notification
+- [x] Provide a clean interrupt path and return a meaningful process status.
+- [x] Avoid busy polling; use the target platform's filesystem notification
       mechanism or a bounded fallback.
-- [ ] Add tests for change detection, ignored files, rebuild failure, and exit.
+- [x] Add tests for change detection, ignored files, rebuild failure, and exit.
 
 ## Gate 7: Workflow consistency and quality
 
