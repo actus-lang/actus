@@ -74,6 +74,7 @@ fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::MissingStructField { .. } => "E1032",
         SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
+        SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
         SemanticErrorKind::MissingReturnValue => "E1028",
@@ -134,6 +135,7 @@ fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::GenericArityMismatch { .. } => "E1053",
         SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
         SemanticErrorKind::InvalidMutation { .. } => "E1051",
+        SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
         SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
         SemanticErrorKind::InvalidGuardAccess { .. } => "E1062",
         SemanticErrorKind::GuardTypeMismatch { .. } => "E1063",
@@ -381,6 +383,9 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::TypeMismatch { callee, parameter, expected, found } => format!(
             "type mismatch for `{parameter}` in `{callee}`: expected `{expected}`, found `{found}`"
         ),
+        SemanticErrorKind::UnresolvedResultConstructor { constructor } => {
+            format!("cannot infer `{constructor}` here; use `Result[T, E].{constructor}(...)`")
+        }
         SemanticErrorKind::ReturnTypeMismatch { expected, found } => {
             format!("return type mismatch: expected `{expected}`, found `{found}`")
         }

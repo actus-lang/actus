@@ -164,6 +164,9 @@ pub enum SemanticErrorKind {
         expected: String,
         found: String,
     },
+    UnresolvedResultConstructor {
+        constructor: String,
+    },
     ReturnTypeMismatch {
         expected: String,
         found: String,

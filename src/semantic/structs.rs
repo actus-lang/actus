@@ -145,6 +145,11 @@ impl Analyzer {
     }
 
     pub(super) fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
+        if let Expr::Call { span, .. } = expression
+            && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
+        {
+            return Some(type_name.clone());
+        }
         match expression {
             Expr::StructLit { name, type_arguments, span, .. } => Some(TypeName {
                 name: name.clone(),

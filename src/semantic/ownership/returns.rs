@@ -21,7 +21,8 @@ impl Analyzer {
             self.plan_return_unwind(statement_span);
             return Ok(());
         };
-        self.visit_expression(expression)?;
+        let expected_return = self.current_return_type_name.clone();
+        self.visit_expression_with_expected(expression, expected_return.as_ref())?;
         self.validate_return_type(expression)?;
         if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
             self.validate_abs_return(expression)?;

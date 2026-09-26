@@ -401,7 +401,7 @@ impl Parser {
         let name_token = self.take_identifier("binding name")?;
         let name = identifier_text(&name_token.kind);
         let ty = if self.match_simple(TokenKind::Colon) {
-            Some(identifier_text(&self.take_identifier("binding type")?.kind))
+            Some(format_type_name(&self.parse_type_name()?))
         } else {
             None
         };
@@ -424,6 +424,17 @@ impl Parser {
             span: SourceSpan::new(role_token.span.start, end),
         })
     }
+}
+
+fn format_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(format_type_name).collect::<Vec<_>>().join(",")
+    )
 }
 
 fn identifier_text(kind: &TokenKind) -> String {

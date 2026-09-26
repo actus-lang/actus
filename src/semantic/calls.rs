@@ -25,7 +25,11 @@ impl VerbDecl {
                 .params
                 .iter()
                 .map(|parameter| {
-                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
+                    (
+                        parameter.name.clone(),
+                        parameter.role.clone(),
+                        super::analyzer::canonical_type_name(&parameter.ty),
+                    )
                 })
                 .collect(),
             dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
@@ -46,7 +50,11 @@ impl ExternalVerbDecl {
                 .params
                 .iter()
                 .map(|parameter| {
-                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
+                    (
+                        parameter.name.clone(),
+                        parameter.role.clone(),
+                        super::analyzer::canonical_type_name(&parameter.ty),
+                    )
                 })
                 .collect(),
             dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
@@ -99,6 +107,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if matches!(callee, "Ok" | "Err") && !self.signatures.contains_key(callee) {
+            return self.visit_result_constructor(callee, arguments, span);
+        }
         if !self.signatures.contains_key(callee)
             && self.visit_intrinsic_call(callee, arguments, span)?
         {
@@ -113,6 +124,51 @@ impl Analyzer {
         self.visit_call_with_signature(callee, arguments, span, &signature)
     }
 
+    fn visit_result_constructor(
+        &mut self,
+        constructor: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(result_type) = self
+            .expected_expression_type
+            .clone()
+            .filter(|type_name| type_name.name == "Result" && type_name.arguments.len() == 2)
+        else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnresolvedResultConstructor {
+                    constructor: constructor.to_owned(),
+                },
+                span,
+            });
+        };
+        if arguments.len() != 1 || arguments[0].name.is_some() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::WrongArgumentCount { callee: constructor.to_owned() },
+                span,
+            });
+        }
+        let payload_index = usize::from(constructor == "Err");
+        let payload_type = &result_type.arguments[payload_index];
+        self.visit_expression_with_expected(&arguments[0].expression, Some(payload_type))?;
+        let found = self
+            .expression_type_name(&arguments[0].expression)
+            .unwrap_or_else(|| "unknown".to_owned());
+        if found != super::analyzer::canonical_type_name(payload_type) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::TypeMismatch {
+                    callee: constructor.to_owned(),
+                    parameter: "payload".to_owned(),
+                    expected: super::analyzer::canonical_type_name(payload_type),
+                    found,
+                },
+                span: argument_span(&arguments[0]),
+            });
+        }
+        self.inferred_expression_types.insert((span.start, span.end), result_type);
+        Ok(())
+    }
+
     pub(super) fn visit_call_with_signature(
         &mut self,
         callee: &str,
@@ -121,47 +177,13 @@ impl Analyzer {
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
         let parameter_indices = self.bind_arguments(callee, signature, arguments, span)?;
-        for argument in arguments {
-            self.visit_expression(&argument.expression)?;
+        for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
+            let expected =
+                parse_type_name_key(&signature.params[*parameter_index].2, argument_span(argument));
+            self.visit_expression_with_expected(&argument.expression, expected.as_ref())?;
         }
         for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
-            let (_, role, _) = &signature.params[*parameter_index];
-            if *role == Role::Ins && argument.role != Some(Role::Ins) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::InvalidArgumentRole {
-                        callee: callee.to_owned(),
-                        parameter: signature.params[*parameter_index].0.clone(),
-                    },
-                    span: argument_span(argument),
-                });
-            }
-            if argument.role.as_ref().is_some_and(|actual| actual != role) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::InvalidArgumentRole {
-                        callee: callee.to_owned(),
-                        parameter: signature.params[*parameter_index].0.clone(),
-                    },
-                    span: argument_span(argument),
-                });
-            }
-            let explicit_owner_view = *role == Role::Abs
-                && argument.role == Some(Role::Abs)
-                && self.is_readable_owner(&argument.expression);
-            if !explicit_owner_view {
-                self.validate_argument_role(
-                    callee,
-                    &signature.params[*parameter_index].0,
-                    role,
-                    &argument.expression,
-                )?;
-            }
-            self.validate_argument_type(
-                callee,
-                &signature.params[*parameter_index].0,
-                &signature.params[*parameter_index].2,
-                signature.dynamic_params[*parameter_index],
-                &argument.expression,
-            )?;
+            self.validate_call_argument(callee, argument, *parameter_index, signature)?;
         }
         self.validate_exclusive_aliases(arguments, &parameter_indices, signature)?;
         for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
@@ -171,6 +193,45 @@ impl Analyzer {
         }
         self.execute_exclusive_loans(callee, arguments, &parameter_indices, signature)?;
         Ok(())
+    }
+
+    fn validate_call_argument(
+        &self,
+        callee: &str,
+        argument: &Argument,
+        parameter_index: usize,
+        signature: &VerbSignature,
+    ) -> Result<(), SemanticError> {
+        let (_, role, ty) = &signature.params[parameter_index];
+        if (*role == Role::Ins && argument.role != Some(Role::Ins))
+            || argument.role.as_ref().is_some_and(|actual| actual != role)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidArgumentRole {
+                    callee: callee.to_owned(),
+                    parameter: signature.params[parameter_index].0.clone(),
+                },
+                span: argument_span(argument),
+            });
+        }
+        let explicit_owner_view = *role == Role::Abs
+            && argument.role == Some(Role::Abs)
+            && self.is_readable_owner(&argument.expression);
+        if !explicit_owner_view {
+            self.validate_argument_role(
+                callee,
+                &signature.params[parameter_index].0,
+                role,
+                &argument.expression,
+            )?;
+        }
+        self.validate_argument_type(
+            callee,
+            &signature.params[parameter_index].0,
+            ty,
+            signature.dynamic_params[parameter_index],
+            &argument.expression,
+        )
     }
 
     pub(super) fn performance_signature(
@@ -205,6 +266,10 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         if let Expr::FieldAccess { object, field, .. } = expression {
             return self.move_struct_field(object, field, span);
+        }
+        if matches!(expression, Expr::Call { callee, .. } if matches!(callee.as_str(), "Ok" | "Err"))
+        {
+            return Ok(());
         }
         let Expr::Identifier { name, span: identifier_span } = expression else {
             return Err(SemanticError {
@@ -328,6 +393,43 @@ impl Analyzer {
             span,
         })
     }
+}
+
+pub(super) fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
+    let Some(open) = key.find('[') else {
+        return Some(crate::ast::TypeName { name: key.to_owned(), arguments: Vec::new(), span });
+    };
+    if !key.ends_with(']') {
+        return None;
+    }
+    let name = key[..open].to_owned();
+    let inner = &key[open + 1..key.len() - 1];
+    let arguments = split_type_arguments(inner)
+        .into_iter()
+        .map(|argument| parse_type_name_key(argument, span))
+        .collect::<Option<Vec<_>>>()?;
+    Some(crate::ast::TypeName { name, arguments, span })
+}
+
+fn split_type_arguments(input: &str) -> Vec<&str> {
+    let mut depth = 0;
+    let mut start = 0;
+    let mut parts = Vec::new();
+    for (index, character) in input.char_indices() {
+        match character {
+            '[' => depth += 1,
+            ']' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(input[start..index].trim());
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    if start < input.len() {
+        parts.push(input[start..].trim());
+    }
+    parts
 }
 
 fn root_binding(expression: &Expr) -> Option<(&String, SourceSpan)> {

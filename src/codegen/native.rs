@@ -19,6 +19,7 @@ use super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::native_runtime::declare_runtime_functions;
 use super::performance::PerformanceRegistry;
 use super::performance_emit::define_performances;
+use super::result_constructors::normalize_program;
 use super::target::build_isa_with_optimization;
 use super::types::NativeType;
 use crate::target::TargetSpec;
@@ -74,6 +75,8 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
+    let normalized_program = normalize_program(program);
+    let program = &normalized_program;
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
     validate_cleanup_plans(&semantic)

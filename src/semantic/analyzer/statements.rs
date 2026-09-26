@@ -63,9 +63,12 @@ impl Analyzer {
         initializer: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let binding_type = self.resolve_binding_type(declared_type, initializer, span)?;
-        self.validate_declared_initializer(name, declared_type, initializer, span)?;
-        self.visit_expression(initializer)?;
+        let declared_type_name =
+            declared_type.and_then(|name| super::super::calls::parse_type_name_key(name, span));
+        let binding_type =
+            self.resolve_binding_type(declared_type_name.as_ref(), initializer, span)?;
+        self.visit_expression_with_expected(initializer, declared_type_name.as_ref())?;
+        self.validate_declared_initializer(name, declared_type_name.as_ref(), initializer, span)?;
         if *role == Role::Erg {
             self.initialize_owner(initializer, span)?;
         }
@@ -83,7 +86,13 @@ impl Analyzer {
             }
         }
         self.record_initializer_struct_type(name, initializer, span)?;
-        self.record_initializer_enum_type(name, initializer, span)
+        if let Some(type_name) = declared_type_name {
+            self.record_struct_binding(name, &type_name, span)?;
+            self.record_enum_binding(name, &type_name, span)?;
+        } else {
+            self.record_initializer_enum_type(name, initializer, span)?;
+        }
+        Ok(())
     }
 
     fn visit_expr_statement(

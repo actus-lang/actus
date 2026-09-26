@@ -6,6 +6,18 @@ use super::Analyzer;
 use super::{canonical_type_name, try_type_mismatch};
 
 impl Analyzer {
+    pub(crate) fn visit_expression_with_expected(
+        &mut self,
+        expression: &Expr,
+        expected: Option<&crate::ast::TypeName>,
+    ) -> Result<(), SemanticError> {
+        let previous = self.expected_expression_type.take();
+        self.expected_expression_type = expected.cloned();
+        let result = self.visit_expression(expression);
+        self.expected_expression_type = previous;
+        result
+    }
+
     pub(crate) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         self.record_origin(expression);
         match expression {

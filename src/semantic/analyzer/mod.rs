@@ -49,6 +49,8 @@ pub(super) struct Analyzer {
     pub(super) binding_dynamic_roles: HashMap<usize, String>,
     pub(super) generic_scopes: Vec<HashSet<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
+    pub(super) expected_expression_type: Option<crate::ast::TypeName>,
+    pub(super) inferred_expression_types: HashMap<(usize, usize), crate::ast::TypeName>,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -109,6 +111,8 @@ impl Analyzer {
             binding_dynamic_roles: HashMap::new(),
             generic_scopes: Vec::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
+            expected_expression_type: None,
+            inferred_expression_types: HashMap::new(),
         }
     }
 

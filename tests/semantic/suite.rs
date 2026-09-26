@@ -329,3 +329,29 @@ fn validates_result_returns_and_try_propagation() {
     let wrong_result = "enum IoError { Eof, Failed, } enum OtherError { Failed, } verb broken() -> Result[Int, IoError] { return Result[Int, OtherError].Ok(1); }";
     analyze_source(wrong_result).expect_err("Result error types must match");
 }
+
+#[test]
+fn infers_short_result_constructors_from_return_and_binding_contexts() {
+    analyze_source(
+        "enum IoError { Failed, } verb consume(dat result: Result[Int, IoError]) { } verb success() -> Result[Int, IoError] { erg result: Result[Int, IoError] = Ok(1); consume(result: Ok(2)); return case 0 { 0 => Ok(3), _ => Err(IoError.Failed), }; } verb failure() -> Result[Int, IoError] { return Err(IoError.Failed); }",
+    )
+    .expect("short Result constructors should use return, binding, argument, and case types");
+}
+
+#[test]
+fn rejects_ambiguous_and_mismatched_short_result_constructors() {
+    let ambiguous = analyze_source("verb broken() { return Ok(1); }")
+        .expect_err("Ok without a Result context must be rejected");
+    assert!(matches!(
+        ambiguous.kind,
+        SemanticErrorKind::UnresolvedResultConstructor { constructor } if constructor == "Ok"
+    ));
+
+    let mismatched = analyze_source(
+        "enum IoError { Failed, } verb broken() -> Result[Int, IoError] { return Ok(\"bad\"); }",
+    )
+    .expect_err("the Ok payload must match Result's success type");
+    assert!(
+        matches!(mismatched.kind, SemanticErrorKind::TypeMismatch { callee, .. } if callee == "Ok")
+    );
+}

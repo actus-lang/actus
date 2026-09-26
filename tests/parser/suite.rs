@@ -440,3 +440,15 @@ fn parses_try_operator_as_a_postfix_expression() {
         panic!("expected try expression")
     };
 }
+
+#[test]
+fn parses_short_result_constructors_and_typed_result_bindings() {
+    let program = parse_source(
+        "verb main() -> Result[Int, IoError] { erg result: Result[Int, IoError] = Ok(1); return result; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::OwnerDecl { initializer, .. } = &verb.body.statements[0] else {
+        panic!("expected owner declaration")
+    };
+    assert!(matches!(initializer, Expr::Call { callee, .. } if callee == "Ok"));
+}

@@ -380,7 +380,10 @@ impl Analyzer {
 
     fn visit_case_body(&mut self, body: &CaseBody) -> Result<(), SemanticError> {
         match body {
-            CaseBody::Expression(expression) => self.visit_expression(expression),
+            CaseBody::Expression(expression) => {
+                let expected = self.expected_expression_type.clone();
+                self.visit_expression_with_expected(expression, expected.as_ref())
+            }
             CaseBody::Block(block) => self.visit_block(block),
         }
     }
