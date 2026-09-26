@@ -216,64 +216,120 @@ the hosted-runtime boundary, and deterministic status reporting.
       input, stream, buffering, and in-memory cursor behavior without
       compiler-specific application intrinsics.
 
-## Gate 3: `std::fs`
+## Gate 3: RAII, Result Propagation, and `std::fs`
 
-Provide explicit filesystem operations for host profiles while keeping the
-module unavailable or replaceable on targets without filesystem services.
+This is the current implementation gate. It combines deterministic resource
+cleanup, typed error propagation, and the first host filesystem API. The
+contracts are defined by ADR-0027 and ADR-0028; filesystem work must use both
+contracts rather than introducing parallel cleanup or error mechanisms.
 
-### API contract
+### ADR-0027: RAII scope drop
 
-- [ ] Define the `std::fs` module facade and public operations.
-- [ ] Define path input ownership and borrowing rules.
-- [ ] Define file-read result and error semantics.
-- [ ] Define file-write result and error semantics.
+- [ ] Register deterministic cleanup contracts for `File` and future sockets.
+- [ ] Emit LIFO cleanup for normal lexical scope exit.
+- [ ] Emit the same cleanup plan for `return`, `break`, and `continue`.
+- [ ] Emit cleanup before `?` early return.
+- [ ] Reject drop while an owner is `Frozen` or `Suspended`.
+- [ ] Ensure every live owned resource has exactly one drop action.
+- [ ] Add native exactly-once cleanup tests.
+
+### ADR-0028: Try operator integration
+
+- [ ] Parse postfix `?` expressions.
+- [ ] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
+- [ ] Validate compatible error propagation.
+- [ ] Lower `Ok` unwrapping and `Err` early return natively.
+- [ ] Preserve cleanup and loan restoration on early return.
+- [ ] Extend `?` integration tests to filesystem operations.
+
+### `std::fs` API and implementation
+
+- [ ] Define the `std::fs` facade and public file operations.
+- [ ] Define `std::path` input ownership and byte-oriented representation.
+- [ ] Define file-read and file-write `Result` contracts.
 - [ ] Define create, truncate, append, and overwrite behavior.
-- [ ] Define byte-buffer ownership for reads and writes.
-- [ ] Define behavior for missing files and permission failures.
-- [ ] Define host-profile availability in the target contract.
-
-### Implementation
-
-- [ ] Implement the public `std::fs` declarations in Actus.
-- [ ] Implement runtime file-open and file-close bridges.
-- [ ] Implement runtime read and write bridges.
-- [ ] Implement deterministic error translation.
-- [ ] Ensure opened resources have exactly one cleanup path.
+- [ ] Implement runtime file-open, read, write, and close bridges.
+- [ ] Translate host failures to typed `IoError` values.
+- [ ] Ensure opened files use exactly one deterministic cleanup path.
+- [ ] Exclude filesystem APIs from targets without filesystem capabilities.
 - [ ] Add semantic ownership and failure-path tests.
-- [ ] Add native tests for read, write, append, and missing-file behavior.
-- [ ] Add a target/profile test proving host-only exclusion.
+- [ ] Add native read, write, append, missing-file, and cleanup tests.
 
 ### Gate 3 invariant
 
-- [ ] Filesystem resources are owned, transferred, and cleaned exactly once.
-- [ ] No filesystem API is silently available on a target that cannot provide
-      its contract.
+- [ ] `std::fs` resources are owned, transferred, and cleaned exactly once.
+- [ ] Every filesystem failure is represented by a typed `Result` value.
+- [ ] `?` propagates filesystem errors without bypassing cleanup.
 
-## Gate 4: `std::path`
+## Gate 3.5: Uniform Method Calls and I/O API Ergonomics
 
-Add the path value model required by `std::fs` without coupling Actus source to
-one host operating system's path syntax.
+Implement ADR-0029 only after Gate 3 contracts are stable. Method syntax must
+desugar to the existing role-qualified verb calls without hiding ownership.
 
-- [ ] Define the `std::path` public facade.
-- [ ] Define owned and borrowed path representations.
-- [ ] Define joining and component inspection operations.
-- [ ] Define conversion from supported string/buffer inputs.
-- [ ] Define platform separator and encoding behavior.
-- [ ] Define invalid-path diagnostics.
-- [ ] Add positive path composition tests.
-- [ ] Add negative path validation tests.
-- [ ] Use the path API from `std::fs` tests.
-- [ ] Verify behavior on Linux, macOS, and Windows.
+- [ ] Parse `receiver.verb(args...)` while preserving evaluation order.
+- [ ] Desugar the receiver into the first verb parameter.
+- [ ] Preserve explicit `erg`, `abs`, `dat`, and `ins` call-site roles.
+- [ ] Reject receiver/parameter type and role mismatches deterministically.
+- [ ] Route static method calls through direct monomorphized dispatch.
+- [ ] Keep dynamic role dispatch on the existing explicit ABI.
+- [ ] Migrate ergonomic `std::io` calls without changing their contracts.
+- [ ] Add parser, semantic, codegen, and native UFCS tests.
+- [ ] Update API documentation and editor tooling for method calls.
+
+### Gate 3.5 invariant
+
+- [ ] Method syntax is only a source-level convenience over canonical verbs.
+- [ ] No implicit borrow, ownership transfer, vtable, or allocation is added.
+
+## Gate 4: Bare-Metal and Embedded HAL
+
+Implement ADR-0026 for Dali OS, MMIO registers, and deterministic protocol
+layouts. The feature must remain usable on freestanding targets without host
+runtime services.
+
+- [ ] Add `u1..u128` and `i1..i128` primitive type declarations.
+- [ ] Define `Bit` as the canonical `u1` alias.
+- [ ] Keep hexadecimal notation as a literal format only.
+- [ ] Add compile-time range and overflow validation.
+- [ ] Define `pack` with an explicit fixed backing integer.
+- [ ] Validate packed field widths, offsets, overlap, and total capacity.
+- [ ] Define deterministic endianness in the packed layout contract.
+- [ ] Integrate packed reads and writes with `erg` and `abs` access rules.
+- [ ] Lower shifts and masks deterministically through Cranelift IR.
+- [ ] Add MMIO-style and network-frame layout tests.
+- [ ] Verify no allocator or host runtime dependency on bare-metal targets.
 
 ### Gate 4 invariant
 
-- [ ] Path operations are deterministic within a target contract and do not
-      leak host-specific assumptions into the language core.
+- [ ] Packed register layouts are deterministic across supported targets.
+- [ ] Width and overflow violations are rejected before native code generation.
 
-## Gate 5: Real Actus Programs and End-to-End Workflow
+## Gate 5: Advanced Memory and Scoped Arenas
 
-Prove that the standard library is usable by application code, not only by
-isolated unit tests.
+Implement ADR-0030 for bounded cyclic data structures while retaining lexical
+provenance and deterministic teardown.
+
+- [ ] Define `Arena[N]` capacity, alignment, and storage layout.
+- [ ] Add arena provenance metadata to semantic bindings and views.
+- [ ] Return objects from an arena through non-escaping `ins` construction.
+- [ ] Permit read-only traversal through `abs` references.
+- [ ] Reject references that escape the arena scope.
+- [ ] Reject owner drop or move while arena-derived views are live.
+- [ ] Reject combinations of references from different arena roots.
+- [ ] Lower arena teardown to one deterministic bulk release operation.
+- [ ] Add cyclic graph and tree native execution tests.
+- [ ] Add exhaustion, nested-scope, and cross-arena negative tests.
+- [ ] Verify operation without a host allocator on bare-metal targets.
+
+### Gate 5 invariant
+
+- [ ] Arena teardown is bounded and deterministic.
+- [ ] Arena references cannot outlive or out-provenance their arena owner.
+
+## Gate 6: Real Actus Programs, Portability, and Completion
+
+Prove that the standard library and new language ergonomics are usable by
+application code, then run the complete portability and quality matrix.
 
 - [ ] Create a console application using `std::io`.
 - [ ] Create a file utility using `std::fs` and `std::path`.
