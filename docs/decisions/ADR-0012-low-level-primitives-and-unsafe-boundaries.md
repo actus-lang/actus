@@ -37,15 +37,15 @@ some guarantees, but the bypass must be explicit and locally visible.
 
 ## Raw Pointers
 
-Actus provides unmanaged raw pointer types:
+The accepted future unsafe design provides unmanaged raw pointer types:
 
 ```act
 *const T
 *mut T
 ```
 
-A raw pointer binding is not an owner and therefore has no semantic role and
-no destructor responsibility:
+When this future surface is implemented, a raw pointer binding will not be an
+owner and therefore will have no semantic role or destructor responsibility:
 
 ```act
 unsafe {
@@ -58,7 +58,7 @@ Raw pointer bindings must not be declared as `erg`. They are unmanaged
 bindings, are not automatically dropped, and do not transfer ownership merely
 because they are copied or passed to an intrinsic.
 
-The initial raw pointer intrinsics are:
+The planned raw pointer intrinsics are:
 
 ```text
 addr(value)
@@ -69,8 +69,8 @@ offset(pointer, count)
 ```
 
 Pointer dereference, pointer arithmetic, casts that may change validity, and
-conversion of a borrow to a raw pointer require an unsafe boundary. Raw
-pointers do not extend the lifetime of an `abs` borrow and do not make a
+conversion of a borrow to a raw pointer will require an unsafe boundary. Raw
+pointers will not extend the lifetime of an `abs` borrow and will not make a
 borrowed value safe to return or store.
 
 ## Hardware and MMIO
@@ -159,7 +159,7 @@ alignment guarantee does not apply.
 
 ## Inline Assembly
 
-Inline assembly is available only in an unsafe boundary:
+The planned inline assembly surface is available only in an unsafe boundary:
 
 ```act
 unsafe {

@@ -44,17 +44,17 @@ to the same language contract.
 
 ### Compiler surface audit
 
-- [ ] Inventory lexer tokens and reserved keywords from the compiler.
-- [ ] Inventory parser productions for declarations, roles, calls, returns,
+- [x] Inventory lexer tokens and reserved keywords from the compiler.
+- [x] Inventory parser productions for declarations, roles, calls, returns,
       modules, patterns, and expressions.
-- [ ] Verify `erg`, `abs`, `dat`, and `ins` in declarations and call sites.
-- [ ] Verify `-> abs Type` in every supported declaration form.
-- [ ] Verify `Buffer[...]` as the canonical buffer construction syntax.
-- [ ] Verify `case abs`, `case dat`, and pattern guards.
-- [ ] Verify `import module;` and `open sibling;` behavior.
-- [ ] Verify `unsafe extern "C"` declaration constraints.
-- [ ] Record any implementation/documentation mismatch as a focused issue.
-- [ ] Reject undocumented syntax additions during this gate.
+- [x] Verify `erg`, `abs`, `dat`, and `ins` in declarations and call sites.
+- [x] Verify `-> abs Type` in every supported declaration form.
+- [x] Verify `Buffer[...]` as the canonical buffer construction syntax.
+- [x] Verify `case abs`, `case dat`, and pattern guards.
+- [x] Verify `import module;` and `open sibling;` behavior.
+- [x] Verify `unsafe extern "C"` declaration constraints.
+- [x] Record that the compiler surface and published documentation agree.
+- [x] Reject undocumented syntax additions during this gate.
 
 ### Tree-sitter synchronization
 
@@ -82,14 +82,17 @@ to the same language contract.
 
 ### LSP synchronization
 
-- [ ] Verify diagnostics for the current ownership roles.
-- [ ] Verify diagnostics for `ins` aliasing and loan forwarding.
-- [ ] Verify diagnostics for invalid `abs` view origins.
-- [ ] Verify definition lookup through imports and facades.
-- [ ] Verify hover output for role-qualified signatures.
-- [ ] Verify formatting for current module and pattern syntax.
-- [ ] Verify UTF-16 ranges with multibyte source text.
-- [ ] Add an integration fixture covering the current complete syntax surface.
+- [x] Verify diagnostics for the current ownership roles.
+- [x] Verify `ins` aliasing and loan-forwarding diagnostics (`E1065`).
+- [x] Verify invalid `abs` view-origin diagnostics (`E1066`).
+- [x] Verify `Suspended` and `Frozen` access diagnostics (`E1064`, `E1009`,
+      and `E1011` where the corresponding semantic state is reached).
+- [x] Verify definition lookup through imports and facades.
+- [x] Verify hover output for `ins` parameters and `-> abs Type` returns.
+- [x] Verify hover output for role-qualified signatures.
+- [x] Verify formatting for current module and pattern syntax.
+- [x] Verify UTF-16 ranges with multibyte source text.
+- [x] Add an integration fixture covering the current complete syntax surface.
 
 ### Gate 0 invariant
 
