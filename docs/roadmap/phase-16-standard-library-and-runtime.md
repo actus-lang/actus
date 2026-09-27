@@ -482,24 +482,29 @@ provenance and deterministic teardown.
 - [x] Return objects from an arena through non-escaping `ins` construction.
 - [x] Permit read-only traversal through `abs` references.
 - [x] Reject references that escape the arena scope.
-- [ ] Reject owner drop or move while arena-derived views are live.
+- [x] Reject owner drop or move while arena-derived views are live.
 - [x] Reject combinations of references from different arena roots.
 - [x] Cranelift lowering & fast bump-pointer allocation.
 - [x] Add native bump-pointer integrity and capacity-exhaustion tests.
 - [x] Indirect-reference graph/tree native execution tests.
-- [ ] Cyclical data structure native execution tests.
-- [ ] Deterministic bulk teardown verification.
+- [x] Cyclical data structure native execution tests.
+- [x] Deterministic bulk teardown verification.
 - [x] Lower arena teardown to one deterministic bulk release operation.
-- [ ] Represent `Option[abs T]` and `Option[ins T]` references with a null-pointer
-      niche and validate recursive self-referential graph construction.
-- [ ] Add cyclic graph and tree native execution tests.
-- [ ] Add exhaustion, nested-scope, and cross-arena negative tests.
-- [ ] Verify operation without a host allocator on bare-metal targets.
+- [x] Represent `Option[abs T]` and `Option[ins T]` references with a
+      canonical null-pointer niche and validate recursive self-referential graph
+      construction.
+- [x] Lower `None`/`Some` matching to direct null comparisons and preserve
+      pointer-sized recursive reference fields.
+- [x] Add cyclic graph and tree native execution tests, including a three-node
+      `Option[abs ListNode]` traversal with a result of `60`.
+- [x] Add exhaustion, nested-scope, and cross-arena negative tests.
+- [x] Verify arena placement and bulk teardown without a host allocator or host
+      runtime dependency on freestanding targets.
 
 ### Gate 5 invariant
 
-- [ ] Arena teardown is bounded and deterministic.
-- [ ] Arena references cannot outlive or out-provenance their arena owner.
+- [x] Arena teardown is bounded and deterministic.
+- [x] Arena references cannot outlive or out-provenance their arena owner.
 
 ## Gate 6: Real Actus Programs, Portability, and Completion
 

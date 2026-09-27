@@ -54,6 +54,7 @@ mod tests {
             arguments: vec![TypeName {
                 name: "Int".to_owned(),
                 arguments: Vec::new(),
+                reference_role: None,
                 span: SourceSpan::new(0, 0),
             }],
             canonical_key: key.to_owned(),

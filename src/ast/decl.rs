@@ -201,6 +201,7 @@ pub enum Role {
 pub struct TypeName {
     pub name: String,
     pub arguments: Vec<TypeName>,
+    pub reference_role: Option<Role>,
     pub span: SourceSpan,
 }
 
@@ -271,7 +272,12 @@ fn generic_parameter(name: &str) -> GenericParam {
 }
 
 fn type_name(name: &str) -> TypeName {
-    TypeName { name: name.to_owned(), arguments: Vec::new(), span: zero_span() }
+    TypeName {
+        name: name.to_owned(),
+        arguments: Vec::new(),
+        reference_role: None,
+        span: zero_span(),
+    }
 }
 
 fn zero_span() -> SourceSpan {

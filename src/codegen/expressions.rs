@@ -374,6 +374,7 @@ pub(super) fn initializer_type(
             let type_name = crate::ast::TypeName {
                 name: name.clone(),
                 arguments: type_arguments.clone(),
+                reference_role: None,
                 span: crate::lexer::SourceSpan::new(0, 0),
             };
             layouts.type_for_type_name(&type_name).unwrap_or(NativeType::Int)

@@ -144,7 +144,8 @@ impl Analyzer {
         self.visit_expression(&argument.expression)?;
         let found =
             self.expression_type_name(&argument.expression).unwrap_or_else(|| "unknown".to_owned());
-        if found == canonical_type_name(expected) {
+        let expected_name = canonical_type_name(expected);
+        if found == expected_name || found == strip_reference_role(&expected_name) {
             if self.enum_payload_owns_value(expected) {
                 self.initialize_owner(&argument.expression, argument_span(argument))?;
             }
@@ -154,7 +155,7 @@ impl Analyzer {
             kind: SemanticErrorKind::EnumVariantArgumentTypeMismatch {
                 variant: variant.to_owned(),
                 parameter: parameter.to_owned(),
-                expected: canonical_type_name(expected),
+                expected: expected_name,
                 found,
             },
             span: argument_span(argument),
@@ -166,6 +167,16 @@ impl Analyzer {
             || self.struct_types.contains_key(&type_name.name)
             || self.drop_types.contains(&type_name.name)
     }
+}
+
+fn strip_reference_role(type_name: &str) -> String {
+    type_name
+        .strip_prefix("abs ")
+        .or_else(|| type_name.strip_prefix("ins "))
+        .or_else(|| type_name.strip_prefix("erg "))
+        .or_else(|| type_name.strip_prefix("dat "))
+        .unwrap_or(type_name)
+        .to_owned()
 }
 
 fn named_argument_error(
@@ -262,8 +273,14 @@ fn receiver_type_name(receiver: &Expr) -> Option<TypeName> {
 }
 
 fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<TypeName> {
+    let (reference_role, key) = reference_role_prefix(key);
     let Some(open) = key.find('[') else {
-        return Some(TypeName { name: key.to_owned(), arguments: Vec::new(), span });
+        return Some(TypeName {
+            name: key.to_owned(),
+            arguments: Vec::new(),
+            reference_role,
+            span,
+        });
     };
     if !key.ends_with(']') {
         return None;
@@ -272,7 +289,16 @@ fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<TypeName> {
         .into_iter()
         .map(|argument| parse_type_name_key(argument, span))
         .collect::<Option<Vec<_>>>()?;
-    Some(TypeName { name: key[..open].to_owned(), arguments, span })
+    Some(TypeName { name: key[..open].to_owned(), arguments, reference_role, span })
+}
+
+fn reference_role_prefix(key: &str) -> (Option<crate::ast::Role>, &str) {
+    for (prefix, role) in [("abs ", crate::ast::Role::Abs), ("ins ", crate::ast::Role::Ins)] {
+        if let Some(name) = key.strip_prefix(prefix) {
+            return (Some(role), name);
+        }
+    }
+    (None, key)
 }
 
 fn split_type_arguments(contents: &str) -> Vec<&str> {
@@ -297,11 +323,21 @@ fn split_type_arguments(contents: &str) -> Vec<&str> {
 }
 
 fn canonical_type_name(type_name: &TypeName) -> String {
+    let role = type_name
+        .reference_role
+        .as_ref()
+        .map(|role| match role {
+            crate::ast::Role::Abs => "abs ",
+            crate::ast::Role::Ins => "ins ",
+            crate::ast::Role::Erg => "erg ",
+            crate::ast::Role::Dat => "dat ",
+        })
+        .unwrap_or("");
     if type_name.arguments.is_empty() {
-        return type_name.name.clone();
+        return format!("{role}{}", type_name.name);
     }
     format!(
-        "{}[{}]",
+        "{role}{}[{}]",
         type_name.name,
         type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )

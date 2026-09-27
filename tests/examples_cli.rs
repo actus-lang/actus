@@ -72,6 +72,6 @@ fn arena_tree_example_builds_and_executes() {
     );
     assert_eq!(result, 0);
     let status = std::process::Command::new(&output).status().expect("run arena tree example");
-    assert_eq!(status.code(), Some(30));
+    assert_eq!(status.code(), Some(60));
     let _ = fs::remove_file(output);
 }

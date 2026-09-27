@@ -35,15 +35,18 @@ impl Analyzer {
         let owner_index = self.binding(name, *owner_span)?;
         self.ensure_access_available(owner_index, name, span)?;
         let arena_reference = self.binding_arena_provenance.contains_key(&owner_index);
+        let field = borrow_field(expression);
+        let reference_field = field.is_some();
         if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat)
-            && !(arena_reference && self.model.bindings[owner_index].role == Role::Ins)
+            && !(arena_reference
+                && matches!(self.model.bindings[owner_index].role, Role::Abs | Role::Ins))
+            && !(reference_field && self.model.bindings[owner_index].role == Role::Abs)
         {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidBorrowTarget { name: name.clone() },
                 span,
             });
         }
-        let field = borrow_field(expression);
         if let Some(field_name) = &field {
             let owner_expression = match expression.as_ref() {
                 Expr::FieldAccess { object, .. } => object.as_ref(),

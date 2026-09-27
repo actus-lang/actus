@@ -116,6 +116,7 @@ impl Analyzer {
                 let parsed = parse_type_name_key(ty, span).unwrap_or_else(|| TypeName {
                     name: ty.clone(),
                     arguments: Vec::new(),
+                    reference_role: None,
                     span,
                 });
                 (
@@ -168,6 +169,7 @@ fn substitute_type(type_name: &TypeName, bindings: &HashMap<String, TypeName>) -
             .iter()
             .map(|argument| substitute_type(argument, bindings))
             .collect(),
+        reference_role: type_name.reference_role.clone(),
         span: type_name.span,
     }
 }

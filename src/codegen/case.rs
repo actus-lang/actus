@@ -176,6 +176,14 @@ fn match_pattern(
             let variant_layout = layouts.enum_variant(enum_id, variant).ok_or_else(|| {
                 NativeEmitError(format!("unknown case variant `{enum_name}.{variant}`"))
             })?;
+            if enum_layout.niche_pointer {
+                let is_none = variant == "None";
+                return Ok(function.ins().icmp_imm_s(
+                    if is_none { IntCC::Equal } else { IntCC::NotEqual },
+                    subject,
+                    0,
+                ));
+            }
             let discriminant = function.ins().load(
                 types::I32,
                 MemFlagsData::new(),

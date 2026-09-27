@@ -233,6 +233,7 @@ fn _specialization_key(instance: &GenericInstance) -> String {
     canonical_type_name(&TypeName {
         name: instance.name.clone(),
         arguments: instance.arguments.clone(),
+        reference_role: None,
         span: crate::lexer::SourceSpan::new(0, 0),
     })
 }

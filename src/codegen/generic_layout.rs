@@ -108,6 +108,9 @@ impl GenericLayoutRegistry {
         type_name: &TypeName,
         visiting: &mut Vec<String>,
     ) -> Result<ValueLayout, NativeEmitError> {
+        if type_name.reference_role.is_some() {
+            return Ok(ValueLayout { size: self.pointer_size, alignment: self.pointer_size });
+        }
         if let Some(builtin) = lookup_builtin_type(&type_name.name) {
             return builtin_layout(builtin, self.pointer_size);
         }
