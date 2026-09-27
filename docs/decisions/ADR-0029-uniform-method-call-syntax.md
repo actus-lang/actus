@@ -1,6 +1,6 @@
 # ADR-0029: Uniform Method Call Syntax (UFCS)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-26
 - Scope: receiver syntax and role-qualified method calls
 

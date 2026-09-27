@@ -338,9 +338,9 @@ desugar to the existing role-qualified verb calls without hiding ownership.
 - [x] Reject receiver/parameter type and role mismatches deterministically.
 - [x] Route static method calls through direct monomorphized dispatch.
 - [x] Keep dynamic role dispatch on the existing explicit ABI.
-- [ ] Migrate ergonomic `std::io` calls without changing their contracts.
+- [x] Migrate ergonomic `std::io` calls without changing their contracts.
 - [x] Add parser, semantic, codegen, and native UFCS tests.
-- [ ] Update API documentation and editor tooling for method calls.
+- [x] Update API documentation and editor tooling for method calls.
 
 ### Gate 3.5 invariant
 
