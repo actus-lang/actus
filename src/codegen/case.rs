@@ -307,6 +307,10 @@ fn lower_case_body<'a>(
             Flow::Fallthrough => {
                 function.ins().iconst(result_type.ir_type(layouts.pointer_type), 0)
             }
+            Flow::VoidReturn => {
+                function.ins().return_(&[]);
+                return Ok(None);
+            }
             Flow::Break | Flow::Continue => {
                 return Err(NativeEmitError("loop control escaped case block".to_owned()));
             }

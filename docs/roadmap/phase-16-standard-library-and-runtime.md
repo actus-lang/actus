@@ -356,45 +356,45 @@ and zero-sized values without implementing packed layouts yet.
 
 ### Lexer: Uniform Integer and Hex Tokenization
 
-- [ ] Lex `u1..u128` and `i1..i128` through one validated integer-type pattern.
-- [ ] Represent width-qualified integer types as
+- [x] Lex `u1..u128` and `i1..i128` through one validated integer-type pattern.
+- [x] Represent width-qualified integer types as
       `Token::IntType { signed: bool, width: u8 }`.
-- [ ] Treat `u1` as the canonical one-bit type; do not add a separate `Bit`
+- [x] Treat `u1` as the canonical one-bit type; do not add a separate `Bit`
       lexer exception.
-- [ ] Lex hexadecimal literals with the `0x` prefix and validate their digit
+- [x] Lex hexadecimal literals with the `0x` prefix and validate their digit
       structure before parsing.
 
 ### Primitive Type Expansion
 
-- [ ] Add `f32` and `f64` IEEE 754 type syntax to lexing, parsing, and type
+- [x] Add `f32` and `f64` IEEE 754 type syntax to lexing, parsing, and type
       references.
-- [ ] Add `Void` as a zero-sized unit type suitable for `Result[Void, E]`.
-- [ ] Preserve the distinction between type names and literal formats.
+- [x] Add `Void` as a zero-sized unit type suitable for `Result[Void, E]`.
+- [x] Preserve the distinction between type names and literal formats.
 
 ### Semantic Type Registry and Validation
 
-- [ ] Register the exact signedness and width for every `uN` and `iN` type.
-- [ ] Validate literal ranges at compile time; for example, reject values
+- [x] Register the exact signedness and width for every `uN` and `iN` type.
+- [x] Validate literal ranges at compile time; for example, reject values
       above `7` for `u3`.
-- [ ] Reject compile-time arithmetic overflow instead of silently truncating.
-- [ ] Produce deterministic diagnostics for unsupported widths and invalid
+- [x] Reject compile-time arithmetic overflow instead of silently truncating.
+- [x] Produce deterministic diagnostics for unsupported widths and invalid
       numeric literals.
 
 ### Cranelift Native Lowering and Storage
 
-- [ ] Lower `u1..u8` and `i1..i8` to `I8` storage.
-- [ ] Lower `u9..u16` and `i9..i16` to `I16` storage.
-- [ ] Lower `u17..u32` and `i17..i32` to `I32` storage.
-- [ ] Lower `u33..u64` and `i33..i64` to `I64` storage.
-- [ ] Represent `u65..u128` and `i65..i128` as deterministic low/high word
-      pairs.
-- [ ] Lower `f32` to `F32` and `f64` to `F64`.
-- [ ] Lower `Void` as a zero-byte, no-value evaluation result.
+- [x] Lower `u1..u8` and `i1..i8` to `I8` storage.
+- [x] Lower `u9..u16` and `i9..i16` to `I16` storage.
+- [x] Lower `u17..u32` and `i17..i32` to `I32` storage.
+- [x] Lower `u33..u64` and `i33..i64` to `I64` storage.
+- [x] Represent `u65..u128` and `i65..i128` with Cranelift `I128` where
+      supported and deterministic 16-byte storage alignment.
+- [x] Lower `f32` to `F32` and `f64` to `F64`.
+- [x] Lower `Void` as a zero-byte, no-value evaluation result.
 
 ### Gate 3.6 invariant
 
-- [ ] Numeric types are no longer limited to `Int == I32`.
-- [ ] Numeric bounds and compile-time overflow are validated before native
+- [x] Numeric types are no longer limited to `Int == I32`.
+- [x] Numeric bounds and compile-time overflow are validated before native
       code generation.
 
 ## Gate 4: Bare-Metal and Embedded HAL

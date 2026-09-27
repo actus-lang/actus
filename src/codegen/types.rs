@@ -1,10 +1,13 @@
 use cranelift_codegen::ir::Type;
 
-use crate::ast::{BuiltinType, TypeName, lookup_builtin_type};
+use crate::ast::{BuiltinType, PrimitiveType, TypeName, lookup_builtin_type, primitive_type};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NativeType {
     Int,
+    Integer { signed: bool, width: u8 },
+    Float { width: u8 },
+    Void,
     String,
     Buffer,
     Struct(usize),
@@ -14,16 +17,31 @@ pub(super) enum NativeType {
 
 impl NativeType {
     pub(super) fn uses_sret(self) -> bool {
-        matches!(self, Self::Struct(_))
+        matches!(self, Self::Struct(_) | Self::Integer { width: 65..=128, .. })
+    }
+
+    pub(super) fn is_wide_integer(self) -> bool {
+        matches!(self, Self::Integer { width: 65..=128, .. })
     }
 
     pub(super) fn from_name(name: &str) -> Option<Self> {
+        if let Some(primitive) = primitive_type(name) {
+            return Some(Self::from_primitive(primitive));
+        }
         match lookup_builtin_type(name)? {
             BuiltinType::Int => Some(Self::Int),
             BuiltinType::Bool => Some(Self::Int),
             BuiltinType::String => Some(Self::String),
             BuiltinType::Buffer => Some(Self::Buffer),
             BuiltinType::Array | BuiltinType::Map => None,
+        }
+    }
+
+    pub(super) fn from_primitive(primitive: PrimitiveType) -> Self {
+        match primitive {
+            PrimitiveType::Integer { signed, width } => Self::Integer { signed, width },
+            PrimitiveType::Float { width } => Self::Float { width },
+            PrimitiveType::Void => Self::Void,
         }
     }
 
@@ -50,6 +68,7 @@ impl NativeType {
         type_name.and_then(|type_name| {
             layouts
                 .type_for_type_name(type_name)
+                .or_else(|| primitive_type(&type_name.name).map(Self::from_primitive))
                 .or_else(|| Self::from_name_with_layout(&type_name.name, layouts))
         })
     }
@@ -57,9 +76,48 @@ impl NativeType {
     pub(super) fn ir_type(self, pointer_type: Type) -> Type {
         match self {
             Self::Int => cranelift_codegen::ir::types::I32,
+            Self::Integer { width, .. } => integer_ir_type(width),
+            Self::Float { width: 32 } => cranelift_codegen::ir::types::F32,
+            Self::Float { width: 64 } => cranelift_codegen::ir::types::F64,
+            Self::Float { .. } => cranelift_codegen::ir::types::F64,
+            Self::Void => cranelift_codegen::ir::types::I8,
             Self::String | Self::Buffer | Self::Struct(_) | Self::Enum(_) | Self::FatPointer => {
                 pointer_type
             }
         }
+    }
+}
+
+fn integer_ir_type(width: u8) -> Type {
+    match width {
+        1..=8 => cranelift_codegen::ir::types::I8,
+        9..=16 => cranelift_codegen::ir::types::I16,
+        17..=32 => cranelift_codegen::ir::types::I32,
+        65..=128 => cranelift_codegen::ir::types::I128,
+        _ => cranelift_codegen::ir::types::I64,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NativeType;
+    use cranelift_codegen::ir::types;
+
+    #[test]
+    fn maps_primitive_widths_to_deterministic_machine_types() {
+        assert_eq!(NativeType::Integer { signed: false, width: 8 }.ir_type(types::I64), types::I8);
+        assert_eq!(NativeType::Integer { signed: true, width: 16 }.ir_type(types::I64), types::I16);
+        assert_eq!(
+            NativeType::Integer { signed: false, width: 32 }.ir_type(types::I64),
+            types::I32
+        );
+        assert_eq!(NativeType::Integer { signed: true, width: 64 }.ir_type(types::I64), types::I64);
+        assert_eq!(
+            NativeType::Integer { signed: false, width: 128 }.ir_type(types::I64),
+            types::I128
+        );
+        assert_eq!(NativeType::Float { width: 32 }.ir_type(types::I64), types::F32);
+        assert_eq!(NativeType::Float { width: 64 }.ir_type(types::I64), types::F64);
+        assert_eq!(NativeType::Void.ir_type(types::I64), types::I8);
     }
 }

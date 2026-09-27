@@ -92,6 +92,11 @@ pub(super) fn vtable_symbol_for_native(role: &str, target: NativeType) -> String
         NativeType::Struct(id) => format!("struct_{id}"),
         NativeType::Enum(id) => format!("enum_{id}"),
         NativeType::Int => "int".to_owned(),
+        NativeType::Integer { signed, width } => {
+            format!("{}int{width}", if signed { "i" } else { "u" })
+        }
+        NativeType::Float { width } => format!("float{width}"),
+        NativeType::Void => "void".to_owned(),
         NativeType::String => "string".to_owned(),
         NativeType::Buffer => "buffer".to_owned(),
         NativeType::FatPointer => "fat_pointer".to_owned(),

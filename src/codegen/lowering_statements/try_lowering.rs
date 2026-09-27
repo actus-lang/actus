@@ -5,6 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::cleanup::emit_return_cleanup;
 use super::super::super::enum_layout;
+use super::super::super::expression_literals::{coerce_to_ir_type, lower_float_as};
 use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::layout::LayoutRegistry;
 use super::super::super::literals::StringDataValues;
@@ -38,16 +39,23 @@ pub(super) fn lower_return(
             layouts,
         );
     }
-    let value = lower_expression(
-        function,
-        expression,
-        locals,
-        types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-    )?;
+    let return_ir_type = function.func.signature.returns.first().map(|ret| ret.value_type);
+    let value =
+        if let (Some(target), Expr::FloatLiteral { value, .. }) = (return_ir_type, expression) {
+            lower_float_as(function, value, target)?
+        } else {
+            lower_expression(
+                function,
+                expression,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )?
+        };
+    let value = return_ir_type.map_or(value, |target| coerce_to_ir_type(function, value, target));
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
     Ok(Flow::Return(value))
 }

@@ -59,6 +59,9 @@ impl LayoutRegistry {
             NativeType::Struct(id) => self.get(id).map(|layout| layout.size),
             NativeType::Enum(id) => self.enum_layout(id).map(|layout| layout.size),
             NativeType::Int => Some(4),
+            NativeType::Integer { width, .. } => Some(integer_storage_bytes(width)),
+            NativeType::Float { width } => Some(u32::from(width / 8)),
+            NativeType::Void => Some(0),
             NativeType::String | NativeType::Buffer => Some(self.pointer_size),
             NativeType::FatPointer => Some(self.pointer_size * 2),
         }
@@ -127,6 +130,17 @@ fn enum_payload_types(payload: &EnumPayload) -> Vec<(Option<String>, &str)> {
 
 fn align_up(offset: u32, alignment: u32) -> u32 {
     offset.div_ceil(alignment) * alignment
+}
+
+fn integer_storage_bytes(width: u8) -> u32 {
+    match width {
+        1..=8 => 1,
+        9..=16 => 2,
+        17..=32 => 4,
+        33..=64 => 8,
+        65..=128 => 16,
+        _ => 0,
+    }
 }
 
 #[cfg(test)]
