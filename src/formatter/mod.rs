@@ -143,9 +143,12 @@ impl Formatter {
             self.indent += 1;
             for field in &definition.fields {
                 self.line_indent();
-                if matches!(field.role, crate::ast::StructFieldRole::Erg) {
-                    self.output.push_str("erg ");
-                }
+                self.output.push_str(match field.role {
+                    crate::ast::StructFieldRole::Value => "",
+                    crate::ast::StructFieldRole::Erg => "erg ",
+                    crate::ast::StructFieldRole::Abs => "abs ",
+                    crate::ast::StructFieldRole::Ins => "ins ",
+                });
                 self.output.push_str(&field.name);
                 self.output.push_str(": ");
                 self.output.push_str(&field.ty.name);

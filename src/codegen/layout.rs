@@ -19,6 +19,7 @@ pub(super) struct FieldLayout {
     pub(super) offset: u32,
     pub(super) ty: NativeType,
     pub(super) owned: bool,
+    pub(super) indirect: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -191,14 +192,26 @@ impl LayoutRegistry {
         let mut offset = 0;
         let mut alignment = 1;
         for field in &definition.fields {
-            let ty = self.native_type(&field.ty.name, visiting)?;
-            let (size, field_alignment) = self.type_layout(ty)?;
+            let indirect = matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins);
+            let ty = if indirect {
+                self.type_for_type_name(&field.ty).ok_or_else(|| {
+                    NativeEmitError(format!("unknown reference field type `{}`", field.ty.name))
+                })?
+            } else {
+                self.native_type(&field.ty.name, visiting)?
+            };
+            let (size, field_alignment) = if indirect {
+                (self.pointer_size, self.pointer_size)
+            } else {
+                self.type_layout(ty)?
+            };
             offset = align_up(offset, field_alignment);
             fields.push(FieldLayout {
                 name: field.name.clone(),
                 offset,
                 ty,
                 owned: matches!(field.role, StructFieldRole::Erg),
+                indirect,
             });
             offset += size;
             alignment = alignment.max(field_alignment);

@@ -486,7 +486,8 @@ provenance and deterministic teardown.
 - [x] Reject combinations of references from different arena roots.
 - [x] Cranelift lowering & fast bump-pointer allocation.
 - [x] Add native bump-pointer integrity and capacity-exhaustion tests.
-- [ ] Cyclical data structures and graph/tree native execution tests.
+- [x] Indirect-reference graph/tree native execution tests.
+- [ ] Cyclical data structure native execution tests.
 - [ ] Deterministic bulk teardown verification.
 - [ ] Lower arena teardown to one deterministic bulk release operation.
 - [ ] Add cyclic graph and tree native execution tests.
