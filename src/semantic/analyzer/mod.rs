@@ -165,6 +165,7 @@ impl Analyzer {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
                 TopLevelDecl::Struct(_)
+                | TopLevelDecl::Pack(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Role(_)
                 | TopLevelDecl::Perform(_) => continue,
@@ -174,6 +175,7 @@ impl Analyzer {
                 TopLevelDecl::Verb(verb) => &verb.generic_parameters,
                 TopLevelDecl::ExternalVerb(verb) => &verb.generic_parameters,
                 TopLevelDecl::Struct(_)
+                | TopLevelDecl::Pack(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Role(_)
                 | TopLevelDecl::Perform(_) => unreachable!(),

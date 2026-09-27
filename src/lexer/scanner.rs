@@ -129,6 +129,7 @@ impl<'source> Scanner<'source> {
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
             "struct" => TokenKind::Struct,
+            "pack" => TokenKind::Pack,
             "enum" => TokenKind::Enum,
             "role" => TokenKind::Role,
             "perform" => TokenKind::Perform,

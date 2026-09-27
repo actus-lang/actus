@@ -31,6 +31,7 @@ impl Formatter {
             TopLevelDecl::Verb(verb) => self.verb(verb),
             TopLevelDecl::ExternalVerb(verb) => self.external_verb(verb),
             TopLevelDecl::Struct(definition) => self.struct_definition(definition),
+            TopLevelDecl::Pack(definition) => self.pack_definition(definition),
             TopLevelDecl::Enum(definition) => self.enum_definition(definition),
             TopLevelDecl::Role(role) => self.role_definition(role),
             TopLevelDecl::Perform(perform) => self.perform_definition(perform),
@@ -200,6 +201,38 @@ impl Formatter {
             self.line_indent();
         }
         self.output.push('}');
+    }
+
+    fn pack_definition(&mut self, definition: &crate::ast::PackDecl) {
+        if definition.is_open {
+            self.output.push_str("open ");
+        }
+        self.output.push_str("pack ");
+        self.output.push_str(&definition.name);
+        self.output.push_str(" { erg storage: ");
+        self.output.push_str(&definition.storage.name);
+        self.output.push_str("; layout ");
+        self.output.push_str(match definition.endianness {
+            crate::ast::LayoutEndianness::Little => "little",
+            crate::ast::LayoutEndianness::Big => "big",
+        });
+        self.output.push_str("; fields {");
+        for field in &definition.fields {
+            self.output.push(' ');
+            self.output.push_str(role_name(&field.role));
+            self.output.push(' ');
+            self.output.push_str(&field.name);
+            self.output.push_str(": ");
+            self.output.push_str(&field.ty.name);
+            self.output.push_str(" at ");
+            self.output.push_str(&field.offset.to_string());
+            if let Some(default_value) = &field.default_value {
+                self.output.push_str(" = ");
+                self.expression(default_value);
+            }
+            self.output.push(';');
+        }
+        self.output.push_str(" } }");
     }
 
     fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {
