@@ -50,6 +50,7 @@ pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
         SemanticErrorKind::ArenaReferenceEscape { .. } => "E1077",
         SemanticErrorKind::CrossArenaReference { .. } => "E1078",
+        SemanticErrorKind::ArenaReferenceLive { .. } => "E1079",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
         SemanticErrorKind::MissingReturnValue => "E1028",
@@ -238,6 +239,9 @@ fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::CrossArenaReference { name } => {
             format!("value `{name}` belongs to a different arena provenance")
+        }
+        SemanticErrorKind::ArenaReferenceLive { arena, reference } => {
+            format!("cannot move or drop arena `{arena}` while reference `{reference}` is live")
         }
         _ => return None,
     };

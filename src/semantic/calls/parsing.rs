@@ -1,8 +1,14 @@
 use crate::lexer::SourceSpan;
 
 pub(crate) fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
+    let (reference_role, key) = reference_role_prefix(key);
     let Some(open) = key.find('[') else {
-        return Some(crate::ast::TypeName { name: key.to_owned(), arguments: Vec::new(), span });
+        return Some(crate::ast::TypeName {
+            name: key.to_owned(),
+            arguments: Vec::new(),
+            reference_role,
+            span,
+        });
     };
     if !key.ends_with(']') {
         return None;
@@ -13,7 +19,16 @@ pub(crate) fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<crate::
         .into_iter()
         .map(|argument| parse_type_name_key(argument, span))
         .collect::<Option<Vec<_>>>()?;
-    Some(crate::ast::TypeName { name, arguments, span })
+    Some(crate::ast::TypeName { name, arguments, reference_role, span })
+}
+
+fn reference_role_prefix(key: &str) -> (Option<crate::ast::Role>, &str) {
+    for (prefix, role) in [("abs ", crate::ast::Role::Abs), ("ins ", crate::ast::Role::Ins)] {
+        if let Some(name) = key.strip_prefix(prefix) {
+            return (Some(role), name);
+        }
+    }
+    (None, key)
 }
 
 fn split_type_arguments(input: &str) -> Vec<&str> {

@@ -49,6 +49,7 @@ impl TypeSubstitution {
         TypeName {
             name: type_name.name.clone(),
             arguments: type_name.arguments.iter().map(|argument| self.apply(argument)).collect(),
+            reference_role: type_name.reference_role.clone(),
             span: type_name.span,
         }
     }
@@ -65,7 +66,12 @@ mod tests {
     use crate::lexer::SourceSpan;
 
     fn ty(name: &str) -> TypeName {
-        TypeName { name: name.to_owned(), arguments: Vec::new(), span: SourceSpan::new(0, 1) }
+        TypeName {
+            name: name.to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: SourceSpan::new(0, 1),
+        }
     }
 
     #[test]
@@ -86,9 +92,11 @@ mod tests {
                 TypeName {
                     name: "Array".to_owned(),
                     arguments: vec![ty("T")],
+                    reference_role: None,
                     span: ty("Array").span,
                 },
             ],
+            reference_role: None,
             span: ty("Result").span,
         };
         assert_eq!(substitution.apply(&applied).arguments[0].name, "Int");

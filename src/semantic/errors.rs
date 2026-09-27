@@ -189,6 +189,10 @@ pub enum SemanticErrorKind {
     CrossArenaReference {
         name: String,
     },
+    ArenaReferenceLive {
+        arena: String,
+        reference: String,
+    },
     InvalidFieldAssignmentTarget {
         field: String,
     },

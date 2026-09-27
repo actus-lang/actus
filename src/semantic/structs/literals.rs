@@ -22,8 +22,12 @@ impl Analyzer {
                 span,
             });
         };
-        let declared_type =
-            TypeName { name: name.to_owned(), arguments: type_arguments.to_vec(), span };
+        let declared_type = TypeName {
+            name: name.to_owned(),
+            arguments: type_arguments.to_vec(),
+            reference_role: None,
+            span,
+        };
         self.validate_type_reference(&declared_type)?;
         let substitution =
             TypeSubstitution::for_type(name, &definition.generic_parameters, type_arguments, span)?;

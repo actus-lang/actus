@@ -57,7 +57,7 @@ impl Analyzer {
         application
             .arguments
             .get(parameter)
-            .map(super::super::analyzer::canonical_type_name)
+            .map(pattern_type_name)
             .unwrap_or_else(|| type_name.to_owned())
     }
 
@@ -95,4 +95,13 @@ impl Analyzer {
         }
         Ok(())
     }
+}
+
+fn pattern_type_name(type_name: &crate::ast::TypeName) -> String {
+    let canonical = super::super::analyzer::canonical_type_name(type_name);
+    canonical
+        .strip_prefix("abs ")
+        .or_else(|| canonical.strip_prefix("ins "))
+        .unwrap_or(&canonical)
+        .to_owned()
 }

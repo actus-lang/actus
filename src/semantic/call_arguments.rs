@@ -22,6 +22,7 @@ impl Analyzer {
                 &crate::ast::TypeName {
                     name: found.clone(),
                     arguments: Vec::new(),
+                    reference_role: None,
                     span: expression_span(expression),
                 },
             ) {

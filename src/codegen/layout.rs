@@ -198,7 +198,7 @@ impl LayoutRegistry {
                     NativeEmitError(format!("unknown reference field type `{}`", field.ty.name))
                 })?
             } else {
-                self.native_type(&field.ty.name, visiting)?
+                self.native_type_for_type_name(&field.ty, visiting)?
             };
             let (size, field_alignment) = if indirect {
                 (self.pointer_size, self.pointer_size)
@@ -264,6 +264,17 @@ impl LayoutRegistry {
             .ok_or_else(|| NativeEmitError(format!("missing layout type `{name}`")))?;
         self.layout_for(definition, visiting)?;
         Ok(NativeType::Struct(id))
+    }
+
+    pub(super) fn native_type_for_type_name(
+        &self,
+        type_name: &TypeName,
+        visiting: &mut Vec<String>,
+    ) -> Result<NativeType, NativeEmitError> {
+        if let Some(native_type) = self.type_for_type_name(type_name) {
+            return Ok(native_type);
+        }
+        self.native_type(&type_name.name, visiting)
     }
 
     pub(super) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {

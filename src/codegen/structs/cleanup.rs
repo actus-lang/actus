@@ -142,6 +142,7 @@ pub(crate) fn emit_binding_drop(
         .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
     match binding_type {
         NativeType::Struct(id) => emit_struct_drop(function, address, id, functions, layouts),
+        NativeType::Enum(id) if layouts.is_niche_option(id) => Ok(()),
         NativeType::Enum(_) => {
             let size = layouts
                 .type_size(binding_type)

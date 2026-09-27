@@ -173,7 +173,12 @@ fn test_main(name: &str) -> TopLevelDecl {
         params: Vec::new(),
         return_type: Some(crate::ast::ReturnType {
             access: crate::ast::ReturnAccess::Owned,
-            ty: TypeName { name: "Int".to_owned(), arguments: Vec::new(), span },
+            ty: TypeName {
+                name: "Int".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span,
+            },
             span,
         }),
         body: Block {

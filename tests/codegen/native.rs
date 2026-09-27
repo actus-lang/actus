@@ -1,4 +1,6 @@
-use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_object};
+use actus::codegen::{
+    emit_program_object_for_target, emit_program_object_with_configuration, emit_zero_return_object,
+};
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
@@ -139,6 +141,30 @@ fn pack_source_is_valid_for_freestanding_target_contract() {
         TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
     assert_eq!(target.entry_contract(), actus::target::EntryContract::Freestanding);
     analyze(&program).expect("pack should be semantically valid for a freestanding target");
+}
+
+#[test]
+fn arena_lowering_is_freestanding_and_has_no_host_runtime_imports() {
+    let source = "struct Node { value: Int, } verb main() -> Int { erg arena: Arena[128] = Arena[128](); erg node = arena.place(value: Node { value: 7, }); return node.value; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("arena source should parse");
+    let target =
+        TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
+    let bytes = emit_program_object_for_target(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default(),
+        &target,
+    )
+    .expect("arena lowering should not require host runtime services");
+    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+    let undefined = file
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
+    assert!(undefined.is_empty(), "freestanding arena object imports host symbols: {undefined:?}");
 }
 
 fn symbol_matches(actual: &str, expected: &str) -> bool {

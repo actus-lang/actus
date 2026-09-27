@@ -42,6 +42,7 @@ impl Analyzer {
                 span,
             });
         }
+        self.ensure_arena_references_inactive(index, name, span)?;
         match self.model.bindings[index].ownership {
             OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
             OwnershipState::PartiallyMoved { .. }
@@ -180,6 +181,7 @@ impl Analyzer {
                 span,
             });
         }
+        self.ensure_arena_references_inactive(index, name, span)?;
         match binding.ownership {
             OwnershipState::Active => {
                 self.model.bindings[index].ownership = OwnershipState::Dropped
@@ -192,6 +194,35 @@ impl Analyzer {
                     span,
                 });
             }
+        }
+        Ok(())
+    }
+
+    fn ensure_arena_references_inactive(
+        &self,
+        arena_index: usize,
+        arena_name: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(arena_id) = self.binding_arena_provenance.get(&arena_index).copied() else {
+            return Ok(());
+        };
+        if let Some((reference_index, _)) = self
+            .binding_arena_provenance
+            .iter()
+            .filter(|(index, provenance)| **provenance == arena_id && **index != arena_index)
+            .find(|(index, _)| {
+                let binding = &self.model.bindings[**index];
+                matches!(binding.role, Role::Abs | Role::Ins) && binding.ownership.is_live()
+            })
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::ArenaReferenceLive {
+                    arena: arena_name.to_owned(),
+                    reference: self.model.bindings[*reference_index].name.clone(),
+                },
+                span,
+            });
         }
         Ok(())
     }

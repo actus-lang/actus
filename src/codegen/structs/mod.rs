@@ -33,6 +33,7 @@ pub(super) fn lower_struct_literal(
     let type_name = TypeName {
         name: name.to_owned(),
         arguments: type_arguments.to_vec(),
+        reference_role: None,
         span: crate::lexer::SourceSpan::new(0, 0),
     };
     let id = layouts
@@ -46,6 +47,34 @@ pub(super) fn lower_struct_literal(
         layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing layout `{id}`")))?;
     let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
     let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    lower_struct_fields(
+        function,
+        address,
+        layout,
+        fields,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    Ok(address)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_struct_fields(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    layout: &super::layout::StructLayout,
+    fields: &[StructFieldInit],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     for field in fields {
         let field_layout = layout
             .fields
@@ -62,19 +91,30 @@ pub(super) fn lower_struct_literal(
             string_data,
             layouts,
         )?;
-        if field_layout.indirect {
-            function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
-        } else if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
-            let size = layouts
-                .type_size(field_layout.ty)
-                .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
-            let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
-            copy_bytes(function, value, destination, size);
-        } else {
-            function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
-        }
+        store_struct_field(function, address, value, field_layout, layouts)?;
     }
-    Ok(address)
+    Ok(())
+}
+
+fn store_struct_field(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    value: cranelift_codegen::ir::Value,
+    field: &super::layout::FieldLayout,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    if field.indirect || matches!(field.ty, NativeType::Enum(id) if layouts.is_niche_option(id)) {
+        function.ins().store(MemFlagsData::new(), value, address, field.offset as i32);
+    } else if matches!(field.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
+        let size = layouts
+            .type_size(field.ty)
+            .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
+        let destination = function.ins().iadd_imm_s(address, i64::from(field.offset));
+        copy_bytes(function, value, destination, size);
+    } else {
+        function.ins().store(MemFlagsData::new(), value, address, field.offset as i32);
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -208,7 +248,9 @@ fn lower_struct_field_assignment(
         string_data,
         layouts,
     )?;
-    if field_layout.indirect {
+    if field_layout.indirect
+        || matches!(field_layout.ty, NativeType::Enum(id) if layouts.is_niche_option(id))
+    {
         function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
     } else if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
         let size = layouts
@@ -290,6 +332,7 @@ pub(super) fn expression_native_type(
             let type_name = TypeName {
                 name: name.clone(),
                 arguments: type_arguments.clone(),
+                reference_role: None,
                 span: crate::lexer::SourceSpan::new(0, 0),
             };
             layouts.type_for_type_name(&type_name)

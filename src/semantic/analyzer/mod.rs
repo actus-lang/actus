@@ -319,11 +319,21 @@ fn try_type_mismatch(
 }
 
 pub(super) fn canonical_type_name(type_name: &crate::ast::TypeName) -> String {
+    let role = type_name
+        .reference_role
+        .as_ref()
+        .map(|role| match role {
+            crate::ast::Role::Abs => "abs ",
+            crate::ast::Role::Ins => "ins ",
+            crate::ast::Role::Erg => "erg ",
+            crate::ast::Role::Dat => "dat ",
+        })
+        .unwrap_or("");
     if type_name.arguments.is_empty() {
-        return type_name.name.clone();
+        return format!("{role}{}", type_name.name);
     }
     format!(
-        "{}[{}]",
+        "{role}{}[{}]",
         type_name.name,
         type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )

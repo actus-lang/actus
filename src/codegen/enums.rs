@@ -41,6 +41,46 @@ pub(super) fn lower_enum_constructor(
     let enum_layout = layouts
         .enum_layout(enum_id)
         .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
+    if enum_layout.niche_pointer {
+        return lower_niche_option_constructor(
+            function,
+            variant,
+            arguments,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        );
+    }
+    lower_regular_enum_constructor(
+        function,
+        arguments,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        enum_layout,
+        variant_layout,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_regular_enum_constructor(
+    function: &mut FunctionBuilder<'_>,
+    arguments: &[Argument],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+    enum_layout: &super::enum_layout::EnumLayout,
+    variant_layout: &EnumVariantLayout,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let allocator = functions
         .get("__actus_enum_allocate")
         .ok_or_else(|| NativeEmitError("native enum allocator is unavailable".to_owned()))?;
@@ -58,6 +98,36 @@ pub(super) fn lower_enum_constructor(
         address,
         enum_layout.discriminant_offset as i32,
     );
+    lower_enum_payload(
+        function,
+        address,
+        arguments,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        enum_layout.payload_offset,
+        variant_layout,
+    )?;
+    Ok(address)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_enum_payload(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    arguments: &[Argument],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+    payload_offset: u32,
+    variant_layout: &EnumVariantLayout,
+) -> Result<(), NativeEmitError> {
     for (field, argument) in ordered_arguments(variant_layout.fields.as_slice(), arguments)? {
         let value = lower_expression(
             function,
@@ -69,12 +139,39 @@ pub(super) fn lower_enum_constructor(
             string_data,
             layouts,
         )?;
-        let destination = function
-            .ins()
-            .iadd_imm_s(address, i64::from(enum_layout.payload_offset + field.offset));
+        let destination =
+            function.ins().iadd_imm_s(address, i64::from(payload_offset + field.offset));
         store_payload(function, destination, value, field.ty, layouts)?;
     }
-    Ok(address)
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_niche_option_constructor(
+    function: &mut FunctionBuilder<'_>,
+    variant: &str,
+    arguments: &[Argument],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    match variant {
+        "None" if arguments.is_empty() => Ok(function.ins().iconst(layouts.pointer_type, 0)),
+        "Some" if arguments.len() == 1 => lower_expression(
+            function,
+            &arguments[0].expression,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
+        _ => Err(NativeEmitError(format!("invalid niche Option constructor `{variant}`"))),
+    }
 }
 
 fn ordered_arguments<'a>(
@@ -109,7 +206,11 @@ fn store_payload(
     if matches!(ty, NativeType::Void) {
         return Ok(());
     }
-    if let NativeType::Struct(id) | NativeType::Enum(id) = ty {
+    if let NativeType::Enum(id) = ty
+        && layouts.is_niche_option(id)
+    {
+        function.ins().store(MemFlagsData::new(), value, destination, 0);
+    } else if let NativeType::Struct(id) | NativeType::Enum(id) = ty {
         let size = layouts
             .type_size(ty)
             .ok_or_else(|| NativeEmitError(format!("missing payload layout `{id}`")))?;
@@ -180,6 +281,9 @@ pub(super) fn emit_enum_payload_drop(
     let enum_layout = layouts
         .enum_layout(enum_id)
         .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
+    if enum_layout.niche_pointer {
+        return Ok(());
+    }
     let field_layout = payload_field(variant_layout, field)?;
     let field_address = function
         .ins()

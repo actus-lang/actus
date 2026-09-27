@@ -1,4 +1,4 @@
-use crate::ast::{EnumDef, EnumPayload};
+use crate::ast::{EnumDef, EnumPayload, TypeName};
 
 use super::layout::LayoutRegistry;
 use super::native::NativeEmitError;
@@ -24,6 +24,7 @@ pub(super) struct EnumLayout {
     pub(super) alignment: u32,
     pub(super) discriminant_offset: u32,
     pub(super) payload_offset: u32,
+    pub(super) niche_pointer: bool,
     pub(super) variants: Vec<EnumVariantLayout>,
 }
 
@@ -34,6 +35,10 @@ impl LayoutRegistry {
 
     pub(super) fn enum_layout(&self, id: usize) -> Option<&EnumLayout> {
         self.enum_layouts.get(id)
+    }
+
+    pub(super) fn is_niche_option(&self, id: usize) -> bool {
+        self.enum_layout(id).is_some_and(|layout| layout.niche_pointer)
     }
 
     pub(super) fn enum_constructor(
@@ -81,22 +86,44 @@ impl LayoutRegistry {
             )));
         }
         visiting.push(definition.name.clone());
+        let niche_pointer = is_pointer_option(definition);
+        let (variants, max_payload_size, max_payload_alignment) =
+            self.enum_variants(definition, visiting)?;
+        visiting.pop();
+        if niche_pointer {
+            return Ok(EnumLayout {
+                size: self.pointer_size,
+                alignment: self.pointer_size,
+                discriminant_offset: 0,
+                payload_offset: 0,
+                niche_pointer: true,
+                variants,
+            });
+        }
+        let discriminant_size = 4;
+        let payload_offset = align_up(discriminant_size, max_payload_alignment);
+        let alignment = discriminant_size.max(max_payload_alignment);
+        Ok(EnumLayout {
+            size: align_up(payload_offset + max_payload_size, alignment),
+            alignment,
+            discriminant_offset: 0,
+            payload_offset,
+            niche_pointer: false,
+            variants,
+        })
+    }
+
+    fn enum_variants(
+        &self,
+        definition: &EnumDef,
+        visiting: &mut Vec<String>,
+    ) -> Result<(Vec<EnumVariantLayout>, u32, u32), NativeEmitError> {
         let mut variants = Vec::new();
         let mut max_payload_size = 0;
         let mut max_payload_alignment = 1;
         for (discriminant, variant) in definition.variants.iter().enumerate() {
-            let mut fields = Vec::new();
-            let mut payload_size = 0;
-            let mut payload_alignment = 1;
-            for (name, type_name) in enum_payload_types(&variant.payload) {
-                let ty = self.native_type(type_name, visiting)?;
-                let (size, alignment) = self.type_layout(ty)?;
-                payload_size = align_up(payload_size, alignment);
-                fields.push(EnumFieldLayout { name, offset: payload_size, ty });
-                payload_size += size;
-                payload_alignment = payload_alignment.max(alignment);
-            }
-            payload_size = align_up(payload_size, payload_alignment);
+            let (fields, payload_size, payload_alignment) =
+                self.enum_variant_fields(&variant.payload, visiting)?;
             max_payload_size = max_payload_size.max(payload_size);
             max_payload_alignment = max_payload_alignment.max(payload_alignment);
             variants.push(EnumVariantLayout {
@@ -106,28 +133,59 @@ impl LayoutRegistry {
                 fields,
             });
         }
-        visiting.pop();
-        let discriminant_size = 4;
-        let payload_offset = align_up(discriminant_size, max_payload_alignment);
-        let alignment = discriminant_size.max(max_payload_alignment);
-        Ok(EnumLayout {
-            size: align_up(payload_offset + max_payload_size, alignment),
-            alignment,
-            discriminant_offset: 0,
-            payload_offset,
-            variants,
-        })
+        Ok((variants, max_payload_size, max_payload_alignment))
+    }
+
+    fn enum_variant_fields(
+        &self,
+        payload: &EnumPayload,
+        visiting: &mut Vec<String>,
+    ) -> Result<(Vec<EnumFieldLayout>, u32, u32), NativeEmitError> {
+        let mut fields = Vec::new();
+        let mut payload_size = 0;
+        let mut payload_alignment = 1;
+        for (name, type_name) in enum_payload_types(payload) {
+            let ty = self.native_type_for_type_name(type_name, visiting)?;
+            let (size, alignment) = if type_name.reference_role.is_some() {
+                (self.pointer_size, self.pointer_size)
+            } else {
+                self.type_layout(ty)?
+            };
+            payload_size = align_up(payload_size, alignment);
+            fields.push(EnumFieldLayout { name, offset: payload_size, ty });
+            payload_size += size;
+            payload_alignment = payload_alignment.max(alignment);
+        }
+        Ok((fields, align_up(payload_size, payload_alignment), payload_alignment))
     }
 }
 
-fn enum_payload_types(payload: &EnumPayload) -> Vec<(Option<String>, &str)> {
+fn enum_payload_types(payload: &EnumPayload) -> Vec<(Option<String>, &TypeName)> {
     match payload {
         EnumPayload::Unit => Vec::new(),
-        EnumPayload::Tuple(types) => types.iter().map(|ty| (None, ty.name.as_str())).collect(),
+        EnumPayload::Tuple(types) => types.iter().map(|ty| (None, ty)).collect(),
         EnumPayload::Struct(fields) => {
-            fields.iter().map(|field| (Some(field.name.clone()), field.ty.name.as_str())).collect()
+            fields.iter().map(|field| (Some(field.name.clone()), &field.ty)).collect()
         }
     }
+}
+
+fn is_pointer_option(definition: &EnumDef) -> bool {
+    if !definition.name.starts_with("Option[") {
+        return false;
+    }
+    let Some(payload) =
+        definition.variants.iter().find(|variant| variant.name == "Some").and_then(|variant| {
+            match &variant.payload {
+                EnumPayload::Tuple(types) if types.len() == 1 => types.first(),
+                _ => None,
+            }
+        })
+    else {
+        return false;
+    };
+    definition.variants.iter().any(|variant| variant.name == "None")
+        && matches!(payload.reference_role, Some(crate::ast::Role::Abs | crate::ast::Role::Ins))
 }
 
 fn align_up(offset: u32, alignment: u32) -> u32 {
@@ -148,6 +206,7 @@ fn integer_storage_bytes(width: u8) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::LayoutRegistry;
+    use crate::codegen::types::NativeType;
     use crate::lexer::scan;
     use crate::parser::parse;
     use cranelift_codegen::ir::types;
@@ -187,5 +246,28 @@ mod tests {
 
         assert_eq!(layout.size, 4);
         assert_eq!(layout.alignment, 4);
+    }
+
+    #[test]
+    fn uses_pointer_niche_for_reference_option_instances() {
+        let (tokens, errors) = scan(
+            "struct Node { value: Int, next: Option[abs Node], } verb main() -> Int { return 0; }",
+        );
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("recursive option should parse");
+        let semantic = crate::semantic::analyze(&program).expect("recursive option should analyze");
+        let layouts = LayoutRegistry::from_program_with_instances(
+            &program,
+            types::I64,
+            &semantic.generic_instances,
+        )
+        .expect("recursive option layout should pass");
+        let id = layouts.enum_id_for("Option[abs Node]").expect("specialized option should exist");
+        let layout = layouts.enum_layout(id).expect("option layout should exist");
+        assert!(layout.niche_pointer);
+        assert_eq!(layout.size, 8);
+        let node = layouts.get(layouts.id_for("Node").expect("node layout should exist")).unwrap();
+        assert_eq!(node.fields[1].offset, 8);
+        assert!(matches!(node.fields[1].ty, NativeType::Enum(option_id) if option_id == id));
     }
 }

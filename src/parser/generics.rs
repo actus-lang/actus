@@ -45,6 +45,15 @@ impl Parser {
     }
 
     pub(super) fn parse_type_name(&mut self) -> Result<TypeName, ParseError> {
+        self.parse_type_name_with_reference_role(false)
+    }
+
+    fn parse_type_name_with_reference_role(
+        &mut self,
+        allow_reference_role: bool,
+    ) -> Result<TypeName, ParseError> {
+        let reference_role =
+            if allow_reference_role { self.parse_type_reference_role()? } else { None };
         let token = self.advance_required("type name")?;
         let name = type_name_text(&token.kind).ok_or_else(|| ParseError {
             code: ParseErrorCode::UnexpectedToken,
@@ -60,7 +69,24 @@ impl Parser {
             Vec::new()
         };
         let end = self.previous().span.end;
-        Ok(TypeName { name, arguments, span: SourceSpan::new(token.span.start, end) })
+        Ok(TypeName {
+            name,
+            arguments,
+            reference_role,
+            span: SourceSpan::new(token.span.start, end),
+        })
+    }
+
+    fn parse_type_reference_role(&mut self) -> Result<Option<crate::ast::Role>, ParseError> {
+        if self.check_simple(&TokenKind::Abs) {
+            self.expect_simple(TokenKind::Abs, "`abs`")?;
+            return Ok(Some(crate::ast::Role::Abs));
+        }
+        if self.check_simple(&TokenKind::Ins) {
+            self.expect_simple(TokenKind::Ins, "`ins`")?;
+            return Ok(Some(crate::ast::Role::Ins));
+        }
+        Ok(None)
     }
 
     pub(super) fn parse_type_arguments(&mut self) -> Result<Vec<TypeName>, ParseError> {
@@ -69,7 +95,7 @@ impl Parser {
             return Err(self.error_at_current("a type argument"));
         }
         loop {
-            arguments.push(self.parse_type_name()?);
+            arguments.push(self.parse_type_name_with_reference_role(true)?);
             if !self.match_simple(TokenKind::Comma) {
                 break;
             }

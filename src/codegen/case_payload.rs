@@ -47,24 +47,85 @@ pub(super) fn bind_payload<'a>(
             .collect::<Vec<_>>(),
         VariantPayload::Unit => Vec::new(),
     };
+    if enum_layout.niche_pointer && variant == "Some" {
+        bind_niche_payload(
+            branch,
+            bindings,
+            subject,
+            variant_layout,
+            &mut branch_locals,
+            &mut branch_types,
+        )?;
+        return Ok((branch_locals, branch_types));
+    }
+    bind_regular_payload(
+        function,
+        subject,
+        enum_layout.payload_offset,
+        bindings,
+        branch,
+        variant_layout,
+        &mut branch_locals,
+        &mut branch_types,
+        layouts,
+    )?;
+    Ok((branch_locals, branch_types))
+}
+
+fn bind_niche_payload<'a>(
+    branch: &'a CaseBranch,
+    bindings: Vec<(Option<&str>, &'a String)>,
+    subject: cranelift_codegen::ir::Value,
+    variant_layout: &EnumVariantLayout,
+    locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'a String, NativeType>,
+) -> Result<(), NativeEmitError> {
+    for (index, (_, binding)) in bindings.into_iter().enumerate() {
+        if binding == "_" {
+            continue;
+        }
+        let field = variant_layout
+            .fields
+            .get(index)
+            .ok_or_else(|| NativeEmitError("missing niche payload field layout".to_owned()))?;
+        let key = branch_binding(branch, binding)
+            .ok_or_else(|| NativeEmitError("missing case binding".to_owned()))?;
+        locals.insert(key, subject);
+        types.insert(key, field.ty);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bind_regular_payload<'a>(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    payload_offset: u32,
+    bindings: Vec<(Option<&str>, &'a String)>,
+    branch: &'a CaseBranch,
+    variant_layout: &EnumVariantLayout,
+    locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'a String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     for (index, (name, binding)) in bindings.into_iter().enumerate() {
         if binding != "_" {
             load_payload_binding(
                 function,
                 subject,
-                enum_layout.payload_offset,
+                payload_offset,
                 index,
                 name,
                 binding,
                 branch,
                 variant_layout,
-                &mut branch_locals,
-                &mut branch_types,
+                locals,
+                types,
                 layouts,
             )?;
         }
     }
-    Ok((branch_locals, branch_types))
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

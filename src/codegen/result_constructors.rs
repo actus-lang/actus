@@ -234,7 +234,12 @@ fn normalize_arguments(
 
 fn parse_type_name(input: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
     let Some(open) = input.find('[') else {
-        return Some(TypeName { name: input.to_owned(), arguments: Vec::new(), span });
+        return Some(TypeName {
+            name: input.to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span,
+        });
     };
     if !input.ends_with(']') {
         return None;
@@ -244,7 +249,7 @@ fn parse_type_name(input: &str, span: crate::lexer::SourceSpan) -> Option<TypeNa
         .split(',')
         .map(|argument| parse_type_name(argument.trim(), span))
         .collect::<Option<Vec<_>>>()?;
-    Some(TypeName { name: input[..open].to_owned(), arguments, span })
+    Some(TypeName { name: input[..open].to_owned(), arguments, reference_role: None, span })
 }
 
 fn canonical_type_name(type_name: &TypeName) -> String {
