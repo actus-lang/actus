@@ -7,7 +7,9 @@ Actus is developed in small, verifiable stages. Each phase has a dedicated docum
 **Phase 16: Standard Library, Runtime, and Tooling Stabilization.** Phase 15's
 local Actus package infrastructure is closed for Alpha; remote registry
 services and web authentication are explicitly deferred to a separate platform
-project. Self-hosting and future language extensions remain tracked separately.
+project. Advanced extension product features are tracked separately in Phase
+17; Phase 16 retains only the compiler/tooling parity required for its own
+acceptance criteria.
 
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
 
@@ -40,3 +42,4 @@ gated implementation roadmaps:
 - [x] [Phase 15.5: Language Server and Editor Tooling](docs/roadmap/phase-15.5-language-server-and-tooling.md)
 - [x] [Phase 15.6: CLI Developer Workflow Polish](docs/roadmap/phase-15.6-cli-developer-workflow.md)
 - [ ] [Phase 16: Standard Library, Runtime, and Tooling Stabilization](docs/roadmap/phase-16-standard-library-and-runtime.md)
+- [ ] [Phase 17: Extension Platform and Developer Experience](docs/roadmap/phase-17-extension-platform-and-developer-experience.md)
