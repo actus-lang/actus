@@ -1,6 +1,6 @@
 # ADR-0029: Uniform Method Call Syntax (UFCS)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-26
 - Scope: receiver syntax and role-qualified method calls
 
@@ -33,12 +33,12 @@ introduce vtables, implicit borrowing, or hidden allocation.
 
 ## Constraints and verification
 
-- [ ] Add parser support for receiver expressions and named arguments.
-- [ ] Desugar before semantic ownership checking.
-- [ ] Preserve explicit `ins`, `abs`, and `dat` call-site validation.
-- [ ] Resolve static performances through direct monomorphized calls.
-- [ ] Add diagnostics for receiver/first-parameter mismatches.
-- [ ] Cover chained calls without changing evaluation order.
+- [x] Add parser support for receiver expressions and named arguments.
+- [x] Desugar before semantic ownership checking.
+- [x] Preserve explicit `erg`, `abs`, `dat`, and `ins` call-site validation.
+- [x] Resolve static performances through direct monomorphized calls.
+- [x] Add diagnostics for receiver/first-parameter mismatches.
+- [x] Cover chained calls without changing evaluation order.
 
 The explicit verb form remains canonical in generated documentation and ABI
 contracts; UFCS is an ergonomic source spelling.

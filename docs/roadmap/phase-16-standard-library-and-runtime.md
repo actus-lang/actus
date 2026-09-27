@@ -238,8 +238,8 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 - [x] Parse postfix `?` expressions.
 - [x] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
 - [x] Validate compatible error propagation.
-- [ ] Lower `Ok` unwrapping and `Err` early return natively.
-- [ ] Preserve cleanup and loan restoration on early return.
+- [x] Lower `Ok` unwrapping and `Err` early return natively.
+- [x] Preserve cleanup and loan restoration on early return.
 - [ ] Extend `?` integration tests to filesystem operations.
 
 ### `std::fs` API and implementation
@@ -332,20 +332,20 @@ each contract can be validated independently.
 Implement ADR-0029 only after Gate 3 contracts are stable. Method syntax must
 desugar to the existing role-qualified verb calls without hiding ownership.
 
-- [ ] Parse `receiver.verb(args...)` while preserving evaluation order.
-- [ ] Desugar the receiver into the first verb parameter.
-- [ ] Preserve explicit `erg`, `abs`, `dat`, and `ins` call-site roles.
-- [ ] Reject receiver/parameter type and role mismatches deterministically.
-- [ ] Route static method calls through direct monomorphized dispatch.
-- [ ] Keep dynamic role dispatch on the existing explicit ABI.
-- [ ] Migrate ergonomic `std::io` calls without changing their contracts.
-- [ ] Add parser, semantic, codegen, and native UFCS tests.
-- [ ] Update API documentation and editor tooling for method calls.
+- [x] Parse `receiver.verb(args...)` while preserving evaluation order.
+- [x] Desugar the receiver into the first verb parameter.
+- [x] Preserve explicit `erg`, `abs`, `dat`, and `ins` call-site roles.
+- [x] Reject receiver/parameter type and role mismatches deterministically.
+- [x] Route static method calls through direct monomorphized dispatch.
+- [x] Keep dynamic role dispatch on the existing explicit ABI.
+- [x] Migrate ergonomic `std::io` calls without changing their contracts.
+- [x] Add parser, semantic, codegen, and native UFCS tests.
+- [x] Update API documentation and editor tooling for method calls.
 
 ### Gate 3.5 invariant
 
-- [ ] Method syntax is only a source-level convenience over canonical verbs.
-- [ ] No implicit borrow, ownership transfer, vtable, or allocation is added.
+- [x] Method syntax is only a source-level convenience over canonical verbs.
+- [x] No implicit borrow, ownership transfer, vtable, or allocation is added.
 
 ## Gate 4: Bare-Metal and Embedded HAL
 

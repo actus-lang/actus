@@ -212,7 +212,7 @@ fn rejects_dat_move_of_a_frozen_struct_field() {
 #[test]
 fn validates_method_receiver_roles_and_types() {
     analyze_source(
-        "struct Point { x: Int, } verb read(abs self: Point) -> Int { return self.x; } verb main() -> Int { erg point = Point { x: 7, }; return point.read(); }",
+        "struct Point { x: Int, } verb read(abs self: Point) -> Int { return self.x; } verb main() -> Int { erg source = Point { x: 7, }; abs point = ref source; return point.read(); }",
     )
     .expect("an abs struct receiver should be valid");
 
@@ -224,11 +224,36 @@ fn validates_method_receiver_roles_and_types() {
 }
 
 #[test]
+fn resolves_owned_dat_method_receivers_and_moves_the_receiver() {
+    let model = analyze_source(
+        "struct File { value: Int, } verb consume(dat self: File) { } verb main() { erg file = File { value: 1, }; file.consume(); }",
+    )
+    .expect("dat method receivers should resolve");
+    assert!(matches!(
+        model
+            .bindings
+            .iter()
+            .find(|binding| binding.name == "file")
+            .map(|binding| &binding.ownership),
+        Some(actus::semantic::OwnershipState::Moved)
+    ));
+}
+
+#[test]
+fn rejects_abs_receiver_for_dat_method() {
+    let error = analyze_source(
+        "struct File { value: Int, } verb consume(dat self: File) { } verb main() { erg source = File { value: 1, }; abs file = ref source; file.consume(); }",
+    )
+    .expect_err("a dat method must not consume an abs receiver");
+    assert!(matches!(error.kind, SemanticErrorKind::InvalidDatArgument { .. }));
+}
+
+#[test]
 fn rejects_invalid_method_receivers() {
     let error = analyze_source(
-        "struct Point { x: Int, } verb read(dat self: Point) -> Int { return 1; } verb main() -> Int { return 1; }",
+        "verb read(abs self: Int) -> Int { return 1; } verb main() -> Int { return 1; }",
     )
-    .expect_err("dat is not a valid method receiver role");
+    .expect_err("scalar types are not valid method receiver types");
     assert!(matches!(
         error.kind,
         SemanticErrorKind::InvalidReceiver { method } if method == "read"
