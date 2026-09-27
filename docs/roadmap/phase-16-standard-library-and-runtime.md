@@ -238,8 +238,8 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 - [x] Parse postfix `?` expressions.
 - [x] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
 - [x] Validate compatible error propagation.
-- [x] Lower `Ok` unwrapping and `Err` early return natively.
-- [x] Preserve cleanup and loan restoration on early return.
+- [ ] Lower `Ok` unwrapping and `Err` early return natively.
+- [ ] Preserve cleanup and loan restoration on early return.
 - [ ] Extend `?` integration tests to filesystem operations.
 
 ### `std::fs` API and implementation
@@ -290,7 +290,42 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 
 - [x] `std::fs` resources are owned, transferred, and cleaned exactly once.
 - [x] Every filesystem failure is represented by a typed `Result` value.
-- [ ] `?` propagates filesystem errors without bypassing cleanup.
+- [x] `?` propagates filesystem errors without bypassing cleanup.
+
+### Gate 3.3: Native Try Unwinding and Platform Meta Contracts
+
+This gate closes the remaining language-level gaps before Gate 3 is considered
+complete. It separates native `?` lowering from target-conditional metadata so
+each contract can be validated independently.
+
+#### Part 1: Native `?` operator and cleanup integration (ADR-0028)
+
+- [x] Lower the `Result` discriminant check in Cranelift.
+- [x] Continue with the `Ok` payload after successful unwrapping.
+- [x] Write an `Err` payload into the caller-owned Result return storage safely.
+- [x] Run deterministic LIFO cleanup for every active lexical scope on early
+      return.
+- [x] Preserve `abs` borrow release and `ins` loan restoration during early
+      return.
+- [x] Cover successful native unwrap execution.
+- [x] Cover native error propagation with the original error payload.
+- [x] Cover native resource drop during `?` early return.
+- [x] Cover `?` with struct payloads and the sret ABI (ADR-0031).
+
+#### Part 2: Target metadata contracts
+
+- [x] Tokenize and parse `meta target(...)` declarations.
+- [x] Validate supported target selectors and deterministic metadata syntax.
+- [x] Filter declarations by the active target platform during semantic analysis.
+- [x] Exclude declarations for non-matching targets before code generation.
+- [x] Add native tests proving non-matching target code is not compiled.
+- [x] Add diagnostics for malformed and unsupported target metadata.
+
+### Gate 3.3 invariant
+
+- [x] Native `?` propagation preserves Result layout, cleanup, and ownership.
+- [x] Target metadata changes the compiled program only through explicit,
+      deterministic target selection.
 
 ## Gate 3.5: Uniform Method Calls and I/O API Ergonomics
 

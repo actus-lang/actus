@@ -35,4 +35,33 @@ pub use model::{
     Origin, OriginRecord, OriginRoot, ReachablePerformance, SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
+
+pub fn filter_program_for_target(
+    program: &crate::ast::Program,
+    target: &crate::target::TargetSpec,
+) -> crate::ast::Program {
+    crate::ast::Program {
+        declarations: program
+            .declarations
+            .iter()
+            .filter(|declaration| declaration_matches_target(declaration, target))
+            .cloned()
+            .collect(),
+    }
+}
+
+fn declaration_matches_target(
+    declaration: &crate::ast::TopLevelDecl,
+    target: &crate::target::TargetSpec,
+) -> bool {
+    let metadata = match declaration {
+        crate::ast::TopLevelDecl::Verb(verb) => &verb.metadata,
+        crate::ast::TopLevelDecl::ExternalVerb(verb) => &verb.metadata,
+        _ => return true,
+    };
+    metadata.iter().all(|attribute| match attribute {
+        crate::ast::MetaAttribute::Target(selector) => target.matches_platform(selector),
+        crate::ast::MetaAttribute::Test => true,
+    })
+}
 pub(crate) use type_substitution::TypeSubstitution;

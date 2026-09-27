@@ -18,7 +18,9 @@ impl Analyzer {
     ) -> Result<VerbSignature, SemanticError> {
         let bindings = self.infer_generic_bindings(signature, arguments);
         self.record_generic_call_instance(name, signature, &bindings);
-        self.specialize_signature(signature, bindings, span)
+        let specialized = self.specialize_signature(signature, bindings, span)?;
+        self.record_specialized_signature_instances(&specialized, span)?;
+        Ok(specialized)
     }
 
     fn record_generic_call_instance(
@@ -75,6 +77,22 @@ impl Analyzer {
             unify_generic_type(return_type, expected, &signature.generic_parameters, &mut bindings);
         }
         bindings
+    }
+
+    fn record_specialized_signature_instances(
+        &mut self,
+        signature: &VerbSignature,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        for (_, _, parameter_type) in &signature.params {
+            if let Some(type_name) = parse_type_name_key(parameter_type, span) {
+                self.validate_type_reference(&type_name)?;
+            }
+        }
+        if let Some(return_type) = &signature.return_type_name {
+            self.validate_type_reference(return_type)?;
+        }
+        Ok(())
     }
 
     fn specialize_signature(

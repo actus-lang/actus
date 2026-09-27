@@ -1,0 +1,98 @@
+import io;
+
+meta test
+verb cursor_reads_owned_bytes_through_reader() -> Int {
+    erg source = Buffer[0];
+    append(source, 65);
+    erg cursor = cursor(dat source);
+    erg destination = Buffer[1];
+    erg result = cursor.read(buffer: ins destination);
+    return case dat result {
+        Result.Ok(count) => case count {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb cursor_reports_end_of_stream() -> Int {
+    erg source = Buffer[0];
+    erg cursor = cursor(dat source);
+    erg destination = Buffer[1];
+    erg result = cursor.read(buffer: ins destination);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => 0,
+            _ => 1,
+        },
+    };
+}
+
+meta test
+verb cursor_writes_through_writer() -> Int {
+    erg destination = Buffer[1];
+    erg cursor = cursor(dat destination);
+    erg source = Buffer[0];
+    append(source, 66);
+    erg result = cursor.write(buffer: abs source);
+    return case dat result {
+        Result.Ok(count) => case count {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb cursor_seek_rejects_out_of_bounds_position() -> Int {
+    erg bytes = Buffer[1];
+    erg cursor = cursor(dat bytes);
+    erg offset = 2;
+    erg result = cursor.seek(offset: offset);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb cursor_flush_returns_typed_success() -> Int {
+    erg bytes = Buffer[1];
+    erg cursor = cursor(dat bytes);
+    erg result = cursor.flush();
+    return case dat result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb direct_cursor_verbs_match_stream_contracts() -> Int {
+    erg bytes = Buffer[1];
+    erg cursor = cursor(dat bytes);
+    erg source = Buffer[0];
+    append(source, 67);
+    erg written = cursor_write(self: ins cursor, buffer: abs source);
+    case dat written {
+        Result.Ok(count) => case count {
+            1 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg destination = Buffer[1];
+    erg moved = cursor_read(self: ins cursor, buffer: ins destination);
+    return case dat moved {
+        Result.Ok(count) => case count {
+            _ => 1,
+        },
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => 0,
+            _ => 1,
+        },
+    };
+}

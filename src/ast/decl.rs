@@ -117,6 +117,7 @@ pub struct ExternalVerbDecl {
     pub is_open: bool,
     pub unsafe_boundary: bool,
     pub abi: ForeignAbi,
+    pub metadata: Vec<MetaAttribute>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub params: Vec<Param>,
@@ -137,9 +138,10 @@ pub struct VerbDecl {
     pub span: SourceSpan,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MetaAttribute {
     Test,
+    Target(String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

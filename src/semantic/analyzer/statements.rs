@@ -22,7 +22,9 @@ impl Analyzer {
                 let index = self.binding(name, *span)?;
                 self.ensure_mutable(index, name, *span)?;
                 self.validate_binding_assignment(index, name, value, *span)?;
-                self.visit_expression(value)
+                self.visit_expression(value)?;
+                self.plan_try_unwind(value);
+                Ok(())
             }
             Stmt::FieldAssignment { object, field, value, span } => {
                 self.validate_field_assignment(object, field, value, *span)
@@ -66,6 +68,7 @@ impl Analyzer {
         let declared_type_name =
             declared_type.and_then(|name| super::super::calls::parse_type_name_key(name, span));
         self.visit_expression_with_expected(initializer, declared_type_name.as_ref())?;
+        self.plan_try_unwind(initializer);
         let binding_type =
             self.resolve_binding_type(declared_type_name.as_ref(), initializer, span)?;
         self.validate_declared_initializer(name, declared_type_name.as_ref(), initializer, span)?;
@@ -97,6 +100,12 @@ impl Analyzer {
             self.record_initializer_enum_type(name, initializer, span)?;
         }
         Ok(())
+    }
+
+    fn plan_try_unwind(&mut self, expression: &Expr) {
+        if let Expr::Try { span, .. } = expression {
+            self.plan_return_unwind(*span);
+        }
     }
 
     fn visit_expr_statement(

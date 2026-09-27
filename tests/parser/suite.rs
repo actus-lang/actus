@@ -25,6 +25,21 @@ fn parses_a_verb_with_roles_and_return_type() {
 }
 
 #[test]
+fn parses_target_metadata_into_the_verb_ast() {
+    let program = parse_source("meta target(\"unix\") verb platform_action() { return 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(verb.metadata, vec![MetaAttribute::Target("unix".to_owned())]);
+}
+
+#[test]
+fn rejects_unknown_target_metadata() {
+    let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unknown target should be rejected");
+    assert!(matches!(error.kind, ParseErrorKind::UnexpectedToken { .. }));
+}
+
+#[test]
 fn attaches_block_docstrings_to_supported_declarations() {
     let program = parse_source(
         "\"\"\"Runs the entry action.\"\"\" verb main() { return 0; } \"\"\"Stores bytes.\"\"\" struct Packet { payload: Buffer, } \"\"\"Defines a reader contract.\"\"\" role Reader { verb read(ins buffer: Buffer); }",

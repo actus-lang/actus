@@ -75,7 +75,7 @@ impl Formatter {
     fn verb(&mut self, verb: &crate::ast::VerbDecl) {
         for metadata in &verb.metadata {
             self.output.push_str("meta ");
-            self.output.push_str(meta_name(*metadata));
+            self.output.push_str(&meta_name(metadata));
             self.output.push('\n');
         }
         if verb.is_open {
@@ -293,9 +293,10 @@ impl Formatter {
     }
 }
 
-fn meta_name(metadata: crate::ast::MetaAttribute) -> &'static str {
+fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
     match metadata {
-        crate::ast::MetaAttribute::Test => "test",
+        crate::ast::MetaAttribute::Test => "test".to_owned(),
+        crate::ast::MetaAttribute::Target(selector) => format!("target(\"{selector}\")"),
     }
 }
 

@@ -7,7 +7,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
-use crate::semantic::{GenericInstance, analyze};
+use crate::semantic::{GenericInstance, analyze, filter_program_for_target};
 
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::declare_functions;
@@ -75,7 +75,8 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    let normalized_program = normalize_program(program);
+    let targeted_program = filter_program_for_target(program, target);
+    let normalized_program = normalize_program(&targeted_program);
     let program = &normalized_program;
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;

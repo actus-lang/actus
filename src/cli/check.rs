@@ -2,6 +2,7 @@ use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_e
 use crate::lexer::scan;
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
+use crate::semantic::filter_program_for_target;
 use std::fs;
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
@@ -53,7 +54,7 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
             return 1;
         }
     };
-    match crate::semantic::analyze(&program) {
+    match crate::semantic::analyze(&filter_program_for_target(&program, configuration.target())) {
         Ok(_) => {
             println!("checked `{input}` successfully");
             0

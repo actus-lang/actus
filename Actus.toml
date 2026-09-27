@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "alpha"
 entry = "main"
 
+[dependencies]
+fs = { path = "library/std" }
+io = { path = "library/std" }
+
 [build]
 target = "host"
 profile = "debug"

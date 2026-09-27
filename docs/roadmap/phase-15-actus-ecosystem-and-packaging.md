@@ -56,6 +56,8 @@ are deferred to a separate Actus web platform project and do not block Phase 16.
 - [x] Add `actus test` with `meta test` discovery, native execution, timing,
       exit codes, and pass/fail reporting.
 - [x] Add project-wide `actus fmt` integration with `--check` support.
+- [ ] Implement `meta target(unix, windows)` conditional declaration
+      availability after the target metadata contract in ADR-0015.
 
 ## Dependencies and Publishing
 

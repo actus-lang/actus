@@ -39,7 +39,7 @@ fn try_error_path_runs_drop_before_returning_err() {
     let root = std::env::temp_dir().join(format!("actus-drop-try-{}", std::process::id()));
     let input = root.with_extension("act");
     let output = root.with_extension("bin");
-    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { print(self.value); } } verb fail() -> Result[Int, Int] { return Err(1); } verb worker() -> Result[Int, Int] { erg counter = Counter { value: 9, }; fail()?; return Ok(0); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }";
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { print(self.value); } } verb fail() -> Result[Int, Int] { return Err(1); } verb worker() -> Result[Int, Int] { erg counter = Counter { value: 9, }; erg code = fail()?; return Ok(code); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }";
     fs::write(&input, source).expect("write source");
     let result = run_with_args(
         vec![

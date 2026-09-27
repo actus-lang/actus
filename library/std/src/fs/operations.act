@@ -167,6 +167,13 @@ open verb write_file(abs path: Buffer, abs contents: Buffer) -> Result[Int, IoEr
             erg file: File = value;
             return file.write(buffer: abs contents);
         },
-        Result.Err(error) => { return Err(error); },
+        Result.Err(error) => {
+            return case dat error {
+                IoError.EndOfStream => Err(IoError.EndOfStream),
+                IoError.Failed => Err(IoError.Failed),
+                IoError.InvalidInput => Err(IoError.InvalidInput),
+                IoError.InvalidData => Err(IoError.InvalidData),
+            };
+        },
     };
 }

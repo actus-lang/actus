@@ -1,0 +1,238 @@
+import io;
+import fs;
+
+meta test
+verb metadata_rejects_empty_path() -> Int {
+    erg path = Buffer[0];
+    erg result = metadata(path: abs path);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb file_open_and_create_reject_empty_path() -> Int {
+    erg path = Buffer[0];
+    erg opened = file_open(path: abs path);
+    erg created = file_create(path: abs path);
+    case dat opened {
+        Result.Ok(_) => { return 1; },
+        Result.Err(_) => { },
+    };
+    return case dat created {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb path_operations_reject_empty_paths() -> Int {
+    erg path = Buffer[0];
+    erg removed = remove_file(path: abs path);
+    erg renamed = rename(from: abs path, to: abs path);
+    erg copied = copy_file(from: abs path, to: abs path);
+    erg created = create_dir(path: abs path);
+    erg deleted = remove_dir(path: abs path);
+    case dat removed {
+        Result.Ok(_) => { return 1; },
+        Result.Err(_) => { },
+    };
+    case dat renamed {
+        Result.Ok(_) => { return 1; },
+        Result.Err(_) => { },
+    };
+    case dat copied {
+        Result.Ok(_) => { return 1; },
+        Result.Err(_) => { },
+    };
+    case dat created {
+        Result.Ok(_) => { return 1; },
+        Result.Err(_) => { },
+    };
+    return case dat deleted {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb read_to_bytes_propagates_empty_path_error() -> Int {
+    erg path = Buffer[0];
+    erg bytes = read_to_bytes(path: abs path);
+    return case dat bytes {
+        Result.Ok(_) => { return 1; },
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb read_to_string_propagates_empty_path_error() -> Int {
+    erg path = Buffer[0];
+    erg text = read_to_string(path: abs path);
+    return case dat text {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb write_file_propagates_empty_path_error() -> Int {
+    erg path = Buffer[0];
+    append(path, 97);
+    append(path, 99);
+    append(path, 116);
+    append(path, 117);
+    append(path, 115);
+    append(path, 95);
+    append(path, 109);
+    append(path, 105);
+    append(path, 115);
+    append(path, 115);
+    append(path, 105);
+    append(path, 110);
+    append(path, 103);
+    append(path, 95);
+    append(path, 112);
+    append(path, 97);
+    append(path, 114);
+    append(path, 101);
+    append(path, 110);
+    append(path, 116);
+    append(path, 47);
+    append(path, 97);
+    append(path, 99);
+    append(path, 116);
+    append(path, 117);
+    append(path, 115);
+    append(path, 95);
+    append(path, 102);
+    append(path, 105);
+    append(path, 108);
+    append(path, 101);
+    erg contents = Buffer[0];
+    erg written = write_file(path: abs path, contents: abs contents);
+    return case dat written {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb open_options_cover_all_modes() -> Int {
+    erg path = Buffer[0];
+    erg empty = options_new();
+    erg readable = options_read(dat empty);
+    erg writable = options_write(dat readable);
+    erg appendable = options_append(dat writable);
+    erg truncating = options_truncate(dat appendable);
+    erg creatable = options_create(dat truncating);
+    erg exclusive = options_create_new(dat creatable);
+    erg result = options_open(options: dat exclusive, path: abs path);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
+    erg path = Buffer[0];
+    append(path, 97);
+    append(path, 99);
+    append(path, 116);
+    append(path, 117);
+    append(path, 115);
+    append(path, 95);
+    append(path, 108);
+    append(path, 105);
+    append(path, 98);
+    append(path, 114);
+    append(path, 97);
+    append(path, 114);
+    append(path, 121);
+    append(path, 95);
+    append(path, 114);
+    append(path, 111);
+    append(path, 117);
+    append(path, 110);
+    append(path, 100);
+    append(path, 114);
+    append(path, 105);
+    append(path, 112);
+    append(path, 46);
+    append(path, 98);
+    append(path, 105);
+    append(path, 110);
+    remove_file(path: abs path);
+    erg contents = Buffer[0];
+    append(contents, 65);
+    append(contents, 66);
+    erg written = write_file(path: abs path, contents: abs contents);
+    case dat written {
+        Result.Ok(count) => case count {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg info_result = metadata(path: abs path);
+    case dat info_result {
+        Result.Ok(info) => case info.size {
+            2 => case info.is_file {
+                1 => { },
+                _ => { return 1; },
+            },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg bytes = read_to_bytes(path: abs path);
+    erg text = read_to_string(path: abs path);
+    case dat bytes {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat text {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg copy_path = Buffer[0];
+    append(copy_path, 97);
+    append(copy_path, 99);
+    append(copy_path, 116);
+    append(copy_path, 117);
+    append(copy_path, 115);
+    append(copy_path, 95);
+    append(copy_path, 108);
+    append(copy_path, 105);
+    append(copy_path, 98);
+    append(copy_path, 114);
+    append(copy_path, 97);
+    append(copy_path, 114);
+    append(copy_path, 121);
+    append(copy_path, 95);
+    append(copy_path, 99);
+    append(copy_path, 111);
+    append(copy_path, 112);
+    append(copy_path, 121);
+    append(copy_path, 46);
+    append(copy_path, 98);
+    append(copy_path, 105);
+    append(copy_path, 110);
+    erg copied = copy_file(from: abs path, to: abs copy_path);
+    case dat copied {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg renamed = rename(from: abs copy_path, to: abs path);
+    case dat renamed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg removed = remove_file(path: abs path);
+    return case dat removed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}

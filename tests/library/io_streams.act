@@ -1,0 +1,153 @@
+import io;
+
+meta test
+verb copy_transfers_cursor_streams() -> Int {
+    erg input_bytes = Buffer[0];
+    append(input_bytes, 65);
+    append(input_bytes, 66);
+    erg reader = cursor(dat input_bytes);
+    erg output_bytes = Buffer[2];
+    erg writer = cursor(dat output_bytes);
+    erg result = copy(reader: ins reader, writer: ins writer);
+    return case dat result {
+        Result.Ok(count) => case count {
+            2 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb buffered_reader_refills_cursor_storage() -> Int {
+    erg input_bytes = Buffer[0];
+    append(input_bytes, 65);
+    erg source = cursor(dat input_bytes);
+    erg storage = Buffer[1];
+    erg reader = buffered_reader(dat source, dat storage);
+    erg result = refill(reader: ins reader);
+    return case dat result {
+        Result.Ok(count) => case count {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb buffered_writer_flushes_cursor_storage() -> Int {
+    erg output_bytes = Buffer[2];
+    erg target = cursor(dat output_bytes);
+    erg storage = Buffer[2];
+    erg writer = buffered_writer(dat target, dat storage);
+    erg input = Buffer[0];
+    append(input, 65);
+    append(input, 66);
+    erg written = buffered_write(writer: ins writer, input: abs input);
+    case dat written {
+        Result.Ok(count) => case count {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg flushed = flush_buffer(writer: ins writer);
+    return case dat flushed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb buffer_utilities_preserve_reusable_storage() -> Int {
+    erg storage = Buffer[0];
+    erg capacity = 4;
+    erg reserved = reserve(buffer: ins storage, capacity: capacity);
+    case dat reserved {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg source = Buffer[0];
+    append(source, 65);
+    erg offset = 0;
+    erg append_length = 1;
+    erg appended = actus_buffer_append_range(
+        target: ins storage,
+        source: abs source,
+        offset: offset,
+        length: append_length
+    );
+    case appended {
+        1 => { },
+        _ => { return 1; },
+    };
+    erg length = actus_buffer_length(buffer: abs storage);
+    erg cleared = actus_buffer_clear(buffer: ins storage);
+    case length {
+        1 => { },
+        _ => { return 1; },
+    };
+    return case cleared {
+        1 => 0,
+        _ => 1,
+    };
+}
+
+meta test
+verb stdin_eof_is_typed() -> Int {
+    erg result = read_byte();
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => 0,
+            _ => 1,
+        },
+    };
+}
+
+meta test
+verb output_wrappers_return_typed_status() -> Int {
+    erg text = Buffer[0];
+    erg value = 0;
+    erg integer = print_int(value: value);
+    erg printed = print(text: abs text);
+    erg line = println(text: abs text);
+    erg error_integer = eprint_int(value: value);
+    erg error_text = eprint(text: abs text);
+    erg error_line = eprintln(text: abs text);
+    erg written = write(buffer: abs text);
+    erg flushed = flush();
+    case dat integer {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat printed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat line {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat error_integer {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat error_text {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat error_line {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    case dat written {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    return case dat flushed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
