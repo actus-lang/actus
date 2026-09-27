@@ -5,11 +5,17 @@ Each field is a scalar switch. The configuration is consumed by `options_open`
 so the host runtime receives one complete, immutable open request.
 """
 open struct OpenOptions {
+    """Permit reading from the opened handle when set to one."""
     erg read: Int,
+    """Permit writing to the opened handle when set to one."""
     erg write: Int,
+    """Place writes at end-of-file without truncating existing bytes."""
     erg append: Int,
+    """Truncate an existing file when the handle is opened."""
     erg truncate: Int,
+    """Create the path when it does not already exist."""
     erg create: Int,
+    """Create only a new path; opening an existing path fails."""
     erg create_new: Int,
 }
 
@@ -97,7 +103,14 @@ open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
     };
 }
 
-"""Open a path with the complete typed configuration."""
+"""
+Open `path` using every flag in the consumed `options` value.
+
+The path is an `abs` view. The scalar flags are passed by value to the
+runtime, which returns an opaque handle or `-1` on failure. A successful
+handle becomes an owned `File`; the raw failure code is translated to
+`IoError.Failed` and is never exposed by the public API.
+"""
 open unsafe extern "C" verb actus_file_open_options_buffer(
     abs path: Buffer,
     abs read: Int,

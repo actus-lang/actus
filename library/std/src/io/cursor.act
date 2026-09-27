@@ -4,7 +4,9 @@ An in-memory stream backed by caller-provided storage.
 `buffer` is owned by the cursor and `position` is its absolute byte offset.
 """
 open struct Cursor {
+    """Owned backing storage. The cursor drops this `erg` buffer with itself."""
     erg buffer: Buffer,
+    """Absolute byte offset used by the next read or write operation."""
     erg position: Int,
 }
 
@@ -27,10 +29,21 @@ open unsafe extern "C" verb actus_cursor_write(
     abs source: Buffer
 ) -> Int;
 
-"""Validate an absolute position against a backing buffer."""
+"""
+Validate `position` against the backing storage in `buffer`.
+
+`buffer` is exclusively borrowed for the bounds check and remains owned by
+the cursor. Zero means the position is valid; `-1` means it is outside the
+buffer and is translated to `IoError.Failed`.
+"""
 open unsafe extern "C" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int;
 
-"""Flush cursor state. In-memory cursors have no external stream to sync."""
+"""
+Flush cursor state without an operating-system side effect.
+
+`target` is an exclusive loan of the cursor's backing buffer. The bridge
+returns zero for success or `-1` for a rejected operation.
+"""
 open unsafe extern "C" verb actus_cursor_flush(ins target: Buffer) -> Int;
 
 """Read from an in-memory cursor into an exclusive caller buffer."""
@@ -42,6 +55,7 @@ open verb cursor_read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoErr
     };
     return case status {
         -1 => Err(IoError.Failed),
+        0 => Err(IoError.EndOfStream),
         _ => Ok(status),
     };
 }
@@ -87,6 +101,7 @@ perform Reader for Cursor {
         };
         return case status {
             -1 => Err(IoError.Failed),
+            0 => Err(IoError.EndOfStream),
             _ => Ok(status),
         };
     }

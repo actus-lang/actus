@@ -145,6 +145,9 @@ impl Analyzer {
         let found =
             self.expression_type_name(&argument.expression).unwrap_or_else(|| "unknown".to_owned());
         if found == canonical_type_name(expected) {
+            if self.enum_payload_owns_value(expected) {
+                self.initialize_owner(&argument.expression, argument_span(argument))?;
+            }
             return Ok(());
         }
         Err(SemanticError {
@@ -156,6 +159,12 @@ impl Analyzer {
             },
             span: argument_span(argument),
         })
+    }
+
+    pub(super) fn enum_payload_owns_value(&self, type_name: &TypeName) -> bool {
+        type_name.name == "Buffer"
+            || self.struct_types.contains_key(&type_name.name)
+            || self.drop_types.contains(&type_name.name)
     }
 }
 

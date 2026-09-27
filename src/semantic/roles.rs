@@ -52,10 +52,22 @@ impl Analyzer {
                     method.span,
                 ));
             }
-            for parameter in &method.params {
+            for (index, parameter) in method.params.iter().enumerate() {
                 self.validate_dynamic_parameter(parameter)?;
                 if parameter.dispatch == crate::ast::DispatchMode::Static {
-                    self.validate_type_reference(&parameter.ty)?;
+                    if parameter.ty.name == "Self" {
+                        if index != 0 || !parameter.ty.arguments.is_empty() {
+                            return Err(role_error(
+                                SemanticErrorKind::InvalidRoleReceiver {
+                                    role: role.name.clone(),
+                                    method: method.name.clone(),
+                                },
+                                parameter.span,
+                            ));
+                        }
+                    } else {
+                        self.validate_type_reference(&parameter.ty)?;
+                    }
                 }
             }
             if let Some(return_type) = &method.return_type {
@@ -185,8 +197,13 @@ fn method_matches(
             |(left, right)| left.access == right.access && type_names_match(&left.ty, &right.ty),
         )
         && implementation.params.first().is_some_and(|parameter| {
-            parameter.name == "self" && type_names_match(&parameter.ty, target)
+            parameter.name == "self"
+                && (is_self_type(&required.params[0].ty) || type_names_match(&parameter.ty, target))
         })
+}
+
+fn is_self_type(type_name: &TypeName) -> bool {
+    type_name.name == "Self" && type_name.arguments.is_empty()
 }
 
 fn type_names_match(left: &TypeName, right: &TypeName) -> bool {

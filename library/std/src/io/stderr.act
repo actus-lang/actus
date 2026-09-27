@@ -4,6 +4,7 @@ open unsafe extern "C" verb actus_print_int_stderr(erg value: Int) -> Int;
 open unsafe extern "C" verb actus_print_buffer_stderr(abs text: Buffer) -> Int;
 """C ABI bridge that writes a borrowed buffer followed by a newline to stderr."""
 open unsafe extern "C" verb actus_print_line_buffer_stderr(abs text: Buffer) -> Int;
+"""Flush stderr; zero means success and any non-zero value means failure."""
 open unsafe extern "C" verb actus_flush_stderr() -> Int;
 
 """Print an integer to stderr and return its typed I/O result."""

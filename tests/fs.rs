@@ -214,6 +214,20 @@ fn std_fs_one_shot_write_and_read_to_string_execute_natively() {
 }
 
 #[test]
+fn std_fs_read_to_bytes_and_rejects_invalid_utf8() {
+    let root = std::env::temp_dir().join(format!("actus-fs-bytes-{}", std::process::id()));
+    let data_path = root.join("bytes.bin");
+    let path = path_literal(&data_path);
+    let source = format!(
+        "import io; import fs; verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; append(contents, 255); write_file(path: abs path, contents: abs contents); erg bytes = read_to_bytes(path: abs path); case dat bytes {{ Result.Ok(_) => {{ erg text = read_to_string(path: abs path); return case dat text {{ Result.Err(_) => 0, Result.Ok(_) => 1, }}; }}, Result.Err(_) => {{ return 1; }}, }}; return 1; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    assert_eq!(fs::read(&data_path).expect("read invalid UTF-8 fixture"), [255]);
+    fs::remove_dir_all(root).expect("remove bytes fixture");
+}
+
+#[test]
 fn runtime_file_bridge_round_trips_and_closes_handles() {
     let path = std::env::temp_dir().join(format!("actus-runtime-fs-{}.bin", std::process::id()));
     let path_bytes = path.to_string_lossy().into_owned().into_bytes();

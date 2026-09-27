@@ -1,26 +1,59 @@
 """
-Copy the next available chunk from a statically selected reader to writer.
+Reserve one reusable scratch allocation, then copy the next available chunk
+from a statically selected reader to writer.
 
 The reusable scratch buffer is allocated once for this operation. Concrete
 Reader and Writer implementations are selected by generic monomorphization.
+The copy-specific C bridge reserves that storage without retaining the buffer.
+Only `EndOfStream` terminates the transfer successfully; all other errors
+are returned to the caller unchanged.
 """
+open unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
+
 open verb copy[R: Reader, W: Writer](
     ins reader: R,
     ins writer: W
 ) -> Result[Int, IoError] {
     erg scratch = Buffer[0];
+    erg capacity = 4096;
+    actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
     erg total = 0;
     loop {
         erg read_result: Result[Int, IoError] = reader.read(buffer: ins scratch);
         case dat read_result {
             Result.Ok(count) => case count {
-                0 => { return Result[Int, IoError].Ok(total); },
+                0 => { return Result[Int, IoError].Err(IoError.InvalidData); },
                 _ => {
-                    writer.write(buffer: abs scratch);
-                    total = total + count;
+                    erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
+                    case dat write_result {
+                        Result.Ok(written) => {
+                            erg difference = written - count;
+                            case difference {
+                                0 => { total = total + written; },
+                                _ => {
+                                    return Result[Int, IoError].Err(IoError.Failed);
+                                },
+                            };
+                        },
+                        Result.Err(error) => {
+                            return case dat error {
+                                IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream),
+                                IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
+                                IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
+                                IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+                            };
+                        },
+                    };
                 },
             },
-            _ => { return Result[Int, IoError].Ok(total); },
+            Result.Err(error) => {
+                return case dat error {
+                    IoError.EndOfStream => Result[Int, IoError].Ok(total),
+                IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
+                IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
+                IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+            };
+            },
         };
     }
     return Result[Int, IoError].Ok(total);

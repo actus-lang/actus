@@ -5,7 +5,9 @@ Both the source and storage are owned by the adapter. Refill borrows the
 adapter for one call and fills the existing storage without allocation.
 """
 open struct BufferedReader[Source: Reader] {
+    """Concrete stream selected by static dispatch and owned by the adapter."""
     erg source: Source,
+    """Reusable storage filled by `refill`; it is never returned by the source."""
     erg buffer: Buffer,
 }
 
@@ -16,7 +18,9 @@ The target and storage are owned by the adapter. Output operations borrow
 the adapter with `ins` and pass source bytes as `abs` views.
 """
 open struct BufferedWriter[Target: Writer] {
+    """Concrete destination selected by static dispatch and owned by the adapter."""
     erg target: Target,
+    """Fixed-capacity pending output; its bytes are borrowed into `Target.write`."""
     erg buffer: Buffer,
 }
 
@@ -41,7 +45,7 @@ open verb buffered_writer[Target: Writer](dat target: Target, dat buffer: Buffer
 }
 
 """
-Refill a reader's existing buffer from stdin until newline or EOF.
+Refill a reader's existing buffer from its statically selected source.
 
 The `ins reader` loan is non-escaping and covers the complete call. The
 result reports the exact byte count or a typed I/O error.
@@ -50,10 +54,36 @@ open verb refill[Source: Reader](ins reader: BufferedReader[Source]) -> Result[I
     return reader.source.read(buffer: ins reader.buffer);
 }
 
+"""
+Reserve at least `capacity` bytes for `buffer` without changing its logical
+length. The `ins` buffer remains owned by the caller; zero is returned only
+for invalid input and `-1` reports allocation failure at the native boundary.
+"""
 open unsafe extern "C" verb actus_buffer_reserve(
     ins buffer: Buffer,
     erg capacity: Int
 ) -> Int;
+
+"""Return reserved capacity, or `-1` for a null or invalid buffer handle."""
+open unsafe extern "C" verb actus_buffer_capacity(abs buffer: Buffer) -> Int;
+
+"""Return logical byte length, or `-1` for a null or invalid buffer handle."""
+open unsafe extern "C" verb actus_buffer_length(abs buffer: Buffer) -> Int;
+
+"""
+Append at most `length` bytes beginning at `offset` from the borrowed source.
+The `ins` target is never reallocated; the return value is the exact appended
+count, zero means full capacity, and `-1` means invalid handles or bounds.
+"""
+open unsafe extern "C" verb actus_buffer_append_range(
+    ins target: Buffer,
+    abs source: Buffer,
+    erg offset: Int,
+    erg length: Int
+) -> Int;
+
+"""Clear logical length while retaining capacity; return cleared byte count or `-1`."""
+open unsafe extern "C" verb actus_buffer_clear(ins buffer: Buffer) -> Int;
 
 """
 Reserve reusable storage for a buffered writer.
@@ -63,31 +93,84 @@ The buffer length is preserved; only its backing capacity is increased.
 open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError] {
     erg status = actus_buffer_reserve(buffer: ins buffer, capacity: capacity);
     return case status {
-        -1 => Err(IoError.Failed),
-        _ => Ok(status),
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
     };
 }
 
 """
 Write an immutable source through the selected writer target.
 
-`Result.Ok(count)` reports the number of source bytes accepted. The source
-remains available because it is borrowed with `abs`; the adapter is
-exclusively borrowed with `ins`.
+The adapter first appends bytes to its fixed-capacity internal buffer. When
+that buffer becomes full, it is flushed through the selected target before
+more source bytes are accepted. The target is never called for a partial
+buffer merely because this verb returns.
 """
 open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target],
     abs input: Buffer
 ) -> Result[Int, IoError] {
-    return writer.target.write(buffer: abs input);
+    erg source_length = actus_buffer_length(buffer: abs input);
+    erg total = 0;
+    loop {
+        erg remaining = source_length - total;
+        case remaining {
+            0 => { return Result[Int, IoError].Ok(total); },
+            _ => { },
+        };
+        erg accepted = actus_buffer_append_range(
+            target: ins writer.buffer,
+            source: abs input,
+            offset: total,
+            length: remaining
+        );
+        case accepted {
+            -1 => { return Result[Int, IoError].Err(IoError.Failed); },
+            0 => { return Result[Int, IoError].Err(IoError.InvalidData); },
+            _ => { },
+        };
+        total = total + accepted;
+        erg capacity = actus_buffer_capacity(buffer: abs writer.buffer);
+        erg buffered = actus_buffer_length(buffer: abs writer.buffer);
+        case capacity {
+            -1 => { return Result[Int, IoError].Err(IoError.Failed); },
+            _ => { },
+        };
+        case buffered {
+            -1 => { return Result[Int, IoError].Err(IoError.Failed); },
+            _ => { },
+        };
+        erg remaining_capacity = buffered - capacity;
+        case remaining_capacity {
+            0 => {
+                flush_buffer(writer: ins writer)?;
+            },
+            _ => { },
+        };
+    }
+    return Result[Int, IoError].Ok(total);
 }
 
 """
 Flush the pending bytes through the selected writer target.
 
-`Result.Ok(count)` is the number of bytes flushed. The backing storage is
-retained for the next write, so repeated flush cycles do not allocate.
+`Result.Ok(count)` is the number of bytes accepted by the target. A
+successful flush clears only the logical length; the backing allocation is
+retained for the next write.
 """
 open verb flush_buffer[Target: Writer](ins writer: BufferedWriter[Target]) -> Result[Int, IoError] {
-    return writer.target.flush();
+    erg pending = actus_buffer_length(buffer: abs writer.buffer);
+    case pending {
+        -1 => { return Result[Int, IoError].Err(IoError.Failed); },
+        _ => { },
+    };
+    erg result = writer.target.write(buffer: abs writer.buffer);
+    return case dat result {
+        Result.Ok(count) => {
+            actus_buffer_clear(buffer: ins writer.buffer);
+            writer.target.flush()?;
+            return Result[Int, IoError].Ok(count);
+        },
+        Result.Err(error) => Result[Int, IoError].Err(error),
+    };
 }

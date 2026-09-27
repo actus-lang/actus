@@ -186,13 +186,56 @@ fn std_io_native_buffered_writer_specializes_cursor() {
         "buffered-writer-cursor",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); print(text: abs writer.target.buffer); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg capacity = 4; reserve(buffer: ins scratch, capacity: capacity); erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); print(text: abs writer.target.buffer); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution =
         Command::new(&output).output().expect("buffered Cursor writer fixture should run");
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"OK");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_buffered_writer_defers_target_write_until_flush() {
+    let (root, input, output) = project(
+        "buffered-writer-deferred",
+        "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
+        &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
+        "import io; verb measure(ins writer: BufferedWriter[Cursor], abs payload: Buffer) -> Int { buffered_write(writer: ins writer, input: abs payload); return writer.target.position; } verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg capacity = 4; reserve(buffer: ins scratch, capacity: capacity); erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); erg before = measure(writer: ins writer, payload: abs payload); flush_buffer(writer: ins writer); return before; }\n",
+    );
+    build(&input, &output);
+    let execution =
+        Command::new(&output).output().expect("buffered writer deferred fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_copy_propagates_reader_failure() {
+    let (root, input, output) = project(
+        "copy-reader-error",
+        "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
+        &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
+        "import io; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("copy reader error fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_copy_propagates_writer_failure() {
+    let (root, input, output) = project(
+        "copy-writer-error",
+        "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
+        &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
+        "import io; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("copy writer error fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
     let _ = fs::remove_dir_all(root);
 }
 

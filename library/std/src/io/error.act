@@ -11,4 +11,6 @@ open enum IoError {
     EndOfStream,
     """The supplied buffer, path, or stream argument is not valid."""
     InvalidInput,
+    """The byte sequence cannot be interpreted under the requested encoding."""
+    InvalidData,
 }

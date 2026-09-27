@@ -6,8 +6,11 @@ or from the end of a file. The runtime returns the resulting absolute byte
 position in `Result.Ok`.
 """
 open enum SeekFrom {
+    """Interpret the signed offset from byte zero of the file."""
     Start(Int),
+    """Interpret the signed offset from the current file position."""
     Current(Int),
+    """Interpret the signed offset from the file's end."""
     End(Int),
 }
 
@@ -18,5 +21,6 @@ The positional stream contract for owned file handles.
 transfer or duplicate the underlying resource.
 """
 open role Seeker {
+    """Move the stream and return its resulting absolute byte position."""
     verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError];
 }

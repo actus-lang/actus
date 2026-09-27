@@ -7,22 +7,32 @@ resource exactly once when ownership leaves scope.
 """
 import io;
 open struct File {
+    """Opaque host handle. Only runtime bridge verbs may interpret it."""
     erg handle: Int,
 }
 
-"""Open an existing file for reading."""
+"""
+Open a path using the runtime's read mode. `path` is an `abs` view and is
+not retained. The result is a new owned `File`, or `-1` on native failure.
+"""
 open unsafe extern "C" verb actus_file_open_buffer(abs path: Buffer, abs mode: Int) -> Int;
 
-"""Read into the spare capacity of an exclusive buffer."""
+"""
+Read into the existing `ins` buffer. Non-negative values are byte counts;
+`-1` is `Failed` and `-2` is `EndOfStream`. The runtime retains no buffer.
+"""
 open unsafe extern "C" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
 
-"""Write the logical bytes of a borrowed buffer."""
+"""
+Write the logical bytes of an `abs` buffer. Non-negative values are byte
+counts; `-1` is `Failed` and `-2` is `EndOfStream`.
+"""
 open unsafe extern "C" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;
 
-"""Flush a file handle through the hosted runtime."""
+"""Flush an owned handle; zero is success and `-1` is `Failed`."""
 open unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
 
-"""Close a file handle through the hosted runtime."""
+"""Close an owned handle exactly once; zero is success and `-1` is failure."""
 open unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
 """Move a file cursor and return its resulting absolute byte position."""
@@ -140,6 +150,11 @@ perform Seeker for File {
 }
 
 """Return metadata for this open file without transferring its handle."""
+open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
+    drop(output);
+    return Result[Metadata, IoError].Err(IoError.Failed);
+}
+
 perform MetadataProvider for File {
     verb metadata(ins self: File) -> Result[Metadata, IoError] {
         erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
@@ -148,8 +163,8 @@ perform MetadataProvider for File {
             output: ins output
         );
         return case status {
-            -1 => Err(IoError.Failed),
-            _ => Ok(output),
+            -1 => file_metadata_failed(output: dat output),
+            _ => Result[Metadata, IoError].Ok(output),
         };
     }
 }

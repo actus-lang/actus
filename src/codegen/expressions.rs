@@ -173,9 +173,14 @@ pub(super) fn initializer_type(
         Expr::Call { callee, .. } => {
             functions.get(callee).map(|function| function.return_type).unwrap_or(NativeType::Int)
         }
-        Expr::MethodCall { method, .. } => enum_expression_type(expression, layouts)
-            .or_else(|| functions.get(method).map(|function| function.return_type))
-            .unwrap_or(NativeType::Int),
+        Expr::MethodCall { receiver, method, .. } => {
+            let receiver_type = initializer_type(receiver, types, functions, layouts);
+            let dispatch_name = super::performance::dispatch_key(receiver_type, method);
+            enum_expression_type(expression, layouts)
+                .or_else(|| functions.get(&dispatch_name).map(|function| function.return_type))
+                .or_else(|| functions.get(method).map(|function| function.return_type))
+                .unwrap_or(NativeType::Int)
+        }
         Expr::StructLit { name, type_arguments, .. } => {
             let type_name = crate::ast::TypeName {
                 name: name.clone(),

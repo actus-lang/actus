@@ -225,7 +225,7 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 
 ### ADR-0027: RAII scope drop
 
-- [ ] Register deterministic cleanup contracts for `File` and future sockets.
+- [x] Register the deterministic cleanup contract for `File`.
 - [x] Emit LIFO cleanup for normal lexical scope exit.
 - [x] Emit the same cleanup plan for `return`, `break`, and `continue`.
 - [x] Emit cleanup before `?` early return.
@@ -244,16 +244,25 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 
 ### `std::fs` API and implementation
 
-- [ ] Define the `std::fs` facade and public file operations.
+- [x] Define the `std::fs` facade and public file operations.
 - [ ] Define `std::path` input ownership and byte-oriented representation.
-- [ ] Define file-read and file-write `Result` contracts.
-- [ ] Define create, truncate, append, and overwrite behavior.
-- [ ] Implement runtime file-open, read, write, and close bridges.
-- [ ] Translate host failures to typed `IoError` values.
-- [ ] Ensure opened files use exactly one deterministic cleanup path.
+- [x] Define file-read and file-write `Result` contracts.
+- [x] Define create, truncate, append, and overwrite behavior.
+- [x] Implement runtime file-open, read, write, and close bridges.
+- [x] Translate host failures to typed `IoError` values.
+- [x] Ensure opened files use exactly one deterministic cleanup path.
 - [ ] Exclude filesystem APIs from targets without filesystem capabilities.
-- [ ] Add semantic ownership and failure-path tests.
-- [ ] Add native read, write, append, missing-file, and cleanup tests.
+- [x] Add semantic ownership and failure-path tests.
+- [x] Add native read, write, append, missing-file, and cleanup tests.
+
+### Production-grade I/O contracts
+
+- [x] Use `Self` receivers for polymorphic `Reader` and `Writer` roles.
+- [x] Implement generic buffered adapters without hardcoded stdin/stdout sources.
+- [x] Defer `BufferedWriter` target writes until capacity or explicit flush.
+- [x] Propagate every `copy` reader and writer error except `EndOfStream`.
+- [x] Provide `read_to_bytes` and reject invalid UTF-8 in `read_to_string`.
+- [x] Document public types, fields, variants, verbs, and C ABI declarations.
 
 ### Gate 3.1: Seeker role and OpenOptions
 
@@ -279,8 +288,8 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 
 ### Gate 3 invariant
 
-- [ ] `std::fs` resources are owned, transferred, and cleaned exactly once.
-- [ ] Every filesystem failure is represented by a typed `Result` value.
+- [x] `std::fs` resources are owned, transferred, and cleaned exactly once.
+- [x] Every filesystem failure is represented by a typed `Result` value.
 - [ ] `?` propagates filesystem errors without bypassing cleanup.
 
 ## Gate 3.5: Uniform Method Calls and I/O API Ergonomics

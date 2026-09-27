@@ -80,3 +80,35 @@ fn std_io_cursor_seek_and_copy_contracts_are_semantically_valid() {
     assert!(exports.contains("verb", "copy"));
     analyze_module(&resolver, "io").expect("cursor utility contracts should be valid");
 }
+
+#[test]
+fn reader_and_writer_self_receivers_support_multiple_implementors() {
+    let source = r#"
+        enum IoError { Failed }
+        role Reader { verb read(ins self: Self, ins buffer: Buffer) -> Result[Int, IoError]; }
+        role Writer {
+            verb write(ins self: Self, abs buffer: Buffer) -> Result[Int, IoError];
+            verb flush(ins self: Self) -> Result[Int, IoError];
+        }
+        struct MemoryReader { erg marker: Int, }
+        struct MemoryWriter { erg marker: Int, }
+        perform Reader for MemoryReader {
+            verb read(ins self: MemoryReader, ins buffer: Buffer) -> Result[Int, IoError] {
+                return Result[Int, IoError].Err(IoError.Failed);
+            }
+        }
+        perform Writer for MemoryWriter {
+            verb write(ins self: MemoryWriter, abs buffer: Buffer) -> Result[Int, IoError] {
+                return Result[Int, IoError].Err(IoError.Failed);
+            }
+            verb flush(ins self: MemoryWriter) -> Result[Int, IoError] {
+                return Result[Int, IoError].Err(IoError.Failed);
+            }
+        }
+        verb main() -> Int { return 0; }
+    "#;
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("Self receiver fixture should parse");
+    analyze(&program).expect("multiple concrete role implementations should validate");
+}

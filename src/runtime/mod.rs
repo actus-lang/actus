@@ -9,8 +9,9 @@ mod stream;
 mod types;
 
 pub use allocation::{
-    actus_buffer_allocate, actus_buffer_append, actus_buffer_drop, actus_buffer_reserve,
-    actus_enum_allocate, actus_enum_drop,
+    actus_buffer_allocate, actus_buffer_append, actus_buffer_append_buffer,
+    actus_buffer_append_range, actus_buffer_capacity, actus_buffer_clear, actus_buffer_drop,
+    actus_buffer_reserve, actus_copy_buffer_reserve, actus_enum_allocate, actus_enum_drop,
 };
 pub use console::{
     actus_flush_stderr, actus_flush_stdout, actus_print_buffer_stderr, actus_print_buffer_stdout,
@@ -37,8 +38,9 @@ pub use fs::{
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use stream::{
-    actus_buffer_length, actus_buffered_write_stdout, actus_cursor_flush, actus_cursor_read,
-    actus_cursor_seek, actus_cursor_write, actus_flush_buffered_stdout, actus_write_buffer_stdout,
+    actus_buffer_length, actus_buffer_validate_utf8, actus_buffered_write_stdout,
+    actus_cursor_flush, actus_cursor_read, actus_cursor_seek, actus_cursor_write,
+    actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
 
