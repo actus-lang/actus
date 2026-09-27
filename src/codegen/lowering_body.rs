@@ -21,7 +21,7 @@ pub(crate) fn lower_body(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<Flow, NativeEmitError> {
     let mut locals = initial_locals.clone();
     let mut types = initial_types.clone();
     match super::lowering_statements::lower_statements(
@@ -35,10 +35,7 @@ pub(crate) fn lower_body(
         string_data,
         layouts,
     )? {
-        Flow::Return(value) => Ok(value),
-        Flow::Fallthrough => {
-            Err(NativeEmitError("native function requires a return value".to_owned()))
-        }
+        flow @ (Flow::Return(_) | Flow::Fallthrough) => Ok(flow),
         Flow::Break | Flow::Continue => {
             Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
         }

@@ -20,9 +20,13 @@ pub(super) fn declare_functions(
     let mut metadata = HashMap::new();
     for verb in verbs {
         let signature = native_signature_for_definition(module, verb, layouts);
-        let symbol = if verb.name == entry_symbol { entry_symbol } else { &verb.name };
+        let symbol = if verb.name == entry_symbol || !needs_private_symbol(&verb.name) {
+            verb.name.clone()
+        } else {
+            format!("__actus_verb_{}", verb.name)
+        };
         let id = module
-            .declare_function(symbol, Linkage::Export, &signature)
+            .declare_function(&symbol, Linkage::Export, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
         metadata.insert(
             verb.name.clone(),
@@ -52,16 +56,21 @@ pub(super) fn declare_functions(
     Ok(metadata)
 }
 
+fn needs_private_symbol(name: &str) -> bool {
+    matches!(name, "read" | "write" | "open" | "close" | "fsync" | "rename")
+}
+
 fn function_meta(
     id: cranelift_module::FuncId,
     params: &[crate::ast::Param],
     return_type: Option<&crate::ast::TypeName>,
     layouts: &LayoutRegistry,
 ) -> FunctionMeta {
+    let return_type = NativeType::from_type_name_with_layout(return_type, layouts);
     FunctionMeta {
         id,
         parameter_names: params.iter().map(|param| param.name.clone()).collect(),
-        return_type: NativeType::from_type_name_with_layout(return_type, layouts),
+        return_type,
         dynamic_params: params
             .iter()
             .map(|parameter| parameter.dispatch == DispatchMode::Dynamic)
@@ -109,6 +118,10 @@ fn signature_for(
 ) -> cranelift_codegen::ir::Signature {
     let mut signature = module.make_signature();
     let pointer_type = module.isa().pointer_type();
+    let native_return = NativeType::from_type_name_with_layout(return_type, layouts);
+    if native_return.uses_sret() {
+        signature.params.push(AbiParam::new(pointer_type));
+    }
     for parameter in params {
         let native_type = if parameter.dispatch == DispatchMode::Dynamic {
             NativeType::FatPointer
@@ -120,8 +133,8 @@ fn signature_for(
             signature.params.push(AbiParam::new(pointer_type));
         }
     }
-    signature.returns.push(AbiParam::new(
-        NativeType::from_type_name_with_layout(return_type, layouts).ir_type(pointer_type),
-    ));
+    if return_type.is_some() && !native_return.uses_sret() {
+        signature.returns.push(AbiParam::new(native_return.ir_type(pointer_type)));
+    }
     signature
 }

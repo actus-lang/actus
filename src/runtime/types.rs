@@ -7,6 +7,14 @@ pub struct ActusBuffer {
     pub capacity: usize,
 }
 
+#[repr(C)]
+pub struct ActusMetadata {
+    pub size: i32,
+    pub is_file: i32,
+    pub is_dir: i32,
+    pub readonly: i32,
+}
+
 pub type BufferHandle = *mut ActusBuffer;
 
 pub(super) fn restore_buffer(buffer: &mut ActusBuffer, data: Vec<u8>) {

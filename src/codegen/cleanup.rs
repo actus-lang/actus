@@ -79,7 +79,7 @@ fn emit_scope_instructions(
             NativeInstruction::EndBorrow { .. } => {}
             NativeInstruction::DropPayloadField { name, enum_name, variant, field, .. } => {
                 super::enums::emit_enum_payload_drop(
-                    function, name, enum_name, variant, field, locals, functions, layouts,
+                    function, name, enum_name, variant, field, locals, types, functions, layouts,
                 )?;
             }
             NativeInstruction::DropBinding { name, .. } => {

@@ -19,6 +19,13 @@ impl Parser {
         }
     }
 
+    pub(super) fn take_callable_name(&mut self, expected: &str) -> Result<Token, ParseError> {
+        if self.check_simple(&TokenKind::Drop) {
+            return self.advance_required(expected);
+        }
+        self.take_identifier(expected)
+    }
+
     pub(super) fn expect_keyword(
         &mut self,
         expected: TokenKind,

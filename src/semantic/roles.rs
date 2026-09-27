@@ -52,10 +52,22 @@ impl Analyzer {
                     method.span,
                 ));
             }
-            for parameter in &method.params {
+            for (index, parameter) in method.params.iter().enumerate() {
                 self.validate_dynamic_parameter(parameter)?;
                 if parameter.dispatch == crate::ast::DispatchMode::Static {
-                    self.validate_type_reference(&parameter.ty)?;
+                    if parameter.ty.name == "Self" {
+                        if index != 0 || !parameter.ty.arguments.is_empty() {
+                            return Err(role_error(
+                                SemanticErrorKind::InvalidRoleReceiver {
+                                    role: role.name.clone(),
+                                    method: method.name.clone(),
+                                },
+                                parameter.span,
+                            ));
+                        }
+                    } else {
+                        self.validate_type_reference(&parameter.ty)?;
+                    }
                 }
             }
             if let Some(return_type) = &method.return_type {
@@ -77,6 +89,9 @@ impl Analyzer {
     }
 
     fn validate_performance(&mut self, perform: &PerformDecl) -> Result<(), SemanticError> {
+        if perform.role_name == "Drop" {
+            return self.validate_drop_performance(perform);
+        }
         let Some(role) = self.role_types.get(&perform.role_name).cloned() else {
             return Err(role_error(
                 SemanticErrorKind::UnknownRole { name: perform.role_name.clone() },
@@ -128,6 +143,38 @@ impl Analyzer {
         }
         Ok(())
     }
+
+    fn validate_drop_performance(&mut self, perform: &PerformDecl) -> Result<(), SemanticError> {
+        let Some(method) = perform.methods.iter().find(|method| method.name == "drop") else {
+            return Err(role_error(
+                SemanticErrorKind::MissingRoleMethod {
+                    role: "Drop".to_owned(),
+                    method: "drop".to_owned(),
+                },
+                perform.span,
+            ));
+        };
+        let valid = method.params.len() == 1
+            && method.params[0].role == crate::ast::Role::Ins
+            && method.params[0].name == "self"
+            && type_names_match(&method.params[0].ty, &perform.target)
+            && method.return_type.is_none();
+        if !valid {
+            return Err(role_error(
+                SemanticErrorKind::RoleMethodMismatch {
+                    role: "Drop".to_owned(),
+                    method: "drop".to_owned(),
+                },
+                method.span,
+            ));
+        }
+        let target_key = canonical_type_name(&perform.target);
+        self.drop_types.insert(target_key.clone());
+        self.performance_methods
+            .insert((target_key.clone(), "drop".to_owned()), method.signature());
+        self.performance_roles.insert((target_key, "drop".to_owned()), "Drop".to_owned());
+        Ok(())
+    }
 }
 
 fn method_matches(
@@ -137,19 +184,26 @@ fn method_matches(
 ) -> bool {
     required.name == implementation.name
         && required.params.len() == implementation.params.len()
-        && required.params.iter().zip(&implementation.params).all(|(left, right)| {
-            left.role == right.role
-                && left.dispatch == right.dispatch
-                && left.name == right.name
-                && type_names_match(&left.ty, &right.ty)
-        })
+        && required.params.iter().zip(&implementation.params).enumerate().all(
+            |(index, (left, right))| {
+                left.role == right.role
+                    && left.dispatch == right.dispatch
+                    && left.name == right.name
+                    && (index == 0 || type_names_match(&left.ty, &right.ty))
+            },
+        )
         && required.return_type.as_ref().zip(implementation.return_type.as_ref()).map_or(
             required.return_type.is_none() && implementation.return_type.is_none(),
             |(left, right)| left.access == right.access && type_names_match(&left.ty, &right.ty),
         )
         && implementation.params.first().is_some_and(|parameter| {
-            parameter.name == "self" && type_names_match(&parameter.ty, target)
+            parameter.name == "self"
+                && (is_self_type(&required.params[0].ty) || type_names_match(&parameter.ty, target))
         })
+}
+
+fn is_self_type(type_name: &TypeName) -> bool {
+    type_name.name == "Self" && type_name.arguments.is_empty()
 }
 
 fn type_names_match(left: &TypeName, right: &TypeName) -> bool {

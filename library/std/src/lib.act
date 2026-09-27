@@ -1,1 +1,3 @@
 open io;
+"""Re-export hosted file-system I/O."""
+open fs;

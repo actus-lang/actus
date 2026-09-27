@@ -165,7 +165,7 @@ impl Analyzer {
         let index = self.binding(name, span)?;
         self.ensure_access_available(index, name, span)?;
         let binding = &self.model.bindings[index];
-        if binding.role == Role::Abs {
+        if matches!(binding.role, Role::Abs | Role::Ins) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::DropBorrow { name: name.to_owned() },
                 span,

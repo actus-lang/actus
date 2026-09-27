@@ -153,6 +153,7 @@ pub(super) fn emit_enum_payload_drop(
     variant: &str,
     field: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
@@ -161,8 +162,17 @@ pub(super) fn emit_enum_payload_drop(
         .find(|(binding, _)| binding.as_str() == subject)
         .map(|(_, value)| *value)
         .ok_or_else(|| NativeEmitError(format!("native binding `{subject}` is unavailable")))?;
-    let (enum_id, variant_layout) = layouts
-        .enum_constructor(enum_name, variant)
+    let enum_id = types
+        .iter()
+        .find(|(binding, ty)| binding.as_str() == subject && matches!(ty, NativeType::Enum(_)))
+        .and_then(|(_, ty)| match ty {
+            NativeType::Enum(id) => Some(*id),
+            _ => None,
+        })
+        .or_else(|| layouts.enum_constructor(enum_name, variant).map(|(id, _)| id))
+        .ok_or_else(|| NativeEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
+    let variant_layout = layouts
+        .enum_variant(enum_id, variant)
         .ok_or_else(|| NativeEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
     let enum_layout = layouts
         .enum_layout(enum_id)

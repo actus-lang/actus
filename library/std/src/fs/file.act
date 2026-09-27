@@ -1,0 +1,177 @@
+"""
+A hosted file handle owned by the enclosing Actus binding.
+
+The handle is an opaque runtime token. File construction returns a typed
+Result, and the Drop performance closes the underlying operating-system
+resource exactly once when ownership leaves scope.
+"""
+import io;
+open struct File {
+    """Opaque host handle. Only runtime bridge verbs may interpret it."""
+    erg handle: Int,
+}
+
+"""
+Open a path using the runtime's read mode. `path` is an `abs` view and is
+not retained. The result is a new owned `File`, or `-1` on native failure.
+"""
+open unsafe extern "C" verb actus_file_open_buffer(abs path: Buffer, abs mode: Int) -> Int;
+
+"""
+Read into the existing `ins` buffer. Non-negative values are byte counts;
+`-1` is `Failed` and `-2` is `EndOfStream`. The runtime retains no buffer.
+"""
+open unsafe extern "C" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
+
+"""
+Write the logical bytes of an `abs` buffer. Non-negative values are byte
+counts; `-1` is `Failed` and `-2` is `EndOfStream`.
+"""
+open unsafe extern "C" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;
+
+"""Flush an owned handle; zero is success and `-1` is `Failed`."""
+open unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
+
+"""Close an owned handle exactly once; zero is success and `-1` is failure."""
+open unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
+
+"""Move a file cursor and return its resulting absolute byte position."""
+open unsafe extern "C" verb actus_file_seek_buffer(
+    abs handle: Int,
+    abs offset: Int,
+    abs whence: Int
+) -> Int;
+
+"""Consume an invalid scalar handle so constructor branches join cleanly."""
+open verb discard_handle(dat handle: Int) -> Int { return handle; }
+
+"""Open an existing path and transfer the resulting File to the caller."""
+open verb file_open(abs path: Buffer) -> Result[File, IoError] {
+    erg mode = 0;
+    erg handle = actus_file_open_buffer(path: abs path, mode: abs mode);
+    return case handle {
+        -1 => { discard_handle(handle: dat handle); return Err(IoError.Failed); },
+        _ => Ok(File { handle: handle, }),
+    };
+}
+
+"""Create or truncate a path and transfer the resulting File to the caller."""
+open verb file_create(abs path: Buffer) -> Result[File, IoError] {
+    erg mode = 1;
+    erg handle = actus_file_open_buffer(path: abs path, mode: abs mode);
+    return case handle {
+        -1 => { discard_handle(handle: dat handle); return Err(IoError.Failed); },
+        _ => Ok(File { handle: handle, }),
+    };
+}
+
+"""Read file bytes into caller-provided storage without allocating per call."""
+perform Reader for File {
+    verb read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
+        erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
+        return case status {
+            -1 => Err(IoError.Failed),
+            -2 => Err(IoError.EndOfStream),
+            _ => Ok(status),
+        };
+    }
+}
+
+"""Write borrowed bytes and flush a file through the Writer contract."""
+perform Writer for File {
+    verb write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
+        erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
+        return case status {
+            -1 => Err(IoError.Failed),
+            -2 => Err(IoError.EndOfStream),
+            _ => Ok(status),
+        };
+    }
+
+    verb flush(ins self: File) -> Result[Int, IoError] {
+        erg status = actus_file_flush_buffer(handle: abs self.handle);
+        return case status {
+            -1 => Err(IoError.Failed),
+            _ => Ok(status),
+        };
+    }
+}
+
+"""Translate a runtime cursor position into a typed result."""
+open verb file_seek_status(erg status: Int) -> Result[Int, IoError] {
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""Seek from the beginning of a file."""
+open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+    erg origin = 0;
+    erg status = actus_file_seek_buffer(
+        handle: abs self.handle,
+        offset: abs offset,
+        whence: abs origin
+    );
+    return file_seek_status(status: status);
+}
+
+"""Seek relative to the current file position."""
+open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+    erg origin = 1;
+    erg status = actus_file_seek_buffer(
+        handle: abs self.handle,
+        offset: abs offset,
+        whence: abs origin
+    );
+    return file_seek_status(status: status);
+}
+
+"""Seek relative to the end of a file."""
+open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+    erg origin = 2;
+    erg status = actus_file_seek_buffer(
+        handle: abs self.handle,
+        offset: abs offset,
+        whence: abs origin
+    );
+    return file_seek_status(status: status);
+}
+
+"""Satisfy the positional stream contract through the host runtime."""
+perform Seeker for File {
+    verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError] {
+        return case dat from {
+            SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
+            SeekFrom.Current(offset) => file_seek_current(self: ins self, offset: abs offset),
+            SeekFrom.End(offset) => file_seek_end(self: ins self, offset: abs offset),
+        };
+    }
+}
+
+"""Return metadata for this open file without transferring its handle."""
+open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
+    drop(output);
+    return Result[Metadata, IoError].Err(IoError.Failed);
+}
+
+perform MetadataProvider for File {
+    verb metadata(ins self: File) -> Result[Metadata, IoError] {
+        erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
+        erg status = actus_file_metadata_handle_buffer(
+            handle: abs self.handle,
+            output: ins output
+        );
+        return case status {
+            -1 => file_metadata_failed(output: dat output),
+            _ => Result[Metadata, IoError].Ok(output),
+        };
+    }
+}
+
+"""Close the owned operating-system resource during deterministic LIFO cleanup."""
+perform Drop for File {
+    verb drop(ins self: File) {
+        actus_file_close_buffer(handle: abs self.handle);
+    }
+}

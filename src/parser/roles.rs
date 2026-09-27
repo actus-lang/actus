@@ -24,7 +24,7 @@ impl Parser {
 
     fn parse_role_method(&mut self) -> Result<RoleMethod, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
-        let name_token = self.take_identifier("role method name")?;
+        let name_token = self.take_callable_name("role method name")?;
         let name = identifier_text(&name_token.kind);
         self.expect_simple(TokenKind::LeftParen, "`(`")?;
         let params = self.parse_params()?;

@@ -13,6 +13,10 @@ pub(super) enum NativeType {
 }
 
 impl NativeType {
+    pub(super) fn uses_sret(self) -> bool {
+        matches!(self, Self::Struct(_))
+    }
+
     pub(super) fn from_name(name: &str) -> Option<Self> {
         match lookup_builtin_type(name)? {
             BuiltinType::Int => Some(Self::Int),

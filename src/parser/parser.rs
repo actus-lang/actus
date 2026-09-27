@@ -81,7 +81,7 @@ impl Parser {
         doc: Option<String>,
     ) -> Result<VerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
-        let name_token = self.take_identifier("verb name")?;
+        let name_token = self.take_callable_name("verb name")?;
         let name = identifier_text(&name_token.kind);
         let generic_parameters = self.parse_generic_parameters()?;
 
@@ -183,6 +183,7 @@ impl Parser {
 fn identifier_text(kind: &TokenKind) -> String {
     match kind {
         TokenKind::Identifier(name) => name.clone(),
+        TokenKind::Drop => "drop".to_owned(),
         _ => unreachable!("identifier_text called with a non-identifier token"),
     }
 }

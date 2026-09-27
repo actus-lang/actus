@@ -134,6 +134,27 @@ pub unsafe extern "C" fn actus_buffer_length(handle: BufferHandle) -> i32 {
     i32::try_from(buffer.length).unwrap_or(-1)
 }
 
+/// Returns zero when a buffer contains valid UTF-8, or -1 otherwise.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_buffer_validate_utf8(handle: BufferHandle) -> i32 {
+    if handle.is_null() {
+        return -1;
+    }
+    let buffer = unsafe { &*handle };
+    if buffer.length == 0 {
+        return 0;
+    }
+    if buffer.length > 0 && buffer.data.is_null() {
+        return -1;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(buffer.data, buffer.length) };
+    if std::str::from_utf8(bytes).is_ok() { 0 } else { -1 }
+}
+
 /// Validate an absolute cursor position against a backing buffer.
 ///
 /// # Safety

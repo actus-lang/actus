@@ -225,40 +225,71 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 
 ### ADR-0027: RAII scope drop
 
-- [ ] Register deterministic cleanup contracts for `File` and future sockets.
-- [ ] Emit LIFO cleanup for normal lexical scope exit.
-- [ ] Emit the same cleanup plan for `return`, `break`, and `continue`.
-- [ ] Emit cleanup before `?` early return.
-- [ ] Reject drop while an owner is `Frozen` or `Suspended`.
-- [ ] Ensure every live owned resource has exactly one drop action.
-- [ ] Add native exactly-once cleanup tests.
+- [x] Register the deterministic cleanup contract for `File`.
+- [x] Emit LIFO cleanup for normal lexical scope exit.
+- [x] Emit the same cleanup plan for `return`, `break`, and `continue`.
+- [x] Emit cleanup before `?` early return.
+- [x] Reject drop while an owner is `Frozen` or `Suspended`.
+- [x] Ensure every live owned resource has exactly one drop action.
+- [x] Add native exactly-once cleanup tests.
 
 ### ADR-0028: Try operator integration
 
-- [ ] Parse postfix `?` expressions.
-- [ ] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
-- [ ] Validate compatible error propagation.
-- [ ] Lower `Ok` unwrapping and `Err` early return natively.
-- [ ] Preserve cleanup and loan restoration on early return.
+- [x] Parse postfix `?` expressions.
+- [x] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
+- [x] Validate compatible error propagation.
+- [x] Lower `Ok` unwrapping and `Err` early return natively.
+- [x] Preserve cleanup and loan restoration on early return.
 - [ ] Extend `?` integration tests to filesystem operations.
 
 ### `std::fs` API and implementation
 
-- [ ] Define the `std::fs` facade and public file operations.
+- [x] Define the `std::fs` facade and public file operations.
 - [ ] Define `std::path` input ownership and byte-oriented representation.
-- [ ] Define file-read and file-write `Result` contracts.
-- [ ] Define create, truncate, append, and overwrite behavior.
-- [ ] Implement runtime file-open, read, write, and close bridges.
-- [ ] Translate host failures to typed `IoError` values.
-- [ ] Ensure opened files use exactly one deterministic cleanup path.
+- [x] Define file-read and file-write `Result` contracts.
+- [x] Define create, truncate, append, and overwrite behavior.
+- [x] Implement runtime file-open, read, write, and close bridges.
+- [x] Translate host failures to typed `IoError` values.
+- [x] Ensure opened files use exactly one deterministic cleanup path.
 - [ ] Exclude filesystem APIs from targets without filesystem capabilities.
-- [ ] Add semantic ownership and failure-path tests.
-- [ ] Add native read, write, append, missing-file, and cleanup tests.
+- [x] Add semantic ownership and failure-path tests.
+- [x] Add native read, write, append, missing-file, and cleanup tests.
+
+### Production-grade I/O contracts
+
+- [x] Use `Self` receivers for polymorphic `Reader` and `Writer` roles.
+- [x] Implement generic buffered adapters without hardcoded stdin/stdout sources.
+- [x] Defer `BufferedWriter` target writes until capacity or explicit flush.
+- [x] Propagate every `copy` reader and writer error except `EndOfStream`.
+- [x] Provide `read_to_bytes` and reject invalid UTF-8 in `read_to_string`.
+- [x] Document public types, fields, variants, verbs, and C ABI declarations.
+
+### Gate 3.1: Seeker role and OpenOptions
+
+- [x] Define `SeekFrom` with `Start`, `Current`, and `End` origins.
+- [x] Define the `Seeker` role and perform it for `File`.
+- [x] Add the runtime seek bridge with bounds and invalid-origin checks.
+- [x] Define scalar `OpenOptions` flags and modality helper verbs.
+- [x] Add typed `options_open` and the runtime modal-open bridge.
+- [x] Add native seek/read-after-seek coverage.
+- [x] Add native append coverage proving existing bytes are preserved.
+
+### Gate 3.2: Metadata, filesystem operations, and one-shot I/O
+
+- [x] Define C-layout `Metadata` values and path/open-handle metadata bridges.
+- [x] Expose typed path operations for remove, rename, copy, and directories.
+- [x] Add one-shot read and write helpers with deterministic `File` cleanup.
+- [x] Move filesystem implementation details behind the `std::fs` facade.
+- [x] Use caller-allocated storage for struct-returning helper verbs.
+- [x] Verify `Result[File, IoError]` and `OpenOptions` helper returns natively.
+- [x] Add native metadata size/type assertions.
+- [x] Add native rename/remove-file assertions.
+- [x] Add native one-shot read/write assertions.
 
 ### Gate 3 invariant
 
-- [ ] `std::fs` resources are owned, transferred, and cleaned exactly once.
-- [ ] Every filesystem failure is represented by a typed `Result` value.
+- [x] `std::fs` resources are owned, transferred, and cleaned exactly once.
+- [x] Every filesystem failure is represented by a typed `Result` value.
 - [ ] `?` propagates filesystem errors without bypassing cleanup.
 
 ## Gate 3.5: Uniform Method Calls and I/O API Ergonomics

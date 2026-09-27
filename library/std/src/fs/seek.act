@@ -1,0 +1,26 @@
+"""
+Describes the three origins accepted by file cursor movement.
+
+The offset is signed so callers can move backward from the current position
+or from the end of a file. The runtime returns the resulting absolute byte
+position in `Result.Ok`.
+"""
+open enum SeekFrom {
+    """Interpret the signed offset from byte zero of the file."""
+    Start(Int),
+    """Interpret the signed offset from the current file position."""
+    Current(Int),
+    """Interpret the signed offset from the file's end."""
+    End(Int),
+}
+
+"""
+The positional stream contract for owned file handles.
+
+`ins self` temporarily loans the handle for movement. The operation does not
+transfer or duplicate the underlying resource.
+"""
+open role Seeker {
+    """Move the stream and return its resulting absolute byte position."""
+    verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError];
+}

@@ -1,0 +1,142 @@
+"""
+Explicit file-open configuration.
+
+Each field is a scalar switch. The configuration is consumed by `options_open`
+so the host runtime receives one complete, immutable open request.
+"""
+open struct OpenOptions {
+    """Permit reading from the opened handle when set to one."""
+    erg read: Int,
+    """Permit writing to the opened handle when set to one."""
+    erg write: Int,
+    """Place writes at end-of-file without truncating existing bytes."""
+    erg append: Int,
+    """Truncate an existing file when the handle is opened."""
+    erg truncate: Int,
+    """Create the path when it does not already exist."""
+    erg create: Int,
+    """Create only a new path; opening an existing path fails."""
+    erg create_new: Int,
+}
+
+"""Create an option set with every access mode disabled."""
+open verb options_new() -> OpenOptions {
+    return OpenOptions {
+        read: 0,
+        write: 0,
+        append: 0,
+        truncate: 0,
+        create: 0,
+        create_new: 0,
+    };
+}
+
+"""Enable read access and return the updated owned configuration."""
+open verb options_read(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: 1,
+        write: options.write,
+        append: options.append,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: options.create_new,
+    };
+}
+
+"""Enable write access and return the updated owned configuration."""
+open verb options_write(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: 1,
+        append: options.append,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: options.create_new,
+    };
+}
+
+"""Enable append mode and return the updated owned configuration."""
+open verb options_append(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: options.write,
+        append: 1,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: options.create_new,
+    };
+}
+
+"""Enable truncation when opening an existing file."""
+open verb options_truncate(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: options.write,
+        append: options.append,
+        truncate: 1,
+        create: options.create,
+        create_new: options.create_new,
+    };
+}
+
+"""Allow creation when the requested path does not exist."""
+open verb options_create(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: options.write,
+        append: options.append,
+        truncate: options.truncate,
+        create: 1,
+        create_new: options.create_new,
+    };
+}
+
+"""Require creation of a new path and reject an existing path."""
+open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: options.write,
+        append: options.append,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: 1,
+    };
+}
+
+"""
+Open `path` using every flag in the consumed `options` value.
+
+The path is an `abs` view. The scalar flags are passed by value to the
+runtime, which returns an opaque handle or `-1` on failure. A successful
+handle becomes an owned `File`; the raw failure code is translated to
+`IoError.Failed` and is never exposed by the public API.
+"""
+open unsafe extern "C" verb actus_file_open_options_buffer(
+    abs path: Buffer,
+    abs read: Int,
+    abs write: Int,
+    abs append: Int,
+    abs truncate: Int,
+    abs create: Int,
+    abs create_new: Int
+) -> Int;
+
+"""Consume options and return an owned File or a typed I/O failure."""
+open verb options_open(dat options: OpenOptions, abs path: Buffer) -> Result[File, IoError] {
+    erg handle = actus_file_open_options_buffer(
+        path: abs path,
+        read: abs options.read,
+        write: abs options.write,
+        append: abs options.append,
+        truncate: abs options.truncate,
+        create: abs options.create,
+        create_new: abs options.create_new
+    );
+    return case handle {
+        -1 => {
+            discard_handle(handle: dat handle);
+            return Err(IoError.Failed);
+        },
+        _ => Ok(File { handle: handle, }),
+    };
+}

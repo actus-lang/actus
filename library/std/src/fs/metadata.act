@@ -1,0 +1,66 @@
+"""
+Basic filesystem facts returned without exposing host-specific handles.
+
+`size` is the logical byte length. The remaining fields are scalar flags so
+the value can cross the runtime boundary in a deterministic C-compatible
+layout.
+"""
+open struct Metadata {
+    """Logical file length in bytes, not including any host metadata header."""
+    erg size: Int,
+    """One when the path identifies a regular file, otherwise zero."""
+    erg is_file: Int,
+    """One when the path identifies a directory, otherwise zero."""
+    erg is_dir: Int,
+    """One when the host marks the file read-only, otherwise zero."""
+    erg readonly: Int,
+}
+
+"""
+Fill `output` with metadata for `path` without retaining either buffer.
+
+`path` is an `abs` byte view. `output` is an `ins` destination owned by the
+caller. The bridge returns zero on success and `-1` when the host cannot
+inspect the path; the public wrapper translates that status to `IoError`.
+"""
+open unsafe extern "C" verb actus_file_metadata_buffer(
+    abs path: Buffer,
+    ins output: Metadata
+) -> Int;
+
+"""
+Fill `output` from the open handle identified by `handle`.
+
+The handle is an opaque scalar owned by the `File` value and is not closed
+or transferred by this call. `output` is exclusively borrowed for the call.
+The bridge returns zero on success or `-1` on a host metadata failure.
+"""
+open unsafe extern "C" verb actus_file_metadata_handle_buffer(
+    abs handle: Int,
+    ins output: Metadata
+) -> Int;
+
+"""
+The metadata provider contract for open filesystem resources.
+
+The path-level `metadata` verb below remains the canonical free operation;
+open handles satisfy this same operation through static performance dispatch.
+"""
+open role MetadataProvider {
+    verb metadata(ins self: File) -> Result[Metadata, IoError];
+}
+
+"""Return typed metadata for a filesystem path."""
+open verb metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
+    drop(output);
+    return Result[Metadata, IoError].Err(IoError.Failed);
+}
+
+open verb metadata(abs path: Buffer) -> Result[Metadata, IoError] {
+    erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
+    erg status = actus_file_metadata_buffer(path: abs path, output: ins output);
+    return case status {
+        -1 => metadata_failed(output: dat output),
+        _ => Result[Metadata, IoError].Ok(output),
+    };
+}

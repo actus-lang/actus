@@ -159,6 +159,7 @@ impl Analyzer {
                 self.binding_type_names
                     .get(&index)
                     .cloned()
+                    .or_else(|| self.binding_enum_type_applications.get(&index).cloned())
                     .or_else(|| self.binding_struct_type_applications.get(&index).cloned())
                     .or_else(|| {
                         self.binding_struct_types.get(&index).map(|name| TypeName {
@@ -171,6 +172,9 @@ impl Analyzer {
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
                 self.resolved_type_name(expression)
             }
+            Expr::Try { expression, .. } => self
+                .enum_type_application(expression)
+                .and_then(|result| result.arguments.first().cloned()),
             Expr::FieldAccess { object, field, .. } => self
                 .resolved_type_name(object)
                 .and_then(|type_name| self.specialized_field_type(&type_name, field)),

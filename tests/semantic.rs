@@ -1,5 +1,7 @@
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/drop.rs"]
+mod drop;
 #[path = "semantic/dynamic.rs"]
 mod dynamic;
 #[path = "semantic/enums.rs"]

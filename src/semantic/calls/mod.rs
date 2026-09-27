@@ -110,6 +110,9 @@ impl Analyzer {
                 span: argument_span(&arguments[0]),
             });
         }
+        if self.enum_payload_owns_value(payload_type) {
+            self.initialize_owner(&arguments[0].expression, argument_span(&arguments[0]))?;
+        }
         self.inferred_expression_types.insert((span.start, span.end), result_type);
         Ok(())
     }

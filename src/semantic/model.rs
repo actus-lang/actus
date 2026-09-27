@@ -98,4 +98,6 @@ pub struct SemanticModel {
     pub generic_instances: Vec<GenericInstance>,
     pub reachable_performances: Vec<ReachablePerformance>,
     pub dynamic_roles: Vec<DynamicRoleType>,
+    pub drop_types: Vec<String>,
+    pub binding_type_names: std::collections::HashMap<usize, TypeName>,
 }

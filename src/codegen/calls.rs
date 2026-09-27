@@ -97,7 +97,21 @@ pub(super) fn lower_call(
     )?;
     let target = resolve_call_target(function, callee, target, &values, functions)?;
     normalize_call_arguments(function, callee, &mut values)?;
+    let result_address = if let NativeType::Struct(id) = target.return_type {
+        let layout = layouts
+            .get(id)
+            .ok_or_else(|| NativeEmitError(format!("missing return layout `{id}`")))?;
+        let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
+        let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+        values.insert(0, address);
+        Some(address)
+    } else {
+        None
+    };
     let call = function.ins().call(target.reference, &values);
+    if let Some(address) = result_address {
+        return Ok(address);
+    }
     function
         .inst_results(call)
         .first()

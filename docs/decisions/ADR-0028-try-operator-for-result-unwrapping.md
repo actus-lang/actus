@@ -1,6 +1,6 @@
 # ADR-0028: Ergonomic Early Return with the Try Operator (?)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-26
 - Scope: `Result[T, E]` propagation and I/O control flow
 
@@ -37,9 +37,9 @@ wrapper objects.
 
 ## Verification
 
-- [ ] Parse postfix `?` expressions.
-- [ ] Infer `Ok` and `Err` constructors from the expected Result type.
-- [ ] Validate compatible error propagation.
-- [ ] Lower success and early-return paths natively.
-- [ ] Preserve scope cleanup and loan restoration on early return.
+- [x] Parse postfix `?` expressions.
+- [x] Infer `Ok` and `Err` constructors from the expected Result type.
+- [x] Validate compatible error propagation.
+- [x] Lower success and early-return paths natively.
+- [x] Preserve scope cleanup and loan restoration on early return.
 - [ ] Extend integration coverage to filesystem and network streams.
