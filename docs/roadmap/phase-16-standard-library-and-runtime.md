@@ -290,7 +290,7 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 
 - [x] `std::fs` resources are owned, transferred, and cleaned exactly once.
 - [x] Every filesystem failure is represented by a typed `Result` value.
-- [ ] `?` propagates filesystem errors without bypassing cleanup.
+- [x] `?` propagates filesystem errors without bypassing cleanup.
 
 ### Gate 3.3: Native Try Unwinding and Platform Meta Contracts
 
@@ -323,7 +323,7 @@ each contract can be validated independently.
 
 ### Gate 3.3 invariant
 
-- [ ] Native `?` propagation preserves Result layout, cleanup, and ownership.
+- [x] Native `?` propagation preserves Result layout, cleanup, and ownership.
 - [x] Target metadata changes the compiled program only through explicit,
       deterministic target selection.
 
