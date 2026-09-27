@@ -19,10 +19,18 @@ pub fn find_hover(uri: &str, source: &str, position: &LspPosition) -> Option<Hov
     let tokens = scan(source).0;
     let offset = LineIndex::new(source).byte_offset(source, position)?;
     let (name, name_span) = identifier_at(&tokens, offset)?;
-    let program = parse(tokens).ok()?;
+    let program = parse(tokens.clone()).ok()?;
     if is_primitive_name(&name) {
         return Some(HoverInfo {
             contents: format!("```actus\ntype {name}\n```"),
+            range: range(source, name_span),
+        });
+    }
+    if name == "place"
+        && let Some(info) = arena_place_info(source, &program, &tokens, name_span, offset)
+    {
+        return Some(HoverInfo {
+            contents: format_markdown(&info, source, info.span.start),
             range: range(source, name_span),
         });
     }
@@ -31,6 +39,31 @@ pub fn find_hover(uri: &str, source: &str, position: &LspPosition) -> Option<Hov
     Some(HoverInfo {
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
+    })
+}
+
+fn arena_place_info(
+    source: &str,
+    program: &Program,
+    tokens: &[Token],
+    method_span: SourceSpan,
+    offset: usize,
+) -> Option<SymbolInfo> {
+    let method_index = tokens.iter().position(|token| token.span == method_span)?;
+    let receiver = tokens.get(method_index.checked_sub(2)?)?;
+    if !matches!(tokens.get(method_index.checked_sub(1)?)?.kind, TokenKind::Dot) {
+        return None;
+    }
+    let TokenKind::Identifier(receiver_name) = &receiver.kind else { return None };
+    let owner = local_info(source, program, receiver_name, offset)?;
+    let type_name = owner.signature.split_once(": ")?.1;
+    let capacity = type_name.strip_prefix("Arena[")?.strip_suffix(']')?;
+    Some(SymbolInfo {
+        signature: format!("Arena[{capacity}].place(value) -> ins T"),
+        span: method_span,
+        documentation: Some(
+            "Places a value in the arena using aligned bump-pointer storage.".to_owned(),
+        ),
     })
 }
 
