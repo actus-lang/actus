@@ -1,6 +1,6 @@
-use actus::codegen::{
-    emit_program_object_for_target, emit_program_object_with_configuration, emit_zero_return_object,
-};
+#[cfg(not(target_os = "macos"))]
+use actus::codegen::emit_program_object_for_target;
+use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_object};
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
