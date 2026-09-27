@@ -86,6 +86,18 @@ impl Analyzer {
         if let Some(type_name) = declared_type_name.as_ref() {
             self.binding_type_names.insert(binding_index, type_name.clone());
         }
+        let initializer_span = super::expression_span(initializer);
+        if let Some(provenance) = self
+            .expression_arena_provenance
+            .get(&(initializer_span.start, initializer_span.end))
+            .copied()
+        {
+            self.binding_arena_provenance.insert(binding_index, provenance);
+        } else if declared_type_name.as_ref().is_some_and(|type_name| type_name.name == "Arena") {
+            let provenance = self.next_arena_id;
+            self.next_arena_id += 1;
+            self.binding_arena_provenance.insert(binding_index, provenance);
+        }
         if *role == Role::Abs
             && let Ok(index) = self.binding(name, span)
         {

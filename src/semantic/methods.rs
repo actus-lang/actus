@@ -41,6 +41,9 @@ impl Analyzer {
             return self
                 .visit_generic_bound_method_call(receiver, &role_name, method, arguments, span);
         }
+        if let Some(result) = self.try_visit_arena_place(receiver, method, arguments, span) {
+            return result;
+        }
         if self.enum_receiver_name(receiver).is_some() {
             return self.validate_enum_constructor(receiver, method, arguments, span);
         }
@@ -81,6 +84,70 @@ impl Analyzer {
             self.visit_call_with_signature(method, &combined, span, &signature)
         } else {
             self.visit_call(method, &combined, span)
+        }
+    }
+
+    fn try_visit_arena_place(
+        &mut self,
+        receiver: &Expr,
+        method: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Option<Result<(), SemanticError>> {
+        (method == "place")
+            .then(|| self.arena_provenance(receiver))
+            .flatten()
+            .map(|arena_id| self.visit_arena_place(receiver, arena_id, arguments, span))
+    }
+
+    fn visit_arena_place(
+        &mut self,
+        receiver: &Expr,
+        arena_id: usize,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        self.visit_expression(receiver)?;
+        if arguments.len() != 1 {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::WrongArgumentCount { callee: "place".to_owned() },
+                span,
+            });
+        }
+        let argument = &arguments[0].expression;
+        self.visit_expression(argument)?;
+        if let Some(source_arena) = self.arena_provenance(argument)
+            && source_arena != arena_id
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::CrossArenaReference { name: "placed value".to_owned() },
+                span: expression_span(argument),
+            });
+        }
+        let Some(type_name) = self.resolved_type_name(argument) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: "place".to_owned() },
+                span: expression_span(argument),
+            });
+        };
+        self.inferred_expression_types.insert((span.start, span.end), type_name);
+        self.expression_arena_provenance.insert((span.start, span.end), arena_id);
+        Ok(())
+    }
+
+    pub(super) fn arena_provenance(&self, expression: &Expr) -> Option<usize> {
+        match expression {
+            Expr::Identifier { name, span } => self
+                .binding(name, *span)
+                .ok()
+                .and_then(|index| self.binding_arena_provenance.get(&index).copied()),
+            Expr::MethodCall { span, .. } | Expr::Call { span, .. } => {
+                self.expression_arena_provenance.get(&(span.start, span.end)).copied()
+            }
+            Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
+                self.arena_provenance(expression)
+            }
+            _ => None,
         }
     }
 

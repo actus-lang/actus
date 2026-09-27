@@ -88,7 +88,8 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if self.type_registry.is_known(name)
+        if name == "Arena"
+            || self.type_registry.is_known(name)
             || self.struct_types.contains_key(name)
             || self.pack_types.contains_key(name)
             || self.enum_types.contains_key(name)

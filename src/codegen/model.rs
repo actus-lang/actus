@@ -226,6 +226,7 @@ mod tests {
             dynamic_roles: Vec::new(),
             drop_types: Vec::new(),
             binding_type_names: std::collections::HashMap::new(),
+            arena_provenance: std::collections::HashMap::new(),
         }
     }
 
@@ -267,6 +268,7 @@ mod tests {
             dynamic_roles: Vec::new(),
             drop_types: Vec::new(),
             binding_type_names: std::collections::HashMap::new(),
+            arena_provenance: std::collections::HashMap::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());

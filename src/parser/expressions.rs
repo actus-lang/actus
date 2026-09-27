@@ -80,13 +80,17 @@ impl Parser {
             Vec::new()
         };
         if self.match_simple(TokenKind::LeftParen) {
-            if !type_arguments.is_empty() {
+            if !type_arguments.is_empty() && name != "Arena" {
                 return Err(self.error_at_current("a struct literal after type arguments"));
             }
             let arguments = self.parse_arguments()?;
             let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
             return Ok(Expr::Call {
-                callee: name,
+                callee: if type_arguments.is_empty() {
+                    name
+                } else {
+                    format_type_application(&name, &type_arguments)
+                },
                 arguments,
                 span: SourceSpan::new(span.start, end),
             });

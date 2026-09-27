@@ -180,6 +180,15 @@ pub enum SemanticErrorKind {
         ty: String,
         literal: String,
     },
+    InvalidArenaCapacity {
+        capacity: String,
+    },
+    ArenaReferenceEscape {
+        name: String,
+    },
+    CrossArenaReference {
+        name: String,
+    },
     InvalidFieldAssignmentTarget {
         field: String,
     },

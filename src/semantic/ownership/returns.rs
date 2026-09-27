@@ -24,6 +24,7 @@ impl Analyzer {
         let expected_return = self.current_return_type_name.clone();
         self.visit_expression_with_expected(expression, expected_return.as_ref())?;
         self.validate_return_type(expression)?;
+        self.reject_arena_escape(expression)?;
         if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
             self.validate_abs_return(expression)?;
             self.plan_return_unwind(statement_span);
@@ -62,6 +63,17 @@ impl Analyzer {
         }
         self.plan_return_unwind(statement_span);
         Ok(())
+    }
+
+    fn reject_arena_escape(&self, expression: &Expr) -> Result<(), SemanticError> {
+        let Expr::Identifier { name, .. } = unwrap_grouping(expression) else { return Ok(()) };
+        if self.arena_provenance(expression).is_none() {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::ArenaReferenceEscape { name: name.clone() },
+            span: expression_span(expression),
+        })
     }
 
     fn validate_return_type(&self, expression: &Expr) -> Result<(), SemanticError> {
