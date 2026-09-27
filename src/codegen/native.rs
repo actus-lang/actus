@@ -158,6 +158,7 @@ fn emit_verbs_object(
         performance_definitions,
         symbol,
         &layouts,
+        target,
     )?;
     let string_data = define_string_data(&mut module, verbs).map_err(NativeEmitError)?;
     let functions = function_metadata(&metadata);
@@ -193,6 +194,7 @@ fn declare_all_functions(
     performance_definitions: &[super::performance::PerformanceDefinition<'_>],
     symbol: &str,
     layouts: &LayoutRegistry,
+    target: &TargetSpec,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = declare_functions(module, verbs, external_verbs, symbol, layouts)?;
     metadata.extend(super::performance::declare_performance_functions(
@@ -202,7 +204,9 @@ fn declare_all_functions(
     )?);
     let has_print_definition = verbs.iter().any(|verb| verb.name == "print")
         || external_verbs.iter().any(|verb| verb.name == "print");
-    metadata.extend(declare_runtime_functions(module, has_print_definition)?);
+    if matches!(target.entry_contract(), crate::target::EntryContract::Hosted) {
+        metadata.extend(declare_runtime_functions(module, has_print_definition)?);
+    }
     Ok(metadata)
 }
 

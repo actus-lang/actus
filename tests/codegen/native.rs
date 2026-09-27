@@ -2,6 +2,7 @@ use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_ob
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
+use actus::target::TargetSpec;
 use object::{Object, ObjectSection, ObjectSymbol};
 
 #[test]
@@ -125,6 +126,30 @@ fn rejects_ins_aliasing_before_native_lowering() {
     let error = actus::codegen::emit_program_object(&program, "main")
         .expect_err("semantic aliasing must stop native lowering");
     assert!(error.to_string().contains("ExclusiveLoanAlias"));
+}
+
+#[test]
+fn pack_lowering_has_no_host_runtime_dependency_for_freestanding_target() {
+    let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { erg register = Register { storage: 0, }; register.enabled = 1; return register.enabled; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("pack source should parse");
+    let target =
+        TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
+    let bytes = actus::codegen::emit_program_object_for_target(
+        &program,
+        "main",
+        &NativeBackendConfiguration::new("pack-freestanding", false),
+        &target,
+    )
+    .expect("pack should lower without host runtime services");
+    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+    let undefined = file
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
+    assert!(undefined.is_empty(), "pack object imports host/runtime symbols: {undefined:?}");
 }
 
 fn symbol_matches(actual: &str, expected: &str) -> bool {
