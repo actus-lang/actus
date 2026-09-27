@@ -39,6 +39,7 @@ pub enum TokenKind {
     Break,
     Continue,
     Struct,
+    Pack,
     Enum,
     Role,
     Perform,

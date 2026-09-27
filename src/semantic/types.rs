@@ -90,6 +90,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         if self.type_registry.is_known(name)
             || self.struct_types.contains_key(name)
+            || self.pack_types.contains_key(name)
             || self.enum_types.contains_key(name)
         {
             return Ok(());
@@ -119,9 +120,13 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let Some(expected_type) = declared_type else { return Ok(()) };
         let expected_name = crate::semantic::analyzer::canonical_type_name(expected_type);
-        if self.struct_types.contains_key(&expected_type.name) {
-            let found =
-                self.expression_struct_type(initializer).unwrap_or_else(|| "unknown".to_owned());
+        if self.struct_types.contains_key(&expected_type.name)
+            || self.pack_types.contains_key(&expected_type.name)
+        {
+            let found = self
+                .expression_struct_type(initializer)
+                .or_else(|| self.expression_pack_type(initializer))
+                .unwrap_or_else(|| "unknown".to_owned());
             if found != expected_name {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::BindingTypeMismatch {
@@ -267,6 +272,11 @@ impl Analyzer {
             .map(|ty| ty.spec().name.to_owned())
             .or_else(|| self.binding_type_name(expression))
             .or_else(|| self.expression_struct_type(expression))
+            .or_else(|| self.expression_pack_type(expression))
+            .or_else(|| {
+                self.resolved_type_name(expression)
+                    .map(|name| super::analyzer::canonical_type_name(&name))
+            })
             .or_else(|| self.expression_enum_type_application(expression))
             .or_else(|| self.expression_case_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))

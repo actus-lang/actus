@@ -359,8 +359,6 @@ and zero-sized values without implementing packed layouts yet.
 - [x] Lex `u1..u128` and `i1..i128` through one validated integer-type pattern.
 - [x] Represent width-qualified integer types as
       `Token::IntType { signed: bool, width: u8 }`.
-- [x] Treat `u1` as the canonical one-bit type; do not add a separate `Bit`
-      lexer exception.
 - [x] Lex hexadecimal literals with the `0x` prefix and validate their digit
       structure before parsing.
 
@@ -451,22 +449,24 @@ Implement ADR-0026 for MMIO registers and deterministic protocol layouts. The
 feature must remain usable on bare-metal targets and embedded microcontrollers
 without host runtime services.
 
-- [ ] Add `u1..u128` and `i1..i128` primitive type declarations.
-- [ ] Define `Bit` as the canonical `u1` alias.
-- [ ] Keep hexadecimal notation as a literal format only.
-- [ ] Add compile-time range and overflow validation.
-- [ ] Define `pack` with an explicit fixed backing integer.
-- [ ] Validate packed field widths, offsets, overlap, and total capacity.
-- [ ] Define deterministic endianness in the packed layout contract.
-- [ ] Integrate packed reads and writes with `erg` and `abs` access rules.
-- [ ] Lower shifts and masks deterministically through Cranelift IR.
-- [ ] Add MMIO-style and network-frame layout tests.
-- [ ] Verify no allocator or host runtime dependency on bare-metal targets.
+- [x] Reuse the `u1..u128` and `i1..i128` primitive type declarations from
+      Gate 3.6.
+- [x] Keep hexadecimal notation as a literal format only.
+- [x] Reuse Gate 3.6 compile-time range and overflow validation.
+- [x] Define `pack` with an explicit fixed backing integer.
+- [x] Validate packed field widths, offsets, overlap, and total capacity.
+- [x] Define deterministic endianness in the packed layout contract.
+- [x] Integrate packed reads and writes with `erg` and `abs` access rules.
+- [x] Lower shifts and masks deterministically through Cranelift IR.
+- [x] Add native MMIO-style register layout tests.
+- [x] Add network-frame layout tests.
+- [x] Verify pack lowering has no allocator or host runtime dependency on
+      bare-metal targets.
 
 ### Gate 4 invariant
 
-- [ ] Packed register layouts are deterministic across supported targets.
-- [ ] Width and overflow violations are rejected before native code generation.
+- [x] Packed register layouts are deterministic across supported targets.
+- [x] Width and overflow violations are rejected before native code generation.
 
 ## Gate 5: Advanced Memory and Scoped Arenas
 

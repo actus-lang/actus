@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
 use crate::ast::{
-    BuiltinType, EnumDef, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName,
-    lookup_builtin_type, primitive_type,
+    BuiltinType, EnumDef, LayoutEndianness, PackDecl, Program, StructDef, StructFieldRole,
+    TopLevelDecl, TypeName, lookup_builtin_type, primitive_type,
 };
 use crate::semantic::GenericInstance;
 
@@ -28,6 +28,22 @@ pub(super) struct StructLayout {
     pub(super) fields: Vec<FieldLayout>,
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct PackFieldLayout {
+    pub(super) name: String,
+    pub(super) role: StructFieldRole,
+    pub(super) ty: NativeType,
+    pub(super) offset: u16,
+    pub(super) width: u8,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct PackLayout {
+    pub(super) storage: NativeType,
+    pub(super) endianness: LayoutEndianness,
+    pub(super) fields: Vec<PackFieldLayout>,
+}
+
 pub struct LayoutRegistry {
     pub(super) pointer_type: Type,
     pub(super) pointer_size: u32,
@@ -37,6 +53,9 @@ pub struct LayoutRegistry {
     pub(super) enum_definitions: Vec<EnumDef>,
     pub(super) enum_layouts: Vec<EnumLayout>,
     pub(super) enum_ids: HashMap<String, usize>,
+    pack_definitions: Vec<PackDecl>,
+    pub(super) pack_layouts: Vec<PackLayout>,
+    pack_ids: HashMap<String, usize>,
 }
 
 impl LayoutRegistry {
@@ -69,6 +88,19 @@ impl LayoutRegistry {
             .collect::<HashMap<_, _>>();
         let capacity = definitions.len();
         let enum_capacity = enum_definitions.len();
+        let pack_definitions = program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Pack(pack) => Some(pack.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let pack_ids = pack_definitions
+            .iter()
+            .enumerate()
+            .map(|(id, pack)| (pack.name.clone(), id))
+            .collect::<HashMap<_, _>>();
         let mut registry = Self {
             pointer_type,
             pointer_size: pointer_type.bytes(),
@@ -78,6 +110,9 @@ impl LayoutRegistry {
             enum_definitions,
             enum_layouts: Vec::with_capacity(enum_capacity),
             enum_ids,
+            pack_definitions,
+            pack_layouts: Vec::new(),
+            pack_ids,
         };
         for definition in registry.definitions.clone() {
             registry.layouts.push(registry.layout_for(&definition, &mut Vec::new())?);
@@ -85,6 +120,11 @@ impl LayoutRegistry {
         for definition in registry.enum_definitions.clone() {
             registry.enum_layouts.push(registry.enum_layout_for(&definition, &mut Vec::new())?);
         }
+        registry.pack_layouts = registry
+            .pack_definitions
+            .iter()
+            .map(|pack| registry.pack_layout_for(pack))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(registry)
     }
 
@@ -96,10 +136,29 @@ impl LayoutRegistry {
         self.layouts.get(id)
     }
 
+    pub(super) fn pack(&self, id: usize) -> Option<&PackLayout> {
+        self.pack_layouts.get(id)
+    }
+
+    pub(super) fn pack_id(&self, name: &str) -> Option<usize> {
+        self.pack_ids.get(name).copied()
+    }
+
+    pub(super) fn ir_type(&self, ty: NativeType) -> Type {
+        match ty {
+            NativeType::Pack(id) => self
+                .pack(id)
+                .map(|pack| self.ir_type(pack.storage))
+                .unwrap_or(cranelift_codegen::ir::types::I32),
+            _ => ty.ir_type(self.pointer_type),
+        }
+    }
+
     pub(super) fn type_for_name(&self, name: &str) -> Option<NativeType> {
         self.id_for(name)
             .map(NativeType::Struct)
             .or_else(|| self.enum_id_for(name).map(NativeType::Enum))
+            .or_else(|| self.pack_ids.get(name).copied().map(NativeType::Pack))
     }
 
     pub(super) fn type_for_type_name(&self, type_name: &TypeName) -> Option<NativeType> {
@@ -174,6 +233,9 @@ impl LayoutRegistry {
             self.enum_layout_for(definition, visiting)?;
             return Ok(NativeType::Enum(enum_id));
         }
+        if let Some(pack_id) = self.pack_ids.get(name).copied() {
+            return Ok(NativeType::Pack(pack_id));
+        }
         let id = self
             .id_for(name)
             .ok_or_else(|| NativeEmitError(format!("unknown layout type `{name}`")))?;
@@ -223,7 +285,44 @@ impl LayoutRegistry {
                 };
                 (layout.size, layout.alignment)
             }
+            NativeType::Pack(id) => self
+                .pack(id)
+                .map(|pack| self.type_layout(pack.storage))
+                .transpose()?
+                .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?,
         })
+    }
+}
+
+impl LayoutRegistry {
+    fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, NativeEmitError> {
+        let storage = self.native_type(&pack.storage.name, &mut Vec::new())?;
+        let fields = pack
+            .fields
+            .iter()
+            .map(|field| {
+                let width = crate::ast::primitive_type(&field.ty.name)
+                    .and_then(|primitive| match primitive {
+                        crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        NativeEmitError(format!("invalid packed field `{}`", field.name))
+                    })?;
+                let role = match field.role {
+                    crate::ast::Role::Erg => StructFieldRole::Erg,
+                    _ => StructFieldRole::Value,
+                };
+                Ok(PackFieldLayout {
+                    name: field.name.clone(),
+                    role,
+                    ty: self.native_type(&field.ty.name, &mut Vec::new())?,
+                    offset: field.offset,
+                    width,
+                })
+            })
+            .collect::<Result<Vec<_>, NativeEmitError>>()?;
+        Ok(PackLayout { storage, endianness: pack.endianness, fields })
     }
 }
 

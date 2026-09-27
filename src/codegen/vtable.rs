@@ -100,6 +100,7 @@ pub(super) fn vtable_symbol_for_native(role: &str, target: NativeType) -> String
         NativeType::String => "string".to_owned(),
         NativeType::Buffer => "buffer".to_owned(),
         NativeType::FatPointer => "fat_pointer".to_owned(),
+        NativeType::Pack(id) => format!("pack_{id}"),
     };
     vtable_symbol(role, &target)
 }

@@ -1,6 +1,7 @@
 use crate::lexer::SourceSpan;
 
 use super::abi::ForeignAbi;
+use super::expr::Expr;
 use super::stmt::Block;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -13,6 +14,7 @@ pub enum TopLevelDecl {
     Verb(VerbDecl),
     ExternalVerb(ExternalVerbDecl),
     Struct(StructDef),
+    Pack(PackDecl),
     Enum(EnumDef),
     Role(RoleDecl),
     Perform(PerformDecl),
@@ -104,6 +106,32 @@ pub struct StructField {
     pub name: String,
     pub ty: TypeName,
     pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackDecl {
+    pub is_open: bool,
+    pub name: String,
+    pub storage: TypeName,
+    pub endianness: LayoutEndianness,
+    pub fields: Vec<PackField>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackField {
+    pub role: Role,
+    pub name: String,
+    pub ty: TypeName,
+    pub offset: u16,
+    pub default_value: Option<Expr>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LayoutEndianness {
+    Little,
+    Big,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

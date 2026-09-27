@@ -20,8 +20,8 @@ separate from the type system.
 ## Decision
 
 Actus will provide first-class unsigned and signed integer types from one to
-128 bits: `u1` through `u128` and `i1` through `i128`. `Bit` is the canonical
-alias for `u1`. The `0x` prefix remains a literal format only; it does not
+128 bits: `u1` through `u128` and `i1` through `i128`. `u1` is the canonical
+one-bit type. The `0x` prefix remains a literal format only; it does not
 select a packed or register type.
 
 Every conversion, literal, assignment, and arithmetic operation is checked
@@ -34,7 +34,7 @@ Actus will add a `pack` declaration for deterministic bitfields:
 
 ```actus
 pack Control: u32 {
-    enabled: Bit,
+    enabled: u1,
     mode: u3,
     channel: u5,
     _reserved: u23,

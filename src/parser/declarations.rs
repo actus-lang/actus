@@ -48,6 +48,9 @@ impl Parser {
         if self.check_simple(&TokenKind::Struct) {
             return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
         }
+        if self.check_simple(&TokenKind::Pack) {
+            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(false)?));
+        }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def(false)?));
         }
@@ -92,6 +95,9 @@ impl Parser {
     fn parse_open_declaration(&mut self, doc: Option<String>) -> Result<TopLevelDecl, ParseError> {
         if self.check_simple(&TokenKind::Struct) {
             return Ok(TopLevelDecl::Struct(self.parse_struct_def(true, doc)?));
+        }
+        if self.check_simple(&TokenKind::Pack) {
+            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(true)?));
         }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def(true)?));

@@ -12,6 +12,8 @@ mod generics;
 mod loans;
 #[path = "semantic/origins.rs"]
 mod origins;
+#[path = "semantic/packs.rs"]
+mod packs;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
 #[path = "semantic/roles.rs"]

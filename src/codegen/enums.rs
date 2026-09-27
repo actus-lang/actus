@@ -184,7 +184,18 @@ pub(super) fn emit_enum_payload_drop(
     let field_address = function
         .ins()
         .iadd_imm_s(address, i64::from(enum_layout.payload_offset + field_layout.offset));
-    match field_layout.ty {
+    drop_enum_payload_field(function, field_layout.ty, field_address, functions, layouts)?;
+    Ok(())
+}
+
+fn drop_enum_payload_field(
+    function: &mut FunctionBuilder<'_>,
+    field_type: NativeType,
+    field_address: cranelift_codegen::ir::Value,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    match field_type {
         NativeType::Buffer => {
             let handle =
                 function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
@@ -204,6 +215,7 @@ pub(super) fn emit_enum_payload_drop(
         | NativeType::Void
         | NativeType::String
         | NativeType::Enum(_)
+        | NativeType::Pack(_)
         | NativeType::FatPointer => {}
     }
     Ok(())

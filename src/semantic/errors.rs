@@ -261,6 +261,39 @@ pub enum SemanticErrorKind {
         name: String,
     },
     MissingReturnValue,
+    InvalidPackStorage {
+        pack: String,
+        ty: String,
+    },
+    InvalidPackFieldType {
+        pack: String,
+        field: String,
+        ty: String,
+    },
+    PackFieldOutOfBounds {
+        pack: String,
+        field: String,
+        offset: u16,
+        width: u8,
+        capacity: u16,
+    },
+    PackFieldOverlap {
+        pack: String,
+        field: String,
+        other: String,
+        start: u16,
+        end: u16,
+    },
+    PackUncoveredBits {
+        pack: String,
+        start: u16,
+        end: u16,
+    },
+    InvalidPackFieldRole {
+        pack: String,
+        field: String,
+        role: String,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

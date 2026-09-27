@@ -2,6 +2,9 @@ use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::ParseErrorCode;
 use crate::semantic::SemanticErrorKind;
 
+#[path = "pack_codes.rs"]
+mod pack_codes;
+
 pub(super) fn lex_code(error: &LexError) -> u8 {
     match error.kind {
         LexErrorKind::UnexpectedCharacter(_) => 1,
@@ -21,6 +24,9 @@ pub(super) fn parse_code(code: ParseErrorCode) -> &'static str {
 }
 
 pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
+    if let Some(code) = pack_codes::code(kind) {
+        return code;
+    }
     if let Some(code) = role_semantic_code(kind) {
         return code;
     }
@@ -214,6 +220,7 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     enum_semantic_message(kind)
         .or_else(|| guard_semantic_message(kind))
         .or_else(|| struct_semantic_message(kind))
+        .or_else(|| pack_codes::message(kind))
         .or_else(|| type_semantic_message(kind))
 }
 

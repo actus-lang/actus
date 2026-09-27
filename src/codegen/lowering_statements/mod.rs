@@ -134,7 +134,7 @@ fn lower_owner_declaration<'source>(
             super::super::expression_literals::lower_float_as(
                 function,
                 value,
-                NativeType::Float { width }.ir_type(layouts.pointer_type),
+                layouts.ir_type(NativeType::Float { width }),
             )?
         } else {
             lower_expression(
@@ -152,7 +152,7 @@ fn lower_owner_declaration<'source>(
         super::super::expression_literals::coerce_to_ir_type(
             function,
             value,
-            declared.ir_type(layouts.pointer_type),
+            layouts.ir_type(declared),
         )
     });
     locals.insert(name, value);

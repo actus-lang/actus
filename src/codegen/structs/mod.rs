@@ -13,7 +13,9 @@ use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
 mod cleanup;
+mod packs;
 pub(crate) use cleanup::{emit_binding_drop, emit_partial_binding_drop, emit_struct_drop};
+pub(super) use packs::{lower_pack_field, lower_pack_field_assignment, lower_pack_literal};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_struct_literal(
@@ -85,6 +87,19 @@ pub(super) fn lower_field_access(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
+        let storage = lower_expression(
+            function,
+            object,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?;
+        return lower_pack_field(function, storage, id, field, layouts);
+    }
     let (address, field_layout) = lower_field_address(
         function,
         object,
@@ -100,7 +115,7 @@ pub(super) fn lower_field_access(
         return Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)));
     }
     Ok(function.ins().load(
-        field_layout.ty.ir_type(layouts.pointer_type),
+        layouts.ir_type(field_layout.ty),
         MemFlagsData::new(),
         address,
         field_layout.offset as i32,
@@ -113,7 +128,49 @@ pub(super) fn lower_field_assignment(
     object: &Expr,
     field: &str,
     value: &Expr,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
+        return lower_pack_field_assignment(
+            function,
+            object,
+            field,
+            value,
+            id,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        );
+    }
+    lower_struct_field_assignment(
+        function,
+        object,
+        field,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_struct_field_assignment(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    value: &Expr,
+    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,

@@ -10,7 +10,7 @@ use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::native::{FunctionRef, NativeEmitError};
-use super::structs::{lower_field_access, lower_struct_literal};
+use super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
 use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
@@ -74,6 +74,19 @@ fn lower_data_construct(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
+        Expr::StructLit { name, type_arguments, fields, .. } if layouts.pack_id(name).is_some() => {
+            lower_pack_literal(
+                function,
+                name,
+                fields,
+                locals,
+                local_types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+        }
         Expr::StructLit { name, type_arguments, fields, .. } => lower_struct_literal(
             function,
             name,

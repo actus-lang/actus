@@ -64,6 +64,7 @@ impl LayoutRegistry {
             NativeType::Void => Some(0),
             NativeType::String | NativeType::Buffer => Some(self.pointer_size),
             NativeType::FatPointer => Some(self.pointer_size * 2),
+            NativeType::Pack(id) => self.pack(id).and_then(|pack| self.type_size(pack.storage)),
         }
     }
 

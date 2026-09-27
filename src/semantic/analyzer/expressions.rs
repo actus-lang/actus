@@ -53,7 +53,11 @@ impl Analyzer {
                 self.visit_method_call(receiver, method, arguments, *span)
             }
             Expr::StructLit { name, type_arguments, fields, span } => {
-                self.validate_struct_literal(name, type_arguments, fields, *span)
+                if self.pack_types.contains_key(name) {
+                    self.validate_pack_literal(name, fields, *span)
+                } else {
+                    self.validate_struct_literal(name, type_arguments, fields, *span)
+                }
             }
             Expr::FieldAccess { object, field, span } => {
                 if self.enum_receiver_name(object).is_some() {

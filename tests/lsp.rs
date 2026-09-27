@@ -283,6 +283,25 @@ fn lsp_exposes_gate_36_primitives_in_hover_completion_and_tokens() {
     assert!(stdout.contains("\"data\":["));
 }
 
+#[test]
+fn lsp_exposes_pack_registers_in_hover_completion_and_tokens() {
+    let uri = "file:///tmp/actus-lsp-pack.act";
+    let source = "pack ControlRegister { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs ready: u1 at 1; abs _reserved: u30 at 2 = 0; } }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "ControlRegister")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("pack ControlRegister"), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"enabled\""), "stdout: {stdout}");
+    assert!(stdout.contains("pack-keyword"), "stdout: {stdout}");
+}
+
 fn position_after(source: &str, marker: &str) -> Value {
     let offset = source.find(marker).expect("marker in source") + marker.len() - 1;
     let line = source[..offset].bytes().filter(|byte| *byte == b'\n').count();

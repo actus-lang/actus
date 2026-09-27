@@ -2,6 +2,8 @@ use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_ob
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
+use actus::semantic::analyze;
+use actus::target::TargetSpec;
 use object::{Object, ObjectSection, ObjectSymbol};
 
 #[test]
@@ -125,6 +127,18 @@ fn rejects_ins_aliasing_before_native_lowering() {
     let error = actus::codegen::emit_program_object(&program, "main")
         .expect_err("semantic aliasing must stop native lowering");
     assert!(error.to_string().contains("ExclusiveLoanAlias"));
+}
+
+#[test]
+fn pack_source_is_valid_for_freestanding_target_contract() {
+    let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { erg register = Register { storage: 0, }; register.enabled = 1; return register.enabled; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("pack source should parse");
+    let target =
+        TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
+    assert_eq!(target.entry_contract(), actus::target::EntryContract::Freestanding);
+    analyze(&program).expect("pack should be semantically valid for a freestanding target");
 }
 
 fn symbol_matches(actual: &str, expected: &str) -> bool {

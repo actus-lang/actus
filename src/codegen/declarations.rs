@@ -128,11 +128,8 @@ fn signature_for(
         } else {
             NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
         };
-        let parameter_type = if native_type.is_wide_integer() {
-            pointer_type
-        } else {
-            native_type.ir_type(pointer_type)
-        };
+        let parameter_type =
+            if native_type.is_wide_integer() { pointer_type } else { layouts.ir_type(native_type) };
         signature.params.push(AbiParam::new(parameter_type));
         if parameter.dispatch == DispatchMode::Dynamic {
             signature.params.push(AbiParam::new(pointer_type));
@@ -142,7 +139,7 @@ fn signature_for(
         && !native_return.uses_sret()
         && !matches!(native_return, NativeType::Void)
     {
-        signature.returns.push(AbiParam::new(native_return.ir_type(pointer_type)));
+        signature.returns.push(AbiParam::new(layouts.ir_type(native_return)));
     }
     signature
 }

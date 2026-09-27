@@ -203,6 +203,7 @@ fn check_declaration_name(
 fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &String, SourceSpan)> {
     match declaration {
         TopLevelDecl::Struct(value) => Some(("struct", &value.name, value.span)),
+        TopLevelDecl::Pack(_) => None,
         TopLevelDecl::Enum(value) => Some(("enum", &value.name, value.span)),
         TopLevelDecl::Role(value) => Some(("role", &value.name, value.span)),
         TopLevelDecl::Verb(value) => Some(("verb", &value.name, value.span)),
@@ -269,6 +270,7 @@ fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
         TopLevelDecl::Verb(value) => value.is_open,
         TopLevelDecl::ExternalVerb(value) => value.is_open,
         TopLevelDecl::Struct(value) => value.is_open,
+        TopLevelDecl::Pack(value) => value.is_open,
         TopLevelDecl::Enum(value) => value.is_open,
         TopLevelDecl::Role(value) => value.is_open,
         TopLevelDecl::Perform(value) => value.is_open,

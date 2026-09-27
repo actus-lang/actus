@@ -36,6 +36,7 @@ pub(super) struct Analyzer {
     pub(super) current_abs_origins: HashMap<String, usize>,
     pub(super) binding_origins: HashMap<usize, Origin>,
     pub(super) struct_types: HashMap<String, StructDef>,
+    pub(super) pack_types: HashMap<String, crate::ast::PackDecl>,
     pub(super) enum_types: HashMap<String, EnumDef>,
     pub(super) role_types: HashMap<String, RoleDecl>,
     pub(super) performances: HashSet<(String, String)>,
@@ -104,6 +105,7 @@ impl Analyzer {
             current_abs_origins: HashMap::new(),
             binding_origins: HashMap::new(),
             struct_types: HashMap::new(),
+            pack_types: HashMap::new(),
             enum_types: HashMap::new(),
             role_types: HashMap::new(),
             performances: HashSet::new(),
@@ -130,6 +132,7 @@ impl Analyzer {
         self.register_enums(program)?;
         self.register_roles(program)?;
         self.register_structs(program)?;
+        self.validate_pack_declarations(program)?;
         self.validate_role_declarations()?;
         self.validate_performances(program)?;
         self.validate_recursive_types()?;
@@ -165,6 +168,7 @@ impl Analyzer {
                     (&verb.name, &verb.params, &verb.return_type, verb.span, verb.signature())
                 }
                 TopLevelDecl::Struct(_)
+                | TopLevelDecl::Pack(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Role(_)
                 | TopLevelDecl::Perform(_) => continue,
@@ -174,6 +178,7 @@ impl Analyzer {
                 TopLevelDecl::Verb(verb) => &verb.generic_parameters,
                 TopLevelDecl::ExternalVerb(verb) => &verb.generic_parameters,
                 TopLevelDecl::Struct(_)
+                | TopLevelDecl::Pack(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Role(_)
                 | TopLevelDecl::Perform(_) => unreachable!(),

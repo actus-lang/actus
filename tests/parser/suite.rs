@@ -1,6 +1,6 @@
 use actus::ast::{
-    EnumPayload, Expr, MetaAttribute, PrimitiveType, ReturnAccess, Role, Stmt, TopLevelDecl,
-    primitive_type,
+    EnumPayload, Expr, LayoutEndianness, MetaAttribute, PrimitiveType, ReturnAccess, Role, Stmt,
+    TopLevelDecl, primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -91,6 +91,36 @@ fn parses_buffer_literal_construction() {
         panic!("expected Buffer literal")
     };
     assert!(matches!(length.as_ref(), Expr::Integer { value, .. } if value == "16"));
+}
+
+#[test]
+fn parses_pack_storage_layout_and_role_qualified_fields() {
+    let program = parse_source(
+        "pack Control { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs mode: u3 at 1; erg channel: u5 at 4; abs _reserved: u23 at 9 = 0; } }",
+    );
+    let TopLevelDecl::Pack(pack) = &program.declarations[0] else { panic!("expected pack") };
+    assert_eq!(pack.name, "Control");
+    assert_eq!(pack.storage.name, "u32");
+    assert_eq!(pack.endianness, LayoutEndianness::Little);
+    assert_eq!(pack.fields.len(), 4);
+    assert_eq!(pack.fields[0].role, Role::Erg);
+    assert_eq!(pack.fields[1].role, Role::Abs);
+    assert_eq!(pack.fields[2].offset, 4);
+    assert!(
+        matches!(pack.fields[3].default_value, Some(Expr::Integer { ref value, .. }) if value == "0")
+    );
+}
+
+#[test]
+fn rejects_pack_unknown_endianness_and_non_access_roles() {
+    for source in [
+        "pack Control { erg storage: u32; layout middle; fields { erg enabled: u1 at 0; } }",
+        "pack Control { erg storage: u32; layout little; fields { dat moved: u1 at 0; } }",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        assert!(parse(tokens).is_err(), "invalid pack should be rejected");
+    }
 }
 
 #[test]

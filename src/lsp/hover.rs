@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::ast::{Param, Program, Role, Stmt, TopLevelDecl, TypeName};
+use crate::ast::{PackDecl, Param, Program, Role, Stmt, TopLevelDecl, TypeName};
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::{SourceSpan, Token, TokenKind, scan};
 use crate::modules::{ModuleResolver, exports_module};
@@ -50,6 +50,11 @@ fn local_info(source: &str, program: &Program, name: &str, offset: usize) -> Opt
         if let Some(info) = declaration_info(source, declaration, name) {
             return Some(info);
         }
+        if let TopLevelDecl::Pack(pack) = declaration
+            && let Some(info) = pack_field_info(source, pack, name)
+        {
+            return Some(info);
+        }
         if let TopLevelDecl::Verb(verb) = declaration
             && verb.span.start <= offset
             && offset <= verb.span.end
@@ -92,12 +97,45 @@ fn declaration_info(source: &str, declaration: &TopLevelDecl, name: &str) -> Opt
             span: role.span,
             documentation: role.doc.clone(),
         }),
+        TopLevelDecl::Pack(pack) if pack.name == name => Some(SymbolInfo {
+            signature: pack_signature(pack),
+            span: pack.span,
+            documentation: None,
+        }),
         _ => None,
     }
     .map(|mut info| {
         info.span = identifier_span(source, info.span, name).unwrap_or(info.span);
         info
     })
+}
+
+fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Option<SymbolInfo> {
+    let field = pack.fields.iter().find(|field| field.name == name)?;
+    Some(SymbolInfo {
+        signature: format!(
+            "{} {}: {} at {}",
+            role_name(&field.role),
+            field.name,
+            type_name(&field.ty),
+            field.offset
+        ),
+        span: identifier_span(source, field.span, name).unwrap_or(field.span),
+        documentation: None,
+    })
+}
+
+fn pack_signature(pack: &PackDecl) -> String {
+    let endianness = match pack.endianness {
+        crate::ast::LayoutEndianness::Little => "little",
+        crate::ast::LayoutEndianness::Big => "big",
+    };
+    format!(
+        "pack {} {{ storage: {}; layout {}; }}",
+        pack.name,
+        type_name(&pack.storage),
+        endianness
+    )
 }
 
 fn parameter_info(source: &str, params: &[Param], name: &str) -> Option<SymbolInfo> {
@@ -165,6 +203,7 @@ fn declaration_name(declaration: &TopLevelDecl) -> Option<&str> {
         TopLevelDecl::Struct(value) => Some(&value.name),
         TopLevelDecl::Enum(value) => Some(&value.name),
         TopLevelDecl::Role(value) => Some(&value.name),
+        TopLevelDecl::Pack(value) => Some(&value.name),
         _ => None,
     }
 }

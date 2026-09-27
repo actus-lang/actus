@@ -11,6 +11,7 @@ pub(super) enum NativeType {
     String,
     Buffer,
     Struct(usize),
+    Pack(usize),
     Enum(usize),
     FatPointer,
 }
@@ -81,9 +82,12 @@ impl NativeType {
             Self::Float { width: 64 } => cranelift_codegen::ir::types::F64,
             Self::Float { .. } => cranelift_codegen::ir::types::F64,
             Self::Void => cranelift_codegen::ir::types::I8,
-            Self::String | Self::Buffer | Self::Struct(_) | Self::Enum(_) | Self::FatPointer => {
-                pointer_type
-            }
+            Self::String
+            | Self::Buffer
+            | Self::Struct(_)
+            | Self::Enum(_)
+            | Self::Pack(_)
+            | Self::FatPointer => pointer_type,
         }
     }
 }
