@@ -3,14 +3,18 @@ use std::path::{Path, PathBuf};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::lexer::scan;
-use crate::modules::{ModuleError, ModuleResolver, analyze_module};
+use crate::modules::{ModuleError, ModuleResolver};
 use crate::parser::parse;
 use crate::semantic::analyze;
 
 use super::position::{LineIndex, LspRange};
 use super::protocol::LspDiagnostic;
 
-pub fn analyze_document(uri: &str, source: &str) -> Vec<LspDiagnostic> {
+pub fn analyze_document(
+    uri: &str,
+    source: &str,
+    overlays: &std::collections::HashMap<PathBuf, String>,
+) -> Vec<LspDiagnostic> {
     let (tokens, lex_errors) = scan(source);
     let index = LineIndex::new(source);
     if !lex_errors.is_empty() {
@@ -30,7 +34,7 @@ pub fn analyze_document(uri: &str, source: &str) -> Vec<LspDiagnostic> {
             )];
         }
     };
-    if let Some(result) = analyze_package_module(uri) {
+    if let Some(result) = analyze_package_module(uri, overlays) {
         return package_diagnostics(source, &index, result);
     }
     if let Err(error) = analyze(&program) {
@@ -39,15 +43,20 @@ pub fn analyze_document(uri: &str, source: &str) -> Vec<LspDiagnostic> {
     Vec::new()
 }
 
-fn analyze_package_module(uri: &str) -> Option<Result<(), ModuleError>> {
+fn analyze_package_module(
+    uri: &str,
+    overlays: &std::collections::HashMap<PathBuf, String>,
+) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
-    let configuration = CompilerConfiguration::from_input_path(&path).ok()?;
+    let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
     let module_path = module_path_for_file(configuration.source_root(), &path)?;
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),
     );
-    Some(analyze_module(&resolver, &module_path).map(|_| ()))
+    Some(
+        crate::modules::analyze_module_with_overlays(&resolver, &module_path, overlays).map(|_| ()),
+    )
 }
 
 fn package_diagnostics(

@@ -127,7 +127,7 @@ fn imported_definition(
     program: &Program,
     name: &str,
 ) -> Option<DefinitionLocation> {
-    let configuration = CompilerConfiguration::from_input_path(current_path).ok()?;
+    let configuration = CompilerConfiguration::from_input_path_read_only(current_path).ok()?;
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),

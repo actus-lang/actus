@@ -184,7 +184,7 @@ fn block_info(source: &str, statements: &[Stmt], name: &str) -> Option<SymbolInf
 
 fn imported_info(uri: &str, program: &Program, name: &str) -> Option<SymbolInfo> {
     let current_path = file_uri_to_path(uri)?;
-    let configuration = CompilerConfiguration::from_input_path(&current_path).ok()?;
+    let configuration = CompilerConfiguration::from_input_path_read_only(&current_path).ok()?;
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),
