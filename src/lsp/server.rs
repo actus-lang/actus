@@ -2,7 +2,7 @@ use std::io::{self, BufRead, Write};
 
 use serde_json::{Value, json};
 
-use super::completion::primitive_items;
+use super::completion::items;
 use super::definition::find_definition;
 use super::diagnostics::analyze_document;
 use super::documents::DocumentStore;
@@ -49,7 +49,7 @@ fn handle_request(
         "textDocument/didClose" => close_document(request.params, store, output)?,
         "textDocument/definition" => definition(request.id, request.params, store, output)?,
         "textDocument/hover" => hover(request.id, request.params, store, output)?,
-        "textDocument/completion" => completion(request.id, output)?,
+        "textDocument/completion" => completion(request.id, request.params, store, output)?,
         "textDocument/semanticTokens/full" => {
             semantic_tokens_full(request.id, request.params, store, output)?
         }
@@ -60,8 +60,16 @@ fn handle_request(
     Ok(false)
 }
 
-fn completion(id: Option<Value>, output: &mut impl Write) -> io::Result<()> {
-    respond(output, id, primitive_items())
+fn completion(
+    id: Option<Value>,
+    params: Value,
+    store: &DocumentStore,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let uri =
+        params.get("textDocument").and_then(|document| document.get("uri")).and_then(Value::as_str);
+    let source = uri.and_then(|value| store.get(value)).map(|document| document.text.as_str());
+    respond(output, id, items(source))
 }
 
 fn semantic_tokens_full(
@@ -202,7 +210,7 @@ fn initialize_result() -> Value {
             "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
             "semanticTokensProvider": {
                 "full": true,
-                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins"], "tokenModifiers": []}
+                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field"], "tokenModifiers": []}
             },
             "documentFormattingProvider": true
         },
