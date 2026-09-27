@@ -35,6 +35,7 @@ pub use model::{
     Origin, OriginRecord, OriginRoot, ReachablePerformance, SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
+pub use types::{SemanticType, TypeRegistry};
 
 pub fn filter_program_for_target(
     program: &crate::ast::Program,

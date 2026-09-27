@@ -1,18 +1,94 @@
 use crate::ast::{
-    BuiltinType, CaseBody, Expr, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic,
+    BuiltinType, CaseBody, Expr, IntrinsicKind, PrimitiveType, TypeName, lookup_builtin_type,
+    lookup_call_intrinsic, primitive_type,
 };
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticType {
+    Builtin(BuiltinType),
+    Primitive(PrimitiveType),
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TypeRegistry;
+
+impl TypeRegistry {
+    pub const fn new() -> Self {
+        Self
+    }
+
+    pub fn resolve(&self, name: &str) -> Option<SemanticType> {
+        primitive_type(name)
+            .map(SemanticType::Primitive)
+            .or_else(|| lookup_builtin_type(name).map(SemanticType::Builtin))
+    }
+
+    pub fn is_known(&self, name: &str) -> bool {
+        self.resolve(name).is_some()
+    }
+}
+
 impl Analyzer {
+    pub(super) fn validate_expected_literal(
+        &self,
+        expression: &Expr,
+        expected: &TypeName,
+    ) -> Result<(), SemanticError> {
+        let Some(PrimitiveType::Integer { signed, width }) = primitive_type(&expected.name) else {
+            return Ok(());
+        };
+        let Some((literal, negative)) = integer_literal(expression) else { return Ok(()) };
+        let magnitude = parse_integer_magnitude(&literal).ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::NumericLiteralOutOfRange {
+                ty: expected.name.clone(),
+                literal: format_literal(&literal, negative),
+            },
+            span: expected.span,
+        })?;
+        let valid = if signed {
+            signed_literal_fits(magnitude, negative, width)
+        } else {
+            !negative && magnitude <= unsigned_maximum(width)
+        };
+        if valid {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::NumericLiteralOutOfRange {
+                ty: expected.name.clone(),
+                literal: format_literal(&literal, negative),
+            },
+            span: expected.span,
+        })
+    }
+
+    pub(super) fn validate_void_expression(
+        &self,
+        expression: &Expr,
+        expected: &TypeName,
+    ) -> Result<(), SemanticError> {
+        if primitive_type(&expected.name) != Some(PrimitiveType::Void) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::ReturnTypeMismatch {
+                expected: "Void".to_owned(),
+                found: self.expression_type_name(expression).unwrap_or_else(|| "value".to_owned()),
+            },
+            span: expected.span,
+        })
+    }
+
     pub(super) fn validate_type_name(
         &self,
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if lookup_builtin_type(name).is_some()
+        if self.type_registry.is_known(name)
             || self.struct_types.contains_key(name)
             || self.enum_types.contains_key(name)
         {
@@ -71,6 +147,10 @@ impl Analyzer {
                     span,
                 });
             }
+            return Ok(());
+        }
+        self.validate_expected_literal(initializer, expected_type)?;
+        if primitive_type(&expected_type.name).is_some() {
             return Ok(());
         }
         let Some(found) = self.expression_type(initializer) else { return Ok(()) };
@@ -205,4 +285,40 @@ impl Analyzer {
             CaseBody::Block(_) => None,
         })
     }
+}
+
+fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
+    match expression {
+        Expr::Integer { value, .. } => Some((value.clone(), false)),
+        Expr::Grouping { expression, .. } => integer_literal(expression),
+        Expr::Unary { operator: crate::ast::UnaryOp::Negate, expression, .. } => {
+            let (value, _) = integer_literal(expression)?;
+            Some((value, true))
+        }
+        _ => None,
+    }
+}
+
+fn parse_integer_magnitude(literal: &str) -> Option<u128> {
+    literal
+        .strip_prefix("0x")
+        .or_else(|| literal.strip_prefix("0X"))
+        .map_or_else(|| literal.parse().ok(), |digits| u128::from_str_radix(digits, 16).ok())
+}
+
+fn unsigned_maximum(width: u8) -> u128 {
+    if width == 128 { u128::MAX } else { (1_u128 << width) - 1 }
+}
+
+fn signed_literal_fits(magnitude: u128, negative: bool, width: u8) -> bool {
+    if width == 128 {
+        return if negative { magnitude <= 1_u128 << 127 } else { magnitude <= i128::MAX as u128 };
+    }
+    let positive_maximum = (1_u128 << (width - 1)) - 1;
+    let negative_maximum = 1_u128 << (width - 1);
+    if negative { magnitude <= negative_maximum } else { magnitude <= positive_maximum }
+}
+
+fn format_literal(literal: &str, negative: bool) -> String {
+    if negative { format!("-{literal}") } else { literal.to_owned() }
 }

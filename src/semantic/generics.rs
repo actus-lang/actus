@@ -1,4 +1,4 @@
-use crate::ast::{GenericParam, TypeName, lookup_builtin_type};
+use crate::ast::{GenericParam, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -123,7 +123,7 @@ impl Analyzer {
     }
 
     fn named_type_arity(&self, name: &str) -> Option<usize> {
-        if lookup_builtin_type(name).is_some() {
+        if self.type_registry.is_known(name) {
             return Some(0);
         }
         self.struct_types.get(name).map(|definition| definition.generic_parameters.len()).or_else(

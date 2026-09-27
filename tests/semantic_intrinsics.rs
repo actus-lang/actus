@@ -1,10 +1,10 @@
 use actus::ast::{
-    BuiltinType, IntrinsicKind, RegistryStatus, lookup_builtin_type, lookup_call_intrinsic,
-    lookup_intrinsic,
+    BuiltinType, IntrinsicKind, PrimitiveType, RegistryStatus, lookup_builtin_type,
+    lookup_call_intrinsic, lookup_intrinsic, primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{SemanticErrorKind, analyze};
+use actus::semantic::{SemanticErrorKind, SemanticType, TypeRegistry, analyze};
 
 fn analyze_source(
     source: &str,
@@ -44,6 +44,49 @@ fn builtin_type_registry_defines_supported_types() {
     assert_eq!(BuiltinType::Buffer.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_builtin_type("Array"), Some(BuiltinType::Array));
     assert_eq!(lookup_builtin_type("Map"), Some(BuiltinType::Map));
+}
+
+#[test]
+fn primitive_type_registry_preserves_width_and_signedness() {
+    assert_eq!(primitive_type("u3"), Some(PrimitiveType::Integer { signed: false, width: 3 }));
+    assert_eq!(primitive_type("i8"), Some(PrimitiveType::Integer { signed: true, width: 8 }));
+    let registry = TypeRegistry::new();
+    assert_eq!(
+        registry.resolve("f32"),
+        Some(SemanticType::Primitive(PrimitiveType::Float { width: 32 }))
+    );
+    assert_eq!(registry.resolve("Void"), Some(SemanticType::Primitive(PrimitiveType::Void)));
+}
+
+#[test]
+fn accepts_primitive_integer_boundary_literals() {
+    analyze_source(
+        "verb main() -> Void { erg a: u3 = 7; erg b: u8 = 255; erg c: i8 = -128; erg d: i8 = 127; erg e: i8 = 0x7F; return; }",
+    )
+    .expect("boundary literals should be accepted");
+}
+
+#[test]
+fn rejects_primitive_integer_overflow_and_unsigned_underflow() {
+    for source in [
+        "verb main() { erg value: u3 = 8; }",
+        "verb main() { erg value: u1 = 2; }",
+        "verb main() { erg value: u8 = 256; }",
+        "verb main() { erg value: u8 = -1; }",
+    ] {
+        let error = analyze_source(source).expect_err("out-of-range literal must be rejected");
+        assert!(matches!(error.kind, SemanticErrorKind::NumericLiteralOutOfRange { .. }));
+    }
+}
+
+#[test]
+fn validates_void_as_a_zero_value_return_type() {
+    analyze_source("verb main() -> Void { return; }").expect("Void may return without a value");
+    let error = analyze_source("verb main() -> Void { return 0; }")
+        .expect_err("Void must reject value returns");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ReturnTypeMismatch { expected, .. } if expected == "Void")
+    );
 }
 
 #[test]
