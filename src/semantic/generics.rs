@@ -126,9 +126,13 @@ impl Analyzer {
         if self.type_registry.is_known(name) {
             return Some(0);
         }
-        self.struct_types.get(name).map(|definition| definition.generic_parameters.len()).or_else(
-            || self.enum_types.get(name).map(|definition| definition.generic_parameters.len()),
-        )
+        self.struct_types
+            .get(name)
+            .map(|definition| definition.generic_parameters.len())
+            .or_else(|| {
+                self.enum_types.get(name).map(|definition| definition.generic_parameters.len())
+            })
+            .or_else(|| self.pack_types.contains_key(name).then_some(0))
     }
 
     fn named_type_parameters(&self, name: &str) -> Option<Vec<GenericParam>> {

@@ -4,14 +4,61 @@ use crate::ast::{PackDecl, PackField, PrimitiveType, Program, Role, TopLevelDecl
 
 impl Analyzer {
     pub(super) fn validate_pack_declarations(
-        &self,
+        &mut self,
         program: &Program,
     ) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Pack(pack) = declaration else { continue };
             validate_pack(pack)?;
+            self.pack_types.insert(pack.name.clone(), pack.clone());
         }
         Ok(())
+    }
+
+    pub(super) fn validate_pack_literal(
+        &mut self,
+        name: &str,
+        fields: &[crate::ast::StructFieldInit],
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(pack) = self.pack_types.get(name).cloned() else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownType { name: name.to_owned() },
+                span,
+            });
+        };
+        let storage =
+            fields.iter().find(|field| field.name == "storage").ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::MissingStructField {
+                    struct_name: name.to_owned(),
+                    field: "storage".to_owned(),
+                },
+                span,
+            })?;
+        if fields.iter().filter(|field| field.name == "storage").count() != 1 {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DuplicateStructField {
+                    struct_name: name.to_owned(),
+                    field: "storage".to_owned(),
+                },
+                span: storage.span,
+            });
+        }
+        if let Some(extra) = fields.iter().find(|field| field.name != "storage") {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownStructField {
+                    struct_name: name.to_owned(),
+                    field: extra.name.clone(),
+                },
+                span: extra.span,
+            });
+        }
+        self.visit_expression(&storage.value)?;
+        self.validate_expected_literal(&storage.value, &pack.storage)
+    }
+
+    pub(super) fn pack_field(&self, pack: &str, field: &str) -> Option<&PackField> {
+        self.pack_types.get(pack)?.fields.iter().find(|candidate| candidate.name == field)
     }
 }
 

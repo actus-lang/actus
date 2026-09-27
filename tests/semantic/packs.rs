@@ -67,3 +67,22 @@ fn rejects_uncovered_bits_without_reserved_field() {
     .expect_err("gaps must require an explicit reserved field");
     assert!(matches!(error, SemanticErrorKind::PackUncoveredBits { start: 3, end: 4, .. }));
 }
+
+#[test]
+fn accepts_pack_literals_and_erg_field_assignment() {
+    analyze_source(
+        "pack Control { erg storage: u8; layout little; fields { erg enabled: u1 at 0; abs _reserved: u7 at 1; } } verb main() -> Int { erg control = Control { storage: 0, }; control.enabled = 1; return control.enabled; }",
+    )
+    .expect("pack storage and erg fields should be usable");
+}
+
+#[test]
+fn rejects_writes_to_abs_pack_fields() {
+    let error = analyze_source(
+        "pack Control { erg storage: u8; layout little; fields { abs mode: u1 at 0; abs _reserved: u7 at 1; } } verb main() -> Int { erg control = Control { storage: 0, }; control.mode = 1; return 0; }",
+    )
+    .expect_err("abs pack fields must remain read-only");
+    assert!(
+        matches!(error, SemanticErrorKind::InvalidFieldAssignmentTarget { field } if field == "mode")
+    );
+}

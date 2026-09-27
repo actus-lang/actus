@@ -199,6 +199,7 @@ fn native_type_key(target: NativeType) -> String {
         NativeType::String => "string".to_owned(),
         NativeType::Buffer => "buffer".to_owned(),
         NativeType::FatPointer => "fat_pointer".to_owned(),
+        NativeType::Pack(id) => format!("pack_{id}"),
     }
 }
 

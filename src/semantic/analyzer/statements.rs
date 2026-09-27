@@ -96,6 +96,7 @@ impl Analyzer {
             }
         }
         self.record_initializer_struct_type(name, initializer, span)?;
+        self.record_initializer_pack_type(name, initializer, span)?;
         if let Some(type_name) = declared_type_name {
             self.record_struct_binding(name, &type_name, span)?;
             self.record_enum_binding(name, &type_name, span)?;

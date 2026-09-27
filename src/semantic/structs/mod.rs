@@ -47,23 +47,63 @@ impl Analyzer {
         if !matches!(object, Expr::Identifier { .. }) {
             self.visit_expression(object)?;
         }
-        let Some(struct_name) = self.expression_struct_type(object) else {
+        let Some(struct_name) =
+            self.expression_struct_type(object).or_else(|| self.expression_pack_type(object))
+        else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
                 span,
             });
         };
-        let Some(struct_field) = self.struct_field(&struct_name, field).cloned() else {
+        if self.pack_field(&struct_name, field).is_some() {
+            return self.validate_pack_field_assignment(&struct_name, field, value, span);
+        }
+        self.validate_struct_field_assignment(&struct_name, field, value, span)
+    }
+
+    fn validate_struct_field_assignment(
+        &mut self,
+        struct_name: &str,
+        field: &str,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(struct_field) = self.struct_field(struct_name, field).cloned() else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownStructField {
-                    struct_name,
+                    struct_name: struct_name.to_owned(),
                     field: field.to_owned(),
                 },
                 span,
             });
         };
         self.visit_expression(value)?;
-        self.validate_field_value(&struct_name, &struct_field, value, span)
+        self.validate_field_value(struct_name, &struct_field, value, span)
+    }
+
+    fn validate_pack_field_assignment(
+        &mut self,
+        pack: &str,
+        field: &str,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let field_definition =
+            self.pack_field(pack, field).cloned().ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::UnknownStructField {
+                    struct_name: pack.to_owned(),
+                    field: field.to_owned(),
+                },
+                span,
+            })?;
+        if !matches!(field_definition.role, Role::Erg) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
+                span,
+            });
+        }
+        self.visit_expression(value)?;
+        self.validate_expected_literal(value, &field_definition.ty)
     }
 
     pub(super) fn register_structs(&mut self, program: &Program) -> Result<(), SemanticError> {
@@ -137,9 +177,30 @@ impl Analyzer {
         Ok(())
     }
 
+    pub(super) fn record_initializer_pack_type(
+        &mut self,
+        name: &str,
+        initializer: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(type_name) = self.resolved_type_name(initializer) else { return Ok(()) };
+        if !self.pack_types.contains_key(&type_name.name) {
+            return Ok(());
+        }
+        let index = self.binding(name, span)?;
+        self.binding_type_names.insert(index, type_name);
+        Ok(())
+    }
+
     pub(super) fn expression_struct_type(&self, expression: &Expr) -> Option<String> {
         self.resolved_type_name(expression)
             .filter(|type_name| self.struct_types.contains_key(&type_name.name))
+            .map(|type_name| canonical_type_name(&type_name))
+    }
+
+    pub(super) fn expression_pack_type(&self, expression: &Expr) -> Option<String> {
+        self.resolved_type_name(expression)
+            .filter(|type_name| self.pack_types.contains_key(&type_name.name))
             .map(|type_name| canonical_type_name(&type_name))
     }
 
@@ -183,6 +244,9 @@ impl Analyzer {
     }
 
     fn specialized_field_type(&self, type_name: &TypeName, field: &str) -> Option<TypeName> {
+        if let Some(pack_field) = self.pack_field(&type_name.name, field) {
+            return Some(pack_field.ty.clone());
+        }
         let definition = self.struct_types.get(&type_name.name)?;
         let field = definition.fields.iter().find(|candidate| candidate.name == field)?;
         if type_name.arguments.is_empty() {
@@ -204,7 +268,9 @@ impl Analyzer {
         field: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let Some(struct_name) = self.expression_struct_type(object) else {
+        let Some(struct_name) =
+            self.expression_struct_type(object).or_else(|| self.expression_pack_type(object))
+        else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownStructField {
                     struct_name: "<non-struct>".to_owned(),
@@ -213,7 +279,9 @@ impl Analyzer {
                 span,
             });
         };
-        if self.struct_field(&struct_name, field).is_none() {
+        if self.struct_field(&struct_name, field).is_none()
+            && self.pack_field(&struct_name, field).is_none()
+        {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownStructField {
                     struct_name,

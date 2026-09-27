@@ -457,12 +457,13 @@ without host runtime services.
       API.
 - [x] Keep hexadecimal notation as a literal format only.
 - [x] Reuse Gate 3.6 compile-time range and overflow validation.
-- [ ] Define `pack` with an explicit fixed backing integer.
-- [ ] Validate packed field widths, offsets, overlap, and total capacity.
-- [ ] Define deterministic endianness in the packed layout contract.
-- [ ] Integrate packed reads and writes with `erg` and `abs` access rules.
-- [ ] Lower shifts and masks deterministically through Cranelift IR.
-- [ ] Add MMIO-style and network-frame layout tests.
+- [x] Define `pack` with an explicit fixed backing integer.
+- [x] Validate packed field widths, offsets, overlap, and total capacity.
+- [x] Define deterministic endianness in the packed layout contract.
+- [x] Integrate packed reads and writes with `erg` and `abs` access rules.
+- [x] Lower shifts and masks deterministically through Cranelift IR.
+- [x] Add native MMIO-style register layout tests.
+- [ ] Add network-frame layout tests.
 - [ ] Verify no allocator or host runtime dependency on bare-metal targets.
 
 ### Gate 4 invariant

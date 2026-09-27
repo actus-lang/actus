@@ -293,13 +293,24 @@ fn load_try_payload(
             Ok(function.ins().load(types::I32, MemFlagsData::new(), payload_address, 0))
         }
         NativeType::Integer { width, .. } => Ok(function.ins().load(
-            NativeType::Integer { signed: false, width }.ir_type(layouts.pointer_type),
+            layouts.ir_type(NativeType::Integer { signed: false, width }),
             MemFlagsData::new(),
             payload_address,
             0,
         )),
+        NativeType::Pack(id) => {
+            let pack = layouts
+                .pack(id)
+                .ok_or_else(|| NativeEmitError("missing packed payload layout".to_owned()))?;
+            Ok(function.ins().load(
+                layouts.ir_type(pack.storage),
+                MemFlagsData::new(),
+                payload_address,
+                0,
+            ))
+        }
         NativeType::Float { width } => Ok(function.ins().load(
-            NativeType::Float { width }.ir_type(layouts.pointer_type),
+            layouts.ir_type(NativeType::Float { width }),
             MemFlagsData::new(),
             payload_address,
             0,
@@ -318,11 +329,7 @@ fn try_payload_ir_type(
     field_type: NativeType,
     layouts: &LayoutRegistry,
 ) -> cranelift_codegen::ir::Type {
-    if matches!(field_type, NativeType::Void) {
-        types::I32
-    } else {
-        field_type.ir_type(layouts.pointer_type)
-    }
+    if matches!(field_type, NativeType::Void) { types::I32 } else { layouts.ir_type(field_type) }
 }
 
 pub(super) fn initializer_type(
