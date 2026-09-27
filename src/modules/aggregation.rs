@@ -146,8 +146,55 @@ pub fn analyze_module(
     resolver: &ModuleResolver,
     module_path: &str,
 ) -> Result<SemanticModel, ModuleError> {
-    let program = parse_module(resolver, module_path)?;
+    analyze_module_with_overlays(resolver, module_path, &HashMap::new())
+}
+
+pub fn analyze_module_with_overlays(
+    resolver: &ModuleResolver,
+    module_path: &str,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<SemanticModel, ModuleError> {
+    let program = parse_module_with_overlays(resolver, module_path, overlays)?;
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
+}
+
+fn parse_module_with_overlays(
+    resolver: &ModuleResolver,
+    module_path: &str,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<Program, ModuleError> {
+    let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
+    let mut declarations = Vec::new();
+    let mut locations = HashMap::new();
+    for (source_index, source_path) in resolved.source_files().enumerate() {
+        let source = source_for_path(source_path, overlays)?;
+        let (tokens, errors) = scan(&source);
+        if !errors.is_empty() {
+            return Err(ModuleError::Lex { path: source_path.to_owned(), errors });
+        }
+        let program = parse(tokens)
+            .map_err(|error| ModuleError::Parse { path: source_path.to_owned(), error })?;
+        if source_index == 0 {
+            validate_open_siblings(module_path, resolved.facade(), resolved.siblings(), &program)?;
+        }
+        for declaration in program.declarations {
+            check_declaration_name(&declaration, source_path, &mut locations)?;
+            declarations.push(declaration);
+        }
+    }
+    Ok(Program { declarations })
+}
+
+fn source_for_path(
+    path: &Path,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<String, ModuleError> {
+    overlays.get(path).cloned().map(Ok).unwrap_or_else(|| {
+        fs::read_to_string(path).map_err(|error| ModuleError::Read {
+            path: path.to_owned(),
+            message: error.to_string(),
+        })
+    })
 }
 
 pub fn analyze_with_imports(

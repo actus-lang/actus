@@ -60,6 +60,17 @@ and keeps syntax rendering in the separate `tree-sitter-actus` repository.
 - [x] Return deterministic text edits without editor-specific style options.
 - [x] Verify hover ranges and formatting edits with multibyte UTF-8 text.
 
+## Gate 4: Definition Navigation and Rich Hardware-Aware Hover
+
+- [x] Support `textDocument/definition` for variables, parameters, verbs, and
+      pack fields.
+- [x] Implement rich hover showing variable ownership roles (`erg`, `abs`,
+      `dat`, and `ins`).
+- [x] Show pack field role, type, bit offset, bit width, and mask in hover
+      output.
+- [x] Add integration coverage for definition navigation and rich hover
+      response schemas.
+
 ## Position Adapter
 
 - [x] Index line starts for every document snapshot.

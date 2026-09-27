@@ -188,8 +188,11 @@ fn close_document(
 }
 
 fn publish(output: &mut impl Write, uri: &str, store: &DocumentStore) -> io::Result<()> {
-    let diagnostics =
-        store.get(uri).map(|document| analyze_document(&document.text)).unwrap_or_default();
+    let overlays = store.source_overlays();
+    let diagnostics = store
+        .get(uri)
+        .map(|document| analyze_document(uri, &document.text, &overlays))
+        .unwrap_or_default();
     write_message(
         output,
         &serde_json::to_value(Notification {

@@ -3,6 +3,7 @@
 
 # Actus generated build artifacts
 /capsula/
+Actus.lock
 
 # Native compiler artifacts
 *.o

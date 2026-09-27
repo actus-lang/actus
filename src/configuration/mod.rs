@@ -140,10 +140,21 @@ impl CompilerConfiguration {
     }
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
+        Self::from_manifest_with_lockfile_policy(path, true)
+    }
+
+    pub fn from_manifest_read_only(path: &Path) -> Result<Self, ConfigurationError> {
+        Self::from_manifest_with_lockfile_policy(path, false)
+    }
+
+    fn from_manifest_with_lockfile_policy(
+        path: &Path,
+        sync_missing_lockfile: bool,
+    ) -> Result<Self, ConfigurationError> {
         manifest::warn_if_legacy_manifest(path);
         let manifest = manifest::read(path)?;
         let dependency_graph = dependencies::resolve(path)?;
-        validate_lockfile(path)?;
+        validate_lockfile(path, sync_missing_lockfile)?;
         let environment = Self::from_environment();
         let (target, linker_flavor, entry_contract, linker) =
             resolve_manifest_target(&manifest, &environment)?;
@@ -189,6 +200,14 @@ impl CompilerConfiguration {
             return Ok(Self::from_environment());
         };
         Self::from_manifest(&manifest)
+    }
+
+    pub fn from_input_path_read_only(path: &Path) -> Result<Self, ConfigurationError> {
+        let start = if path.is_dir() { path } else { path.parent().unwrap_or(path) };
+        let Some(manifest) = manifest::find_manifest(start) else {
+            return Ok(Self::from_environment());
+        };
+        Self::from_manifest_read_only(&manifest)
     }
 
     pub fn source_root(&self) -> &Path {
@@ -279,10 +298,12 @@ pub fn package_identity(path: &Path) -> Result<PackageIdentity, ConfigurationErr
     Ok(PackageIdentity { name: manifest.package.name, version: manifest.package.version })
 }
 
-fn validate_lockfile(path: &Path) -> Result<(), ConfigurationError> {
+fn validate_lockfile(path: &Path, sync_missing_lockfile: bool) -> Result<(), ConfigurationError> {
     let lock_path = path.with_file_name("Actus.lock");
     if !lock_path.is_file() {
-        ActusLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
+        if sync_missing_lockfile {
+            ActusLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
+        }
         return Ok(());
     }
     let lock_source = std::fs::read_to_string(&lock_path).map_err(|error| {

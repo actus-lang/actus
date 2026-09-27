@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use super::position::{LspRange, byte_range};
 
@@ -46,6 +47,25 @@ impl DocumentStore {
     pub fn get(&self, uri: &str) -> Option<&Document> {
         self.documents.get(uri)
     }
+
+    pub fn source_overlays(&self) -> HashMap<PathBuf, String> {
+        self.documents
+            .iter()
+            .filter_map(|(uri, document)| {
+                file_uri_to_path(uri).map(|path| (path, document.text.clone()))
+            })
+            .collect()
+    }
+}
+
+fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
+    let path = uri.strip_prefix("file://")?;
+    #[cfg(windows)]
+    {
+        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
+    }
+    #[cfg(not(windows))]
+    Some(PathBuf::from(path))
 }
 
 #[derive(Clone, Debug)]

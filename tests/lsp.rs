@@ -302,6 +302,78 @@ fn lsp_exposes_pack_registers_in_hover_completion_and_tokens() {
     assert!(stdout.contains("pack-keyword"), "stdout: {stdout}");
 }
 
+#[test]
+fn lsp_resolves_pack_fields_and_renders_hardware_aware_hover() {
+    let uri = "file:///tmp/actus-lsp-pack-field.act";
+    let source = "pack Control { erg storage: u32; layout little; fields { erg prescaler: u4 at 2; abs _reserved: u26 at 6 = 0; } }\nverb main() -> Int { erg control = Control { storage: 0, }; control.prescaler = 3; return control.prescaler; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":position_after(source, "control.prescaler")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "control.prescaler")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("offset: 2"), "stdout: {stdout}");
+    assert!(stdout.contains("width: 4 bits"), "stdout: {stdout}");
+    assert!(stdout.contains("mask: 0x0F"), "stdout: {stdout}");
+    assert!(stdout.contains("erg prescaler: u4"), "stdout: {stdout}");
+    assert!(stdout.contains("\"start\":{\"character\":61,\"line\":0}"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_resolves_std_io_sibling_context_for_open_documents() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src/io/reader.act");
+    let source = fs::read_to_string(&path).expect("read std io reader source");
+    let uri = file_uri(&path);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(!stdout.contains("E1023"), "stdout: {stdout}");
+    assert!(!stdout.contains("E1056"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_uses_unsaved_sibling_overlay_for_package_diagnostics() {
+    let root = temp_root();
+    let module = root.join("src/math");
+    fs::create_dir_all(&module).expect("create module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-overlay\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(module.join("math.act"), "open ops; open consumer;\n").expect("write facade");
+    let ops_uri = file_uri(&module.join("ops.act"));
+    let consumer_uri = file_uri(&module.join("consumer.act"));
+    let ops = "open verb add() -> Int { return 1; }\n";
+    let consumer = "open verb use() -> Int { return add(); }\n";
+    fs::write(module.join("ops.act"), ops).expect("write ops");
+    fs::write(module.join("consumer.act"), consumer).expect("write consumer");
+    let changed_ops = "open verb renamed() -> Int { return missing; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":ops_uri,"version":1,"text":ops}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":consumer_uri,"version":1,"text":consumer}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":ops_uri,"version":2},"contentChanges":[{"text":changed_ops}]}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":consumer_uri,"version":2},"contentChanges":[{"text":consumer}]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(
+        stdout.contains("E1003"),
+        "overlay diagnostics did not use unsaved sibling text: {stdout}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
 fn position_after(source: &str, marker: &str) -> Value {
     let offset = source.find(marker).expect("marker in source") + marker.len() - 1;
     let line = source[..offset].bytes().filter(|byte| *byte == b'\n').count();
