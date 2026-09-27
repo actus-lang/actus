@@ -125,11 +125,28 @@ impl Parser {
     fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
         self.expect_keyword(TokenKind::Meta, "`meta`")?;
         let attribute = self.take_identifier("metadata name")?;
-        if identifier_text(&attribute.kind) != "test" {
-            return Err(self.error_at_current("supported metadata name `test`"));
+        match identifier_text(&attribute.kind).as_str() {
+            "test" => {
+                let _ = self.match_simple(TokenKind::Semicolon);
+                Ok(vec![MetaAttribute::Test])
+            }
+            "target" => {
+                self.expect_simple(TokenKind::LeftParen, "`(` after `target`")?;
+                let selector = self.advance_required("target platform string")?;
+                let TokenKind::StringLiteral(selector) = selector.kind else {
+                    return Err(self.error_at_current("a target platform string"));
+                };
+                if !matches!(selector.as_str(), "unix" | "posix" | "windows") {
+                    return Err(
+                        self.error_at_current("supported target `unix`, `posix`, or `windows`")
+                    );
+                }
+                self.expect_simple(TokenKind::RightParen, "`)` after target platform")?;
+                let _ = self.match_simple(TokenKind::Semicolon);
+                Ok(vec![MetaAttribute::Target(selector)])
+            }
+            _ => Err(self.error_at_current("supported metadata names `test` or `target`")),
         }
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Test])
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {

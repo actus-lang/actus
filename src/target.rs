@@ -179,6 +179,17 @@ impl TargetSpec {
         &self.triple
     }
 
+    pub fn matches_platform(&self, selector: &str) -> bool {
+        match selector {
+            "windows" => self.triple.operating_system == OperatingSystem::Windows,
+            "unix" | "posix" => {
+                self.triple.operating_system != OperatingSystem::Windows
+                    && self.entry_contract() == EntryContract::Hosted
+            }
+            _ => false,
+        }
+    }
+
     pub const fn linker_flavor(&self) -> LinkerFlavor {
         self.linker_flavor
     }

@@ -314,17 +314,17 @@ each contract can be validated independently.
 
 #### Part 2: Target metadata contracts
 
-- [ ] Tokenize and parse `meta target(...)` declarations.
-- [ ] Validate supported target selectors and deterministic metadata syntax.
-- [ ] Filter declarations by the active target platform during semantic analysis.
-- [ ] Exclude declarations for non-matching targets before code generation.
-- [ ] Add native tests proving non-matching target code is not compiled.
-- [ ] Add diagnostics for malformed and unsupported target metadata.
+- [x] Tokenize and parse `meta target(...)` declarations.
+- [x] Validate supported target selectors and deterministic metadata syntax.
+- [x] Filter declarations by the active target platform during semantic analysis.
+- [x] Exclude declarations for non-matching targets before code generation.
+- [x] Add native tests proving non-matching target code is not compiled.
+- [x] Add diagnostics for malformed and unsupported target metadata.
 
 ### Gate 3.3 invariant
 
 - [ ] Native `?` propagation preserves Result layout, cleanup, and ownership.
-- [ ] Target metadata changes the compiled program only through explicit,
+- [x] Target metadata changes the compiled program only through explicit,
       deterministic target selection.
 
 ## Gate 3.5: Uniform Method Calls and I/O API Ergonomics

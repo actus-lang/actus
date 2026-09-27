@@ -8,6 +8,7 @@ use crate::diagnostics::{render_lex_error, render_parse_error};
 use crate::lexer::scan;
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
+use crate::semantic::filter_program_for_target;
 
 #[derive(Clone, Copy)]
 pub(super) enum EmitKind {
@@ -175,6 +176,7 @@ fn build_file_with_report(
             return 1;
         }
     };
+    let program = filter_program_for_target(&program, configuration.target());
     let Some(fallback_symbol) = first_defined_verb(&program) else {
         eprintln!("error: `{input}` contains no verb declarations");
         return 1;
