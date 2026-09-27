@@ -238,8 +238,8 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 - [x] Parse postfix `?` expressions.
 - [x] Resolve `Ok` and `Err` from the expected `Result[T, E]` type.
 - [x] Validate compatible error propagation.
-- [ ] Lower `Ok` unwrapping and `Err` early return natively.
-- [ ] Preserve cleanup and loan restoration on early return.
+- [x] Lower `Ok` unwrapping and `Err` early return natively.
+- [x] Preserve cleanup and loan restoration on early return.
 - [ ] Extend `?` integration tests to filesystem operations.
 
 ### `std::fs` API and implementation
