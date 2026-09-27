@@ -475,7 +475,7 @@ provenance and deterministic teardown.
 
 - [x] Architecture & lexical/semantic contract: define `Arena[N]`, `place(...)`,
       and scope lifetime rules.
-- [ ] Define `Arena[N]` capacity, alignment, and storage layout.
+- [x] Define `Arena[N]` capacity, alignment, and storage layout.
 - [x] Provenance & escape analysis: bind arena roots and reject cross-arena or
       escaping references.
 - [x] Add arena provenance metadata to semantic bindings and views.
@@ -489,7 +489,9 @@ provenance and deterministic teardown.
 - [x] Indirect-reference graph/tree native execution tests.
 - [ ] Cyclical data structure native execution tests.
 - [ ] Deterministic bulk teardown verification.
-- [ ] Lower arena teardown to one deterministic bulk release operation.
+- [x] Lower arena teardown to one deterministic bulk release operation.
+- [ ] Represent `Option[abs T]` and `Option[ins T]` references with a null-pointer
+      niche and validate recursive self-referential graph construction.
 - [ ] Add cyclic graph and tree native execution tests.
 - [ ] Add exhaustion, nested-scope, and cross-arena negative tests.
 - [ ] Verify operation without a host allocator on bare-metal targets.
