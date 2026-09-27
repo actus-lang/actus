@@ -17,6 +17,7 @@ mod methods;
 mod model;
 mod origins;
 mod ownership;
+mod packs;
 mod pattern_moves;
 mod pattern_support;
 mod patterns;
