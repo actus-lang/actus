@@ -1,0 +1,12 @@
+import io;
+import fs;
+
+meta test
+verb empty_path_is_rejected_by_file_open() -> Int {
+    erg path = Buffer[0];
+    erg result = file_open(path: abs path);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
