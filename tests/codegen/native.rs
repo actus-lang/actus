@@ -143,6 +143,7 @@ fn pack_source_is_valid_for_freestanding_target_contract() {
     analyze(&program).expect("pack should be semantically valid for a freestanding target");
 }
 
+#[cfg(not(target_os = "macos"))]
 #[test]
 fn arena_lowering_is_freestanding_and_has_no_host_runtime_imports() {
     let source = "struct Node { value: Int, } verb main() -> Int { erg arena: Arena[128] = Arena[128](); erg node = arena.place(value: Node { value: 7, }); return node.value; }";
@@ -165,6 +166,19 @@ fn arena_lowering_is_freestanding_and_has_no_host_runtime_imports() {
         .filter_map(|symbol| symbol.name().ok())
         .collect::<Vec<_>>();
     assert!(undefined.is_empty(), "freestanding arena object imports host symbols: {undefined:?}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn arena_freestanding_contract_is_valid_on_macos() {
+    let source = "struct Node { value: Int, } verb main() -> Int { erg arena: Arena[128] = Arena[128](); erg node = arena.place(value: Node { value: 7, }); return node.value; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("arena source should parse");
+    let target =
+        TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
+    assert_eq!(target.entry_contract(), actus::target::EntryContract::Freestanding);
+    analyze(&program).expect("arena should be semantically valid for a freestanding target");
 }
 
 fn symbol_matches(actual: &str, expected: &str) -> bool {
