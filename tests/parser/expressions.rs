@@ -166,10 +166,10 @@ fn rejects_abs_struct_fields() {
 }
 
 #[test]
-fn rejects_instrumental_local_bindings() {
-    let (tokens, errors) = scan("verb main() { ins buffer = Buffer[1]; }");
+fn parses_instrumental_arena_reference_bindings() {
+    let (tokens, errors) = scan("verb main() { ins node = arena.place(value: node); }");
     assert!(errors.is_empty());
-    parse(tokens).expect_err("ins must not be a local binding role");
+    parse(tokens).expect("ins arena references are local bindings");
 }
 
 #[test]

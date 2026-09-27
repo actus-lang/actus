@@ -66,12 +66,18 @@ impl Analyzer {
     }
 
     fn reject_arena_escape(&self, expression: &Expr) -> Result<(), SemanticError> {
-        let Expr::Identifier { name, .. } = unwrap_grouping(expression) else { return Ok(()) };
-        if self.arena_provenance(expression).is_none() {
+        if self.arena_provenances(expression).is_empty() {
+            return Ok(());
+        }
+        let name = match unwrap_grouping(expression) {
+            Expr::Identifier { name, .. } => name.clone(),
+            _ => "arena-derived value".to_owned(),
+        };
+        if name.is_empty() {
             return Ok(());
         }
         Err(SemanticError {
-            kind: SemanticErrorKind::ArenaReferenceEscape { name: name.clone() },
+            kind: SemanticErrorKind::ArenaReferenceEscape { name },
             span: expression_span(expression),
         })
     }

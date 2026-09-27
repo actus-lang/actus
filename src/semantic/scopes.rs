@@ -21,6 +21,7 @@ impl Analyzer {
             return Err(SemanticError { kind: SemanticErrorKind::ShadowedBinding { name }, span });
         }
         let index = self.model.bindings.len();
+        let scope_depth = self.scopes.len();
         self.model.bindings.push(Binding {
             name: name.clone(),
             role,
@@ -31,6 +32,7 @@ impl Analyzer {
         });
         self.scopes.last_mut().expect("binding requires a scope").declaration_indices.push(index);
         self.scopes.last_mut().expect("binding requires a scope").bindings.insert(name, index);
+        self.binding_scope_depth.insert(index, scope_depth);
         Ok(())
     }
 

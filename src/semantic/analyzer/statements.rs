@@ -26,6 +26,8 @@ impl Analyzer {
                     self.validate_expected_literal(value, expected)?;
                 }
                 self.visit_expression(value)?;
+                self.validate_arena_provenance_target(index, name, value, *span)?;
+                self.record_binding_arena_provenance(index, value);
                 self.plan_try_unwind(value);
                 Ok(())
             }
@@ -75,6 +77,7 @@ impl Analyzer {
         let binding_type =
             self.resolve_binding_type(declared_type_name.as_ref(), initializer, span)?;
         self.validate_declared_initializer(name, declared_type_name.as_ref(), initializer, span)?;
+        self.validate_arena_provenance_for_binding(name, initializer, span)?;
         if *role == Role::Erg {
             self.initialize_owner(initializer, span)?;
         }
@@ -86,17 +89,12 @@ impl Analyzer {
         if let Some(type_name) = declared_type_name.as_ref() {
             self.binding_type_names.insert(binding_index, type_name.clone());
         }
-        let initializer_span = super::expression_span(initializer);
-        if let Some(provenance) = self
-            .expression_arena_provenance
-            .get(&(initializer_span.start, initializer_span.end))
-            .copied()
-        {
-            self.binding_arena_provenance.insert(binding_index, provenance);
-        } else if declared_type_name.as_ref().is_some_and(|type_name| type_name.name == "Arena") {
+        self.record_binding_arena_provenance(binding_index, initializer);
+        if declared_type_name.as_ref().is_some_and(|type_name| type_name.name == "Arena") {
             let provenance = self.next_arena_id;
             self.next_arena_id += 1;
             self.binding_arena_provenance.insert(binding_index, provenance);
+            self.arena_scope_depth.insert(provenance, self.scopes.len());
         }
         if *role == Role::Abs
             && let Ok(index) = self.binding(name, span)
@@ -122,6 +120,72 @@ impl Analyzer {
         if let Expr::Try { span, .. } = expression {
             self.plan_return_unwind(*span);
         }
+    }
+
+    fn record_binding_arena_provenance(&mut self, binding_index: usize, expression: &Expr) {
+        self.binding_arena_provenance.remove(&binding_index);
+        let arenas = self.arena_provenances(expression);
+        if arenas.len() == 1 {
+            self.binding_arena_provenance.insert(binding_index, *arenas.iter().next().unwrap());
+        }
+    }
+
+    fn validate_arena_provenance_for_binding(
+        &self,
+        name: &str,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let arenas = self.arena_provenances(expression);
+        if arenas.len() > 1 {
+            return Err(SemanticError {
+                kind: super::super::errors::SemanticErrorKind::CrossArenaReference {
+                    name: name.to_owned(),
+                },
+                span,
+            });
+        }
+        if let Some(arena_id) = arenas.iter().next()
+            && self.scopes.len() < *self.arena_scope_depth.get(arena_id).unwrap_or(&0)
+        {
+            return Err(SemanticError {
+                kind: super::super::errors::SemanticErrorKind::ArenaReferenceEscape {
+                    name: name.to_owned(),
+                },
+                span,
+            });
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_arena_provenance_target(
+        &self,
+        binding_index: usize,
+        name: &str,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let arenas = self.arena_provenances(expression);
+        if arenas.len() > 1 {
+            return Err(SemanticError {
+                kind: super::super::errors::SemanticErrorKind::CrossArenaReference {
+                    name: name.to_owned(),
+                },
+                span,
+            });
+        }
+        if let Some(arena_id) = arenas.iter().next()
+            && self.binding_scope_depth.get(&binding_index).copied().unwrap_or(0)
+                < *self.arena_scope_depth.get(arena_id).unwrap_or(&0)
+        {
+            return Err(SemanticError {
+                kind: super::super::errors::SemanticErrorKind::ArenaReferenceEscape {
+                    name: name.to_owned(),
+                },
+                span,
+            });
+        }
+        Ok(())
     }
 
     fn visit_expr_statement(

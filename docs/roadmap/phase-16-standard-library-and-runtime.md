@@ -473,17 +473,17 @@ without host runtime services.
 Implement ADR-0030 for bounded cyclic data structures while retaining lexical
 provenance and deterministic teardown.
 
-- [ ] Architecture & lexical/semantic contract: define `Arena[N]`, `place(...)`,
+- [x] Architecture & lexical/semantic contract: define `Arena[N]`, `place(...)`,
       and scope lifetime rules.
 - [ ] Define `Arena[N]` capacity, alignment, and storage layout.
-- [ ] Provenance & escape analysis: bind arena roots and reject cross-arena or
+- [x] Provenance & escape analysis: bind arena roots and reject cross-arena or
       escaping references.
-- [ ] Add arena provenance metadata to semantic bindings and views.
-- [ ] Return objects from an arena through non-escaping `ins` construction.
-- [ ] Permit read-only traversal through `abs` references.
-- [ ] Reject references that escape the arena scope.
+- [x] Add arena provenance metadata to semantic bindings and views.
+- [x] Return objects from an arena through non-escaping `ins` construction.
+- [x] Permit read-only traversal through `abs` references.
+- [x] Reject references that escape the arena scope.
 - [ ] Reject owner drop or move while arena-derived views are live.
-- [ ] Reject combinations of references from different arena roots.
+- [x] Reject combinations of references from different arena roots.
 - [ ] Cranelift lowering & fast bump-pointer allocation.
 - [ ] Cyclical data structures and graph/tree native execution tests.
 - [ ] Deterministic bulk teardown verification.
