@@ -302,6 +302,26 @@ fn lsp_exposes_pack_registers_in_hover_completion_and_tokens() {
     assert!(stdout.contains("pack-keyword"), "stdout: {stdout}");
 }
 
+#[test]
+fn lsp_resolves_pack_fields_and_renders_hardware_aware_hover() {
+    let uri = "file:///tmp/actus-lsp-pack-field.act";
+    let source = "pack Control { erg storage: u32; layout little; fields { erg prescaler: u4 at 2; abs _reserved: u26 at 6 = 0; } }\nverb main() -> Int { erg control = Control { storage: 0, }; control.prescaler = 3; return control.prescaler; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":position_after(source, "control.prescaler")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "control.prescaler")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("offset: 2"), "stdout: {stdout}");
+    assert!(stdout.contains("width: 4 bits"), "stdout: {stdout}");
+    assert!(stdout.contains("mask: 0x0F"), "stdout: {stdout}");
+    assert!(stdout.contains("erg prescaler: u4"), "stdout: {stdout}");
+    assert!(stdout.contains("\"start\":{\"character\":61,\"line\":0}"), "stdout: {stdout}");
+}
+
 fn position_after(source: &str, marker: &str) -> Value {
     let offset = source.find(marker).expect("marker in source") + marker.len() - 1;
     let line = source[..offset].bytes().filter(|byte| *byte == b'\n').count();

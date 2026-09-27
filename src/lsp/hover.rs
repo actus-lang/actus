@@ -112,17 +112,31 @@ fn declaration_info(source: &str, declaration: &TopLevelDecl, name: &str) -> Opt
 
 fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Option<SymbolInfo> {
     let field = pack.fields.iter().find(|field| field.name == name)?;
+    let width =
+        crate::ast::primitive_type(&field.ty.name).and_then(|primitive| match primitive {
+            crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
+            _ => None,
+        })?;
+    let mask = format_mask(width);
     Some(SymbolInfo {
         signature: format!(
-            "{} {}: {} at {}",
+            "{} {}: {} (offset: {}, width: {} bits, mask: {})",
             role_name(&field.role),
             field.name,
             type_name(&field.ty),
-            field.offset
+            field.offset,
+            width,
+            mask,
         ),
         span: identifier_span(source, field.span, name).unwrap_or(field.span),
         documentation: None,
     })
+}
+
+fn format_mask(width: u8) -> String {
+    let mask = if width == 128 { u128::MAX } else { (1u128 << width) - 1 };
+    let digits = usize::from(width.div_ceil(4)).max(2);
+    format!("0x{mask:0digits$X}")
 }
 
 fn pack_signature(pack: &PackDecl) -> String {

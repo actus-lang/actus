@@ -40,6 +40,9 @@ fn local_definition(
     let mut definitions = Vec::new();
     for declaration in &program.declarations {
         collect_top_level_definition(source, declaration, name, &mut definitions);
+        if let TopLevelDecl::Pack(pack) = declaration {
+            collect_pack_field_definitions(source, pack, name, &mut definitions);
+        }
         if let TopLevelDecl::Verb(verb) = declaration
             && verb.span.start <= use_offset
             && use_offset <= verb.span.end
@@ -49,6 +52,21 @@ fn local_definition(
         }
     }
     definitions.into_iter().filter(|span| span.start <= use_offset).max_by_key(|span| span.start)
+}
+
+fn collect_pack_field_definitions(
+    source: &str,
+    pack: &crate::ast::PackDecl,
+    name: &str,
+    definitions: &mut Vec<SourceSpan>,
+) {
+    for field in &pack.fields {
+        if field.name == name
+            && let Some(identifier) = identifier_span(source, field.span, name)
+        {
+            definitions.push(identifier);
+        }
+    }
 }
 
 fn collect_top_level_definition(
