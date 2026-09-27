@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::InstBuilder;
+use cranelift_codegen::ir::{InstBuilder, MemFlagsData, condcodes::IntCC, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
 use super::case::lower_case;
+use super::cleanup::emit_return_cleanup;
 use super::enums::enum_expression_type;
 use super::expression_construct::lower_construct;
 use super::expression_literals::{lower_identifier, lower_integer, lower_string};
@@ -117,6 +118,17 @@ fn lower_complex_expression(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
+        Expr::Try { expression, span } => lower_try_expression(
+            function,
+            expression,
+            *span,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
         Expr::Unary { .. } | Expr::Binary { .. } => lower_operation(
             function,
             expression,
@@ -127,6 +139,31 @@ fn lower_complex_expression(
             string_data,
             layouts,
         ),
+        _ => lower_construct_or_case(
+            function,
+            expression,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_construct_or_case(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    match expression {
         Expr::Call { .. }
         | Expr::MethodCall { .. }
         | Expr::StructLit { .. }
@@ -151,11 +188,108 @@ fn lower_complex_expression(
             string_data,
             layouts,
         ),
-        Expr::Try { .. } => {
-            Err(NativeEmitError("try operator lowering is not implemented yet".to_owned()))
-        }
         _ => Err(NativeEmitError("unsupported native expression".to_owned())),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_try_expression(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let source = lower_expression(
+        function,
+        expression,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let NativeType::Enum(enum_id) = initializer_type(expression, local_types, functions, layouts)
+    else {
+        return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
+    };
+    let layout = layouts
+        .enum_layout(enum_id)
+        .ok_or_else(|| NativeEmitError("try operand has no enum layout".to_owned()))?;
+    let ok = layouts
+        .enum_variant(enum_id, "Ok")
+        .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
+    let field =
+        ok.fields.first().ok_or_else(|| NativeEmitError("Result.Ok has no payload".to_owned()))?;
+    emit_try_control_flow(
+        function,
+        source,
+        span,
+        field.ty,
+        layout.discriminant_offset,
+        layout.payload_offset + field.offset,
+        ok.discriminant,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_try_control_flow(
+    function: &mut FunctionBuilder<'_>,
+    source: cranelift_codegen::ir::Value,
+    span: crate::lexer::SourceSpan,
+    field_type: NativeType,
+    discriminant_offset: u32,
+    payload_offset: u32,
+    ok_discriminant: u32,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let discriminant =
+        function.ins().load(types::I32, MemFlagsData::new(), source, discriminant_offset as i32);
+    let is_ok = function.ins().icmp_imm_s(IntCC::Equal, discriminant, i64::from(ok_discriminant));
+    let ok_block = function.create_block();
+    let err_block = function.create_block();
+    let merge = function.create_block();
+    function.append_block_param(merge, field_type.ir_type(layouts.pointer_type));
+    function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
+
+    function.switch_to_block(err_block);
+    emit_return_cleanup(function, cleanup_schedule, span, locals, local_types, functions, layouts)?;
+    function.ins().return_(&[source]);
+    function.seal_block(err_block);
+
+    function.switch_to_block(ok_block);
+    let payload_address = function.ins().iadd_imm_s(source, i64::from(payload_offset));
+    let value = match field_type {
+        NativeType::Struct(_) | NativeType::Enum(_) => payload_address,
+        NativeType::Int => function.ins().load(types::I32, MemFlagsData::new(), payload_address, 0),
+        NativeType::String | NativeType::Buffer => {
+            function.ins().load(layouts.pointer_type, MemFlagsData::new(), payload_address, 0)
+        }
+        NativeType::FatPointer => {
+            return Err(NativeEmitError("try does not yet unwrap fat-pointer payloads".to_owned()));
+        }
+    };
+    let argument = cranelift_codegen::ir::BlockArg::Value(value);
+    function.ins().jump(merge, [&argument]);
+    function.seal_block(ok_block);
+
+    function.switch_to_block(merge);
+    function.seal_block(merge);
+    Ok(function.block_params(merge)[0])
 }
 
 pub(super) fn initializer_type(
@@ -169,6 +303,16 @@ pub(super) fn initializer_type(
         Expr::BufferLiteral { .. } => NativeType::Buffer,
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             initializer_type(expression, types, functions, layouts)
+        }
+        Expr::Try { expression, .. } => {
+            let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts)
+            else {
+                return NativeType::Int;
+            };
+            layouts
+                .enum_variant(enum_id, "Ok")
+                .and_then(|variant| variant.fields.first().map(|field| field.ty))
+                .unwrap_or(NativeType::Int)
         }
         Expr::Call { callee, .. } => {
             functions.get(callee).map(|function| function.return_type).unwrap_or(NativeType::Int)

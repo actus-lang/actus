@@ -120,6 +120,36 @@ fn executes_monomorphized_generic_enum_cleanup() {
 
 #[cfg(unix)]
 #[test]
+fn executes_try_unwrap_in_an_initializer() {
+    build_and_run(
+        "verb produce() -> Result[Int, Int] { return Ok(42); } verb worker() -> Result[Int, Int] { erg value = produce()?; return Ok(value); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 1, }; }\n",
+        "try-initializer",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_struct_ok_payload_through_try_unwrap() {
+    build_and_run(
+        "struct Payload { value: Int, } verb make_payload() -> Payload { return Payload { value: 42, }; } verb produce() -> Result[Payload, Int] { return Ok(make_payload()); } verb worker() -> Result[Payload, Int] { erg payload = produce()?; return Ok(payload); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(payload) => payload.value, Result.Err(_) => 1, }; }\n",
+        "try-struct-ok-payload",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_struct_err_payload_through_try_propagation() {
+    build_and_run(
+        "struct Failure { code: Int, } verb produce() -> Result[Int, Failure] { return Err(Failure { code: 42, }); } verb worker() -> Result[Int, Failure] { produce()?; return Ok(0); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(_) => 1, Result.Err(error) => error.code, }; }\n",
+        "try-struct-err-payload",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_option_none_without_null_propagation() {
     build_and_run(
         "verb main() -> Int { erg option = Option[Int].None; return case dat option { Option.Some(_) => 1, Option.None => 0, }; }\n",
