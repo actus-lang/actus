@@ -44,9 +44,7 @@ pub unsafe extern "C" fn actus_file_open(path: *const u8, path_len: usize, mode:
         let wide = String::from_utf8_lossy(bytes).encode_utf16().collect::<Vec<_>>();
         let path = std::ffi::OsString::from_wide(&wide);
         use std::os::windows::io::IntoRawHandle;
-        return options
-            .open(path)
-            .map_or(-1, |file| file.into_raw_handle() as *mut std::ffi::c_void as i64);
+        return options.open(path).map_or(-1, |file| file.into_raw_handle() as i64);
     }
     #[allow(unreachable_code)]
     -1
@@ -285,7 +283,7 @@ fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> i64 {
         let wide = String::from_utf8_lossy(bytes).encode_utf16().collect::<Vec<_>>();
         return options
             .open(std::ffi::OsString::from_wide(&wide))
-            .map_or(-1, |file| file.into_raw_handle() as *mut std::ffi::c_void as i64);
+            .map_or(-1, |file| file.into_raw_handle() as i64);
     }
     #[allow(unreachable_code)]
     -1
