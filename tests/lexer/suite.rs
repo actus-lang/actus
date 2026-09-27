@@ -31,6 +31,38 @@ fn scans_the_instrumental_role_keyword() {
 }
 
 #[test]
+fn scans_width_qualified_integer_types_and_hex_literals() {
+    let (tokens, errors) = scan("u1 u8 u32 u128 i16 f32 f64 Void 0xDEADBEEF 0x0");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].kind, TokenKind::IntType { signed: false, width: 1 });
+    assert_eq!(tokens[1].kind, TokenKind::IntType { signed: false, width: 8 });
+    assert_eq!(tokens[2].kind, TokenKind::IntType { signed: false, width: 32 });
+    assert_eq!(tokens[3].kind, TokenKind::IntType { signed: false, width: 128 });
+    assert_eq!(tokens[4].kind, TokenKind::IntType { signed: true, width: 16 });
+    assert_eq!(tokens[5].kind, TokenKind::FloatType { width: 32 });
+    assert_eq!(tokens[6].kind, TokenKind::FloatType { width: 64 });
+    assert_eq!(tokens[7].kind, TokenKind::VoidType);
+    assert_eq!(tokens[8].kind, TokenKind::Integer("0xDEADBEEF".to_owned()));
+    assert_eq!(tokens[9].kind, TokenKind::Integer("0x0".to_owned()));
+}
+
+#[test]
+fn rejects_invalid_width_types_and_hex_literals() {
+    let (_, errors) = scan("u0 i0 u129 i256 0x 0x12G");
+
+    assert_eq!(errors.len(), 6);
+    assert!(
+        errors
+            .iter()
+            .take(4)
+            .all(|error| { matches!(error.kind, LexErrorKind::InvalidIntegerType(_)) })
+    );
+    assert!(matches!(errors[4].kind, LexErrorKind::InvalidHexLiteral(_)));
+    assert!(matches!(errors[5].kind, LexErrorKind::InvalidHexLiteral(_)));
+}
+
+#[test]
 fn scans_generic_delimiters() {
     let (tokens, errors) = scan("Option[Int, Result[Bool, String]]");
 

@@ -21,4 +21,4 @@ pub use intrinsic::{IntrinsicKind, IntrinsicSpec, lookup_call_intrinsic, lookup_
 pub use pattern::{LiteralPattern, NamedPattern, Pattern, PatternBinding, VariantPayload};
 pub use registry::RegistryStatus;
 pub use stmt::{Block, Stmt};
-pub use types::{BuiltinType, BuiltinTypeSpec, lookup_builtin_type};
+pub use types::{BuiltinType, BuiltinTypeSpec, PrimitiveType, lookup_builtin_type, primitive_type};

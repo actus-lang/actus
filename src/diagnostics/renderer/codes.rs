@@ -7,6 +7,8 @@ pub(super) fn lex_code(error: &LexError) -> u8 {
         LexErrorKind::UnexpectedCharacter(_) => 1,
         LexErrorKind::UnterminatedString => 2,
         LexErrorKind::UnterminatedDocString => 3,
+        LexErrorKind::InvalidIntegerType(_) => 4,
+        LexErrorKind::InvalidHexLiteral(_) => 5,
     }
 }
 

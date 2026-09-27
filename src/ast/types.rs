@@ -9,6 +9,29 @@ pub enum BuiltinType {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrimitiveType {
+    Integer { signed: bool, width: u8 },
+    Float { width: u8 },
+    Void,
+}
+
+pub fn primitive_type(name: &str) -> Option<PrimitiveType> {
+    if let Some((prefix, digits)) = name.split_at_checked(1)
+        && matches!(prefix, "u" | "i")
+        && let Ok(width) = digits.parse::<u16>()
+        && (1..=128).contains(&width)
+    {
+        return Some(PrimitiveType::Integer { signed: prefix == "i", width: width as u8 });
+    }
+    match name {
+        "f32" => Some(PrimitiveType::Float { width: 32 }),
+        "f64" => Some(PrimitiveType::Float { width: 64 }),
+        "Void" => Some(PrimitiveType::Void),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BuiltinTypeSpec {
     pub name: &'static str,
     pub status: RegistryStatus,

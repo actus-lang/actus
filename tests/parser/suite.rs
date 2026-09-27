@@ -1,4 +1,7 @@
-use actus::ast::{EnumPayload, Expr, MetaAttribute, ReturnAccess, Role, Stmt, TopLevelDecl};
+use actus::ast::{
+    EnumPayload, Expr, MetaAttribute, PrimitiveType, ReturnAccess, Role, Stmt, TopLevelDecl,
+    primitive_type,
+};
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
 
@@ -88,6 +91,22 @@ fn parses_buffer_literal_construction() {
         panic!("expected Buffer literal")
     };
     assert!(matches!(length.as_ref(), Expr::Integer { value, .. } if value == "16"));
+}
+
+#[test]
+fn parses_width_qualified_and_expanded_primitive_types() {
+    let program = parse_source(
+        "verb primitives(erg bit: u1, erg word: u128, erg signed: i16, erg single: f32, erg double: f64, erg unit: Void) -> Void { return; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+
+    let names = verb.params.iter().map(|param| param.ty.name.as_str()).collect::<Vec<_>>();
+    assert_eq!(names, ["u1", "u128", "i16", "f32", "f64", "Void"]);
+    assert_eq!(primitive_type("u1"), Some(PrimitiveType::Integer { signed: false, width: 1 }));
+    assert_eq!(primitive_type("i16"), Some(PrimitiveType::Integer { signed: true, width: 16 }));
+    assert_eq!(primitive_type("f32"), Some(PrimitiveType::Float { width: 32 }));
+    assert_eq!(primitive_type("f64"), Some(PrimitiveType::Float { width: 64 }));
+    assert_eq!(primitive_type("Void"), Some(PrimitiveType::Void));
 }
 
 #[test]
