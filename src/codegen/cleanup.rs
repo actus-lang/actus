@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::lexer::SourceSpan;
@@ -95,6 +96,21 @@ fn emit_scope_instructions(
                     functions,
                     layouts,
                 )?;
+            }
+            NativeInstruction::ResetArena { name, .. } => {
+                let Some(NativeType::Arena(capacity)) = types.get(name).copied() else {
+                    return Err(NativeEmitError(format!("arena binding `{name}` is unavailable")));
+                };
+                let address = locals
+                    .iter()
+                    .find(|(binding, _)| binding.as_str() == name)
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| {
+                        NativeEmitError(format!("arena binding `{name}` is unavailable"))
+                    })?;
+                let offset_address = function.ins().iadd_imm_s(address, i64::from(capacity));
+                let zero = function.ins().iconst(layouts.pointer_type, 0);
+                function.ins().store(MemFlagsData::new(), zero, offset_address, 0);
             }
         }
     }

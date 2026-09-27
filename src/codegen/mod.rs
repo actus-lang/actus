@@ -1,4 +1,5 @@
 mod abi;
+mod arenas;
 mod calls;
 mod case;
 mod case_payload;

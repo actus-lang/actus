@@ -97,6 +97,7 @@ impl Analyzer {
             &frame.borrow_ids,
             &frame.payload_cleanup,
             &self.model.bindings,
+            &self.binding_type_names,
         ));
     }
 }

@@ -216,6 +216,7 @@ fn drop_enum_payload_field(
         | NativeType::String
         | NativeType::Enum(_)
         | NativeType::Pack(_)
+        | NativeType::Arena(_)
         | NativeType::FatPointer => {}
     }
     Ok(())

@@ -127,6 +127,20 @@ fn lower_method_construct(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if let Some(value) = lower_arena_method(
+        function,
+        receiver,
+        method,
+        arguments,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    ) {
+        return value;
+    }
     if enum_receiver_name(receiver)
         .and_then(|name| layouts.enum_constructor(name, method))
         .is_some()
@@ -157,6 +171,40 @@ fn lower_method_construct(
             layouts,
         )
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_arena_method(
+    function: &mut FunctionBuilder<'_>,
+    receiver: &Expr,
+    method: &str,
+    arguments: &[Argument],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Option<Result<cranelift_codegen::ir::Value, NativeEmitError>> {
+    if method != "place"
+        || !matches!(
+            super::structs::expression_native_type(receiver, local_types, layouts),
+            Some(NativeType::Arena(_))
+        )
+    {
+        return None;
+    }
+    Some(super::arenas::lower_place(
+        function,
+        receiver,
+        arguments,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
