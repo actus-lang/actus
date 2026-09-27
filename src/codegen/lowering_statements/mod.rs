@@ -71,8 +71,11 @@ fn lower_statement<'source>(
             function, expression, *span, locals, types, functions, cleanup_schedule, string_data,
             layouts,
         ),
-        Stmt::Return { value: None, .. } => {
-            Err(NativeEmitError("native function requires a return value".to_owned()))
+        Stmt::Return { value: None, span } => {
+            super::super::cleanup::emit_return_cleanup(
+                function, cleanup_schedule, *span, locals, types, functions, layouts,
+            )?;
+            Ok(Flow::VoidReturn)
         }
         Stmt::Expression { expression, span } if matches!(expression, Expr::Try { .. }) => {
             try_lowering::lower_try_statement(
@@ -99,9 +102,7 @@ fn lower_statement<'source>(
             emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Continue, locals, types, functions, layouts)?;
             super::lowering_loops::emit_loop_jump(function, targets, locals, true)
         }
-        _ => Err(NativeEmitError(
-            "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns".to_owned(),
-        )),
+        _ => Err(NativeEmitError("native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns".to_owned())),
     }
 }
 
@@ -118,20 +119,43 @@ fn lower_owner_declaration<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let value = lower_expression(
-        function,
-        initializer,
-        locals,
-        types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-    )?;
+    let declared_native = declared_type
+        .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)));
+    let native_type =
+        declared_native.unwrap_or_else(|| initializer_type(initializer, types, functions, layouts));
+    let value =
+        if let (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) =
+            (declared_native, initializer)
+        {
+            super::super::expression_literals::lower_wide_integer(function, value)?
+        } else if let (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) =
+            (declared_native, initializer)
+        {
+            super::super::expression_literals::lower_float_as(
+                function,
+                value,
+                NativeType::Float { width }.ir_type(layouts.pointer_type),
+            )?
+        } else {
+            lower_expression(
+                function,
+                initializer,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )?
+        };
+    let value = declared_native.map_or(value, |declared| {
+        super::super::expression_literals::coerce_to_ir_type(
+            function,
+            value,
+            declared.ir_type(layouts.pointer_type),
+        )
+    });
     locals.insert(name, value);
-    let native_type = declared_type
-        .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)))
-        .unwrap_or_else(|| initializer_type(initializer, types, functions, layouts));
     types.insert(name, native_type);
     Ok(Flow::Fallthrough)
 }

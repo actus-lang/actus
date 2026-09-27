@@ -45,8 +45,15 @@ impl Parser {
     }
 
     pub(super) fn parse_type_name(&mut self) -> Result<TypeName, ParseError> {
-        let token = self.take_identifier("type name")?;
-        let name = identifier_text(&token.kind);
+        let token = self.advance_required("type name")?;
+        let name = type_name_text(&token.kind).ok_or_else(|| ParseError {
+            code: ParseErrorCode::UnexpectedToken,
+            kind: ParseErrorKind::UnexpectedToken {
+                expected: "type name".to_owned(),
+                found: token.kind.clone(),
+            },
+            span: token.span,
+        })?;
         let arguments = if self.match_simple(TokenKind::LeftBracket) {
             self.parse_type_arguments()?
         } else {
@@ -69,6 +76,18 @@ impl Parser {
         }
         self.expect_simple(TokenKind::RightBracket, "`]`")?;
         Ok(arguments)
+    }
+}
+
+fn type_name_text(kind: &TokenKind) -> Option<String> {
+    match kind {
+        TokenKind::Identifier(name) => Some(name.clone()),
+        TokenKind::IntType { signed, width } => {
+            Some(format!("{}{}", if *signed { 'i' } else { 'u' }, width))
+        }
+        TokenKind::FloatType { width } => Some(format!("f{width}")),
+        TokenKind::VoidType => Some("Void".to_owned()),
+        _ => None,
     }
 }
 

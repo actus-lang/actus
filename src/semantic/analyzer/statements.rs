@@ -22,6 +22,9 @@ impl Analyzer {
                 let index = self.binding(name, *span)?;
                 self.ensure_mutable(index, name, *span)?;
                 self.validate_binding_assignment(index, name, value, *span)?;
+                if let Some(expected) = self.binding_type_names.get(&index) {
+                    self.validate_expected_literal(value, expected)?;
+                }
                 self.visit_expression(value)?;
                 self.plan_try_unwind(value);
                 Ok(())

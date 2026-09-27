@@ -14,6 +14,7 @@ pub(super) use lowering_body::{lower_body, lower_case_block};
 pub(super) enum Flow {
     Fallthrough,
     Return(cranelift_codegen::ir::Value),
+    VoidReturn,
     Break,
     Continue,
 }

@@ -7,6 +7,8 @@ pub(super) fn lex_code(error: &LexError) -> u8 {
         LexErrorKind::UnexpectedCharacter(_) => 1,
         LexErrorKind::UnterminatedString => 2,
         LexErrorKind::UnterminatedDocString => 3,
+        LexErrorKind::InvalidIntegerType(_) => 4,
+        LexErrorKind::InvalidHexLiteral(_) => 5,
     }
 }
 
@@ -38,6 +40,7 @@ pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
         SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
+        SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
         SemanticErrorKind::MissingReturnValue => "E1028",
@@ -120,6 +123,9 @@ fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
 }
 
 pub(super) fn semantic_message(kind: &SemanticErrorKind) -> String {
+    if let SemanticErrorKind::NumericLiteralOutOfRange { ty, literal } = kind {
+        return format!("literal `{literal}` is outside the range of `{ty}`");
+    }
     if let Some(message) = ownership_semantic_message(kind) {
         return message;
     }

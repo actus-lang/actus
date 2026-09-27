@@ -9,7 +9,7 @@ use super::case::lower_case;
 use super::cleanup::emit_return_cleanup;
 use super::enums::enum_expression_type;
 use super::expression_construct::lower_construct;
-use super::expression_literals::{lower_identifier, lower_integer, lower_string};
+use super::expression_literals::{lower_float, lower_identifier, lower_integer, lower_string};
 use super::expression_operations::lower_operation;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -41,9 +41,7 @@ pub(super) fn lower_expression(
             string_data,
             layouts,
         ),
-        Expr::FloatLiteral { .. } => {
-            Err(NativeEmitError("floating-point expressions are not lowered yet".to_owned()))
-        }
+        Expr::FloatLiteral { value, .. } => lower_float(function, value),
         Expr::StringLiteral { value, .. } => lower_string(function, value, string_data),
         Expr::Identifier { name, .. } => lower_identifier(name, locals),
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => lower_expression(
@@ -263,7 +261,7 @@ fn emit_try_control_flow(
     let ok_block = function.create_block();
     let err_block = function.create_block();
     let merge = function.create_block();
-    function.append_block_param(merge, field_type.ir_type(layouts.pointer_type));
+    function.append_block_param(merge, try_payload_ir_type(field_type, layouts));
     function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
 
     function.switch_to_block(err_block);
@@ -273,16 +271,7 @@ fn emit_try_control_flow(
 
     function.switch_to_block(ok_block);
     let payload_address = function.ins().iadd_imm_s(source, i64::from(payload_offset));
-    let value = match field_type {
-        NativeType::Struct(_) | NativeType::Enum(_) => payload_address,
-        NativeType::Int => function.ins().load(types::I32, MemFlagsData::new(), payload_address, 0),
-        NativeType::String | NativeType::Buffer => {
-            function.ins().load(layouts.pointer_type, MemFlagsData::new(), payload_address, 0)
-        }
-        NativeType::FatPointer => {
-            return Err(NativeEmitError("try does not yet unwrap fat-pointer payloads".to_owned()));
-        }
-    };
+    let value = load_try_payload(function, payload_address, field_type, layouts)?;
     let argument = cranelift_codegen::ir::BlockArg::Value(value);
     function.ins().jump(merge, [&argument]);
     function.seal_block(ok_block);
@@ -290,6 +279,50 @@ fn emit_try_control_flow(
     function.switch_to_block(merge);
     function.seal_block(merge);
     Ok(function.block_params(merge)[0])
+}
+
+fn load_try_payload(
+    function: &mut FunctionBuilder<'_>,
+    payload_address: cranelift_codegen::ir::Value,
+    field_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    match field_type {
+        NativeType::Struct(_) | NativeType::Enum(_) => Ok(payload_address),
+        NativeType::Int => {
+            Ok(function.ins().load(types::I32, MemFlagsData::new(), payload_address, 0))
+        }
+        NativeType::Integer { width, .. } => Ok(function.ins().load(
+            NativeType::Integer { signed: false, width }.ir_type(layouts.pointer_type),
+            MemFlagsData::new(),
+            payload_address,
+            0,
+        )),
+        NativeType::Float { width } => Ok(function.ins().load(
+            NativeType::Float { width }.ir_type(layouts.pointer_type),
+            MemFlagsData::new(),
+            payload_address,
+            0,
+        )),
+        NativeType::Void => Ok(function.ins().iconst(types::I32, 0)),
+        NativeType::String | NativeType::Buffer => {
+            Ok(function.ins().load(layouts.pointer_type, MemFlagsData::new(), payload_address, 0))
+        }
+        NativeType::FatPointer => {
+            Err(NativeEmitError("try does not yet unwrap fat-pointer payloads".to_owned()))
+        }
+    }
+}
+
+fn try_payload_ir_type(
+    field_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> cranelift_codegen::ir::Type {
+    if matches!(field_type, NativeType::Void) {
+        types::I32
+    } else {
+        field_type.ir_type(layouts.pointer_type)
+    }
 }
 
 pub(super) fn initializer_type(

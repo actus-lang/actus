@@ -9,9 +9,9 @@
 Actus must represent hardware registers, protocol frames, and compact wire
 formats without forcing programmers to reconstruct bitfields with masks and
 shifts. That approach is verbose, obscures the width contract, and moves
-range errors into runtime code. Bare-metal targets, including Dali OS, need a
-layout that is known before linking and does not depend on an allocator or
-host runtime.
+range errors into runtime code. Bare-metal targets and embedded microcontrollers
+need a layout that is known before linking and does not depend on an allocator
+or host runtime.
 
 Hexadecimal notation is useful for writing numeric literals, but it does not
 describe the width or layout of a value. A literal format must therefore stay

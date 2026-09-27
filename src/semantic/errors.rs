@@ -176,6 +176,10 @@ pub enum SemanticErrorKind {
         expected: String,
         found: String,
     },
+    NumericLiteralOutOfRange {
+        ty: String,
+        literal: String,
+    },
     InvalidFieldAssignmentTarget {
         field: String,
     },

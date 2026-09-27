@@ -58,8 +58,13 @@ fn emit_struct_drop_except(
                 functions,
                 layouts,
             )?,
-            NativeType::Enum(_) | NativeType::Int | NativeType::String | NativeType::FatPointer => {
-            }
+            NativeType::Enum(_)
+            | NativeType::Int
+            | NativeType::Integer { .. }
+            | NativeType::Float { .. }
+            | NativeType::Void
+            | NativeType::String
+            | NativeType::FatPointer => {}
         }
     }
     Ok(())

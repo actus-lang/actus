@@ -234,6 +234,7 @@ pub(super) fn expression_native_type(
         }
         Expr::MethodCall { .. } => super::enums::enum_expression_type(expression, layouts),
         Expr::Integer { .. } => Some(NativeType::Int),
+        Expr::FloatLiteral { .. } => Some(NativeType::Float { width: 64 }),
         Expr::StringLiteral { .. } => Some(NativeType::String),
         _ => None,
     }

@@ -14,6 +14,10 @@ pub fn render_lex_error(source: &str, error: &LexError) -> String {
         }
         LexErrorKind::UnterminatedString => "unterminated string literal".to_owned(),
         LexErrorKind::UnterminatedDocString => "unterminated docstring literal".to_owned(),
+        LexErrorKind::InvalidIntegerType(text) => {
+            format!("invalid integer type `{text}`; expected `u1..u128` or `i1..i128`")
+        }
+        LexErrorKind::InvalidHexLiteral(text) => format!("invalid hexadecimal literal `{text}`"),
     };
     format!("error[E000{code}] at {line}:{column}: {message}", code = lex_code(error))
 }

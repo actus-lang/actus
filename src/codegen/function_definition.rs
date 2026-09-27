@@ -78,14 +78,12 @@ fn emit_flow(
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     match (return_type, return_slot, flow) {
-        (
-            Some(NativeType::Struct(id)),
-            Some(destination),
-            super::lowering::Flow::Return(result),
-        ) => {
+        (Some(return_type), Some(destination), super::lowering::Flow::Return(result))
+            if return_type.uses_sret() =>
+        {
             let size = layouts
-                .type_size(NativeType::Struct(id))
-                .ok_or_else(|| NativeEmitError(format!("missing return layout `{id}`")))?;
+                .type_size(return_type)
+                .ok_or_else(|| NativeEmitError("missing sret return layout".to_owned()))?;
             copy_bytes(function, result, destination, size);
             function.ins().return_(&[]);
         }
@@ -95,11 +93,19 @@ fn emit_flow(
         (None, None, super::lowering::Flow::Fallthrough) => {
             function.ins().return_(&[]);
         }
+        (Some(NativeType::Void), None, super::lowering::Flow::Fallthrough)
+        | (Some(NativeType::Void), None, super::lowering::Flow::VoidReturn)
+        | (None, None, super::lowering::Flow::VoidReturn) => {
+            function.ins().return_(&[]);
+        }
         (Some(_), _, super::lowering::Flow::Fallthrough) => {
             return Err(NativeEmitError("native function requires a return value".to_owned()));
         }
         (None, _, super::lowering::Flow::Return(_)) => {
             return Err(NativeEmitError("void native function returned a value".to_owned()));
+        }
+        (Some(NativeType::Void), _, super::lowering::Flow::Return(_)) => {
+            return Err(NativeEmitError("Void native function returned a value".to_owned()));
         }
         (_, _, super::lowering::Flow::Break | super::lowering::Flow::Continue) => {
             return Err(NativeEmitError(

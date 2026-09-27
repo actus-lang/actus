@@ -14,6 +14,13 @@ impl Analyzer {
         let previous = self.expected_expression_type.take();
         self.expected_expression_type = expected.cloned();
         let result = self.visit_expression(expression);
+        let result = result.and_then(|()| {
+            if let Some(expected) = expected {
+                self.validate_expected_literal(expression, expected)?;
+                self.validate_void_expression(expression, expected)?;
+            }
+            Ok(())
+        });
         self.expected_expression_type = previous;
         result
     }

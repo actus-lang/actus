@@ -4,7 +4,7 @@ use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
 use crate::ast::{
     BuiltinType, EnumDef, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName,
-    lookup_builtin_type,
+    lookup_builtin_type, primitive_type,
 };
 use crate::semantic::GenericInstance;
 
@@ -152,6 +152,9 @@ impl LayoutRegistry {
         name: &str,
         visiting: &mut Vec<String>,
     ) -> Result<NativeType, NativeEmitError> {
+        if let Some(primitive) = primitive_type(name) {
+            return Ok(NativeType::from_primitive(primitive));
+        }
         if let Some(ty) = lookup_builtin_type(name) {
             return match ty {
                 BuiltinType::Int => Ok(NativeType::Int),
@@ -190,6 +193,15 @@ impl LayoutRegistry {
     pub(super) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {
         Ok(match ty {
             NativeType::Int => (4, 4),
+            NativeType::Integer { width, .. } => {
+                let bytes = integer_storage_bytes(width);
+                (bytes, bytes)
+            }
+            NativeType::Float { width } => {
+                let bytes = u32::from(width / 8);
+                (bytes, bytes)
+            }
+            NativeType::Void => (0, 1),
             NativeType::String | NativeType::Buffer => (self.pointer_size, self.pointer_size),
             NativeType::FatPointer => (self.pointer_size * 2, self.pointer_size),
             NativeType::Struct(id) => {
@@ -212,6 +224,17 @@ impl LayoutRegistry {
                 (layout.size, layout.alignment)
             }
         })
+    }
+}
+
+fn integer_storage_bytes(width: u8) -> u32 {
+    match width {
+        1..=8 => 1,
+        9..=16 => 2,
+        17..=32 => 4,
+        33..=64 => 8,
+        65..=128 => 16,
+        _ => 0,
     }
 }
 

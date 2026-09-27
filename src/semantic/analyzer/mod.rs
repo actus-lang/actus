@@ -54,6 +54,7 @@ pub(super) struct Analyzer {
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
     pub(super) expected_expression_type: Option<crate::ast::TypeName>,
     pub(super) inferred_expression_types: HashMap<(usize, usize), crate::ast::TypeName>,
+    pub(super) type_registry: super::types::TypeRegistry,
 }
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
@@ -121,6 +122,7 @@ impl Analyzer {
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
             expected_expression_type: None,
             inferred_expression_types: HashMap::new(),
+            type_registry: super::types::TypeRegistry::new(),
         }
     }
 

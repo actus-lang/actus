@@ -106,6 +106,9 @@ fn store_payload(
     ty: NativeType,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
+    if matches!(ty, NativeType::Void) {
+        return Ok(());
+    }
     if let NativeType::Struct(id) | NativeType::Enum(id) = ty {
         let size = layouts
             .type_size(ty)
@@ -195,7 +198,13 @@ pub(super) fn emit_enum_payload_drop(
         NativeType::Struct(nested_id) => {
             emit_struct_drop(function, field_address, nested_id, functions, layouts)?;
         }
-        NativeType::Int | NativeType::String | NativeType::Enum(_) | NativeType::FatPointer => {}
+        NativeType::Int
+        | NativeType::Integer { .. }
+        | NativeType::Float { .. }
+        | NativeType::Void
+        | NativeType::String
+        | NativeType::Enum(_)
+        | NativeType::FatPointer => {}
     }
     Ok(())
 }

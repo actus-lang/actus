@@ -261,6 +261,28 @@ fn lsp_preserves_utf16_ranges_with_multibyte_source_text() {
     assert!(stdout.contains("გამარჯობა 🚀"), "stdout: {stdout}");
 }
 
+#[test]
+fn lsp_exposes_gate_36_primitives_in_hover_completion_and_tokens() {
+    let uri = "file:///tmp/actus-lsp-primitives.act";
+    let source =
+        "verb sample(erg count: u8, erg ratio: f64, erg unit: Void) -> u128 { return 0x2A; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "u8")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("completionProvider"));
+    assert!(stdout.contains("type u8"));
+    assert!(stdout.contains("\"label\":\"u128\""));
+    assert!(stdout.contains("semanticTokensProvider"));
+    assert!(stdout.contains("\"data\":["));
+}
+
 fn position_after(source: &str, marker: &str) -> Value {
     let offset = source.find(marker).expect("marker in source") + marker.len() - 1;
     let line = source[..offset].bytes().filter(|byte| *byte == b'\n').count();

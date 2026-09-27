@@ -20,12 +20,22 @@ pub fn find_hover(uri: &str, source: &str, position: &LspPosition) -> Option<Hov
     let offset = LineIndex::new(source).byte_offset(source, position)?;
     let (name, name_span) = identifier_at(&tokens, offset)?;
     let program = parse(tokens).ok()?;
+    if is_primitive_name(&name) {
+        return Some(HoverInfo {
+            contents: format!("```actus\ntype {name}\n```"),
+            range: range(source, name_span),
+        });
+    }
     let info = local_info(source, &program, &name, offset)
         .or_else(|| imported_info(uri, &program, &name))?;
     Some(HoverInfo {
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
     })
+}
+
+fn is_primitive_name(name: &str) -> bool {
+    crate::ast::primitive_type(name).is_some()
 }
 
 #[derive(Clone, Debug)]
@@ -235,9 +245,20 @@ fn identifier_at(tokens: &[Token], offset: usize) -> Option<(String, SourceSpan)
     tokens.iter().find_map(|token| {
         (token.span.start <= offset
             && offset <= token.span.end
-            && matches!(token.kind, TokenKind::Identifier(_)))
+            && matches!(
+                token.kind,
+                TokenKind::Identifier(_)
+                    | TokenKind::IntType { .. }
+                    | TokenKind::FloatType { .. }
+                    | TokenKind::VoidType
+            ))
         .then(|| match &token.kind {
             TokenKind::Identifier(name) => (name.clone(), token.span),
+            TokenKind::IntType { signed, width } => {
+                (format!("{}{}", if *signed { 'i' } else { 'u' }, width), token.span)
+            }
+            TokenKind::FloatType { width } => (format!("f{width}"), token.span),
+            TokenKind::VoidType => ("Void".to_owned(), token.span),
             _ => unreachable!(),
         })
     })

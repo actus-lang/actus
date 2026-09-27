@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{InstBuilder, types};
+use cranelift_codegen::ir::{InstBuilder, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr, IntrinsicKind, lookup_call_intrinsic};
@@ -97,26 +97,48 @@ pub(super) fn lower_call(
     )?;
     let target = resolve_call_target(function, callee, target, &values, functions)?;
     normalize_call_arguments(function, callee, &mut values)?;
-    let result_address = if let NativeType::Struct(id) = target.return_type {
-        let layout = layouts
-            .get(id)
-            .ok_or_else(|| NativeEmitError(format!("missing return layout `{id}`")))?;
-        let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
-        let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    let result_address = allocate_return_address(function, target.return_type, layouts)?;
+    if let Some(address) = result_address {
         values.insert(0, address);
-        Some(address)
-    } else {
-        None
-    };
+    }
     let call = function.ins().call(target.reference, &values);
     if let Some(address) = result_address {
         return Ok(address);
+    }
+    if matches!(target.return_type, NativeType::Void) {
+        return Ok(function.ins().iconst(types::I32, 0));
     }
     function
         .inst_results(call)
         .first()
         .copied()
         .ok_or_else(|| NativeEmitError(format!("native function `{callee}` returned no value")))
+}
+
+fn allocate_return_address(
+    function: &mut FunctionBuilder<'_>,
+    return_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+    if !return_type.uses_sret() {
+        return Ok(None);
+    }
+    let slot = if let NativeType::Struct(id) = return_type {
+        let layout = layouts
+            .get(id)
+            .ok_or_else(|| NativeEmitError(format!("missing return layout `{id}`")))?;
+        function.func.create_sized_stack_slot(layouts.stack_slot(layout))
+    } else {
+        let size = layouts
+            .type_size(return_type)
+            .ok_or_else(|| NativeEmitError("missing sret return layout".to_owned()))?;
+        function.func.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            size,
+            4,
+        ))
+    };
+    Ok(Some(function.ins().stack_addr(layouts.pointer_type, slot, 0)))
 }
 
 #[allow(clippy::too_many_arguments)]
