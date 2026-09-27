@@ -4,3 +4,5 @@ contracts. File ownership is deterministic: an owned File closes at scope
 exit through its Drop performance.
 """
 open file;
+open options;
+open seek;

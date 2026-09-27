@@ -28,16 +28,7 @@ fn path_literal(path: &Path) -> String {
         .join(" ")
 }
 
-#[test]
-fn std_fs_api_builds_with_reader_writer_and_drop_contracts() {
-    let root = std::env::temp_dir().join(format!("actus-fs-{}", std::process::id()));
-    let source_root = root.join("src");
-    fs::create_dir_all(&source_root).expect("create fixture root");
-    fs::write(
-        root.join("Actus.toml"),
-        "[package]\nname = \"fs-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
-    )
-    .expect("write fixture manifest");
+fn copy_std_library(root: &Path) {
     let relative_files = [
         ("lib.act", library_file("lib.act")),
         ("io/io.act", library_file("io/io.act")),
@@ -54,8 +45,55 @@ fn std_fs_api_builds_with_reader_writer_and_drop_contracts() {
         ("io/copy.act", library_file("io/copy.act")),
         ("fs/fs.act", library_file("fs/fs.act")),
         ("fs/file.act", library_file("fs/file.act")),
+        ("fs/seek.act", library_file("fs/seek.act")),
+        ("fs/options.act", library_file("fs/options.act")),
     ];
-    copy_library(&root, &relative_files);
+    copy_library(root, &relative_files);
+}
+
+fn write_fixture(root: &Path, name: &str, source: &str) -> (PathBuf, PathBuf) {
+    let source_root = root.join("src");
+    fs::create_dir_all(&source_root).expect("create fixture root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"fs-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write fixture manifest");
+    copy_std_library(root);
+    let input = source_root.join(name);
+    fs::write(&input, source).expect("write Actus fixture");
+    (input, root.join("fixture"))
+}
+
+fn build_and_run(input: &Path, output: &Path) {
+    let status = run_with_args(
+        [
+            "build",
+            input.to_str().expect("fixture path"),
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path"),
+        ]
+        .into_iter()
+        .map(str::to_owned),
+    );
+    assert_eq!(status, 0);
+    let execution = std::process::Command::new(output).status().expect("run fs fixture");
+    assert_eq!(execution.code(), Some(0));
+}
+
+#[test]
+fn std_fs_api_builds_with_reader_writer_and_drop_contracts() {
+    let root = std::env::temp_dir().join(format!("actus-fs-{}", std::process::id()));
+    let source_root = root.join("src");
+    fs::create_dir_all(&source_root).expect("create fixture root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"fs-fixture\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write fixture manifest");
+    copy_std_library(&root);
     let data_path = root.join("roundtrip.bin");
     let path = path_literal(&data_path);
     let source = format!(
@@ -81,6 +119,34 @@ fn std_fs_api_builds_with_reader_writer_and_drop_contracts() {
     assert_eq!(execution.code(), Some(0));
     assert_eq!(fs::read(&data_path).expect("read round-trip file"), b"AB");
     fs::remove_dir_all(root).expect("remove fixture root");
+}
+
+#[test]
+fn std_fs_seek_reads_from_start_after_writing() {
+    let root = std::env::temp_dir().join(format!("actus-fs-seek-{}", std::process::id()));
+    let data_path = root.join("seek.bin");
+    let path = path_literal(&data_path);
+    let source = format!(
+        "import io; import fs; verb seek_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg payload = Buffer[0]; append(payload, 65); append(payload, 66); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs payload); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg origin = SeekFrom.Start(0); erg moved = file.seek(from: dat origin); case dat moved {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg destination = Buffer[0]; erg capacity = 2; reserve(buffer: ins destination, capacity: capacity); erg result = file.read(buffer: ins destination); case dat result {{ Result.Ok(count) => {{ return Result[Int, IoError].Ok(count); }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Result[Int, IoError].Err(IoError.Failed); }} verb main() -> Int {{ erg result = seek_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 99, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    assert_eq!(fs::read(&data_path).expect("read seek fixture"), b"AB");
+    fs::remove_dir_all(root).expect("remove seek fixture");
+}
+
+#[test]
+fn std_fs_open_options_append_preserves_existing_bytes() {
+    let root = std::env::temp_dir().join(format!("actus-fs-append-{}", std::process::id()));
+    let data_path = root.join("append.bin");
+    let path = path_literal(&data_path);
+    let source = format!(
+        "import io; import fs; verb append_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg first = Buffer[0]; append(first, 65); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs first); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg appendable = OpenOptions {{ read: 0, write: 1, append: 1, truncate: 0, create: 0, create_new: 0, }}; erg opened = options_open(options: dat appendable, path: abs path); case dat opened {{ Result.Ok(value) => {{ erg file: File = value; erg second = Buffer[0]; append(second, 66); erg written = file.write(buffer: abs second); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Ok(2); }} verb main() -> Int {{ erg result = append_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 1, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    assert_eq!(fs::read(&data_path).expect("read append fixture"), b"AB");
+    fs::remove_dir_all(root).expect("remove append fixture");
 }
 
 #[test]

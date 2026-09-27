@@ -25,6 +25,13 @@ open unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
 """Close a file handle through the hosted runtime."""
 open unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
+"""Move a file cursor and return its resulting absolute byte position."""
+open unsafe extern "C" verb actus_file_seek_buffer(
+    abs handle: Int,
+    abs offset: Int,
+    abs whence: Int
+) -> Int;
+
 """Consume an invalid scalar handle so constructor branches join cleanly."""
 open verb discard_handle(dat handle: Int) -> Int { return handle; }
 
@@ -76,6 +83,58 @@ perform Writer for File {
         return case status {
             -1 => Err(IoError.Failed),
             _ => Ok(status),
+        };
+    }
+}
+
+"""Translate a runtime cursor position into a typed result."""
+open verb file_seek_status(erg status: Int) -> Result[Int, IoError] {
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""Seek from the beginning of a file."""
+open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+    erg origin = 0;
+    erg status = actus_file_seek_buffer(
+        handle: abs self.handle,
+        offset: abs offset,
+        whence: abs origin
+    );
+    return file_seek_status(status: status);
+}
+
+"""Seek relative to the current file position."""
+open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+    erg origin = 1;
+    erg status = actus_file_seek_buffer(
+        handle: abs self.handle,
+        offset: abs offset,
+        whence: abs origin
+    );
+    return file_seek_status(status: status);
+}
+
+"""Seek relative to the end of a file."""
+open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+    erg origin = 2;
+    erg status = actus_file_seek_buffer(
+        handle: abs self.handle,
+        offset: abs offset,
+        whence: abs origin
+    );
+    return file_seek_status(status: status);
+}
+
+"""Satisfy the positional stream contract through the host runtime."""
+perform Seeker for File {
+    verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError] {
+        return case dat from {
+            SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
+            SeekFrom.Current(offset) => file_seek_current(self: ins self, offset: abs offset),
+            SeekFrom.End(offset) => file_seek_end(self: ins self, offset: abs offset),
         };
     }
 }

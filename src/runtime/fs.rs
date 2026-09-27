@@ -1,8 +1,11 @@
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 use super::types::BufferHandle;
 
 const MODE_CREATE: u32 = 1;
+const WHENCE_START: i32 = 0;
+const WHENCE_CURRENT: i32 = 1;
+const WHENCE_END: i32 = 2;
 
 /// Opens a host file using a stable, pointer-and-length C ABI.
 ///
@@ -87,6 +90,26 @@ pub extern "C" fn actus_file_close(handle: i64) -> i32 {
     close_file(handle)
 }
 
+/// Moves a host file cursor and returns its resulting absolute position.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_seek(handle: i64, offset: i64, whence: i32) -> i64 {
+    let origin = match whence {
+        WHENCE_START if offset >= 0 => SeekFrom::Start(offset as u64),
+        WHENCE_START => return -1,
+        WHENCE_CURRENT => SeekFrom::Current(offset),
+        WHENCE_END => SeekFrom::End(offset),
+        _ => return -1,
+    };
+    with_file(handle, |file| file.seek(origin).map_or(-1, |position| position as i64))
+}
+
+/// Moves a file cursor through the scalar ABI used by Actus external verbs.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_seek_buffer(handle: i32, offset: i32, whence: i32) -> i32 {
+    let position = actus_file_seek(i64::from(handle), i64::from(offset), whence);
+    i32::try_from(position).unwrap_or(-1)
+}
+
 /// Opens a file from the Actus buffer representation used by external verbs.
 ///
 /// # Safety
@@ -101,6 +124,45 @@ pub unsafe extern "C" fn actus_file_open_buffer(path: BufferHandle, mode: i32) -
         return -1;
     }
     let handle = unsafe { actus_file_open(path.data, path.length, mode as u32) };
+    handle_to_actus(handle)
+}
+
+/// Opens a path from independent Actus boolean options.
+///
+/// # Safety
+/// `path` must be null or point to a valid live `ActusBuffer` whose bytes are
+/// readable for the duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_open_options_buffer(
+    path: BufferHandle,
+    read: i32,
+    write: i32,
+    append: i32,
+    truncate: i32,
+    create: i32,
+    create_new: i32,
+) -> i32 {
+    if path.is_null() {
+        return -1;
+    }
+    let path = unsafe { &*path };
+    if path.length > 0 && path.data.is_null() {
+        return -1;
+    }
+    let bytes = if path.length == 0 {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(path.data, path.length) }
+    };
+    let mut options = std::fs::OpenOptions::new();
+    options
+        .read(read != 0)
+        .write(write != 0 || append != 0)
+        .append(append != 0)
+        .truncate(truncate != 0)
+        .create(create != 0)
+        .create_new(create_new != 0);
+    let handle = open_with_options(bytes, options);
     handle_to_actus(handle)
 }
 
@@ -168,6 +230,28 @@ fn handle_to_actus(handle: i64) -> i32 {
     #[cfg(windows)]
     {
         return windows_handles::insert(handle);
+    }
+    #[allow(unreachable_code)]
+    -1
+}
+
+fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> i64 {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        use std::os::unix::io::IntoRawFd;
+        return options
+            .open(std::ffi::OsStr::from_bytes(bytes))
+            .map_or(-1, |file| file.into_raw_fd() as i64);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStringExt;
+        use std::os::windows::io::IntoRawHandle;
+        let wide = String::from_utf8_lossy(bytes).encode_utf16().collect::<Vec<_>>();
+        return options
+            .open(std::ffi::OsString::from_wide(&wide))
+            .map_or(-1, |file| file.into_raw_handle() as *mut std::ffi::c_void as i64);
     }
     #[allow(unreachable_code)]
     -1

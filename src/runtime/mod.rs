@@ -28,8 +28,9 @@ pub use contract::{
 };
 pub use fs::{
     actus_file_close, actus_file_close_buffer, actus_file_flush, actus_file_flush_buffer,
-    actus_file_open, actus_file_open_buffer, actus_file_read, actus_file_read_buffer,
-    actus_file_write, actus_file_write_buffer,
+    actus_file_open, actus_file_open_buffer, actus_file_open_options_buffer, actus_file_read,
+    actus_file_read_buffer, actus_file_seek, actus_file_seek_buffer, actus_file_write,
+    actus_file_write_buffer,
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use stream::{

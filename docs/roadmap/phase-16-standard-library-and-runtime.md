@@ -255,6 +255,16 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 - [ ] Add semantic ownership and failure-path tests.
 - [ ] Add native read, write, append, missing-file, and cleanup tests.
 
+### Gate 3.1: Seeker role and OpenOptions
+
+- [x] Define `SeekFrom` with `Start`, `Current`, and `End` origins.
+- [x] Define the `Seeker` role and perform it for `File`.
+- [x] Add the runtime seek bridge with bounds and invalid-origin checks.
+- [x] Define scalar `OpenOptions` flags and modality helper verbs.
+- [x] Add typed `options_open` and the runtime modal-open bridge.
+- [x] Add native seek/read-after-seek coverage.
+- [x] Add native append coverage proving existing bytes are preserved.
+
 ### Gate 3 invariant
 
 - [ ] `std::fs` resources are owned, transferred, and cleaned exactly once.
