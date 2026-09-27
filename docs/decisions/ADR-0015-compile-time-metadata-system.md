@@ -153,6 +153,40 @@ Target selection, linker choice, and build profiles belong in `Actus.toml`, not
 in declaration metadata. A future `pragma` system must not become a substitute
 for project configuration.
 
+### Target-conditional declarations
+
+Actus uses declaration metadata to express whether a declaration is available
+for a selected compilation target. The canonical form is:
+
+```act
+meta target(unix)
+verb platform_name() -> Int {
+    return 1;
+}
+```
+
+The `target(...)` metadata item is a compile-time availability condition, not
+the mechanism that selects the target. The target remains selected by
+`Actus.toml` or an explicit compiler configuration. When the condition does
+not match the selected target, the declaration is excluded before semantic
+name resolution and code generation. No runtime branch, allocation, or
+metadata object is emitted.
+
+The first supported target predicates are `unix` and `windows`. Multiple
+predicates in one item are alternatives:
+
+```act
+meta target(unix, windows)
+verb hosted_name() -> Int {
+    return 1;
+}
+```
+
+Target conditions are validated against the compiler's target model. Unknown
+predicates, empty predicate lists, duplicate predicates, and contradictory
+metadata are compile-time errors. `meta target(...)` does not weaken ownership,
+borrowing, ABI, or cleanup validation for declarations that remain active.
+
 ## Safety and Semantic Boundaries
 
 Metadata must never:
@@ -181,6 +215,8 @@ as unchecked escape hatches.
   general macro system.
 - Metadata names and argument contracts must be versioned and documented as
   the compiler evolves.
+- Target-conditional metadata provides platform availability without adopting
+  foreign attribute syntax or moving target selection into source files.
 
 ## Rejected Alternatives
 
