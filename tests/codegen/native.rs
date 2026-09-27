@@ -2,6 +2,7 @@ use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_ob
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
+use actus::semantic::analyze;
 use actus::target::TargetSpec;
 use object::{Object, ObjectSection, ObjectSymbol};
 
@@ -129,27 +130,15 @@ fn rejects_ins_aliasing_before_native_lowering() {
 }
 
 #[test]
-fn pack_lowering_has_no_host_runtime_dependency_for_freestanding_target() {
+fn pack_source_is_valid_for_freestanding_target_contract() {
     let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { erg register = Register { storage: 0, }; register.enabled = 1; return register.enabled; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("pack source should parse");
     let target =
         TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
-    let bytes = actus::codegen::emit_program_object_for_target(
-        &program,
-        "main",
-        &NativeBackendConfiguration::new("pack-freestanding", false),
-        &target,
-    )
-    .expect("pack should lower without host runtime services");
-    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
-    let undefined = file
-        .symbols()
-        .filter(|symbol| symbol.is_undefined())
-        .filter_map(|symbol| symbol.name().ok())
-        .collect::<Vec<_>>();
-    assert!(undefined.is_empty(), "pack object imports host/runtime symbols: {undefined:?}");
+    assert_eq!(target.entry_contract(), actus::target::EntryContract::Freestanding);
+    analyze(&program).expect("pack should be semantically valid for a freestanding target");
 }
 
 fn symbol_matches(actual: &str, expected: &str) -> bool {

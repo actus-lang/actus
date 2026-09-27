@@ -204,10 +204,14 @@ fn declare_all_functions(
     )?);
     let has_print_definition = verbs.iter().any(|verb| verb.name == "print")
         || external_verbs.iter().any(|verb| verb.name == "print");
-    if matches!(target.entry_contract(), crate::target::EntryContract::Hosted) {
+    if target_requires_host_runtime(target) {
         metadata.extend(declare_runtime_functions(module, has_print_definition)?);
     }
     Ok(metadata)
+}
+
+fn target_requires_host_runtime(target: &TargetSpec) -> bool {
+    matches!(target.entry_contract(), crate::target::EntryContract::Hosted)
 }
 
 fn validate_native_program(
