@@ -34,7 +34,10 @@ impl Analyzer {
         };
         let owner_index = self.binding(name, *owner_span)?;
         self.ensure_access_available(owner_index, name, span)?;
-        if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat) {
+        let arena_reference = self.binding_arena_provenance.contains_key(&owner_index);
+        if !matches!(self.model.bindings[owner_index].role, Role::Erg | Role::Dat)
+            && !(arena_reference && self.model.bindings[owner_index].role == Role::Ins)
+        {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidBorrowTarget { name: name.clone() },
                 span,

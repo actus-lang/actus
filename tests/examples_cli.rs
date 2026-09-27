@@ -51,3 +51,27 @@ fn hardware_register_example_builds_and_executes() {
     assert_eq!(status.code(), Some(8));
     let _ = fs::remove_file(output);
 }
+
+#[cfg(unix)]
+#[test]
+fn arena_tree_example_builds_and_executes() {
+    let root =
+        std::env::temp_dir().join(format!("actus-arena-tree-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/arena_tree.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run arena tree example");
+    assert_eq!(status.code(), Some(30));
+    let _ = fs::remove_file(output);
+}

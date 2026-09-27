@@ -323,6 +323,22 @@ fn lsp_resolves_pack_fields_and_renders_hardware_aware_hover() {
 }
 
 #[test]
+fn lsp_renders_arena_capacity_and_place_signature() {
+    let uri = "file:///tmp/actus-lsp-arena.act";
+    let source = "struct Node { value: Int, }\nverb main() -> Int { erg arena: Arena[64] = Arena[64] {}; erg node = arena.place(Node { value: 7, }); return node.value; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "arena.place")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("Arena[64].place(value) -> ins T"), "stdout: {stdout}");
+    assert!(stdout.contains("aligned bump-pointer storage"), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_resolves_std_io_sibling_context_for_open_documents() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src/io/reader.act");
     let source = fs::read_to_string(&path).expect("read std io reader source");

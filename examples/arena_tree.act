@@ -1,0 +1,20 @@
+// A small arena-backed tree. Reference fields are pointer-sized, so the
+// Node layout remains finite even when the graph grows through abs links.
+struct Leaf {
+    value: Int,
+}
+
+struct Node {
+    value: Int,
+    abs left: Leaf,
+    abs right: Leaf,
+}
+
+verb main() -> Int {
+    erg arena: Arena[128] = Arena[128]();
+    erg left = arena.place(value: Leaf { value: 10, });
+    erg right = arena.place(value: Leaf { value: 20, });
+    erg root = arena.place(value: Node { value: 12, left: left, right: right, });
+
+    return root.left.value + root.right.value;
+}

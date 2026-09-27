@@ -138,6 +138,8 @@ pub enum LayoutEndianness {
 pub enum StructFieldRole {
     Value,
     Erg,
+    Abs,
+    Ins,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

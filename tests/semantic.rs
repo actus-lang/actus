@@ -1,3 +1,5 @@
+#[path = "semantic/arenas.rs"]
+mod arenas;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
 #[path = "semantic/drop.rs"]

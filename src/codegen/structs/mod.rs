@@ -62,7 +62,9 @@ pub(super) fn lower_struct_literal(
             string_data,
             layouts,
         )?;
-        if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
+        if field_layout.indirect {
+            function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
+        } else if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
             let size = layouts
                 .type_size(field_layout.ty)
                 .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
@@ -111,6 +113,14 @@ pub(super) fn lower_field_access(
         string_data,
         layouts,
     )?;
+    if field_layout.indirect {
+        return Ok(function.ins().load(
+            layouts.pointer_type,
+            MemFlagsData::new(),
+            address,
+            field_layout.offset as i32,
+        ));
+    }
     if matches!(field_layout.ty, NativeType::Struct(_)) {
         return Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)));
     }
@@ -198,7 +208,9 @@ fn lower_struct_field_assignment(
         string_data,
         layouts,
     )?;
-    if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
+    if field_layout.indirect {
+        function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
+    } else if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
         let size = layouts
             .type_size(field_layout.ty)
             .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;

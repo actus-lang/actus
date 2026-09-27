@@ -50,6 +50,12 @@ pub(super) struct Analyzer {
     pub(super) binding_enum_types: HashMap<usize, String>,
     pub(super) binding_enum_type_applications: HashMap<usize, crate::ast::TypeName>,
     pub(super) binding_dynamic_roles: HashMap<usize, String>,
+    pub(super) binding_arena_provenance: HashMap<usize, usize>,
+    pub(super) binding_scope_depth: HashMap<usize, usize>,
+    pub(super) arena_scope_depth: HashMap<usize, usize>,
+    pub(super) field_arena_provenance: HashMap<(usize, String), usize>,
+    pub(super) expression_arena_provenance: HashMap<(usize, usize), usize>,
+    pub(super) next_arena_id: usize,
     pub(super) generic_scopes: Vec<HashSet<String>>,
     pub(super) generic_bounds: HashMap<String, Vec<String>>,
     pub(super) generic_instances: super::generic_cache::GenericInstanceCache,
@@ -91,6 +97,7 @@ impl Analyzer {
                 dynamic_roles: Vec::new(),
                 drop_types: Vec::new(),
                 binding_type_names: HashMap::new(),
+                arena_provenance: HashMap::new(),
             },
             scopes: Vec::new(),
             next_borrow_id: 0,
@@ -119,6 +126,12 @@ impl Analyzer {
             binding_enum_types: HashMap::new(),
             binding_enum_type_applications: HashMap::new(),
             binding_dynamic_roles: HashMap::new(),
+            binding_arena_provenance: HashMap::new(),
+            binding_scope_depth: HashMap::new(),
+            arena_scope_depth: HashMap::new(),
+            field_arena_provenance: HashMap::new(),
+            expression_arena_provenance: HashMap::new(),
+            next_arena_id: 0,
             generic_scopes: Vec::new(),
             generic_bounds: HashMap::new(),
             generic_instances: super::generic_cache::GenericInstanceCache::for_current_toolchain(),
@@ -152,6 +165,7 @@ impl Analyzer {
         self.model.drop_types = self.drop_types.into_iter().collect();
         self.model.drop_types.sort();
         self.model.binding_type_names = self.binding_type_names.clone();
+        self.model.arena_provenance = self.binding_arena_provenance.clone();
         self.current_return_type = None;
         self.current_return_type_name = None;
         self.current_return_access = None;

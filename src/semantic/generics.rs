@@ -82,6 +82,14 @@ impl Analyzer {
 
     fn resolve_type_reference(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
         let name = type_name.name.as_str();
+        if name == "Arena" {
+            self.validate_arena_type(type_name)?;
+            let capacity = type_name.arguments[0].name.clone();
+            return Ok(ResolvedType::Applied {
+                name: name.to_owned(),
+                arguments: vec![ResolvedType::Concrete(capacity)],
+            });
+        }
         if self.is_generic_parameter(name) {
             if !type_name.arguments.is_empty() {
                 return Err(arity_error(name, 0, type_name.arguments.len(), type_name.span));
@@ -132,7 +140,22 @@ impl Analyzer {
             .or_else(|| {
                 self.enum_types.get(name).map(|definition| definition.generic_parameters.len())
             })
+            .or_else(|| (name == "Arena").then_some(1))
             .or_else(|| self.pack_types.contains_key(name).then_some(0))
+    }
+
+    fn validate_arena_type(&self, type_name: &TypeName) -> Result<(), SemanticError> {
+        let Some(capacity) = type_name.arguments.first() else {
+            return Err(arena_capacity_error(type_name.span, "missing"));
+        };
+        if type_name.arguments.len() != 1
+            || capacity.name.parse::<usize>().is_err()
+            || capacity.name == "0"
+            || !capacity.arguments.is_empty()
+        {
+            return Err(arena_capacity_error(capacity.span, &capacity.name));
+        }
+        Ok(())
     }
 
     fn named_type_parameters(&self, name: &str) -> Option<Vec<GenericParam>> {
@@ -248,6 +271,13 @@ fn canonical_type_name(type_name: &TypeName) -> String {
         type_name.name,
         type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )
+}
+
+fn arena_capacity_error(span: SourceSpan, capacity: &str) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::InvalidArenaCapacity { capacity: capacity.to_owned() },
+        span,
+    }
 }
 
 fn arity_error(name: &str, expected: usize, found: usize, span: SourceSpan) -> SemanticError {

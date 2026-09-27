@@ -473,14 +473,25 @@ without host runtime services.
 Implement ADR-0030 for bounded cyclic data structures while retaining lexical
 provenance and deterministic teardown.
 
-- [ ] Define `Arena[N]` capacity, alignment, and storage layout.
-- [ ] Add arena provenance metadata to semantic bindings and views.
-- [ ] Return objects from an arena through non-escaping `ins` construction.
-- [ ] Permit read-only traversal through `abs` references.
-- [ ] Reject references that escape the arena scope.
+- [x] Architecture & lexical/semantic contract: define `Arena[N]`, `place(...)`,
+      and scope lifetime rules.
+- [x] Define `Arena[N]` capacity, alignment, and storage layout.
+- [x] Provenance & escape analysis: bind arena roots and reject cross-arena or
+      escaping references.
+- [x] Add arena provenance metadata to semantic bindings and views.
+- [x] Return objects from an arena through non-escaping `ins` construction.
+- [x] Permit read-only traversal through `abs` references.
+- [x] Reject references that escape the arena scope.
 - [ ] Reject owner drop or move while arena-derived views are live.
-- [ ] Reject combinations of references from different arena roots.
-- [ ] Lower arena teardown to one deterministic bulk release operation.
+- [x] Reject combinations of references from different arena roots.
+- [x] Cranelift lowering & fast bump-pointer allocation.
+- [x] Add native bump-pointer integrity and capacity-exhaustion tests.
+- [x] Indirect-reference graph/tree native execution tests.
+- [ ] Cyclical data structure native execution tests.
+- [ ] Deterministic bulk teardown verification.
+- [x] Lower arena teardown to one deterministic bulk release operation.
+- [ ] Represent `Option[abs T]` and `Option[ins T]` references with a null-pointer
+      niche and validate recursive self-referential graph construction.
 - [ ] Add cyclic graph and tree native execution tests.
 - [ ] Add exhaustion, nested-scope, and cross-arena negative tests.
 - [ ] Verify operation without a host allocator on bare-metal targets.

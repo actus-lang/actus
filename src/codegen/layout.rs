@@ -19,6 +19,7 @@ pub(super) struct FieldLayout {
     pub(super) offset: u32,
     pub(super) ty: NativeType,
     pub(super) owned: bool,
+    pub(super) indirect: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -150,6 +151,7 @@ impl LayoutRegistry {
                 .pack(id)
                 .map(|pack| self.ir_type(pack.storage))
                 .unwrap_or(cranelift_codegen::ir::types::I32),
+            NativeType::Arena(_) => self.pointer_type,
             _ => ty.ir_type(self.pointer_type),
         }
     }
@@ -190,14 +192,26 @@ impl LayoutRegistry {
         let mut offset = 0;
         let mut alignment = 1;
         for field in &definition.fields {
-            let ty = self.native_type(&field.ty.name, visiting)?;
-            let (size, field_alignment) = self.type_layout(ty)?;
+            let indirect = matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins);
+            let ty = if indirect {
+                self.type_for_type_name(&field.ty).ok_or_else(|| {
+                    NativeEmitError(format!("unknown reference field type `{}`", field.ty.name))
+                })?
+            } else {
+                self.native_type(&field.ty.name, visiting)?
+            };
+            let (size, field_alignment) = if indirect {
+                (self.pointer_size, self.pointer_size)
+            } else {
+                self.type_layout(ty)?
+            };
             offset = align_up(offset, field_alignment);
             fields.push(FieldLayout {
                 name: field.name.clone(),
                 offset,
                 ty,
                 owned: matches!(field.role, StructFieldRole::Erg),
+                indirect,
             });
             offset += size;
             alignment = alignment.max(field_alignment);
@@ -290,6 +304,29 @@ impl LayoutRegistry {
                 .map(|pack| self.type_layout(pack.storage))
                 .transpose()?
                 .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?,
+            NativeType::Arena(capacity) => (capacity + self.pointer_size, self.pointer_size),
+        })
+    }
+
+    pub(super) fn alignment(&self, ty: NativeType) -> Result<u32, NativeEmitError> {
+        Ok(match ty {
+            NativeType::Struct(id) => self
+                .get(id)
+                .map(|layout| layout.alignment)
+                .ok_or_else(|| NativeEmitError("missing struct alignment".to_owned()))?,
+            NativeType::Enum(id) => self
+                .enum_layout(id)
+                .map(|layout| layout.alignment)
+                .ok_or_else(|| NativeEmitError("missing enum alignment".to_owned()))?,
+            NativeType::Integer { width, .. } => integer_storage_bytes(width),
+            NativeType::Float { width } => u32::from(width / 8),
+            NativeType::Int => 4,
+            NativeType::String | NativeType::Buffer | NativeType::Arena(_) => self.pointer_size,
+            NativeType::FatPointer => self.pointer_size,
+            NativeType::Void => 1,
+            NativeType::Pack(id) => {
+                self.pack(id).map(|pack| self.alignment(pack.storage)).transpose()?.unwrap_or(1)
+            }
         })
     }
 }

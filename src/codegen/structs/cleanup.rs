@@ -65,6 +65,7 @@ fn emit_struct_drop_except(
             | NativeType::Void
             | NativeType::String
             | NativeType::Pack(_)
+            | NativeType::Arena(_)
             | NativeType::FatPointer => {}
         }
     }

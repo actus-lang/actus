@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, Role, Stmt};
@@ -60,7 +61,7 @@ fn lower_statement<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     match statement {
-        Stmt::OwnerDecl { role: Role::Erg | Role::Abs, name, ty, initializer, .. } =>
+        Stmt::OwnerDecl { role: Role::Erg | Role::Abs | Role::Ins, name, ty, initializer, .. } =>
             lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions, cleanup_schedule, string_data, layouts),
         Stmt::Assignment { name, value, .. } =>
             lower_assignment(function, name, value, locals, types, functions, cleanup_schedule, string_data, layouts),
@@ -123,6 +124,12 @@ fn lower_owner_declaration<'source>(
         .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)));
     let native_type =
         declared_native.unwrap_or_else(|| initializer_type(initializer, types, functions, layouts));
+    if let NativeType::Arena(capacity) = native_type {
+        let address = lower_arena_declaration(function, capacity, layouts)?;
+        locals.insert(name, address);
+        types.insert(name, native_type);
+        return Ok(Flow::Fallthrough);
+    }
     let value =
         if let (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) =
             (declared_native, initializer)
@@ -158,6 +165,26 @@ fn lower_owner_declaration<'source>(
     locals.insert(name, value);
     types.insert(name, native_type);
     Ok(Flow::Fallthrough)
+}
+
+fn lower_arena_declaration(
+    function: &mut FunctionBuilder<'_>,
+    capacity: u32,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let size = capacity
+        .checked_add(layouts.pointer_type.bytes())
+        .ok_or_else(|| NativeEmitError("arena storage size overflow".to_owned()))?;
+    let slot = function.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        size,
+        layouts.pointer_type.bytes().trailing_zeros() as u8,
+    ));
+    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    let offset_address = function.ins().iadd_imm_s(address, i64::from(capacity));
+    let zero = function.ins().iconst(layouts.pointer_type, 0);
+    function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), zero, offset_address, 0);
+    Ok(address)
 }
 
 #[allow(clippy::too_many_arguments)]

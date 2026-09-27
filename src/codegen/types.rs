@@ -12,6 +12,7 @@ pub(super) enum NativeType {
     Buffer,
     Struct(usize),
     Pack(usize),
+    Arena(u32),
     Enum(usize),
     FatPointer,
 }
@@ -26,6 +27,10 @@ impl NativeType {
     }
 
     pub(super) fn from_name(name: &str) -> Option<Self> {
+        if let Some(capacity) = name.strip_prefix("Arena[").and_then(|name| name.strip_suffix(']'))
+        {
+            return capacity.parse::<u32>().ok().map(Self::Arena);
+        }
         if let Some(primitive) = primitive_type(name) {
             return Some(Self::from_primitive(primitive));
         }
@@ -67,6 +72,13 @@ impl NativeType {
         layouts: &super::layout::LayoutRegistry,
     ) -> Option<Self> {
         type_name.and_then(|type_name| {
+            if type_name.name == "Arena" {
+                return type_name
+                    .arguments
+                    .first()
+                    .and_then(|capacity| capacity.name.parse::<u32>().ok())
+                    .map(Self::Arena);
+            }
             layouts
                 .type_for_type_name(type_name)
                 .or_else(|| primitive_type(&type_name.name).map(Self::from_primitive))
@@ -87,6 +99,7 @@ impl NativeType {
             | Self::Struct(_)
             | Self::Enum(_)
             | Self::Pack(_)
+            | Self::Arena(_)
             | Self::FatPointer => pointer_type,
         }
     }

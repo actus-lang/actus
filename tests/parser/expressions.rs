@@ -148,28 +148,32 @@ fn parses_an_erg_struct_field() {
 }
 
 #[test]
-fn rejects_abs_struct_fields() {
-    for (source, role) in [
-        ("struct Borrowed { abs view: Buffer, }", actus::lexer::TokenKind::Abs),
-        ("struct Moved { dat payload: Buffer, }", actus::lexer::TokenKind::Dat),
-        ("struct Instrumented { ins buffer: Buffer, }", actus::lexer::TokenKind::Ins),
-    ] {
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let error = parse(tokens).expect_err("borrow and move fields must be rejected");
-        assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
-        assert!(matches!(
-            error.kind,
-            ParseErrorKind::UnexpectedToken { found, .. } if found == role
-        ));
-    }
+fn parses_indirect_struct_reference_fields() {
+    let program = parse_source("struct Node { abs next: Node, ins cursor: Node, } ");
+    let TopLevelDecl::Struct(definition) = &program.declarations[0] else {
+        panic!("expected struct");
+    };
+    assert_eq!(definition.fields[0].role, StructFieldRole::Abs);
+    assert_eq!(definition.fields[1].role, StructFieldRole::Ins);
 }
 
 #[test]
-fn rejects_instrumental_local_bindings() {
-    let (tokens, errors) = scan("verb main() { ins buffer = Buffer[1]; }");
+fn rejects_dat_struct_fields() {
+    let (tokens, errors) = scan("struct Moved { dat payload: Buffer, }");
     assert!(errors.is_empty());
-    parse(tokens).expect_err("ins must not be a local binding role");
+    let error = parse(tokens).expect_err("dat fields must be rejected");
+    assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnexpectedToken { found, .. } if found == actus::lexer::TokenKind::Dat
+    ));
+}
+
+#[test]
+fn parses_instrumental_arena_reference_bindings() {
+    let (tokens, errors) = scan("verb main() { ins node = arena.place(value: node); }");
+    assert!(errors.is_empty());
+    parse(tokens).expect("ins arena references are local bindings");
 }
 
 #[test]

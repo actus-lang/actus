@@ -23,6 +23,10 @@ pub enum NativeInstruction {
         name: String,
         moved_fields: Vec<String>,
     },
+    ResetArena {
+        binding_index: usize,
+        name: String,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -156,6 +160,11 @@ fn validate_scope(
                     return Err(format!("cleanup repeats payload field `{field}`"));
                 }
             }
+            CleanupAction::ResetArena { binding_index } => {
+                if *binding_index >= model.bindings.len() {
+                    return Err(format!("cleanup references invalid arena `{binding_index}`"));
+                }
+            }
         }
     }
     Ok(())
@@ -199,6 +208,10 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruct
                 },
             }
         }
+        CleanupAction::ResetArena { binding_index } => NativeInstruction::ResetArena {
+            binding_index: *binding_index,
+            name: model.bindings[*binding_index].name.clone(),
+        },
     }
 }
 
@@ -226,6 +239,7 @@ mod tests {
             dynamic_roles: Vec::new(),
             drop_types: Vec::new(),
             binding_type_names: std::collections::HashMap::new(),
+            arena_provenance: std::collections::HashMap::new(),
         }
     }
 
@@ -267,6 +281,7 @@ mod tests {
             dynamic_roles: Vec::new(),
             drop_types: Vec::new(),
             binding_type_names: std::collections::HashMap::new(),
+            arena_provenance: std::collections::HashMap::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());

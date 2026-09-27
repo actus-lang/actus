@@ -28,7 +28,10 @@ impl Parser {
         if self.match_simple(TokenKind::Loop) {
             return Ok(Stmt::Loop(self.parse_block()?));
         }
-        if self.check_role(&TokenKind::Erg) || self.check_role(&TokenKind::Abs) {
+        if self.check_role(&TokenKind::Erg)
+            || self.check_role(&TokenKind::Abs)
+            || self.check_role(&TokenKind::Ins)
+        {
             return self.parse_owner_declaration();
         }
         if self.match_simple(TokenKind::Return) {
@@ -102,11 +105,12 @@ impl Parser {
         let role = match role_token.kind {
             TokenKind::Erg => Role::Erg,
             TokenKind::Abs => Role::Abs,
+            TokenKind::Ins => Role::Ins,
             found => {
                 return Err(ParseError {
                     code: ParseErrorCode::UnexpectedToken,
                     kind: ParseErrorKind::UnexpectedToken {
-                        expected: "`erg` or `abs`".to_owned(),
+                        expected: "`erg`, `abs`, or `ins`".to_owned(),
                         found,
                     },
                     span: role_token.span,

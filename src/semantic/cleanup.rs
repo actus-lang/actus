@@ -1,4 +1,4 @@
-use crate::ast::Role;
+use crate::ast::{Role, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -10,6 +10,7 @@ pub enum CleanupAction {
     EndBorrow { borrow_id: usize },
     DropPayloadField { binding_index: usize, enum_name: String, variant: String, field: String },
     DropBinding { binding_index: usize },
+    ResetArena { binding_index: usize },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,6 +46,7 @@ pub(super) fn plan_scope_cleanup(
     borrow_ids: &[usize],
     payload_cleanup: &[(usize, String, String, String)],
     bindings: &[Binding],
+    binding_type_names: &std::collections::HashMap<usize, TypeName>,
 ) -> ScopeCleanup {
     let mut actions = borrow_ids
         .iter()
@@ -68,6 +70,12 @@ pub(super) fn plan_scope_cleanup(
         );
         (owned && live).then_some(CleanupAction::DropBinding { binding_index: *index })
     }));
+    actions.extend(binding_indices.iter().rev().filter_map(|index| {
+        binding_type_names
+            .get(index)
+            .filter(|type_name| type_name.name == "Arena")
+            .map(|_| CleanupAction::ResetArena { binding_index: *index })
+    }));
     ScopeCleanup { depth, span, actions }
 }
 
@@ -86,6 +94,7 @@ impl Analyzer {
                     &frame.borrow_ids,
                     &frame.payload_cleanup,
                     &self.model.bindings,
+                    &self.binding_type_names,
                 )
             })
             .collect();
@@ -118,6 +127,7 @@ impl Analyzer {
                     &frame.borrow_ids,
                     &frame.payload_cleanup,
                     &self.model.bindings,
+                    &self.binding_type_names,
                 )
             })
             .collect();

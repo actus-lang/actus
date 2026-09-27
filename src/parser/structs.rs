@@ -48,11 +48,13 @@ impl Parser {
         let first = self.advance_required("struct field")?;
         let (role, start) = match first.kind {
             TokenKind::Erg => (StructFieldRole::Erg, first.span.start),
-            TokenKind::Abs | TokenKind::Dat => {
+            TokenKind::Abs => (StructFieldRole::Abs, first.span.start),
+            TokenKind::Ins => (StructFieldRole::Ins, first.span.start),
+            TokenKind::Dat => {
                 return Err(ParseError {
                     code: ParseErrorCode::UnexpectedToken,
                     kind: ParseErrorKind::UnexpectedToken {
-                        expected: "a value field or an `erg` field".to_owned(),
+                        expected: "a value field, `erg`, `abs`, or `ins` field".to_owned(),
                         found: first.kind,
                     },
                     span: first.span,

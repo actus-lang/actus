@@ -47,6 +47,9 @@ pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
         SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
         SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
+        SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
+        SemanticErrorKind::ArenaReferenceEscape { .. } => "E1077",
+        SemanticErrorKind::CrossArenaReference { .. } => "E1078",
         SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
         SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
         SemanticErrorKind::MissingReturnValue => "E1028",
@@ -221,7 +224,24 @@ fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         .or_else(|| guard_semantic_message(kind))
         .or_else(|| struct_semantic_message(kind))
         .or_else(|| pack_codes::message(kind))
+        .or_else(|| arena_semantic_message(kind))
         .or_else(|| type_semantic_message(kind))
+}
+
+fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::InvalidArenaCapacity { capacity } => {
+            format!("arena capacity `{capacity}` must be a positive compile-time byte count")
+        }
+        SemanticErrorKind::ArenaReferenceEscape { name } => {
+            format!("arena-derived reference `{name}` cannot escape its arena scope")
+        }
+        SemanticErrorKind::CrossArenaReference { name } => {
+            format!("value `{name}` belongs to a different arena provenance")
+        }
+        _ => return None,
+    };
+    Some(message)
 }
 
 fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {

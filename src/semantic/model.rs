@@ -100,4 +100,5 @@ pub struct SemanticModel {
     pub dynamic_roles: Vec<DynamicRoleType>,
     pub drop_types: Vec<String>,
     pub binding_type_names: std::collections::HashMap<usize, TypeName>,
+    pub arena_provenance: std::collections::HashMap<usize, usize>,
 }

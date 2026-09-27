@@ -288,7 +288,7 @@ fn load_try_payload(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match field_type {
-        NativeType::Struct(_) | NativeType::Enum(_) => Ok(payload_address),
+        NativeType::Struct(_) | NativeType::Enum(_) | NativeType::Arena(_) => Ok(payload_address),
         NativeType::Int => {
             Ok(function.ins().load(types::I32, MemFlagsData::new(), payload_address, 0))
         }
@@ -357,6 +357,11 @@ pub(super) fn initializer_type(
         Expr::Call { callee, .. } => {
             functions.get(callee).map(|function| function.return_type).unwrap_or(NativeType::Int)
         }
+        Expr::MethodCall { receiver, arguments, .. }
+            if is_arena(receiver, types, functions, layouts) =>
+        {
+            arena_place_type(arguments, types, functions, layouts)
+        }
         Expr::MethodCall { receiver, method, .. } => {
             let receiver_type = initializer_type(receiver, types, functions, layouts);
             let dispatch_name = super::performance::dispatch_key(receiver_type, method);
@@ -380,6 +385,27 @@ pub(super) fn initializer_type(
         Expr::FloatLiteral { .. } => NativeType::Int,
         _ => NativeType::Int,
     }
+}
+
+fn is_arena(
+    expression: &Expr,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> bool {
+    matches!(initializer_type(expression, types, functions, layouts), NativeType::Arena(_))
+}
+
+fn arena_place_type(
+    arguments: &[crate::ast::Argument],
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> NativeType {
+    arguments
+        .first()
+        .map(|argument| initializer_type(&argument.expression, types, functions, layouts))
+        .unwrap_or(NativeType::Int)
 }
 
 pub(super) fn emit_buffer_drop(
