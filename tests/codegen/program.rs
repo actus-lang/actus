@@ -23,7 +23,7 @@ fn lowers_integer_parameters_to_a_native_object() {
 
 #[test]
 fn lowers_struct_method_calls_to_a_native_object() {
-    let source = "struct Point { x: Int, } verb read(abs self: Point) -> Int { return self.x; } verb main() -> Int { erg point = Point { x: 7, }; return point.read(); }";
+    let source = "struct Point { x: Int, } verb read(abs self: Point) -> Int { return self.x; } verb main() -> Int { erg source = Point { x: 7, }; abs point = ref source; return point.read(); }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
@@ -33,7 +33,7 @@ fn lowers_struct_method_calls_to_a_native_object() {
 
 #[test]
 fn emits_deterministic_struct_method_objects() {
-    let source = "struct Point { x: Int, y: Int, } verb sum(abs self: Point) -> Int { return self.x + self.y; } verb main() -> Int { erg point = Point { x: 7, y: 5, }; return point.sum(); }";
+    let source = "struct Point { x: Int, y: Int, } verb sum(abs self: Point) -> Int { return self.x + self.y; } verb main() -> Int { erg source = Point { x: 7, y: 5, }; abs point = ref source; return point.sum(); }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");

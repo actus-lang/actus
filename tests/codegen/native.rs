@@ -77,7 +77,7 @@ fn declares_external_c_functions_as_imported_symbols() {
 
 #[test]
 fn emits_a_deterministic_role_vtable_data_object() {
-    let source = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value; } } verb main() -> Int { erg file = File { value: 1, }; return file.write(); }";
+    let source = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value; } } verb main() -> Int { erg source = File { value: 1, }; abs file = ref source; return file.write(); }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("role performance source should parse");

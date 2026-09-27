@@ -66,7 +66,7 @@ fn rejects_mismatched_and_implicit_performance_receivers() {
 #[test]
 fn resolves_performance_calls_and_records_reachable_implementations() {
     let model = analyze_source(
-        "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg file = File { value: 1, }; return file.write(); }",
+        "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg source = File { value: 1, }; abs file = ref source; return file.write(); }",
     )
     .expect("performed method calls should resolve");
     assert_eq!(model.reachable_performances.len(), 1);

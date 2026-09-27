@@ -120,6 +120,23 @@ fn parses_struct_method_calls() {
 }
 
 #[test]
+fn parses_chained_method_calls_as_left_associative_receivers() {
+    let program = parse_source(
+        "struct Point { x: Int, } verb main() -> Int { erg point = Point { x: 1, }; return point.first().second(); }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected main verb");
+    };
+    let Stmt::Return { value: Some(Expr::MethodCall { receiver, method, .. }), .. } =
+        &verb.body.statements[1]
+    else {
+        panic!("expected chained method call");
+    };
+    assert_eq!(method, "second");
+    assert!(matches!(receiver.as_ref(), Expr::MethodCall { method, .. } if method == "first"));
+}
+
+#[test]
 fn parses_an_erg_struct_field() {
     let program = parse_source("struct Packet { erg payload: Buffer, sequence: Int, }");
     let TopLevelDecl::Struct(definition) = &program.declarations[0] else {

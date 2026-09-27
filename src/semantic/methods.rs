@@ -15,7 +15,7 @@ impl Analyzer {
             if receiver.name != "self" {
                 continue;
             }
-            if !matches!(receiver.role, Role::Erg | Role::Abs | Role::Ins)
+            if !matches!(receiver.role, Role::Erg | Role::Abs | Role::Dat | Role::Ins)
                 || !self.struct_types.contains_key(&receiver.ty.name)
             {
                 return Err(SemanticError {
@@ -212,7 +212,7 @@ impl Analyzer {
             });
         };
         let valid = signature.params.first().is_some_and(|(name, role, _)| {
-            name == "self" && matches!(role, Role::Erg | Role::Abs | Role::Ins)
+            name == "self" && matches!(role, Role::Erg | Role::Abs | Role::Dat | Role::Ins)
         });
         if valid {
             Ok(signature)
@@ -233,11 +233,7 @@ impl Analyzer {
     ) -> Vec<Argument> {
         let receiver_expression = match role {
             Role::Erg => receiver.clone(),
-            Role::Abs if self.is_abs_binding(receiver) => receiver.clone(),
-            Role::Abs => Expr::Borrow {
-                expression: Box::new(receiver.clone()),
-                span: expression_span(receiver),
-            },
+            Role::Abs => receiver.clone(),
             Role::Dat | Role::Ins => receiver.clone(),
         };
         let named = arguments.iter().any(|argument| argument.name.is_some());
@@ -250,13 +246,6 @@ impl Analyzer {
         });
         combined.extend(arguments.iter().cloned());
         combined
-    }
-
-    fn is_abs_binding(&self, expression: &Expr) -> bool {
-        let Expr::Identifier { name, span } = expression else { return false };
-        self.binding(name, *span)
-            .ok()
-            .is_some_and(|index| self.model.bindings[index].role == Role::Abs)
     }
 }
 

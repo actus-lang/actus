@@ -82,8 +82,18 @@ fn executes_monomorphized_generic_struct() {
 #[test]
 fn executes_static_performance_dispatch() {
     build_and_run(
-        "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value + 1; } } verb main() -> Int { erg file = File { value: 41, }; return file.write(); }\n",
+        "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value + 1; } } verb main() -> Int { erg source = File { value: 41, }; abs file = ref source; return file.write(); }\n",
         "static-performance-dispatch",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_direct_dat_method_dispatch() {
+    build_and_run(
+        "struct File { value: Int, } verb consume(dat self: File) -> Int { return self.value; } verb main() -> Int { erg file = File { value: 42, }; return file.consume(); }\n",
+        "direct-dat-method-dispatch",
         42,
     );
 }
