@@ -45,6 +45,8 @@ fn copy_std_library(root: &Path) {
         ("io/copy.act", library_file("io/copy.act")),
         ("fs/fs.act", library_file("fs/fs.act")),
         ("fs/file.act", library_file("fs/file.act")),
+        ("fs/metadata.act", library_file("fs/metadata.act")),
+        ("fs/operations.act", library_file("fs/operations.act")),
         ("fs/seek.act", library_file("fs/seek.act")),
         ("fs/options.act", library_file("fs/options.act")),
     ];
@@ -141,7 +143,7 @@ fn std_fs_open_options_append_preserves_existing_bytes() {
     let data_path = root.join("append.bin");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb append_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg first = Buffer[0]; append(first, 65); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs first); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg appendable = OpenOptions {{ read: 0, write: 1, append: 1, truncate: 0, create: 0, create_new: 0, }}; erg opened = options_open(options: dat appendable, path: abs path); case dat opened {{ Result.Ok(value) => {{ erg file: File = value; erg second = Buffer[0]; append(second, 66); erg written = file.write(buffer: abs second); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Ok(2); }} verb main() -> Int {{ erg result = append_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 1, }}; }}"
+        "import io; import fs; verb append_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg first = Buffer[0]; append(first, 65); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs first); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg empty = options_new(); erg writable = options_write(dat empty); erg appendable = options_append(dat writable); erg opened = options_open(options: dat appendable, path: abs path); case dat opened {{ Result.Ok(value) => {{ erg file: File = value; erg second = Buffer[0]; append(second, 66); erg written = file.write(buffer: abs second); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Ok(2); }} verb main() -> Int {{ erg result = append_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 1, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);

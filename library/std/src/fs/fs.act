@@ -1,8 +1,6 @@
-"""
-The `std::fs` facade exposes hosted file I/O through the typed stream
-contracts. File ownership is deterministic: an owned File closes at scope
-exit through its Drop performance.
-"""
+"""The public `std::fs` facade for filesystem operations."""
 open file;
+open metadata;
+open operations;
 open options;
 open seek;

@@ -124,6 +124,21 @@ fn branch_type(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> NativeType {
+    let block_types = branches.iter().map(|branch| match &branch.body {
+        CaseBody::Expression(expression) => {
+            Some(initializer_type(expression, local_types, functions, layouts))
+        }
+        CaseBody::Block(block) => block.statements.iter().find_map(|statement| match statement {
+            crate::ast::Stmt::Return { value: Some(expression), .. } => {
+                Some(initializer_type(expression, local_types, functions, layouts))
+            }
+            _ => None,
+        }),
+    });
+    let mut types = block_types.collect::<Vec<_>>();
+    if types.iter().all(Option::is_some) {
+        return types.remove(0).expect("all case branches have a type");
+    }
     branches
         .iter()
         .find_map(|branch| match &branch.body {

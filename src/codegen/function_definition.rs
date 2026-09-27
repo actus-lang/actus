@@ -14,6 +14,7 @@ use super::literals::{StringDataIds, declare_string_values};
 use super::lowering::lower_body;
 use super::model::NativeCleanupSchedule;
 use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
+use super::structs::copy_bytes;
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 
@@ -41,8 +42,13 @@ pub(super) fn define_function(
         function.switch_to_block(block);
         function.append_block_params_for_function_params(block);
         let parameters = function.block_params(block).to_vec();
+        let return_type = verb.return_type.as_ref().map(|return_type| {
+            NativeType::from_type_name_with_layout(Some(&return_type.ty), layouts)
+        });
+        let return_slot = return_type.filter(|ty| ty.uses_sret()).map(|_| parameters[0]);
+        let parameter_offset = usize::from(return_slot.is_some());
         let (locals, local_types) =
-            bind_parameters(&mut function, module, verb, &parameters, layouts);
+            bind_parameters(&mut function, module, verb, &parameters[parameter_offset..], layouts);
         function.seal_block(block);
         let flow = lower_body(
             &mut function,
@@ -54,7 +60,7 @@ pub(super) fn define_function(
             &string_values,
             layouts,
         )?;
-        emit_flow(&mut function, verb.return_type.is_some(), flow)?;
+        emit_flow(&mut function, return_type, return_slot, flow, layouts)?;
         function.finalize(frontend_config);
     }
     module
@@ -66,26 +72,42 @@ pub(super) fn define_function(
 
 fn emit_flow(
     function: &mut FunctionBuilder<'_>,
-    returns_value: bool,
+    return_type: Option<NativeType>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
     flow: super::lowering::Flow,
+    layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
-    match (returns_value, flow) {
-        (true, super::lowering::Flow::Return(result)) => {
-            function.ins().return_(&[result]);
-        }
-        (false, super::lowering::Flow::Fallthrough) => {
+    match (return_type, return_slot, flow) {
+        (
+            Some(NativeType::Struct(id)),
+            Some(destination),
+            super::lowering::Flow::Return(result),
+        ) => {
+            let size = layouts
+                .type_size(NativeType::Struct(id))
+                .ok_or_else(|| NativeEmitError(format!("missing return layout `{id}`")))?;
+            copy_bytes(function, result, destination, size);
             function.ins().return_(&[]);
         }
-        (true, super::lowering::Flow::Fallthrough) => {
+        (Some(_), None, super::lowering::Flow::Return(result)) => {
+            function.ins().return_(&[result]);
+        }
+        (None, None, super::lowering::Flow::Fallthrough) => {
+            function.ins().return_(&[]);
+        }
+        (Some(_), _, super::lowering::Flow::Fallthrough) => {
             return Err(NativeEmitError("native function requires a return value".to_owned()));
         }
-        (false, super::lowering::Flow::Return(_)) => {
+        (None, _, super::lowering::Flow::Return(_)) => {
             return Err(NativeEmitError("void native function returned a value".to_owned()));
         }
-        (_, super::lowering::Flow::Break | super::lowering::Flow::Continue) => {
+        (_, _, super::lowering::Flow::Break | super::lowering::Flow::Continue) => {
             return Err(NativeEmitError(
                 "loop control escaped its loop during native lowering".to_owned(),
             ));
+        }
+        _ => {
+            return Err(NativeEmitError("invalid native return ABI state".to_owned()));
         }
     };
     Ok(())

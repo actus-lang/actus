@@ -265,6 +265,18 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 - [x] Add native seek/read-after-seek coverage.
 - [x] Add native append coverage proving existing bytes are preserved.
 
+### Gate 3.2: Metadata, filesystem operations, and one-shot I/O
+
+- [x] Define C-layout `Metadata` values and path/open-handle metadata bridges.
+- [x] Expose typed path operations for remove, rename, copy, and directories.
+- [x] Add one-shot read and write helpers with deterministic `File` cleanup.
+- [x] Move filesystem implementation details behind the `std::fs` facade.
+- [x] Use caller-allocated storage for struct-returning helper verbs.
+- [x] Verify `Result[File, IoError]` and `OpenOptions` helper returns natively.
+- [ ] Add native metadata size/type assertions.
+- [ ] Add native rename/remove-file assertions.
+- [ ] Add native one-shot read/write assertions.
+
 ### Gate 3 invariant
 
 - [ ] `std::fs` resources are owned, transferred, and cleaned exactly once.

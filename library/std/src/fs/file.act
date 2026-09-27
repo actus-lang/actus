@@ -139,6 +139,21 @@ perform Seeker for File {
     }
 }
 
+"""Return metadata for this open file without transferring its handle."""
+perform MetadataProvider for File {
+    verb metadata(ins self: File) -> Result[Metadata, IoError] {
+        erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
+        erg status = actus_file_metadata_handle_buffer(
+            handle: abs self.handle,
+            output: ins output
+        );
+        return case status {
+            -1 => Err(IoError.Failed),
+            _ => Ok(output),
+        };
+    }
+}
+
 """Close the owned operating-system resource during deterministic LIFO cleanup."""
 perform Drop for File {
     verb drop(ins self: File) {

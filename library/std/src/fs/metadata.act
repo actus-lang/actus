@@ -1,0 +1,45 @@
+"""
+Basic filesystem facts returned without exposing host-specific handles.
+
+`size` is the logical byte length. The remaining fields are scalar flags so
+the value can cross the runtime boundary in a deterministic C-compatible
+layout.
+"""
+open struct Metadata {
+    erg size: Int,
+    erg is_file: Int,
+    erg is_dir: Int,
+    erg readonly: Int,
+}
+
+"""Fill a caller-owned Metadata value from a path."""
+open unsafe extern "C" verb actus_file_metadata_buffer(
+    abs path: Buffer,
+    ins output: Metadata
+) -> Int;
+
+"""Read metadata for an open file handle into a caller-owned value."""
+open unsafe extern "C" verb actus_file_metadata_handle_buffer(
+    abs handle: Int,
+    ins output: Metadata
+) -> Int;
+
+"""
+The metadata provider contract for open filesystem resources.
+
+The path-level `metadata` verb below remains the canonical free operation;
+open handles satisfy this same operation through static performance dispatch.
+"""
+open role MetadataProvider {
+    verb metadata(ins self: File) -> Result[Metadata, IoError];
+}
+
+"""Return typed metadata for a filesystem path."""
+open verb metadata(abs path: Buffer) -> Result[Metadata, IoError] {
+    erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
+    erg status = actus_file_metadata_buffer(path: abs path, output: ins output);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(output),
+    };
+}

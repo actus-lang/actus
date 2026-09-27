@@ -191,7 +191,7 @@ fn lower_field_address(
     Ok((address, field_layout))
 }
 
-fn copy_bytes(
+pub(super) fn copy_bytes(
     function: &mut FunctionBuilder<'_>,
     source: cranelift_codegen::ir::Value,
     destination: cranelift_codegen::ir::Value,

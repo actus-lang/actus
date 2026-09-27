@@ -2,6 +2,13 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 use super::types::BufferHandle;
 
+mod operations;
+pub use operations::{
+    actus_file_copy_buffer, actus_file_create_dir_buffer, actus_file_metadata_buffer,
+    actus_file_metadata_handle_buffer, actus_file_remove_buffer, actus_file_remove_dir_buffer,
+    actus_file_rename_buffer,
+};
+
 const MODE_CREATE: u32 = 1;
 const WHENCE_START: i32 = 0;
 const WHENCE_CURRENT: i32 = 1;
@@ -192,6 +199,33 @@ pub unsafe extern "C" fn actus_file_read_buffer(handle: i32, buffer: BufferHandl
     i32::try_from(bytes).unwrap_or(-1)
 }
 
+/// Reads a file to EOF into one reusable Actus buffer.
+///
+/// # Safety
+/// `buffer` must be a valid live `ActusBuffer` with coherent length and
+/// capacity fields.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_read_all_buffer(handle: i32, buffer: BufferHandle) -> i32 {
+    if buffer.is_null() {
+        return -1;
+    }
+    let buffer = unsafe { &mut *buffer };
+    if buffer.length > buffer.capacity || (buffer.capacity > 0 && buffer.data.is_null()) {
+        return -1;
+    }
+    let pointer = if buffer.data.is_null() {
+        std::ptr::NonNull::<u8>::dangling().as_ptr()
+    } else {
+        buffer.data
+    };
+    let mut data = unsafe { Vec::from_raw_parts(pointer, buffer.length, buffer.capacity) };
+    let status = with_file(actus_handle(handle), |file| {
+        file.read_to_end(&mut data).map_or(-1, |count| count as i64)
+    });
+    super::types::restore_buffer(buffer, data);
+    i32::try_from(status).unwrap_or(-1)
+}
+
 /// Writes the logical bytes of an Actus buffer to a file.
 ///
 /// # Safety
@@ -257,7 +291,7 @@ fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> i64 {
     -1
 }
 
-fn actus_handle(handle: i32) -> i64 {
+pub(super) fn actus_handle(handle: i32) -> i64 {
     #[cfg(unix)]
     {
         return i64::from(handle);
@@ -287,7 +321,7 @@ fn close_file(handle: i64) -> i32 {
     -1
 }
 
-fn with_file(handle: i64, operation: impl FnOnce(&mut std::fs::File) -> i64) -> i64 {
+pub(super) fn with_file(handle: i64, operation: impl FnOnce(&mut std::fs::File) -> i64) -> i64 {
     #[cfg(unix)]
     {
         use std::os::unix::io::FromRawFd;

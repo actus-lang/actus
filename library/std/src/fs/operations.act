@@ -1,0 +1,88 @@
+"""Filesystem operations implemented behind the public `std::fs` facade."""
+open file;
+
+"""Remove one regular file."""
+open unsafe extern "C" verb actus_file_remove_buffer(abs path: Buffer) -> Int;
+"""Rename one path to another."""
+open unsafe extern "C" verb actus_file_rename_buffer(abs from: Buffer, abs to: Buffer) -> Int;
+"""Copy one file and return its byte count."""
+open unsafe extern "C" verb actus_file_copy_buffer(abs from: Buffer, abs to: Buffer) -> Int;
+"""Create one directory."""
+open unsafe extern "C" verb actus_file_create_dir_buffer(abs path: Buffer) -> Int;
+"""Remove one empty directory."""
+open unsafe extern "C" verb actus_file_remove_dir_buffer(abs path: Buffer) -> Int;
+"""Read an entire file into one owned buffer."""
+open unsafe extern "C" verb actus_file_read_all_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
+
+"""Translate a private runtime status into the public I/O result contract."""
+open verb fs_status(erg status: Int) -> Result[Int, IoError] {
+    return case status {
+        -1 => Err(IoError.Failed),
+        -2 => Err(IoError.EndOfStream),
+        _ => Ok(status),
+    };
+}
+
+"""Remove one regular file."""
+open verb remove_file(abs path: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_remove_buffer(path: abs path);
+    return fs_status(status: erg status);
+}
+
+"""Rename a filesystem path."""
+open verb rename(abs from: Buffer, abs to: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_rename_buffer(from: abs from, to: abs to);
+    return fs_status(status: erg status);
+}
+
+"""Copy a file and report its byte count."""
+open verb copy_file(abs from: Buffer, abs to: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_copy_buffer(from: abs from, to: abs to);
+    return fs_status(status: erg status);
+}
+
+"""Create one directory."""
+open verb create_dir(abs path: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_create_dir_buffer(path: abs path);
+    return fs_status(status: erg status);
+}
+
+"""Remove one empty directory."""
+open verb remove_dir(abs path: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_remove_dir_buffer(path: abs path);
+    return fs_status(status: erg status);
+}
+
+"""Finish a one-shot read while preserving the owned output buffer."""
+open verb read_all_status(erg status: Int, dat output: Buffer) -> Result[Buffer, IoError] {
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(output),
+    };
+}
+
+"""Read all bytes and close the temporary owned File on every return path."""
+open verb read_to_string(abs path: Buffer) -> Result[Buffer, IoError] {
+    erg opened = file_open(path: abs path);
+    return case dat opened {
+        Result.Ok(value) => {
+            erg file: File = value;
+            erg output = Buffer[0];
+            erg status = actus_file_read_all_buffer(handle: abs file.handle, buffer: ins output);
+            return read_all_status(status: erg status, output: dat output);
+        },
+        Result.Err(error) => { return Err(error); },
+    };
+}
+
+"""Create, truncate, write, and close a file deterministically."""
+open verb write_file(abs path: Buffer, abs contents: Buffer) -> Result[Int, IoError] {
+    erg opened = file_create(path: abs path);
+    return case dat opened {
+        Result.Ok(value) => {
+            erg file: File = value;
+            return file.write(buffer: abs contents);
+        },
+        Result.Err(error) => { return Err(error); },
+    };
+}

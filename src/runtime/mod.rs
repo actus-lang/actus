@@ -27,9 +27,12 @@ pub use contract::{
     RUNTIME_ABI_VERSION, RuntimeCapability, WRITE_BUFFER_STDOUT_SYMBOL,
 };
 pub use fs::{
-    actus_file_close, actus_file_close_buffer, actus_file_flush, actus_file_flush_buffer,
-    actus_file_open, actus_file_open_buffer, actus_file_open_options_buffer, actus_file_read,
-    actus_file_read_buffer, actus_file_seek, actus_file_seek_buffer, actus_file_write,
+    actus_file_close, actus_file_close_buffer, actus_file_copy_buffer,
+    actus_file_create_dir_buffer, actus_file_flush, actus_file_flush_buffer,
+    actus_file_metadata_buffer, actus_file_metadata_handle_buffer, actus_file_open,
+    actus_file_open_buffer, actus_file_open_options_buffer, actus_file_read,
+    actus_file_read_buffer, actus_file_remove_buffer, actus_file_remove_dir_buffer,
+    actus_file_rename_buffer, actus_file_seek, actus_file_seek_buffer, actus_file_write,
     actus_file_write_buffer,
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
@@ -37,7 +40,7 @@ pub use stream::{
     actus_buffer_length, actus_buffered_write_stdout, actus_cursor_flush, actus_cursor_read,
     actus_cursor_seek, actus_cursor_write, actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
-pub use types::{ActusBuffer, BufferHandle};
+pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
     option_env!("ACTUS_RUNTIME_ARCHIVE").map(Path::new)
