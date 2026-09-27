@@ -2,6 +2,7 @@ use std::io::{self, BufRead, Write};
 
 use serde_json::{Value, json};
 
+use super::completion::primitive_items;
 use super::definition::find_definition;
 use super::diagnostics::analyze_document;
 use super::documents::DocumentStore;
@@ -11,6 +12,7 @@ use super::protocol::{
     DefinitionParams, DidChangeParams, DidOpenParams, FormattingParams, Notification,
     PublishDiagnosticsParams, Request, Response, TextEdit,
 };
+use super::semantic_tokens::full as semantic_tokens;
 
 pub fn run_stdio() -> io::Result<()> {
     let stdin = io::stdin();
@@ -47,11 +49,33 @@ fn handle_request(
         "textDocument/didClose" => close_document(request.params, store, output)?,
         "textDocument/definition" => definition(request.id, request.params, store, output)?,
         "textDocument/hover" => hover(request.id, request.params, store, output)?,
+        "textDocument/completion" => completion(request.id, output)?,
+        "textDocument/semanticTokens/full" => {
+            semantic_tokens_full(request.id, request.params, store, output)?
+        }
         "textDocument/formatting" => formatting(request.id, request.params, store, output)?,
         _ if request.id.is_some() => respond(output, request.id, Value::Null)?,
         _ => {}
     }
     Ok(false)
+}
+
+fn completion(id: Option<Value>, output: &mut impl Write) -> io::Result<()> {
+    respond(output, id, primitive_items())
+}
+
+fn semantic_tokens_full(
+    id: Option<Value>,
+    params: Value,
+    store: &DocumentStore,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let params = serde_json::from_value::<FormattingParams>(params).map_err(invalid_params)?;
+    let result = store
+        .get(&params.text_document.uri)
+        .map(|document| semantic_tokens(&document.text))
+        .unwrap_or_else(|| serde_json::json!({"data": []}));
+    respond(output, id, result)
 }
 
 fn definition(
@@ -175,6 +199,11 @@ fn initialize_result() -> Value {
             "textDocumentSync": 1,
             "definitionProvider": true,
             "hoverProvider": true,
+            "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
+            "semanticTokensProvider": {
+                "full": true,
+                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins"], "tokenModifiers": []}
+            },
             "documentFormattingProvider": true
         },
         "serverInfo": { "name": "actus-lsp", "version": env!("CARGO_PKG_VERSION") }
