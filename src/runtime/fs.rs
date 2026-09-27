@@ -111,7 +111,7 @@ pub extern "C" fn actus_file_seek(handle: i64, offset: i64, whence: i32) -> i64 
 /// Moves a file cursor through the scalar ABI used by Actus external verbs.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_seek_buffer(handle: i32, offset: i32, whence: i32) -> i32 {
-    let position = actus_file_seek(i64::from(handle), i64::from(offset), whence);
+    let position = actus_file_seek(actus_handle(handle), i64::from(offset), whence);
     i32::try_from(position).unwrap_or(-1)
 }
 
