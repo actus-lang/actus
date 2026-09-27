@@ -28,6 +28,10 @@ fn path_literal(path: &Path) -> String {
         .join(" ")
 }
 
+fn path_literal_for(path: &Path, binding: &str) -> String {
+    path_literal(path).replace("path,", &format!("{binding},"))
+}
+
 fn copy_std_library(root: &Path) {
     let relative_files = [
         ("lib.act", library_file("lib.act")),
@@ -149,6 +153,64 @@ fn std_fs_open_options_append_preserves_existing_bytes() {
     build_and_run(&input, &output);
     assert_eq!(fs::read(&data_path).expect("read append fixture"), b"AB");
     fs::remove_dir_all(root).expect("remove append fixture");
+}
+
+#[test]
+fn std_fs_metadata_reports_file_size_and_kind() {
+    let root = std::env::temp_dir().join(format!("actus-fs-metadata-{}", std::process::id()));
+    let data_path = root.join("metadata.bin");
+    fs::create_dir_all(&root).expect("create metadata fixture");
+    fs::write(&data_path, b"AB").expect("write metadata fixture");
+    let path = path_literal(&data_path);
+    let source = format!(
+        "import io; import fs; verb main() -> Int {{ erg path = Buffer[0]; {path} erg result = metadata(path: abs path); return case dat result {{ Result.Ok(value) => {{ erg info: Metadata = value; return case info.size {{ 2 => case info.is_file {{ 1 => case info.is_dir {{ 0 => 0, _ => 1, }}, _ => 1, }}, _ => 1, }}; }}, Result.Err(_) => 2, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    let metadata = fs::metadata(&data_path).expect("read metadata fixture");
+    assert_eq!(metadata.len(), 2);
+    assert!(metadata.is_file());
+    fs::remove_dir_all(root).expect("remove metadata fixture");
+}
+
+#[test]
+fn std_fs_rename_and_remove_file_execute_natively() {
+    let root = std::env::temp_dir().join(format!("actus-fs-rename-{}", std::process::id()));
+    let source_path = root.join("before.bin");
+    let renamed_path = root.join("after.bin");
+    let source_literal = path_literal_for(&source_path, "source");
+    let renamed_literal = path_literal_for(&renamed_path, "renamed");
+    fs::create_dir_all(&root).expect("create rename fixture");
+    fs::write(&source_path, b"A").expect("write rename source");
+    let rename_source = format!(
+        "import io; import fs; verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg source = Buffer[0]; {source_literal} erg moved = rename(from: abs source, to: abs renamed); return case dat moved {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &rename_source);
+    build_and_run(&input, &output);
+    assert!(!source_path.exists());
+    assert!(renamed_path.exists());
+
+    let remove_source = format!(
+        "import io; import fs; verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg removed = remove_file(path: abs renamed); return case dat removed {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
+    );
+    fs::write(&input, remove_source).expect("write remove fixture");
+    build_and_run(&input, &output);
+    assert!(!renamed_path.exists());
+    fs::remove_dir_all(root).expect("remove rename fixture");
+}
+
+#[test]
+fn std_fs_one_shot_write_and_read_to_string_execute_natively() {
+    let root = std::env::temp_dir().join(format!("actus-fs-one-shot-{}", std::process::id()));
+    let data_path = root.join("one-shot.bin");
+    let path = path_literal(&data_path);
+    let source = format!(
+        "import io; import fs; verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; append(contents, 88); append(contents, 89); erg written = write_file(path: abs path, contents: abs contents); return case dat written {{ Result.Ok(_) => {{ erg loaded = read_to_string(path: abs path); return case dat loaded {{ Result.Ok(_) => 0, Result.Err(_) => 2, }}; }}, Result.Err(_) => 1, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    assert_eq!(fs::read(&data_path).expect("read one-shot fixture"), b"XY");
+    fs::remove_dir_all(root).expect("remove one-shot fixture");
 }
 
 #[test]

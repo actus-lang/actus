@@ -273,9 +273,9 @@ contracts rather than introducing parallel cleanup or error mechanisms.
 - [x] Move filesystem implementation details behind the `std::fs` facade.
 - [x] Use caller-allocated storage for struct-returning helper verbs.
 - [x] Verify `Result[File, IoError]` and `OpenOptions` helper returns natively.
-- [ ] Add native metadata size/type assertions.
-- [ ] Add native rename/remove-file assertions.
-- [ ] Add native one-shot read/write assertions.
+- [x] Add native metadata size/type assertions.
+- [x] Add native rename/remove-file assertions.
+- [x] Add native one-shot read/write assertions.
 
 ### Gate 3 invariant
 

@@ -57,7 +57,7 @@ pub(super) fn declare_functions(
 }
 
 fn needs_private_symbol(name: &str) -> bool {
-    matches!(name, "read" | "write" | "open" | "close" | "fsync")
+    matches!(name, "read" | "write" | "open" | "close" | "fsync" | "rename")
 }
 
 fn function_meta(
