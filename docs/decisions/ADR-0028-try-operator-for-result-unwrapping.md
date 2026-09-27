@@ -35,6 +35,12 @@ enum layout. The error block performs planned cleanup and returns the original
 `Err` payload. The success block unwraps the value without allocation or
 wrapper objects.
 
+The operator uses the enclosing verb's existing return ABI. If the propagated
+error contains a struct payload, the caller-owned `sret`/Result storage is used
+for the error value; `?` never returns a pointer into the current callee frame.
+Raw runtime status integers must be converted to `IoError` before reaching a
+`Result` expression.
+
 ## Verification
 
 - [x] Parse postfix `?` expressions.
@@ -42,4 +48,5 @@ wrapper objects.
 - [x] Validate compatible error propagation.
 - [x] Lower success and early-return paths natively.
 - [x] Preserve scope cleanup and loan restoration on early return.
-- [ ] Extend integration coverage to filesystem and network streams.
+- [x] Extend integration coverage to filesystem streams.
+- [ ] Extend integration coverage to network streams when `std::net` exists.

@@ -42,3 +42,15 @@ introduce vtables, implicit borrowing, or hidden allocation.
 
 The explicit verb form remains canonical in generated documentation and ABI
 contracts; UFCS is an ergonomic source spelling.
+
+## ABI and evaluation-order contract
+
+UFCS does not create a second calling convention. After desugaring, the call
+uses the same direct static ABI as the canonical verb form, including hidden
+caller-allocated `sret` storage for struct returns and the registered layouts
+for wide integers, floating-point values, and `Void`.
+
+The receiver expression is evaluated first, followed by explicit arguments from
+left to right. The receiver is passed with the role required by the first verb
+parameter; no implicit borrow, dereference, conversion, allocation, or status
+code translation is inserted by UFCS.

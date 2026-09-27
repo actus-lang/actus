@@ -397,6 +397,54 @@ and zero-sized values without implementing packed layouts yet.
 - [x] Numeric bounds and compile-time overflow are validated before native
       code generation.
 
+## Gate 3.7: Stabilization and ABI Hardening
+
+Freeze the Gate 3 compiler, runtime, and standard-library contracts before
+introducing packed registers or MMIO-specific lowering in Gate 4. This gate
+does not add new language syntax; it verifies that the existing contracts are
+portable, documented, and safe to consume from native code.
+
+### Documentation and ABI freeze
+
+- [x] Document caller-allocated `sret` storage and aggregate payload copying in
+      ADR-0031.
+- [x] Document scalar, wide-integer, floating-point, and zero-sized `Void`
+      return conventions in ADR-0031.
+- [x] Align ADR-0028 with the implemented Result layout, cleanup, and early
+      return contract.
+- [x] Align ADR-0029 with the canonical call ABI and receiver evaluation order.
+- [x] Record the distinction between fallible public APIs and private raw C
+      runtime status codes.
+
+### Error and standard-library contract audit
+
+- [x] Verify that every fallible public `std::io` and `std::fs` operation
+      returns `Result[T, IoError]`.
+- [x] Keep raw host/C status values private to `unsafe extern "C"` declarations
+      and convert them at the Actus library boundary.
+- [x] Preserve infallible constructors and configuration verbs as direct value
+      returns rather than manufacturing artificial I/O errors.
+- [x] Verify UTF-8 validation, EOF handling, and failure propagation through
+      one-shot and stream APIs.
+
+### Native and tooling smoke matrix
+
+- [x] Run native coverage for `tests/library/`, `tests/std_io.rs`,
+      `tests/fs.rs`, and `tests/examples_cli.rs`.
+- [x] Verify `examples/sensor_telemetry.act` through the Actus CLI.
+- [x] Run Tree-sitter corpus tests for primitive types, hexadecimal literals,
+      and ownership-role scopes.
+- [x] Verify VS Code grammar packaging and installation for the Gate 3.6
+      syntax surface.
+- [x] Verify LSP primitive hover, completion, and semantic ownership tokens.
+
+### Gate 3.7 invariant
+
+- [x] The native ABI for structs, wide integers, floats, and `Void` is
+      explicitly documented and covered by tests.
+- [x] Public standard-library failures cannot expose raw host/C status codes.
+- [x] Compiler and tooling checks are green before Gate 4 begins.
+
 ## Gate 4: Bare-Metal and Embedded HAL
 
 Implement ADR-0026 for MMIO registers and deterministic protocol layouts. The
