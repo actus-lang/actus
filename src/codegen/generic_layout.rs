@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::{
     BuiltinType, EnumDef, Program, StructDef, TopLevelDecl, TypeName, builtin_enum_definitions,
-    lookup_builtin_type,
+    lookup_builtin_type, primitive_type,
 };
 use crate::semantic::GenericInstance;
 
@@ -111,6 +111,9 @@ impl GenericLayoutRegistry {
         if let Some(builtin) = lookup_builtin_type(&type_name.name) {
             return builtin_layout(builtin, self.pointer_size);
         }
+        if let Some(primitive) = primitive_type(&type_name.name) {
+            return primitive_layout(primitive);
+        }
         if let Some(definition) = self.structs.get(&type_name.name) {
             let layout = self.layout_struct(definition, &type_name.arguments, visiting)?;
             return Ok(ValueLayout { size: layout.size, alignment: layout.alignment });
@@ -156,6 +159,22 @@ fn builtin_layout(builtin: BuiltinType, pointer_size: u32) -> Result<ValueLayout
             builtin.spec().name
         ))),
     }
+}
+
+fn primitive_layout(primitive: crate::ast::PrimitiveType) -> Result<ValueLayout, NativeEmitError> {
+    let (size, alignment) = match primitive {
+        crate::ast::PrimitiveType::Integer { width, .. } => match width {
+            1..=8 => (1, 1),
+            9..=16 => (2, 2),
+            17..=32 => (4, 4),
+            33..=64 => (8, 8),
+            65..=128 => (16, 16),
+            _ => return Err(NativeEmitError("invalid primitive integer width".to_owned())),
+        },
+        crate::ast::PrimitiveType::Float { width } => (u32::from(width / 8), u32::from(width / 8)),
+        crate::ast::PrimitiveType::Void => (0, 1),
+    };
+    Ok(ValueLayout { size, alignment })
 }
 
 pub(super) fn application_key(name: &str, arguments: &[TypeName]) -> String {

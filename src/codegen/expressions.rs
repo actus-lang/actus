@@ -261,7 +261,7 @@ fn emit_try_control_flow(
     let ok_block = function.create_block();
     let err_block = function.create_block();
     let merge = function.create_block();
-    function.append_block_param(merge, field_type.ir_type(layouts.pointer_type));
+    function.append_block_param(merge, try_payload_ir_type(field_type, layouts));
     function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
 
     function.switch_to_block(err_block);
@@ -304,13 +304,24 @@ fn load_try_payload(
             payload_address,
             0,
         )),
-        NativeType::Void => Err(NativeEmitError("Void cannot be an enum payload".to_owned())),
+        NativeType::Void => Ok(function.ins().iconst(types::I32, 0)),
         NativeType::String | NativeType::Buffer => {
             Ok(function.ins().load(layouts.pointer_type, MemFlagsData::new(), payload_address, 0))
         }
         NativeType::FatPointer => {
             Err(NativeEmitError("try does not yet unwrap fat-pointer payloads".to_owned()))
         }
+    }
+}
+
+fn try_payload_ir_type(
+    field_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> cranelift_codegen::ir::Type {
+    if matches!(field_type, NativeType::Void) {
+        types::I32
+    } else {
+        field_type.ir_type(layouts.pointer_type)
     }
 }
 

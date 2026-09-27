@@ -106,6 +106,9 @@ fn store_payload(
     ty: NativeType,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
+    if matches!(ty, NativeType::Void) {
+        return Ok(());
+    }
     if let NativeType::Struct(id) | NativeType::Enum(id) = ty {
         let size = layouts
             .type_size(ty)

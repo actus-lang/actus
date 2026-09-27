@@ -123,26 +123,31 @@ fn lower_owner_declaration<'source>(
         .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)));
     let native_type =
         declared_native.unwrap_or_else(|| initializer_type(initializer, types, functions, layouts));
-    let value = if let (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) =
-        (declared_native, initializer)
-    {
-        super::super::expression_literals::lower_float_as(
-            function,
-            value,
-            NativeType::Float { width }.ir_type(layouts.pointer_type),
-        )?
-    } else {
-        lower_expression(
-            function,
-            initializer,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )?
-    };
+    let value =
+        if let (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) =
+            (declared_native, initializer)
+        {
+            super::super::expression_literals::lower_wide_integer(function, value)?
+        } else if let (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) =
+            (declared_native, initializer)
+        {
+            super::super::expression_literals::lower_float_as(
+                function,
+                value,
+                NativeType::Float { width }.ir_type(layouts.pointer_type),
+            )?
+        } else {
+            lower_expression(
+                function,
+                initializer,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )?
+        };
     let value = declared_native.map_or(value, |declared| {
         super::super::expression_literals::coerce_to_ir_type(
             function,
