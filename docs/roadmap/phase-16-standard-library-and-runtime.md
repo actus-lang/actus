@@ -451,10 +451,12 @@ Implement ADR-0026 for MMIO registers and deterministic protocol layouts. The
 feature must remain usable on bare-metal targets and embedded microcontrollers
 without host runtime services.
 
-- [ ] Add `u1..u128` and `i1..i128` primitive type declarations.
-- [ ] Define `Bit` as the canonical `u1` alias.
-- [ ] Keep hexadecimal notation as a literal format only.
-- [ ] Add compile-time range and overflow validation.
+- [x] Reuse the `u1..u128` and `i1..i128` primitive type declarations from
+      Gate 3.6.
+- [ ] Define `Bit` as the canonical `u1` alias as part of the packed-register
+      API.
+- [x] Keep hexadecimal notation as a literal format only.
+- [x] Reuse Gate 3.6 compile-time range and overflow validation.
 - [ ] Define `pack` with an explicit fixed backing integer.
 - [ ] Validate packed field widths, offsets, overlap, and total capacity.
 - [ ] Define deterministic endianness in the packed layout contract.
