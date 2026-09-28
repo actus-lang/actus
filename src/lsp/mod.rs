@@ -9,4 +9,5 @@ mod protocol;
 mod semantic_tokens;
 mod server;
 
+pub use diagnostics::analyze_document;
 pub use server::run_stdio;

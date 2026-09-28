@@ -116,7 +116,7 @@ behavior around the existing language and runtime contracts.
 - [x] Reject duplicate diagnostic codes and contradictory severity metadata.
 - [x] Sort diagnostics deterministically by source path, span, phase, and code.
 - [ ] Ensure renderer choice cannot change validation, ordering, or exit code.
-- [ ] Add text, colored, JSON, and LSP diagnostic tests from the same fixtures.
+- [x] Add text, colored, JSON, and LSP diagnostic tests from the same fixture.
 - [ ] Add golden tests for stable messages and stable source locations.
 - [ ] Verify diagnostics remain deterministic across repeated clean runs.
 

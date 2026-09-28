@@ -13,6 +13,12 @@ use crate::semantic::analyze;
 use super::position::{LineIndex, LspRange};
 use super::protocol::LspDiagnostic;
 
+/// Analyzes one document and converts the shared diagnostic model to LSP values.
+///
+/// `uri` identifies the document, `source` is the current document text, and
+/// `overlays` supplies unsaved sibling modules for package-aware analysis.
+/// The returned diagnostics preserve code, severity, and source range while
+/// rendering the human-readable message through the shared text renderer.
 pub fn analyze_document(
     uri: &str,
     source: &str,
