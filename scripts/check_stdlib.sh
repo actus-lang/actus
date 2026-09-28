@@ -5,6 +5,10 @@ set -eu
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
+if [ -n "${ACTUS_CI_LINKER:-}" ]; then
+    export ACTUS_LINKER="$ACTUS_CI_LINKER"
+fi
+
 strict_object="$repo_root/target/actus-stdlib-strict.o"
 repeat_object="$repo_root/target/actus-stdlib-strict-repeat.o"
 trap 'rm -f "$strict_object" "$repeat_object"' EXIT
