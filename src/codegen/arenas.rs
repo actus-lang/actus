@@ -26,12 +26,8 @@ pub(super) fn lower_place(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let argument = arguments
-        .first()
-        .map(|argument| &argument.expression)
-        .ok_or_else(|| NativeEmitError("place requires one value".to_owned()))?;
-    let (capacity, size, alignment) =
-        placement_layout(receiver, argument, local_types, functions, layouts)?;
+    let (argument, capacity, size, alignment) =
+        place_inputs(receiver, arguments, local_types, functions, layouts)?;
     let arena = lower_expression(
         function,
         receiver,
@@ -53,6 +49,22 @@ pub(super) fn lower_place(
         layouts,
     )?;
     lower_placed_value(function, arena, value, capacity, size, alignment, layouts)
+}
+
+fn place_inputs<'a>(
+    receiver: &Expr,
+    arguments: &'a [Argument],
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(&'a Expr, u32, u32, u32), NativeEmitError> {
+    let argument = arguments
+        .first()
+        .map(|argument| &argument.expression)
+        .ok_or_else(|| NativeEmitError("place requires one value".to_owned()))?;
+    let (capacity, size, alignment) =
+        placement_layout(receiver, argument, local_types, functions, layouts)?;
+    Ok((argument, capacity, size, alignment))
 }
 
 fn placement_layout(
@@ -85,14 +97,9 @@ fn lower_placed_value(
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let offset_address = function.ins().iadd_imm_s(arena, i64::from(capacity));
     let offset = function.ins().load(layouts.pointer_type, MemFlagsData::new(), offset_address, 0);
-    let alignment_minus_one =
-        function.ins().iconst(layouts.pointer_type, i64::from(alignment.saturating_sub(1)));
-    let rounded = function.ins().iadd(offset, alignment_minus_one);
-    let alignment_mask = function.ins().bnot(alignment_minus_one);
-    let aligned = function.ins().band(rounded, alignment_mask);
+    let aligned = aligned_offset(function, offset, alignment, layouts);
     let new_offset = function.ins().iadd_imm_s(aligned, i64::from(size));
-    let capacity_value = function.ins().iconst(layouts.pointer_type, i64::from(capacity));
-    let fits = function.ins().icmp(IntCC::UnsignedLessThanOrEqual, new_offset, capacity_value);
+    let fits = capacity_check(function, new_offset, capacity, layouts);
     let ok_block = function.create_block();
     let trap_block = function.create_block();
     function.ins().brif(fits, ok_block, &[], trap_block, &[]);
@@ -105,4 +112,27 @@ fn lower_placed_value(
     copy_bytes(function, value, destination, size);
     function.seal_block(ok_block);
     Ok(coerce_to_ir_type(function, destination, layouts.pointer_type))
+}
+
+fn aligned_offset(
+    function: &mut FunctionBuilder<'_>,
+    offset: cranelift_codegen::ir::Value,
+    alignment: u32,
+    layouts: &LayoutRegistry,
+) -> cranelift_codegen::ir::Value {
+    let alignment_minus_one =
+        function.ins().iconst(layouts.pointer_type, i64::from(alignment.saturating_sub(1)));
+    let rounded = function.ins().iadd(offset, alignment_minus_one);
+    let alignment_mask = function.ins().bnot(alignment_minus_one);
+    function.ins().band(rounded, alignment_mask)
+}
+
+fn capacity_check(
+    function: &mut FunctionBuilder<'_>,
+    new_offset: cranelift_codegen::ir::Value,
+    capacity: u32,
+    layouts: &LayoutRegistry,
+) -> cranelift_codegen::ir::Value {
+    let capacity_value = function.ins().iconst(layouts.pointer_type, i64::from(capacity));
+    function.ins().icmp(IntCC::UnsignedLessThanOrEqual, new_offset, capacity_value)
 }

@@ -32,6 +32,31 @@ pub(crate) fn lower_pack_literal(
         .iter()
         .find(|field| field.name == "storage")
         .ok_or_else(|| NativeEmitError("pack literal is missing storage".to_owned()))?;
+    lower_pack_storage_value(
+        function,
+        storage,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        pack.storage,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_pack_storage_value(
+    function: &mut FunctionBuilder<'_>,
+    storage: &StructFieldInit,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    storage_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let value = lower_expression(
         function,
         &storage.value,
@@ -45,31 +70,125 @@ pub(crate) fn lower_pack_literal(
     Ok(super::super::expressions::coerce_to_ir_type(
         function,
         value,
-        layouts.ir_type(pack.storage)?,
+        layouts.ir_type(storage_type)?,
     ))
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn lower_pack_field_assignment(
+pub(crate) fn lower_pack_field_assignment<'source>(
     function: &mut FunctionBuilder<'_>,
     object: &Expr,
     field: &str,
     value: &Expr,
     pack_id: usize,
-    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
-    let name = binding_name(object)?;
-    let pack =
-        layouts.pack(pack_id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
-    let field_layout = packed_field(pack, field)?;
+    lower_pack_field_assignment_inner(
+        PackAssignmentContext {
+            function,
+            object,
+            field,
+            value,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        },
+        pack_id,
+    )
+}
+
+struct PackAssignmentContext<'input, 'source, 'function> {
+    function: &'input mut FunctionBuilder<'function>,
+    object: &'input Expr,
+    field: &'input str,
+    value: &'input Expr,
+    locals: &'input mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &'input HashMap<&'source String, NativeType>,
+    functions: &'input HashMap<String, FunctionRef>,
+    cleanup_schedule: &'input NativeCleanupSchedule,
+    string_data: &'input StringDataValues,
+    layouts: &'input LayoutRegistry,
+}
+
+fn lower_pack_field_assignment_inner(
+    context: PackAssignmentContext<'_, '_, '_>,
+    pack_id: usize,
+) -> Result<(), NativeEmitError> {
+    let name = binding_name(context.object)?;
+    let pack = context
+        .layouts
+        .pack(pack_id)
+        .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+    let field_layout = packed_field(pack, context.field)?;
+    ensure_pack_field_is_mutable(field_layout, context.field)?;
+    let (storage, new_value) = lower_pack_assignment_operands(
+        context.function,
+        context.object,
+        context.value,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )?;
+    let updated = lower_pack_field_write(
+        context.function,
+        storage,
+        new_value,
+        field_layout,
+        pack.storage,
+        pack.endianness,
+        context.layouts,
+    )?;
+    update_pack_binding(context.locals, name, updated)?;
+    Ok(())
+}
+
+fn update_pack_binding(
+    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
+    name: &str,
+    updated: cranelift_codegen::ir::Value,
+) -> Result<(), NativeEmitError> {
+    let binding = locals
+        .keys()
+        .find(|candidate| candidate.as_str() == name)
+        .copied()
+        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+    locals.insert(binding, updated);
+    Ok(())
+}
+
+fn ensure_pack_field_is_mutable(
+    field_layout: &PackFieldLayout,
+    field: &str,
+) -> Result<(), NativeEmitError> {
     if !matches!(field_layout.role, crate::ast::StructFieldRole::Erg) {
         return Err(NativeEmitError(format!("packed field `{field}` is read-only")));
     }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_pack_assignment_operands(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    value: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), NativeEmitError> {
     let storage = lower_expression(
         function,
         object,
@@ -90,22 +209,7 @@ pub(crate) fn lower_pack_field_assignment(
         string_data,
         layouts,
     )?;
-    let updated = lower_pack_field_write(
-        function,
-        storage,
-        new_value,
-        field_layout,
-        pack.storage,
-        pack.endianness,
-        layouts,
-    )?;
-    let binding = locals
-        .keys()
-        .find(|candidate| candidate.as_str() == name)
-        .copied()
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
-    locals.insert(binding, updated);
-    Ok(())
+    Ok((storage, new_value))
 }
 
 pub(crate) fn lower_pack_field(
