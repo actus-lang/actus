@@ -86,6 +86,18 @@ fn renders_unknown_metadata_with_a_stable_code() {
 }
 
 #[test]
+fn renders_unknown_keyword_with_a_stable_parser_code() {
+    let (tokens, errors) = scan("verbb main() { return 0; }");
+    assert!(errors.is_empty());
+    let error = parse(tokens).expect_err("unknown declaration keyword should fail");
+
+    assert_eq!(
+        render_parse_error("verbb main() { return 0; }", &error),
+        "error[E0009] at 1:1: unknown keyword `verbb`"
+    );
+}
+
+#[test]
 fn renders_missing_facade_with_a_stable_module_code() {
     let error = ModuleError::Resolution(ModuleResolutionError::MissingFacade {
         module: "std::missing".to_owned(),

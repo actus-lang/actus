@@ -1,5 +1,5 @@
 use crate::ast::{ExternalVerbDecl, ForeignAbi, TopLevelDecl};
-use crate::lexer::{SourceSpan, TokenKind};
+use crate::lexer::{SourceSpan, Token, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
 
@@ -42,6 +42,13 @@ impl Parser {
         }
         if self.check_simple(&TokenKind::Perform) {
             return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false)?));
+        }
+        if let Some(Token { kind: TokenKind::Identifier(name), span }) = self.peek() {
+            return Err(ParseError {
+                code: ParseErrorCode::UnknownKeyword,
+                kind: ParseErrorKind::UnknownKeyword { name: name.clone() },
+                span: *span,
+            });
         }
         let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
         Ok(TopLevelDecl::Verb(declaration))

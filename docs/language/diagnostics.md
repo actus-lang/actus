@@ -7,7 +7,8 @@ edition.
 | Code range | Category |
 | --- | --- |
 | `E0001`–`E0002` | Lexer errors |
-| `E0003`–`E0004` | Parser errors |
+| `E0003`–`E0004` | Parser token and end-of-input errors |
+| `E0005`–`E0009` | Parser declaration, keyword, and metadata errors |
 | `E1001`–`E1028` | Bindings, ownership, calls, types, and returns |
 | `E1029`–`E1033` | Struct declarations and initialization |
 | `E1034`–`E1035` | Struct mutation and field borrow conflicts |

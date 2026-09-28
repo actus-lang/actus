@@ -70,6 +70,18 @@ fn rejects_unknown_metadata_attributes() {
 }
 
 #[test]
+fn rejects_unknown_top_level_keywords_with_a_stable_code() {
+    let (tokens, errors) = scan("verbb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unknown declaration keywords must fail");
+    assert_eq!(error.code, ParseErrorCode::UnknownKeyword);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnknownKeyword { name } if name == "verbb"
+    ));
+}
+
+#[test]
 fn rejects_metadata_attached_to_a_non_verb_declaration() {
     let (tokens, errors) = scan("meta test struct Packet { payload: Buffer, }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

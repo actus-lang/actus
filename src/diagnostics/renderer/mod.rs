@@ -108,6 +108,7 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::DuplicateName { kind, name } => {
             format!("duplicate {kind} `{name}`")
         }
+        ParseErrorKind::UnknownKeyword { name } => format!("unknown keyword `{name}`"),
         ParseErrorKind::UnknownMetadata { name } => format!("unknown metadata attribute `{name}`"),
         ParseErrorKind::UnsupportedTargetPlatform { name } => {
             format!("unsupported target platform `{name}`")

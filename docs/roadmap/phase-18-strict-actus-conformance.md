@@ -174,7 +174,7 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.4: Frontend and declaration completeness
 
-- [ ] Reject unknown keywords with stable diagnostics.
+- [x] Reject unknown keywords with stable `E0009` diagnostics.
 - [x] Reject unknown types with stable `E1023` diagnostics.
 - [x] Reject unknown verbs and function calls with stable `E1069` diagnostics.
 - [x] Reject malformed internal generic type keys with stable `E1080`
@@ -189,10 +189,10 @@ behavior around the existing language and runtime contracts.
       siblings with stable diagnostics.
 - [x] Reject ambiguous positional calls and ambiguous module roots
       deterministically.
-- [ ] Validate all return paths and reject missing-result branches.
-- [ ] Validate generic parameters, bounds, instantiations, and unsupported
+- [x] Validate all return paths and reject missing-result branches.
+- [x] Validate generic parameters, bounds, instantiations, and unsupported
       combinations before code generation.
-- [ ] Validate primitive widths, signedness, literal ranges, and overflow
+- [x] Validate primitive widths, signedness, literal ranges, and overflow
       behavior without silent truncation.
 - [ ] Add positive and negative fixtures for every declared frontend rule.
 - [ ] Add a completeness report identifying validated and intentionally
