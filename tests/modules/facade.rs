@@ -60,6 +60,22 @@ fn unlisted_sibling_symbols_are_not_external_exports() {
 }
 
 #[test]
+fn facade_controls_performance_exports_as_well() {
+    let fixture = Fixture::new();
+    fixture.write("driver/gpio/gpio.act", "open implementations;");
+    fixture.write(
+        "driver/gpio/implementations.act",
+        "open perform PublicRole for PublicType { } perform HiddenRole for HiddenType { }",
+    );
+
+    let exports = exports_module(&ModuleResolver::new(&fixture.root), "driver::gpio")
+        .expect("performance exports should resolve");
+
+    assert!(exports.contains("perform", "PublicRole for PublicType"));
+    assert!(!exports.contains("perform", "HiddenRole for HiddenType"));
+}
+
+#[test]
 fn facade_rejects_unknown_sibling_module() {
     let fixture = Fixture::new();
     fixture.write("driver/gpio/gpio.act", "open missing;");

@@ -5,7 +5,7 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 
 /// Converts a module, import, or facade failure into the shared diagnostic model.
 ///
-/// Resolution failures use the stable `E1100`–`E1104` module range. Nested
+/// Resolution failures use the stable `E1100`–`E1108` module range. Nested
 /// lexical, parser, and semantic failures retain their subsystem code while
 /// gaining the module source path when one is available.
 pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
@@ -42,6 +42,9 @@ fn resolution_diagnostic(error: &ModuleResolutionError) -> Diagnostic {
         }
         ModuleResolutionError::AmbiguousModule { directory, .. } => {
             ("E1102", Some(directory.display().to_string()))
+        }
+        ModuleResolutionError::BypassesFacade { facade, .. } => {
+            ("E1108", Some(facade.display().to_string()))
         }
         ModuleResolutionError::Io { path, .. } => ("E1103", Some(path.display().to_string())),
     };

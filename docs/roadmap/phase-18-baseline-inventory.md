@@ -40,7 +40,7 @@ ranges:
 | `E1034`–`E1035` | Struct mutation and field borrowing |
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enums, roles, generics, packs, and arenas |
-| `E1100`–`E1107` | Module paths, facades, sibling declarations, and module I/O |
+| `E1100`–`E1108` | Module paths, facades, sibling visibility, declarations, and module I/O |
 | `E1800`–`E1809` | Strict configuration and policy |
 | `E1810`–`E1819` | Strict frontend validation |
 | `E1820`–`E1829` | Strict semantic validation |

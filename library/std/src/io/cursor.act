@@ -92,7 +92,7 @@ open verb cursor_flush(ins self: Cursor) -> Result[Int, IoError] {
 }
 
 """Satisfy the static Reader contract for Cursor."""
-perform Reader for Cursor {
+open perform Reader for Cursor {
     verb read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_cursor_read(source: abs self.buffer, position: self.position, target: ins buffer);
         case status {
@@ -108,7 +108,7 @@ perform Reader for Cursor {
 }
 
 """Satisfy the static Writer contract for Cursor."""
-perform Writer for Cursor {
+open perform Writer for Cursor {
     verb write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_cursor_write(target: ins self.buffer, position: self.position, source: abs buffer);
         case status {

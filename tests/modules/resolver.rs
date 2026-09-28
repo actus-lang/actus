@@ -91,6 +91,24 @@ fn rejects_ambiguous_directory_and_single_file_roots() {
 }
 
 #[test]
+fn rejects_direct_imports_that_bypass_a_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("driver/gpio/gpio.act");
+    fixture.write("driver/gpio/registers.act");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("driver::gpio::registers")
+        .expect_err("sibling modules must be reached through the parent facade");
+
+    assert!(
+        matches!(&error, ModuleResolutionError::BypassesFacade { parent, .. } if parent == "driver::gpio")
+    );
+    let diagnostic =
+        actus::diagnostics::module_diagnostic(&actus::modules::ModuleError::Resolution(error));
+    assert_eq!(diagnostic.code(), "E1108");
+}
+
+#[test]
 fn rejects_invalid_module_paths() {
     let fixture = Fixture::new();
     let error = ModuleResolver::new(&fixture.root)

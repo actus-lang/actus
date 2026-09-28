@@ -223,11 +223,8 @@ pub fn resolve_imports(
         let imported = parse_module(resolver, &import.path)?;
         let exports = exports_module(resolver, &import.path)?;
         declarations.extend(imported.declarations.into_iter().filter(|candidate| {
-            if matches!(candidate, TopLevelDecl::Perform(_)) {
-                return true;
-            }
-            let Some((kind, name, _)) = declaration_identity(candidate) else { return false };
-            exports.contains(kind, name)
+            let Some((kind, name)) = export_identity(candidate) else { return false };
+            exports.contains(kind, &name)
         }));
     }
     Ok(Program { declarations })
@@ -238,18 +235,43 @@ fn check_declaration_name(
     path: &Path,
     locations: &mut HashMap<(String, String), ModuleLocation>,
 ) -> Result<(), ModuleError> {
-    let Some((kind, name, span)) = declaration_identity(declaration) else { return Ok(()) };
-    let key = (kind.to_owned(), name.to_owned());
+    let (kind, name, span) = match declaration {
+        TopLevelDecl::Perform(perform) => {
+            ("perform".to_owned(), performance_identity(perform), perform.span)
+        }
+        _ => {
+            let Some((kind, name, span)) = declaration_identity(declaration) else {
+                return Ok(());
+            };
+            (kind.to_owned(), name.to_owned(), span)
+        }
+    };
+    let key = (kind.clone(), name.clone());
     let location = ModuleLocation { path: path.to_owned(), span };
     if let Some(first) = locations.insert(key, location.clone()) {
         return Err(ModuleError::DuplicateDeclaration(Box::new(DuplicateDeclaration {
-            kind: kind.to_owned(),
-            name: name.to_owned(),
+            kind,
+            name,
             first,
             second: location,
         })));
     }
     Ok(())
+}
+
+fn performance_identity(perform: &crate::ast::PerformDecl) -> String {
+    format!("{} for {}", perform.role_name, canonical_type_name(&perform.target))
+}
+
+fn canonical_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    )
 }
 
 fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &String, SourceSpan)> {
@@ -263,6 +285,16 @@ fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &St
         TopLevelDecl::Perform(_) => None,
         TopLevelDecl::OpenSibling(_) => None,
         TopLevelDecl::Import(_) => None,
+    }
+}
+
+fn export_identity(declaration: &TopLevelDecl) -> Option<(&'static str, String)> {
+    if let Some((kind, name, _)) = declaration_identity(declaration) {
+        return Some((kind, name.clone()));
+    }
+    match declaration {
+        TopLevelDecl::Perform(perform) => Some(("perform", performance_identity(perform))),
+        _ => None,
     }
 }
 
@@ -305,10 +337,10 @@ fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
         let sibling_name = path.file_stem().and_then(|stem| stem.to_str());
         if index > 0 && sibling_name.is_some_and(|name| facade_open.contains(name)) {
             symbols.extend(program.declarations.iter().filter_map(|declaration| {
-                let (kind, name, _) = declaration_identity(declaration)?;
+                let (kind, name) = export_identity(declaration)?;
                 declaration_is_open(declaration).then(|| ExportedSymbol {
                     kind: kind.to_owned(),
-                    name: name.to_owned(),
+                    name,
                     source: path.clone(),
                 })
             }));

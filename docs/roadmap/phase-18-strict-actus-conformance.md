@@ -229,20 +229,21 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.6: Module facades and architectural boundaries
 
-- [ ] Require every directory module to expose one canonical module-named
-      `.act` facade.
-- [ ] Reject external access to unexported siblings and imports that bypass the
+- [x] Require every directory module to expose one canonical module-named
+      `.act` facade. See
+      [`phase-18-architecture-conformance.md`](phase-18-architecture-conformance.md).
+- [x] Reject external access to unexported siblings and imports that bypass the
       facade.
-- [ ] Reject duplicate or ambiguous sibling declarations deterministically.
-- [ ] Validate extensionless `open` exports and their visibility boundaries.
-- [ ] Reject reverse compiler-pipeline dependencies.
-- [ ] Reject parser ownership logic, AST backend types, semantic terminal
+- [x] Reject duplicate or ambiguous sibling declarations deterministically.
+- [x] Validate extensionless `open` exports and their visibility boundaries.
+- [x] Reject reverse compiler-pipeline dependencies.
+- [x] Reject parser ownership logic, AST backend types, semantic terminal
       rendering, and codegen semantic repair.
-- [ ] Reject generic Actus files named `utils.act`, `helpers.act`, `common.act`,
+- [x] Reject generic Actus files named `utils.act`, `helpers.act`, `common.act`,
       or `misc.act` unless an explicit architectural exception is recorded.
-- [ ] Apply the same responsibility-based naming rule to Rust source modules,
+- [x] Apply the same responsibility-based naming rule to Rust source modules,
       including `utils.rs`, `helpers.rs`, `common.rs`, and `misc.rs`.
-- [ ] Add facade, sibling discovery, duplicate, visibility, and dependency
+- [x] Add facade, sibling discovery, duplicate, visibility, and dependency
       direction fixtures.
 
 ## Gate 18.7: Public documentation conformance

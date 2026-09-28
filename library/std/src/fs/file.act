@@ -80,7 +80,7 @@ open verb file_create(abs path: Path) -> Result[File, IoError] {
 }
 
 """Read file bytes into caller-provided storage without allocating per call."""
-perform Reader for File {
+open perform Reader for File {
     verb read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
         return case status {
@@ -92,7 +92,7 @@ perform Reader for File {
 }
 
 """Write borrowed bytes and flush a file through the Writer contract."""
-perform Writer for File {
+open perform Writer for File {
     verb write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
         return case status {
@@ -153,7 +153,7 @@ open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError]
 }
 
 """Satisfy the positional stream contract through the host runtime."""
-perform Seeker for File {
+open perform Seeker for File {
     verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError] {
         return case dat from {
             SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
@@ -169,7 +169,7 @@ open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, IoError
     return Result[Metadata, IoError].Err(IoError.Failed);
 }
 
-perform MetadataProvider for File {
+open perform MetadataProvider for File {
     verb metadata(ins self: File) -> Result[Metadata, IoError] {
         erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
         erg status = actus_file_metadata_handle_buffer(
@@ -184,7 +184,7 @@ perform MetadataProvider for File {
 }
 
 """Close the owned operating-system resource during deterministic LIFO cleanup."""
-perform Drop for File {
+open perform Drop for File {
     verb drop(ins self: File) {
         actus_file_close_buffer(handle: abs self.handle);
     }
