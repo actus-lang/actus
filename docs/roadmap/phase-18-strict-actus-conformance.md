@@ -52,6 +52,8 @@ behavior around the existing language and runtime contracts.
       through the shared diagnostic catalog validator.
 - [x] Route `actus check` and `actus build` frontend/semantic diagnostics
       through one source-aware CLI reporter.
+- [x] Route strict `actus test` semantic preflight diagnostics through the
+      shared diagnostic model with source-aware rendering.
 
 ## Strict-mode contract
 

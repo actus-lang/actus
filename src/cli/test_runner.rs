@@ -7,7 +7,7 @@ use std::time::Instant;
 use crate::ast::{Block, Expr, MetaAttribute, Program, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::codegen::{emit_program_object_for_target, link_object};
 use crate::configuration::CompilerConfiguration;
-use crate::diagnostics::render_semantic_error;
+use crate::diagnostics::{render_diagnostic, semantic_diagnostic};
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
@@ -143,7 +143,9 @@ fn collect_tests(
         let program = filter_program_for_target(&program, configuration.target());
         if mode.is_strict() {
             crate::semantic::analyze(&program).map_err(|error| {
-                format!("{}: {}", path.display(), render_semantic_error(&source, &error))
+                let diagnostic =
+                    semantic_diagnostic(&error).with_source_path(path.display().to_string());
+                format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
             })?;
         }
         for declaration in &program.declarations {
