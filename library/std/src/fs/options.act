@@ -3,6 +3,7 @@
 Each field is a scalar switch. The configuration is consumed by `options_open`
 so the host runtime receives one complete, immutable open request.
 """
+import io;
 import path;
 open struct OpenOptions {
     """Permit reading from the opened handle when set to one."""

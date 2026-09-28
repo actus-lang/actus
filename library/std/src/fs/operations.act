@@ -1,5 +1,6 @@
 """Filesystem operations implemented behind the public `std::fs` facade."""
 open file;
+import io;
 import path;
 
 """

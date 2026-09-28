@@ -66,3 +66,16 @@ fn rejects_private_imported_types() {
         .expect_err("closed sibling declarations must not cross the import boundary");
     assert!(matches!(error, ModuleError::Semantic(_)));
 }
+
+#[test]
+fn resolves_repeated_imports_once() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open types;");
+    fixture.write("shared/types.act", "open struct Token { byte: Int, }");
+    let program = parse_source(
+        "import shared; import shared; verb main() -> Int { erg token = Token { byte: 7, }; return token.byte; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("repeated imports must not duplicate exported declarations");
+}

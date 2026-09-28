@@ -4,6 +4,7 @@
 the value can cross the runtime boundary in a deterministic C-compatible
 layout.
 """
+import io;
 import path;
 open struct Metadata {
     """Logical file length in bytes, not including any host metadata header."""

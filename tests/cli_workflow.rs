@@ -104,6 +104,33 @@ fn check_validates_source_without_emitting_code() {
     let _ = fs::remove_file(input);
 }
 
+#[test]
+fn check_validates_a_module_sibling_through_its_facade() {
+    let root = std::env::temp_dir().join(format!("actus-check-module-{}", std::process::id()));
+    let module = root.join("src/path");
+    fs::create_dir_all(&module).expect("create module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"module-check\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(module.join("path.act"), "open types;\nopen use;\n").expect("write module facade");
+    fs::write(module.join("types.act"), "open struct Token { erg byte: Int, }\n")
+        .expect("write type sibling");
+    fs::write(
+        module.join("use.act"),
+        "open verb inspect(abs token: Token) -> Int { return token.byte; }\n",
+    )
+    .expect("write dependent sibling");
+
+    let result = run_with_args(
+        vec!["check".to_owned(), module.join("use.act").display().to_string()].into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let _ = fs::remove_dir_all(root);
+}
+
 #[cfg(unix)]
 #[test]
 fn watch_once_checks_the_project_entry() {
