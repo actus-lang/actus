@@ -2,6 +2,7 @@ mod declarations;
 mod expressions;
 mod lifecycle;
 mod state;
+mod statement_control;
 mod statements;
 mod validation;
 mod verb;

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
+use crate::ast::{Param, PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -43,36 +43,56 @@ impl Analyzer {
                     method.span,
                 ));
             }
-            if method.params.first().is_none_or(|parameter| parameter.name != "self") {
-                return Err(role_error(
-                    SemanticErrorKind::InvalidRoleReceiver {
-                        role: role.name.clone(),
-                        method: method.name.clone(),
-                    },
-                    method.span,
-                ));
-            }
-            for (index, parameter) in method.params.iter().enumerate() {
-                self.validate_dynamic_parameter(parameter)?;
-                if parameter.dispatch == crate::ast::DispatchMode::Static {
-                    if parameter.ty.name == "Self" {
-                        if index != 0 || !parameter.ty.arguments.is_empty() {
-                            return Err(role_error(
-                                SemanticErrorKind::InvalidRoleReceiver {
-                                    role: role.name.clone(),
-                                    method: method.name.clone(),
-                                },
-                                parameter.span,
-                            ));
-                        }
-                    } else {
-                        self.validate_type_reference(&parameter.ty)?;
-                    }
-                }
-            }
-            if let Some(return_type) = &method.return_type {
-                self.validate_type_reference(&return_type.ty)?;
-            }
+            self.validate_role_method(role, method)?;
+        }
+        Ok(())
+    }
+
+    fn validate_role_method(
+        &mut self,
+        role: &RoleDecl,
+        method: &RoleMethod,
+    ) -> Result<(), SemanticError> {
+        if method.params.first().is_none_or(|parameter| parameter.name != "self") {
+            return Err(role_error(
+                SemanticErrorKind::InvalidRoleReceiver {
+                    role: role.name.clone(),
+                    method: method.name.clone(),
+                },
+                method.span,
+            ));
+        }
+        for (index, parameter) in method.params.iter().enumerate() {
+            self.validate_dynamic_parameter(parameter)?;
+            self.validate_role_parameter(role, method, index, parameter)?;
+        }
+        if let Some(return_type) = &method.return_type {
+            self.validate_type_reference(&return_type.ty)?;
+        }
+        Ok(())
+    }
+
+    fn validate_role_parameter(
+        &mut self,
+        role: &RoleDecl,
+        method: &RoleMethod,
+        index: usize,
+        parameter: &Param,
+    ) -> Result<(), SemanticError> {
+        if parameter.dispatch != crate::ast::DispatchMode::Static {
+            return Ok(());
+        }
+        if parameter.ty.name == "Self" && (index != 0 || !parameter.ty.arguments.is_empty()) {
+            return Err(role_error(
+                SemanticErrorKind::InvalidRoleReceiver {
+                    role: role.name.clone(),
+                    method: method.name.clone(),
+                },
+                parameter.span,
+            ));
+        }
+        if parameter.ty.name != "Self" {
+            self.validate_type_reference(&parameter.ty)?;
         }
         Ok(())
     }
@@ -99,19 +119,18 @@ impl Analyzer {
             ));
         };
         self.validate_type_reference(&perform.target)?;
-        self.performances.insert((perform.role_name.clone(), canonical_type_name(&perform.target)));
+        self.validate_performance_methods(&role, perform)?;
+        self.register_performance_methods(perform);
+        Ok(())
+    }
+
+    fn validate_performance_methods(
+        &self,
+        role: &RoleDecl,
+        perform: &PerformDecl,
+    ) -> Result<(), SemanticError> {
         let mut methods = HashSet::new();
-        for method in &perform.methods {
-            if !methods.insert(method.name.clone()) {
-                return Err(role_error(
-                    SemanticErrorKind::DuplicateRoleMethod {
-                        role: perform.role_name.clone(),
-                        method: method.name.clone(),
-                    },
-                    method.span,
-                ));
-            }
-        }
+        self.validate_unique_performance_methods(perform, &mut methods)?;
         for required in &role.methods {
             let Some(implementation) =
                 perform.methods.iter().find(|method| method.name == required.name)
@@ -134,14 +153,37 @@ impl Analyzer {
                 ));
             }
         }
+        Ok(())
+    }
+
+    fn validate_unique_performance_methods(
+        &self,
+        perform: &PerformDecl,
+        names: &mut HashSet<String>,
+    ) -> Result<(), SemanticError> {
+        for method in &perform.methods {
+            if !names.insert(method.name.clone()) {
+                return Err(role_error(
+                    SemanticErrorKind::DuplicateRoleMethod {
+                        role: perform.role_name.clone(),
+                        method: method.name.clone(),
+                    },
+                    method.span,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn register_performance_methods(&mut self, perform: &PerformDecl) {
         let target_key = canonical_type_name(&perform.target);
+        self.performances.insert((perform.role_name.clone(), target_key.clone()));
         for method in &perform.methods {
             self.performance_methods
                 .insert((target_key.clone(), method.name.clone()), method.signature());
             self.performance_roles
                 .insert((target_key.clone(), method.name.clone()), perform.role_name.clone());
         }
-        Ok(())
     }
 
     fn validate_drop_performance(&mut self, perform: &PerformDecl) -> Result<(), SemanticError> {

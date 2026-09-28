@@ -1,0 +1,78 @@
+import io;
+import fs;
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb file_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 103);
+    append(raw, 97);
+    append(raw, 116);
+    append(raw, 101);
+    append(raw, 54);
+    append(raw, 95);
+    append(raw, 99);
+    append(raw, 111);
+    append(raw, 110);
+    append(raw, 116);
+    append(raw, 114);
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 46);
+    append(raw, 98);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+meta test
+verb create_new_rejects_existing_file() -> Int {
+    erg path = file_path();
+    erg stale = remove_file(path: abs path);
+    case dat stale {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg created = file_create(path: abs path);
+    case dat created {
+        Result.Ok(file) => { drop(file); },
+        Result.Err(_) => { return 1; },
+    };
+    erg options = options_new();
+    erg exclusive = options_create_new(dat options);
+    erg opened = options_open(options: dat exclusive, path: abs path);
+    case dat opened {
+        Result.Ok(file) => {
+            drop(file);
+            remove_file(path: abs path);
+            return 1;
+        },
+        Result.Err(_) => { },
+    };
+    erg removed = remove_file(path: abs path);
+    return case dat removed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}

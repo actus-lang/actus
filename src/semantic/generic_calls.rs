@@ -4,7 +4,7 @@ use crate::ast::{Argument, GenericParam, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
-use super::call_arguments::argument_span;
+use super::argument_shapes::argument_span;
 use super::calls::{VerbSignature, parse_type_name_key};
 use super::errors::{SemanticError, SemanticErrorKind};
 

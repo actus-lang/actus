@@ -39,7 +39,28 @@ fn std_path_file_name_executes_through_the_runtime_bridge() {
     )
     .expect("write fixture manifest");
     copy_path_library(&root);
-    let source = r#"
+    fs::write(root.join("src/main.act"), path_fixture_source()).expect("write path fixture");
+    let output = root.join("path-fixture");
+    let status = run_with_args(
+        [
+            "build",
+            root.join("src/main.act").to_str().expect("fixture path"),
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("fixture output"),
+        ]
+        .into_iter()
+        .map(str::to_owned),
+    );
+    assert_eq!(status, 0);
+    let execution = std::process::Command::new(&output).status().expect("run path fixture");
+    assert_eq!(execution.code(), Some(0));
+    fs::remove_dir_all(root).expect("remove path fixture");
+}
+
+fn path_fixture_source() -> &'static str {
+    r#"
 import path;
 
 verb main() -> Int {
@@ -69,24 +90,5 @@ verb main() -> Int {
         },
     };
 }
-"#;
-    let input = root.join("src/main.act");
-    let output = root.join("path-fixture");
-    fs::write(&input, source).expect("write path fixture");
-    let status = run_with_args(
-        [
-            "build",
-            input.to_str().expect("fixture path"),
-            "--emit",
-            "exe",
-            "-o",
-            output.to_str().expect("fixture output"),
-        ]
-        .into_iter()
-        .map(str::to_owned),
-    );
-    assert_eq!(status, 0);
-    let execution = std::process::Command::new(&output).status().expect("run path fixture");
-    assert_eq!(execution.code(), Some(0));
-    fs::remove_dir_all(root).expect("remove path fixture");
+"#
 }

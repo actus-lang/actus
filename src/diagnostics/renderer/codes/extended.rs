@@ -31,6 +31,14 @@ fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    enum_declaration_message(kind).or_else(|| enum_pattern_message(kind))
+}
+
+fn enum_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
+    enum_type_message(kind).or_else(|| enum_variant_message(kind))
+}
+
+fn enum_type_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::DuplicateEnumName { name } => {
             format!("duplicate enum declaration `{name}`")
@@ -38,6 +46,16 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::EmptyEnum { name } => {
             format!("enum `{name}` must declare at least one variant")
         }
+        SemanticErrorKind::RecursiveType { name } => {
+            format!("recursive type `{name}` requires indirection")
+        }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn enum_variant_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
         SemanticErrorKind::UnknownEnumVariant { enum_name, variant } => {
             format!("unknown variant `{variant}` for enum `{enum_name}`")
         }
@@ -59,9 +77,13 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
                 "type mismatch for variant `{variant}` field `{parameter}`: expected `{expected}`, found `{found}`"
             )
         }
-        SemanticErrorKind::RecursiveType { name } => {
-            format!("recursive type `{name}` requires indirection")
-        }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn enum_pattern_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
         SemanticErrorKind::NonExhaustiveMatch { subject, missing } => {
             format!("non-exhaustive match on `{subject}`; missing: {}", missing.join(", "))
         }
@@ -105,6 +127,10 @@ fn guard_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    struct_declaration_message(kind).or_else(|| struct_field_message(kind))
+}
+
+fn struct_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::DuplicateStructName { name } => {
             format!("duplicate struct declaration `{name}`")
@@ -112,6 +138,13 @@ fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::DuplicatePackName { name } => {
             format!("duplicate pack declaration `{name}`")
         }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn struct_field_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
         SemanticErrorKind::DuplicateStructField { struct_name, field } => {
             format!("duplicate field `{field}` in struct `{struct_name}`")
         }
@@ -138,9 +171,16 @@ fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
-    if let Some(message) = type_contract_message(kind) {
-        return Some(message);
-    }
+    type_contract_message(kind)
+        .or_else(|| type_role_message(kind))
+        .or_else(|| type_result_message(kind))
+}
+
+fn type_role_message(kind: &SemanticErrorKind) -> Option<String> {
+    type_role_declaration_message(kind).or_else(|| type_signature_message(kind))
+}
+
+fn type_role_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::DuplicateRoleName { name } => {
             format!("duplicate role declaration `{name}`")
@@ -158,6 +198,13 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidRoleReceiver { role, method } => {
             format!("method `{method}` in role `{role}` must declare an explicit `self` receiver")
         }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn type_signature_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
         SemanticErrorKind::DuplicateVerbName { name } => {
             format!("duplicate verb declaration `{name}`")
         }
@@ -177,6 +224,13 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidReceiver { method } => {
             format!("invalid receiver for method `{method}`")
         }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn type_result_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
         SemanticErrorKind::ReceiverTypeMismatch { method, expected, found } => {
             format!("receiver type mismatch for `{method}`: expected `{expected}`, found `{found}")
         }

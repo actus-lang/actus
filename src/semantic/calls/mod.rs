@@ -2,15 +2,17 @@ use crate::ast::{Argument, Expr, Role};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
-use super::call_arguments::argument_span;
+use super::argument_shapes::argument_span;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::state::OwnershipState;
 
 mod ownership;
 mod parsing;
+mod paths;
 mod signatures;
 
 pub(super) use parsing::parse_type_name_key;
+use paths::{format_field_path, paths_overlap, root_binding};
 pub(super) use signatures::VerbSignature;
 
 impl Analyzer {
@@ -50,24 +52,8 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if let Some(type_name) = arena_constructor_type(callee, span) {
-            self.validate_type_reference(&type_name)?;
-            if !arguments.is_empty() {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
-                    span,
-                });
-            }
-            self.inferred_expression_types.insert((span.start, span.end), type_name);
-            return Ok(());
-        }
-        if matches!(callee, "Ok" | "Err") && !self.signatures.contains_key(callee) {
-            return self.visit_result_constructor(callee, arguments, span);
-        }
-        if !self.signatures.contains_key(callee)
-            && self.visit_intrinsic_call(callee, arguments, span)?
-        {
-            return Ok(());
+        if let Some(result) = self.visit_special_call(callee, arguments, span)? {
+            return result;
         }
         let Some(mut signature) = self.signatures.get(callee).cloned() else {
             for argument in arguments {
@@ -82,6 +68,34 @@ impl Analyzer {
             signature = self.instantiate_generic_signature(callee, &signature, arguments, span)?;
         }
         self.visit_call_with_signature(callee, arguments, span, &signature)
+    }
+
+    fn visit_special_call(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<Option<Result<(), SemanticError>>, SemanticError> {
+        if let Some(type_name) = arena_constructor_type(callee, span) {
+            self.validate_type_reference(&type_name)?;
+            if !arguments.is_empty() {
+                return Ok(Some(Err(SemanticError {
+                    kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
+                    span,
+                })));
+            }
+            self.inferred_expression_types.insert((span.start, span.end), type_name);
+            return Ok(Some(Ok(())));
+        }
+        if matches!(callee, "Ok" | "Err") && !self.signatures.contains_key(callee) {
+            return Ok(Some(self.visit_result_constructor(callee, arguments, span)));
+        }
+        if !self.signatures.contains_key(callee)
+            && self.visit_intrinsic_call(callee, arguments, span)?
+        {
+            return Ok(Some(Ok(())));
+        }
+        Ok(None)
     }
 
     fn visit_result_constructor(
@@ -109,10 +123,20 @@ impl Analyzer {
             });
         }
         let payload_type = &result_type.arguments[usize::from(constructor == "Err")];
-        self.visit_expression_with_expected(&arguments[0].expression, Some(payload_type))?;
-        let found = self
-            .expression_type_name(&arguments[0].expression)
-            .unwrap_or_else(|| "unknown".to_owned());
+        self.validate_result_payload(constructor, &arguments[0], payload_type)?;
+        self.inferred_expression_types.insert((span.start, span.end), result_type);
+        Ok(())
+    }
+
+    fn validate_result_payload(
+        &mut self,
+        constructor: &str,
+        argument: &Argument,
+        payload_type: &crate::ast::TypeName,
+    ) -> Result<(), SemanticError> {
+        self.visit_expression_with_expected(&argument.expression, Some(payload_type))?;
+        let found =
+            self.expression_type_name(&argument.expression).unwrap_or_else(|| "unknown".to_owned());
         if found != super::analyzer::canonical_type_name(payload_type) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
@@ -121,13 +145,12 @@ impl Analyzer {
                     expected: super::analyzer::canonical_type_name(payload_type),
                     found,
                 },
-                span: argument_span(&arguments[0]),
+                span: argument_span(argument),
             });
         }
         if self.enum_payload_owns_value(payload_type) {
-            self.initialize_owner(&arguments[0].expression, argument_span(&arguments[0]))?;
+            self.initialize_owner(&argument.expression, argument_span(argument))?;
         }
-        self.inferred_expression_types.insert((span.start, span.end), result_type);
         Ok(())
     }
 
@@ -168,33 +191,48 @@ impl Analyzer {
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
         let (_, role, ty) = &signature.params[parameter_index];
-        if (*role == Role::Ins && argument.role != Some(Role::Ins))
-            || argument.role.as_ref().is_some_and(|actual| actual != role)
-        {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidArgumentRole {
-                    callee: callee.to_owned(),
-                    parameter: signature.params[parameter_index].0.clone(),
-                },
-                span: argument_span(argument),
-            });
-        }
-        let explicit_owner_view = *role == Role::Abs
-            && argument.role == Some(Role::Abs)
-            && self.is_readable_owner(&argument.expression);
-        if !explicit_owner_view {
-            self.validate_argument_role(
-                callee,
-                &signature.params[parameter_index].0,
-                role,
-                &argument.expression,
-            )?;
-        }
+        self.validate_call_role(callee, argument, parameter_index, signature, role)?;
         self.validate_argument_type(
             callee,
             &signature.params[parameter_index].0,
             ty,
             signature.dynamic_params[parameter_index],
+            &argument.expression,
+        )
+    }
+
+    fn validate_call_role(
+        &self,
+        callee: &str,
+        argument: &Argument,
+        parameter_index: usize,
+        signature: &VerbSignature,
+        role: &Role,
+    ) -> Result<(), SemanticError> {
+        if !call_role_matches(role, argument) {
+            return Err(invalid_call_role(callee, parameter_index, argument, signature));
+        }
+        self.validate_explicit_owner_view(callee, argument, parameter_index, signature, role)
+    }
+
+    fn validate_explicit_owner_view(
+        &self,
+        callee: &str,
+        argument: &Argument,
+        parameter_index: usize,
+        signature: &VerbSignature,
+        role: &Role,
+    ) -> Result<(), SemanticError> {
+        if *role == Role::Abs
+            && argument.role == Some(Role::Abs)
+            && self.is_readable_owner(&argument.expression)
+        {
+            return Ok(());
+        }
+        self.validate_argument_role(
+            callee,
+            &signature.params[parameter_index].0,
+            role,
             &argument.expression,
         )
     }
@@ -225,36 +263,26 @@ impl Analyzer {
     }
 }
 
+fn call_role_matches(role: &Role, argument: &Argument) -> bool {
+    !(*role == Role::Ins && argument.role != Some(Role::Ins))
+        && !argument.role.as_ref().is_some_and(|actual| actual != role)
+}
+
+fn invalid_call_role(
+    callee: &str,
+    parameter_index: usize,
+    argument: &Argument,
+    signature: &VerbSignature,
+) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::InvalidArgumentRole {
+            callee: callee.to_owned(),
+            parameter: signature.params[parameter_index].0.clone(),
+        },
+        span: argument_span(argument),
+    }
+}
+
 fn arena_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
     callee.starts_with("Arena[").then(|| parse_type_name_key(callee, span)).flatten()
-}
-
-fn root_binding(expression: &Expr) -> Option<(&String, SourceSpan)> {
-    match expression {
-        Expr::Identifier { name, span } => Some((name, *span)),
-        Expr::FieldAccess { object, .. } => root_binding(object),
-        _ => None,
-    }
-}
-
-fn format_field_path(object: &Expr, field: &str) -> String {
-    let prefix = format_expression_path(object);
-    if prefix.is_empty() { field.to_owned() } else { format!("{prefix}.{field}") }
-}
-
-fn format_expression_path(expression: &Expr) -> String {
-    match expression {
-        Expr::Identifier { .. } => String::new(),
-        Expr::FieldAccess { object, field, .. } => {
-            let prefix = format_expression_path(object);
-            if prefix.is_empty() { field.clone() } else { format!("{prefix}.{field}") }
-        }
-        _ => String::new(),
-    }
-}
-
-fn paths_overlap(left: &str, right: &str) -> bool {
-    left == right
-        || left.strip_prefix(right).is_some_and(|suffix| suffix.starts_with('.'))
-        || right.strip_prefix(left).is_some_and(|suffix| suffix.starts_with('.'))
 }

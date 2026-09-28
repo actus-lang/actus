@@ -50,11 +50,28 @@ pub struct Parser {
     case_subject: bool,
 }
 
+struct VerbSignature {
+    name: String,
+    generic_parameters: Vec<crate::ast::GenericParam>,
+    params: Vec<Param>,
+    return_type: Option<crate::ast::ReturnType>,
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, cursor: 0, enum_names: HashSet::new(), case_subject: false }
     }
 
+    fn parse_verb_signature(&mut self) -> Result<VerbSignature, ParseError> {
+        let name_token = self.take_callable_name("verb name")?;
+        let name = identifier_text(&name_token.kind);
+        let generic_parameters = self.parse_generic_parameters()?;
+        self.expect_simple(TokenKind::LeftParen, "`(`")?;
+        let params = self.parse_params()?;
+        self.expect_simple(TokenKind::RightParen, "`)`")?;
+        let return_type = self.parse_return_type()?;
+        Ok(VerbSignature { name, generic_parameters, params, return_type })
+    }
     pub fn parse(mut self) -> Result<Program, ParseError> {
         let mut declarations = Vec::new();
 
@@ -94,16 +111,7 @@ impl Parser {
         doc: Option<String>,
     ) -> Result<VerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
-        let name_token = self.take_callable_name("verb name")?;
-        let name = identifier_text(&name_token.kind);
-        let generic_parameters = self.parse_generic_parameters()?;
-
-        self.expect_simple(TokenKind::LeftParen, "`(`")?;
-        let params = self.parse_params()?;
-        self.expect_simple(TokenKind::RightParen, "`)`")?;
-
-        let return_type = self.parse_return_type()?;
-
+        let signature = self.parse_verb_signature()?;
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
 
@@ -111,10 +119,10 @@ impl Parser {
             is_open,
             doc,
             metadata,
-            name,
-            generic_parameters,
-            params,
-            return_type,
+            name: signature.name,
+            generic_parameters: signature.generic_parameters,
+            params: signature.params,
+            return_type: signature.return_type,
             body,
             span,
         })
@@ -143,39 +151,41 @@ impl Parser {
                 let _ = self.match_simple(TokenKind::Semicolon);
                 Ok(vec![MetaAttribute::Test])
             }
-            "target" => {
-                self.expect_simple(TokenKind::LeftParen, "`(` after `target`")?;
-                let selector_token = self.advance_required("target platform string")?;
-                let selector = match selector_token.kind {
-                    TokenKind::StringLiteral(selector) => selector,
-                    found => {
-                        return Err(ParseError {
-                            code: ParseErrorCode::UnexpectedToken,
-                            kind: ParseErrorKind::UnexpectedToken {
-                                expected: "a target platform string".to_owned(),
-                                found,
-                            },
-                            span: selector_token.span,
-                        });
-                    }
-                };
-                if !matches!(selector.as_str(), "unix" | "posix" | "windows") {
-                    return Err(ParseError {
-                        code: ParseErrorCode::UnsupportedTargetPlatform,
-                        kind: ParseErrorKind::UnsupportedTargetPlatform { name: selector },
-                        span: selector_token.span,
-                    });
-                }
-                self.expect_simple(TokenKind::RightParen, "`)` after target platform")?;
-                let _ = self.match_simple(TokenKind::Semicolon);
-                Ok(vec![MetaAttribute::Target(selector)])
-            }
+            "target" => self.parse_target_metadata(),
             name => Err(ParseError {
                 code: ParseErrorCode::UnknownMetadata,
                 kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },
                 span: attribute.span,
             }),
         }
+    }
+
+    fn parse_target_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
+        self.expect_simple(TokenKind::LeftParen, "`(` after `target`")?;
+        let selector_token = self.advance_required("target platform string")?;
+        let selector = match selector_token.kind {
+            TokenKind::StringLiteral(selector) => selector,
+            found => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "a target platform string".to_owned(),
+                        found,
+                    },
+                    span: selector_token.span,
+                });
+            }
+        };
+        if !matches!(selector.as_str(), "unix" | "posix" | "windows") {
+            return Err(ParseError {
+                code: ParseErrorCode::UnsupportedTargetPlatform,
+                kind: ParseErrorKind::UnsupportedTargetPlatform { name: selector },
+                span: selector_token.span,
+            });
+        }
+        self.expect_simple(TokenKind::RightParen, "`)` after target platform")?;
+        let _ = self.match_simple(TokenKind::Semicolon);
+        Ok(vec![MetaAttribute::Target(selector)])
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {

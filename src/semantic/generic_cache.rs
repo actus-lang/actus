@@ -7,6 +7,12 @@ pub(super) struct GenericInstanceCache {
     entries: BTreeMap<(String, String), GenericInstance>,
 }
 
+impl Default for GenericInstanceCache {
+    fn default() -> Self {
+        Self::for_current_toolchain()
+    }
+}
+
 impl GenericInstanceCache {
     pub(super) fn new(toolchain_hash: impl Into<String>) -> Self {
         Self { toolchain_hash: toolchain_hash.into(), entries: BTreeMap::new() }

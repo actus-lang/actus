@@ -1,0 +1,94 @@
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb component_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 47);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 114);
+    append(raw, 47);
+    append(raw, 97);
+    append(raw, 114);
+    append(raw, 99);
+    append(raw, 104);
+    append(raw, 105);
+    append(raw, 118);
+    append(raw, 101);
+    append(raw, 46);
+    append(raw, 116);
+    append(raw, 97);
+    append(raw, 114);
+    append(raw, 46);
+    append(raw, 103);
+    append(raw, 122);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb verify_path_predicates(abs path: Path) -> Int {
+    case is_absolute(self: abs path) {
+        true => { },
+        _ => { return 1; },
+    };
+    case is_relative(self: abs path) {
+        false => { },
+        _ => { return 1; },
+    };
+    case has_root(self: abs path) {
+        true => { },
+        _ => { return 1; },
+    };
+    return 0;
+}
+
+verb verify_component_lengths(abs path: Path) -> Int {
+    erg name = file_name(self: abs path);
+    erg stem = file_stem(self: abs path);
+    erg extension = extension(self: abs path);
+    case dat name {
+        Option.Some(component) => case component.length {
+            14 => { },
+            _ => { return 1; },
+        },
+        Option.None => { return 1; },
+    };
+    case dat stem {
+        Option.Some(component) => case component.length {
+            11 => { },
+            _ => { return 1; },
+        },
+        Option.None => { return 1; },
+    };
+    return case dat extension {
+        Option.Some(component) => case component.length {
+            2 => 0,
+            _ => 1,
+        },
+        Option.None => 1,
+    };
+}
+
+meta test
+verb path_components_and_predicates() -> Int {
+    erg path = component_path();
+    erg predicates = verify_path_predicates(path: abs path);
+    case predicates {
+        0 => { },
+        _ => { return 1; },
+    };
+    return verify_component_lengths(path: abs path);
+}

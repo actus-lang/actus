@@ -3,46 +3,100 @@ use crate::lexer::{SourceSpan, Token, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
 
+struct ExternalVerbSignature {
+    name: String,
+    generic_parameters: Vec<crate::ast::GenericParam>,
+    params: Vec<crate::ast::Param>,
+    return_type: Option<crate::ast::ReturnType>,
+    end: usize,
+}
+
 impl Parser {
     pub(super) fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
         let mut doc = self.take_doc_string_group();
         if self.check_simple(&TokenKind::Meta) {
-            let mut metadata = Vec::new();
-            while self.check_simple(&TokenKind::Meta) {
-                metadata.extend(self.parse_metadata()?);
-            }
-            if doc.is_none() {
-                doc = self.take_doc_string_group();
-            }
+            let metadata = self.parse_metadata_group()?;
+            doc = doc.or_else(|| self.take_doc_string_group());
             return self.parse_metadata_declaration(metadata, doc);
         }
+        if let Some(declaration) = self.parse_keyword_declaration(doc.clone())? {
+            return Ok(declaration);
+        }
+        self.parse_unknown_keyword()?;
+        let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
+        Ok(TopLevelDecl::Verb(declaration))
+    }
+
+    fn parse_metadata_group(&mut self) -> Result<Vec<crate::ast::MetaAttribute>, ParseError> {
+        let mut metadata = Vec::new();
+        while self.check_simple(&TokenKind::Meta) {
+            metadata.extend(self.parse_metadata()?);
+        }
+        Ok(metadata)
+    }
+
+    fn parse_keyword_declaration(
+        &mut self,
+        doc: Option<String>,
+    ) -> Result<Option<TopLevelDecl>, ParseError> {
+        if let Some(declaration) = self.parse_module_keyword(doc.clone())? {
+            return Ok(Some(declaration));
+        }
+        if let Some(declaration) = self.parse_external_keyword(doc.clone())? {
+            return Ok(Some(declaration));
+        }
+        self.parse_type_keyword(doc)
+    }
+
+    fn parse_module_keyword(
+        &mut self,
+        doc: Option<String>,
+    ) -> Result<Option<TopLevelDecl>, ParseError> {
         if self.check_simple(&TokenKind::Import) {
-            return self.parse_import_decl();
+            return Ok(Some(self.parse_import_decl()?));
         }
         if self.check_simple(&TokenKind::Open) {
-            return self.parse_open_top_level(doc);
+            return Ok(Some(self.parse_open_top_level(doc)?));
         }
+        Ok(None)
+    }
+
+    fn parse_external_keyword(
+        &mut self,
+        doc: Option<String>,
+    ) -> Result<Option<TopLevelDecl>, ParseError> {
         if self.check_simple(&TokenKind::Unsafe) {
-            return self.parse_external_declaration(true, doc);
+            return Ok(Some(self.parse_external_declaration(true, doc)?));
         }
         if self.check_simple(&TokenKind::Extern) {
-            return self.parse_external_declaration(false, doc);
+            return Ok(Some(self.parse_external_declaration(false, doc)?));
         }
+        Ok(None)
+    }
+
+    fn parse_type_keyword(
+        &mut self,
+        doc: Option<String>,
+    ) -> Result<Option<TopLevelDecl>, ParseError> {
         if self.check_simple(&TokenKind::Struct) {
-            return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
+            return Ok(Some(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?)));
         }
         if self.check_simple(&TokenKind::Pack) {
-            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(false, doc)?));
+            return Ok(Some(TopLevelDecl::Pack(self.parse_pack_decl(false, doc)?)));
         }
         if self.check_simple(&TokenKind::Enum) {
-            return Ok(TopLevelDecl::Enum(self.parse_enum_def(false, doc)?));
+            return Ok(Some(TopLevelDecl::Enum(self.parse_enum_def(false, doc)?)));
         }
         if self.check_simple(&TokenKind::Role) {
-            return Ok(TopLevelDecl::Role(self.parse_role_decl(false, doc)?));
+            return Ok(Some(TopLevelDecl::Role(self.parse_role_decl(false, doc)?)));
         }
         if self.check_simple(&TokenKind::Perform) {
-            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false, doc)?));
+            return Ok(Some(TopLevelDecl::Perform(self.parse_perform_decl(false, doc)?)));
         }
+        Ok(None)
+    }
+
+    fn parse_unknown_keyword(&self) -> Result<(), ParseError> {
         if let Some(Token { kind: TokenKind::Identifier(name), span }) = self.peek() {
             return Err(ParseError {
                 code: ParseErrorCode::UnknownKeyword,
@@ -50,8 +104,7 @@ impl Parser {
                 span: *span,
             });
         }
-        let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
-        Ok(TopLevelDecl::Verb(declaration))
+        Ok(())
     }
 
     fn parse_metadata_declaration(
@@ -156,6 +209,27 @@ impl Parser {
         metadata: Vec<crate::ast::MetaAttribute>,
         doc: Option<String>,
     ) -> Result<ExternalVerbDecl, ParseError> {
+        let (start, abi) = self.parse_external_prefix(unsafe_boundary)?;
+        self.expect_keyword(TokenKind::Verb, "`verb`")?;
+        let signature = self.parse_external_signature()?;
+        Ok(ExternalVerbDecl {
+            is_open,
+            doc,
+            unsafe_boundary,
+            abi,
+            metadata,
+            name: signature.name,
+            generic_parameters: signature.generic_parameters,
+            params: signature.params,
+            return_type: signature.return_type,
+            span: SourceSpan::new(start, signature.end),
+        })
+    }
+
+    fn parse_external_prefix(
+        &mut self,
+        unsafe_boundary: bool,
+    ) -> Result<(usize, ForeignAbi), ParseError> {
         let start = if unsafe_boundary {
             let start = self.expect_keyword(TokenKind::Unsafe, "`unsafe`")?.span.start;
             self.expect_keyword(TokenKind::Extern, "`extern`")?;
@@ -177,7 +251,10 @@ impl Parser {
                 });
             }
         };
-        self.expect_keyword(TokenKind::Verb, "`verb`")?;
+        Ok((start, abi))
+    }
+
+    fn parse_external_signature(&mut self) -> Result<ExternalVerbSignature, ParseError> {
         let name_token = self.take_identifier("external verb name")?;
         let name = identifier_text(&name_token.kind);
         let generic_parameters = self.parse_generic_parameters()?;
@@ -186,17 +263,6 @@ impl Parser {
         self.expect_simple(TokenKind::RightParen, "`)`")?;
         let return_type = self.parse_return_type()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(ExternalVerbDecl {
-            is_open,
-            doc,
-            unsafe_boundary,
-            abi,
-            metadata,
-            name,
-            generic_parameters,
-            params,
-            return_type,
-            span: SourceSpan::new(start, end),
-        })
+        Ok(ExternalVerbSignature { name, generic_parameters, params, return_type, end })
     }
 }

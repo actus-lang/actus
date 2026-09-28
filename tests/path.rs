@@ -7,6 +7,11 @@ fn std_path_representation_module_exports_validated_storage_contracts() {
     let source_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src");
     let resolver = ModuleResolver::new(source_root);
     let exports = exports_module(&resolver, "path").expect("std path facade should resolve");
+    assert_path_exports(&exports);
+    analyze_module(&resolver, "path").expect("std path representation should be valid");
+}
+
+fn assert_path_exports(exports: &actus::modules::ModuleExports) {
     for (kind, name) in [
         ("struct", "Path"),
         ("enum", "PathPlatform"),
@@ -41,7 +46,6 @@ fn std_path_representation_module_exports_validated_storage_contracts() {
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");
     }
-    analyze_module(&resolver, "path").expect("std path representation should be valid");
 }
 
 #[test]

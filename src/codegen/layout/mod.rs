@@ -13,6 +13,7 @@ use super::generic::{canonical_type_name, specialized_enums, specialized_structs
 use super::native::NativeEmitError;
 use super::types::NativeType;
 
+mod packs;
 mod structs;
 
 #[derive(Clone, Debug)]
@@ -76,59 +77,50 @@ impl LayoutRegistry {
         pointer_type: Type,
         instances: &[GenericInstance],
     ) -> Result<Self, NativeEmitError> {
-        let (mut definitions, mut enum_definitions) = base_definitions(program);
-        definitions.extend(specialized_structs(program, instances)?);
-        let ids = definitions
-            .iter()
-            .enumerate()
-            .map(|(id, definition)| (definition.name.clone(), id))
-            .collect::<HashMap<_, _>>();
-        enum_definitions.extend(specialized_enums(program, instances)?);
-        let enum_ids = enum_definitions
-            .iter()
-            .enumerate()
-            .map(|(id, definition)| (definition.name.clone(), id))
-            .collect::<HashMap<_, _>>();
-        let capacity = definitions.len();
-        let enum_capacity = enum_definitions.len();
-        let pack_definitions = program
-            .declarations
-            .iter()
-            .filter_map(|declaration| match declaration {
-                TopLevelDecl::Pack(pack) => Some(pack.clone()),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        let pack_ids = pack_definitions
-            .iter()
-            .enumerate()
-            .map(|(id, pack)| (pack.name.clone(), id))
-            .collect::<HashMap<_, _>>();
-        let mut registry = Self {
+        let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
+        let pack_definitions = pack_definitions(program);
+        let mut registry = Self::new(pointer_type, definitions, enum_definitions, pack_definitions);
+        registry.populate_layouts()?;
+        Ok(registry)
+    }
+
+    fn new(
+        pointer_type: Type,
+        definitions: Vec<StructDef>,
+        enum_definitions: Vec<EnumDef>,
+        pack_definitions: Vec<PackDecl>,
+    ) -> Self {
+        let ids = named_ids(&definitions, |definition| &definition.name);
+        let enum_ids = named_ids(&enum_definitions, |definition| &definition.name);
+        let pack_ids = named_ids(&pack_definitions, |definition| &definition.name);
+        Self {
             pointer_type,
             pointer_size: pointer_type.bytes(),
+            layouts: Vec::with_capacity(definitions.len()),
+            enum_layouts: Vec::with_capacity(enum_definitions.len()),
             definitions,
-            layouts: Vec::with_capacity(capacity),
             ids,
             enum_definitions,
-            enum_layouts: Vec::with_capacity(enum_capacity),
             enum_ids,
             pack_definitions,
             pack_layouts: Vec::new(),
             pack_ids,
-        };
-        for definition in registry.definitions.clone() {
-            registry.layouts.push(registry.layout_for(&definition, &mut Vec::new())?);
         }
-        for definition in registry.enum_definitions.clone() {
-            registry.enum_layouts.push(registry.enum_layout_for(&definition, &mut Vec::new())?);
+    }
+
+    fn populate_layouts(&mut self) -> Result<(), NativeEmitError> {
+        for definition in self.definitions.clone() {
+            self.layouts.push(self.layout_for(&definition, &mut Vec::new())?);
         }
-        registry.pack_layouts = registry
+        for definition in self.enum_definitions.clone() {
+            self.enum_layouts.push(self.enum_layout_for(&definition, &mut Vec::new())?);
+        }
+        self.pack_layouts = self
             .pack_definitions
             .iter()
-            .map(|pack| registry.pack_layout_for(pack))
+            .map(|pack| self.pack_layout_for(pack))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(registry)
+        Ok(())
     }
 
     pub(super) fn id_for(&self, name: &str) -> Option<usize> {
@@ -225,44 +217,6 @@ impl LayoutRegistry {
     }
 }
 
-impl LayoutRegistry {
-    fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, NativeEmitError> {
-        let storage = self.native_type(&pack.storage.name, &mut Vec::new())?;
-        let fields = pack
-            .fields
-            .iter()
-            .map(|field| {
-                let width = crate::ast::primitive_type(&field.ty.name)
-                    .and_then(|primitive| match primitive {
-                        crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
-                        _ => None,
-                    })
-                    .ok_or_else(|| {
-                        NativeEmitError(format!("invalid packed field `{}`", field.name))
-                    })?;
-                let role = match field.role {
-                    crate::ast::Role::Erg => StructFieldRole::Erg,
-                    crate::ast::Role::Abs => StructFieldRole::Value,
-                    crate::ast::Role::Dat | crate::ast::Role::Ins => {
-                        return Err(NativeEmitError(format!(
-                            "invalid packed field role for `{}`",
-                            field.name
-                        )));
-                    }
-                };
-                Ok(PackFieldLayout {
-                    name: field.name.clone(),
-                    role,
-                    ty: self.native_type(&field.ty.name, &mut Vec::new())?,
-                    offset: field.offset,
-                    width,
-                })
-            })
-            .collect::<Result<Vec<_>, NativeEmitError>>()?;
-        Ok(PackLayout { storage, endianness: pack.endianness, fields })
-    }
-}
-
 pub(super) fn integer_storage_bytes(width: u8) -> Option<u32> {
     match width {
         1..=8 => Some(1),
@@ -289,6 +243,31 @@ fn base_definitions(program: &Program) -> (Vec<StructDef>, Vec<EnumDef>) {
         }
     }
     (structs, enums)
+}
+
+fn specialized_definitions(
+    program: &Program,
+    instances: &[GenericInstance],
+) -> Result<(Vec<StructDef>, Vec<EnumDef>), NativeEmitError> {
+    let (mut definitions, mut enum_definitions) = base_definitions(program);
+    definitions.extend(specialized_structs(program, instances)?);
+    enum_definitions.extend(specialized_enums(program, instances)?);
+    Ok((definitions, enum_definitions))
+}
+
+fn pack_definitions(program: &Program) -> Vec<PackDecl> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Pack(pack) => Some(pack.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn named_ids<T>(definitions: &[T], name: impl Fn(&T) -> &String) -> HashMap<String, usize> {
+    definitions.iter().enumerate().map(|(id, definition)| (name(definition).clone(), id)).collect()
 }
 
 fn align_up(offset: u32, alignment: u32) -> u32 {

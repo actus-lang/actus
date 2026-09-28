@@ -81,34 +81,38 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
             collect_expression(left, values);
             collect_expression(right, values);
         }
-        Expr::Call { arguments, .. } => {
-            for argument in arguments {
-                collect_expression(&argument.expression, values);
-            }
-        }
+        Expr::Call { arguments, .. } => collect_arguments(arguments, values),
         Expr::MethodCall { receiver, arguments, .. } => {
             collect_expression(receiver, values);
-            for argument in arguments {
-                collect_expression(&argument.expression, values);
-            }
+            collect_arguments(arguments, values);
         }
-        Expr::StructLit { fields, .. } => {
-            for field in fields {
-                collect_expression(&field.value, values);
-            }
-        }
+        Expr::StructLit { fields, .. } => collect_struct_fields(fields, values),
         Expr::FieldAccess { object, .. } => collect_expression(object, values),
-        Expr::Case { subject, branches, .. } => {
-            collect_expression(subject, values);
-            for branch in branches {
-                if let crate::ast::CaseBody::Expression(expression) = &branch.body {
-                    collect_expression(expression, values);
-                }
-            }
-        }
+        Expr::Case { subject, branches, .. } => collect_case(subject, branches, values),
         Expr::Identifier { .. }
         | Expr::Integer { .. }
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. } => {}
+    }
+}
+
+fn collect_struct_fields(fields: &[crate::ast::StructFieldInit], values: &mut HashSet<String>) {
+    for field in fields {
+        collect_expression(&field.value, values);
+    }
+}
+
+fn collect_arguments(arguments: &[crate::ast::Argument], values: &mut HashSet<String>) {
+    for argument in arguments {
+        collect_expression(&argument.expression, values);
+    }
+}
+
+fn collect_case(subject: &Expr, branches: &[crate::ast::CaseBranch], values: &mut HashSet<String>) {
+    collect_expression(subject, values);
+    for branch in branches {
+        if let crate::ast::CaseBody::Expression(expression) = &branch.body {
+            collect_expression(expression, values);
+        }
     }
 }

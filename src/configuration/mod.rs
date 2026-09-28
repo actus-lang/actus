@@ -1,4 +1,5 @@
 mod accessors;
+mod checksum;
 mod dependencies;
 mod loading;
 mod lockfile;

@@ -91,26 +91,20 @@ impl LayoutRegistry {
             self.enum_variants(definition, visiting)?;
         visiting.pop();
         if niche_pointer {
-            return Ok(EnumLayout {
-                size: self.pointer_size,
-                alignment: self.pointer_size,
-                discriminant_offset: 0,
-                payload_offset: 0,
-                niche_pointer: true,
-                variants,
-            });
+            return Ok(self.niche_enum_layout(variants));
         }
-        let discriminant_size = 4;
-        let payload_offset = align_up(discriminant_size, max_payload_alignment);
-        let alignment = discriminant_size.max(max_payload_alignment);
-        Ok(EnumLayout {
-            size: align_up(payload_offset + max_payload_size, alignment),
-            alignment,
+        Ok(regular_enum_layout(variants, max_payload_size, max_payload_alignment))
+    }
+
+    fn niche_enum_layout(&self, variants: Vec<EnumVariantLayout>) -> EnumLayout {
+        EnumLayout {
+            size: self.pointer_size,
+            alignment: self.pointer_size,
             discriminant_offset: 0,
-            payload_offset,
-            niche_pointer: false,
+            payload_offset: 0,
+            niche_pointer: true,
             variants,
-        })
+        }
     }
 
     fn enum_variants(
@@ -157,6 +151,24 @@ impl LayoutRegistry {
             payload_alignment = payload_alignment.max(alignment);
         }
         Ok((fields, align_up(payload_size, payload_alignment), payload_alignment))
+    }
+}
+
+fn regular_enum_layout(
+    variants: Vec<EnumVariantLayout>,
+    max_payload_size: u32,
+    max_payload_alignment: u32,
+) -> EnumLayout {
+    let discriminant_size = 4;
+    let payload_offset = align_up(discriminant_size, max_payload_alignment);
+    let alignment = discriminant_size.max(max_payload_alignment);
+    EnumLayout {
+        size: align_up(payload_offset + max_payload_size, alignment),
+        alignment,
+        discriminant_offset: 0,
+        payload_offset,
+        niche_pointer: false,
+        variants,
     }
 }
 

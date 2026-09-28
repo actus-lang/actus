@@ -41,3 +41,9 @@ The documentation validator currently reports `E1840` for a missing or empty
 block, `E1841` for a missing contract section, `E1842` for an incomplete or
 signature-restating summary, `E1844` for an ownership contradiction, and
 `E1845` for a result guarantee that misrepresents implementation behavior.
+
+The source-limit validator reports `E1850` when a file exceeds the preferred
+300-line size or `E1853` when a function exceeds the preferred 30-line size.
+`E1851` and `E1854` are strict split-required failures at 400 file lines and
+40 function lines. `E1852` and `E1855` reject files above 500 lines and
+functions above 60 lines respectively.

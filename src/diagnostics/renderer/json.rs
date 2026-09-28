@@ -35,6 +35,7 @@ fn json_span(span: SourceSpan) -> Value {
 fn phase_name(phase: DiagnosticPhase) -> &'static str {
     match phase {
         DiagnosticPhase::Configuration => "configuration",
+        DiagnosticPhase::Conformance => "conformance",
         DiagnosticPhase::Lexical => "lexical",
         DiagnosticPhase::Parser => "parser",
         DiagnosticPhase::Module => "module",

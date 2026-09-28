@@ -24,36 +24,49 @@ pub(super) fn match_pattern(
             Ok(function.ins().icmp_imm_s(IntCC::Equal, subject, expected))
         }
         Pattern::Variant { enum_name, variant, .. } => {
-            let NativeType::Enum(enum_id) = subject_type else {
-                return Err(NativeEmitError(format!("case subject is not enum `{enum_name}`")));
-            };
-            let enum_layout = layouts.enum_layout(enum_id).ok_or_else(|| {
-                NativeEmitError("missing enum layout for case subject".to_owned())
-            })?;
-            let variant_layout = layouts.enum_variant(enum_id, variant).ok_or_else(|| {
-                NativeEmitError(format!("unknown case variant `{enum_name}.{variant}`"))
-            })?;
-            if enum_layout.niche_pointer {
-                let is_none = variant == "None";
-                return Ok(function.ins().icmp_imm_s(
-                    if is_none { IntCC::Equal } else { IntCC::NotEqual },
-                    subject,
-                    0,
-                ));
-            }
-            let discriminant = function.ins().load(
-                types::I32,
-                MemFlagsData::new(),
-                subject,
-                enum_layout.discriminant_offset as i32,
-            );
-            Ok(function.ins().icmp_imm_s(
-                IntCC::Equal,
-                discriminant,
-                i64::from(variant_layout.discriminant),
-            ))
+            match_variant_pattern(function, subject, subject_type, enum_name, variant, layouts)
         }
     }
+}
+
+fn match_variant_pattern(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    enum_name: &str,
+    variant: &str,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let NativeType::Enum(enum_id) = subject_type else {
+        return Err(NativeEmitError(format!("case subject is not enum `{enum_name}`")));
+    };
+    let enum_layout = layouts
+        .enum_layout(enum_id)
+        .ok_or_else(|| NativeEmitError("missing enum layout for case subject".to_owned()))?;
+    let variant_layout = layouts
+        .enum_variant(enum_id, variant)
+        .ok_or_else(|| NativeEmitError(format!("unknown case variant `{enum_name}.{variant}`")))?;
+    Ok(variant_match_value(function, subject, variant, enum_layout, variant_layout))
+}
+
+fn variant_match_value(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    variant: &str,
+    enum_layout: &super::super::enum_layout::EnumLayout,
+    variant_layout: &super::super::enum_layout::EnumVariantLayout,
+) -> cranelift_codegen::ir::Value {
+    if enum_layout.niche_pointer {
+        let comparison = if variant == "None" { IntCC::Equal } else { IntCC::NotEqual };
+        return function.ins().icmp_imm_s(comparison, subject, 0);
+    }
+    let discriminant = function.ins().load(
+        types::I32,
+        MemFlagsData::new(),
+        subject,
+        enum_layout.discriminant_offset as i32,
+    );
+    function.ins().icmp_imm_s(IntCC::Equal, discriminant, i64::from(variant_layout.discriminant))
 }
 
 fn parse_integer_pattern(value: &str) -> Result<i64, NativeEmitError> {

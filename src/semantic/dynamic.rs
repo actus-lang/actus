@@ -76,49 +76,48 @@ impl Analyzer {
     pub(super) fn collect_dynamic_roles(&mut self, program: &Program) {
         let mut role_names = Vec::new();
         for declaration in &program.declarations {
-            let parameters = match declaration {
-                TopLevelDecl::Verb(verb) => &verb.params,
-                TopLevelDecl::ExternalVerb(verb) => &verb.params,
+            match declaration {
+                TopLevelDecl::Verb(verb) => {
+                    self.collect_dynamic_parameters(&mut role_names, &verb.params)
+                }
+                TopLevelDecl::ExternalVerb(verb) => {
+                    self.collect_dynamic_parameters(&mut role_names, &verb.params)
+                }
                 TopLevelDecl::Role(role) => {
-                    for method in &role.methods {
-                        for parameter in &method.params {
-                            if parameter.dispatch == DispatchMode::Dynamic
-                                && !role_names.contains(&parameter.ty.name)
-                            {
-                                role_names.push(parameter.ty.name.clone());
-                            }
-                        }
-                    }
-                    continue;
+                    self.collect_dynamic_methods(&mut role_names, &role.methods)
                 }
                 TopLevelDecl::Perform(perform) => {
                     for method in &perform.methods {
-                        for parameter in &method.params {
-                            if parameter.dispatch == DispatchMode::Dynamic
-                                && !role_names.contains(&parameter.ty.name)
-                            {
-                                role_names.push(parameter.ty.name.clone());
-                            }
-                        }
+                        self.collect_dynamic_parameters(&mut role_names, &method.params);
                     }
-                    continue;
                 }
                 TopLevelDecl::Struct(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Pack(_)
                 | TopLevelDecl::OpenSibling(_)
-                | TopLevelDecl::Import(_) => {
-                    continue;
-                }
-            };
-            for parameter in parameters {
-                if parameter.dispatch == DispatchMode::Dynamic
-                    && !role_names.contains(&parameter.ty.name)
-                {
-                    role_names.push(parameter.ty.name.clone());
-                }
+                | TopLevelDecl::Import(_) => {}
             }
         }
+        self.finalize_dynamic_roles(role_names);
+    }
+
+    fn collect_dynamic_parameters(&self, role_names: &mut Vec<String>, parameters: &[Param]) {
+        for parameter in parameters {
+            if parameter.dispatch == DispatchMode::Dynamic
+                && !role_names.contains(&parameter.ty.name)
+            {
+                role_names.push(parameter.ty.name.clone());
+            }
+        }
+    }
+
+    fn collect_dynamic_methods(&self, role_names: &mut Vec<String>, methods: &[RoleMethod]) {
+        for method in methods {
+            self.collect_dynamic_parameters(role_names, &method.params);
+        }
+    }
+
+    fn finalize_dynamic_roles(&mut self, mut role_names: Vec<String>) {
         role_names.sort();
         self.model.dynamic_roles = role_names
             .into_iter()

@@ -33,22 +33,38 @@ impl Analyzer {
         }
         let branch_state = self.snapshot_binding_states();
         let branch_count = branch_state.len();
+        let branch_results = self.validate_case_branches(
+            mode,
+            subject,
+            branches,
+            &subject_type,
+            &branch_state,
+            branch_count,
+        )?;
+        self.validate_branch_join(&branch_results, span)?;
+        if let Some(joined_state) = branch_results.first() {
+            self.restore_binding_states(joined_state);
+        }
+        self.leave_scope();
+        Ok(())
+    }
+
+    fn validate_case_branches(
+        &mut self,
+        mode: crate::ast::CaseMode,
+        subject: &Expr,
+        branches: &[CaseBranch],
+        subject_type: &str,
+        branch_state: &[(OwnershipState, AccessState)],
+        branch_count: usize,
+    ) -> Result<Vec<Vec<(OwnershipState, AccessState)>>, SemanticError> {
         let mut branch_results = Vec::new();
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
         for branch in branches {
-            self.restore_binding_states(&branch_state);
-            let name = pattern_name(&branch.pattern);
-            let guarded = branch.guard.is_some();
-            if wildcard_seen {
-                return Err(unreachable_pattern(name, pattern_span(&branch.pattern)));
-            }
-            if is_wildcard(&branch.pattern) && !guarded {
-                wildcard_seen = true;
-            } else if !guarded && !seen.insert(name.clone()) {
-                return Err(duplicate_pattern(name, pattern_span(&branch.pattern)));
-            }
-            self.validate_pattern(&branch.pattern, &subject_type, subject)?;
+            self.restore_binding_states(branch_state);
+            self.validate_branch_order(&mut seen, &mut wildcard_seen, branch)?;
+            self.validate_pattern(&branch.pattern, subject_type, subject)?;
             self.enter_scope(branch.span);
             self.bind_pattern_variables(&branch.pattern, mode, subject)?;
             if mode == crate::ast::CaseMode::Dat {
@@ -60,13 +76,26 @@ impl Analyzer {
             self.visit_case_body(&branch.body)?;
             self.leave_scope();
             branch_results.push(self.snapshot_binding_prefix(branch_count));
-            self.restore_binding_states(&branch_state);
         }
-        self.validate_branch_join(&branch_results, span)?;
-        if let Some(joined_state) = branch_results.first() {
-            self.restore_binding_states(joined_state);
+        Ok(branch_results)
+    }
+
+    fn validate_branch_order(
+        &self,
+        seen: &mut HashSet<String>,
+        wildcard_seen: &mut bool,
+        branch: &CaseBranch,
+    ) -> Result<(), SemanticError> {
+        let name = pattern_name(&branch.pattern);
+        let guarded = branch.guard.is_some();
+        if *wildcard_seen {
+            return Err(unreachable_pattern(name, pattern_span(&branch.pattern)));
         }
-        self.leave_scope();
+        if is_wildcard(&branch.pattern) && !guarded {
+            *wildcard_seen = true;
+        } else if !guarded && !seen.insert(name.clone()) {
+            return Err(duplicate_pattern(name, pattern_span(&branch.pattern)));
+        }
         Ok(())
     }
 

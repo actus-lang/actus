@@ -36,13 +36,36 @@ pub(super) fn lower_scoped_block<'source>(
         string_data,
         layouts,
     )?;
+    finish_scoped_block(
+        function,
+        flow,
+        block.span,
+        &nested_locals,
+        &nested_types,
+        functions,
+        cleanup_schedule,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_scoped_block(
+    function: &mut FunctionBuilder<'_>,
+    flow: Flow,
+    cleanup_span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
     if matches!(flow, Flow::Fallthrough) {
         emit_scope_cleanup(
             function,
             cleanup_schedule,
-            block.span,
-            &nested_locals,
-            &nested_types,
+            cleanup_span,
+            locals,
+            types,
             functions,
             layouts,
         )?;

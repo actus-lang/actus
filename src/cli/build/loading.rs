@@ -13,38 +13,57 @@ pub(super) fn load_build_program(
     input: &str,
     configuration: &CompilerConfiguration,
 ) -> Option<(String, crate::ast::Program)> {
-    let source = match fs::read_to_string(input) {
-        Ok(source) => source,
+    let source = read_build_source(input)?;
+    let program = parse_build_source(input, &source)?;
+    let program = resolve_build_program(input, &source, program, configuration)?;
+    Some((source, program))
+}
+
+fn read_build_source(input: &str) -> Option<String> {
+    match fs::read_to_string(input) {
+        Ok(source) => Some(source),
         Err(error) => {
             eprintln!("error: cannot read `{input}`: {error}");
-            return None;
+            None
         }
-    };
-    let (tokens, lex_errors) = scan(&source);
-    if !lex_errors.is_empty() {
+    }
+}
+
+fn parse_build_source(input: &str, source: &str) -> Option<crate::ast::Program> {
+    let (tokens, lex_errors) = scan(source);
+    if lex_errors.is_empty() {
+        match parse(tokens) {
+            Ok(program) => Some(program),
+            Err(error) => {
+                report_diagnostic(Path::new(input), source, parse_diagnostic(&error));
+                None
+            }
+        }
+    } else {
         report_diagnostics(
             Path::new(input),
-            &source,
+            source,
             lex_errors.iter().map(lex_diagnostic).collect(),
         );
-        return None;
+        None
     }
-    let program = match parse(tokens) {
-        Ok(program) => program,
-        Err(error) => {
-            report_diagnostic(Path::new(input), &source, parse_diagnostic(&error));
-            return None;
-        }
-    };
+}
+
+fn resolve_build_program(
+    input: &str,
+    source: &str,
+    program: crate::ast::Program,
+    configuration: &CompilerConfiguration,
+) -> Option<crate::ast::Program> {
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),
     );
     match resolve_imports(&program, &resolver) {
-        Ok(program) => Some((source, program)),
+        Ok(program) => Some(program),
         Err(error) => {
             let diagnostic = module_diagnostic(&error);
-            eprintln!("{input}: {}", render_diagnostic(&source, &diagnostic));
+            eprintln!("{input}: {}", render_diagnostic(source, &diagnostic));
             None
         }
     }

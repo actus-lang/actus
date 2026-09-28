@@ -39,6 +39,31 @@ pub(super) fn lower_return(
             layouts,
         );
     }
+    let value = lower_return_value(
+        function,
+        expression,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
+    Ok(Flow::Return(value))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_return_value(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let return_ir_type = function.func.signature.returns.first().map(|ret| ret.value_type);
     let value =
         if let (Some(target), Expr::FloatLiteral { value, .. }) = (return_ir_type, expression) {
@@ -55,9 +80,7 @@ pub(super) fn lower_return(
                 layouts,
             )?
         };
-    let value = return_ir_type.map_or(value, |target| coerce_to_ir_type(function, value, target));
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
-    Ok(Flow::Return(value))
+    Ok(return_ir_type.map_or(value, |target| coerce_to_ir_type(function, value, target)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -92,6 +115,19 @@ fn lower_try_return(
         .enum_variant(enum_id, "Ok")
         .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
     let result = allocate_enum(function, layout.size, functions, layouts)?;
+    let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts);
+    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
+    Ok(Flow::Return(return_value))
+}
+
+fn emit_try_return_branches(
+    function: &mut FunctionBuilder<'_>,
+    source: cranelift_codegen::ir::Value,
+    result: cranelift_codegen::ir::Value,
+    layout: &enum_layout::EnumLayout,
+    ok: &enum_layout::EnumVariantLayout,
+    layouts: &LayoutRegistry,
+) -> cranelift_codegen::ir::Value {
     let discriminant = function.ins().load(
         types::I32,
         MemFlagsData::new(),
@@ -116,8 +152,7 @@ fn lower_try_return(
     function.seal_block(err_block);
     function.switch_to_block(merge);
     function.seal_block(merge);
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
-    Ok(Flow::Return(function.block_params(merge)[0]))
+    function.block_params(merge)[0]
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -132,6 +167,45 @@ pub(super) fn lower_try_statement(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
+    let (source, layout, ok) = lower_try_operand(
+        function,
+        expression,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    emit_try_statement_branches(
+        function,
+        source,
+        layout,
+        ok,
+        span,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        layouts,
+    )?;
+    Ok(Flow::Fallthrough)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_try_operand<'a>(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &'a LayoutRegistry,
+) -> Result<
+    (cranelift_codegen::ir::Value, &'a enum_layout::EnumLayout, &'a enum_layout::EnumVariantLayout),
+    NativeEmitError,
+> {
     let source_expression = match expression {
         Expr::Try { expression, .. } => expression.as_ref(),
         _ => return Err(NativeEmitError("expected try expression".to_owned())),
@@ -156,6 +230,22 @@ pub(super) fn lower_try_statement(
     let ok = layouts
         .enum_variant(enum_id, "Ok")
         .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
+    Ok((source, layout, ok))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_try_statement_branches(
+    function: &mut FunctionBuilder<'_>,
+    source: cranelift_codegen::ir::Value,
+    layout: &enum_layout::EnumLayout,
+    ok: &enum_layout::EnumVariantLayout,
+    span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     let discriminant = function.ins().load(
         types::I32,
         MemFlagsData::new(),
@@ -176,7 +266,7 @@ pub(super) fn lower_try_statement(
     function.seal_block(ok_block);
     function.switch_to_block(continuation);
     function.seal_block(continuation);
-    Ok(Flow::Fallthrough)
+    Ok(())
 }
 
 fn copy_enum_bytes(

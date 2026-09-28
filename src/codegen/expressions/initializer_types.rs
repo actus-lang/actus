@@ -39,56 +39,98 @@ fn infer_complex_initializer_type(
     layouts: &LayoutRegistry,
 ) -> Result<NativeType, NativeEmitError> {
     match expression {
-        Expr::Try { expression, .. } => {
-            let NativeType::Enum(enum_id) =
-                initializer_type(expression, types, functions, layouts)?
-            else {
-                return Err(NativeEmitError("try operand is not a native enum value".to_owned()));
-            };
-            layouts
-                .enum_variant(enum_id, "Ok")
-                .and_then(|variant| variant.fields.first().map(|field| field.ty))
-                .ok_or_else(|| NativeEmitError("try operand has no Result.Ok payload".to_owned()))
-        }
-        Expr::Call { callee, .. } => functions
-            .get(callee)
-            .map(|function| function.return_type)
-            .ok_or_else(|| NativeEmitError(format!("native function `{callee}` is unavailable"))),
-        Expr::MethodCall { receiver, method, .. } => {
-            if let Some(enum_type) = enum_expression_type(expression, layouts) {
-                return Ok(enum_type);
-            }
-            let receiver_type = initializer_type(receiver, types, functions, layouts)?;
-            if matches!(receiver_type, NativeType::Arena(_)) && method == "place" {
-                return arena_place_type(expression, types, functions, layouts);
-            }
-            let dispatch_name = performance::dispatch_key(receiver_type, method);
-            functions
-                .get(&dispatch_name)
-                .map(|function| function.return_type)
-                .or_else(|| functions.get(method).map(|function| function.return_type))
-                .ok_or_else(|| NativeEmitError(format!("native method `{method}` is unavailable")))
-        }
+        Expr::Try { expression, .. } => infer_try_type(expression, types, functions, layouts),
+        Expr::Call { callee, .. } => infer_call_type(callee, functions),
+        Expr::MethodCall { .. } => infer_method_type(expression, types, functions, layouts),
         Expr::StructLit { name, type_arguments, .. } => {
-            let type_name = crate::ast::TypeName {
-                name: name.clone(),
-                arguments: type_arguments.clone(),
-                reference_role: None,
-                span: crate::lexer::SourceSpan::new(0, 0),
-            };
-            layouts.type_for_type_name(&type_name).ok_or_else(|| {
-                NativeEmitError(format!("native layout for struct `{name}` is unavailable"))
-            })
+            infer_struct_type(name, type_arguments, layouts)
         }
-        Expr::FieldAccess { object, field, .. } => expression_native_type(object, types, layouts)
-            .and_then(|ty| field_type(ty, field, layouts))
-            .or_else(|| enum_expression_type(expression, layouts))
-            .ok_or_else(|| NativeEmitError(format!("native field `{field}` is unavailable"))),
+        Expr::FieldAccess { object, field, .. } => {
+            infer_field_type(expression, object, field, types, layouts)
+        }
         Expr::Case { branches, .. } => {
             super::super::case::infer_case_type(branches, types, functions, layouts)
         }
         _ => Err(NativeEmitError("unsupported native type expression".to_owned())),
     }
+}
+
+fn infer_try_type(
+    expression: &Expr,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts)? else {
+        return Err(NativeEmitError("try operand is not a native enum value".to_owned()));
+    };
+    layouts
+        .enum_variant(enum_id, "Ok")
+        .and_then(|variant| variant.fields.first().map(|field| field.ty))
+        .ok_or_else(|| NativeEmitError("try operand has no Result.Ok payload".to_owned()))
+}
+
+fn infer_call_type(
+    callee: &str,
+    functions: &HashMap<String, FunctionRef>,
+) -> Result<NativeType, NativeEmitError> {
+    functions
+        .get(callee)
+        .map(|function| function.return_type)
+        .ok_or_else(|| NativeEmitError(format!("native function `{callee}` is unavailable")))
+}
+
+fn infer_method_type(
+    expression: &Expr,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    let Expr::MethodCall { receiver, method, .. } = expression else {
+        return Err(NativeEmitError("native method expression is unavailable".to_owned()));
+    };
+    if let Some(enum_type) = enum_expression_type(expression, layouts) {
+        return Ok(enum_type);
+    }
+    let receiver_type = initializer_type(receiver, types, functions, layouts)?;
+    if matches!(receiver_type, NativeType::Arena(_)) && method == "place" {
+        return arena_place_type(expression, types, functions, layouts);
+    }
+    let dispatch_name = performance::dispatch_key(receiver_type, method);
+    functions
+        .get(&dispatch_name)
+        .map(|function| function.return_type)
+        .or_else(|| functions.get(method).map(|function| function.return_type))
+        .ok_or_else(|| NativeEmitError(format!("native method `{method}` is unavailable")))
+}
+
+fn infer_struct_type(
+    name: &str,
+    type_arguments: &[crate::ast::TypeName],
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    let type_name = crate::ast::TypeName {
+        name: name.to_owned(),
+        arguments: type_arguments.to_vec(),
+        reference_role: None,
+        span: crate::lexer::SourceSpan::new(0, 0),
+    };
+    layouts
+        .type_for_type_name(&type_name)
+        .ok_or_else(|| NativeEmitError(format!("native layout for struct `{name}` is unavailable")))
+}
+
+fn infer_field_type(
+    expression: &Expr,
+    object: &Expr,
+    field: &str,
+    types: &HashMap<&String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    expression_native_type(object, types, layouts)
+        .and_then(|ty| field_type(ty, field, layouts))
+        .or_else(|| enum_expression_type(expression, layouts))
+        .ok_or_else(|| NativeEmitError(format!("native field `{field}` is unavailable")))
 }
 
 fn arena_place_type(

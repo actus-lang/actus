@@ -11,10 +11,12 @@ use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
 mod branches;
+mod context;
 mod matching;
 mod payload;
 mod types;
 
+use self::context::CaseLoweringContext;
 use self::types::branch_type;
 pub(super) use types::infer_case_type;
 
@@ -30,16 +32,9 @@ pub(super) fn lower_case(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let subject_value = lower_expression(
-        function,
-        subject,
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-    )?;
+    let context =
+        case_context(locals, local_types, functions, cleanup_schedule, string_data, layouts);
+    let subject_value = lower_case_subject(function, subject, &context)?;
     let merge = function.create_block();
     let subject_type = initializer_type(subject, local_types, functions, layouts)?;
     let result_type = branch_type(branches, subject_type, local_types, functions, layouts)?;
@@ -51,14 +46,41 @@ pub(super) fn lower_case(
         subject_type,
         result_type,
         merge,
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
+        &context,
     )?;
+    finish_case_merge(function, merge);
+    Ok(function.block_params(merge)[0])
+}
+
+fn finish_case_merge(function: &mut FunctionBuilder<'_>, merge: cranelift_codegen::ir::Block) {
     function.switch_to_block(merge);
     function.seal_block(merge);
-    Ok(function.block_params(merge)[0])
+}
+
+fn case_context<'maps, 'keys>(
+    locals: &'maps HashMap<&'keys String, cranelift_codegen::ir::Value>,
+    local_types: &'maps HashMap<&'keys String, NativeType>,
+    functions: &'maps HashMap<String, FunctionRef>,
+    cleanup_schedule: &'maps super::model::NativeCleanupSchedule,
+    string_data: &'maps StringDataValues,
+    layouts: &'maps LayoutRegistry,
+) -> CaseLoweringContext<'maps, 'keys> {
+    CaseLoweringContext::new(locals, local_types, functions, cleanup_schedule, string_data, layouts)
+}
+
+fn lower_case_subject(
+    function: &mut FunctionBuilder<'_>,
+    subject: &Expr,
+    context: &CaseLoweringContext<'_, '_>,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    lower_expression(
+        function,
+        subject,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )
 }

@@ -212,6 +212,15 @@ pub unsafe extern "C" fn actus_buffer_append_range(
     if count == 0 {
         return 0;
     }
+    append_range_bytes(target, source, offset, count)
+}
+
+fn append_range_bytes(
+    target: &mut ActusBuffer,
+    source: &ActusBuffer,
+    offset: usize,
+    count: usize,
+) -> i32 {
     unsafe {
         std::ptr::copy_nonoverlapping(
             source.data.add(offset),

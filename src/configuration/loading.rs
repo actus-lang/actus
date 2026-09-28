@@ -48,47 +48,11 @@ impl CompilerConfiguration {
         sync_missing_lockfile: bool,
         reject_legacy_manifest: bool,
     ) -> Result<Self, ConfigurationError> {
-        if reject_legacy_manifest && manifest::is_legacy_manifest(path) {
-            return Err(ConfigurationError(
-                "strict mode rejects deprecated `Arca.toml`; rename it to `Actus.toml`".to_owned(),
-            ));
-        }
-        if !reject_legacy_manifest {
-            manifest::warn_if_legacy_manifest(path);
-        }
-        let manifest = manifest::read(path)?;
+        let manifest = read_manifest_for_policy(path, reject_legacy_manifest)?;
         let dependency_graph = super::dependencies::resolve(path, reject_legacy_manifest)?;
         validate_lockfile(path, sync_missing_lockfile)?;
         let environment = Self::from_environment();
-        let (target, linker_flavor, entry_contract, linker) =
-            resolve_manifest_target(&manifest, &environment)?;
-        let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
-        let source_root = manifest::source_root(&manifest, manifest_directory);
-        if manifest.package.source_root.is_some() && !source_root.is_dir() {
-            return Err(ConfigurationError(format!(
-                "InvalidSourceRoot: Actus.toml package.source_root `{}` does not exist",
-                source_root.display()
-            )));
-        }
-        let (profile, native_backend, libraries, library_paths) =
-            build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
-        Ok(Self {
-            project_root: manifest_directory.to_path_buf(),
-            source_root,
-            dependency_roots: dependency_graph.roots,
-            target_spec_hash: target.spec_hash(),
-            target,
-            profile,
-            profiles: manifest.profile,
-            linker,
-            linker_flavor,
-            entry_contract,
-            native_backend,
-            entry_symbol: manifest.package.entry,
-            library_paths,
-            libraries,
-            ..environment
-        })
+        build_from_manifest(path, manifest, dependency_graph, environment)
     }
 
     pub fn from_current_manifest() -> Result<Self, ConfigurationError> {
@@ -113,6 +77,66 @@ impl CompilerConfiguration {
         };
         Self::from_manifest_read_only(&manifest)
     }
+}
+
+fn build_from_manifest(
+    path: &Path,
+    manifest: manifest::ActusManifest,
+    dependency_graph: super::dependencies::DependencyGraph,
+    environment: CompilerConfiguration,
+) -> Result<CompilerConfiguration, ConfigurationError> {
+    let (target, linker_flavor, entry_contract, linker) =
+        resolve_manifest_target(&manifest, &environment)?;
+    let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
+    let source_root = validated_source_root(&manifest, manifest_directory)?;
+    let (profile, native_backend, libraries, library_paths) =
+        build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
+    Ok(CompilerConfiguration {
+        project_root: manifest_directory.to_path_buf(),
+        source_root,
+        dependency_roots: dependency_graph.roots,
+        target_spec_hash: target.spec_hash(),
+        target,
+        profile,
+        profiles: manifest.profile,
+        linker,
+        linker_flavor,
+        entry_contract,
+        native_backend,
+        entry_symbol: manifest.package.entry,
+        library_paths,
+        libraries,
+        ..environment
+    })
+}
+
+fn validated_source_root(
+    manifest: &manifest::ActusManifest,
+    manifest_directory: &Path,
+) -> Result<PathBuf, ConfigurationError> {
+    let source_root = manifest::source_root(manifest, manifest_directory);
+    if manifest.package.source_root.is_none() || source_root.is_dir() {
+        return Ok(source_root);
+    }
+    Err(ConfigurationError(format!(
+        "InvalidSourceRoot: Actus.toml package.source_root `{}` does not exist",
+        source_root.display()
+    )))
+}
+
+fn read_manifest_for_policy(
+    path: &Path,
+    reject_legacy_manifest: bool,
+) -> Result<manifest::ActusManifest, ConfigurationError> {
+    if reject_legacy_manifest && manifest::is_legacy_manifest(path) {
+        return Err(ConfigurationError(
+            "strict mode rejects deprecated `Arca.toml`; rename it to `Actus.toml`".to_owned(),
+        ));
+    }
+    if !reject_legacy_manifest {
+        manifest::warn_if_legacy_manifest(path);
+    }
+    manifest::read(path)
 }
 
 pub(crate) fn manifest_path_in_directory(path: &Path) -> Option<PathBuf> {

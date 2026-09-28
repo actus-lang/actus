@@ -28,51 +28,91 @@ impl Analyzer {
     pub(crate) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         self.record_origin(expression);
         match expression {
-            Expr::BufferLiteral { length, .. } => {
-                self.visit_expression(length)?;
-                self.require_buffer_length(length)
-            }
-            Expr::Identifier { name, span } => {
-                let index = self.binding(name, *span)?;
-                self.ensure_readable(index, name, *span)
-            }
-            Expr::Binary { left, right, .. } => {
-                self.visit_expression(left)?;
-                self.visit_expression(right)
-            }
+            Expr::BufferLiteral { length, .. } => self.visit_buffer_literal(length),
+            Expr::Identifier { name, span } => self.visit_identifier(name, *span),
+            Expr::Binary { left, right, .. } => self.visit_binary_expression(left, right),
             Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
                 self.visit_expression(expression)
             }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
-            Expr::Try { expression, span } => {
-                self.visit_expression(expression)?;
-                self.validate_try_expression(expression, *span)
-            }
+            Expr::Try { expression, span } => self.visit_try_expression(expression, *span),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
             Expr::MethodCall { receiver, method, arguments, span } => {
                 self.visit_method_call(receiver, method, arguments, *span)
             }
             Expr::StructLit { name, type_arguments, fields, span } => {
-                if self.pack_types.contains_key(name) {
-                    self.validate_pack_literal(name, fields, *span)
-                } else {
-                    self.validate_struct_literal(name, type_arguments, fields, *span)
-                }
+                self.visit_struct_literal(name, type_arguments, fields, *span)
             }
             Expr::FieldAccess { object, field, span } => {
-                if self.enum_receiver_name(object).is_some() {
-                    self.validate_enum_unit_variant(object, field, *span)
-                } else {
-                    self.validate_field_access(object, field, *span)?;
-                    self.ensure_field_access_readable(object, field, *span)
-                }
+                self.visit_field_access(object, field, *span)
             }
             Expr::Case { mode, subject, branches, span } => {
-                self.visit_expression(subject)?;
-                self.validate_case_patterns(*mode, subject, branches, *span)
+                self.visit_case_expression(*mode, subject, branches, *span)
             }
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    fn visit_buffer_literal(&mut self, length: &Expr) -> Result<(), SemanticError> {
+        self.visit_expression(length)?;
+        self.require_buffer_length(length)
+    }
+
+    fn visit_identifier(&self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
+        let index = self.binding(name, span)?;
+        self.ensure_readable(index, name, span)
+    }
+
+    fn visit_binary_expression(&mut self, left: &Expr, right: &Expr) -> Result<(), SemanticError> {
+        self.visit_expression(left)?;
+        self.visit_expression(right)
+    }
+
+    fn visit_try_expression(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        self.visit_expression(expression)?;
+        self.validate_try_expression(expression, span)
+    }
+
+    fn visit_struct_literal(
+        &mut self,
+        name: &str,
+        type_arguments: &[crate::ast::TypeName],
+        fields: &[crate::ast::StructFieldInit],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.pack_types.contains_key(name) {
+            self.validate_pack_literal(name, fields, span)
+        } else {
+            self.validate_struct_literal(name, type_arguments, fields, span)
+        }
+    }
+
+    fn visit_field_access(
+        &mut self,
+        object: &Expr,
+        field: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.enum_receiver_name(object).is_some() {
+            return self.validate_enum_unit_variant(object, field, span);
+        }
+        self.validate_field_access(object, field, span)?;
+        self.ensure_field_access_readable(object, field, span)
+    }
+
+    fn visit_case_expression(
+        &mut self,
+        mode: crate::ast::CaseMode,
+        subject: &Expr,
+        branches: &[crate::ast::CaseBranch],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        self.visit_expression(subject)?;
+        self.validate_case_patterns(mode, subject, branches, span)
     }
 
     fn validate_try_expression(

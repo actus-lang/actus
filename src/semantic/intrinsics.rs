@@ -128,30 +128,7 @@ impl Analyzer {
         parameter_names: &[&str],
         span: SourceSpan,
     ) -> Result<Vec<&'a Argument>, SemanticError> {
-        let unknown_name = arguments.iter().find_map(|argument| {
-            argument.name.as_deref().filter(|name| !parameter_names.contains(name))
-        });
-        if let Some(name) = unknown_name {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::UnknownParameter {
-                    callee: callee.to_owned(),
-                    name: name.to_owned(),
-                },
-                span,
-            });
-        }
-        let unique_names = arguments
-            .iter()
-            .filter_map(|argument| argument.name.as_deref())
-            .collect::<HashSet<_>>();
-        if unique_names.len() != arguments.len() {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::DuplicateArgument {
-                    name: "intrinsic parameter".to_owned(),
-                },
-                span,
-            });
-        }
+        self.validate_named_intrinsic_arguments(callee, arguments, parameter_names, span)?;
         let mut ordered = Vec::with_capacity(parameter_names.len());
         for parameter_name in parameter_names {
             let Some(argument) =
@@ -168,6 +145,37 @@ impl Analyzer {
             ordered.push(argument);
         }
         Ok(ordered)
+    }
+
+    fn validate_named_intrinsic_arguments(
+        &self,
+        callee: &str,
+        arguments: &[Argument],
+        parameter_names: &[&str],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if let Some(name) = arguments.iter().find_map(|argument| {
+            argument.name.as_deref().filter(|name| !parameter_names.contains(name))
+        }) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownParameter {
+                    callee: callee.to_owned(),
+                    name: name.to_owned(),
+                },
+                span,
+            });
+        }
+        let unique_names = arguments
+            .iter()
+            .filter_map(|argument| argument.name.as_deref())
+            .collect::<HashSet<_>>();
+        if unique_names.len() == arguments.len() {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::DuplicateArgument { name: "intrinsic parameter".to_owned() },
+            span,
+        })
     }
 
     fn require_intrinsic_type(

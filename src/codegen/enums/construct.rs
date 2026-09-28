@@ -5,11 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::super::enum_layout::{EnumFieldLayout, EnumVariantLayout};
+use super::super::calls::CallLoweringContext;
+use super::super::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
 use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
-use super::super::literals::StringDataValues;
-use super::super::model::NativeCleanupSchedule;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::structs::copy_bytes;
 use super::super::types::NativeType;
@@ -20,13 +19,20 @@ pub(crate) fn lower_enum_constructor(
     receiver: &Expr,
     variant: &str,
     arguments: &[Argument],
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
+    context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let (enum_layout, variant_layout) = constructor_layouts(receiver, variant, context.layouts)?;
+    if enum_layout.niche_pointer {
+        return lower_niche_option_constructor(function, variant, arguments, context);
+    }
+    lower_regular_enum_constructor(function, arguments, enum_layout, variant_layout, context)
+}
+
+fn constructor_layouts<'a>(
+    receiver: &Expr,
+    variant: &str,
+    layouts: &'a LayoutRegistry,
+) -> Result<(&'a EnumLayout, &'a EnumVariantLayout), NativeEmitError> {
     let enum_name = super::types::enum_receiver_name(receiver)
         .ok_or_else(|| NativeEmitError("enum constructor requires a type receiver".to_owned()))?;
     let (enum_id, variant_layout) =
@@ -36,56 +42,18 @@ pub(crate) fn lower_enum_constructor(
     let enum_layout = layouts
         .enum_layout(enum_id)
         .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
-    if enum_layout.niche_pointer {
-        return lower_niche_option_constructor(
-            function,
-            variant,
-            arguments,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        );
-    }
-    lower_regular_enum_constructor(
-        function,
-        arguments,
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-        enum_layout,
-        variant_layout,
-    )
+    Ok((enum_layout, variant_layout))
 }
 
 #[allow(clippy::too_many_arguments)]
 fn lower_regular_enum_constructor(
     function: &mut FunctionBuilder<'_>,
     arguments: &[Argument],
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
-    enum_layout: &super::super::enum_layout::EnumLayout,
+    enum_layout: &EnumLayout,
     variant_layout: &EnumVariantLayout,
+    context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let allocator = functions
-        .get("__actus_enum_allocate")
-        .ok_or_else(|| NativeEmitError("native enum allocator is unavailable".to_owned()))?;
-    let size = function.ins().iconst(layouts.pointer_type, i64::from(enum_layout.size));
-    let allocation = function.ins().call(allocator.reference, &[size]);
-    let address = function
-        .inst_results(allocation)
-        .first()
-        .copied()
-        .ok_or_else(|| NativeEmitError("native enum allocator returned no value".to_owned()))?;
+    let address = allocate_enum(function, context.functions, context.layouts, enum_layout.size)?;
     let discriminant = function.ins().iconst(types::I32, i64::from(variant_layout.discriminant));
     function.ins().store(
         MemFlagsData::new(),
@@ -97,16 +65,29 @@ fn lower_regular_enum_constructor(
         function,
         address,
         arguments,
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
         enum_layout.payload_offset,
         variant_layout,
+        context,
     )?;
     Ok(address)
+}
+
+fn allocate_enum(
+    function: &mut FunctionBuilder<'_>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+    size: u32,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let allocator = functions
+        .get("__actus_enum_allocate")
+        .ok_or_else(|| NativeEmitError("native enum allocator is unavailable".to_owned()))?;
+    let size_value = function.ins().iconst(layouts.pointer_type, i64::from(size));
+    let allocation = function.ins().call(allocator.reference, &[size_value]);
+    function
+        .inst_results(allocation)
+        .first()
+        .copied()
+        .ok_or_else(|| NativeEmitError("native enum allocator returned no value".to_owned()))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -114,29 +95,24 @@ fn lower_enum_payload(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
     arguments: &[Argument],
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
     payload_offset: u32,
     variant_layout: &EnumVariantLayout,
+    context: &CallLoweringContext<'_, '_>,
 ) -> Result<(), NativeEmitError> {
     for (field, argument) in ordered_arguments(&variant_layout.fields, arguments)? {
         let value = lower_expression(
             function,
             &argument.expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
+            context.locals,
+            context.local_types,
+            context.functions,
+            context.cleanup_schedule,
+            context.string_data,
+            context.layouts,
         )?;
         let destination =
             function.ins().iadd_imm_s(address, i64::from(payload_offset + field.offset));
-        store_payload(function, destination, value, field.ty, layouts)?;
+        store_payload(function, destination, value, field.ty, context.layouts)?;
     }
     Ok(())
 }
@@ -146,24 +122,21 @@ fn lower_niche_option_constructor(
     function: &mut FunctionBuilder<'_>,
     variant: &str,
     arguments: &[Argument],
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
+    context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match variant {
-        "None" if arguments.is_empty() => Ok(function.ins().iconst(layouts.pointer_type, 0)),
+        "None" if arguments.is_empty() => {
+            Ok(function.ins().iconst(context.layouts.pointer_type, 0))
+        }
         "Some" if arguments.len() == 1 => lower_expression(
             function,
             &arguments[0].expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
+            context.locals,
+            context.local_types,
+            context.functions,
+            context.cleanup_schedule,
+            context.string_data,
+            context.layouts,
         ),
         _ => Err(NativeEmitError(format!("invalid niche Option constructor `{variant}`"))),
     }

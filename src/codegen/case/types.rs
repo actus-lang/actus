@@ -17,26 +17,9 @@ pub(in crate::codegen) fn infer_case_type(
     let mut inferred = None;
     let mut has_block_body = false;
     for branch in branches {
-        let candidate = match &branch.body {
-            CaseBody::Expression(expression) => {
-                Some(initializer_type(expression, types, functions, layouts)?)
-            }
-            CaseBody::Block(_) => {
-                has_block_body = true;
-                None
-            }
-        };
-        if let Some(candidate) = candidate {
-            if let Some(expected) = inferred {
-                if expected != candidate {
-                    return Err(NativeEmitError(
-                        "case branches have different native types".to_owned(),
-                    ));
-                }
-            } else {
-                inferred = Some(candidate);
-            }
-        }
+        let (candidate, is_block) = body_type(&branch.body, types, functions, layouts)?;
+        has_block_body |= is_block;
+        inferred = merge_case_type(inferred, candidate)?;
     }
     finish_case_type(inferred, has_block_body)
 }
@@ -53,28 +36,39 @@ pub(super) fn branch_type(
     for branch in branches {
         let mut branch_types = local_types.clone();
         add_payload_types(branch, subject_type, &mut branch_types, layouts);
-        let candidate = match &branch.body {
-            CaseBody::Expression(expression) => {
-                Some(initializer_type(expression, &branch_types, functions, layouts)?)
-            }
-            CaseBody::Block(_) => {
-                has_block_body = true;
-                None
-            }
-        };
-        if let Some(candidate) = candidate {
-            if let Some(expected) = inferred {
-                if expected != candidate {
-                    return Err(NativeEmitError(
-                        "case branches have different native types".to_owned(),
-                    ));
-                }
-            } else {
-                inferred = Some(candidate);
-            }
-        }
+        let (candidate, is_block) = body_type(&branch.body, &branch_types, functions, layouts)?;
+        has_block_body |= is_block;
+        inferred = merge_case_type(inferred, candidate)?;
     }
     finish_case_type(inferred, has_block_body)
+}
+
+fn body_type(
+    body: &CaseBody,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(Option<NativeType>, bool), NativeEmitError> {
+    match body {
+        CaseBody::Expression(expression) => {
+            Ok((Some(initializer_type(expression, types, functions, layouts)?), false))
+        }
+        CaseBody::Block(_) => Ok((None, true)),
+    }
+}
+
+fn merge_case_type(
+    inferred: Option<NativeType>,
+    candidate: Option<NativeType>,
+) -> Result<Option<NativeType>, NativeEmitError> {
+    let Some(candidate) = candidate else { return Ok(inferred) };
+    match inferred {
+        Some(expected) if expected != candidate => {
+            Err(NativeEmitError("case branches have different native types".to_owned()))
+        }
+        Some(expected) => Ok(Some(expected)),
+        None => Ok(Some(candidate)),
+    }
 }
 
 fn finish_case_type(

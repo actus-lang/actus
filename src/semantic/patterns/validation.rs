@@ -51,28 +51,28 @@ impl Analyzer {
             | Expr::Borrow { expression, .. }
             | Expr::Try { expression, .. }
             | Expr::Unary { expression, .. } => self.validate_guard_access(expression),
-            Expr::Binary { left, right, .. } => {
-                self.validate_guard_access(left)?;
-                self.validate_guard_access(right)
-            }
+            Expr::Binary { left, right, .. } => self.validate_binary_guard_access(left, right),
             Expr::Call { callee, span, .. } | Expr::MethodCall { method: callee, span, .. } => {
-                Err(SemanticError {
-                    kind: SemanticErrorKind::InvalidGuardAccess { name: callee.clone() },
-                    span: *span,
-                })
+                Err(self.invalid_guard_access(callee, *span))
             }
             Expr::Integer { .. }
             | Expr::BufferLiteral { .. }
             | Expr::FloatLiteral { .. }
             | Expr::StringLiteral { .. } => Ok(()),
-            Expr::StructLit { name, span, .. } => Err(SemanticError {
-                kind: SemanticErrorKind::InvalidGuardAccess { name: name.clone() },
-                span: *span,
-            }),
-            Expr::Case { span, .. } => Err(SemanticError {
-                kind: SemanticErrorKind::InvalidGuardAccess { name: "case".to_owned() },
-                span: *span,
-            }),
+            Expr::StructLit { name, span, .. } => Err(self.invalid_guard_access(name, *span)),
+            Expr::Case { span, .. } => Err(self.invalid_guard_access("case", *span)),
+        }
+    }
+
+    fn validate_binary_guard_access(&self, left: &Expr, right: &Expr) -> Result<(), SemanticError> {
+        self.validate_guard_access(left)?;
+        self.validate_guard_access(right)
+    }
+
+    fn invalid_guard_access(&self, name: &str, span: SourceSpan) -> SemanticError {
+        SemanticError {
+            kind: SemanticErrorKind::InvalidGuardAccess { name: name.to_owned() },
+            span,
         }
     }
 
@@ -163,50 +163,59 @@ impl Analyzer {
         match (payload, pattern) {
             (EnumPayload::Unit, VariantPayload::Unit) => Ok(()),
             (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
-                if types.len() != bindings.len() {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::EnumVariantArgumentCount {
-                            enum_name: "pattern".to_owned(),
-                            variant: "payload".to_owned(),
-                            expected: types.len(),
-                            found: bindings.len(),
-                        },
-                        span,
-                    });
-                }
-                Ok(())
+                self.validate_payload_count(types.len(), bindings.len(), span)
             }
             (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
-                if fields.len() != patterns.len() {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::EnumVariantArgumentCount {
-                            enum_name: "pattern".to_owned(),
-                            variant: "payload".to_owned(),
-                            expected: fields.len(),
-                            found: patterns.len(),
-                        },
-                        span,
-                    });
-                }
-                let mut names = HashSet::new();
-                for item in patterns {
-                    if !names.insert(item.name.clone()) {
-                        return Err(duplicate_pattern(item.name.clone(), item.span));
-                    }
-                    if !fields.iter().any(|field| field.name == item.name) {
-                        return Err(SemanticError {
-                            kind: SemanticErrorKind::EnumVariantArgumentName {
-                                enum_name: "pattern".to_owned(),
-                                variant: "payload".to_owned(),
-                                name: item.name.clone(),
-                            },
-                            span: item.span,
-                        });
-                    }
-                }
-                Ok(())
+                self.validate_named_payload(fields.len(), &fields, patterns, span)
             }
             _ => Err(pattern_type_mismatch("matching payload", "different payload", span)),
         }
+    }
+
+    fn validate_payload_count(
+        &self,
+        expected: usize,
+        found: usize,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if expected == found {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::EnumVariantArgumentCount {
+                enum_name: "pattern".to_owned(),
+                variant: "payload".to_owned(),
+                expected,
+                found,
+            },
+            span,
+        })
+    }
+
+    fn validate_named_payload(
+        &self,
+        expected: usize,
+        fields: &[crate::ast::EnumField],
+        patterns: &[crate::ast::NamedPattern],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        self.validate_payload_count(expected, patterns.len(), span)?;
+        let mut names = HashSet::new();
+        for item in patterns {
+            if !names.insert(item.name.clone()) {
+                return Err(duplicate_pattern(item.name.clone(), item.span));
+            }
+            if !fields.iter().any(|field| field.name == item.name) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::EnumVariantArgumentName {
+                        enum_name: "pattern".to_owned(),
+                        variant: "payload".to_owned(),
+                        name: item.name.clone(),
+                    },
+                    span: item.span,
+                });
+            }
+        }
+        Ok(())
     }
 }

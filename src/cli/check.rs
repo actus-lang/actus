@@ -7,7 +7,7 @@ use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 use std::fs;
 
-use super::conformance::{ConformanceMode, parse_strict_option};
+use super::conformance::{ConformanceMode, parse_strict_option, validate_source_limits};
 use super::diagnostics::{report_diagnostic, report_diagnostics};
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
@@ -75,40 +75,69 @@ fn check_source(
     mode: ConformanceMode,
 ) -> i32 {
     let input = input_path.to_path_buf();
-    let source = match fs::read_to_string(&input) {
-        Ok(source) => source,
-        Err(error) => {
-            eprintln!("error: cannot read `{}`: {error}", input.display());
-            return 1;
-        }
-    };
-    let (tokens, lex_errors) = scan(&source);
-    if !lex_errors.is_empty() {
-        let diagnostics = lex_errors.iter().map(lex_diagnostic).collect::<Vec<_>>();
-        report_diagnostics(&input, &source, diagnostics);
+    let Some(source) = read_check_source(&input) else { return 1 };
+    if !validate_source_limits(&input, &source, mode) {
         return 1;
     }
-    let program = match parse(tokens) {
-        Ok(program) => program,
-        Err(error) => {
-            report_diagnostic(&input, &source, parse_diagnostic(&error));
-            return 1;
-        }
+    let Some(program) = parse_check_source(&input, &source) else { return 1 };
+    let Some(program) = resolve_check_program(configuration, &input, &source, program) else {
+        return 1;
     };
-    let program = match resolve_imports(
-        &program,
-        &ModuleResolver::with_dependencies(
-            configuration.source_root(),
-            configuration.dependency_roots(),
-        ),
-    ) {
-        Ok(program) => program,
+    analyze_check_program(&input, &source, configuration, mode, program)
+}
+
+fn read_check_source(input: &std::path::Path) -> Option<String> {
+    match fs::read_to_string(input) {
+        Ok(source) => Some(source),
+        Err(error) => {
+            eprintln!("error: cannot read `{}`: {error}", input.display());
+            None
+        }
+    }
+}
+
+fn parse_check_source(input: &std::path::Path, source: &str) -> Option<crate::ast::Program> {
+    let (tokens, lex_errors) = scan(source);
+    if !lex_errors.is_empty() {
+        report_diagnostics(input, source, lex_errors.iter().map(lex_diagnostic).collect());
+        return None;
+    }
+    match parse(tokens) {
+        Ok(program) => Some(program),
+        Err(error) => {
+            report_diagnostic(input, source, parse_diagnostic(&error));
+            None
+        }
+    }
+}
+
+fn resolve_check_program(
+    configuration: &crate::configuration::CompilerConfiguration,
+    input: &std::path::Path,
+    source: &str,
+    program: crate::ast::Program,
+) -> Option<crate::ast::Program> {
+    let resolver = ModuleResolver::with_dependencies(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+    );
+    match resolve_imports(&program, &resolver) {
+        Ok(program) => Some(program),
         Err(error) => {
             let diagnostic = module_diagnostic(&error);
-            eprintln!("{}: {}", input.display(), render_diagnostic("", &diagnostic));
-            return 1;
+            eprintln!("{}: {}", input.display(), render_diagnostic(source, &diagnostic));
+            None
         }
-    };
+    }
+}
+
+fn analyze_check_program(
+    input: &std::path::Path,
+    source: &str,
+    configuration: &crate::configuration::CompilerConfiguration,
+    mode: ConformanceMode,
+    program: crate::ast::Program,
+) -> i32 {
     let program = filter_program_for_target(&program, configuration.target());
     match crate::semantic::analyze(&program) {
         Ok(_) => {
@@ -120,7 +149,7 @@ fn check_source(
             0
         }
         Err(error) => {
-            report_diagnostic(&input, &source, semantic_diagnostic(&error));
+            report_diagnostic(input, source, semantic_diagnostic(&error));
             1
         }
     }

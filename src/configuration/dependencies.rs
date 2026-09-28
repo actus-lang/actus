@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use super::ConfigurationError;
+use super::checksum::content_checksum;
 use super::manifest::{ActusManifest, source_root};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -52,18 +53,8 @@ fn visit_manifest(
     visiting: &mut HashSet<PathBuf>,
     reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
-    if reject_legacy_manifest && super::manifest::is_legacy_manifest(manifest_path) {
-        return Err(ConfigurationError(
-            "strict mode rejects deprecated dependency `Arca.toml`; rename it to `Actus.toml`"
-                .to_owned(),
-        ));
-    }
-    let canonical = fs::canonicalize(manifest_path).map_err(|error| {
-        ConfigurationError(format!(
-            "cannot resolve manifest `{}`: {error}",
-            manifest_path.display()
-        ))
-    })?;
+    reject_legacy_dependency(manifest_path, reject_legacy_manifest)?;
+    let canonical = canonical_manifest_path(manifest_path)?;
     if !visiting.insert(canonical.clone()) {
         return Err(ConfigurationError(format!(
             "DependencyCycle: dependency graph contains `{}`",
@@ -72,6 +63,40 @@ fn visit_manifest(
     }
     let manifest = super::manifest::read(&canonical)?;
     let dependencies = dependency_specs(&manifest)?;
+    visit_dependency_specs(&canonical, dependencies, graph, visiting, reject_legacy_manifest)?;
+    visiting.remove(&canonical);
+    Ok(())
+}
+
+fn reject_legacy_dependency(
+    manifest_path: &Path,
+    reject_legacy_manifest: bool,
+) -> Result<(), ConfigurationError> {
+    if reject_legacy_manifest && super::manifest::is_legacy_manifest(manifest_path) {
+        return Err(ConfigurationError(
+            "strict mode rejects deprecated dependency `Arca.toml`; rename it to `Actus.toml`"
+                .to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn canonical_manifest_path(manifest_path: &Path) -> Result<PathBuf, ConfigurationError> {
+    fs::canonicalize(manifest_path).map_err(|error| {
+        ConfigurationError(format!(
+            "cannot resolve manifest `{}`: {error}",
+            manifest_path.display()
+        ))
+    })
+}
+
+fn visit_dependency_specs(
+    canonical: &Path,
+    dependencies: BTreeMap<String, DependencySpec>,
+    graph: &mut DependencyGraph,
+    visiting: &mut HashSet<PathBuf>,
+    reject_legacy_manifest: bool,
+) -> Result<(), ConfigurationError> {
     for (name, specification) in dependencies {
         match specification {
             DependencySpec::Version(version) => {
@@ -84,7 +109,7 @@ fn visit_manifest(
                 )?;
             }
             DependencySpec::Local(table) => visit_local_dependency(
-                &canonical,
+                canonical,
                 name,
                 table,
                 graph,
@@ -93,7 +118,6 @@ fn visit_manifest(
             )?,
         }
     }
-    visiting.remove(&canonical);
     Ok(())
 }
 
@@ -125,30 +149,53 @@ fn visit_local_dependency(
     visiting: &mut HashSet<PathBuf>,
     reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
-    let relative_path = table.path.ok_or_else(|| {
-        ConfigurationError(format!("dependency `{name}` must declare a local `path`"))
-    })?;
+    let relative_path = required_local_path(&name, table.path)?;
     let (package_root, dependency_manifest, child) =
         load_local_dependency(parent_manifest, &name, &relative_path, reject_legacy_manifest)?;
     validate_dependency_version(&name, table.version.as_deref(), &child.package.version)?;
-    let child_source_root = source_root(&child, &package_root);
-    if !child_source_root.is_dir() {
-        return Err(ConfigurationError(format!(
-            "InvalidSourceRoot: dependency `{name}` source root `{}` does not exist",
-            child_source_root.display()
-        )));
-    }
+    let child_source_root = dependency_source_root(&name, &child, &package_root)?;
     graph.roots.insert(name.clone(), child_source_root);
+    record_local_package(graph, name, relative_path, &child, &package_root)?;
+    visit_manifest(&dependency_manifest, graph, visiting, reject_legacy_manifest)
+}
+
+fn required_local_path(name: &str, path: Option<String>) -> Result<String, ConfigurationError> {
+    path.ok_or_else(|| {
+        ConfigurationError(format!("dependency `{name}` must declare a local `path`"))
+    })
+}
+
+fn dependency_source_root(
+    name: &str,
+    child: &ActusManifest,
+    package_root: &Path,
+) -> Result<PathBuf, ConfigurationError> {
+    let child_source_root = source_root(child, package_root);
+    if child_source_root.is_dir() {
+        return Ok(child_source_root);
+    }
+    Err(ConfigurationError(format!(
+        "InvalidSourceRoot: dependency `{name}` source root `{}` does not exist",
+        child_source_root.display()
+    )))
+}
+
+fn record_local_package(
+    graph: &mut DependencyGraph,
+    name: String,
+    relative_path: String,
+    child: &ActusManifest,
+    package_root: &Path,
+) -> Result<(), ConfigurationError> {
     record_package(
         graph,
         DependencyPackage {
             name,
             version: child.package.version.clone(),
             path: Some(relative_path),
-            checksum: Some(content_checksum(&package_root)?),
+            checksum: Some(content_checksum(package_root)?),
         },
-    )?;
-    visit_manifest(&dependency_manifest, graph, visiting, reject_legacy_manifest)
+    )
 }
 
 fn load_local_dependency(
@@ -229,53 +276,5 @@ fn constraint_text(constraint: super::version::VersionConstraint) -> String {
         super::version::VersionConstraint::GreaterOrEqual(version) => {
             format!(">={}.{}.{}", version.major, version.minor, version.patch)
         }
-    }
-}
-
-fn content_checksum(root: &Path) -> Result<String, ConfigurationError> {
-    let mut files = Vec::new();
-    collect_files(root, root, &mut files)?;
-    files.sort_by(|left, right| left.0.cmp(&right.0));
-    let mut hash = 0xcbf29ce484222325_u64;
-    for (relative, path) in files {
-        update_hash(&mut hash, relative.as_bytes());
-        update_hash(
-            &mut hash,
-            &fs::read(path).map_err(|error| {
-                ConfigurationError(format!("cannot hash dependency content: {error}"))
-            })?,
-        );
-    }
-    Ok(format!("{hash:016x}"))
-}
-
-fn collect_files(
-    root: &Path,
-    directory: &Path,
-    files: &mut Vec<(String, PathBuf)>,
-) -> Result<(), ConfigurationError> {
-    let entries = fs::read_dir(directory).map_err(|error| {
-        ConfigurationError(format!("cannot inspect dependency `{}`: {error}", directory.display()))
-    })?;
-    for entry in entries {
-        let path = entry.map_err(|error| ConfigurationError(error.to_string()))?.path();
-        if path.file_name().is_some_and(|name| matches!(name.to_str(), Some(".git" | "capsula"))) {
-            continue;
-        }
-        if path.is_dir() {
-            collect_files(root, &path, files)?;
-        } else if path.is_file() {
-            let relative =
-                path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
-            files.push((relative, path));
-        }
-    }
-    Ok(())
-}
-
-fn update_hash(hash: &mut u64, bytes: &[u8]) {
-    for byte in bytes {
-        *hash ^= u64::from(*byte);
-        *hash = hash.wrapping_mul(0x100000001b3);
     }
 }

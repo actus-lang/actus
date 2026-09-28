@@ -1,4 +1,4 @@
-use crate::ast::{EnumDef, EnumPayload, TypeName};
+use crate::ast::{EnumDef, EnumPayload, EnumVariant, TypeName};
 use crate::semantic::TypeSubstitution;
 
 use super::super::native::NativeEmitError;
@@ -47,36 +47,60 @@ impl GenericLayoutRegistry {
         let mut max_payload_size = 0;
         let mut max_payload_alignment = 1;
         for (index, variant) in definition.variants.iter().enumerate() {
-            let mut fields = Vec::new();
-            let mut offset = 0;
-            let mut payload_alignment = 1;
-            for (name, field_type, owned) in variant_fields(&variant.payload) {
-                let layout = self.layout_type(&substitution.apply(field_type), visiting)?;
-                offset = align_up(offset, layout.alignment);
-                fields.push(GenericFieldLayout {
-                    name,
-                    offset,
-                    size: layout.size,
-                    alignment: layout.alignment,
-                    owned,
-                });
-                offset += layout.size;
-                payload_alignment = payload_alignment.max(layout.alignment);
-            }
-            let payload_size = align_up(offset, payload_alignment);
+            let (variant_layout, payload_size, payload_alignment) =
+                self.layout_variant(variant, index, substitution, visiting)?;
             max_payload_size = max_payload_size.max(payload_size);
             max_payload_alignment = max_payload_alignment.max(payload_alignment);
-            variants.push(GenericEnumVariantLayout {
-                name: variant.name.clone(),
-                discriminant: u32::try_from(index)
-                    .map_err(|_| NativeEmitError("enum has too many variants".to_owned()))?,
-                fields,
-            });
+            variants.push(variant_layout);
         }
         let payload_offset = align_up(4, max_payload_alignment);
         let alignment = 4.max(max_payload_alignment);
         let size = align_up(payload_offset + max_payload_size, alignment);
         Ok((size, alignment, payload_offset, max_payload_size, variants))
+    }
+
+    fn layout_variant(
+        &self,
+        variant: &EnumVariant,
+        index: usize,
+        substitution: &TypeSubstitution,
+        visiting: &mut Vec<String>,
+    ) -> Result<(GenericEnumVariantLayout, u32, u32), NativeEmitError> {
+        let (fields, payload_size, payload_alignment) =
+            self.layout_variant_fields(variant, substitution, visiting)?;
+        let discriminant = u32::try_from(index)
+            .map_err(|_| NativeEmitError("enum has too many variants".to_owned()))?;
+        Ok((
+            GenericEnumVariantLayout { name: variant.name.clone(), discriminant, fields },
+            payload_size,
+            payload_alignment,
+        ))
+    }
+
+    fn layout_variant_fields(
+        &self,
+        variant: &EnumVariant,
+        substitution: &TypeSubstitution,
+        visiting: &mut Vec<String>,
+    ) -> Result<(Vec<GenericFieldLayout>, u32, u32), NativeEmitError> {
+        let mut fields = Vec::new();
+        let mut offset = 0;
+        let mut payload_alignment = 1;
+        for (name, field_type, owned) in variant_fields(&variant.payload) {
+            let layout = self.layout_type(&substitution.apply(field_type), visiting)?;
+            offset = align_up(offset, layout.alignment);
+            fields.push(GenericFieldLayout {
+                name,
+                offset,
+                size: layout.size,
+                alignment: layout.alignment,
+                owned,
+            });
+            offset += layout.size;
+            payload_alignment = payload_alignment.max(layout.alignment);
+        }
+        let payload_size = align_up(offset, payload_alignment);
+        Ok((fields, payload_size, payload_alignment))
     }
 }
 

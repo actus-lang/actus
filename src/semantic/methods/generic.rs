@@ -22,25 +22,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let role = self.role_types.get(role_name).cloned().ok_or_else(|| SemanticError {
-            kind: SemanticErrorKind::UnknownRole { name: role_name.to_owned() },
-            span,
-        })?;
-        let method_decl =
-            role.methods.iter().find(|candidate| candidate.name == method).ok_or_else(|| {
-                SemanticError {
-                    kind: SemanticErrorKind::UnknownMethod { method: method.to_owned() },
-                    span,
-                }
-            })?;
-        let receiver_role =
-            method_decl.params.first().map(|parameter| parameter.role.clone()).ok_or_else(
-                || SemanticError {
-                    kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
-                    span,
-                },
-            )?;
-        let signature = super::super::dynamic::role_method_signature(method_decl);
+        let method_decl = self.generic_method(role_name, method, span)?;
+        let receiver_role = self.generic_receiver_role(&method_decl, method, span)?;
+        let signature = super::super::dynamic::role_method_signature(&method_decl);
         self.visit_expression(receiver)?;
         if receiver_role == crate::ast::Role::Ins && !self.is_exclusive_owner(receiver) {
             return Err(SemanticError {
@@ -62,5 +46,35 @@ impl Analyzer {
             self.inferred_expression_types.insert((span.start, span.end), return_type.clone());
         }
         Ok(())
+    }
+
+    fn generic_method(
+        &self,
+        role_name: &str,
+        method: &str,
+        span: SourceSpan,
+    ) -> Result<crate::ast::RoleMethod, SemanticError> {
+        let role = self.role_types.get(role_name).ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::UnknownRole { name: role_name.to_owned() },
+            span,
+        })?;
+        role.methods
+            .iter()
+            .find(|candidate| candidate.name == method)
+            .cloned()
+            .ok_or_else(|| SemanticErrorKind::UnknownMethod { method: method.to_owned() })
+            .map_err(|kind| SemanticError { kind, span })
+    }
+
+    fn generic_receiver_role(
+        &self,
+        method: &crate::ast::RoleMethod,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<crate::ast::Role, SemanticError> {
+        method.params.first().map(|parameter| parameter.role.clone()).ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::InvalidReceiver { method: name.to_owned() },
+            span,
+        })
     }
 }

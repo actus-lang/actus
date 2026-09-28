@@ -7,7 +7,6 @@ use actus::diagnostics::{
     semantic_diagnostic, sort_diagnostics, strict_code_category, validate_diagnostic_catalog,
 };
 use actus::lexer::{SourceSpan, scan};
-use actus::lsp::analyze_document;
 use actus::modules::{ModuleError, ModuleResolutionError};
 use actus::parser::parse;
 use actus::semantic::{SemanticErrorKind, analyze};
@@ -191,59 +190,6 @@ fn json_renderer_preserves_shared_diagnostic_metadata() {
 }
 
 #[test]
-fn colored_renderer_preserves_plain_output_when_disabled() {
-    let diagnostic = Diagnostic::error("E1003", SourceSpan::new(0, 1), "undeclared name")
-        .with_phase(DiagnosticPhase::Semantic);
-    let plain = render_diagnostic("x", &diagnostic);
-
-    assert_eq!(render_colored_diagnostic("x", &diagnostic, false), plain);
-    assert_eq!(
-        render_colored_diagnostic("x", &diagnostic, true),
-        "\x1b[31merror[E1003]\x1b[0m at 1:1: undeclared name"
-    );
-}
-
-#[test]
-fn all_diagnostic_adapters_preserve_one_fixture() {
-    let source = "verb main() -> Int { return missing; }\n";
-    let (tokens, errors) = scan(source);
-    assert!(errors.is_empty());
-    let program = parse(tokens).expect("fixture should parse");
-    let error = analyze(&program).expect_err("fixture should fail semantic analysis");
-    let diagnostic = semantic_diagnostic(&error);
-
-    assert_eq!(diagnostic.code(), "E1003");
-    assert_eq!(diagnostic.severity(), DiagnosticSeverity::Error);
-    assert_eq!(diagnostic.span(), SourceSpan::new(28, 35));
-    assert_eq!(
-        render_diagnostic(source, &diagnostic),
-        "error[E1003] at 1:29: undeclared identifier `missing`"
-    );
-    assert_eq!(
-        render_colored_diagnostic(source, &diagnostic, true),
-        "\x1b[31merror[E1003]\x1b[0m at 1:29: undeclared identifier `missing`"
-    );
-
-    let encoded = render_json_diagnostics(std::slice::from_ref(&diagnostic))
-        .expect("fixture should serialize");
-    let json: serde_json::Value = serde_json::from_str(&encoded).expect("valid diagnostic JSON");
-    assert_eq!(json[0]["code"], "E1003");
-    assert_eq!(json[0]["severity"], "error");
-    assert_eq!(json[0]["span"]["start"], 28);
-    assert_eq!(json[0]["span"]["end"], 35);
-
-    let lsp =
-        analyze_document("file:///tmp/actus-diagnostic-parity.act", source, &Default::default());
-    assert_eq!(lsp.len(), 1);
-    assert_eq!(lsp[0].code.as_deref(), Some("E1003"));
-    assert_eq!(lsp[0].severity, 1);
-    assert_eq!(lsp[0].range.start.line, 0);
-    assert_eq!(lsp[0].range.start.character, 28);
-    assert_eq!(lsp[0].range.end.line, 0);
-    assert_eq!(lsp[0].range.end.character, 35);
-}
-
-#[test]
 fn renderer_choice_preserves_order_validation_and_exit_status() {
     let diagnostics = vec![
         Diagnostic::error("E1003", SourceSpan::new(4, 5), "later")
@@ -257,24 +203,33 @@ fn renderer_choice_preserves_order_validation_and_exit_status() {
     let mut ordered = diagnostics.clone();
     sort_diagnostics(&mut ordered);
     let expected_codes = ["E0001", "E1003"];
+    assert_rendered_order(&ordered, &expected_codes);
+    assert_json_order(&diagnostics, &expected_codes);
+    assert_eq!(diagnostics, original);
+    assert_diagnostic_commands_fail();
+}
 
-    let plain = ordered
+fn assert_rendered_order(diagnostics: &[Diagnostic], expected_codes: &[&str; 2]) {
+    let plain = diagnostics
         .iter()
         .map(|diagnostic| render_diagnostic("source", diagnostic))
         .collect::<Vec<_>>();
-    let colored = ordered
+    let colored = diagnostics
         .iter()
         .map(|diagnostic| render_colored_diagnostic("source", diagnostic, true))
         .collect::<Vec<_>>();
     assert!(plain[0].contains(expected_codes[0]) && plain[1].contains(expected_codes[1]));
     assert!(colored[0].contains(expected_codes[0]) && colored[1].contains(expected_codes[1]));
+}
 
-    let encoded = render_json_diagnostics(&diagnostics).expect("JSON renderer should succeed");
+fn assert_json_order(diagnostics: &[Diagnostic], expected_codes: &[&str; 2]) {
+    let encoded = render_json_diagnostics(diagnostics).expect("JSON renderer should succeed");
     let json: serde_json::Value = serde_json::from_str(&encoded).expect("valid JSON output");
     assert_eq!(json[0]["code"], expected_codes[0]);
     assert_eq!(json[1]["code"], expected_codes[1]);
-    assert_eq!(diagnostics, original);
+}
 
+fn assert_diagnostic_commands_fail() {
     let plain_result = run_diagnostic_check();
     let colored_result = Command::new(env!("CARGO_BIN_EXE_actus"))
         .env("TERM", "xterm-256color")

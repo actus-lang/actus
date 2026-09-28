@@ -26,6 +26,29 @@ pub(crate) fn lower_struct_literal(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let layout = resolve_struct_layout(name, type_arguments, layouts)?;
+    let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
+    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    lower_struct_fields(
+        function,
+        fields,
+        address,
+        layout,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    Ok(address)
+}
+
+fn resolve_struct_layout<'a>(
+    name: &str,
+    type_arguments: &[TypeName],
+    layouts: &'a LayoutRegistry,
+) -> Result<&'a super::super::layout::StructLayout, NativeEmitError> {
     let type_name = TypeName {
         name: name.to_owned(),
         arguments: type_arguments.to_vec(),
@@ -39,10 +62,22 @@ pub(crate) fn lower_struct_literal(
             _ => None,
         })
         .ok_or_else(|| NativeEmitError(format!("missing layout for struct `{name}`")))?;
-    let layout =
-        layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing layout `{id}`")))?;
-    let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
-    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing layout `{id}`")))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_struct_fields(
+    function: &mut FunctionBuilder<'_>,
+    fields: &[StructFieldInit],
+    address: cranelift_codegen::ir::Value,
+    layout: &super::super::layout::StructLayout,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     for field in fields {
         let field_layout = layout
             .fields
@@ -61,5 +96,5 @@ pub(crate) fn lower_struct_literal(
         )?;
         store_struct_field(function, address, value, field_layout, layouts)?;
     }
-    Ok(address)
+    Ok(())
 }

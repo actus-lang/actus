@@ -24,31 +24,49 @@ impl Analyzer {
                 span,
             });
         };
-        let index = self.binding(name, *identifier_span)?;
+        self.move_dat_binding(name, *identifier_span, span)
+    }
+
+    fn move_dat_binding(
+        &mut self,
+        name: &str,
+        identifier_span: SourceSpan,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let index = self.binding(name, identifier_span)?;
         self.ensure_access_available(index, name, span)?;
         self.reject_ins_dat_transfer(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidDatArgument { name: name.clone() },
+                kind: SemanticErrorKind::InvalidDatArgument { name: name.to_owned() },
                 span,
             });
         }
         if self.model.bindings[index].access.is_frozen() {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MoveFrozen {
-                    name: name.clone(),
+                    name: name.to_owned(),
                     borrow_ids: self.blocking_borrow_ids(index),
                 },
                 span,
             });
         }
+        self.update_dat_ownership(index, name, span)
+    }
+
+    fn update_dat_ownership(
+        &mut self,
+        index: usize,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         match self.model.bindings[index].ownership.clone() {
             OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
                 return Err(SemanticError {
-                    kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                    kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
                     span,
                 });
             }
@@ -73,16 +91,36 @@ impl Analyzer {
         self.reject_ins_dat_transfer(index, name, span)?;
         self.validate_struct_field_move(object, field, span)?;
         let field_path = format_field_path(object, field);
+        self.apply_struct_field_move(index, name, field_path, span)
+    }
+
+    fn apply_struct_field_move(
+        &mut self,
+        index: usize,
+        name: &str,
+        field_path: String,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         if self.model.bindings[index].access.is_frozen() {
             return Err(SemanticError {
                 kind: SemanticErrorKind::FieldBorrowConflict {
-                    owner: name.clone(),
+                    owner: name.to_owned(),
                     field: field_path,
                     borrow_ids: self.blocking_borrow_ids(index),
                 },
                 span,
             });
         }
+        self.update_struct_field_ownership(index, name, field_path, span)
+    }
+
+    fn update_struct_field_ownership(
+        &mut self,
+        index: usize,
+        name: &str,
+        field_path: String,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         match self.model.bindings[index].ownership.clone() {
             OwnershipState::Active => {
                 self.model.bindings[index].ownership =
@@ -90,27 +128,37 @@ impl Analyzer {
                 Ok(())
             }
             OwnershipState::PartiallyMoved { fields } => {
-                if fields.iter().any(|moved| paths_overlap(moved, &field_path)) {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
-                        span,
-                    });
-                }
-                let mut updated = fields;
-                updated.push(field_path);
-                self.model.bindings[index].ownership =
-                    OwnershipState::PartiallyMoved { fields: updated };
-                Ok(())
+                self.append_struct_field_move(index, name, fields, field_path, span)
             }
             OwnershipState::Moved => Err(SemanticError {
-                kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
                 span,
             }),
             OwnershipState::Dropped => Err(SemanticError {
-                kind: SemanticErrorKind::UseAfterDrop { name: name.clone() },
+                kind: SemanticErrorKind::UseAfterDrop { name: name.to_owned() },
                 span,
             }),
         }
+    }
+
+    fn append_struct_field_move(
+        &mut self,
+        index: usize,
+        name: &str,
+        fields: Vec<String>,
+        field_path: String,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if fields.iter().any(|moved| paths_overlap(moved, &field_path)) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
+                span,
+            });
+        }
+        let mut updated = fields;
+        updated.push(field_path);
+        self.model.bindings[index].ownership = OwnershipState::PartiallyMoved { fields: updated };
+        Ok(())
     }
 
     fn validate_struct_field_move(

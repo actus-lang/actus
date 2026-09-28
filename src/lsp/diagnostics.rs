@@ -49,7 +49,7 @@ fn collect_diagnostics(
             return vec![parse_diagnostic(&error)];
         }
     };
-    if let Some(result) = analyze_package_module(uri, overlays) {
+    if let Some(result) = analyze_package_module(uri, &program, overlays) {
         let mut diagnostics = package_diagnostics(result);
         sort_diagnostics(&mut diagnostics);
         return diagnostics;
@@ -84,18 +84,25 @@ fn analyze_test_fixture(
 
 fn analyze_package_module(
     uri: &str,
+    program: &crate::ast::Program,
     overlays: &std::collections::HashMap<PathBuf, String>,
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
-    let module_path = module_path_for_file(configuration.source_root(), &path)?;
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),
     );
-    Some(
-        crate::modules::analyze_module_with_overlays(&resolver, &module_path, overlays).map(|_| ()),
-    )
+    let result = match module_path_for_file(configuration.source_root(), &path) {
+        Some(module_path) => {
+            crate::modules::analyze_module_with_overlays(&resolver, &module_path, overlays)
+        }
+        None if path.parent() == Some(configuration.source_root()) => {
+            crate::modules::analyze_with_imports(program, &resolver)
+        }
+        None => return None,
+    };
+    Some(result.map(|_| ()))
 }
 
 fn package_diagnostics(result: Result<(), ModuleError>) -> Vec<Diagnostic> {

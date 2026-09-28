@@ -11,56 +11,86 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         match pattern {
             Pattern::Variant { enum_name, variant, payload, span } => {
-                let Some(definition) = self.enum_types.get(enum_name) else {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::UnknownType { name: enum_name.clone() },
-                        span: *span,
-                    });
-                };
-                let Some(candidate) = definition.variants.iter().find(|item| item.name == *variant)
-                else {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::UnknownEnumVariant {
-                            enum_name: enum_name.clone(),
-                            variant: variant.clone(),
-                        },
-                        span: *span,
-                    });
-                };
-                let candidate_payload = candidate.payload.clone();
-                match (candidate_payload, payload) {
-                    (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
-                        for (binding, ty) in bindings.iter().zip(types) {
-                            let type_name =
-                                self.specialize_pattern_type(enum_name, &ty.name, subject)?;
-                            self.bind_pattern_binding(binding, &type_name, mode)?;
-                        }
-                    }
-                    (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
-                        for pattern in patterns {
-                            let Some(field) =
-                                fields.iter().find(|field| field.name == pattern.name)
-                            else {
-                                return Err(SemanticError {
-                                    kind: SemanticErrorKind::EnumVariantArgumentName {
-                                        enum_name: enum_name.clone(),
-                                        variant: variant.clone(),
-                                        name: pattern.name.clone(),
-                                    },
-                                    span: pattern.span,
-                                });
-                            };
-                            let type_name =
-                                self.specialize_pattern_type(enum_name, &field.ty.name, subject)?;
-                            self.bind_pattern_binding(&pattern.binding, &type_name, mode)?;
-                        }
-                    }
-                    _ => {}
-                }
-                Ok(())
+                self.bind_variant_pattern(enum_name, variant, payload, *span, mode, subject)
             }
             Pattern::Literal { .. } | Pattern::Wildcard { .. } => Ok(()),
         }
+    }
+
+    fn bind_variant_pattern(
+        &mut self,
+        enum_name: &str,
+        variant: &str,
+        payload: &VariantPayload,
+        span: crate::lexer::SourceSpan,
+        mode: crate::ast::CaseMode,
+        subject: &Expr,
+    ) -> Result<(), SemanticError> {
+        let Some(definition) = self.enum_types.get(enum_name) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownType { name: enum_name.to_owned() },
+                span,
+            });
+        };
+        let Some(candidate) = definition.variants.iter().find(|item| item.name == variant) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownEnumVariant {
+                    enum_name: enum_name.to_owned(),
+                    variant: variant.to_owned(),
+                },
+                span,
+            });
+        };
+        match (candidate.payload.clone(), payload) {
+            (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
+                self.bind_tuple_pattern(enum_name, types, bindings, mode, subject)
+            }
+            (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
+                self.bind_named_pattern(enum_name, variant, fields, patterns, mode, subject)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn bind_tuple_pattern(
+        &mut self,
+        enum_name: &str,
+        types: Vec<crate::ast::TypeName>,
+        bindings: &[crate::ast::PatternBinding],
+        mode: crate::ast::CaseMode,
+        subject: &Expr,
+    ) -> Result<(), SemanticError> {
+        for (binding, ty) in bindings.iter().zip(types) {
+            let type_name = self.specialize_pattern_type(enum_name, &ty.name, subject)?;
+            self.bind_pattern_binding(binding, &type_name, mode)?;
+        }
+        Ok(())
+    }
+
+    fn bind_named_pattern(
+        &mut self,
+        enum_name: &str,
+        variant: &str,
+        fields: Vec<crate::ast::EnumField>,
+        patterns: &[crate::ast::NamedPattern],
+        mode: crate::ast::CaseMode,
+        subject: &Expr,
+    ) -> Result<(), SemanticError> {
+        for pattern in patterns {
+            let Some(field) = fields.iter().find(|field| field.name == pattern.name) else {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::EnumVariantArgumentName {
+                        enum_name: enum_name.to_owned(),
+                        variant: variant.to_owned(),
+                        name: pattern.name.clone(),
+                    },
+                    span: pattern.span,
+                });
+            };
+            let type_name = self.specialize_pattern_type(enum_name, &field.ty.name, subject)?;
+            self.bind_pattern_binding(&pattern.binding, &type_name, mode)?;
+        }
+        Ok(())
     }
 
     fn specialize_pattern_type(

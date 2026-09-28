@@ -129,43 +129,83 @@ fn validate_scope(
     scope: &crate::semantic::ScopeCleanup,
     model: &SemanticModel,
 ) -> Result<(), String> {
-    let mut bindings = HashSet::new();
-    let mut borrows = HashSet::new();
-    let mut payload_fields = HashSet::new();
+    let mut state = CleanupValidationState::default();
     for action in &scope.actions {
-        match action {
-            CleanupAction::EndBorrow { borrow_id } => {
-                if !borrows.insert(*borrow_id) {
-                    return Err(format!("cleanup repeats borrow `{borrow_id}`"));
-                }
-                if !model.borrows.iter().any(|borrow| borrow.id == *borrow_id) {
-                    return Err(format!("cleanup references unknown borrow `{borrow_id}`"));
-                }
-            }
-            CleanupAction::DropBinding { binding_index }
-                if *binding_index >= model.bindings.len() =>
-            {
-                return Err(format!("cleanup references invalid binding `{binding_index}`"));
-            }
-            CleanupAction::DropBinding { binding_index } => {
-                if !bindings.insert(*binding_index) {
-                    return Err(format!("cleanup repeats binding `{binding_index}`"));
-                }
-            }
-            CleanupAction::DropPayloadField { binding_index, field, .. } => {
-                if *binding_index >= model.bindings.len() {
-                    return Err(format!("cleanup references invalid binding `{binding_index}`"));
-                }
-                if !payload_fields.insert((*binding_index, field.clone())) {
-                    return Err(format!("cleanup repeats payload field `{field}`"));
-                }
-            }
-            CleanupAction::ResetArena { binding_index } => {
-                if *binding_index >= model.bindings.len() {
-                    return Err(format!("cleanup references invalid arena `{binding_index}`"));
-                }
-            }
+        validate_cleanup_action(action, model, &mut state)?;
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct CleanupValidationState {
+    bindings: HashSet<usize>,
+    borrows: HashSet<usize>,
+    payload_fields: HashSet<(usize, String)>,
+}
+
+fn validate_cleanup_action(
+    action: &CleanupAction,
+    model: &SemanticModel,
+    state: &mut CleanupValidationState,
+) -> Result<(), String> {
+    match action {
+        CleanupAction::EndBorrow { borrow_id } => validate_borrow(*borrow_id, model, state),
+        CleanupAction::DropBinding { binding_index } => {
+            validate_binding(*binding_index, model, &mut state.bindings)
         }
+        CleanupAction::DropPayloadField { binding_index, field, .. } => {
+            validate_payload_field(*binding_index, field, model, &mut state.payload_fields)
+        }
+        CleanupAction::ResetArena { binding_index } => validate_arena(*binding_index, model),
+    }
+}
+
+fn validate_borrow(
+    borrow_id: usize,
+    model: &SemanticModel,
+    state: &mut CleanupValidationState,
+) -> Result<(), String> {
+    if !state.borrows.insert(borrow_id) {
+        return Err(format!("cleanup repeats borrow `{borrow_id}`"));
+    }
+    if !model.borrows.iter().any(|borrow| borrow.id == borrow_id) {
+        return Err(format!("cleanup references unknown borrow `{borrow_id}`"));
+    }
+    Ok(())
+}
+
+fn validate_binding(
+    binding_index: usize,
+    model: &SemanticModel,
+    bindings: &mut HashSet<usize>,
+) -> Result<(), String> {
+    if binding_index >= model.bindings.len() {
+        return Err(format!("cleanup references invalid binding `{binding_index}`"));
+    }
+    if !bindings.insert(binding_index) {
+        return Err(format!("cleanup repeats binding `{binding_index}`"));
+    }
+    Ok(())
+}
+
+fn validate_payload_field(
+    binding_index: usize,
+    field: &str,
+    model: &SemanticModel,
+    payload_fields: &mut HashSet<(usize, String)>,
+) -> Result<(), String> {
+    if binding_index >= model.bindings.len() {
+        return Err(format!("cleanup references invalid binding `{binding_index}`"));
+    }
+    if !payload_fields.insert((binding_index, field.to_owned())) {
+        return Err(format!("cleanup repeats payload field `{field}`"));
+    }
+    Ok(())
+}
+
+fn validate_arena(binding_index: usize, model: &SemanticModel) -> Result<(), String> {
+    if binding_index >= model.bindings.len() {
+        return Err(format!("cleanup references invalid arena `{binding_index}`"));
     }
     Ok(())
 }
@@ -192,26 +232,25 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruct
                 field: field.clone(),
             }
         }
-        CleanupAction::DropBinding { binding_index } => {
-            let binding = &model.bindings[*binding_index];
-            match &binding.ownership {
-                crate::semantic::OwnershipState::PartiallyMoved { fields } => {
-                    NativeInstruction::DropBindingFields {
-                        binding_index: *binding_index,
-                        name: binding.name.clone(),
-                        moved_fields: fields.clone(),
-                    }
-                }
-                _ => NativeInstruction::DropBinding {
-                    binding_index: *binding_index,
-                    name: binding.name.clone(),
-                },
-            }
-        }
+        CleanupAction::DropBinding { binding_index } => lower_binding_drop(*binding_index, model),
         CleanupAction::ResetArena { binding_index } => NativeInstruction::ResetArena {
             binding_index: *binding_index,
             name: model.bindings[*binding_index].name.clone(),
         },
+    }
+}
+
+fn lower_binding_drop(binding_index: usize, model: &SemanticModel) -> NativeInstruction {
+    let binding = &model.bindings[binding_index];
+    match &binding.ownership {
+        crate::semantic::OwnershipState::PartiallyMoved { fields } => {
+            NativeInstruction::DropBindingFields {
+                binding_index,
+                name: binding.name.clone(),
+                moved_fields: fields.clone(),
+            }
+        }
+        _ => NativeInstruction::DropBinding { binding_index, name: binding.name.clone() },
     }
 }
 

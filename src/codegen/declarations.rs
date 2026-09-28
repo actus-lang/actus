@@ -18,42 +18,53 @@ pub(super) fn declare_functions(
     layouts: &LayoutRegistry,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
+    declare_internal_functions(module, verbs, entry_symbol, layouts, &mut metadata)?;
+    declare_external_functions(module, external_verbs, layouts, &mut metadata)?;
+    Ok(metadata)
+}
+
+fn declare_internal_functions(
+    module: &mut ObjectModule,
+    verbs: &[&VerbDecl],
+    entry_symbol: &str,
+    layouts: &LayoutRegistry,
+    metadata: &mut HashMap<String, FunctionMeta>,
+) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let signature = native_signature_for_definition(module, verb, layouts)?;
-        let symbol = if verb.name == entry_symbol || !needs_private_symbol(&verb.name) {
-            verb.name.clone()
-        } else {
-            format!("__actus_verb_{}", verb.name)
-        };
+        let symbol = internal_symbol(&verb.name, entry_symbol);
         let id = module
             .declare_function(&symbol, Linkage::Export, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
-        metadata.insert(
-            verb.name.clone(),
-            function_meta(
-                id,
-                &verb.params,
-                verb.return_type.as_ref().map(|return_type| &return_type.ty),
-                layouts,
-            )?,
-        );
+        let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
+        metadata.insert(verb.name.clone(), function_meta(id, &verb.params, return_type, layouts)?);
     }
-    for verb in external_verbs {
+    Ok(())
+}
+
+fn declare_external_functions(
+    module: &mut ObjectModule,
+    verbs: &[&ExternalVerbDecl],
+    layouts: &LayoutRegistry,
+    metadata: &mut HashMap<String, FunctionMeta>,
+) -> Result<(), NativeEmitError> {
+    for verb in verbs {
         let signature = external_native_signature(module, verb, layouts)?;
         let id = module
             .declare_function(&verb.name, Linkage::Import, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
-        metadata.insert(
-            verb.name.clone(),
-            function_meta(
-                id,
-                &verb.params,
-                verb.return_type.as_ref().map(|return_type| &return_type.ty),
-                layouts,
-            )?,
-        );
+        let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
+        metadata.insert(verb.name.clone(), function_meta(id, &verb.params, return_type, layouts)?);
     }
-    Ok(metadata)
+    Ok(())
+}
+
+fn internal_symbol(name: &str, entry_symbol: &str) -> String {
+    if name == entry_symbol || !needs_private_symbol(name) {
+        name.to_owned()
+    } else {
+        format!("__actus_verb_{name}")
+    }
 }
 
 fn needs_private_symbol(name: &str) -> bool {
@@ -124,26 +135,44 @@ fn signature_for(
         signature.params.push(AbiParam::new(pointer_type));
     }
     for parameter in params {
-        let native_type = if parameter.dispatch == DispatchMode::Dynamic {
-            NativeType::FatPointer
-        } else {
-            NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)?
-        };
-        let parameter_type = if native_type.is_wide_integer() {
-            pointer_type
-        } else {
-            layouts.ir_type(native_type)?
-        };
-        signature.params.push(AbiParam::new(parameter_type));
-        if parameter.dispatch == DispatchMode::Dynamic {
-            signature.params.push(AbiParam::new(pointer_type));
-        }
+        append_parameter(&mut signature, parameter, pointer_type, layouts)?;
     }
-    if return_type.is_some()
+    append_return(&mut signature, return_type, native_return, uses_return_slot, layouts)?;
+    Ok(signature)
+}
+
+fn append_parameter(
+    signature: &mut cranelift_codegen::ir::Signature,
+    parameter: &crate::ast::Param,
+    pointer_type: cranelift_codegen::ir::Type,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let native_type = if parameter.dispatch == DispatchMode::Dynamic {
+        NativeType::FatPointer
+    } else {
+        NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)?
+    };
+    let parameter_type =
+        if native_type.is_wide_integer() { pointer_type } else { layouts.ir_type(native_type)? };
+    signature.params.push(AbiParam::new(parameter_type));
+    if parameter.dispatch == DispatchMode::Dynamic {
+        signature.params.push(AbiParam::new(pointer_type));
+    }
+    Ok(())
+}
+
+fn append_return(
+    signature: &mut cranelift_codegen::ir::Signature,
+    return_type: Option<&crate::ast::TypeName>,
+    native_return: NativeType,
+    uses_return_slot: bool,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let returns_value = return_type.is_some()
         && (!uses_return_slot || layouts.returns_borrowed_view(native_return))
-        && !matches!(native_return, NativeType::Void)
-    {
+        && !matches!(native_return, NativeType::Void);
+    if returns_value {
         signature.returns.push(AbiParam::new(layouts.ir_type(native_return)?));
     }
-    Ok(signature)
+    Ok(())
 }

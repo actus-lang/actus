@@ -277,6 +277,20 @@ checked `src/main.act` successfully
 `check` reads the source, resolves modules, parses it, and runs semantic
 analysis without emitting an object file or executable.
 
+Use `conformance` to inspect the repository-wide source structure and size
+rules. It scans compiler sources, standard-library sources, and test sources,
+then prints every `E1850`–`E1855` diagnostic in deterministic order:
+
+```text
+$ actus conformance --strict
+.../src/example.rs: error[E1854] at 20:1: function `large_function` has 42 lines; split is required at 40
+conformance: scanned N source files; N diagnostics (strict)
+```
+
+Without `--strict`, the command still prints the complete inventory and exits
+successfully. With `--strict`, any reported source-limit diagnostic produces a
+non-zero exit status, making the command suitable for CI and release gates.
+
 For a package that selects another source root or entry in `Actus.toml`, the
 same commands follow that manifest contract automatically:
 

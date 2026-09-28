@@ -86,6 +86,26 @@ fn records_local_dependency_path_and_content_checksum_in_lockfile() {
 }
 
 #[test]
+fn ignores_generated_lockfiles_when_hashing_local_dependencies() {
+    let fixture = dependency_fixture();
+    let manifest = fixture.root.join("app/Actus.toml");
+    let before = ActusLock::generate_from_manifest(&manifest).expect("generate initial lockfile");
+    fixture.write("foo/Actus.lock", "lockfile_version = 1\n");
+    let after = ActusLock::generate_from_manifest(&manifest).expect("generate updated lockfile");
+    let before_checksum = before
+        .packages
+        .iter()
+        .find(|package| package.name == "foo")
+        .and_then(|package| package.checksum.as_deref());
+    let after_checksum = after
+        .packages
+        .iter()
+        .find(|package| package.name == "foo")
+        .and_then(|package| package.checksum.as_deref());
+    assert_eq!(before_checksum, after_checksum);
+}
+
+#[test]
 fn rejects_a_missing_local_dependency_manifest() {
     let fixture = Fixture::new();
     fixture.write(

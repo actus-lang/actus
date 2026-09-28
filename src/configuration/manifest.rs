@@ -113,6 +113,12 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
 }
 
 pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
+    validate_package(manifest)?;
+    validate_build(manifest)?;
+    validate_libraries(manifest)
+}
+
+fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
         return Err(ConfigurationError(
             "Actus.toml package name and version must not be empty".to_owned(),
@@ -131,6 +137,10 @@ pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationErro
             "Actus.toml package.source_root must not be empty".to_owned(),
         ));
     }
+    Ok(())
+}
+
+fn validate_build(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError("Actus.toml linker must not be empty".to_owned()));
     }
@@ -142,6 +152,10 @@ pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationErro
             "Actus.toml library_paths must not contain empty paths".to_owned(),
         ));
     }
+    Ok(())
+}
+
+fn validate_libraries(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if let Some(library) = manifest
         .build
         .libraries

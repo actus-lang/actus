@@ -18,44 +18,63 @@ pub(super) fn declare_runtime_functions(
     has_print_definition: bool,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let pointer_type = module.isa().pointer_type();
-    let allocate_id = declare_allocate(module, pointer_type)?;
-    let drop_id = declare_drop(module, pointer_type)?;
-    let append_id = declare_append(module, pointer_type)?;
-    let print_int_id = declare_print_int(module)?;
-    let print_string_id = declare_print_string(module, pointer_type)?;
-    let enum_allocate_id = declare_enum_allocate(module, pointer_type)?;
-    let enum_drop_id = declare_enum_drop(module, pointer_type)?;
+    let ids = RuntimeFunctionIds {
+        allocate: declare_allocate(module, pointer_type)?,
+        drop: declare_drop(module, pointer_type)?,
+        append: declare_append(module, pointer_type)?,
+        print_int: declare_print_int(module)?,
+        print_string: declare_print_string(module, pointer_type)?,
+        enum_allocate: declare_enum_allocate(module, pointer_type)?,
+        enum_drop: declare_enum_drop(module, pointer_type)?,
+    };
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
-
-    let mut functions = HashMap::from([
-        (
-            format!("__{BUFFER_ALLOCATE_SYMBOL}"),
-            named_meta(allocate_id, &["length"], NativeType::Buffer),
-        ),
-        (BUFFER_DROP_SYMBOL.to_owned(), named_meta(drop_id, &["handle"], NativeType::Int)),
-        (
-            format!("__{ENUM_ALLOCATE_SYMBOL}"),
-            named_meta(enum_allocate_id, &["size"], NativeType::Buffer),
-        ),
-        (
-            ENUM_DROP_SYMBOL.to_owned(),
-            named_meta(enum_drop_id, &["pointer", "size"], NativeType::Int),
-        ),
-        (
-            append_spec.name.to_owned(),
-            intrinsic_meta(append_id, append_spec.parameters, NativeType::Int),
-        ),
-        (
-            print_spec.name.to_owned(),
-            intrinsic_meta(print_int_id, print_spec.parameters, NativeType::Int),
-        ),
-        (PRINT_STRING_SYMBOL.to_owned(), named_meta(print_string_id, &["value"], NativeType::Int)),
-    ]);
+    let mut functions = runtime_metadata(&ids, &append_spec, &print_spec);
     if has_print_definition {
         functions.remove(print_spec.name);
     }
     Ok(functions)
+}
+
+struct RuntimeFunctionIds {
+    allocate: cranelift_module::FuncId,
+    drop: cranelift_module::FuncId,
+    append: cranelift_module::FuncId,
+    print_int: cranelift_module::FuncId,
+    print_string: cranelift_module::FuncId,
+    enum_allocate: cranelift_module::FuncId,
+    enum_drop: cranelift_module::FuncId,
+}
+
+fn runtime_metadata(
+    ids: &RuntimeFunctionIds,
+    append_spec: &crate::ast::IntrinsicSpec,
+    print_spec: &crate::ast::IntrinsicSpec,
+) -> HashMap<String, FunctionMeta> {
+    HashMap::from([
+        (
+            format!("__{BUFFER_ALLOCATE_SYMBOL}"),
+            named_meta(ids.allocate, &["length"], NativeType::Buffer),
+        ),
+        (BUFFER_DROP_SYMBOL.to_owned(), named_meta(ids.drop, &["handle"], NativeType::Int)),
+        (
+            format!("__{ENUM_ALLOCATE_SYMBOL}"),
+            named_meta(ids.enum_allocate, &["size"], NativeType::Buffer),
+        ),
+        (
+            ENUM_DROP_SYMBOL.to_owned(),
+            named_meta(ids.enum_drop, &["pointer", "size"], NativeType::Int),
+        ),
+        (
+            append_spec.name.to_owned(),
+            intrinsic_meta(ids.append, append_spec.parameters, NativeType::Int),
+        ),
+        (
+            print_spec.name.to_owned(),
+            intrinsic_meta(ids.print_int, print_spec.parameters, NativeType::Int),
+        ),
+        (PRINT_STRING_SYMBOL.to_owned(), named_meta(ids.print_string, &["value"], NativeType::Int)),
+    ])
 }
 
 fn declare_enum_allocate(

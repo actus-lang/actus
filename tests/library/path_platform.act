@@ -29,8 +29,7 @@ verb make_windows(dat raw: Buffer) -> Path {
 }
 
 meta target("unix")
-meta test
-verb component_predicates_respect_boundaries() -> Int {
+verb posix_bin_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 47);
     append(raw, 117);
@@ -41,20 +40,33 @@ verb component_predicates_respect_boundaries() -> Int {
     append(raw, 105);
     append(raw, 110);
     append(raw, 0);
-    erg path = make_posix(raw: dat raw);
-    erg prefix_raw = Buffer[0];
-    append(prefix_raw, 47);
-    append(prefix_raw, 117);
-    append(prefix_raw, 115);
-    append(prefix_raw, 114);
-    append(prefix_raw, 0);
-    erg prefix = make_posix(raw: dat prefix_raw);
-    erg partial_raw = Buffer[0];
-    append(partial_raw, 47);
-    append(partial_raw, 117);
-    append(partial_raw, 115);
-    append(partial_raw, 0);
-    erg partial = make_posix(raw: dat partial_raw);
+    return make_posix(raw: dat raw);
+}
+
+verb posix_usr_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 47);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 114);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb posix_us_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 47);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+meta test
+verb component_predicates_respect_boundaries() -> Int {
+    erg path = posix_bin_path();
+    erg prefix = posix_usr_path();
+    erg partial = posix_us_path();
     case starts_with(self: abs path, prefix: abs prefix) {
         true => { },
         _ => { return 1; },
@@ -73,23 +85,46 @@ verb component_predicates_respect_boundaries() -> Int {
     };
 }
 
+verb drive_relative_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 67);
+    append(raw, 0);
+    append(raw, 58);
+    append(raw, 0);
+    append(raw, 102);
+    append(raw, 0);
+    append(raw, 111);
+    append(raw, 0);
+    append(raw, 111);
+    append(raw, 0);
+    append(raw, 0);
+    append(raw, 0);
+    return make_windows(raw: dat raw);
+}
+
+verb mixed_separator_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 67);
+    append(raw, 0);
+    append(raw, 58);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 97);
+    append(raw, 0);
+    append(raw, 47);
+    append(raw, 0);
+    append(raw, 98);
+    append(raw, 0);
+    append(raw, 0);
+    append(raw, 0);
+    return make_windows(raw: dat raw);
+}
+
 meta target("windows")
 meta test
 verb windows_drive_forms_and_mixed_separators() -> Int {
-    erg relative_raw = Buffer[0];
-    append(relative_raw, 67);
-    append(relative_raw, 0);
-    append(relative_raw, 58);
-    append(relative_raw, 0);
-    append(relative_raw, 102);
-    append(relative_raw, 0);
-    append(relative_raw, 111);
-    append(relative_raw, 0);
-    append(relative_raw, 111);
-    append(relative_raw, 0);
-    append(relative_raw, 0);
-    append(relative_raw, 0);
-    erg relative = make_windows(raw: dat relative_raw);
+    erg relative = drive_relative_path();
     erg relative_kind = windows_root(abs relative);
     case dat relative_kind {
         Result.Ok(kind) => case dat kind {
@@ -102,22 +137,7 @@ verb windows_drive_forms_and_mixed_separators() -> Int {
         false => { },
         _ => { return 1; },
     };
-    erg mixed_raw = Buffer[0];
-    append(mixed_raw, 67);
-    append(mixed_raw, 0);
-    append(mixed_raw, 58);
-    append(mixed_raw, 0);
-    append(mixed_raw, 92);
-    append(mixed_raw, 0);
-    append(mixed_raw, 97);
-    append(mixed_raw, 0);
-    append(mixed_raw, 47);
-    append(mixed_raw, 0);
-    append(mixed_raw, 98);
-    append(mixed_raw, 0);
-    append(mixed_raw, 0);
-    append(mixed_raw, 0);
-    erg mixed = make_windows(raw: dat mixed_raw);
+    erg mixed = mixed_separator_path();
     case is_absolute(self: abs mixed) {
         true => { },
         _ => { return 1; },
@@ -132,27 +152,69 @@ verb windows_drive_forms_and_mixed_separators() -> Int {
     };
 }
 
+verb unc_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 115);
+    append(raw, 0);
+    append(raw, 104);
+    append(raw, 0);
+    append(raw, 97);
+    append(raw, 0);
+    append(raw, 114);
+    append(raw, 0);
+    append(raw, 101);
+    append(raw, 0);
+    append(raw, 0);
+    append(raw, 0);
+    return make_windows(raw: dat raw);
+}
+
+verb windows_absolute_prefix() -> Buffer {
+    erg raw = Buffer[0];
+    append(raw, 67);
+    append(raw, 0);
+    append(raw, 58);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    return raw;
+}
+
+verb normalized_windows_path() -> Path {
+    erg raw = windows_absolute_prefix();
+    append(raw, 97);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 46);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 98);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 46);
+    append(raw, 0);
+    append(raw, 46);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 99);
+    append(raw, 0);
+    append(raw, 0);
+    append(raw, 0);
+    return make_windows(raw: dat raw);
+}
+
 meta target("windows")
 meta test
 verb windows_unc_and_normalization_preserve_units() -> Int {
-    erg unc_raw = Buffer[0];
-    append(unc_raw, 92);
-    append(unc_raw, 0);
-    append(unc_raw, 92);
-    append(unc_raw, 0);
-    append(unc_raw, 115);
-    append(unc_raw, 0);
-    append(unc_raw, 104);
-    append(unc_raw, 0);
-    append(unc_raw, 97);
-    append(unc_raw, 0);
-    append(unc_raw, 114);
-    append(unc_raw, 0);
-    append(unc_raw, 101);
-    append(unc_raw, 0);
-    append(unc_raw, 0);
-    append(unc_raw, 0);
-    erg unc = make_windows(raw: dat unc_raw);
+    erg unc = unc_path();
     erg kind = windows_root(abs unc);
     case dat kind {
         Result.Ok(root) => case dat root {
@@ -161,36 +223,7 @@ verb windows_unc_and_normalization_preserve_units() -> Int {
         },
         Result.Err(_) => { return 1; },
     };
-    erg normalized_raw = Buffer[0];
-    append(normalized_raw, 67);
-    append(normalized_raw, 0);
-    append(normalized_raw, 58);
-    append(normalized_raw, 0);
-    append(normalized_raw, 92);
-    append(normalized_raw, 0);
-    append(normalized_raw, 97);
-    append(normalized_raw, 0);
-    append(normalized_raw, 92);
-    append(normalized_raw, 0);
-    append(normalized_raw, 46);
-    append(normalized_raw, 0);
-    append(normalized_raw, 92);
-    append(normalized_raw, 0);
-    append(normalized_raw, 98);
-    append(normalized_raw, 0);
-    append(normalized_raw, 92);
-    append(normalized_raw, 0);
-    append(normalized_raw, 46);
-    append(normalized_raw, 0);
-    append(normalized_raw, 46);
-    append(normalized_raw, 0);
-    append(normalized_raw, 92);
-    append(normalized_raw, 0);
-    append(normalized_raw, 99);
-    append(normalized_raw, 0);
-    append(normalized_raw, 0);
-    append(normalized_raw, 0);
-    erg candidate = make_windows(raw: dat normalized_raw);
+    erg candidate = normalized_windows_path();
     erg normalized = normalize(dat candidate);
     return case dat normalized {
         Result.Ok(path) => case path.length {

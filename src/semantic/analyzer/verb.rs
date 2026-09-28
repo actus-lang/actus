@@ -6,6 +6,17 @@ use super::validation::block_guarantees_return;
 
 impl Analyzer {
     pub(super) fn analyze_verb_body(&mut self, verb: &VerbDecl) -> Result<(), SemanticError> {
+        self.configure_return_state(verb);
+        self.initialize_origin_parameter_map(&verb.params);
+        self.enter_scope(verb.body.span);
+        self.bind_parameters(&verb.params)?;
+        self.visit_block(&verb.body)?;
+        self.validate_missing_return(verb)?;
+        self.leave_scope();
+        Ok(())
+    }
+
+    fn configure_return_state(&mut self, verb: &VerbDecl) {
         self.current_return_access =
             verb.return_type.as_ref().map(|return_type| return_type.access);
         self.current_return_type = verb
@@ -22,9 +33,10 @@ impl Analyzer {
                         .get("Result")
                         .is_some_and(|definition| definition.span.start == 0)
             });
-        self.initialize_origin_parameter_map(&verb.params);
-        self.enter_scope(verb.body.span);
-        for parameter in &verb.params {
+    }
+
+    fn bind_parameters(&mut self, parameters: &[crate::ast::Param]) -> Result<(), SemanticError> {
+        for parameter in parameters {
             let ty = lookup_builtin_type(&parameter.ty.name);
             self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
             let index = self.binding(&parameter.name, parameter.span)?;
@@ -44,7 +56,10 @@ impl Analyzer {
                 );
             }
         }
-        self.visit_block(&verb.body)?;
+        Ok(())
+    }
+
+    fn validate_missing_return(&self, verb: &VerbDecl) -> Result<(), SemanticError> {
         let requires_return_value =
             self.current_return_type.is_some() || self.current_return_is_builtin_result;
         if requires_return_value && !block_guarantees_return(&verb.body) {
@@ -53,7 +68,6 @@ impl Analyzer {
                 span: verb.body.span,
             });
         }
-        self.leave_scope();
         Ok(())
     }
 }

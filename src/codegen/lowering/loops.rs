@@ -12,6 +12,9 @@ use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
+type LoopState<'source> =
+    (HashMap<&'source String, cranelift_codegen::ir::Value>, HashMap<&'source String, NativeType>);
+
 pub(super) fn emit_loop_jump(
     function: &mut FunctionBuilder<'_>,
     targets: Option<LoopTargets>,
@@ -43,20 +46,8 @@ pub(super) fn lower_loop<'source>(
     let header = function.create_block();
     let body = function.create_block();
     let exit = function.create_block();
-    append_loop_parameters(function, &carried, header, exit);
-    let initial_values = carried_values(locals, &carried)?;
-    jump_with_values(function, header, initial_values);
-    function.switch_to_block(header);
-    function.ins().jump(body, &[]);
-    function.seal_block(body);
-    function.switch_to_block(body);
-    let mut loop_locals = locals.clone();
-    let mut loop_types = types.clone();
-    let header_values = function.block_params(header).to_vec();
-    for (name, value) in carried.iter().zip(header_values) {
-        let binding = find_loop_binding(locals, name)?;
-        loop_locals.insert(binding, value);
-    }
+    let (mut loop_locals, mut loop_types) =
+        initialize_loop(function, locals, types, &carried, header, body, exit)?;
     let flow = super::statements::lower_statements(
         function,
         &block.statements,
@@ -68,23 +59,60 @@ pub(super) fn lower_loop<'source>(
         string_data,
         layouts,
     )?;
+    finish_loop(function, locals, &loop_locals, &carried, header, exit, flow)
+}
+
+fn initialize_loop<'source>(
+    function: &mut FunctionBuilder<'_>,
+    locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&'source String, NativeType>,
+    carried: &[String],
+    header: cranelift_codegen::ir::Block,
+    body: cranelift_codegen::ir::Block,
+    exit: cranelift_codegen::ir::Block,
+) -> Result<LoopState<'source>, NativeEmitError> {
+    append_loop_parameters(function, carried, header, exit);
+    let initial_values = carried_values(locals, carried)?;
+    jump_with_values(function, header, initial_values);
+    function.switch_to_block(header);
+    function.ins().jump(body, &[]);
+    function.seal_block(body);
+    function.switch_to_block(body);
+    let mut loop_locals = locals.clone();
+    let loop_types = types.clone();
+    let header_values = function.block_params(header).to_vec();
+    for (name, value) in carried.iter().zip(header_values) {
+        let binding = find_loop_binding(locals, name)?;
+        loop_locals.insert(binding, value);
+    }
+    Ok((loop_locals, loop_types))
+}
+
+fn finish_loop<'source>(
+    function: &mut FunctionBuilder<'_>,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    loop_locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
+    carried: &[String],
+    header: cranelift_codegen::ir::Block,
+    exit: cranelift_codegen::ir::Block,
+    flow: Flow,
+) -> Result<Flow, NativeEmitError> {
     if matches!(flow, Flow::Fallthrough) {
-        let values = carried_values(&loop_locals, &carried)?;
+        let values = carried_values(loop_locals, carried)?;
         jump_with_values(function, header, values);
     }
     function.seal_block(header);
-    if matches!(flow, Flow::Break | Flow::Fallthrough | Flow::Continue) {
-        function.switch_to_block(exit);
-        function.seal_block(exit);
-        let exit_values = function.block_params(exit).to_vec();
-        for (name, value) in carried.iter().zip(exit_values) {
-            let binding = find_loop_binding(locals, name)?;
-            locals.insert(binding, value);
-        }
-        Ok(Flow::Fallthrough)
-    } else {
-        Ok(flow)
+    if !matches!(flow, Flow::Break | Flow::Fallthrough | Flow::Continue) {
+        return Ok(flow);
     }
+    function.switch_to_block(exit);
+    function.seal_block(exit);
+    let exit_values = function.block_params(exit).to_vec();
+    for (name, value) in carried.iter().zip(exit_values) {
+        let binding = find_loop_binding(locals, name)?;
+        locals.insert(binding, value);
+    }
+    Ok(Flow::Fallthrough)
 }
 
 fn find_loop_binding<'source>(

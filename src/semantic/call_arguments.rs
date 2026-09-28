@@ -1,9 +1,10 @@
-use crate::ast::{
-    Argument, DispatchMode, Expr, PrimitiveType, Role, lookup_builtin_type, primitive_type,
-};
+use crate::ast::{Argument, DispatchMode, Expr, Role};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
+use super::argument_shapes::{
+    argument_span, argument_type_matches, expression_span, is_scalar_name,
+};
 use super::calls::VerbSignature;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::state::{AccessState, OwnershipState};
@@ -18,24 +19,39 @@ impl Analyzer {
         expression: &Expr,
     ) -> Result<(), SemanticError> {
         if dispatch == DispatchMode::Dynamic {
-            let found =
-                self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
-            if self.has_performance(
-                expected,
-                &crate::ast::TypeName {
-                    name: found.clone(),
-                    arguments: Vec::new(),
-                    reference_role: None,
-                    span: expression_span(expression),
-                },
-            ) {
-                return Ok(());
-            }
-            return Err(SemanticError {
-                kind: SemanticErrorKind::DynamicRoleMismatch { role: expected.to_owned(), found },
-                span: expression_span(expression),
-            });
+            return self.validate_dynamic_argument(expected, expression);
         }
+        self.validate_static_argument(callee, parameter, expected, expression)
+    }
+
+    fn validate_dynamic_argument(
+        &self,
+        expected: &str,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
+        let type_name = crate::ast::TypeName {
+            name: found.clone(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: expression_span(expression),
+        };
+        if self.has_performance(expected, &type_name) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::DynamicRoleMismatch { role: expected.to_owned(), found },
+            span: expression_span(expression),
+        })
+    }
+
+    fn validate_static_argument(
+        &self,
+        callee: &str,
+        parameter: &str,
+        expected: &str,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
         let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
         if argument_type_matches(expected, &found, expression) {
             return Ok(());
@@ -76,6 +92,15 @@ impl Analyzer {
             self.validate_positional_call(callee, signature, span)?;
             return Ok((0..arguments.len()).collect());
         }
+        self.bind_named_arguments(callee, signature, arguments)
+    }
+
+    fn bind_named_arguments(
+        &self,
+        callee: &str,
+        signature: &VerbSignature,
+        arguments: &[Argument],
+    ) -> Result<Vec<usize>, SemanticError> {
         let mut indices = Vec::with_capacity(arguments.len());
         for argument in arguments {
             let name = argument.name.as_ref().expect("named call argument");
@@ -218,75 +243,5 @@ impl Analyzer {
             _ => return None,
         };
         self.binding(name, *span).ok()
-    }
-}
-
-fn is_scalar_name(name: &str) -> bool {
-    matches!(
-        lookup_builtin_type(name),
-        Some(
-            crate::ast::BuiltinType::Int
-                | crate::ast::BuiltinType::Bool
-                | crate::ast::BuiltinType::String
-        )
-    ) || matches!(
-        primitive_type(name),
-        Some(PrimitiveType::Integer { .. } | PrimitiveType::Float { .. })
-    )
-}
-
-fn argument_type_matches(expected: &str, found: &str, expression: &Expr) -> bool {
-    let expected = strip_reference_role(expected);
-    if strip_reference_role(found) == expected {
-        return true;
-    }
-    match primitive_type(expected) {
-        Some(PrimitiveType::Integer { .. }) => is_integer_literal(expression),
-        Some(PrimitiveType::Float { .. }) => matches!(expression, Expr::FloatLiteral { .. }),
-        Some(PrimitiveType::Void) => false,
-        None => false,
-    }
-}
-
-fn is_integer_literal(expression: &Expr) -> bool {
-    match expression {
-        Expr::Integer { .. } => true,
-        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-            is_integer_literal(expression)
-        }
-        _ => false,
-    }
-}
-
-fn strip_reference_role(type_name: &str) -> &str {
-    type_name
-        .strip_prefix("abs ")
-        .or_else(|| type_name.strip_prefix("ins "))
-        .or_else(|| type_name.strip_prefix("erg "))
-        .or_else(|| type_name.strip_prefix("dat "))
-        .unwrap_or(type_name)
-}
-
-pub(super) fn argument_span(argument: &Argument) -> SourceSpan {
-    expression_span(&argument.expression)
-}
-
-fn expression_span(expression: &Expr) -> SourceSpan {
-    match expression {
-        Expr::Identifier { span, .. }
-        | Expr::Integer { span, .. }
-        | Expr::BufferLiteral { span, .. }
-        | Expr::FloatLiteral { span, .. }
-        | Expr::StringLiteral { span, .. }
-        | Expr::Grouping { span, .. }
-        | Expr::Unary { span, .. }
-        | Expr::Binary { span, .. }
-        | Expr::Borrow { span, .. }
-        | Expr::Try { span, .. }
-        | Expr::Call { span, .. }
-        | Expr::MethodCall { span, .. }
-        | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. }
-        | Expr::Case { span, .. } => *span,
     }
 }

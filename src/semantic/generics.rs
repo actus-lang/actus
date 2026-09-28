@@ -83,33 +83,12 @@ impl Analyzer {
     fn resolve_type_reference(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
         let name = type_name.name.as_str();
         if name == "Arena" {
-            self.validate_arena_type(type_name)?;
-            let capacity = type_name.arguments[0].name.clone();
-            return Ok(ResolvedType::Applied {
-                name: name.to_owned(),
-                arguments: vec![ResolvedType::Concrete(capacity)],
-            });
+            return self.resolve_arena_type(type_name);
         }
-        if self.is_generic_parameter(name) {
-            if !type_name.arguments.is_empty() {
-                return Err(arity_error(name, 0, type_name.arguments.len(), type_name.span));
-            }
-            return Ok(ResolvedType::GenericParameter(name.to_owned()));
-        } else if let Some(expected) = self.named_type_arity(name) {
-            if expected != type_name.arguments.len() {
-                return Err(arity_error(name, expected, type_name.arguments.len(), type_name.span));
-            }
-        } else if self.generic_scopes.iter().any(|scope| !scope.is_empty()) {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::UnknownTypeParameter { name: name.to_owned() },
-                span: type_name.span,
-            });
-        } else {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::UnknownType { name: name.to_owned() },
-                span: type_name.span,
-            });
+        if let Some(generic) = self.resolve_generic_parameter(type_name)? {
+            return Ok(generic);
         }
+        self.validate_named_type(type_name)?;
 
         if type_name.arguments.is_empty() {
             return Ok(ResolvedType::Concrete(name.to_owned()));
@@ -124,6 +103,43 @@ impl Analyzer {
             .map(|argument| self.resolve_type_reference(argument))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(ResolvedType::Applied { name: name.to_owned(), arguments })
+    }
+
+    fn resolve_arena_type(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
+        self.validate_arena_type(type_name)?;
+        Ok(ResolvedType::Applied {
+            name: type_name.name.clone(),
+            arguments: vec![ResolvedType::Concrete(type_name.arguments[0].name.clone())],
+        })
+    }
+
+    fn resolve_generic_parameter(
+        &self,
+        type_name: &TypeName,
+    ) -> Result<Option<ResolvedType>, SemanticError> {
+        if !self.is_generic_parameter(&type_name.name) {
+            return Ok(None);
+        }
+        if !type_name.arguments.is_empty() {
+            return Err(arity_error(&type_name.name, 0, type_name.arguments.len(), type_name.span));
+        }
+        Ok(Some(ResolvedType::GenericParameter(type_name.name.clone())))
+    }
+
+    fn validate_named_type(&self, type_name: &TypeName) -> Result<(), SemanticError> {
+        let name = type_name.name.as_str();
+        if let Some(expected) = self.named_type_arity(name) {
+            if expected != type_name.arguments.len() {
+                return Err(arity_error(name, expected, type_name.arguments.len(), type_name.span));
+            }
+            return Ok(());
+        }
+        let kind = if self.generic_scopes.iter().any(|scope| !scope.is_empty()) {
+            SemanticErrorKind::UnknownTypeParameter { name: name.to_owned() }
+        } else {
+            SemanticErrorKind::UnknownType { name: name.to_owned() }
+        };
+        Err(SemanticError { kind, span: type_name.span })
     }
 
     pub(super) fn is_generic_parameter(&self, name: &str) -> bool {

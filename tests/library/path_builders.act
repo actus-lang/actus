@@ -1,0 +1,109 @@
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb base_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 47);
+    append(raw, 98);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb child_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 99);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb extension_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 108);
+    append(raw, 111);
+    append(raw, 103);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb name_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 102);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 97);
+    append(raw, 108);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb mutate_joined_path(ins joined: Path, abs child: Path) -> Int {
+    erg capacity = 16;
+    erg reserved = reserve_path(self: ins joined, capacity: erg capacity);
+    case dat reserved {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg pushed = push(self: ins joined, other: abs child);
+    case dat pushed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg extension = extension_path();
+    erg name = name_path();
+    erg renamed = set_file_name(self: ins joined, name: abs name);
+    case dat renamed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    drop(name);
+    erg changed = set_extension(self: ins joined, extension: abs extension);
+    return case dat changed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+verb verify_posix_separators() -> Int {
+    erg slash = 47;
+    case posix_is_separator(byte: erg slash) {
+        1 => { },
+        _ => { return 1; },
+    };
+    erg backslash = 92;
+    return case posix_is_separator(byte: erg backslash) {
+        0 => 0,
+        _ => 1,
+    };
+}
+
+meta test
+verb path_builders_and_platform_parsers() -> Int {
+    erg base = base_path();
+    erg child = child_path();
+    erg joined_result = join(self: dat base, other: abs child);
+    return case dat joined_result {
+        Result.Err(_) => 1,
+        Result.Ok(joined) => {
+            erg mutated = mutate_joined_path(joined: ins joined, child: abs child);
+            case mutated {
+                0 => { },
+                _ => { return 1; },
+            };
+            return verify_posix_separators();
+        },
+    };
+}

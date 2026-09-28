@@ -53,28 +53,48 @@ impl Analyzer {
                     span: initializer.span,
                 });
             }
-            let Some(field) = self.struct_field(name, &initializer.name).cloned() else {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::UnknownStructField {
-                        struct_name: name.to_owned(),
-                        field: initializer.name.clone(),
-                    },
-                    span: initializer.span,
-                });
-            };
-            self.visit_expression(&initializer.value)?;
-            let expected = substitution.apply(&field.ty);
-            self.validate_field_value_type(
-                name,
-                &field,
-                &expected,
-                &initializer.value,
-                initializer.span,
-            )?;
-            if matches!(field.role, crate::ast::StructFieldRole::Erg) {
-                self.initialize_owner(&initializer.value, initializer.span)?;
-            }
+            self.validate_struct_initializer(name, substitution, initializer)?;
         }
+        self.validate_missing_struct_fields(name, definition, &initialized, span)
+    }
+
+    fn validate_struct_initializer(
+        &mut self,
+        name: &str,
+        substitution: &TypeSubstitution,
+        initializer: &StructFieldInit,
+    ) -> Result<(), SemanticError> {
+        let Some(field) = self.struct_field(name, &initializer.name).cloned() else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownStructField {
+                    struct_name: name.to_owned(),
+                    field: initializer.name.clone(),
+                },
+                span: initializer.span,
+            });
+        };
+        self.visit_expression(&initializer.value)?;
+        let expected = substitution.apply(&field.ty);
+        self.validate_field_value_type(
+            name,
+            &field,
+            &expected,
+            &initializer.value,
+            initializer.span,
+        )?;
+        if matches!(field.role, crate::ast::StructFieldRole::Erg) {
+            self.initialize_owner(&initializer.value, initializer.span)?;
+        }
+        Ok(())
+    }
+
+    fn validate_missing_struct_fields(
+        &self,
+        name: &str,
+        definition: &StructDef,
+        initialized: &HashSet<String>,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         for field in &definition.fields {
             if !initialized.contains(&field.name) {
                 return Err(SemanticError {

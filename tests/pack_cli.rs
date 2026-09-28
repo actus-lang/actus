@@ -7,10 +7,12 @@ use actus::cli::run_with_args;
 #[cfg(unix)]
 #[test]
 fn executes_pack_field_reads_and_erg_mutation_natively() {
-    let root = std::env::temp_dir().join(format!("actus-pack-{}", std::process::id()));
-    let input = root.with_extension("act");
-    let output = root.with_extension("bin");
-    let source = r#"
+    run_pack_fixture("actus-pack", pack_field_source(), 32);
+}
+
+#[cfg(unix)]
+fn pack_field_source() -> &'static str {
+    r#"
 pack Control {
     erg storage: u32;
     layout little;
@@ -39,33 +41,18 @@ verb main() -> Int {
     big.high = 10;
     return control.enabled + control.channel + control.mode + big.high;
 }
-"#;
-    fs::write(&input, source).expect("write pack fixture");
-    let result = run_with_args(
-        vec![
-            "build".to_owned(),
-            input.display().to_string(),
-            "--emit".to_owned(),
-            "exe".to_owned(),
-            "-o".to_owned(),
-            output.display().to_string(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(result, 0);
-    let status = std::process::Command::new(&output).status().expect("run pack fixture");
-    assert_eq!(status.code(), Some(32));
-    let _ = fs::remove_file(input);
-    let _ = fs::remove_file(output);
+"#
 }
 
 #[cfg(unix)]
 #[test]
 fn executes_big_endian_network_frame_layout_natively() {
-    let root = std::env::temp_dir().join(format!("actus-network-frame-{}", std::process::id()));
-    let input = root.with_extension("act");
-    let output = root.with_extension("bin");
-    let source = r#"
+    run_pack_fixture("actus-network-frame", network_frame_source(), 154);
+}
+
+#[cfg(unix)]
+fn network_frame_source() -> &'static str {
+    r#"
 pack NetworkHeader {
     erg storage: u32;
     layout big;
@@ -83,7 +70,14 @@ verb main() -> Int {
     header.total_length = 150;
     return header.version + header.total_length;
 }
-"#;
+"#
+}
+
+#[cfg(unix)]
+fn run_pack_fixture(name: &str, source: &str, expected: i32) {
+    let root = std::env::temp_dir().join(format!("{name}-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
     fs::write(&input, source).expect("write network frame fixture");
     let result = run_with_args(
         vec![
@@ -98,7 +92,7 @@ verb main() -> Int {
     );
     assert_eq!(result, 0);
     let status = std::process::Command::new(&output).status().expect("run network frame fixture");
-    assert_eq!(status.code(), Some(154));
+    assert_eq!(status.code(), Some(expected));
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
 }

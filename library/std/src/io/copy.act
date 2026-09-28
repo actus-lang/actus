@@ -15,12 +15,8 @@ Copy chunks through ins reader and writer loans using one reusable allocation.
 The result is the exact count or a typed error; EndOfStream is handled as the
 successful termination condition and all scratch storage is cleaned up.
 """
-open verb copy[R: Reader, W: Writer](
-    ins reader: R,
-    ins writer: W
-) -> Result[Int, IoError] {
-    erg scratch = Buffer[0];
-    erg capacity = 4096;
+open verb copy[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
+    erg scratch = Buffer[0]; erg capacity = 4096;
     erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
     case reserved {
         -1 => { return Result[Int, IoError].Err(IoError.Failed); },
@@ -37,31 +33,18 @@ open verb copy[R: Reader, W: Writer](
                     case dat write_result {
                         Result.Ok(written) => {
                             erg difference = written - count;
-                            case difference {
-                                0 => { total = total + written; },
-                                _ => {
-                                    return Result[Int, IoError].Err(IoError.Failed);
-                                },
-                            };
+                            case difference { 0 => { total = total + written; }, _ => {
+                                return Result[Int, IoError].Err(IoError.Failed);
+                            }, };
                         },
                         Result.Err(error) => {
-                            return case dat error {
-                                IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream),
-                                IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
-                                IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
-                                IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
-                            };
+                            return case dat error { IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
                         },
                     };
                 },
             },
             Result.Err(error) => {
-                return case dat error {
-                    IoError.EndOfStream => Result[Int, IoError].Ok(total),
-                IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
-                IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
-                IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
-            };
+                return case dat error { IoError.EndOfStream => Result[Int, IoError].Ok(total), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
             },
         };
     }
