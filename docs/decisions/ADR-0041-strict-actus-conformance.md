@@ -233,6 +233,11 @@ Diagnostics must be deterministic in ordering and content. Terminal colors,
 LSP rendering, JSON output, and editor presentation are renderers only; they
 must not change validation behavior.
 
+The shared diagnostic catalog validator operates on registered code
+definitions, rejecting duplicate stable codes and any attempt to associate one
+code with contradictory severities. Repeated emitted instances of one code at
+different source spans remain valid.
+
 ## Target and metadata rules
 
 Target metadata is part of the language contract, not a comment convention.

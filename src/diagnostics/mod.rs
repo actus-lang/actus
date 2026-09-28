@@ -2,7 +2,10 @@ mod model;
 mod renderer;
 mod strict_codes;
 
-pub use model::{Diagnostic, DiagnosticPhase, DiagnosticSeverity, sort_diagnostics};
+pub use model::{
+    Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase, DiagnosticSeverity,
+    sort_diagnostics, validate_diagnostic_catalog,
+};
 pub use renderer::{
     lex_diagnostic, parse_diagnostic, render_colored_diagnostic, render_diagnostic,
     render_json_diagnostics, render_lex_error, render_parse_error, render_semantic_error,

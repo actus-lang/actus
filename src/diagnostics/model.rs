@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::lexer::SourceSpan;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -24,6 +26,53 @@ pub enum DiagnosticSeverity {
     Error,
     /// A condition that may be promoted to an error by strict policy.
     Warning,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+/// A violation found while validating a diagnostic batch.
+pub enum DiagnosticCatalogError {
+    /// The same code was registered more than once with one severity.
+    DuplicateCode { code: String },
+    /// One code was registered with incompatible severities.
+    ContradictorySeverity { code: String, first: DiagnosticSeverity, second: DiagnosticSeverity },
+}
+
+impl std::fmt::Display for DiagnosticCatalogError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateCode { code } => write!(formatter, "duplicate diagnostic code `{code}`"),
+            Self::ContradictorySeverity { code, first, second } => write!(
+                formatter,
+                "diagnostic code `{code}` has contradictory severities: {first:?} and {second:?}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DiagnosticCatalogError {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+/// A stable diagnostic code definition registered by a compiler subsystem.
+pub struct DiagnosticDefinition {
+    code: String,
+    severity: DiagnosticSeverity,
+}
+
+impl DiagnosticDefinition {
+    /// Creates a code definition with its single authoritative severity.
+    pub fn new(code: impl Into<String>, severity: DiagnosticSeverity) -> Self {
+        Self { code: code.into(), severity }
+    }
+
+    /// Returns the stable code represented by this definition.
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    /// Returns the authoritative severity represented by this definition.
+    pub const fn severity(&self) -> DiagnosticSeverity {
+        self.severity
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -153,4 +202,29 @@ pub fn sort_diagnostics(diagnostics: &mut [Diagnostic]) {
             .then(left.code().cmp(right.code()))
             .then(left.message().cmp(right.message()))
     });
+}
+
+/// Rejects duplicate diagnostic codes and contradictory severity metadata.
+///
+/// A batch is valid only when every stable code has exactly one severity. The
+/// function does not sort or mutate the caller's diagnostics.
+pub fn validate_diagnostic_catalog(
+    definitions: &[DiagnosticDefinition],
+) -> Result<(), DiagnosticCatalogError> {
+    let mut severities = BTreeMap::new();
+    for definition in definitions {
+        let code = definition.code().to_owned();
+        let Some(previous) = severities.insert(code.clone(), definition.severity()) else {
+            continue;
+        };
+        if previous == definition.severity() {
+            return Err(DiagnosticCatalogError::DuplicateCode { code });
+        }
+        return Err(DiagnosticCatalogError::ContradictorySeverity {
+            code,
+            first: previous,
+            second: definition.severity(),
+        });
+    }
+    Ok(())
 }

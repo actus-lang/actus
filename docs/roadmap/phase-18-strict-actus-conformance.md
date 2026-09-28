@@ -48,6 +48,8 @@ behavior around the existing language and runtime contracts.
       plain renderer and whose colors are presentation-only.
 - [x] Inventory the current frontend and semantic diagnostic catalog and
       reserve categorized strict ranges in `E1800`–`E1899`.
+- [x] Reject duplicate diagnostic codes and contradictory severity metadata
+      through the shared diagnostic catalog validator.
 
 ## Strict-mode contract
 
@@ -101,7 +103,7 @@ behavior around the existing language and runtime contracts.
       message, rule explanation, and actionable correction independently.
 - [x] Define strict categories for frontend, semantic, architecture,
       documentation, source limits, and execution failures.
-- [ ] Reject duplicate diagnostic codes and contradictory severity metadata.
+- [x] Reject duplicate diagnostic codes and contradictory severity metadata.
 - [x] Sort diagnostics deterministically by source path, span, phase, and code.
 - [ ] Ensure renderer choice cannot change validation, ordering, or exit code.
 - [ ] Add text, colored, JSON, and LSP diagnostic tests from the same fixtures.

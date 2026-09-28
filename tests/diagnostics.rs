@@ -1,7 +1,8 @@
 use actus::diagnostics::{
-    Diagnostic, DiagnosticPhase, DiagnosticSeverity, StrictDiagnosticCategory, lex_diagnostic,
-    render_colored_diagnostic, render_diagnostic, render_json_diagnostics, render_semantic_error,
-    semantic_diagnostic, sort_diagnostics, strict_code_category,
+    Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase, DiagnosticSeverity,
+    StrictDiagnosticCategory, lex_diagnostic, render_colored_diagnostic, render_diagnostic,
+    render_json_diagnostics, render_semantic_error, semantic_diagnostic, sort_diagnostics,
+    strict_code_category, validate_diagnostic_catalog,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
@@ -114,6 +115,36 @@ fn strict_codes_use_the_reserved_category_ranges() {
     assert_eq!(strict_code_category("E1899"), Some(StrictDiagnosticCategory::Execution));
     assert_eq!(strict_code_category("E1079"), None);
     assert_eq!(strict_code_category("E18"), None);
+}
+
+#[test]
+fn diagnostic_catalog_rejects_duplicate_codes() {
+    let diagnostics = vec![
+        DiagnosticDefinition::new("E1800", DiagnosticSeverity::Error),
+        DiagnosticDefinition::new("E1800", DiagnosticSeverity::Error),
+    ];
+
+    assert_eq!(
+        validate_diagnostic_catalog(&diagnostics),
+        Err(DiagnosticCatalogError::DuplicateCode { code: "E1800".to_owned() })
+    );
+}
+
+#[test]
+fn diagnostic_catalog_rejects_contradictory_severity() {
+    let diagnostics = vec![
+        DiagnosticDefinition::new("E1800", DiagnosticSeverity::Error),
+        DiagnosticDefinition::new("E1800", DiagnosticSeverity::Warning),
+    ];
+
+    assert_eq!(
+        validate_diagnostic_catalog(&diagnostics),
+        Err(DiagnosticCatalogError::ContradictorySeverity {
+            code: "E1800".to_owned(),
+            first: DiagnosticSeverity::Error,
+            second: DiagnosticSeverity::Warning,
+        })
+    );
 }
 
 #[test]
