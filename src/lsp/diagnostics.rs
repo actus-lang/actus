@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{
-    Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, parse_diagnostic,
+    Diagnostic, DiagnosticSeverity, lex_diagnostic, module_diagnostic, parse_diagnostic,
     render_diagnostic, semantic_diagnostic, sort_diagnostics,
 };
 use crate::lexer::scan;
@@ -101,11 +101,7 @@ fn analyze_package_module(
 fn package_diagnostics(result: Result<(), ModuleError>) -> Vec<Diagnostic> {
     match result {
         Ok(()) => Vec::new(),
-        Err(ModuleError::Semantic(error)) => vec![semantic_diagnostic(&error)],
-        Err(error) => vec![
-            Diagnostic::error("E1000", crate::lexer::SourceSpan::new(0, 0), error.to_string())
-                .with_phase(DiagnosticPhase::Module),
-        ],
+        Err(error) => vec![module_diagnostic(&error)],
     }
 }
 

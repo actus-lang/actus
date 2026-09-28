@@ -8,6 +8,7 @@ use actus::diagnostics::{
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::lsp::analyze_document;
+use actus::modules::{ModuleError, ModuleResolutionError};
 use actus::parser::parse;
 use actus::semantic::{SemanticErrorKind, analyze};
 
@@ -82,6 +83,33 @@ fn renders_unknown_metadata_with_a_stable_code() {
         render_parse_error(source, &error),
         "error[E0006] at 1:6: unknown metadata attribute `experimental`"
     );
+}
+
+#[test]
+fn renders_missing_facade_with_a_stable_module_code() {
+    let error = ModuleError::Resolution(ModuleResolutionError::MissingFacade {
+        module: "std::missing".to_owned(),
+        expected: std::path::PathBuf::from("library/std/src/missing/missing.act"),
+    });
+
+    let diagnostic = actus::diagnostics::module_diagnostic(&error);
+    assert_eq!(diagnostic.code(), "E1101");
+    assert_eq!(diagnostic.phase(), DiagnosticPhase::Module);
+    assert_eq!(
+        render_diagnostic("", &diagnostic),
+        "error[E1101] at 1:1: module `std::missing` is missing its canonical facade `library/std/src/missing/missing.act`"
+    );
+}
+
+#[test]
+fn renders_unknown_facade_sibling_with_a_stable_module_code() {
+    let error = ModuleError::UnknownSiblingModule {
+        module: "std::io".to_owned(),
+        sibling: "missing".to_owned(),
+        facade: std::path::PathBuf::from("library/std/src/io/io.act"),
+    };
+
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1104");
 }
 
 #[test]

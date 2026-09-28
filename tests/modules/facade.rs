@@ -68,6 +68,7 @@ fn facade_rejects_unknown_sibling_module() {
         .expect_err("unknown sibling must be rejected");
 
     assert!(
-        matches!(error, ModuleError::UnknownSiblingModule { sibling, .. } if sibling == "missing")
+        matches!(&error, ModuleError::UnknownSiblingModule { sibling, .. } if sibling == "missing")
     );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1104");
 }

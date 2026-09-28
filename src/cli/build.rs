@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use crate::build_graph::{invalidate_stale_artifact, write_metadata};
 use crate::codegen::link_object;
 use crate::configuration::{BuildProfile, CompilerConfiguration, EntryContract};
-use crate::diagnostics::{lex_diagnostic, parse_diagnostic, semantic_diagnostic};
+use crate::diagnostics::{
+    lex_diagnostic, module_diagnostic, parse_diagnostic, render_diagnostic, semantic_diagnostic,
+};
 use crate::lexer::scan;
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
@@ -234,7 +236,8 @@ fn load_build_program(
     match resolve_imports(&program, &resolver) {
         Ok(program) => Some((source, program)),
         Err(error) => {
-            eprintln!("error: cannot resolve imports for `{input}`: {error}");
+            let diagnostic = module_diagnostic(&error);
+            eprintln!("{input}: {}", render_diagnostic(&source, &diagnostic));
             None
         }
     }

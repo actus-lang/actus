@@ -7,7 +7,7 @@ use std::time::Instant;
 use crate::ast::{Block, Expr, MetaAttribute, Program, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::codegen::{emit_program_object_for_target, link_object};
 use crate::configuration::CompilerConfiguration;
-use crate::diagnostics::{render_diagnostic, semantic_diagnostic};
+use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
@@ -146,8 +146,10 @@ fn collect_tests(
         }
         let program = parse(tokens)
             .map_err(|error| format!("cannot parse `{}`: {error:?}", path.display()))?;
-        let program = resolve_imports(&program, &resolver)
-            .map_err(|error| format!("cannot resolve `{}`: {error}", path.display()))?;
+        let program = resolve_imports(&program, &resolver).map_err(|error| {
+            let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+        })?;
         let program = filter_program_for_target(&program, configuration.target());
         if mode.is_strict() {
             crate::semantic::analyze(&program).map_err(|error| {

@@ -1,4 +1,6 @@
-use crate::diagnostics::{lex_diagnostic, parse_diagnostic, semantic_diagnostic};
+use crate::diagnostics::{
+    lex_diagnostic, module_diagnostic, parse_diagnostic, render_diagnostic, semantic_diagnostic,
+};
 use crate::lexer::scan;
 use crate::modules::{ModuleError, ModuleResolver, parse_module, resolve_imports};
 use crate::parser::parse;
@@ -102,7 +104,8 @@ fn check_source(
     ) {
         Ok(program) => program,
         Err(error) => {
-            eprintln!("error: cannot resolve imports for `{}`: {error}", input.display());
+            let diagnostic = module_diagnostic(&error);
+            eprintln!("{}: {}", input.display(), render_diagnostic("", &diagnostic));
             return 1;
         }
     };
@@ -159,6 +162,7 @@ fn check_module(
 }
 
 fn report_module_error(module_path: &str, error: ModuleError) -> i32 {
-    eprintln!("error: cannot check module `{module_path}`: {error}");
+    let diagnostic = module_diagnostic(&error);
+    eprintln!("{module_path}: {}", render_diagnostic("", &diagnostic));
     1
 }

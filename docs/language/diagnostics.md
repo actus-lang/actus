@@ -13,6 +13,11 @@ edition.
 | `E1034`–`E1035` | Struct mutation and field borrow conflicts |
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enum patterns, roles, generics, packs, and arenas |
+| `E1100`–`E1103` | Module path validation, facade discovery, and module I/O |
+| `E1104` | Unknown sibling referenced by a module facade |
+| `E1105` | Module source read failure or defensive module-source fallback |
+| `E1106` | Duplicate declaration aggregated across module sources |
+| `E1107` | Invalid empty lexical failure reported by a module boundary |
 | `E1800`–`E1809` | Strict configuration and policy |
 | `E1810`–`E1819` | Strict frontend validation |
 | `E1820`–`E1829` | Strict semantic validation |

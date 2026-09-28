@@ -180,7 +180,7 @@ behavior around the existing language and runtime contracts.
 - [x] Reject malformed internal generic type keys with stable `E1080`
       diagnostics instead of falling back to an unparsed type.
 - [x] Reject unknown fields with stable `E1031` diagnostics.
-- [ ] Reject unknown modules and imports with stable module diagnostics.
+- [x] Reject unknown modules and imports with stable module diagnostics.
 - [x] Reject unknown metadata attributes and target selectors with stable
       `E0006`/`E0007` diagnostics.
 - [x] Reject malformed metadata and metadata attached to an invalid target

@@ -98,3 +98,14 @@ fn rejects_invalid_module_paths() {
         .expect_err("path traversal must fail");
     assert!(matches!(error, ModuleResolutionError::InvalidPath(_)));
 }
+
+#[test]
+fn classifies_resolution_failures_with_stable_module_codes() {
+    let fixture = Fixture::new();
+    let missing = ModuleResolver::new(&fixture.root)
+        .resolve("driver::gpio")
+        .expect_err("missing facade should fail");
+    let diagnostic =
+        actus::diagnostics::module_diagnostic(&actus::modules::ModuleError::Resolution(missing));
+    assert_eq!(diagnostic.code(), "E1101");
+}
