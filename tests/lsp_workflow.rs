@@ -37,6 +37,7 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
     let ops_uri = file_uri(&root.join("src/math/ops.act"));
     let messages = definition_messages(&uri, &source);
     let stdout = run_lsp(messages);
+    assert!(!stdout.contains("unknown verb `add`"), "stdout: {stdout}");
     assert!(stdout.contains("\"id\":2") && stdout.contains(&uri), "stdout: {stdout}");
     assert!(stdout.contains("\"id\":3") && stdout.contains(&ops_uri), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);
@@ -106,5 +107,9 @@ fn temp_root() -> PathBuf {
 
 fn file_uri(path: &Path) -> String {
     let normalized = path.to_string_lossy().replace('\\', "/");
-    format!("file://{normalized}")
+    if normalized.as_bytes().get(1) == Some(&b':') {
+        format!("file:///{normalized}")
+    } else {
+        format!("file://{normalized}")
+    }
 }
