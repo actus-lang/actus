@@ -1,5 +1,6 @@
 use std::io::Read;
 
+use super::contract::{ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
 use super::types::{BufferHandle, restore_buffer};
 
 /// Reads bytes through the next newline into an exclusively borrowed buffer.
@@ -12,7 +13,7 @@ use super::types::{BufferHandle, restore_buffer};
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_read_stdin_line(handle: BufferHandle) -> i32 {
     if handle.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &mut *handle };
     let mut data = unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
@@ -22,29 +23,29 @@ pub unsafe extern "C" fn actus_read_stdin_line(handle: BufferHandle) -> i32 {
         match input.read(&mut byte) {
             Ok(0) if data.is_empty() => {
                 restore_buffer(buffer, data);
-                return -2;
+                return ABI_STATUS_END_OF_STREAM;
             }
             Ok(0) => break,
             Ok(_) if byte[0] == b'\n' => break,
             Ok(_) => data.push(byte[0]),
             Err(_) => {
                 restore_buffer(buffer, data);
-                return -1;
+                return ABI_STATUS_FAILURE;
             }
         }
     }
-    let count = i32::try_from(data.len()).unwrap_or(-1);
+    let count = i32::try_from(data.len()).unwrap_or(ABI_STATUS_FAILURE);
     restore_buffer(buffer, data);
     count
 }
 
-/// Reads one byte from stdin, returning `-2` at EOF or `-1` on error.
+/// Reads one byte from stdin, returning the ABI EOF or failure status.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_read_byte() -> i32 {
     let mut byte = [0_u8; 1];
     match std::io::stdin().read(&mut byte) {
         Ok(1) => i32::from(byte[0]),
-        Ok(0) => -2,
-        Ok(_) | Err(_) => -1,
+        Ok(0) => ABI_STATUS_END_OF_STREAM,
+        Ok(_) | Err(_) => ABI_STATUS_FAILURE,
     }
 }

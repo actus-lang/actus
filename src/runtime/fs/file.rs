@@ -1,5 +1,7 @@
 use std::io::{Read, Seek, SeekFrom, Write};
 
+use super::super::contract::{ABI_HANDLE_FAILURE, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
+
 const MODE_CREATE: u32 = 1;
 const WHENCE_START: i32 = 0;
 const WHENCE_CURRENT: i32 = 1;
@@ -12,7 +14,7 @@ const WHENCE_END: i32 = 2;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_open(path: *const u8, path_len: usize, mode: u32) -> i64 {
     if path.is_null() {
-        return -1;
+        return ABI_HANDLE_FAILURE;
     }
     let bytes = unsafe { std::slice::from_raw_parts(path, path_len) };
     let mut options = std::fs::OpenOptions::new();
@@ -30,11 +32,13 @@ pub unsafe extern "C" fn actus_file_open(path: *const u8, path_len: usize, mode:
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_read(handle: i64, buf: *mut u8, len: usize) -> i64 {
     if handle < 0 || (len > 0 && buf.is_null()) {
-        return -1;
+        return ABI_STATUS_FAILURE as i64;
     }
     let target =
         if len == 0 { &mut [] } else { unsafe { std::slice::from_raw_parts_mut(buf, len) } };
-    with_file(handle, |file| file.read(target).map_or(-1, |count| count as i64))
+    with_file(handle, |file| {
+        file.read(target).map_or(ABI_STATUS_FAILURE as i64, |count| count as i64)
+    })
 }
 
 /// Writes from a caller-owned raw memory region.
@@ -44,26 +48,34 @@ pub unsafe extern "C" fn actus_file_read(handle: i64, buf: *mut u8, len: usize) 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_write(handle: i64, buf: *const u8, len: usize) -> i64 {
     if handle < 0 || (len > 0 && buf.is_null()) {
-        return -1;
+        return ABI_STATUS_FAILURE as i64;
     }
     let source = if len == 0 { &[] } else { unsafe { std::slice::from_raw_parts(buf, len) } };
-    with_file(handle, |file| file.write(source).map_or(-1, |count| count as i64))
+    with_file(handle, |file| {
+        file.write(source).map_or(ABI_STATUS_FAILURE as i64, |count| count as i64)
+    })
 }
 
 /// Flushes a host file, returning zero or `-1`.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_flush(handle: i64) -> i32 {
     if handle < 0 {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
-    with_file(handle, |file| if file.flush().is_ok() { 0 } else { -1 }) as i32
+    with_file(handle, |file| {
+        if file.flush().is_ok() {
+            i64::from(ABI_STATUS_SUCCESS)
+        } else {
+            i64::from(ABI_STATUS_FAILURE)
+        }
+    }) as i32
 }
 
 /// Closes a host file, returning zero or `-1`.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_close(handle: i64) -> i32 {
     if handle < 0 {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     close_file(handle)
 }
@@ -71,37 +83,44 @@ pub extern "C" fn actus_file_close(handle: i64) -> i32 {
 /// Moves a host file cursor and returns its resulting absolute position.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_seek(handle: i64, offset: i64, whence: i32) -> i64 {
+    if handle < 0 {
+        return ABI_STATUS_FAILURE as i64;
+    }
     let origin = match whence {
         WHENCE_START if offset >= 0 => SeekFrom::Start(offset as u64),
-        WHENCE_START => return -1,
+        WHENCE_START => return ABI_STATUS_FAILURE as i64,
         WHENCE_CURRENT => SeekFrom::Current(offset),
         WHENCE_END => SeekFrom::End(offset),
-        _ => return -1,
+        _ => return ABI_STATUS_FAILURE as i64,
     };
-    with_file(handle, |file| file.seek(origin).map_or(-1, |position| position as i64))
+    with_file(handle, |file| {
+        file.seek(origin).map_or(ABI_STATUS_FAILURE as i64, |position| position as i64)
+    })
 }
 
 /// Moves a file cursor through the scalar ABI used by Actus external verbs.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_seek_buffer(handle: i32, offset: i32, whence: i32) -> i32 {
     let position = actus_file_seek(actus_handle(handle), i64::from(offset), whence);
-    i32::try_from(position).unwrap_or(-1)
+    i32::try_from(position).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 pub(crate) fn handle_to_actus(handle: i64) -> i32 {
     if handle < 0 {
-        return -1;
+        return ABI_HANDLE_FAILURE as i32;
     }
     #[cfg(unix)]
     {
-        return i32::try_from(handle).unwrap_or(-1);
+        return i32::try_from(handle).unwrap_or(ABI_HANDLE_FAILURE as i32);
     }
     #[cfg(windows)]
     {
         return windows_handles::insert(handle);
     }
     #[allow(unreachable_code)]
-    -1
+    {
+        ABI_HANDLE_FAILURE as i32
+    }
 }
 
 pub(super) fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> i64 {
@@ -127,16 +146,19 @@ pub(super) fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> 
 }
 
 pub(crate) fn actus_handle(handle: i32) -> i64 {
+    if handle < 0 {
+        return ABI_HANDLE_FAILURE;
+    }
     #[cfg(unix)]
     {
         return i64::from(handle);
     }
     #[cfg(windows)]
     {
-        return windows_handles::get(handle).unwrap_or(-1);
+        return windows_handles::get(handle).unwrap_or(ABI_HANDLE_FAILURE);
     }
     #[allow(unreachable_code)]
-    -1
+    ABI_HANDLE_FAILURE
 }
 
 fn close_file(handle: i64) -> i32 {
@@ -153,7 +175,7 @@ fn close_file(handle: i64) -> i32 {
         return 0;
     }
     #[allow(unreachable_code)]
-    -1
+    ABI_STATUS_FAILURE
 }
 
 pub(crate) fn with_file(handle: i64, operation: impl FnOnce(&mut std::fs::File) -> i64) -> i64 {

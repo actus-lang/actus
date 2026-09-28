@@ -1,6 +1,23 @@
 /// Version of the C ABI exported by the hosted Actus runtime.
 pub const RUNTIME_ABI_VERSION: u32 = 1;
 
+/// Successful scalar C-ABI operation status.
+pub const ABI_STATUS_SUCCESS: i32 = 0;
+
+/// Failed scalar C-ABI operation status.
+pub const ABI_STATUS_FAILURE: i32 = -1;
+
+/// End-of-stream status returned by byte-oriented input bridges.
+pub const ABI_STATUS_END_OF_STREAM: i32 = -2;
+
+/// Failed opaque-handle C-ABI result.
+pub const ABI_HANDLE_FAILURE: i64 = -1;
+
+/// Returns whether a scalar status is a non-negative byte count or position.
+pub const fn is_successful_count(status: i32) -> bool {
+    status >= ABI_STATUS_SUCCESS
+}
+
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";

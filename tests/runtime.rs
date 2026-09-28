@@ -50,7 +50,24 @@ fn exposes_the_cargo_built_runtime_archive() {
 #[test]
 fn exposes_the_versioned_runtime_contract_symbols() {
     assert_eq!(actus::runtime::RUNTIME_ABI_VERSION, 1);
+    assert_eq!(actus::runtime::ABI_STATUS_SUCCESS, 0);
+    assert_eq!(actus::runtime::ABI_STATUS_FAILURE, -1);
+    assert_eq!(actus::runtime::ABI_STATUS_END_OF_STREAM, -2);
+    assert_eq!(actus::runtime::ABI_HANDLE_FAILURE, -1);
+    assert!(actus::runtime::is_successful_count(0));
+    assert!(actus::runtime::is_successful_count(37));
+    assert!(!actus::runtime::is_successful_count(-1));
     assert_eq!(actus::runtime::BUFFER_ALLOCATE_SYMBOL, "actus_buffer_allocate");
     assert_eq!(actus::runtime::BUFFER_APPEND_SYMBOL, "actus_buffer_append");
     assert_eq!(actus::runtime::BUFFER_DROP_SYMBOL, "actus_buffer_drop");
+}
+
+#[test]
+fn invalid_file_bridge_inputs_use_the_documented_failure_status() {
+    assert_eq!(actus::runtime::actus_file_flush(-1), actus::runtime::ABI_STATUS_FAILURE);
+    assert_eq!(actus::runtime::actus_file_close(-1), actus::runtime::ABI_STATUS_FAILURE);
+    assert_eq!(
+        actus::runtime::actus_file_seek_buffer(-1, 0, 0),
+        actus::runtime::ABI_STATUS_FAILURE
+    );
 }
