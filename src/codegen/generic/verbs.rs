@@ -85,13 +85,7 @@ fn specialize_block(block: &Block, substitution: &TypeSubstitution) -> Block {
 
 fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> Stmt {
     match statement {
-        Stmt::OwnerDecl { role, name, ty, span, initializer } => Stmt::OwnerDecl {
-            role: role.clone(),
-            name: name.clone(),
-            ty: ty.clone(),
-            initializer: specialize_expression(initializer, substitution),
-            span: *span,
-        },
+        Stmt::OwnerDecl { .. } => specialize_owner_declaration(statement, substitution),
         Stmt::Assignment { name, value, span } => Stmt::Assignment {
             name: name.clone(),
             value: specialize_expression(value, substitution),
@@ -113,6 +107,17 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
         Stmt::Loop(block) => Stmt::Loop(specialize_block(block, substitution)),
         Stmt::Block(block) => Stmt::Block(specialize_block(block, substitution)),
         _ => statement.clone(),
+    }
+}
+
+fn specialize_owner_declaration(statement: &Stmt, substitution: &TypeSubstitution) -> Stmt {
+    let Stmt::OwnerDecl { role, name, ty, span, initializer } = statement else { unreachable!() };
+    Stmt::OwnerDecl {
+        role: role.clone(),
+        name: name.clone(),
+        ty: ty.clone(),
+        initializer: specialize_expression(initializer, substitution),
+        span: *span,
     }
 }
 
@@ -147,57 +152,87 @@ fn specialize_expression(expression: &Expr, substitution: &TypeSubstitution) -> 
 
 fn specialize_complex_expression(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     match expression {
-        Expr::Binary { left, operator, right, span } => Expr::Binary {
-            left: Box::new(specialize_expression(left, substitution)),
-            operator: *operator,
-            right: Box::new(specialize_expression(right, substitution)),
-            span: *span,
-        },
-        Expr::Call { callee, arguments, span } => Expr::Call {
-            callee: callee.clone(),
-            arguments: specialize_arguments(arguments, substitution),
-            span: *span,
-        },
-        Expr::MethodCall { receiver, method, arguments, span } => Expr::MethodCall {
-            receiver: Box::new(specialize_expression(receiver, substitution)),
-            method: method.clone(),
-            arguments: specialize_arguments(arguments, substitution),
-            span: *span,
-        },
-        Expr::StructLit { name, type_arguments, fields, span } => Expr::StructLit {
-            name: name.clone(),
-            type_arguments: type_arguments.iter().map(|ty| substitution.apply(ty)).collect(),
-            fields: fields
-                .iter()
-                .map(|field| crate::ast::StructFieldInit {
-                    value: specialize_expression(&field.value, substitution),
-                    ..field.clone()
-                })
-                .collect(),
-            span: *span,
-        },
-        Expr::FieldAccess { object, field, span } => Expr::FieldAccess {
-            object: Box::new(specialize_expression(object, substitution)),
-            field: field.clone(),
-            span: *span,
-        },
-        Expr::Case { mode, subject, branches, span } => Expr::Case {
-            mode: *mode,
-            subject: Box::new(specialize_expression(subject, substitution)),
-            branches: branches
-                .iter()
-                .map(|branch| crate::ast::CaseBranch {
-                    guard: branch
-                        .guard
-                        .as_ref()
-                        .map(|guard| Box::new(specialize_expression(guard, substitution))),
-                    body: specialize_case_body(&branch.body, substitution),
-                    ..branch.clone()
-                })
-                .collect(),
-            span: *span,
-        },
+        Expr::Binary { .. } => specialize_binary(expression, substitution),
+        Expr::Call { .. } => specialize_call(expression, substitution),
+        Expr::MethodCall { .. } => specialize_method_call(expression, substitution),
+        Expr::StructLit { .. } => specialize_struct_literal(expression, substitution),
+        Expr::FieldAccess { .. } => specialize_field_access(expression, substitution),
+        Expr::Case { .. } => specialize_case(expression, substitution),
         _ => expression.clone(),
+    }
+}
+
+fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
+    let Expr::Binary { left, operator, right, span } = expression else { unreachable!() };
+    Expr::Binary {
+        left: Box::new(specialize_expression(left, substitution)),
+        operator: *operator,
+        right: Box::new(specialize_expression(right, substitution)),
+        span: *span,
+    }
+}
+
+fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
+    let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
+    Expr::Call {
+        callee: callee.clone(),
+        arguments: specialize_arguments(arguments, substitution),
+        span: *span,
+    }
+}
+
+fn specialize_method_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
+    let Expr::MethodCall { receiver, method, arguments, span } = expression else { unreachable!() };
+    Expr::MethodCall {
+        receiver: Box::new(specialize_expression(receiver, substitution)),
+        method: method.clone(),
+        arguments: specialize_arguments(arguments, substitution),
+        span: *span,
+    }
+}
+
+fn specialize_struct_literal(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
+    let Expr::StructLit { name, type_arguments, fields, span } = expression else { unreachable!() };
+    Expr::StructLit {
+        name: name.clone(),
+        type_arguments: type_arguments.iter().map(|ty| substitution.apply(ty)).collect(),
+        fields: fields
+            .iter()
+            .map(|field| crate::ast::StructFieldInit {
+                value: specialize_expression(&field.value, substitution),
+                ..field.clone()
+            })
+            .collect(),
+        span: *span,
+    }
+}
+
+fn specialize_field_access(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
+    let Expr::FieldAccess { object, field, span } = expression else { unreachable!() };
+    Expr::FieldAccess {
+        object: Box::new(specialize_expression(object, substitution)),
+        field: field.clone(),
+        span: *span,
+    }
+}
+
+fn specialize_case(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
+    let Expr::Case { mode, subject, branches, span } = expression else { unreachable!() };
+    Expr::Case {
+        mode: *mode,
+        subject: Box::new(specialize_expression(subject, substitution)),
+        branches: branches
+            .iter()
+            .map(|branch| crate::ast::CaseBranch {
+                guard: branch
+                    .guard
+                    .as_ref()
+                    .map(|guard| Box::new(specialize_expression(guard, substitution))),
+                body: specialize_case_body(&branch.body, substitution),
+                ..branch.clone()
+            })
+            .collect(),
+        span: *span,
     }
 }
 
