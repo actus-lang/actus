@@ -59,8 +59,8 @@ impl ActusLock {
     }
 
     pub fn generate_from_manifest(path: &Path) -> Result<Self, LockfileError> {
-        let graph =
-            super::dependencies::resolve(path).map_err(|error| LockfileError(error.to_string()))?;
+        let graph = super::dependencies::resolve(path, false)
+            .map_err(|error| LockfileError(error.to_string()))?;
         let packages = graph
             .packages
             .into_iter()

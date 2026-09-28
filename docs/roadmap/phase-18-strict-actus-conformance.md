@@ -23,6 +23,20 @@ behavior around the existing language and runtime contracts.
 - [ ] Mark Phase 18 complete only after every final acceptance criterion is
       evidenced by a command, fixture, or CI artifact.
 
+## Current implementation checkpoint
+
+- [x] Add one non-repeatable `--strict` parser for `check`, `build`, and
+      `test`.
+- [x] Reject duplicate strict flags before configuration loading or source
+      compilation.
+- [x] Route strict configuration loading through a dedicated policy boundary.
+- [x] Reject deprecated root and local dependency `Arca.toml` manifests in
+      strict mode instead of emitting compatibility warnings.
+- [x] Run source-aware semantic preflight before strict build code generation.
+- [x] Run source-aware semantic validation while collecting strict meta tests.
+- [x] Add positive and negative CLI/configuration regression tests for the
+      implemented strict behaviors.
+
 ## Strict-mode contract
 
 - [ ] `actus check --strict` validates source without producing executable
@@ -84,7 +98,7 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.2: Strict CLI and configuration enforcement
 
-- [ ] Parse `--strict` consistently for `check`, `build`, and `test`.
+- [x] Parse `--strict` consistently for `check`, `build`, and `test`.
 - [ ] Reject unknown, duplicated, conflicting, or misplaced strict-mode flags.
 - [ ] Ensure strict configuration is visible in command diagnostics and test
       metadata.
@@ -100,15 +114,15 @@ behavior around the existing language and runtime contracts.
 
 - [ ] Prevent parser recovery nodes from reaching semantic analysis as valid
       declarations or expressions.
-- [ ] Prevent semantic errors from reaching code generation or linking.
+- [x] Prevent semantic errors from reaching code generation or linking in the
+      strict build flow.
 - [ ] Reject empty, incomplete, duplicate, unreachable, or placeholder
       declarations where the language contract requires implementation.
 - [ ] Reject unsupported constructs instead of emitting partial code.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.
-- [ ] Add regression tests proving no artifact is emitted after each failure
-      class.
+- [x] Add a regression test proving a strict semantic failure emits no artifact.
 - [ ] Verify failed builds leave deterministic, bounded cleanup artifacts.
 
 ## Gate 18.4: Frontend and declaration completeness

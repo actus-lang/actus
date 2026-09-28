@@ -9,6 +9,7 @@ use crate::target::{TargetSpec, TargetSpecError};
 mod dependencies;
 mod lockfile;
 mod manifest;
+mod strict;
 mod version;
 
 pub use lockfile::{ActusLock, LockedPackage, LockfileError};
@@ -140,20 +141,28 @@ impl CompilerConfiguration {
     }
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
-        Self::from_manifest_with_lockfile_policy(path, true)
+        Self::from_manifest_with_lockfile_policy(path, true, false)
     }
 
     pub fn from_manifest_read_only(path: &Path) -> Result<Self, ConfigurationError> {
-        Self::from_manifest_with_lockfile_policy(path, false)
+        Self::from_manifest_with_lockfile_policy(path, false, false)
     }
 
     fn from_manifest_with_lockfile_policy(
         path: &Path,
         sync_missing_lockfile: bool,
+        reject_legacy_manifest: bool,
     ) -> Result<Self, ConfigurationError> {
-        manifest::warn_if_legacy_manifest(path);
+        if reject_legacy_manifest && manifest::is_legacy_manifest(path) {
+            return Err(ConfigurationError(
+                "strict mode rejects deprecated `Arca.toml`; rename it to `Actus.toml`".to_owned(),
+            ));
+        }
+        if !reject_legacy_manifest {
+            manifest::warn_if_legacy_manifest(path);
+        }
         let manifest = manifest::read(path)?;
-        let dependency_graph = dependencies::resolve(path)?;
+        let dependency_graph = dependencies::resolve(path, reject_legacy_manifest)?;
         validate_lockfile(path, sync_missing_lockfile)?;
         let environment = Self::from_environment();
         let (target, linker_flavor, entry_contract, linker) =

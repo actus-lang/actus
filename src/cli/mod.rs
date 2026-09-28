@@ -7,6 +7,7 @@ use crate::parser::parse;
 
 mod build;
 mod check;
+mod conformance;
 mod fmt;
 mod input;
 mod lsp;
@@ -164,11 +165,11 @@ fn command_help_text(command: &str) -> Option<&'static str> {
             "usage: actus init [--no-git|--vcs none]\n\nInitialize the current directory as an Actus project.",
         ),
         "check" => Some(
-            "usage: actus check [file.act]\n\nParse, resolve, and validate an Actus project without code generation.",
+            "usage: actus check [file.act] [--strict]\n\nParse, resolve, and validate an Actus project without code generation.",
         ),
         "parse" => Some("usage: actus parse <file.act>\n\nParse a source file and print its AST."),
         "build" => Some(
-            "usage: actus build [file.act] [--release|--profile <name>] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.",
+            "usage: actus build [file.act] [--strict] [--release|--profile <name>] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.",
         ),
         "run" => Some(
             "usage: actus run [file.act] [--release|--profile <name>] [-- program-args...]\n\nBuild and execute an Actus program once.",
@@ -176,7 +177,7 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         "watch" => Some(
             "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",
         ),
-        "test" => Some("usage: actus test [path]\n\nCollect and run Actus meta tests."),
+        "test" => Some("usage: actus test [--strict]\n\nCollect and run Actus meta tests."),
         "fmt" => Some(
             "usage: actus fmt [path] [--check]\n\nFormat Actus source files with canonical rules.",
         ),
@@ -210,6 +211,9 @@ mod tests {
         assert!(help.contains("Commands:"));
         assert!(help.contains("build    Compile"));
         assert!(help.contains("watch    Re-check"));
+        assert!(command_help_text("check").unwrap().contains("--strict"));
+        assert!(command_help_text("build").unwrap().contains("--strict"));
+        assert!(command_help_text("test").unwrap().contains("--strict"));
     }
 
     #[test]

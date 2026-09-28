@@ -7,17 +7,34 @@ use std::time::Instant;
 use crate::ast::{Block, Expr, MetaAttribute, Program, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::codegen::{emit_program_object_for_target, link_object};
 use crate::configuration::CompilerConfiguration;
+use crate::diagnostics::render_semantic_error;
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 
-pub(super) fn test_command(mut arguments: impl Iterator<Item = String>) -> i32 {
-    if arguments.next().is_some() {
-        eprintln!("error: `actus test` does not accept positional arguments yet");
-        return 2;
+use super::conformance::{ConformanceMode, parse_strict_option};
+
+pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
+    let mut mode = ConformanceMode::Standard;
+    for argument in arguments {
+        match parse_strict_option(&argument, &mut mode) {
+            Ok(true) => continue,
+            Ok(false) => {
+                eprintln!("error: `actus test` does not accept argument `{argument}`");
+                return 2;
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                return 2;
+            }
+        }
     }
-    let configuration = match CompilerConfiguration::from_current_manifest() {
+    let configuration = match if mode.is_strict() {
+        CompilerConfiguration::from_current_manifest_strict()
+    } else {
+        CompilerConfiguration::from_current_manifest()
+    } {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
@@ -28,7 +45,7 @@ pub(super) fn test_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     collect_act_files(&configuration.project_root().join("tests"), &mut files);
     collect_act_files(configuration.source_root(), &mut files);
     files.sort();
-    let tests = match collect_tests(files, &configuration) {
+    let tests = match collect_tests(files, &configuration, mode) {
         Ok(tests) => tests,
         Err(error) => {
             eprintln!("error: {error}");
@@ -101,6 +118,7 @@ struct DiscoveredTest {
 fn collect_tests(
     files: Vec<PathBuf>,
     configuration: &CompilerConfiguration,
+    mode: ConformanceMode,
 ) -> Result<Vec<DiscoveredTest>, String> {
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
@@ -122,6 +140,11 @@ fn collect_tests(
         let program = resolve_imports(&program, &resolver)
             .map_err(|error| format!("cannot resolve `{}`: {error}", path.display()))?;
         let program = filter_program_for_target(&program, configuration.target());
+        if mode.is_strict() {
+            crate::semantic::analyze(&program).map_err(|error| {
+                format!("{}: {}", path.display(), render_semantic_error(&source, &error))
+            })?;
+        }
         for declaration in &program.declarations {
             if let TopLevelDecl::Verb(verb) = declaration
                 && verb.metadata.contains(&MetaAttribute::Test)

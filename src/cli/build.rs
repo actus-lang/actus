@@ -4,11 +4,13 @@ use std::path::{Path, PathBuf};
 use crate::build_graph::{invalidate_stale_artifact, write_metadata};
 use crate::codegen::link_object;
 use crate::configuration::{BuildProfile, CompilerConfiguration, EntryContract};
-use crate::diagnostics::{render_lex_error, render_parse_error};
+use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::lexer::scan;
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
+
+use super::conformance::{ConformanceMode, parse_strict_option};
 
 #[derive(Clone, Copy)]
 pub(super) enum EmitKind {
@@ -21,6 +23,7 @@ struct BuildOptions {
     output: Option<String>,
     emit: EmitKind,
     profile: Option<BuildProfile>,
+    mode: ConformanceMode,
 }
 
 pub(super) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
@@ -31,7 +34,8 @@ pub(super) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
             return 2;
         }
     };
-    let input_configuration = match configuration_for_build(options.input.as_deref()) {
+    let input_configuration = match configuration_for_build(options.input.as_deref(), options.mode)
+    {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
@@ -45,16 +49,32 @@ pub(super) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
     let input = options
         .input
         .unwrap_or_else(|| input_configuration.default_entry_path().display().to_string());
-    build_file(&input, options.output.as_deref().map(Path::new), options.emit, &input_configuration)
+    build_file_with_mode(
+        &input,
+        options.output.as_deref().map(Path::new),
+        options.emit,
+        &input_configuration,
+        options.mode,
+    )
 }
 
-fn configuration_for_build(input: Option<&str>) -> Result<CompilerConfiguration, String> {
+fn configuration_for_build(
+    input: Option<&str>,
+    mode: ConformanceMode,
+) -> Result<CompilerConfiguration, String> {
     let configuration = match input {
+        Some(path) if mode.is_strict() => {
+            CompilerConfiguration::from_input_path_strict(Path::new(path))
+        }
         Some(path) => CompilerConfiguration::from_input_path(Path::new(path)),
         None => {
             let current = std::env::current_dir()
                 .map_err(|error| format!("cannot read current directory: {error}"))?;
-            CompilerConfiguration::from_input_path(&current)
+            if mode.is_strict() {
+                CompilerConfiguration::from_input_path_strict(&current)
+            } else {
+                CompilerConfiguration::from_input_path(&current)
+            }
         }
     }
     .map_err(|error| error.to_string())?;
@@ -71,8 +91,12 @@ fn parse_build_options(
     let mut output = None;
     let mut emit = EmitKind::Object;
     let mut profile = None;
+    let mut mode = ConformanceMode::Standard;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
+            "--strict" => {
+                parse_strict_option(&argument, &mut mode)?;
+            }
             "--release" => {
                 if profile.replace(BuildProfile::Release).is_some() {
                     return Err("duplicate or conflicting profile option".to_owned());
@@ -114,7 +138,7 @@ fn parse_build_options(
             _ => return Err(format!("unexpected build argument `{argument}`")),
         }
     }
-    Ok(BuildOptions { input, output, emit, profile })
+    Ok(BuildOptions { input, output, emit, profile, mode })
 }
 
 pub(super) fn build_file(
@@ -123,7 +147,17 @@ pub(super) fn build_file(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> i32 {
-    build_file_with_report(input, output, emit, configuration, true)
+    build_file_with_mode(input, output, emit, configuration, ConformanceMode::Standard)
+}
+
+pub(super) fn build_file_with_mode(
+    input: &str,
+    output: Option<&Path>,
+    emit: EmitKind,
+    configuration: &CompilerConfiguration,
+    mode: ConformanceMode,
+) -> i32 {
+    build_file_with_report(input, output, emit, configuration, true, mode)
 }
 
 pub(super) fn build_file_quiet(
@@ -132,7 +166,7 @@ pub(super) fn build_file_quiet(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> i32 {
-    build_file_with_report(input, output, emit, configuration, false)
+    build_file_with_report(input, output, emit, configuration, false, ConformanceMode::Standard)
 }
 
 fn build_file_with_report(
@@ -141,42 +175,15 @@ fn build_file_with_report(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
     report_output: bool,
+    mode: ConformanceMode,
 ) -> i32 {
-    let source = match fs::read_to_string(input) {
-        Ok(source) => source,
-        Err(error) => {
-            eprintln!("error: cannot read `{input}`: {error}");
-            return 1;
-        }
-    };
-    let (tokens, lex_errors) = scan(&source);
-    if !lex_errors.is_empty() {
-        for error in &lex_errors {
-            eprintln!("{input}: {}", render_lex_error(&source, error));
-        }
+    let Some((source, program)) = load_build_program(input, configuration) else {
         return 1;
-    }
-    let program = match parse(tokens) {
-        Ok(program) => program,
-        Err(error) => {
-            eprintln!("{input}: {}", render_parse_error(&source, &error));
-            return 1;
-        }
-    };
-    let program = match resolve_imports(
-        &program,
-        &ModuleResolver::with_dependencies(
-            configuration.source_root(),
-            configuration.dependency_roots(),
-        ),
-    ) {
-        Ok(program) => program,
-        Err(error) => {
-            eprintln!("error: cannot resolve imports for `{input}`: {error}");
-            return 1;
-        }
     };
     let program = filter_program_for_target(&program, configuration.target());
+    if mode.is_strict() && !validate_strict_program(input, &source, &program) {
+        return 1;
+    }
     let Some(fallback_symbol) = first_defined_verb(&program) else {
         eprintln!("error: `{input}` contains no verb declarations");
         return 1;
@@ -187,6 +194,54 @@ fn build_file_with_report(
         .unwrap_or(fallback_symbol)
         .to_owned();
     emit_and_write(input, output, emit, configuration, &program, &symbol, report_output)
+}
+
+fn load_build_program(
+    input: &str,
+    configuration: &CompilerConfiguration,
+) -> Option<(String, crate::ast::Program)> {
+    let source = match fs::read_to_string(input) {
+        Ok(source) => source,
+        Err(error) => {
+            eprintln!("error: cannot read `{input}`: {error}");
+            return None;
+        }
+    };
+    let (tokens, lex_errors) = scan(&source);
+    if !lex_errors.is_empty() {
+        for error in &lex_errors {
+            eprintln!("{input}: {}", render_lex_error(&source, error));
+        }
+        return None;
+    }
+    let program = match parse(tokens) {
+        Ok(program) => program,
+        Err(error) => {
+            eprintln!("{input}: {}", render_parse_error(&source, &error));
+            return None;
+        }
+    };
+    let resolver = ModuleResolver::with_dependencies(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+    );
+    match resolve_imports(&program, &resolver) {
+        Ok(program) => Some((source, program)),
+        Err(error) => {
+            eprintln!("error: cannot resolve imports for `{input}`: {error}");
+            None
+        }
+    }
+}
+
+fn validate_strict_program(input: &str, source: &str, program: &crate::ast::Program) -> bool {
+    match crate::semantic::analyze(program) {
+        Ok(_) => true,
+        Err(error) => {
+            eprintln!("{input}: {}", render_semantic_error(source, &error));
+            false
+        }
+    }
 }
 
 fn emit_and_write(

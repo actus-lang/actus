@@ -5,13 +5,21 @@ use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 use std::fs;
 
+use super::conformance::{ConformanceMode, parse_strict_option};
+
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
-    let explicit_input = arguments.next();
-    if arguments.next().is_some() {
-        eprintln!("error: unexpected extra argument");
-        return 2;
-    }
-    let configuration = match super::input::configuration_for_input(explicit_input.as_deref()) {
+    let options = match parse_check_options(&mut arguments) {
+        Ok(options) => options,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 2;
+        }
+    };
+    let explicit_input = options.input;
+    let configuration = match super::input::configuration_for_input_with_mode(
+        explicit_input.as_deref(),
+        options.mode,
+    ) {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
@@ -19,26 +27,49 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
         }
     };
     let input_path = super::input::entry_path(&configuration, explicit_input.as_deref());
-    check_input(&configuration, &input_path, explicit_input.is_some())
+    check_input(&configuration, &input_path, explicit_input.is_some(), options.mode)
+}
+
+struct CheckOptions {
+    input: Option<String>,
+    mode: ConformanceMode,
+}
+
+fn parse_check_options(arguments: impl Iterator<Item = String>) -> Result<CheckOptions, String> {
+    let mut input = None;
+    let mut mode = ConformanceMode::Standard;
+    for argument in arguments {
+        if parse_strict_option(&argument, &mut mode)? {
+            continue;
+        }
+        if input.is_none() && !argument.starts_with('-') {
+            input = Some(argument);
+            continue;
+        }
+        return Err(format!("unexpected check argument `{argument}`"));
+    }
+    Ok(CheckOptions { input, mode })
 }
 
 fn check_input(
     configuration: &crate::configuration::CompilerConfiguration,
     input_path: &std::path::Path,
     explicit: bool,
+    mode: ConformanceMode,
 ) -> i32 {
     if explicit
         && let Some(module_path) =
             super::input::module_path_for_file(configuration.source_root(), input_path)
     {
-        return check_module(configuration, input_path, &module_path);
+        return check_module(configuration, input_path, &module_path, mode);
     }
-    check_source(configuration, input_path)
+    check_source(configuration, input_path, mode)
 }
 
 fn check_source(
     configuration: &crate::configuration::CompilerConfiguration,
     input_path: &std::path::Path,
+    mode: ConformanceMode,
 ) -> i32 {
     let input = super::input::source_path(input_path);
     let source = match fs::read_to_string(&input) {
@@ -75,9 +106,14 @@ fn check_source(
             return 1;
         }
     };
-    match crate::semantic::analyze(&filter_program_for_target(&program, configuration.target())) {
+    let program = filter_program_for_target(&program, configuration.target());
+    match crate::semantic::analyze(&program) {
         Ok(_) => {
-            println!("checked `{input}` successfully");
+            if mode.is_strict() {
+                println!("checked `{input}` successfully (strict)");
+            } else {
+                println!("checked `{input}` successfully");
+            }
             0
         }
         Err(error) => {
@@ -91,6 +127,7 @@ fn check_module(
     configuration: &crate::configuration::CompilerConfiguration,
     input_path: &std::path::Path,
     module_path: &str,
+    mode: ConformanceMode,
 ) -> i32 {
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
@@ -104,9 +141,14 @@ fn check_module(
         Ok(program) => program,
         Err(error) => return report_module_error(module_path, error),
     };
-    match crate::semantic::analyze(&filter_program_for_target(&program, configuration.target())) {
+    let program = filter_program_for_target(&program, configuration.target());
+    match crate::semantic::analyze(&program) {
         Ok(_) => {
-            println!("checked `{}` successfully", input_path.display());
+            if mode.is_strict() {
+                println!("checked `{}` successfully (strict)", input_path.display());
+            } else {
+                println!("checked `{}` successfully", input_path.display());
+            }
             0
         }
         Err(error) => {

@@ -155,3 +155,17 @@ fn rejects_unknown_language_editions() {
     assert!(error.to_string().contains("unsupported Actus edition"));
     let _ = fs::remove_file(path);
 }
+
+#[test]
+fn strict_configuration_rejects_legacy_manifest_warnings() {
+    let root = std::env::temp_dir().join(format!("actus-strict-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create strict configuration directory");
+    let path = root.join("Arca.toml");
+    fs::write(&path, "[package]\nname = \"legacy\"\nversion = \"1.0.0\"\n")
+        .expect("write legacy manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("strict mode must reject legacy manifest");
+    assert!(error.to_string().contains("strict mode rejects deprecated `Arca.toml`"));
+    let _ = fs::remove_dir_all(root);
+}
