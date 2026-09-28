@@ -255,7 +255,7 @@ fn check_declaration_name(
 fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &String, SourceSpan)> {
     match declaration {
         TopLevelDecl::Struct(value) => Some(("struct", &value.name, value.span)),
-        TopLevelDecl::Pack(_) => None,
+        TopLevelDecl::Pack(value) => Some(("pack", &value.name, value.span)),
         TopLevelDecl::Enum(value) => Some(("enum", &value.name, value.span)),
         TopLevelDecl::Role(value) => Some(("role", &value.name, value.span)),
         TopLevelDecl::Verb(value) => Some(("verb", &value.name, value.span)),

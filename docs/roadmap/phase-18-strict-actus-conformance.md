@@ -182,7 +182,10 @@ behavior around the existing language and runtime contracts.
 - [ ] Reject unknown fields, modules, imports, and attributes with stable
       diagnostics.
 - [ ] Reject malformed metadata and metadata attached to an invalid target.
-- [ ] Reject duplicate declarations and ambiguous overload or sibling cases.
+- [x] Reject duplicate declarations across compiler namespaces and module
+      siblings with stable diagnostics.
+- [x] Reject ambiguous positional calls and ambiguous module roots
+      deterministically.
 - [ ] Validate all return paths and reject missing-result branches.
 - [ ] Validate generic parameters, bounds, instantiations, and unsupported
       combinations before code generation.

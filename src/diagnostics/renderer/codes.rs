@@ -40,6 +40,7 @@ pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
         SemanticErrorKind::DuplicateStructName { .. } => "E1029",
         SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
+        SemanticErrorKind::DuplicatePackName { .. } => "E1081",
         SemanticErrorKind::EmptyEnum { .. } => "E1810",
         SemanticErrorKind::DuplicateStructField { .. } => "E1030",
         SemanticErrorKind::UnknownStructField { .. } => "E1031",
@@ -330,6 +331,9 @@ fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::DuplicateStructName { name } => {
             format!("duplicate struct declaration `{name}`")
+        }
+        SemanticErrorKind::DuplicatePackName { name } => {
+            format!("duplicate pack declaration `{name}`")
         }
         SemanticErrorKind::DuplicateStructField { struct_name, field } => {
             format!("duplicate field `{field}` in struct `{struct_name}`")

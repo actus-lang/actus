@@ -10,7 +10,12 @@ impl Analyzer {
         for declaration in &program.declarations {
             let TopLevelDecl::Pack(pack) = declaration else { continue };
             validate_pack(pack)?;
-            self.pack_types.insert(pack.name.clone(), pack.clone());
+            if self.pack_types.insert(pack.name.clone(), pack.clone()).is_some() {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::DuplicatePackName { name: pack.name.clone() },
+                    span: pack.span,
+                });
+            }
         }
         Ok(())
     }

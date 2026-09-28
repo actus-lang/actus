@@ -146,6 +146,9 @@ pub enum SemanticErrorKind {
     DuplicateEnumName {
         name: String,
     },
+    DuplicatePackName {
+        name: String,
+    },
     EmptyEnum {
         name: String,
     },

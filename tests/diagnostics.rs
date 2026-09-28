@@ -58,6 +58,20 @@ fn renders_malformed_type_name_diagnostics_with_a_stable_code() {
 }
 
 #[test]
+fn renders_duplicate_pack_diagnostics_with_a_stable_code() {
+    let error = actus::semantic::SemanticError {
+        kind: SemanticErrorKind::DuplicatePackName { name: "Register".to_owned() },
+        span: SourceSpan::new(0, 8),
+    };
+
+    assert_eq!(
+        render_semantic_error("pack Register", &error),
+        "error[E1081] at 1:1: duplicate pack declaration `Register`"
+    );
+    assert_eq!(semantic_diagnostic(&error).code(), "E1081");
+}
+
+#[test]
 fn diagnostic_model_is_independent_from_terminal_rendering() {
     let source = "ok\nvalue\n";
     let diagnostic = Diagnostic::warning("E1800", SourceSpan::new(3, 8), "strict warning")
