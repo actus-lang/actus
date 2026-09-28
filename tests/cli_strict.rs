@@ -73,6 +73,39 @@ fn strict_build_fails_closed_before_codegen_and_cleans_failed_outputs() {
 }
 
 #[test]
+fn strict_build_rejects_declaration_contract_violations_without_artifact() {
+    let root =
+        std::env::temp_dir().join(format!("actus-strict-declarations-{}", std::process::id()));
+    let cases = [
+        ("duplicate", "verb main() -> Int { return 0; } verb main() -> Int { return 0; }\n"),
+        (
+            "incomplete",
+            "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; verb flush(abs self: File); } perform Writer for File { verb write(abs self: File) -> Int { return 0; } } verb main() -> Int { return 0; }\n",
+        ),
+    ];
+
+    for (name, source) in cases {
+        let input = root.with_extension(format!("{name}.act"));
+        let output = root.with_extension(format!("{name}.o"));
+        fs::write(&input, source).expect("write declaration violation");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 1);
+        assert!(!output.exists());
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[test]
 fn strict_options_are_rejected_when_repeated() {
     assert_eq!(
         run_with_args(

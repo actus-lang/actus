@@ -140,8 +140,13 @@ behavior around the existing language and runtime contracts.
       declarations or expressions.
 - [x] Prevent semantic errors from reaching code generation or linking in the
       strict build flow.
-- [ ] Reject empty, incomplete, duplicate, unreachable, or placeholder
-      declarations where the language contract requires implementation.
+- [ ] Reject empty declarations where the language contract requires
+      implementation.
+- [x] Reject incomplete role performances before code generation.
+- [x] Reject duplicate top-level declarations before code generation.
+- [x] Reject unreachable patterns during semantic validation.
+- [ ] Reject placeholder declarations where the language contract requires
+      implementation.
 - [x] Reject unsupported constructs instead of emitting partial code.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
