@@ -33,6 +33,11 @@ fn std_path_representation_module_exports_validated_storage_contracts() {
         ("verb", "starts_with"),
         ("verb", "ends_with"),
         ("verb", "normalize"),
+        ("verb", "join"),
+        ("verb", "push"),
+        ("verb", "reserve"),
+        ("verb", "set_extension"),
+        ("verb", "set_file_name"),
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");
     }

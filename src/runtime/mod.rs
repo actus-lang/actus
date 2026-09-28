@@ -6,6 +6,7 @@ mod contract;
 mod fs;
 mod input;
 mod path;
+mod path_builders;
 mod path_components;
 mod path_normalize;
 mod path_predicates;
@@ -47,6 +48,10 @@ pub use path::{
     actus_posix_is_separator, actus_posix_root_kind, actus_windows_is_separator,
     actus_windows_root_kind, components, extension, file_name, file_stem, posix_is_separator,
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
+};
+pub use path_builders::{
+    actus_path_join, actus_path_push, actus_path_reserve, actus_path_set_extension,
+    actus_path_set_file_name,
 };
 pub use path_components::{
     ActusPathComponent, ActusPathComponents, actus_path_components, actus_path_extension,

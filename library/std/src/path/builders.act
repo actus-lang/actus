@@ -1,0 +1,88 @@
+"""
+Ownership-aware path builders.
+
+The runtime bridges operate on raw POSIX bytes or native-endian UTF-16 units.
+They never transcode path data to `String`. `join` consumes its owned receiver
+and returns that same storage after the combination; the mutation verbs use an
+`ins` loan and restore the caller's owner after the call.
+"""
+
+open unsafe extern "C" verb actus_path_reserve(ins self: Path, erg capacity: Int) -> Int;
+open unsafe extern "C" verb actus_path_join(ins self: Path, abs other: Path) -> Int;
+open unsafe extern "C" verb actus_path_push(ins self: Path, abs other: Path) -> Int;
+open unsafe extern "C" verb actus_path_set_extension(
+    ins self: Path,
+    abs extension: Path
+) -> Int;
+open unsafe extern "C" verb actus_path_set_file_name(
+    ins self: Path,
+    abs name: Path
+) -> Int;
+
+"""Translate a builder bridge status without exposing its numeric ABI."""
+open verb finish_builder(dat path: Path, erg status: Int) -> Result[Path, PathError] {
+    return case status {
+        0 => Result[Path, PathError].Ok(path),
+        _ => {
+            erg error = path_error_from_status(status: status);
+            discard_path(path: dat path);
+            return Result[Path, PathError].Err(error);
+        },
+    };
+}
+
+"""
+Join `other` to an owned `dat self` path.
+
+An absolute `other` replaces the receiver payload; a relative `other` is
+separated from the receiver using the platform's raw separator. The returned
+`Ok` path retains ownership of the receiver storage. `Err` reports
+`InvalidLength`, `CapacityExceeded`, or `UnsupportedPlatform` and drops the
+consumed receiver after the failed operation.
+"""
+open verb join(dat self: Path, abs other: Path) -> Result[Path, PathError] {
+    erg status = actus_path_join(self: ins self, other: abs other);
+    return finish_builder(path: dat self, status: status);
+}
+
+"""
+Append `other` in place through an exclusive `ins self` loan.
+
+The owner is restored to the caller after the bridge returns. `Ok(0)` denotes
+successful mutation; `Err` reports a typed path error and leaves ownership with
+the caller so the failed path can still be cleaned up deterministically.
+"""
+open verb push(ins self: Path, abs other: Path) -> Result[Int, PathError] {
+    erg status = actus_path_push(self: ins self, other: abs other);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}
+
+"""Reserve at least `capacity` raw storage bytes for an `ins self` path."""
+open verb reserve(ins self: Path, erg capacity: Int) -> Result[Int, PathError] {
+    erg status = actus_path_reserve(self: ins self, capacity: capacity);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}
+
+"""Replace the final file name through an exclusive `ins self` loan."""
+open verb set_file_name(ins self: Path, abs name: Path) -> Result[Int, PathError] {
+    erg status = actus_path_set_file_name(self: ins self, name: abs name);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}
+
+"""Replace the final extension through an exclusive `ins self` loan."""
+open verb set_extension(ins self: Path, abs extension: Path) -> Result[Int, PathError] {
+    erg status = actus_path_set_extension(self: ins self, extension: abs extension);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}

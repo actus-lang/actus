@@ -4,8 +4,10 @@ Validated constructors for the owned `Path` representation.
 The runtime validation bridge inspects caller-owned raw storage without
 retaining its pointer. It returns zero on success, `-1` for an embedded null,
 `-2` for invalid encoding or unit width, `-3` for a missing terminator, and
-`-4` for an inconsistent length or capacity. The wrappers translate every
-status into `PathError` and transfer the buffer only on success.
+`-4` for an inconsistent length or capacity. Builder bridges additionally use
+`-5` for insufficient capacity and `-6` for incompatible platform storage.
+The wrappers translate every status into `PathError` and transfer the buffer
+only on success.
 """
 open unsafe extern "C" verb actus_path_validate_storage(
     abs storage: Buffer,
@@ -42,6 +44,8 @@ open verb path_error_from_status(erg status: Int) -> PathError {
         -2 => PathError.InvalidEncoding,
         -3 => PathError.MissingTerminator,
         -4 => PathError.InvalidLength,
+        -5 => PathError.CapacityExceeded,
+        -6 => PathError.UnsupportedPlatform,
         _ => PathError.InvalidEncoding,
     };
 }

@@ -20,6 +20,7 @@ fn copy_path_library(root: &Path) {
         "path/windows.act",
         "path/predicates.act",
         "path/normalize.act",
+        "path/builders.act",
     ] {
         let destination = root.join("src").join(relative);
         fs::create_dir_all(destination.parent().expect("path library parent"))

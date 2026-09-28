@@ -482,9 +482,9 @@ String conversions.
 
 ### Sub-gate E: Builders and In-Place Mutations
 
-- [ ] Implement consuming transformations (`dat self`): `join`, `normalize`.
-- [ ] Implement in-place mutations (`ins self`): `push`, `set_extension`, `set_file_name`.
-- [ ] Implement explicit capacity checks and `reserve`.
+- [x] Implement consuming transformations (`dat self`): `join`, `normalize`.
+- [x] Implement in-place mutations (`ins self`): `push`, `set_extension`, `set_file_name`.
+- [x] Implement explicit capacity checks and `reserve`.
 
 ### Sub-gate F: C ABI Boundary Integration
 

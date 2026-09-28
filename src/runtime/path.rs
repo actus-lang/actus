@@ -19,6 +19,8 @@ pub enum PathErrorCode {
     InvalidEncoding = -2,
     MissingTerminator = -3,
     InvalidLength = -4,
+    CapacityExceeded = -5,
+    UnsupportedPlatform = -6,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
