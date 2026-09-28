@@ -4,6 +4,7 @@ use crate::diagnostics::{
     Diagnostic, DiagnosticPhase, STRICT_SOURCE_FILE_DECOMPOSITION, STRICT_SOURCE_FILE_HARD_LIMIT,
     STRICT_SOURCE_FILE_SPLIT_REQUIRED, STRICT_SOURCE_FUNCTION_DECOMPOSITION,
     STRICT_SOURCE_FUNCTION_HARD_LIMIT, STRICT_SOURCE_FUNCTION_SPLIT_REQUIRED,
+    STRICT_SOURCE_LIMIT_SUPPRESSION,
 };
 use crate::lexer::SourceSpan;
 
@@ -35,6 +36,37 @@ pub(super) fn function_diagnostics(
     };
     let span = line_span(source, function.start_line, function.end_line);
     vec![diagnostic(path, span, code, message, explanation)]
+}
+
+pub(super) fn suppression_diagnostics(path: &Path, source: &str) -> Vec<Diagnostic> {
+    const MARKERS: [&str; 4] = [
+        "actus: allow(source-limit)",
+        "actus: ignore(source-limit)",
+        "#[allow(source_limit)]",
+        "#![allow(source_limit)]",
+    ];
+    let mut diagnostics = Vec::new();
+    for (line_number, line) in source.lines().enumerate() {
+        let trimmed = line.trim_start();
+        let comment_or_attribute = trimmed.starts_with("//") || trimmed.starts_with("#[");
+        if comment_or_attribute && MARKERS.iter().any(|marker| line.contains(marker)) {
+            let span = line_span(source, line_number + 1, line_number + 1);
+            diagnostics.push(
+                Diagnostic::error(
+                    STRICT_SOURCE_LIMIT_SUPPRESSION,
+                    span,
+                    "source-local suppression of architectural limits is forbidden",
+                )
+                .with_source_path(path.display().to_string())
+                .with_phase(DiagnosticPhase::Conformance)
+                .with_explanation(
+                    "Limit exceptions must be declared in the reviewed conformance manifest.",
+                )
+                .with_suggestion("Remove the suppression and split the source by responsibility."),
+            );
+        }
+    }
+    diagnostics
 }
 
 fn file_violation(

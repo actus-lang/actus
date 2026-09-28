@@ -73,6 +73,16 @@ fn scan_conformance_paths(paths: &[PathBuf]) -> Result<usize, String> {
             report_diagnostics(path, &source, diagnostics);
         }
     }
+    let root =
+        env::current_dir().map_err(|error| format!("cannot determine repository root: {error}"))?;
+    for diagnostic in crate::conformance::fixture_tree_diagnostics(&root)
+        .map_err(|error| format!("cannot scan Actus fixture tree: {error}"))?
+    {
+        diagnostics_count += 1;
+        let source_path =
+            diagnostic.source_path().map(str::to_owned).unwrap_or_else(|| "<unknown>".to_owned());
+        report_diagnostics(Path::new(&source_path), "", vec![diagnostic]);
+    }
     Ok(diagnostics_count)
 }
 

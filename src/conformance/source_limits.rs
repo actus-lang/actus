@@ -12,7 +12,7 @@ mod policy;
 #[path = "scan.rs"]
 mod scan;
 
-use diagnostics::{file_diagnostics, function_diagnostics};
+use diagnostics::{file_diagnostics, function_diagnostics, suppression_diagnostics};
 pub use policy::SourceLimitPolicy;
 use scan::find_functions;
 
@@ -31,6 +31,7 @@ pub fn source_limit_diagnostics(
     for function in find_functions(source) {
         diagnostics.extend(function_diagnostics(path, source, &function, policy));
     }
+    diagnostics.extend(suppression_diagnostics(path, source));
     diagnostics
 }
 
