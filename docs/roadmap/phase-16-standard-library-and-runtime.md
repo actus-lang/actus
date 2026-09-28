@@ -443,6 +443,66 @@ portable, documented, and safe to consume from native code.
 - [x] Public standard-library failures cannot expose raw host/C status codes.
 - [x] Compiler and tooling checks are green before Gate 4 begins.
 
+## Gate 3.8: `std::path` Module and Cross-Platform Resolution
+
+Define and implement production-grade, zero-allocation path handling without
+String conversions.
+
+### Sub-gate A: Path Representation and Storage
+
+- [ ] Define owned `Path` aggregate layout and platform discriminators.
+- [ ] Implement raw POSIX byte backing storage (`Buffer`, `u8`).
+- [ ] Implement raw Windows UTF-16 code-unit storage (`Buffer`, `u16`).
+- [ ] Enforce capacity, length, and trailing null-terminator invariants.
+- [ ] Implement embedded-null rejection and validation rules.
+- [ ] Add `PathError` type and error invariants.
+- [ ] Add unit and representation tests for Sub-gate A.
+
+### Sub-gate B: Borrowed Components and Views
+
+- [ ] Define non-owning `PathComponent` view.
+- [ ] Define `PathComponents` borrowed iterator state.
+- [ ] Enforce non-escaping borrow rules (`abs` propagation).
+- [ ] Implement component boundary detection.
+- [ ] Add parent, file_name, file_stem, and extension inspection.
+
+### Sub-gate C: Platform-Specific Parsers
+
+- [ ] Implement POSIX root (`/`) and separator rules.
+- [ ] Implement Windows drive (`C:`, `C:\`) and UNC (`\\server\\share`) rules.
+- [ ] Support mixed separators on Windows where permitted.
+- [ ] Add platform-independent parser fixtures.
+
+### Sub-gate D: Predicates and Lexical Normalization
+
+- [ ] Implement `is_absolute`, `is_relative`, and `has_root` predicates.
+- [ ] Implement component-aware `starts_with` and `ends_with`.
+- [ ] Implement lexical `.` and `..` normalization without filesystem access.
+- [ ] Prevent root escape on absolute paths.
+
+### Sub-gate E: Builders and In-Place Mutations
+
+- [ ] Implement consuming transformations (`dat self`): `join`, `normalize`.
+- [ ] Implement in-place mutations (`ins self`): `push`, `set_extension`, `set_file_name`.
+- [ ] Implement explicit capacity checks and `reserve`.
+
+### Sub-gate F: C ABI Boundary Integration
+
+- [ ] Implement `PathCView` null-terminated byte pointer contract for POSIX.
+- [ ] Implement `PathCView` wide null-terminated pointer contract for Windows.
+- [ ] Validate zero-allocation C-bridge handoff.
+
+### Sub-gate G: `std::fs` Integration
+
+- [ ] Update `std::fs` verbs to accept `abs Path` instead of raw `Buffer`.
+- [ ] Preserve `Result[T, IoError]` contracts and error mappings.
+- [ ] Verify deterministic RAII cleanup across filesystem operations with paths.
+
+### Gate 3.8 invariant
+
+- [ ] `Path` is entirely byte/code-unit-driven (no implicit `String` or UTF-8 transcoding).
+- [ ] Non-owning path inspection causes zero heap allocations.
+
 ## Gate 4: Bare-Metal and Embedded HAL
 
 Implement ADR-0026 for MMIO registers and deterministic protocol layouts. The
@@ -526,7 +586,7 @@ application code, then run the complete portability and quality matrix.
 - [ ] Verify deterministic build artifacts and lockfile behavior.
 - [ ] Document a complete beginner-to-running-program workflow.
 
-### Gate 5 invariant
+### Gate 6 invariant
 
 - [ ] A real Actus application can use I/O and filesystem services through
       public library APIs without compiler-specific source code.

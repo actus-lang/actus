@@ -1,0 +1,104 @@
+"""
+Validated constructors for the owned `Path` representation.
+
+The runtime validation bridge inspects caller-owned raw storage without
+retaining its pointer. It returns zero on success, `-1` for an embedded null,
+`-2` for invalid encoding or unit width, `-3` for a missing terminator, and
+`-4` for an inconsistent length or capacity. The wrappers translate every
+status into `PathError` and transfer the buffer only on success.
+"""
+open unsafe extern "C" verb actus_path_validate_storage(
+    abs storage: Buffer,
+    abs unit_width: Int
+) -> Int;
+
+"""
+Return the logical payload length of validated raw storage.
+
+The `storage` argument is an `abs` view and remains owned by its caller. The
+bridge returns the length excluding the trailing null terminator, or `-1`
+when the storage metadata cannot be inspected.
+"""
+open unsafe extern "C" verb actus_path_payload_length(abs storage: Buffer) -> Int;
+
+"""
+Return the total capacity of validated raw storage.
+
+The result includes space reserved for the trailing null terminator. A
+negative result means that the runtime rejected the buffer metadata.
+"""
+open unsafe extern "C" verb actus_path_storage_capacity(abs storage: Buffer) -> Int;
+
+"""Drop a rejected raw path buffer and return its typed validation error."""
+open verb reject_path_storage(dat storage: Buffer, dat error: PathError) -> Result[Path, PathError] {
+    drop(storage);
+    return Result[Path, PathError].Err(error);
+}
+
+"""Translate the private validation status into a public path error."""
+open verb path_error_from_status(erg status: Int) -> PathError {
+    return case status {
+        -1 => PathError.EmbeddedNull,
+        -2 => PathError.InvalidEncoding,
+        -3 => PathError.MissingTerminator,
+        -4 => PathError.InvalidLength,
+        _ => PathError.InvalidEncoding,
+    };
+}
+
+"""
+Validate and own POSIX raw path bytes.
+
+`storage` is transferred with `dat`. The bytes are never interpreted as
+UTF-8. Success returns an owned `Path`; failure drops the supplied buffer and
+returns `Err(PathError)`.
+"""
+open verb path_from_posix(dat storage: Buffer) -> Result[Path, PathError] {
+    erg unit_width = 1;
+    erg status = actus_path_validate_storage(storage: abs storage, unit_width: abs unit_width);
+    return case status {
+        0 => {
+            erg length = actus_path_payload_length(storage: abs storage);
+            erg capacity = actus_path_storage_capacity(storage: abs storage);
+            return Ok(Path {
+                storage: storage,
+                platform: PathPlatform.Posix,
+                length: length,
+                capacity: capacity,
+                terminated: 1,
+            });
+        },
+        _ => {
+            erg error = path_error_from_status(status: status);
+            return reject_path_storage(storage: dat storage, error: dat error);
+        },
+    };
+}
+
+"""
+Validate and own Windows raw UTF-16 code-unit bytes.
+
+`storage` is transferred with `dat`; each code unit occupies two bytes in the
+target ABI layout. No UTF-8 conversion or temporary text allocation occurs.
+"""
+open verb path_from_windows_utf16(dat storage: Buffer) -> Result[Path, PathError] {
+    erg unit_width = 2;
+    erg status = actus_path_validate_storage(storage: abs storage, unit_width: abs unit_width);
+    return case status {
+        0 => {
+            erg length = actus_path_payload_length(storage: abs storage);
+            erg capacity = actus_path_storage_capacity(storage: abs storage);
+            return Ok(Path {
+                storage: storage,
+                platform: PathPlatform.Windows,
+                length: length,
+                capacity: capacity,
+                terminated: 1,
+            });
+        },
+        _ => {
+            erg error = path_error_from_status(status: status);
+            return reject_path_storage(storage: dat storage, error: dat error);
+        },
+    };
+}

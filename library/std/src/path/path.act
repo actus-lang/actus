@@ -1,0 +1,11 @@
+"""
+The public `std::path` facade.
+
+It re-exports the owned raw path representation, platform discriminator,
+typed validation errors, and validated storage constructors. Component views,
+normalization, builders, and C ABI views belong to later Gate 3.8 sub-gates.
+"""
+open types;
+open error;
+open storage;
+open components;
