@@ -1,4 +1,4 @@
-use super::path::{ActusPath, path_length, path_units};
+use super::{ActusPath, path_length, path_units};
 
 #[unsafe(no_mangle)]
 /// Tests whether a borrowed path has an absolute root.
@@ -8,9 +8,9 @@ use super::path::{ActusPath, path_length, path_units};
 pub unsafe extern "C" fn actus_path_is_absolute(path: *const ActusPath) -> i32 {
     let Ok((_, platform)) = (unsafe { path_units(path) }) else { return -1 };
     let kind = if platform == 0 {
-        unsafe { super::path::actus_posix_root_kind(path) }
+        unsafe { super::actus_posix_root_kind(path) }
     } else {
-        unsafe { super::path::actus_windows_root_kind(path) }
+        unsafe { super::actus_windows_root_kind(path) }
     };
     let absolute = if platform == 0 { kind == 1 } else { kind == 2 || kind == 3 };
     i32::from(absolute)
@@ -34,9 +34,9 @@ pub unsafe extern "C" fn actus_path_is_relative(path: *const ActusPath) -> i32 {
 pub unsafe extern "C" fn actus_path_has_root(path: *const ActusPath) -> i32 {
     let Ok((_, platform)) = (unsafe { path_units(path) }) else { return -1 };
     let kind = if platform == 0 {
-        unsafe { super::path::actus_posix_root_kind(path) }
+        unsafe { super::actus_posix_root_kind(path) }
     } else {
-        unsafe { super::path::actus_windows_root_kind(path) }
+        unsafe { super::actus_windows_root_kind(path) }
     };
     i32::from(kind > 0)
 }

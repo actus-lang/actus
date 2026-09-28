@@ -1,5 +1,5 @@
-use super::path::{ActusPath, PathErrorCode, path_units, validate_windows_units};
-use super::types::{ActusBuffer, BufferHandle, restore_buffer};
+use super::super::types::{ActusBuffer, BufferHandle, restore_buffer};
+use super::{ActusPath, PathErrorCode, path_units, validate_windows_units};
 
 const POSIX: i32 = 0;
 const WINDOWS: i32 = 1;

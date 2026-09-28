@@ -1,6 +1,6 @@
-use super::super::fs_path::{with_host_path, with_host_paths};
 use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
+use super::path_bridge::{with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
 
 /// Writes file metadata into a caller-owned C-layout output struct.

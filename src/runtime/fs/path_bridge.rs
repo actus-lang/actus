@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use super::path::ActusPath;
+use super::super::path::ActusPath;
 #[cfg(unix)]
-use super::path_c_view::{ActusPathCView, actus_path_c_view};
+use super::super::path::{ActusPathCView, actus_path_c_view};
 #[cfg(windows)]
-use super::path_c_view::{ActusPathWideCView, actus_path_wide_c_view};
+use super::super::path::{ActusPathWideCView, actus_path_wide_c_view};
 
 /// Runs a borrowed host path operation without retaining the source pointer.
 /// POSIX uses a borrowed byte slice; Windows constructs the host wide path

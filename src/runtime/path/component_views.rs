@@ -1,4 +1,4 @@
-use super::path::{ActusPath, ComponentRange, path_units};
+use super::{ActusPath, ComponentRange, path_units};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -176,11 +176,10 @@ unsafe fn raw_path(path: *const ActusPath) -> Option<RawPath<'static>> {
         return None;
     }
     if platform == 0 {
-        super::path::validate_posix(bytes).ok()?;
+        super::validate_posix(bytes).ok()?;
     } else {
         let (pairs, _) = bytes.as_chunks::<2>();
-        super::path::validate_windows_units(pairs.iter().map(|pair| u16::from_ne_bytes(*pair)))
-            .ok()?;
+        super::validate_windows_units(pairs.iter().map(|pair| u16::from_ne_bytes(*pair))).ok()?;
     }
     Some(RawPath { path, bytes, width, windows: platform == 1, units: length })
 }

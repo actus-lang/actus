@@ -1,6 +1,7 @@
 mod buffers;
 mod file;
 mod operations;
+mod path_bridge;
 mod path_open;
 
 pub use buffers::{

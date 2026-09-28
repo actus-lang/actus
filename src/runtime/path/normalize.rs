@@ -1,4 +1,4 @@
-use super::path::{ActusPath, PathErrorCode, path_units};
+use super::{ActusPath, PathErrorCode, path_units};
 
 #[unsafe(no_mangle)]
 /// Normalizes a borrowed C-layout path in its caller-owned storage.
@@ -12,7 +12,7 @@ pub unsafe extern "C" fn actus_path_normalize(path: *mut ActusPath) -> i32 {
     let payload_length = unsafe { (*path).length as usize * width };
     let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.data, payload_length) };
     let absolute = if platform == 0 {
-        unsafe { super::path::actus_posix_root_kind(path_const) == 1 }
+        unsafe { super::actus_posix_root_kind(path_const) == 1 }
     } else {
         is_windows_absolute(path_const)
     };
@@ -41,8 +41,7 @@ fn written_error(error: Result<usize, PathErrorCode>) -> i32 {
 
 fn is_windows_absolute(path: *const ActusPath) -> bool {
     unsafe {
-        super::path::actus_windows_root_kind(path) == 2
-            || super::path::actus_windows_root_kind(path) == 3
+        super::actus_windows_root_kind(path) == 2 || super::actus_windows_root_kind(path) == 3
     }
 }
 

@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use super::super::fs_path::with_host_path;
 use super::super::path::ActusPath;
+use super::path_bridge::with_host_path;
 use super::{MODE_CREATE, handle_to_actus};
 
 /// Opens a validated `ActusPath` without converting it through UTF-8.

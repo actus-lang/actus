@@ -1,4 +1,4 @@
-use super::path::{ActusPath, PathErrorCode, path_units, validate_windows_units};
+use super::{ActusPath, PathErrorCode, path_units, validate_windows_units};
 
 #[repr(C)]
 /// Borrowed POSIX path bytes for a native C ABI call.
