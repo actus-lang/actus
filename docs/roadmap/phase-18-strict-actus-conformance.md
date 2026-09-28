@@ -58,6 +58,8 @@ behavior around the existing language and runtime contracts.
       arguments across `check`, `build`, and `test`.
 - [x] Make strict mode visible in successful `check`, `build`, and `test`
       command output.
+- [x] Use the shared colored diagnostic renderer for interactive CLI errors
+      while preserving plain output for non-terminal streams.
 
 ## Strict-mode contract
 

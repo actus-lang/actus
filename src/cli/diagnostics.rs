@@ -1,6 +1,7 @@
+use std::io::{self, IsTerminal};
 use std::path::Path;
 
-use crate::diagnostics::{Diagnostic, render_diagnostic, sort_diagnostics};
+use crate::diagnostics::{Diagnostic, render_colored_diagnostic, sort_diagnostics};
 
 pub(super) fn report_diagnostics(path: &Path, source: &str, mut diagnostics: Vec<Diagnostic>) {
     let source_path = path.display().to_string();
@@ -14,5 +15,6 @@ pub(super) fn report_diagnostics(path: &Path, source: &str, mut diagnostics: Vec
 }
 
 pub(super) fn report_diagnostic(path: &Path, source: &str, diagnostic: Diagnostic) {
-    eprintln!("{}: {}", path.display(), render_diagnostic(source, &diagnostic));
+    let colored = io::stderr().is_terminal();
+    eprintln!("{}: {}", path.display(), render_colored_diagnostic(source, &diagnostic, colored));
 }
