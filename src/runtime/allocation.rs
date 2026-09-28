@@ -1,5 +1,6 @@
 use std::mem::ManuallyDrop;
 
+use super::contract::ABI_STATUS_FAILURE;
 use super::types::{ActusBuffer, BufferHandle, restore_buffer};
 
 #[unsafe(no_mangle)]
@@ -52,7 +53,7 @@ pub unsafe extern "C" fn actus_buffer_reserve(
     requested_capacity: i32,
 ) -> i32 {
     if handle.is_null() || requested_capacity < 0 {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &mut *handle };
     let mut data = unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
@@ -62,7 +63,7 @@ pub unsafe extern "C" fn actus_buffer_reserve(
     } else {
         Ok(requested_capacity)
     };
-    let status = result.unwrap_or(-1);
+    let status = result.unwrap_or(ABI_STATUS_FAILURE);
     restore_buffer(buffer, data);
     status
 }
@@ -128,10 +129,10 @@ pub unsafe extern "C" fn actus_buffer_append(handle: BufferHandle, byte: u8) -> 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_buffer_capacity(handle: BufferHandle) -> i32 {
     if handle.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &*handle };
-    i32::try_from(buffer.capacity).unwrap_or(-1)
+    i32::try_from(buffer.capacity).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 /// Appends as many source bytes as fit in the target's existing capacity.
@@ -149,7 +150,7 @@ pub unsafe extern "C" fn actus_buffer_append_buffer(
     source_handle: BufferHandle,
 ) -> i32 {
     if target_handle.is_null() || source_handle.is_null() || target_handle == source_handle {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let target = unsafe { &mut *target_handle };
     let source = unsafe { &*source_handle };
@@ -157,7 +158,7 @@ pub unsafe extern "C" fn actus_buffer_append_buffer(
         || (target.length > 0 && target.data.is_null())
         || (source.length > 0 && source.data.is_null())
     {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let available = target.capacity - target.length;
     let count = available.min(source.length);
@@ -168,7 +169,7 @@ pub unsafe extern "C" fn actus_buffer_append_buffer(
         std::ptr::copy_nonoverlapping(source.data, target.data.add(target.length), count);
     }
     target.length += count;
-    i32::try_from(count).unwrap_or(-1)
+    i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 /// Appends a bounded source range into existing target capacity.
@@ -193,7 +194,7 @@ pub unsafe extern "C" fn actus_buffer_append_range(
         || offset < 0
         || length < 0
     {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let target = unsafe { &mut *target_handle };
     let source = unsafe { &*source_handle };
@@ -204,7 +205,7 @@ pub unsafe extern "C" fn actus_buffer_append_range(
         || (target.length > 0 && target.data.is_null())
         || (source.length > 0 && source.data.is_null())
     {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let source_end = offset.saturating_add(requested).min(source.length);
     let available = target.capacity - target.length;
@@ -229,7 +230,7 @@ fn append_range_bytes(
         );
     }
     target.length += count;
-    i32::try_from(count).unwrap_or(-1)
+    i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 /// Clears a buffer's logical contents while retaining its allocation.
@@ -241,15 +242,15 @@ fn append_range_bytes(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_buffer_clear(handle: BufferHandle) -> i32 {
     if handle.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &mut *handle };
     if buffer.length > 0 && buffer.data.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
-    let count = i32::try_from(buffer.length).unwrap_or(-1);
+    let count = i32::try_from(buffer.length).unwrap_or(ABI_STATUS_FAILURE);
     if count < 0 {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     buffer.length = 0;
     count

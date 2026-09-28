@@ -1,5 +1,6 @@
 use std::io::Read;
 
+use super::super::contract::ABI_STATUS_FAILURE;
 use super::super::types::BufferHandle;
 use super::file::{
     actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_write,
@@ -13,11 +14,11 @@ use super::file::{
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_open_buffer(path: BufferHandle, mode: i32) -> i32 {
     if path.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let path = unsafe { &*path };
     if path.length > 0 && path.data.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let handle = unsafe { actus_file_open(path.data, path.length, mode as u32) };
     handle_to_actus(handle)
@@ -38,11 +39,11 @@ pub unsafe extern "C" fn actus_file_open_options_buffer(
     create_new: i32,
 ) -> i32 {
     if path.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let path = unsafe { &*path };
     if path.length > 0 && path.data.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let bytes = if path.length == 0 {
         &[]
@@ -67,11 +68,11 @@ pub unsafe extern "C" fn actus_file_open_options_buffer(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_read_buffer(handle: i32, buffer: BufferHandle) -> i32 {
     if buffer.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &mut *buffer };
     if buffer.length > buffer.capacity || (buffer.capacity > 0 && buffer.data.is_null()) {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let spare = buffer.capacity.saturating_sub(buffer.length);
     let destination = if spare == 0 {
@@ -83,7 +84,7 @@ pub unsafe extern "C" fn actus_file_read_buffer(handle: i32, buffer: BufferHandl
     if bytes >= 0 {
         buffer.length = buffer.length.saturating_add(bytes as usize);
     }
-    i32::try_from(bytes).unwrap_or(-1)
+    i32::try_from(bytes).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 /// Reads a file to EOF into one reusable Actus buffer.
@@ -93,11 +94,11 @@ pub unsafe extern "C" fn actus_file_read_buffer(handle: i32, buffer: BufferHandl
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_read_all_buffer(handle: i32, buffer: BufferHandle) -> i32 {
     if buffer.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &mut *buffer };
     if buffer.length > buffer.capacity || (buffer.capacity > 0 && buffer.data.is_null()) {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let pointer = if buffer.data.is_null() {
         std::ptr::NonNull::<u8>::dangling().as_ptr()
@@ -106,10 +107,10 @@ pub unsafe extern "C" fn actus_file_read_all_buffer(handle: i32, buffer: BufferH
     };
     let mut data = unsafe { Vec::from_raw_parts(pointer, buffer.length, buffer.capacity) };
     let status = super::file::with_file(super::file::actus_handle(handle), |file| {
-        file.read_to_end(&mut data).map_or(-1, |count| count as i64)
+        file.read_to_end(&mut data).map_or(ABI_STATUS_FAILURE as i64, |count| count as i64)
     });
     super::super::types::restore_buffer(buffer, data);
-    i32::try_from(status).unwrap_or(-1)
+    i32::try_from(status).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 /// Writes the logical bytes of an Actus buffer to a file.
@@ -119,15 +120,15 @@ pub unsafe extern "C" fn actus_file_read_all_buffer(handle: i32, buffer: BufferH
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_write_buffer(handle: i32, buffer: BufferHandle) -> i32 {
     if buffer.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let buffer = unsafe { &*buffer };
     if buffer.length > 0 && buffer.data.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let bytes =
         unsafe { actus_file_write(super::file::actus_handle(handle), buffer.data, buffer.length) };
-    i32::try_from(bytes).unwrap_or(-1)
+    i32::try_from(bytes).unwrap_or(ABI_STATUS_FAILURE)
 }
 
 #[unsafe(no_mangle)]
