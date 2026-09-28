@@ -1,4 +1,6 @@
 use std::fs;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use actus::cli::run_with_args;
@@ -20,6 +22,7 @@ fn library_file(relative: &str) -> String {
     fs::read_to_string(path).expect("standard library source should exist")
 }
 
+#[cfg(unix)]
 fn path_literal(path: &Path) -> String {
     let mut source = path
         .to_string_lossy()
@@ -30,6 +33,48 @@ fn path_literal(path: &Path) -> String {
     source.push_str(" append(raw, 0);");
     source.push_str(" erg path = make_path(raw: dat raw);");
     source
+}
+
+#[cfg(windows)]
+fn path_literal(path: &Path) -> String {
+    let mut source = path
+        .as_os_str()
+        .encode_wide()
+        .flat_map(u16::to_ne_bytes)
+        .map(|byte| format!("append(raw, {});", byte))
+        .collect::<Vec<_>>()
+        .join(" ");
+    source.push_str(" append(raw, 0); append(raw, 0);");
+    source.push_str(" erg path = make_path(raw: dat raw);");
+    source
+}
+
+#[cfg(unix)]
+fn path_constructor() -> &'static str {
+    "path_from_posix"
+}
+
+#[cfg(windows)]
+fn path_constructor() -> &'static str {
+    "path_from_windows_utf16"
+}
+
+#[cfg(unix)]
+fn fallback_path_fields() -> (&'static str, &'static str, &'static str) {
+    ("Buffer[1]", "PathPlatform.Posix", "1")
+}
+
+#[cfg(windows)]
+fn fallback_path_fields() -> (&'static str, &'static str, &'static str) {
+    ("Buffer[2]", "PathPlatform.Windows", "2")
+}
+
+fn make_path_source() -> String {
+    let (storage, platform, capacity) = fallback_path_fields();
+    format!(
+        "verb make_path(dat raw: Buffer) -> Path {{ erg result = {}(storage: dat raw); return case dat result {{ Result.Ok(value) => value, Result.Err(_) => Path {{ storage: {storage}, platform: {platform}, length: 0, capacity: {capacity}, terminated: 1, }}, }}; }}",
+        path_constructor(),
+    )
 }
 
 fn path_literal_for(path: &Path, binding: &str) -> String {
@@ -46,9 +91,7 @@ fn prepare_source(source: &str) -> String {
         .replace("erg renamed = Buffer[0];", "erg renamed_raw = Buffer[0];")
         .replace("erg source = Buffer[0];", "erg source_raw = Buffer[0];")
         .replace("import io; import fs;", "import io; import path; import fs;");
-    format!(
-        "{source}\nverb make_path(dat raw: Buffer) -> Path {{ erg result = path_from_posix(storage: dat raw); return case dat result {{ Result.Ok(value) => value, Result.Err(_) => Path {{ storage: Buffer[1], platform: PathPlatform.Posix, length: 0, capacity: 1, terminated: 1, }}, }}; }}"
-    )
+    format!("{source}\n{}", make_path_source())
 }
 
 fn copy_std_library(root: &Path) {
