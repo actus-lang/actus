@@ -45,6 +45,29 @@ After the final gate, strict mode becomes the default for standard-library
 validation and release checks. A non-strict developer mode may remain for
 interactive exploration, but it must never be accepted as release evidence.
 
+### Conformance policy source and precedence
+
+During Phase 18, `--strict` is the only supported command-line policy switch.
+There is no `--no-strict` escape hatch and no `ACTUS_STRICT` environment
+override. Environment variables that configure the toolchain, such as
+`ACTUS_LINKER`, may affect linking but cannot change conformance mode.
+
+Strictness is monotonic. The effective policy is the strongest requirement
+from these sources, in descending authority:
+
+1. target policy;
+2. package policy;
+3. workspace policy;
+4. the explicit command-line `--strict` request.
+
+For the initial implementation, only the command-line source can request
+strict mode; target, package, and workspace files have no strictness field.
+Their absence therefore means “no additional requirement”, never “disable an
+explicit strict request”. Future policy fields may promote `Standard` to
+`Strict`, but a lower-priority source must not downgrade a stronger policy.
+Conflicting policy declarations are configuration errors and must be rejected
+before source compilation.
+
 ## Fail-closed compilation contract
 
 Strict mode has the following non-negotiable rules:
@@ -197,6 +220,26 @@ Strict validation must verify the complete execution boundary:
 The test runner must report the exact number of discovered, passed, failed,
 and filtered tests. A filtered test must be explainable by target selection or
 an explicit test filter; it must not disappear silently.
+
+## Migration from permissive checks
+
+Migration is staged and explicit:
+
+1. run `actus check --strict` on the package and classify every failure by
+   diagnostic phase;
+2. fix frontend, semantic, ownership, architecture, documentation, and
+   source-limit failures without adding suppression annotations;
+3. run `actus build --strict` and verify that no artifact is produced after a
+   failed validation;
+4. run `actus test --strict` and require deterministic discovery, execution,
+   cleanup, and exit-status evidence;
+5. enable the same strict commands in CI and standard-library checks;
+6. reserve non-strict mode for local exploration only, never for release or
+   conformance evidence.
+
+The migration is complete only when the strict command set is reproducible
+from a clean checkout and no workspace or environment setting can downgrade
+the effective policy.
 
 ## Diagnostics contract
 

@@ -121,16 +121,19 @@ fn strict_commands_report_mode_in_success_metadata() {
 
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["check", "--strict"])
+        .env("ACTUS_STRICT", "0")
         .current_dir(&root)
         .output()
         .expect("run strict check");
     let build = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["build", "--strict", "--emit", "obj"])
+        .env("ACTUS_STRICT", "0")
         .current_dir(&root)
         .output()
         .expect("run strict build");
     let test = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["test", "--strict"])
+        .env("ACTUS_STRICT", "0")
         .current_dir(&root)
         .output()
         .expect("run strict tests");
