@@ -72,6 +72,7 @@ fn fmt_check_reports_drift_then_accepts_canonical_output() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(unix)]
 fn create_test_project(name: &str, file: &str, source: &str) -> std::path::PathBuf {
     let root = std::env::temp_dir().join(format!("actus-{name}-{}", std::process::id()));
     fs::create_dir_all(root.join("tests")).expect("create test directory");
@@ -84,10 +85,12 @@ fn create_test_project(name: &str, file: &str, source: &str) -> std::path::PathB
     root
 }
 
+#[cfg(unix)]
 fn run_test_command(root: &std::path::Path) -> std::process::Output {
     run_command(root, &["test"])
 }
 
+#[cfg(unix)]
 fn run_in_project(root: &std::path::Path, arguments: &[&str]) -> std::process::ExitStatus {
     Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(arguments)
@@ -96,6 +99,7 @@ fn run_in_project(root: &std::path::Path, arguments: &[&str]) -> std::process::E
         .expect("run project command")
 }
 
+#[cfg(unix)]
 fn run_command(root: &std::path::Path, arguments: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(arguments)
