@@ -38,6 +38,8 @@ behavior around the existing language and runtime contracts.
       implemented strict behaviors.
 - [x] Introduce a renderer-independent diagnostic model with stable metadata
       and terminal rendering compatibility.
+- [x] Define and use the initial strict configuration diagnostic codes
+      `E1800` through `E1802`.
 
 ## Strict-mode contract
 

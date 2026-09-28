@@ -21,12 +21,11 @@ pub(super) fn configuration_for_input_with_mode(
         },
         |path| Ok(PathBuf::from(path)),
     )?;
-    let configuration = if mode.is_strict() {
-        CompilerConfiguration::from_input_path_strict(&path)
-    } else {
-        CompilerConfiguration::from_input_path(&path)
-    };
-    configuration.map_err(|error| error.to_string())
+    if mode.is_strict() {
+        return CompilerConfiguration::from_input_path_strict(&path)
+            .map_err(|error| error.to_string());
+    }
+    CompilerConfiguration::from_input_path(&path).map_err(|error| error.to_string())
 }
 
 pub(super) fn entry_path(configuration: &CompilerConfiguration, input: Option<&str>) -> PathBuf {

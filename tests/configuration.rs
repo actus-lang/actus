@@ -1,6 +1,7 @@
 use std::fs;
 
 use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel};
+use actus::diagnostics::{DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST};
 use actus::target::TargetSpec;
 
 #[test]
@@ -166,6 +167,30 @@ fn strict_configuration_rejects_legacy_manifest_warnings() {
 
     let error = CompilerConfiguration::from_manifest_strict(&path)
         .expect_err("strict mode must reject legacy manifest");
+    assert_eq!(error.diagnostic().code(), STRICT_LEGACY_MANIFEST);
+    assert_eq!(error.diagnostic().severity(), DiagnosticSeverity::Error);
+    assert_eq!(error.diagnostic().source_path(), Some(path.to_str().unwrap()));
+    assert!(error.to_string().contains("E1801"));
     assert!(error.to_string().contains("strict mode rejects deprecated `Arca.toml`"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn strict_configuration_codes_legacy_dependency_manifest_failures() {
+    let root = std::env::temp_dir().join(format!("actus-strict-dependency-{}", std::process::id()));
+    let dependency = root.join("legacy");
+    fs::create_dir_all(dependency.join("src")).expect("create dependency source directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"root\"\nversion = \"1.0.0\"\n\n[dependencies.legacy]\npath = \"legacy\"\n",
+    )
+    .expect("write root manifest");
+    fs::write(dependency.join("Arca.toml"), "[package]\nname = \"legacy\"\nversion = \"1.0.0\"\n")
+        .expect("write legacy dependency manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&root.join("Actus.toml"))
+        .expect_err("strict mode must reject a legacy dependency manifest");
+    assert_eq!(error.diagnostic().code(), STRICT_LEGACY_DEPENDENCY);
+    assert_eq!(error.diagnostic().severity(), DiagnosticSeverity::Error);
     let _ = fs::remove_dir_all(root);
 }

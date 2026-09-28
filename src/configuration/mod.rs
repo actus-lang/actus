@@ -16,6 +16,7 @@ pub use lockfile::{ActusLock, LockedPackage, LockfileError};
 use manifest::ActusManifest;
 pub use manifest::OptimizationLevel;
 pub use manifest::{BuildProfile, LibraryKind};
+pub use strict::StrictConfigurationError;
 pub use version::{Version, VersionConstraint, VersionError};
 
 pub(crate) fn manifest_path_in_directory(path: &std::path::Path) -> Option<std::path::PathBuf> {

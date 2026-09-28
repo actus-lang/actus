@@ -65,19 +65,21 @@ fn configuration_for_build(
     let configuration = match input {
         Some(path) if mode.is_strict() => {
             CompilerConfiguration::from_input_path_strict(Path::new(path))
+                .map_err(|error| error.to_string())
         }
-        Some(path) => CompilerConfiguration::from_input_path(Path::new(path)),
+        Some(path) => CompilerConfiguration::from_input_path(Path::new(path))
+            .map_err(|error| error.to_string()),
         None => {
             let current = std::env::current_dir()
                 .map_err(|error| format!("cannot read current directory: {error}"))?;
             if mode.is_strict() {
                 CompilerConfiguration::from_input_path_strict(&current)
+                    .map_err(|error| error.to_string())
             } else {
-                CompilerConfiguration::from_input_path(&current)
+                CompilerConfiguration::from_input_path(&current).map_err(|error| error.to_string())
             }
         }
-    }
-    .map_err(|error| error.to_string())?;
+    }?;
     if input.is_none() && !configuration.has_manifest() {
         return Err("cannot discover Actus.toml from the current directory".to_owned());
     }

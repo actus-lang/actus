@@ -30,11 +30,12 @@ pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
             }
         }
     }
-    let configuration = match if mode.is_strict() {
-        CompilerConfiguration::from_current_manifest_strict()
+    let configuration = if mode.is_strict() {
+        CompilerConfiguration::from_current_manifest_strict().map_err(|error| error.to_string())
     } else {
-        CompilerConfiguration::from_current_manifest()
-    } {
+        CompilerConfiguration::from_current_manifest().map_err(|error| error.to_string())
+    };
+    let configuration = match configuration {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
