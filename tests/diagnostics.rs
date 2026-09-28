@@ -9,7 +9,7 @@ use actus::diagnostics::{
 use actus::lexer::{SourceSpan, scan};
 use actus::lsp::analyze_document;
 use actus::parser::parse;
-use actus::semantic::analyze;
+use actus::semantic::{SemanticErrorKind, analyze};
 
 #[test]
 fn renders_stable_semantic_error_codes_and_locations() {
@@ -41,6 +41,20 @@ fn renders_unknown_verb_diagnostics_with_a_stable_code() {
         "error[E1069] at 1:15: unknown verb `missing_verb`"
     );
     assert_eq!(semantic_diagnostic(&error).code(), "E1069");
+}
+
+#[test]
+fn renders_malformed_type_name_diagnostics_with_a_stable_code() {
+    let error = actus::semantic::SemanticError {
+        kind: SemanticErrorKind::MalformedTypeName { name: "Box[".to_owned() },
+        span: SourceSpan::new(0, 4),
+    };
+
+    assert_eq!(
+        render_semantic_error("Box[", &error),
+        "error[E1080] at 1:1: malformed type name `Box[`"
+    );
+    assert_eq!(semantic_diagnostic(&error).code(), "E1080");
 }
 
 #[test]

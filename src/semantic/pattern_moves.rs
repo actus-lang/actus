@@ -1,7 +1,7 @@
 use crate::ast::{EnumPayload, Expr, Pattern, VariantPayload};
 
 use super::analyzer::Analyzer;
-use super::errors::SemanticError;
+use super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
     pub(super) fn register_unbound_payload_cleanup(
@@ -11,11 +11,21 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let Expr::Identifier { name, span } = subject else { return Ok(()) };
         let binding_index = self.binding(name, *span)?;
-        let Pattern::Variant { enum_name, variant, payload, .. } = pattern else { return Ok(()) };
+        let Pattern::Variant { enum_name, variant, payload, span } = pattern else {
+            return Ok(());
+        };
         let definition = self.enum_types[enum_name].clone();
-        let substitution = self.enum_substitution_for_binding(binding_index, &definition);
-        let candidate_payload =
-            definition.variants.iter().find(|item| item.name == *variant).unwrap().payload.clone();
+        let substitution = self.enum_substitution_for_binding(binding_index, &definition)?;
+        let Some(candidate) = definition.variants.iter().find(|item| item.name == *variant) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownEnumVariant {
+                    enum_name: enum_name.clone(),
+                    variant: variant.clone(),
+                },
+                span: *span,
+            });
+        };
+        let candidate_payload = candidate.payload.clone();
         match (candidate_payload, payload) {
             (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => self
                 .register_tuple_cleanup(
@@ -44,15 +54,27 @@ impl Analyzer {
         &self,
         binding_index: usize,
         definition: &crate::ast::EnumDef,
-    ) -> Option<super::type_substitution::TypeSubstitution> {
-        let type_name = self.binding_enum_type_applications.get(&binding_index)?;
+    ) -> Result<Option<super::type_substitution::TypeSubstitution>, SemanticError> {
+        let Some(type_name) = self.binding_enum_type_applications.get(&binding_index) else {
+            if definition.generic_parameters.is_empty() {
+                return Ok(None);
+            }
+            return Err(SemanticError {
+                kind: SemanticErrorKind::GenericArityMismatch {
+                    name: definition.name.clone(),
+                    expected: definition.generic_parameters.len(),
+                    found: 0,
+                },
+                span: definition.span,
+            });
+        };
         super::type_substitution::TypeSubstitution::for_type(
             &definition.name,
             &definition.generic_parameters,
             &type_name.arguments,
             type_name.span,
         )
-        .ok()
+        .map(Some)
     }
 
     fn register_tuple_cleanup(

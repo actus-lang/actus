@@ -109,6 +109,7 @@ fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
 fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
     Some(match kind {
         SemanticErrorKind::UnknownType { .. } => "E1023",
+        SemanticErrorKind::MalformedTypeName { .. } => "E1080",
         SemanticErrorKind::UnknownTypeParameter { .. } => "E1052",
         SemanticErrorKind::GenericArityMismatch { .. } => "E1053",
         SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
@@ -356,19 +357,10 @@ fn struct_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    if let Some(message) = type_contract_message(kind) {
+        return Some(message);
+    }
     let message = match kind {
-        SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
-        SemanticErrorKind::UnknownTypeParameter { name } => {
-            format!("undeclared generic type parameter `{name}`")
-        }
-        SemanticErrorKind::GenericArityMismatch { name, expected, found } => {
-            format!(
-                "wrong number of type arguments for `{name}`: expected {expected}, found {found}"
-            )
-        }
-        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } => {
-            format!("generic parameter `{parameter}` requires `{constraint}`, found `{argument}`")
-        }
         SemanticErrorKind::DuplicateRoleName { name } => {
             format!("duplicate role declaration `{name}`")
         }
@@ -409,6 +401,35 @@ fn type_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::MissingReturnValue => {
             "verb must return a value on every path".to_owned()
+        }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn type_contract_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
+        SemanticErrorKind::MalformedTypeName { name } => format!("malformed type name `{name}`"),
+        SemanticErrorKind::UnknownTypeParameter { name } => {
+            format!("undeclared generic type parameter `{name}`")
+        }
+        SemanticErrorKind::GenericArityMismatch { name, expected, found } => {
+            format!(
+                "wrong number of type arguments for `{name}`: expected {expected}, found {found}"
+            )
+        }
+        SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, argument } => {
+            format!("generic parameter `{parameter}` requires `{constraint}`, found `{argument}`")
+        }
+        SemanticErrorKind::TypeMismatch { callee, parameter, expected, found } => format!(
+            "type mismatch for `{parameter}` in `{callee}`: expected `{expected}`, found `{found}`"
+        ),
+        SemanticErrorKind::ReturnTypeMismatch { expected, found } => {
+            format!("return type mismatch: expected `{expected}`, found `{found}`")
+        }
+        SemanticErrorKind::BindingTypeMismatch { binding, expected, found } => {
+            format!("type mismatch for `{binding}`: expected `{expected}`, found `{found}`")
         }
         _ => return None,
     };

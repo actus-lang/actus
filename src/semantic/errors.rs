@@ -89,6 +89,9 @@ pub enum SemanticErrorKind {
     UnknownType {
         name: String,
     },
+    MalformedTypeName {
+        name: String,
+    },
     UnknownTypeParameter {
         name: String,
     },
