@@ -1,9 +1,9 @@
-"""
-Explicit file-open configuration.
+"""Explicit file-open configuration.
 
 Each field is a scalar switch. The configuration is consumed by `options_open`
 so the host runtime receives one complete, immutable open request.
 """
+import path;
 open struct OpenOptions {
     """Permit reading from the opened handle when set to one."""
     erg read: Int,
@@ -111,8 +111,8 @@ runtime, which returns an opaque handle or `-1` on failure. A successful
 handle becomes an owned `File`; the raw failure code is translated to
 `IoError.Failed` and is never exposed by the public API.
 """
-open unsafe extern "C" verb actus_file_open_options_buffer(
-    abs path: Buffer,
+open unsafe extern "C" verb actus_file_open_options_path(
+    abs path: Path,
     abs read: Int,
     abs write: Int,
     abs append: Int,
@@ -122,8 +122,8 @@ open unsafe extern "C" verb actus_file_open_options_buffer(
 ) -> Int;
 
 """Consume options and return an owned File or a typed I/O failure."""
-open verb options_open(dat options: OpenOptions, abs path: Buffer) -> Result[File, IoError] {
-    erg handle = actus_file_open_options_buffer(
+open verb options_open(dat options: OpenOptions, abs path: Path) -> Result[File, IoError] {
+    erg handle = actus_file_open_options_path(
         path: abs path,
         read: abs options.read,
         write: abs options.write,

@@ -35,7 +35,7 @@ fn std_path_representation_module_exports_validated_storage_contracts() {
         ("verb", "normalize"),
         ("verb", "join"),
         ("verb", "push"),
-        ("verb", "reserve"),
+        ("verb", "reserve_path"),
         ("verb", "set_extension"),
         ("verb", "set_file_name"),
     ] {

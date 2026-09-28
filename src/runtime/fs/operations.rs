@@ -1,3 +1,5 @@
+use super::super::fs_path::{with_host_path, with_host_paths};
+use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
 use super::{actus_handle, with_file};
 
@@ -21,6 +23,26 @@ pub unsafe extern "C" fn actus_file_metadata_buffer(
     let bytes = unsafe { buffer_bytes(path) };
     let Ok(metadata) = host_path(bytes).metadata() else { return -1 };
     unsafe { write_metadata(output, &metadata) }
+}
+
+/// Writes metadata for a validated borrowed `ActusPath`.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor and `output` must be
+/// writable for one `ActusMetadata`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_metadata_path(
+    path: *const ActusPath,
+    output: *mut ActusMetadata,
+) -> i32 {
+    if output.is_null() {
+        return -1;
+    }
+    let result = unsafe { with_host_path(path, |native| native.metadata()) };
+    match result {
+        Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
+        _ => -1,
+    }
 }
 
 /// Writes metadata for an already-open file handle into an output struct.
@@ -49,6 +71,17 @@ pub unsafe extern "C" fn actus_file_remove_buffer(path: BufferHandle) -> i32 {
     unsafe { path_operation(path, |value| std::fs::remove_file(value)) }
 }
 
+/// Removes a regular file named by a validated borrowed `ActusPath`.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_remove_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::remove_file(value)) }
+        .and_then(Result::ok)
+        .map_or(-1, |_| 0)
+}
+
 /// Renames a path using the host filesystem's atomic rename operation.
 ///
 /// # Safety
@@ -58,6 +91,20 @@ pub unsafe extern "C" fn actus_file_rename_buffer(from: BufferHandle, to: Buffer
     unsafe {
         two_path_operation(from, to, |source, destination| std::fs::rename(source, destination))
     }
+}
+
+/// Renames two validated borrowed `ActusPath` values.
+///
+/// # Safety
+/// Both paths must be valid immutable descriptors for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_rename_path(
+    from: *const ActusPath,
+    to: *const ActusPath,
+) -> i32 {
+    unsafe { with_host_paths(from, to, |source, destination| std::fs::rename(source, destination)) }
+        .and_then(Result::ok)
+        .map_or(-1, |_| 0)
 }
 
 /// Copies a file and returns the number of copied bytes, or `-1` on failure.
@@ -71,6 +118,17 @@ pub unsafe extern "C" fn actus_file_copy_buffer(from: BufferHandle, to: BufferHa
     }
 }
 
+/// Copies a file between two validated borrowed `ActusPath` values.
+///
+/// # Safety
+/// Both paths must be valid immutable descriptors for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_copy_path(from: *const ActusPath, to: *const ActusPath) -> i32 {
+    unsafe { with_host_paths(from, to, |source, destination| std::fs::copy(source, destination)) }
+        .and_then(Result::ok)
+        .map_or(-1, |count| i32::try_from(count).unwrap_or(-1))
+}
+
 /// Creates one directory at the requested path.
 ///
 /// # Safety
@@ -80,6 +138,17 @@ pub unsafe extern "C" fn actus_file_create_dir_buffer(path: BufferHandle) -> i32
     unsafe { path_operation(path, |value| std::fs::create_dir(value)) }
 }
 
+/// Creates one directory named by a validated borrowed `ActusPath`.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_create_dir_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::create_dir(value)) }
+        .and_then(Result::ok)
+        .map_or(-1, |_| 0)
+}
+
 /// Removes one empty directory at the requested path.
 ///
 /// # Safety
@@ -87,6 +156,17 @@ pub unsafe extern "C" fn actus_file_create_dir_buffer(path: BufferHandle) -> i32
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_remove_dir_buffer(path: BufferHandle) -> i32 {
     unsafe { path_operation(path, |value| std::fs::remove_dir(value)) }
+}
+
+/// Removes one empty directory named by a validated borrowed `ActusPath`.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_remove_dir_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::remove_dir(value)) }
+        .and_then(Result::ok)
+        .map_or(-1, |_| 0)
 }
 
 unsafe fn buffer_bytes(buffer: &super::super::types::ActusBuffer) -> &[u8] {

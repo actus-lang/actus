@@ -494,9 +494,9 @@ String conversions.
 
 ### Sub-gate G: `std::fs` Integration
 
-- [ ] Update `std::fs` verbs to accept `abs Path` instead of raw `Buffer`.
-- [ ] Preserve `Result[T, IoError]` contracts and error mappings.
-- [ ] Verify deterministic RAII cleanup across filesystem operations with paths.
+- [x] Update `std::fs` verbs to accept `abs Path` instead of raw `Buffer`.
+- [x] Preserve `Result[T, IoError]` contracts and error mappings.
+- [x] Verify deterministic RAII cleanup across filesystem operations with paths.
 
 ### Gate 3.8 invariant
 

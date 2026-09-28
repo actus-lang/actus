@@ -218,7 +218,7 @@ pub unsafe extern "C" fn actus_path_validate_storage(
     if unit_width != 1 && unit_width != 2 {
         return -2;
     }
-    if buffer.capacity == 0 || buffer.length == 0 || buffer.length >= buffer.capacity {
+    if buffer.capacity == 0 || buffer.length == 0 || buffer.length > buffer.capacity {
         return -4;
     }
     let bytes = unsafe { std::slice::from_raw_parts(buffer.data, buffer.length) };

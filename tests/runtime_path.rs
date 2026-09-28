@@ -3,9 +3,9 @@ use actus::runtime::{
     WindowsRoot, actus_path_components, actus_path_ends_with, actus_path_extension,
     actus_path_file_name, actus_path_file_stem, actus_path_has_root, actus_path_is_absolute,
     actus_path_is_relative, actus_path_next_component, actus_path_normalize, actus_path_parent,
-    actus_path_starts_with, actus_posix_is_separator, actus_posix_root_kind,
-    actus_windows_is_separator, actus_windows_root_kind, components, extension, file_name,
-    file_stem, posix_root, validate_posix, validate_windows, windows_root,
+    actus_path_starts_with, actus_path_validate_storage, actus_posix_is_separator,
+    actus_posix_root_kind, actus_windows_is_separator, actus_windows_root_kind, components,
+    extension, file_name, file_stem, posix_root, validate_posix, validate_windows, windows_root,
 };
 
 fn bytes_buffer(bytes: &[u8]) -> (Vec<u8>, ActusBuffer) {
@@ -33,6 +33,17 @@ fn posix_runtime_preserves_non_utf8_bytes_and_root_rules() {
     assert_eq!(posix_root(b"///usr//\xff/bin"), Ok(PosixRoot::Absolute));
     assert_eq!(posix_root(b"foo/bar"), Ok(PosixRoot::Relative));
     assert_eq!(validate_posix(b".\0"), Err(PathErrorCode::EmbeddedNull));
+}
+
+#[test]
+fn terminated_storage_may_use_its_full_capacity() {
+    let mut storage = b"plain\0".to_vec();
+    let mut buffer = ActusBuffer {
+        data: storage.as_mut_ptr(),
+        length: storage.len(),
+        capacity: storage.capacity(),
+    };
+    assert_eq!(unsafe { actus_path_validate_storage(&mut buffer, 1) }, 0);
 }
 
 #[test]

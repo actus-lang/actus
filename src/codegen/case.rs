@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBody, Expr, Pattern};
 
-use super::case_payload::{BranchLocals, bind_payload};
+use super::case_payload::{BranchLocals, add_payload_types, bind_payload};
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -35,10 +35,10 @@ pub(super) fn lower_case(
         string_data,
         layouts,
     )?;
-    let result_type = branch_type(branches, local_types, functions, layouts);
     let merge = function.create_block();
-    function.append_block_param(merge, layouts.ir_type(result_type));
     let subject_type = initializer_type(subject, local_types, functions, layouts);
+    let result_type = branch_type(branches, subject_type, local_types, functions, layouts);
+    function.append_block_param(merge, layouts.ir_type(result_type));
     emit_case_branches(
         function,
         branches,
@@ -120,20 +120,27 @@ fn emit_case_branches(
 
 fn branch_type(
     branches: &[crate::ast::CaseBranch],
+    subject_type: NativeType,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> NativeType {
-    let block_types = branches.iter().map(|branch| match &branch.body {
-        CaseBody::Expression(expression) => {
-            Some(initializer_type(expression, local_types, functions, layouts))
-        }
-        CaseBody::Block(block) => block.statements.iter().find_map(|statement| match statement {
-            crate::ast::Stmt::Return { value: Some(expression), .. } => {
-                Some(initializer_type(expression, local_types, functions, layouts))
+    let block_types = branches.iter().map(|branch| {
+        let mut branch_types = local_types.clone();
+        add_payload_types(branch, subject_type, &mut branch_types, layouts);
+        match &branch.body {
+            CaseBody::Expression(expression) => {
+                Some(initializer_type(expression, &branch_types, functions, layouts))
             }
-            _ => None,
-        }),
+            CaseBody::Block(block) => {
+                block.statements.iter().find_map(|statement| match statement {
+                    crate::ast::Stmt::Return { value: Some(expression), .. } => {
+                        Some(initializer_type(expression, &branch_types, functions, layouts))
+                    }
+                    _ => None,
+                })
+            }
+        }
     });
     let mut types = block_types.collect::<Vec<_>>();
     if types.iter().all(Option::is_some) {

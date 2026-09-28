@@ -4,6 +4,7 @@ mod allocation;
 mod console;
 mod contract;
 mod fs;
+mod fs_path;
 mod input;
 mod path;
 mod path_builders;
@@ -34,13 +35,15 @@ pub use contract::{
     RUNTIME_ABI_VERSION, RuntimeCapability, WRITE_BUFFER_STDOUT_SYMBOL,
 };
 pub use fs::{
-    actus_file_close, actus_file_close_buffer, actus_file_copy_buffer,
-    actus_file_create_dir_buffer, actus_file_flush, actus_file_flush_buffer,
-    actus_file_metadata_buffer, actus_file_metadata_handle_buffer, actus_file_open,
-    actus_file_open_buffer, actus_file_open_options_buffer, actus_file_read,
-    actus_file_read_buffer, actus_file_remove_buffer, actus_file_remove_dir_buffer,
-    actus_file_rename_buffer, actus_file_seek, actus_file_seek_buffer, actus_file_write,
-    actus_file_write_buffer,
+    actus_file_close, actus_file_close_buffer, actus_file_copy_buffer, actus_file_copy_path,
+    actus_file_create_dir_buffer, actus_file_create_dir_path, actus_file_flush,
+    actus_file_flush_buffer, actus_file_metadata_buffer, actus_file_metadata_handle_buffer,
+    actus_file_metadata_path, actus_file_open, actus_file_open_buffer,
+    actus_file_open_options_buffer, actus_file_open_options_path, actus_file_open_path,
+    actus_file_read, actus_file_read_buffer, actus_file_remove_buffer,
+    actus_file_remove_dir_buffer, actus_file_remove_dir_path, actus_file_remove_path,
+    actus_file_rename_buffer, actus_file_rename_path, actus_file_seek, actus_file_seek_buffer,
+    actus_file_write, actus_file_write_buffer,
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use path::{
