@@ -108,23 +108,17 @@ more source bytes are accepted. The target is never called for a partial
 buffer merely because this verb returns; typed errors are propagated to the caller.
 """
 open verb buffered_write[Target: Writer](
-    ins writer: BufferedWriter[Target],
-    abs input: Buffer
+    ins writer: BufferedWriter[Target], abs input: Buffer
 ) -> Result[Int, IoError] {
-    erg source_length = actus_buffer_length(buffer: abs input);
-    erg total = 0;
+    erg source_length = actus_buffer_length(buffer: abs input); erg total = 0;
     loop {
         erg remaining = source_length - total;
         case remaining {
             0 => { return Result[Int, IoError].Ok(total); },
             _ => { },
         };
-        erg accepted = actus_buffer_append_range(
-            target: ins writer.buffer,
-            source: abs input,
-            offset: total,
-            length: remaining
-        );
+        erg accepted = actus_buffer_append_range(target: ins writer.buffer, source: abs input,
+            offset: total, length: remaining);
         case accepted {
             -1 => { return Result[Int, IoError].Err(IoError.Failed); },
             0 => { return Result[Int, IoError].Err(IoError.InvalidData); },

@@ -58,7 +58,7 @@ fn declaration_name(line: &str) -> Option<String> {
     let words = line.split_whitespace().collect::<Vec<_>>();
     let index = words.iter().position(|word| *word == "fn" || *word == "verb")?;
     let name = words.get(index + 1)?;
-    let name = name.split(['(', '<', ':']).next().unwrap_or(name);
+    let name = name.split(['(', '<', ':', '[']).next().unwrap_or(name);
     (!name.is_empty()).then_some(name.to_owned())
 }
 
