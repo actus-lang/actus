@@ -88,6 +88,8 @@ impl Analyzer {
         let binding_index = self.binding(name, span)?;
         if let Some(type_name) = declared_type_name.as_ref() {
             self.binding_type_names.insert(binding_index, type_name.clone());
+        } else {
+            self.record_inferred_binding_type(binding_index, initializer, span);
         }
         self.record_binding_arena_provenance(binding_index, initializer);
         if declared_type_name.as_ref().is_some_and(|type_name| type_name.name == "Arena") {
@@ -114,6 +116,19 @@ impl Analyzer {
             self.record_initializer_enum_type(name, initializer, span)?;
         }
         Ok(())
+    }
+
+    fn record_inferred_binding_type(
+        &mut self,
+        binding_index: usize,
+        initializer: &Expr,
+        span: SourceSpan,
+    ) {
+        let Some(type_name) = self.expression_type_name(initializer) else { return };
+        let Some(type_name) = super::super::calls::parse_type_name_key(&type_name, span) else {
+            return;
+        };
+        self.binding_type_names.insert(binding_index, type_name);
     }
 
     fn plan_try_unwind(&mut self, expression: &Expr) {

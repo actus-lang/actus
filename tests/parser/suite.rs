@@ -50,7 +50,44 @@ fn rejects_unknown_target_metadata() {
     let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
     let error = parse(tokens).expect_err("unknown target should be rejected");
-    assert!(matches!(error.kind, ParseErrorKind::UnexpectedToken { .. }));
+    assert_eq!(error.code, ParseErrorCode::UnsupportedTargetPlatform);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnsupportedTargetPlatform { name } if name == "plan9"
+    ));
+}
+
+#[test]
+fn rejects_unknown_metadata_attributes() {
+    let (tokens, errors) = scan("meta experimental verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unknown metadata must be rejected");
+    assert_eq!(error.code, ParseErrorCode::UnknownMetadata);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnknownMetadata { name } if name == "experimental"
+    ));
+}
+
+#[test]
+fn rejects_unknown_top_level_keywords_with_a_stable_code() {
+    let (tokens, errors) = scan("verbb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unknown declaration keywords must fail");
+    assert_eq!(error.code, ParseErrorCode::UnknownKeyword);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnknownKeyword { name } if name == "verbb"
+    ));
+}
+
+#[test]
+fn rejects_metadata_attached_to_a_non_verb_declaration() {
+    let (tokens, errors) = scan("meta test struct Packet { payload: Buffer, }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("metadata must reject invalid declaration targets");
+    assert_eq!(error.code, ParseErrorCode::MetadataTargetNotAllowed);
+    assert!(matches!(error.kind, ParseErrorKind::MetadataTargetNotAllowed));
 }
 
 #[test]
@@ -85,6 +122,44 @@ fn docstrings_inside_supported_bodies_are_consumed_as_documentation() {
         "struct Packet { \"\"\"Payload bytes.\"\"\" payload: Buffer, } enum Status { \"\"\"Ready state.\"\"\" Ready, } verb main() { \"\"\"This statement is documented.\"\"\" return 0; }",
     );
     assert_eq!(program.declarations.len(), 3);
+}
+
+#[test]
+fn preserves_nested_and_performance_documentation_in_the_ast() {
+    let program = parse_source(
+        r#"
+        """Packet storage contract.""" open struct Packet {
+            """Owned payload bytes.""" erg payload: Buffer,
+        }
+        """Status contract.""" open enum Status {
+            """Ready variant.""" Ready,
+        }
+        """Reader contract.""" open role Reader {
+            """Read through an ins loan.""" verb read(ins self: Self) -> Int;
+        }
+        """Reader performance.""" open perform Reader for Packet {
+            """Read the packet.""" verb read(ins self: Packet) -> Int { return 0; }
+        }
+        """Exported sibling.""" open stream;
+        "#,
+    );
+    let TopLevelDecl::Struct(packet) = &program.declarations[0] else { panic!("expected struct") };
+    assert_eq!(packet.doc.as_deref(), Some("Packet storage contract."));
+    assert_eq!(packet.fields[0].doc.as_deref(), Some("Owned payload bytes."));
+    let TopLevelDecl::Enum(status) = &program.declarations[1] else { panic!("expected enum") };
+    assert_eq!(status.doc.as_deref(), Some("Status contract."));
+    assert_eq!(status.variants[0].doc.as_deref(), Some("Ready variant."));
+    let TopLevelDecl::Role(reader) = &program.declarations[2] else { panic!("expected role") };
+    assert_eq!(reader.methods[0].doc.as_deref(), Some("Read through an ins loan."));
+    let TopLevelDecl::Perform(perform) = &program.declarations[3] else {
+        panic!("expected perform")
+    };
+    assert_eq!(perform.doc.as_deref(), Some("Reader performance."));
+    assert_eq!(perform.methods[0].doc.as_deref(), Some("Read the packet."));
+    let TopLevelDecl::OpenSibling(sibling) = &program.declarations[4] else {
+        panic!("expected sibling")
+    };
+    assert_eq!(sibling.doc.as_deref(), Some("Exported sibling."));
 }
 
 #[test]

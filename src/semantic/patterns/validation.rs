@@ -83,12 +83,13 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let Some(enum_name) = self.expression_enum_type(subject) else {
-            if branches.iter().any(|branch| is_wildcard(&branch.pattern)) {
+            if branches.iter().any(|branch| is_wildcard(&branch.pattern) && branch.guard.is_none())
+            {
                 return Ok(());
             }
             return Err(non_exhaustive("primitive", vec!["_".to_owned()], span));
         };
-        if branches.iter().any(|branch| is_wildcard(&branch.pattern)) {
+        if branches.iter().any(|branch| is_wildcard(&branch.pattern) && branch.guard.is_none()) {
             return Ok(());
         }
         let covered = branches

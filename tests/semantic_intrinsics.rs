@@ -80,6 +80,38 @@ fn rejects_primitive_integer_overflow_and_unsigned_underflow() {
 }
 
 #[test]
+fn rejects_mismatched_primitive_calls_and_assignments() {
+    let call_error = analyze_source(
+        "verb consume(erg sample: f32) { } verb main() { erg sample: f64 = 1.5; consume(sample: sample); }",
+    )
+    .expect_err("primitive call types must match");
+    assert!(matches!(
+        call_error.kind,
+        SemanticErrorKind::TypeMismatch { expected, found, .. }
+            if expected == "f32" && found == "f64"
+    ));
+
+    let assignment_error = analyze_source(
+        "verb main() { erg sample: f32 = 1.5; erg other: f64 = 1.5; sample = other; }",
+    )
+    .expect_err("primitive assignment types must match");
+    assert!(matches!(
+        assignment_error.kind,
+        SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
+            if expected == "f32" && found == "f64"
+    ));
+
+    let return_error =
+        analyze_source("verb produce() -> f32 { erg sample: f64 = 1.5; return sample; }")
+            .expect_err("primitive return types must match");
+    assert!(matches!(
+        return_error.kind,
+        SemanticErrorKind::ReturnTypeMismatch { expected, found }
+            if expected == "f32" && found == "f64"
+    ));
+}
+
+#[test]
 fn validates_void_as_a_zero_value_return_type() {
     analyze_source("verb main() -> Void { return; }").expect("Void may return without a value");
     let error = analyze_source("verb main() -> Void { return 0; }")
@@ -100,6 +132,16 @@ fn rejects_unknown_declared_types() {
     let error = analyze_source("verb main(erg buffer: Vector) { }")
         .expect_err("unsupported types must fail before code generation");
     assert!(matches!(error.kind, SemanticErrorKind::UnknownType { name } if name == "Vector"));
+}
+
+#[test]
+fn rejects_calls_to_unknown_verbs() {
+    let error = analyze_source("verb main() { missing_verb(1); }")
+        .expect_err("calls must resolve to a declared verb or intrinsic");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UnknownVerb { name } if name == "missing_verb"
+    ));
 }
 
 #[test]
@@ -168,6 +210,17 @@ fn rejects_typed_initializer_and_assignment_mismatches() {
         assignment.kind,
         SemanticErrorKind::BindingTypeMismatch { binding, expected, found }
             if binding == "buffer" && expected == "Buffer" && found == "Int"
+    ));
+}
+
+#[test]
+fn rejects_assignment_that_changes_an_inferred_primitive_type() {
+    let error = analyze_source("verb main() { erg sample = 1.5; sample = 1; }")
+        .expect_err("inferred primitive bindings must keep their type");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
+            if expected == "f64" && found == "Int"
     ));
 }
 

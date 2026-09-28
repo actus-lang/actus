@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Role};
+use crate::ast::{Expr, PrimitiveType, Role, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::super::analyzer::Analyzer;
@@ -21,12 +21,8 @@ impl Analyzer {
             self.plan_return_unwind(statement_span);
             return Ok(());
         };
-        let expected_return = self.current_return_type_name.clone();
-        self.visit_expression_with_expected(expression, expected_return.as_ref())?;
-        self.validate_return_type(expression)?;
-        self.reject_arena_escape(expression)?;
+        self.validate_return_expression(expression)?;
         if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
-            self.validate_abs_return(expression)?;
             self.plan_return_unwind(statement_span);
             return Ok(());
         }
@@ -43,6 +39,7 @@ impl Analyzer {
         };
         let index = self.binding(name, *span)?;
         self.ensure_access_available(index, name, *span)?;
+        self.reject_ins_return(index, name, *span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::BorrowedReturn { name: name.clone() },
@@ -63,6 +60,28 @@ impl Analyzer {
         }
         self.plan_return_unwind(statement_span);
         Ok(())
+    }
+
+    fn reject_ins_return(
+        &self,
+        index: usize,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.model.bindings[index].role != Role::Ins {
+            return Ok(());
+        }
+        Err(SemanticError { kind: SemanticErrorKind::EscapingLoan { name: name.to_owned() }, span })
+    }
+
+    fn validate_return_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+        let expected_return = self.current_return_type_name.clone();
+        self.visit_expression_with_expected(expression, expected_return.as_ref())?;
+        if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
+            self.validate_abs_return(expression)?;
+        }
+        self.validate_return_type(expression)?;
+        self.reject_arena_escape(expression)
     }
 
     fn reject_arena_escape(&self, expression: &Expr) -> Result<(), SemanticError> {
@@ -113,16 +132,14 @@ impl Analyzer {
                 span: expression_span(expression),
             });
         }
-        let Some(expected) = self.current_return_type else { return Ok(()) };
-        let Some(found) = self.expression_type(expression) else { return Ok(()) };
-        if found == expected {
+        let Some(expected) = self.current_return_type_name.as_ref() else { return Ok(()) };
+        let expected_name = super::super::analyzer::canonical_type_name(expected);
+        let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
+        if return_value_matches(expected, &expected_name, &found, expression) {
             return Ok(());
         }
         Err(SemanticError {
-            kind: SemanticErrorKind::ReturnTypeMismatch {
-                expected: expected.spec().name.to_owned(),
-                found: found.spec().name.to_owned(),
-            },
+            kind: SemanticErrorKind::ReturnTypeMismatch { expected: expected_name, found },
             span: expression_span(expression),
         })
     }
@@ -149,6 +166,49 @@ impl Analyzer {
             }
         }
     }
+}
+
+fn return_value_matches(
+    expected: &crate::ast::TypeName,
+    expected_name: &str,
+    found: &str,
+    expression: &Expr,
+) -> bool {
+    if strip_reference_role(expected_name) == strip_reference_role(found) {
+        return true;
+    }
+    if strip_reference_role(expected_name) == "Int"
+        && matches!(
+            primitive_type(strip_reference_role(found)),
+            Some(PrimitiveType::Integer { .. })
+        )
+    {
+        return true;
+    }
+    match primitive_type(&expected.name) {
+        Some(PrimitiveType::Integer { .. }) => is_integer_literal(expression),
+        Some(PrimitiveType::Float { .. }) => matches!(expression, Expr::FloatLiteral { .. }),
+        Some(PrimitiveType::Void) | None => false,
+    }
+}
+
+fn is_integer_literal(expression: &Expr) -> bool {
+    match expression {
+        Expr::Integer { .. } => true,
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            is_integer_literal(expression)
+        }
+        _ => false,
+    }
+}
+
+fn strip_reference_role(type_name: &str) -> &str {
+    type_name
+        .strip_prefix("abs ")
+        .or_else(|| type_name.strip_prefix("ins "))
+        .or_else(|| type_name.strip_prefix("erg "))
+        .or_else(|| type_name.strip_prefix("dat "))
+        .unwrap_or(type_name)
 }
 
 fn contains_returned_borrow(expression: &Expr) -> bool {

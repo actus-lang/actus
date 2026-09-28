@@ -1,4 +1,5 @@
 """Filesystem operations implemented behind the public `std::fs` facade."""
+"""Re-export the owned file handle required by these filesystem operations."""
 open file;
 import io;
 import path;
@@ -21,14 +22,16 @@ open unsafe extern "C" verb actus_file_rename_path(abs from: Path, abs to: Path)
 Copy the file named by `from` to `to` and return its byte count.
 
 The two path views are borrowed and never retained. A non-negative return is
-the number of copied bytes; `-1` is translated to `IoError.Failed`.
+the number of copied bytes; the C ABI returns `-1` for failure, translated to
+`IoError.Failed`.
 """
 open unsafe extern "C" verb actus_file_copy_path(abs from: Path, abs to: Path) -> Int;
 """
 Create the directory named by `path`.
 
 The path is an `abs` view. The bridge returns zero on success or `-1` when
-the host rejects the operation.
+the host rejects the operation. It does not retain the path or allocate a
+converted string; the facade maps `-1` to `IoError.Failed`.
 """
 open unsafe extern "C" verb actus_file_create_dir_path(abs path: Path) -> Int;
 """
@@ -49,7 +52,8 @@ open unsafe extern "C" verb actus_file_read_all_buffer(abs handle: Int, ins buff
 Validate the bytes in `buffer` as UTF-8 without taking ownership.
 
 The buffer is an `abs` view and remains owned by its caller. Zero means
-valid UTF-8; non-zero means invalid data and is mapped to `InvalidData`.
+valid UTF-8; the C ABI returns non-zero for invalid data, mapped to
+`InvalidData`.
 """
 open unsafe extern "C" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;
 
@@ -122,13 +126,17 @@ open verb remove_dir(abs path: Path) -> Result[Int, IoError] {
     return fs_status(status: erg status);
 }
 
-"""Discard an incomplete read buffer and return its native failure."""
+"""
+Discard an incomplete owned read buffer with `dat` and return its typed native
+failure. The buffer is deterministically dropped before `Err(IoError.Failed)`
+is produced, so the caller receives no leaked allocation.
+"""
 open verb discard_read_output(dat output: Buffer) -> Result[Buffer, IoError] {
     drop(output);
     return Result[Buffer, IoError].Err(IoError.Failed);
 }
 
-"""Read one open file into an owned buffer and close the file on return."""
+"""Read one open file into an owned buffer, close the file, and return typed failure when reading fails."""
 open verb read_open_file(dat file: File) -> Result[Buffer, IoError] {
     erg output = Buffer[0];
     erg status = actus_file_read_all_buffer(handle: abs file.handle, buffer: ins output);
@@ -160,7 +168,11 @@ open verb reject_invalid_text(dat output: Buffer) -> Result[Buffer, IoError] {
     return Err(IoError.InvalidData);
 }
 
-"""Return validated text while consuming the temporary byte buffer."""
+"""
+Validate text while consuming the temporary `dat` byte buffer. `Ok(output)`
+returns the same owned buffer; invalid data returns `Err(IoError.InvalidData)`
+after ownership cleanup remains deterministic.
+"""
 open verb accept_valid_text(dat output: Buffer) -> Result[Buffer, IoError] {
     return Ok(output);
 }
@@ -175,7 +187,7 @@ open verb propagate_text_error(dat error: IoError) -> Result[Buffer, IoError] {
     };
 }
 
-"""Validate and consume one owned byte buffer as text."""
+"""Validate and consume one owned byte buffer as text, returning bytes or typed failure."""
 open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, IoError] {
     erg valid = actus_buffer_validate_utf8(buffer: abs output);
     return case valid {
@@ -184,7 +196,7 @@ open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, IoError] {
     };
 }
 
-"""Read a file and reject contents that are not valid UTF-8 text."""
+"""Read a file, reject invalid UTF-8, and return owned bytes or a typed error."""
 open verb validate_loaded_text(dat loaded: Result[Buffer, IoError]) -> Result[Buffer, IoError] {
     return case dat loaded {
         Result.Err(error) => propagate_text_error(error: dat error),

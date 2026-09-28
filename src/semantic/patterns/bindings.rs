@@ -1,5 +1,5 @@
 use super::super::analyzer::Analyzer;
-use super::super::errors::SemanticError;
+use super::super::errors::{SemanticError, SemanticErrorKind};
 use crate::ast::{EnumPayload, Expr, Pattern, PatternBinding, Role, VariantPayload};
 
 impl Analyzer {
@@ -10,28 +10,48 @@ impl Analyzer {
         subject: &Expr,
     ) -> Result<(), SemanticError> {
         match pattern {
-            Pattern::Variant { enum_name, variant, payload, .. } => {
-                let candidate_payload = self.enum_types[enum_name]
-                    .variants
-                    .iter()
-                    .find(|item| item.name == *variant)
-                    .unwrap()
-                    .payload
-                    .clone();
+            Pattern::Variant { enum_name, variant, payload, span } => {
+                let Some(definition) = self.enum_types.get(enum_name) else {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::UnknownType { name: enum_name.clone() },
+                        span: *span,
+                    });
+                };
+                let Some(candidate) = definition.variants.iter().find(|item| item.name == *variant)
+                else {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::UnknownEnumVariant {
+                            enum_name: enum_name.clone(),
+                            variant: variant.clone(),
+                        },
+                        span: *span,
+                    });
+                };
+                let candidate_payload = candidate.payload.clone();
                 match (candidate_payload, payload) {
                     (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => {
                         for (binding, ty) in bindings.iter().zip(types) {
                             let type_name =
-                                self.specialize_pattern_type(enum_name, &ty.name, subject);
+                                self.specialize_pattern_type(enum_name, &ty.name, subject)?;
                             self.bind_pattern_binding(binding, &type_name, mode)?;
                         }
                     }
                     (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
                         for pattern in patterns {
-                            let field =
-                                fields.iter().find(|field| field.name == pattern.name).unwrap();
+                            let Some(field) =
+                                fields.iter().find(|field| field.name == pattern.name)
+                            else {
+                                return Err(SemanticError {
+                                    kind: SemanticErrorKind::EnumVariantArgumentName {
+                                        enum_name: enum_name.clone(),
+                                        variant: variant.clone(),
+                                        name: pattern.name.clone(),
+                                    },
+                                    span: pattern.span,
+                                });
+                            };
                             let type_name =
-                                self.specialize_pattern_type(enum_name, &field.ty.name, subject);
+                                self.specialize_pattern_type(enum_name, &field.ty.name, subject)?;
                             self.bind_pattern_binding(&pattern.binding, &type_name, mode)?;
                         }
                     }
@@ -43,22 +63,31 @@ impl Analyzer {
         }
     }
 
-    fn specialize_pattern_type(&self, enum_name: &str, type_name: &str, subject: &Expr) -> String {
+    fn specialize_pattern_type(
+        &self,
+        enum_name: &str,
+        type_name: &str,
+        subject: &Expr,
+    ) -> Result<String, SemanticError> {
         let Some(application) = self.resolved_type_name(subject) else {
-            return type_name.to_owned();
+            return Ok(type_name.to_owned());
         };
         let Some(parameter) = self.enum_types[enum_name]
             .generic_parameters
             .iter()
             .position(|parameter| parameter.name == type_name)
         else {
-            return type_name.to_owned();
+            return Ok(type_name.to_owned());
         };
-        application
-            .arguments
-            .get(parameter)
-            .map(pattern_type_name)
-            .unwrap_or_else(|| type_name.to_owned())
+        let argument = application.arguments.get(parameter).ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::GenericArityMismatch {
+                name: application.name.clone(),
+                expected: self.enum_types[enum_name].generic_parameters.len(),
+                found: application.arguments.len(),
+            },
+            span: application.span,
+        })?;
+        Ok(pattern_type_name(argument))
     }
 
     fn bind_pattern_binding(

@@ -85,9 +85,9 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         for (_, _, parameter_type) in &signature.params {
-            if let Some(type_name) = parse_type_name_key(parameter_type, span) {
-                self.validate_type_reference(&type_name)?;
-            }
+            let type_name = parse_type_name_key(parameter_type, span)
+                .ok_or_else(|| malformed_type_name(parameter_type, span))?;
+            self.validate_type_reference(&type_name)?;
         }
         if let Some(return_type) = &signature.return_type_name {
             self.validate_type_reference(return_type)?;
@@ -109,23 +109,16 @@ impl Analyzer {
                 });
             }
         }
-        let params = signature
-            .params
-            .iter()
-            .map(|(name, role, ty)| {
-                let parsed = parse_type_name_key(ty, span).unwrap_or_else(|| TypeName {
-                    name: ty.clone(),
-                    arguments: Vec::new(),
-                    reference_role: None,
-                    span,
-                });
-                (
-                    name.clone(),
-                    role.clone(),
-                    super::analyzer::canonical_type_name(&substitute_type(&parsed, &bindings)),
-                )
-            })
-            .collect();
+        let mut params = Vec::with_capacity(signature.params.len());
+        for (name, role, ty) in &signature.params {
+            let parsed =
+                parse_type_name_key(ty, span).ok_or_else(|| malformed_type_name(ty, span))?;
+            params.push((
+                name.clone(),
+                role.clone(),
+                super::analyzer::canonical_type_name(&substitute_type(&parsed, &bindings)),
+            ));
+        }
         Ok(VerbSignature {
             params,
             dynamic_params: signature.dynamic_params.clone(),
@@ -138,6 +131,10 @@ impl Analyzer {
             generic_parameters: Vec::new(),
         })
     }
+}
+
+fn malformed_type_name(name: &str, span: SourceSpan) -> SemanticError {
+    SemanticError { kind: SemanticErrorKind::MalformedTypeName { name: name.to_owned() }, span }
 }
 
 fn unify_generic_type(

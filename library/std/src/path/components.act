@@ -9,7 +9,7 @@ must never be returned as an owned path or escape the source scope.
 open struct PathComponent {
     """The single borrowed origin that keeps this component view alive."""
     abs source: Path,
-    """Start byte or code-unit offset within the source path."""
+    """Owned erg start byte or code-unit offset within the source path."""
     erg offset: Int,
     """Component length in the source representation's units."""
     erg length: Int,
@@ -25,28 +25,40 @@ and return components whose origin remains this source path.
 open struct PathComponents {
     """The one source path from which every returned component originates."""
     abs source: Path,
-    """Current byte or code-unit offset for the next component."""
+    """Owned erg current byte or code-unit offset for the next component."""
     erg offset: Int,
     """Exclusive payload limit, excluding the source terminator."""
     erg limit: Int,
 }
 
-"""Return the final parent component as a non-owning `abs` view, if present."""
+"""Return the final parent component through the C ABI as a non-owning `abs` view, if present."""
 open unsafe extern "C" verb actus_path_parent(abs self: Path) -> Option[abs PathComponent];
 
-"""Return the final file-name component as a non-owning `abs` view, if present."""
+"""Return the final file-name component through the C ABI as a non-owning `abs` view, if present."""
 open unsafe extern "C" verb actus_path_file_name(abs self: Path) -> Option[abs PathComponent];
 
-"""Return the file stem as an `abs` component, excluding its final extension."""
+"""
+Return the file stem through the C ABI as an `abs` component, excluding its
+final extension. The view aliases source storage and performs no allocation.
+`None` is returned when the path has no file name.
+"""
 open unsafe extern "C" verb actus_path_file_stem(abs self: Path) -> Option[abs PathComponent];
 
-"""Return the final extension as an `abs` component, if the name has one."""
+"""
+Return the final extension through the C ABI as an `abs` component without
+allocating or transcoding source units. `None` means the final name has no
+extension according to the selected platform's raw separator rules.
+"""
 open unsafe extern "C" verb actus_path_extension(abs self: Path) -> Option[abs PathComponent];
 
-"""Create zero-allocation iterator state rooted in the borrowed source path."""
+"""Create zero-allocation iterator state through the C ABI, rooted in the borrowed source path."""
 open unsafe extern "C" verb actus_path_components(abs self: Path) -> PathComponents;
 
-"""Advance a borrowed iterator and return its next source-origin component."""
+"""
+Advance the borrowed iterator through the C ABI. `iter` is an `ins` loan whose
+cursor is restored to its caller; the returned `Option` is an `abs`
+source-origin view and no component allocation occurs.
+"""
 open unsafe extern "C" verb actus_path_next_component(ins iter: PathComponents) -> Option[abs PathComponent];
 
 """Return the final parent component as a non-owning `abs` view, if present."""
@@ -59,12 +71,18 @@ open verb file_name(abs self: Path) -> Option[abs PathComponent] {
     return actus_path_file_name(self: abs self);
 }
 
-"""Return the file stem as an `abs` component, excluding its final extension."""
+"""
+Return the file stem as a zero-allocation `abs` component, excluding its final
+extension. `None` is returned when no file name can be identified.
+"""
 open verb file_stem(abs self: Path) -> Option[abs PathComponent] {
     return actus_path_file_stem(self: abs self);
 }
 
-"""Return the final extension as an `abs` component, if the name has one."""
+"""
+Return the final extension as a zero-allocation `abs` component. `None` means
+the final file name has no extension under the raw platform parser.
+"""
 open verb extension(abs self: Path) -> Option[abs PathComponent] {
     return actus_path_extension(self: abs self);
 }
@@ -74,7 +92,11 @@ open verb components(abs self: Path) -> PathComponents {
     return actus_path_components(self: abs self);
 }
 
-"""Advance a borrowed iterator and return its next source-origin component."""
+"""
+Advance `iter` through an exclusive `ins` loan and restore its cursor to the
+caller. The returned `Option` is an `abs` view into the original path; no heap
+storage is created and `None` marks the end of iteration.
+"""
 open verb next_component(ins iter: PathComponents) -> Option[abs PathComponent] {
     return actus_path_next_component(iter: ins iter);
 }

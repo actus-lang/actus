@@ -28,9 +28,22 @@ fn validates_mutable_struct_field_assignment() {
 }
 
 #[test]
+fn rejects_assignment_between_inferred_struct_types() {
+    let error = analyze_source(
+        "struct Left { value: Int, } struct Right { value: Int, } verb main() { erg left = Left { value: 1, }; erg right = Right { value: 2, }; left = right; }",
+    )
+    .expect_err("inferred struct assignments must preserve the concrete type");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
+            if expected == "Left" && found == "Right"
+    ));
+}
+
+#[test]
 fn registers_structs_and_validates_owned_literals() {
     let model = analyze_source(
-        "struct Point { x: Int, y: Int, } verb main() { erg point = Point { x: 1, y: 2, }; inspect(point.x); }",
+        "struct Point { x: Int, y: Int, } verb main() { erg point = Point { x: 1, y: 2, }; point.x; }",
     )
     .expect("valid struct declaration and literal should pass");
 
@@ -180,7 +193,7 @@ fn rejects_nested_move_that_overlaps_an_existing_partial_move() {
 #[test]
 fn freezes_struct_owner_for_field_borrow_and_restores_it() {
     let model = analyze_source(
-        "struct Holder { payload: Buffer, value: Int, } verb main() { erg holder = Holder { payload: Buffer[4], value: 1, }; { abs view = ref holder.payload; inspect(view); } holder.value = 2; }",
+        "struct Holder { payload: Buffer, value: Int, } verb main() { erg holder = Holder { payload: Buffer[4], value: 1, }; { abs view = ref holder.payload; view; } holder.value = 2; }",
     )
     .expect("field borrow should end with its lexical scope");
     assert_eq!(model.borrows[0].field.as_deref(), Some("payload"));

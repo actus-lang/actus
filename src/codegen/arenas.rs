@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::expression_literals::coerce_to_ir_type;
+use super::expressions::coerce_to_ir_type;
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -67,7 +67,7 @@ fn placement_layout(
     else {
         return Err(NativeEmitError("place receiver is not an Arena".to_owned()));
     };
-    let value_type = initializer_type(argument, local_types, functions, layouts);
+    let value_type = initializer_type(argument, local_types, functions, layouts)?;
     let size = layouts
         .type_size(value_type)
         .ok_or_else(|| NativeEmitError("placed value has no native layout".to_owned()))?;

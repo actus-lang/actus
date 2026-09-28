@@ -26,6 +26,7 @@ impl Analyzer {
         };
         let index = self.binding(name, *identifier_span)?;
         self.ensure_access_available(index, name, span)?;
+        self.reject_ins_dat_transfer(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidDatArgument { name: name.clone() },
@@ -69,6 +70,7 @@ impl Analyzer {
         };
         let index = self.binding(name, object_span)?;
         self.ensure_access_available(index, name, span)?;
+        self.reject_ins_dat_transfer(index, name, span)?;
         self.validate_struct_field_move(object, field, span)?;
         let field_path = format_field_path(object, field);
         if self.model.bindings[index].access.is_frozen() {
@@ -139,6 +141,18 @@ impl Analyzer {
             kind: SemanticErrorKind::InvalidDatArgument { name: field.to_owned() },
             span,
         })
+    }
+
+    fn reject_ins_dat_transfer(
+        &self,
+        index: usize,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.model.bindings[index].role != Role::Ins {
+            return Ok(());
+        }
+        Err(SemanticError { kind: SemanticErrorKind::EscapingLoan { name: name.to_owned() }, span })
     }
 }
 

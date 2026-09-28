@@ -1,6 +1,11 @@
 """The public `std::fs` facade for filesystem operations."""
+"""Re-export the owned file handle and its stream performances."""
 open file;
+"""Re-export typed metadata values and metadata providers."""
 open metadata;
+"""Re-export path-based filesystem operations and typed statuses."""
 open operations;
+"""Re-export explicit open-mode configuration and constructors."""
 open options;
+"""Re-export file cursor origins and seek contracts."""
 open seek;

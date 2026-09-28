@@ -45,14 +45,19 @@ open unsafe extern "C" verb actus_path_set_extension(
 Replace the final file-name component using raw platform code units.
 
 `self` is an `ins` loan and `name` is an `abs` view. The bridge returns zero
-or a typed-negative status and performs no implicit UTF-8 transcoding.
+or a typed-negative status, performs no implicit UTF-8 transcoding, and uses
+the existing capacity without allocation. `name` is never retained.
 """
 open unsafe extern "C" verb actus_path_set_file_name(
     ins self: Path,
     abs name: Path
 ) -> Int;
 
-"""Translate a builder bridge status without exposing its numeric ABI."""
+"""
+Translate a builder status while consuming `path` with `dat`. `Ok` returns the
+same owned storage; `Err` reports `PathError` and drops the consumed path so
+the numeric C ABI status and cleanup never escape the typed facade.
+"""
 open verb finish_builder(dat path: Path, erg status: Int) -> Result[Path, PathError] {
     return case status {
         0 => Result[Path, PathError].Ok(path),

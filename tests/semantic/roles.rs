@@ -16,6 +16,14 @@ fn validates_a_performance_against_its_role_contract() {
 }
 
 #[test]
+fn accepts_zero_sized_structs_and_marker_roles() {
+    analyze_source(
+        "struct Marker { } role MarkerRole { } perform MarkerRole for Marker { } verb main() -> Int { return 0; }",
+    )
+    .expect("empty structs and marker roles have explicit language meaning");
+}
+
+#[test]
 fn rejects_duplicate_roles_and_role_methods() {
     let duplicate_role = analyze_source(
         "role Writer { verb write(abs self: Int); } role Writer { verb read(abs self: Int); }",

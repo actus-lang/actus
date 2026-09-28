@@ -1,6 +1,6 @@
 """Lexical path normalization without filesystem or symlink resolution."""
 
-"""Normalize an owned path in place through the Rust runtime.
+"""Normalize an owned path in place through the Rust runtime without allocation.
 
 `self` is an `ins` call-scope loan at the ABI boundary so the runtime can
 rewrite the existing owned buffer without allocation. The public `normalize`
@@ -11,15 +11,20 @@ open unsafe extern "C" verb actus_path_normalize(ins self: Path) -> Int;
 """Remove lexical dot components and repeated separators from an owned path.
 
 `self` is transferred with `dat`. Success returns the same owned `Path` after
-in-place normalization; errors return `PathError` and preserve no filesystem
-side effects. Absolute roots cannot escape through `..`.
+in-place normalization without allocating; errors return `PathError` and
+preserve no filesystem side effects. Absolute roots cannot escape through
+`..`.
 """
 open verb normalize(dat self: Path) -> Result[Path, PathError] {
     erg status = actus_path_normalize(self: ins self);
     return finish_normalized(path: dat self, status: status);
 }
 
-"""Translate runtime normalization status while consuming the owned path."""
+"""
+Translate runtime normalization status while consuming the owned path with
+`dat`. `Ok` returns the same storage; `Err` maps the status to `PathError` and
+performs deterministic cleanup of the consumed path.
+"""
 open verb finish_normalized(dat path: Path, erg status: Int) -> Result[Path, PathError] {
     return case status {
         0 => Ok(path),

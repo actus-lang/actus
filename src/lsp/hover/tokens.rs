@@ -1,0 +1,47 @@
+use std::path::PathBuf;
+
+use crate::lexer::{SourceSpan, Token, TokenKind, scan};
+
+use super::super::position::{LineIndex, LspRange};
+
+pub(super) fn identifier_at(tokens: &[Token], offset: usize) -> Option<(String, SourceSpan)> {
+    tokens.iter().find_map(|token| {
+        (token.span.start <= offset
+            && offset <= token.span.end
+            && matches!(
+                token.kind,
+                TokenKind::Identifier(_)
+                    | TokenKind::IntType { .. }
+                    | TokenKind::FloatType { .. }
+                    | TokenKind::VoidType
+            ))
+        .then(|| match &token.kind {
+            TokenKind::Identifier(name) => (name.clone(), token.span),
+            TokenKind::IntType { signed, width } => {
+                (format!("{}{}", if *signed { 'i' } else { 'u' }, width), token.span)
+            }
+            TokenKind::FloatType { width } => (format!("f{width}"), token.span),
+            TokenKind::VoidType => ("Void".to_owned(), token.span),
+            _ => unreachable!(),
+        })
+    })
+}
+
+pub(super) fn identifier_span(source: &str, span: SourceSpan, name: &str) -> Option<SourceSpan> {
+    let (tokens, _) = scan(source.get(span.start..span.end)?);
+    tokens.into_iter().find_map(|token| match token.kind {
+        TokenKind::Identifier(identifier) if identifier == name => {
+            Some(SourceSpan::new(span.start + token.span.start, span.start + token.span.end))
+        }
+        _ => None,
+    })
+}
+
+pub(super) fn range(source: &str, span: SourceSpan) -> LspRange {
+    let index = LineIndex::new(source);
+    LspRange { start: index.position(source, span.start), end: index.position(source, span.end) }
+}
+
+pub(super) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
+    uri.strip_prefix("file://").map(PathBuf::from)
+}

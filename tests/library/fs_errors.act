@@ -141,7 +141,7 @@ verb invalid_text_returns_typed_error() -> Int {
     return case dat loaded {
         Result.Ok(output) => {
             drop(output);
-            1;
+            return 1;
         },
         Result.Err(error) => case dat error {
             IoError.InvalidData => 0,

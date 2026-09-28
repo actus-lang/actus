@@ -7,6 +7,10 @@ resource exactly once when ownership leaves scope.
 """
 import io;
 import path;
+"""
+An owned opaque file handle backed by one host operating-system resource.
+The erg handle is closed by its Drop performance and never stores a Path.
+"""
 open struct File {
     """Opaque host handle. Only runtime bridge verbs may interpret it."""
     erg handle: Int,
@@ -14,7 +18,9 @@ open struct File {
 
 """
 Open a path using the runtime's read mode. `path` is an `abs` view and is
-not retained. The result is a new owned `File`, or `-1` on native failure.
+not retained or copied. The bridge performs no path allocation. The result is
+a new owned `File`, or `-1` on native failure; the facade maps failure to
+`IoError.Failed`.
 """
 open unsafe extern "C" verb actus_file_open_path(abs path: Path, abs mode: Int) -> Int;
 
@@ -28,22 +34,23 @@ open unsafe extern "C" verb actus_file_read_buffer(abs handle: Int, ins buffer: 
 Write the logical bytes of an `abs` buffer. Non-negative values are byte
 counts; `-1` is `Failed` and `-2` is `EndOfStream`.
 """
+"""The C ABI returns a byte count, `-1` for failure, or `-2` for EOF."""
 open unsafe extern "C" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;
 
-"""Flush an owned handle; zero is success and `-1` is `Failed`."""
+"""Flush an owned handle through the C ABI; zero is success and `-1` is `Failed`."""
 open unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
 
-"""Close an owned handle exactly once; zero is success and `-1` is failure."""
+"""Close an owned handle exactly once through the C ABI; zero is success and `-1` is failure."""
 open unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
-"""Move a file cursor and return its resulting absolute byte position."""
+"""Move a file cursor through the C ABI and return its resulting absolute byte position or failure."""
 open unsafe extern "C" verb actus_file_seek_buffer(
     abs handle: Int,
     abs offset: Int,
     abs whence: Int
 ) -> Int;
 
-"""Consume an invalid scalar handle so constructor branches join cleanly."""
+"""Consume an invalid scalar handle and return it so constructor branches join cleanly."""
 open verb discard_handle(dat handle: Int) -> Int { return handle; }
 
 """
@@ -80,7 +87,8 @@ open verb file_create(abs path: Path) -> Result[File, IoError] {
 }
 
 """Read file bytes into caller-provided storage without allocating per call."""
-perform Reader for File {
+open perform Reader for File {
+    """Read through ins loans, mutate caller storage, and return count or typed error."""
     verb read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
         return case status {
@@ -92,7 +100,12 @@ perform Reader for File {
 }
 
 """Write borrowed bytes and flush a file through the Writer contract."""
-perform Writer for File {
+open perform Writer for File {
+    """
+    Write an `abs` byte view through an `ins` file loan. No input buffer is
+    allocated or retained. `Result.Ok(count)` is the exact byte count;
+    `Err` reports the typed I/O failure.
+    """
     verb write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
         return case status {
@@ -102,6 +115,7 @@ perform Writer for File {
         };
     }
 
+    """Flush through an ins file loan and return zero or typed failure."""
     verb flush(ins self: File) -> Result[Int, IoError] {
         erg status = actus_file_flush_buffer(handle: abs self.handle);
         return case status {
@@ -119,7 +133,11 @@ open verb file_seek_status(erg status: Int) -> Result[Int, IoError] {
     };
 }
 
-"""Seek from the beginning of a file."""
+"""
+Seek through the `ins` file loan from the beginning. The file position is
+mutated in the runtime without allocating a buffer. `Ok(position)` returns the
+new position; `Err(IoError.Failed)` reports rejection.
+"""
 open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, IoError] {
     erg origin = 0;
     erg status = actus_file_seek_buffer(
@@ -130,7 +148,11 @@ open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, IoErro
     return file_seek_status(status: status);
 }
 
-"""Seek relative to the current file position."""
+"""
+Seek through the `ins` file loan relative to its current position. The
+position mutation is allocation-free. `Ok(position)` returns the new position;
+`Err(IoError.Failed)` reports runtime rejection.
+"""
 open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, IoError] {
     erg origin = 1;
     erg status = actus_file_seek_buffer(
@@ -141,7 +163,11 @@ open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, IoEr
     return file_seek_status(status: status);
 }
 
-"""Seek relative to the end of a file."""
+"""
+Seek through the `ins` file loan relative to the end of the file. The runtime
+mutates only the cursor position and allocates no buffer. `Ok(position)` is the
+new position; `Err(IoError.Failed)` reports rejection.
+"""
 open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError] {
     erg origin = 2;
     erg status = actus_file_seek_buffer(
@@ -153,7 +179,8 @@ open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError]
 }
 
 """Satisfy the positional stream contract through the host runtime."""
-perform Seeker for File {
+open perform Seeker for File {
+    """Seek through an ins file loan and dat cursor origin, returning a position or error."""
     verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError] {
         return case dat from {
             SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
@@ -163,13 +190,15 @@ perform Seeker for File {
     }
 }
 
-"""Return metadata for this open file without transferring its handle."""
+"""Return metadata for this open file without transferring its handle, or typed failure."""
 open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
     drop(output);
     return Result[Metadata, IoError].Err(IoError.Failed);
 }
 
-perform MetadataProvider for File {
+"""Provide metadata through an ins file loan and return scalar facts or error."""
+open perform MetadataProvider for File {
+    """Inspect metadata through an ins file loan and return scalar facts or failure."""
     verb metadata(ins self: File) -> Result[Metadata, IoError] {
         erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
         erg status = actus_file_metadata_handle_buffer(
@@ -184,7 +213,8 @@ perform MetadataProvider for File {
 }
 
 """Close the owned operating-system resource during deterministic LIFO cleanup."""
-perform Drop for File {
+open perform Drop for File {
+    """Close the owned File resource through an ins loan during deterministic cleanup."""
     verb drop(ins self: File) {
         actus_file_close_buffer(handle: abs self.handle);
     }

@@ -62,3 +62,40 @@ fn reports_duplicate_declarations_with_both_source_locations() {
     assert_eq!(diagnostic.first.span.start, 0);
     assert_eq!(diagnostic.second.span.start, 0);
 }
+
+#[test]
+fn reports_duplicate_pack_declarations_with_both_source_locations() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "demo/demo.act",
+        "pack Register { erg storage: u8; layout little; fields { erg all: u8 at 0; } }",
+    );
+    fixture.write(
+        "demo/other.act",
+        "pack Register { erg storage: u8; layout little; fields { erg all: u8 at 0; } }",
+    );
+
+    let error = parse_module(&ModuleResolver::new(&fixture.root), "demo")
+        .expect_err("duplicate sibling packs must fail");
+    let ModuleError::DuplicateDeclaration(diagnostic) = error else {
+        panic!("expected duplicate declaration diagnostic");
+    };
+    assert_eq!(diagnostic.kind, "pack");
+    assert_eq!(diagnostic.name, "Register");
+}
+
+#[test]
+fn reports_duplicate_performances_with_both_source_locations() {
+    let fixture = Fixture::new();
+    fixture.write("demo/demo.act", "role Marker { }");
+    fixture.write("demo/first.act", "perform Marker for Int { }");
+    fixture.write("demo/second.act", "perform Marker for Int { }");
+
+    let error = parse_module(&ModuleResolver::new(&fixture.root), "demo")
+        .expect_err("duplicate sibling performances must fail");
+    let ModuleError::DuplicateDeclaration(diagnostic) = error else {
+        panic!("expected duplicate declaration diagnostic");
+    };
+    assert_eq!(diagnostic.kind, "perform");
+    assert_eq!(diagnostic.name, "Marker for Int");
+}

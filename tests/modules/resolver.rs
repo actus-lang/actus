@@ -91,10 +91,39 @@ fn rejects_ambiguous_directory_and_single_file_roots() {
 }
 
 #[test]
+fn rejects_direct_imports_that_bypass_a_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("driver/gpio/gpio.act");
+    fixture.write("driver/gpio/registers.act");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("driver::gpio::registers")
+        .expect_err("sibling modules must be reached through the parent facade");
+
+    assert!(
+        matches!(&error, ModuleResolutionError::BypassesFacade { parent, .. } if parent == "driver::gpio")
+    );
+    let diagnostic =
+        actus::diagnostics::module_diagnostic(&actus::modules::ModuleError::Resolution(error));
+    assert_eq!(diagnostic.code(), "E1108");
+}
+
+#[test]
 fn rejects_invalid_module_paths() {
     let fixture = Fixture::new();
     let error = ModuleResolver::new(&fixture.root)
         .resolve("driver/../gpio")
         .expect_err("path traversal must fail");
     assert!(matches!(error, ModuleResolutionError::InvalidPath(_)));
+}
+
+#[test]
+fn classifies_resolution_failures_with_stable_module_codes() {
+    let fixture = Fixture::new();
+    let missing = ModuleResolver::new(&fixture.root)
+        .resolve("driver::gpio")
+        .expect_err("missing facade should fail");
+    let diagnostic =
+        actus::diagnostics::module_diagnostic(&actus::modules::ModuleError::Resolution(missing));
+    assert_eq!(diagnostic.code(), "E1101");
 }

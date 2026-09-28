@@ -35,10 +35,13 @@ pub(crate) struct DependencyGraph {
     pub(crate) packages: Vec<DependencyPackage>,
 }
 
-pub(crate) fn resolve(manifest_path: &Path) -> Result<DependencyGraph, ConfigurationError> {
+pub(crate) fn resolve(
+    manifest_path: &Path,
+    reject_legacy_manifest: bool,
+) -> Result<DependencyGraph, ConfigurationError> {
     let mut graph = DependencyGraph::default();
     let mut visiting = HashSet::new();
-    visit_manifest(manifest_path, &mut graph, &mut visiting)?;
+    visit_manifest(manifest_path, &mut graph, &mut visiting, reject_legacy_manifest)?;
     graph.packages.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(graph)
 }
@@ -47,7 +50,14 @@ fn visit_manifest(
     manifest_path: &Path,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
+    reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
+    if reject_legacy_manifest && super::manifest::is_legacy_manifest(manifest_path) {
+        return Err(ConfigurationError(
+            "strict mode rejects deprecated dependency `Arca.toml`; rename it to `Actus.toml`"
+                .to_owned(),
+        ));
+    }
     let canonical = fs::canonicalize(manifest_path).map_err(|error| {
         ConfigurationError(format!(
             "cannot resolve manifest `{}`: {error}",
@@ -73,9 +83,14 @@ fn visit_manifest(
                     DependencyPackage { name, version, path: None, checksum: None },
                 )?;
             }
-            DependencySpec::Local(table) => {
-                visit_local_dependency(&canonical, name, table, graph, visiting)?
-            }
+            DependencySpec::Local(table) => visit_local_dependency(
+                &canonical,
+                name,
+                table,
+                graph,
+                visiting,
+                reject_legacy_manifest,
+            )?,
         }
     }
     visiting.remove(&canonical);
@@ -108,34 +123,14 @@ fn visit_local_dependency(
     table: DependencyTable,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
+    reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
     let relative_path = table.path.ok_or_else(|| {
         ConfigurationError(format!("dependency `{name}` must declare a local `path`"))
     })?;
-    let package_root =
-        parent_manifest.parent().unwrap_or_else(|| Path::new(".")).join(&relative_path);
-    let Some(dependency_manifest) = super::manifest::manifest_in_directory(&package_root) else {
-        return Err(ConfigurationError(format!(
-            "InvalidDependencyPath: dependency `{name}` has no Actus.toml at `{}`",
-            package_root.display()
-        )));
-    };
-    super::manifest::warn_if_legacy_manifest(&dependency_manifest);
-    let child = super::manifest::read(&dependency_manifest)?;
-    if let Some(constraint) = &table.version {
-        let constraint = super::version::VersionConstraint::parse(constraint).map_err(|error| {
-            ConfigurationError(format!("InvalidVersionConstraint for `{name}`: {error}"))
-        })?;
-        let package_version = super::version::Version::parse(&child.package.version)
-            .map_err(|error| ConfigurationError(format!("InvalidVersion for `{name}`: {error}")))?;
-        if !constraint.matches(&package_version) {
-            return Err(ConfigurationError(format!(
-                "VersionConflict: dependency `{name}` requires `{}` but package provides `{}`",
-                constraint_text(constraint),
-                child.package.version
-            )));
-        }
-    }
+    let (package_root, dependency_manifest, child) =
+        load_local_dependency(parent_manifest, &name, &relative_path, reject_legacy_manifest)?;
+    validate_dependency_version(&name, table.version.as_deref(), &child.package.version)?;
     let child_source_root = source_root(&child, &package_root);
     if !child_source_root.is_dir() {
         return Err(ConfigurationError(format!(
@@ -153,7 +148,57 @@ fn visit_local_dependency(
             checksum: Some(content_checksum(&package_root)?),
         },
     )?;
-    visit_manifest(&dependency_manifest, graph, visiting)
+    visit_manifest(&dependency_manifest, graph, visiting, reject_legacy_manifest)
+}
+
+fn load_local_dependency(
+    parent_manifest: &Path,
+    name: &str,
+    relative_path: &str,
+    reject_legacy_manifest: bool,
+) -> Result<(PathBuf, PathBuf, ActusManifest), ConfigurationError> {
+    let package_root =
+        parent_manifest.parent().unwrap_or_else(|| Path::new(".")).join(relative_path);
+    let Some(dependency_manifest) = super::manifest::manifest_in_directory(&package_root) else {
+        return Err(ConfigurationError(format!(
+            "InvalidDependencyPath: dependency `{name}` has no Actus.toml at `{}`",
+            package_root.display()
+        )));
+    };
+    if reject_legacy_manifest && super::manifest::is_legacy_manifest(&dependency_manifest) {
+        return Err(ConfigurationError(
+            "strict mode rejects deprecated dependency `Arca.toml`; rename it to `Actus.toml`"
+                .to_owned(),
+        ));
+    }
+    if !reject_legacy_manifest {
+        super::manifest::warn_if_legacy_manifest(&dependency_manifest);
+    }
+    let child = super::manifest::read(&dependency_manifest)?;
+    Ok((package_root, dependency_manifest, child))
+}
+
+fn validate_dependency_version(
+    name: &str,
+    constraint_text_value: Option<&str>,
+    package_version_text: &str,
+) -> Result<(), ConfigurationError> {
+    let Some(constraint_text_value) = constraint_text_value else {
+        return Ok(());
+    };
+    let constraint =
+        super::version::VersionConstraint::parse(constraint_text_value).map_err(|error| {
+            ConfigurationError(format!("InvalidVersionConstraint for `{name}`: {error}"))
+        })?;
+    let package_version = super::version::Version::parse(package_version_text)
+        .map_err(|error| ConfigurationError(format!("InvalidVersion for `{name}`: {error}")))?;
+    if constraint.matches(&package_version) {
+        return Ok(());
+    }
+    Err(ConfigurationError(format!(
+        "VersionConflict: dependency `{name}` requires `{}` but package provides `{package_version_text}`",
+        constraint_text(constraint)
+    )))
 }
 
 fn record_package(

@@ -65,6 +65,12 @@ impl Analyzer {
         let Expr::Identifier { name, span: identifier_span } = expression else { return Ok(()) };
         let index = self.binding(name, *identifier_span)?;
         self.ensure_access_available(index, name, span)?;
+        if self.model.bindings[index].role == Role::Ins {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::EscapingLoan { name: name.clone() },
+                span,
+            });
+        }
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidOwnerInitializer { name: name.clone() },

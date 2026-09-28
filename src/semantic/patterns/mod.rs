@@ -39,12 +39,13 @@ impl Analyzer {
         for branch in branches {
             self.restore_binding_states(&branch_state);
             let name = pattern_name(&branch.pattern);
+            let guarded = branch.guard.is_some();
             if wildcard_seen {
                 return Err(unreachable_pattern(name, pattern_span(&branch.pattern)));
             }
-            if is_wildcard(&branch.pattern) {
+            if is_wildcard(&branch.pattern) && !guarded {
                 wildcard_seen = true;
-            } else if !seen.insert(name.clone()) {
+            } else if !guarded && !seen.insert(name.clone()) {
                 return Err(duplicate_pattern(name, pattern_span(&branch.pattern)));
             }
             self.validate_pattern(&branch.pattern, &subject_type, subject)?;

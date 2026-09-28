@@ -8,6 +8,7 @@ pub enum ModuleResolutionError {
     InvalidPath(String),
     MissingFacade { module: String, expected: PathBuf },
     AmbiguousModule { module: String, directory: PathBuf, file: PathBuf },
+    BypassesFacade { module: String, parent: String, facade: PathBuf },
     Io { path: PathBuf, message: String },
 }
 
@@ -25,6 +26,11 @@ impl Display for ModuleResolutionError {
                 "module `{module}` has both directory `{}` and file `{}` roots",
                 directory.display(),
                 file.display()
+            ),
+            Self::BypassesFacade { module, parent, facade } => write!(
+                formatter,
+                "module `{module}` bypasses parent facade `{}` for `{parent}`",
+                facade.display()
             ),
             Self::Io { path, message } => {
                 write!(formatter, "cannot inspect module path `{}`: {message}", path.display())
@@ -85,6 +91,7 @@ impl ModuleResolver {
             .get(segments[0])
             .cloned()
             .unwrap_or_else(|| self.source_root.clone());
+        reject_facade_bypass(&root, &segments, module_path)?;
         let directory = segments.iter().fold(root.clone(), |path, segment| path.join(segment));
         let file = self.module_file_root(&root, &segments).with_extension("act");
         if directory.is_dir() && file.is_file() {
@@ -128,6 +135,34 @@ fn valid_segment(segment: &str) -> bool {
     let Some(first) = characters.next() else { return false };
     (first == '_' || first.is_ascii_alphabetic())
         && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+}
+
+fn reject_facade_bypass(
+    root: &Path,
+    segments: &[&str],
+    module_path: &str,
+) -> Result<(), ModuleResolutionError> {
+    if segments.len() < 2 {
+        return Ok(());
+    }
+    for parent_length in 1..segments.len() {
+        let parent = segments[..parent_length]
+            .iter()
+            .fold(root.to_owned(), |path, segment| path.join(segment));
+        if !parent.is_dir() {
+            continue;
+        }
+        let parent_name = segments[parent_length - 1];
+        let facade = parent.join(format!("{parent_name}.act"));
+        if facade.is_file() {
+            return Err(ModuleResolutionError::BypassesFacade {
+                module: module_path.to_owned(),
+                parent: segments[..parent_length].join("::"),
+                facade,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn resolve_directory(

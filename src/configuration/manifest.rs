@@ -174,7 +174,11 @@ pub(crate) fn manifest_in_directory(directory: &Path) -> Option<PathBuf> {
 }
 
 pub(crate) fn warn_if_legacy_manifest(path: &Path) {
-    if path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME) {
+    if is_legacy_manifest(path) {
         eprintln!("warning: 'Arca.toml' is deprecated, please rename to 'Actus.toml'");
     }
+}
+
+pub(crate) fn is_legacy_manifest(path: &Path) -> bool {
+    path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME)
 }

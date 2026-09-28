@@ -37,7 +37,7 @@ pub(super) fn lower_method_call(
     });
     combined.extend(arguments.iter().cloned());
     let receiver_type =
-        super::expressions::initializer_type(receiver, local_types, functions, layouts);
+        super::expressions::initializer_type(receiver, local_types, functions, layouts)?;
     if receiver_type == NativeType::FatPointer {
         let fat_pointer = lower_expression(
             function,
@@ -174,13 +174,17 @@ fn lower_call_arguments(
             layouts,
         )?;
         values.push(value);
-        if dynamic_params.get(index).copied().unwrap_or(false) {
+        let is_dynamic = dynamic_params
+            .get(index)
+            .copied()
+            .ok_or_else(|| NativeEmitError("call metadata is missing parameter mode".to_owned()))?;
+        if is_dynamic {
             let role = dynamic_roles
                 .get(index)
                 .and_then(Option::as_deref)
                 .ok_or_else(|| NativeEmitError("dynamic parameter has no role".to_owned()))?;
             let native_type =
-                super::expressions::initializer_type(argument, local_types, functions, layouts);
+                super::expressions::initializer_type(argument, local_types, functions, layouts)?;
             let symbol = super::vtable::vtable_symbol_for_native(role, native_type);
             let global = string_data
                 .get(&symbol)

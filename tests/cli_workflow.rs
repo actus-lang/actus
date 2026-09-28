@@ -105,6 +105,49 @@ fn check_validates_source_without_emitting_code() {
 }
 
 #[test]
+fn strict_commands_report_mode_in_success_metadata() {
+    let root = std::env::temp_dir().join(format!("actus-strict-metadata-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::create_dir_all(root.join("tests")).expect("create test directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"strict-metadata\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+        .expect("write entry source");
+    fs::write(root.join("tests/smoke.act"), "meta test\nverb smoke() -> Int { return 0; }\n")
+        .expect("write test source");
+
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", "--strict"])
+        .env("ACTUS_STRICT", "0")
+        .current_dir(&root)
+        .output()
+        .expect("run strict check");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "obj"])
+        .env("ACTUS_STRICT", "0")
+        .current_dir(&root)
+        .output()
+        .expect("run strict build");
+    let test = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["test", "--strict"])
+        .env("ACTUS_STRICT", "0")
+        .current_dir(&root)
+        .output()
+        .expect("run strict tests");
+
+    assert!(check.status.success());
+    assert!(build.status.success());
+    assert!(test.status.success());
+    assert!(String::from_utf8_lossy(&check.stdout).contains("(strict)"));
+    assert!(String::from_utf8_lossy(&build.stdout).contains("(strict)"));
+    assert!(String::from_utf8_lossy(&test.stdout).contains("(strict)"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn check_validates_a_module_sibling_through_its_facade() {
     let root = std::env::temp_dir().join(format!("actus-check-module-{}", std::process::id()));
     let module = root.join("src/path");
@@ -380,6 +423,62 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
     assert!(stdout.contains("exit code 0"));
     assert!(!stdout.contains("\x1b[32m"));
     assert!(!stdout.contains("\x1b[31m"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_reports_target_filtered_counts_deterministically() {
+    let root = std::env::temp_dir().join(format!("actus-test-targets-{}", std::process::id()));
+    fs::create_dir_all(root.join("tests")).expect("create test directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"runner-targets\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        root.join("tests/targets.act"),
+        "meta target(\"unix\") meta test\nverb unix_smoke() -> Int { return 0; }\nmeta target(\"windows\") meta test\nverb windows_smoke() -> Int { return 0; }\n",
+    )
+    .expect("write target tests");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("test")
+        .current_dir(&root)
+        .output()
+        .expect("run target tests");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let expected_name = if cfg!(windows) { "windows_smoke" } else { "unix_smoke" };
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("running 1 tests (1 filtered)"), "stdout: {stdout}");
+    assert!(stdout.contains(expected_name), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_propagates_non_zero_meta_test_exit_status() {
+    let root = std::env::temp_dir().join(format!("actus-test-failure-{}", std::process::id()));
+    fs::create_dir_all(root.join("tests")).expect("create test directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"runner-failure\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("tests/failure.act"), "meta test\nverb fails() -> Int { return 7; }\n")
+        .expect("write failing test");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("test")
+        .current_dir(&root)
+        .output()
+        .expect("run failing test");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout.contains("FAILED ("), "stdout: {stdout}");
+    assert!(stdout.contains("exit code 7"), "stdout: {stdout}");
+    assert!(stdout.contains("0 passed; 1 failed"), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);
 }
 

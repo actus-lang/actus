@@ -79,3 +79,14 @@ fn resolves_repeated_imports_once() {
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("repeated imports must not duplicate exported declarations");
 }
+
+#[test]
+fn rejects_unknown_import_with_stable_module_diagnostic() {
+    let fixture = Fixture::new();
+    let program = parse_source("import missing; verb main() -> Int { return 0; }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("unknown imports must fail module resolution");
+    let diagnostic = actus::diagnostics::module_diagnostic(&error);
+    assert_eq!(diagnostic.code(), "E1101");
+}

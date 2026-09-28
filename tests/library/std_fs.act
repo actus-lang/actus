@@ -2,9 +2,25 @@ import io;
 import fs;
 import path;
 
+verb empty_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 0);
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(value) => value,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
 meta test
 verb empty_path_is_rejected_by_file_open() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg result = file_open(path: abs path);
     return case dat result {
         Result.Ok(_) => 1,

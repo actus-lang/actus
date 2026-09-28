@@ -6,12 +6,19 @@ typed validation errors, and validated storage constructors. Component views,
 normalization, and builders are exposed through typed facade wrappers; C ABI
 views belong to a later Gate 3.8 sub-gate.
 """
+"""Re-export the owned path aggregate and platform discriminator."""
 open types;
+"""Re-export typed validation failures for raw path storage."""
 open error;
+"""Re-export zero-transcoding path storage constructors."""
 open storage;
+"""Re-export non-owning component views and iterator state."""
 open components;
+"""Re-export component-aware predicates and comparisons."""
 open predicates;
+"""Re-export lexical normalization without filesystem access."""
 open normalize;
+"""Re-export ownership-aware path builders and mutations."""
 open builders;
 """Re-export POSIX raw separator and root classification."""
 open posix;

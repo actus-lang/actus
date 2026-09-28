@@ -5,8 +5,11 @@ The concrete `Self` target is selected statically. The `ins` receiver owns
 the mutable stream state; source bytes are an `abs` view.
 """
 open role Writer {
-    """Write a borrowed view without taking ownership of its bytes."""
+    """
+    Write through an `ins` receiver and `abs` byte view without allocating or
+    retaining input bytes. `Ok(count)` is exact; `Err` is the typed `IoError`.
+    """
     verb write(ins self: Self, abs buffer: Buffer) -> Result[Int, IoError];
-    """Synchronize pending output and report a typed status."""
+    """Flush through an ins receiver and return a typed status after mutation."""
     verb flush(ins self: Self) -> Result[Int, IoError];
 }

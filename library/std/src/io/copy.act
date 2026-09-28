@@ -10,6 +10,11 @@ are returned to the caller unchanged.
 """
 open unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
 
+"""
+Copy chunks through ins reader and writer loans using one reusable allocation.
+The result is the exact count or a typed error; EndOfStream is handled as the
+successful termination condition and all scratch storage is cleaned up.
+"""
 open verb copy[R: Reader, W: Writer](
     ins reader: R,
     ins writer: W

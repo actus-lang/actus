@@ -30,6 +30,12 @@ impl Analyzer {
     }
 
     fn validate_enum_definition(&mut self, definition: &EnumDef) -> Result<(), SemanticError> {
+        if definition.variants.is_empty() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::EmptyEnum { name: definition.name.clone() },
+                span: definition.span,
+            });
+        }
         self.with_generic_scope(&definition.generic_parameters, |analyzer| {
             for variant in &definition.variants {
                 let types = match &variant.payload {

@@ -1,3 +1,4 @@
+"""Re-export console and stream I/O contracts."""
 open io;
 """Re-export raw, platform-aware path representation."""
 open path;

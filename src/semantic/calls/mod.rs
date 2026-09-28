@@ -73,7 +73,10 @@ impl Analyzer {
             for argument in arguments {
                 self.visit_expression(&argument.expression)?;
             }
-            return Ok(());
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownVerb { name: callee.to_owned() },
+                span,
+            });
         };
         if !signature.generic_parameters.is_empty() {
             signature = self.instantiate_generic_signature(callee, &signature, arguments, span)?;

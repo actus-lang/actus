@@ -34,6 +34,18 @@ fn rejects_unsupported_pack_storage_types() {
 }
 
 #[test]
+fn rejects_duplicate_pack_names() {
+    let error = analyze_source(
+        "pack Control { erg storage: u8; layout little; fields { erg all: u8 at 0; } } pack Control { erg storage: u8; layout little; fields { erg all: u8 at 0; } }",
+    )
+    .expect_err("duplicate pack names must fail");
+    assert!(matches!(
+        error,
+        SemanticErrorKind::DuplicatePackName { name } if name == "Control"
+    ));
+}
+
+#[test]
 fn rejects_pack_field_overlaps_with_bit_details() {
     let error = analyze_source(
         "pack Control { erg storage: u8; layout little; fields { erg first: u4 at 0; abs second: u4 at 3; } }",

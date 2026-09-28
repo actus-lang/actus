@@ -76,6 +76,16 @@ fn rejects_unknown_and_recursive_enum_payload_types() {
 }
 
 #[test]
+fn rejects_empty_enums_before_codegen() {
+    let error = analyze_source("enum Nothing { } verb main() -> Int { return 0; }")
+        .expect_err("empty enums must not enter code generation");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::EmptyEnum { name } if name == "Nothing"
+    ));
+}
+
+#[test]
 fn validates_exhaustive_enum_patterns_and_payload_bindings() {
     analyze_source(
         "enum Color { Red, Green, } enum Message { Move(Int, Int), Write { text: String, }, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Green => 2, }; } verb read(erg message: Message) -> Int { return case message { Message.Move(x, y) => x + y, Message.Write(text: text) => print(text), }; }",
@@ -124,6 +134,36 @@ fn rejects_non_exhaustive_enum_and_primitive_patterns() {
         primitive_error.kind,
         SemanticErrorKind::NonExhaustiveMatch { subject, .. } if subject == "primitive"
     ));
+}
+
+#[test]
+fn guarded_patterns_do_not_provide_exhaustiveness() {
+    let primitive_error = analyze_source(
+        "verb choose(erg ready: Bool, erg value: Int) -> Int { return case value { _ if ready => 1, }; }",
+    )
+    .expect_err("a guarded primitive wildcard must not cover every value");
+    assert!(matches!(
+        primitive_error.kind,
+        SemanticErrorKind::NonExhaustiveMatch { subject, .. } if subject == "primitive"
+    ));
+
+    let enum_error = analyze_source(
+        "enum Color { Red, Green, } verb choose(erg ready: Bool, erg color: Color) -> Int { return case color { Color.Red if ready => 1, Color.Green => 2, }; }",
+    )
+    .expect_err("a guarded enum variant must remain uncovered");
+    assert!(matches!(
+        enum_error.kind,
+        SemanticErrorKind::NonExhaustiveMatch { subject, missing }
+            if subject == "Color" && missing == vec!["Red"]
+    ));
+}
+
+#[test]
+fn guarded_patterns_can_fall_through_to_an_unguarded_wildcard() {
+    analyze_source(
+        "verb choose(erg ready: Bool, erg value: Int) -> Int { return case value { _ if ready => 1, _ => 2, }; }",
+    )
+    .expect("an unguarded wildcard must close the guarded case");
 }
 
 #[test]

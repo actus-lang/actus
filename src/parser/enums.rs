@@ -6,7 +6,11 @@ use crate::lexer::{SourceSpan, TokenKind};
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
 
 impl Parser {
-    pub(super) fn parse_enum_def(&mut self, is_open: bool) -> Result<EnumDef, ParseError> {
+    pub(super) fn parse_enum_def(
+        &mut self,
+        is_open: bool,
+        doc: Option<String>,
+    ) -> Result<EnumDef, ParseError> {
         let start = self.expect_keyword(TokenKind::Enum, "`enum`")?.span.start;
         let name_token = self.take_identifier("enum name")?;
         let name = identifier_text(&name_token.kind);
@@ -19,6 +23,7 @@ impl Parser {
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(EnumDef {
             is_open,
+            doc,
             name,
             generic_parameters,
             variants,
@@ -33,11 +38,11 @@ impl Parser {
             if self.at_end() {
                 return Err(self.error_at_current("`}`"));
             }
-            self.skip_doc_strings();
+            let doc = self.take_doc_string_group();
             if self.check_simple(&TokenKind::RightBrace) {
                 break;
             }
-            let variant = self.parse_enum_variant()?;
+            let variant = self.parse_enum_variant(doc)?;
             if !names.insert(variant.name.clone()) {
                 return Err(duplicate_name("enum variant", variant.name, variant.span));
             }
@@ -49,7 +54,7 @@ impl Parser {
         Ok(variants)
     }
 
-    fn parse_enum_variant(&mut self) -> Result<EnumVariant, ParseError> {
+    fn parse_enum_variant(&mut self, doc: Option<String>) -> Result<EnumVariant, ParseError> {
         let name_token = self.take_identifier("enum variant name")?;
         let name = identifier_text(&name_token.kind);
         let payload = if self.match_simple(TokenKind::LeftParen) {
@@ -60,7 +65,7 @@ impl Parser {
             EnumPayload::Unit
         };
         let end = self.previous().span.end;
-        Ok(EnumVariant { name, payload, span: SourceSpan::new(name_token.span.start, end) })
+        Ok(EnumVariant { doc, name, payload, span: SourceSpan::new(name_token.span.start, end) })
     }
 
     fn parse_tuple_payload(&mut self) -> Result<Vec<crate::ast::TypeName>, ParseError> {
@@ -79,7 +84,7 @@ impl Parser {
         let mut fields = Vec::new();
         let mut names = HashSet::new();
         while !self.check_simple(&TokenKind::RightBrace) {
-            self.skip_doc_strings();
+            let doc = self.take_doc_string_group();
             if self.check_simple(&TokenKind::RightBrace) {
                 break;
             }
@@ -91,6 +96,7 @@ impl Parser {
             self.expect_simple(TokenKind::Colon, "`:`")?;
             let ty = self.parse_type_name()?;
             fields.push(EnumField {
+                doc,
                 name,
                 span: SourceSpan::new(name_token.span.start, ty.span.end),
                 ty,
