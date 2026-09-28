@@ -47,9 +47,19 @@ pub(super) fn lower_owner_declaration<'source>(
         string_data,
         layouts,
     )?;
+    store_owner_binding(name, value, native_type, locals, types);
+    Ok(Flow::Fallthrough)
+}
+
+fn store_owner_binding<'source>(
+    name: &'source String,
+    value: cranelift_codegen::ir::Value,
+    native_type: NativeType,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'source String, NativeType>,
+) {
     locals.insert(name, value);
     types.insert(name, native_type);
-    Ok(Flow::Fallthrough)
 }
 
 fn declared_native_type(
@@ -83,15 +93,23 @@ fn lower_owner_value(
         string_data,
         layouts,
     )?;
-    let value = match declared_native {
-        Some(declared) => super::super::super::expressions::coerce_to_ir_type(
+    coerce_owner_value(function, value, declared_native, layouts)
+}
+
+fn coerce_owner_value(
+    function: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    declared_native: Option<NativeType>,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    match declared_native {
+        Some(declared) => Ok(super::super::super::expressions::coerce_to_ir_type(
             function,
             value,
             layouts.ir_type(declared)?,
-        ),
-        None => value,
-    };
-    Ok(value)
+        )),
+        None => Ok(value),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -106,28 +124,42 @@ fn lower_initializer_value(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    match (declared_native, initializer) {
+    if let Some(value) = lower_special_initializer(function, declared_native, initializer, layouts)?
+    {
+        return Ok(value);
+    }
+    lower_expression(
+        function,
+        initializer,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
+}
+
+fn lower_special_initializer(
+    function: &mut FunctionBuilder<'_>,
+    declared_native: Option<NativeType>,
+    initializer: &Expr,
+    layouts: &LayoutRegistry,
+) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+    let value = match (declared_native, initializer) {
         (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
-            super::super::super::expressions::lower_wide_integer(function, value)
+            Some(super::super::super::expressions::lower_wide_integer(function, value)?)
         }
         (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) => {
-            super::super::super::expressions::lower_float_as(
+            Some(super::super::super::expressions::lower_float_as(
                 function,
                 value,
                 layouts.ir_type(NativeType::Float { width })?,
-            )
+            )?)
         }
-        _ => lower_expression(
-            function,
-            initializer,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-    }
+        _ => None,
+    };
+    Ok(value)
 }
 
 fn lower_arena_declaration(

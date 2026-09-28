@@ -67,13 +67,36 @@ pub(crate) fn lower_case_block<'source>(
         string_data,
         layouts,
     )?;
+    finish_case_block(
+        function,
+        flow,
+        cleanup_span,
+        &branch_locals,
+        &branch_types,
+        functions,
+        cleanup_schedule,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_case_block(
+    function: &mut FunctionBuilder<'_>,
+    flow: Flow,
+    cleanup_span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
     if matches!(flow, Flow::Fallthrough) {
         emit_scope_cleanup(
             function,
             cleanup_schedule,
             cleanup_span,
-            &branch_locals,
-            &branch_types,
+            locals,
+            types,
             functions,
             layouts,
         )?;

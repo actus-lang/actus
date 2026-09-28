@@ -275,7 +275,7 @@ fn lower_control_statement<'source>(
         Stmt::Loop(block) => super::super::loops::lower_loop(
             function, block, locals, types, functions, cleanup_schedule, string_data, layouts,
         ),
-        Stmt::Break { span } | Stmt::Continue { span } => super::lower_loop_control(
+        Stmt::Break { span } | Stmt::Continue { span } => lower_loop_exit(
             function,
             *span,
             targets,
@@ -290,4 +290,29 @@ fn lower_control_statement<'source>(
             "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns".to_owned(),
         )),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_loop_exit<'source>(
+    function: &mut FunctionBuilder<'_>,
+    span: crate::lexer::SourceSpan,
+    targets: Option<LoopTargets>,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    layouts: &LayoutRegistry,
+    is_continue: bool,
+) -> Result<Flow, NativeEmitError> {
+    super::lower_loop_control(
+        function,
+        span,
+        targets,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        layouts,
+        is_continue,
+    )
 }

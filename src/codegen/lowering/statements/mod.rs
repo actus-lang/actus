@@ -125,6 +125,29 @@ fn lower_expression_statement(
             layouts,
         );
     }
+    lower_plain_expression_statement(
+        function,
+        expression,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_plain_expression_statement(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
     lower_expression(
         function,
         expression,
