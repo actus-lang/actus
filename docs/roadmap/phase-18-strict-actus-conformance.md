@@ -101,10 +101,10 @@ behavior around the existing language and runtime contracts.
 - [x] Define the accepted behavior for check, build, and test in normal and
       strict modes.
 - [x] Define which diagnostics are errors in every command and mode.
-- [ ] Define stable exit-status categories for source, configuration, test,
+- [x] Define stable exit-status categories for source, configuration, test,
       runtime, and infrastructure failures.
-- [ ] Define the minimum evidence required before a gate can be checked off.
-- [ ] Add a review record for every intentional compatibility break.
+- [x] Define the minimum evidence required before a gate can be checked off.
+- [x] Add a review record for every intentional compatibility break.
 
 ## Gate 18.1: Deterministic diagnostics and strict error catalog
 

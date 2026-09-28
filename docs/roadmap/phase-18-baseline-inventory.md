@@ -170,6 +170,64 @@ This matrix is intentionally limited to `check`, `build`, and `test`, the
 commands that currently accept `--strict`. The behavior of `run`, `watch`,
 `fmt`, `parse`, `lsp`, and `publish` must not be inferred from this matrix.
 
+## Stable exit-status categories
+
+The CLI keeps a small numeric status surface and exposes the detailed category
+through the diagnostic or test-result output:
+
+| Category | Status | Meaning |
+| --- | ---: | --- |
+| Success | `0` | The requested command completed its declared contract. |
+| Usage | `2` | The command, option, argument count, or option value is invalid. |
+| Source | `1` | Lexing, parsing, module resolution, semantic, ownership, or code-generation validation failed. |
+| Configuration | `1` | Manifest, dependency, target, profile, or lockfile policy failed. |
+| Test | `1` | A meta test failed, timed out, received an invalid process result, or could not be executed. |
+| Runtime | `1` | A built program or runtime bridge returned a failure result. |
+| Infrastructure | `1` | Required file, linker, process, or host operation failed. |
+
+The categories intentionally share status `1` so shell callers retain the
+existing contract while diagnostics remain precise. A future numeric change
+would require a documented compatibility decision and command-level fixtures;
+new source, configuration, test, runtime, and infrastructure failures must not
+silently become success or usage status.
+
+## Minimum gate evidence
+
+A roadmap checkbox may be marked complete only when all applicable evidence is
+available:
+
+1. the implementation or documented contract names its responsible module;
+2. at least one accepted and one rejected fixture cover the rule, unless the
+   task is purely an inventory or documentation task;
+3. the command output and exit status are captured for both relevant outcomes;
+4. artifact creation, cleanup, and lockfile effects are checked when the task
+   can produce them;
+5. repeated execution produces the same diagnostics, ordering, counts, and
+   status; and
+6. the required repository quality commands pass.
+
+Cross-platform or ABI behavior additionally requires native execution evidence
+on every applicable target. A passing compilation without the corresponding
+execution or rejection evidence is not sufficient.
+
+## Compatibility-break review record
+
+The following intentional differences between normal and strict behavior are
+recorded before implementation expands the strict boundary:
+
+| Existing compatibility path | Strict policy | Reason and follow-up |
+| --- | --- | --- |
+| Normal configuration can accept legacy `Arca.toml` manifests with compatibility handling. | Reject the legacy root and dependency manifest with stable strict diagnostics. | Prevents ambiguous project identity; covered by strict configuration fixtures. |
+| Normal configuration can synchronize a missing lockfile. | Require the lockfile policy and reject stale or absent required content. | Makes dependency selection reproducible; close with lockfile command fixtures. |
+| The source-limit script currently checks only Rust hard limits. | Extend strict validation to preferred/warning thresholds and Actus source boundaries. | Prevents standard-library and documentation drift; close in Gate 18.8/18.10. |
+| Strict mode currently applies only to `check`, `build`, and `test`. | Do not imply strict guarantees for `run`, `watch`, `fmt`, `parse`, `lsp`, or `publish`. | Avoids an undocumented partial contract; expand only through a reviewed roadmap change. |
+| Normal test execution can discover and run tests without strict semantic preflight. | Require strict configuration and semantic preflight before test execution. | Prevents executable tests from hiding unresolved source state; close with runner fixtures. |
+
+Each row is an approved compatibility boundary for this phase, not a waiver of
+the strict contract. Any additional compatibility break must add a row here,
+an ADR/roadmap reference, and positive and negative command evidence before its
+checkbox is marked complete.
+
 ## Standard-library inventory
 
 `library/std/src/` currently contains 29 Actus files and 1,941 lines:
