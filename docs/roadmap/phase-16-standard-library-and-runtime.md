@@ -468,10 +468,10 @@ String conversions.
 
 ### Sub-gate C: Platform-Specific Parsers
 
-- [ ] Implement POSIX root (`/`) and separator rules.
-- [ ] Implement Windows drive (`C:`, `C:\`) and UNC (`\\server\\share`) rules.
-- [ ] Support mixed separators on Windows where permitted.
-- [ ] Add platform-independent parser fixtures.
+- [x] Implement POSIX root (`/`) and separator rules.
+- [x] Implement Windows drive (`C:`, `C:\`) and UNC (`\\server\\share`) rules.
+- [x] Support mixed separators on Windows where permitted.
+- [x] Add platform-independent parser fixtures.
 
 ### Sub-gate D: Predicates and Lexical Normalization
 

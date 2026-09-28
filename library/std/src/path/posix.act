@@ -1,0 +1,61 @@
+"""
+POSIX-specific raw path classification.
+
+The parser consumes an `abs` `Path` without allocating or converting its
+bytes to text. A leading ASCII slash (`47`) identifies the root; repeated
+slashes such as `///usr//bin` are equivalent separators for classification.
+Relative examples include `foo/bar` and `..`. Every other non-null byte
+remains opaque path data and is not decoded as UTF-8.
+"""
+open enum PosixRoot {
+    """The path has no leading root separator and is relative."""
+    Relative,
+    """The path begins at the POSIX root represented by `/`."""
+    Absolute,
+}
+
+"""
+Return whether one raw POSIX byte is a separator.
+
+`byte` is an `erg` scalar value for this pure predicate. The operation does
+not inspect or mutate a buffer and returns integer `1` only for ASCII byte
+`47`, otherwise integer `0`.
+"""
+open unsafe extern "C" verb actus_posix_is_separator(erg byte: Int) -> Int;
+
+"""Return `1` for raw POSIX `/` and `0` for every other byte."""
+open verb posix_is_separator(erg byte: Int) -> Int {
+    return actus_posix_is_separator(byte: erg byte);
+}
+
+"""
+Private runtime parser contract for POSIX root classification.
+
+The borrowed path is not retained. Zero means relative, one means absolute,
+`-1` means an embedded null, and `-2` means invalid storage metadata. The
+bridge never converts the raw bytes to UTF-8.
+"""
+open unsafe extern "C" verb actus_posix_root_kind(abs path: Path) -> Int;
+
+"""Translate a POSIX parser status into the public root result."""
+open verb posix_root_result(erg status: Int) -> Result[PosixRoot, PathError] {
+    return case status {
+        0 => Ok(PosixRoot.Relative),
+        1 => Ok(PosixRoot.Absolute),
+        -1 => Err(PathError.EmbeddedNull),
+        -2 => Err(PathError.InvalidLength),
+        _ => Err(PathError.InvalidEncoding),
+    };
+}
+
+"""
+Classify a POSIX path root without allocating or normalizing its bytes.
+
+`path` is borrowed with `abs`. The result is `Ok(PosixRoot.Relative)` or
+`Ok(PosixRoot.Absolute)` on success, and `Err(PathError)` for rejected raw
+storage. Repeated leading slashes remain one root classification.
+"""
+open verb posix_root(abs path: Path) -> Result[PosixRoot, PathError] {
+    erg status = actus_posix_root_kind(path: abs path);
+    return posix_root_result(status: status);
+}

@@ -21,10 +21,31 @@ fn std_path_representation_module_exports_validated_storage_contracts() {
         ("verb", "extension"),
         ("verb", "components"),
         ("verb", "next_component"),
+        ("enum", "PosixRoot"),
+        ("verb", "posix_is_separator"),
+        ("verb", "posix_root"),
+        ("enum", "WindowsRoot"),
+        ("verb", "windows_is_separator"),
+        ("verb", "windows_root"),
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");
     }
     analyze_module(&resolver, "path").expect("std path representation should be valid");
+}
+
+#[test]
+fn std_path_platform_contracts_preserve_raw_separator_and_root_rules() {
+    let source_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src/path");
+    let posix = std::fs::read_to_string(source_root.join("posix.act"))
+        .expect("POSIX parser source should exist");
+    let windows = std::fs::read_to_string(source_root.join("windows.act"))
+        .expect("Windows parser source should exist");
+    for marker in ["47", "///usr//bin", "foo/bar", ".."] {
+        assert!(posix.contains(marker), "missing POSIX raw fixture marker {marker}");
+    }
+    for marker in ["47", "92", "C:foo", "C:\\\\", "server", "share"] {
+        assert!(windows.contains(marker), "missing Windows raw fixture marker {marker}");
+    }
 }
 
 #[test]

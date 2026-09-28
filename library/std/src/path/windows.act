@@ -1,0 +1,67 @@
+"""
+Windows-specific raw path classification.
+
+The parser consumes UTF-16 code units through an `abs` `Path` and never
+creates a UTF-8 or heap-backed string. ASCII slash (`47`) and backslash
+(`92`) are separators. The supported raw fixtures include `C:foo`, `C:\\`,
+`C:\\foo/bar`, and `\\\\server\\share\\file`. Drive-relative,
+drive-absolute, and UNC roots remain distinct classifications.
+"""
+open enum WindowsRoot {
+    """The path has no drive or UNC root and is relative."""
+    Relative,
+    """The path starts with a drive designator such as `C:` only."""
+    DriveRelative,
+    """The path starts with a drive and an absolute separator, such as `C:\\`."""
+    DriveAbsolute,
+    """The path starts with a UNC server/share root."""
+    Unc,
+}
+
+"""
+Return whether one raw Windows separator byte is accepted.
+
+`byte` is an `erg` scalar. ASCII slash `47` and backslash `92` return integer
+`1`; all other values return integer `0` without any text conversion.
+"""
+open unsafe extern "C" verb actus_windows_is_separator(erg byte: Int) -> Int;
+
+"""Return `1` for raw Windows `/` or `\\` and `0` otherwise."""
+open verb windows_is_separator(erg byte: Int) -> Int {
+    return actus_windows_is_separator(byte: erg byte);
+}
+
+"""
+Private runtime parser contract for Windows root classification.
+
+Zero means relative, one drive-relative, two drive-absolute, and three UNC.
+`-1` means an embedded null, `-2` invalid UTF-16 units, and `-3` an invalid
+drive or UNC prefix. The bridge receives raw UTF-16 storage only.
+"""
+open unsafe extern "C" verb actus_windows_root_kind(abs path: Path) -> Int;
+
+"""Translate a Windows parser status into the public root result."""
+open verb windows_root_result(erg status: Int) -> Result[WindowsRoot, PathError] {
+    return case status {
+        0 => Ok(WindowsRoot.Relative),
+        1 => Ok(WindowsRoot.DriveRelative),
+        2 => Ok(WindowsRoot.DriveAbsolute),
+        3 => Ok(WindowsRoot.Unc),
+        -1 => Err(PathError.EmbeddedNull),
+        -2 => Err(PathError.InvalidEncoding),
+        -3 => Err(PathError.InvalidLength),
+        _ => Err(PathError.InvalidEncoding),
+    };
+}
+
+"""
+Classify a Windows path root from raw UTF-16 units.
+
+`path` is an `abs` view and is not retained. The result distinguishes
+`C:foo`, `C:\\foo`, and `\\\\server\\share` without allocating or converting
+the path to UTF-8 text.
+"""
+open verb windows_root(abs path: Path) -> Result[WindowsRoot, PathError] {
+    erg status = actus_windows_root_kind(path: abs path);
+    return windows_root_result(status: status);
+}
