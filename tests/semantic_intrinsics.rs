@@ -100,6 +100,15 @@ fn rejects_mismatched_primitive_calls_and_assignments() {
         SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
             if expected == "f32" && found == "f64"
     ));
+
+    let return_error =
+        analyze_source("verb produce() -> f32 { erg sample: f64 = 1.5; return sample; }")
+            .expect_err("primitive return types must match");
+    assert!(matches!(
+        return_error.kind,
+        SemanticErrorKind::ReturnTypeMismatch { expected, found }
+            if expected == "f32" && found == "f64"
+    ));
 }
 
 #[test]
