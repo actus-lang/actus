@@ -38,7 +38,7 @@ pub unsafe extern "C" fn actus_path_ascii_to_native(storage: BufferHandle) -> i3
         buffer.length = units.len() * std::mem::size_of::<u16>();
         buffer.capacity = units.capacity() * std::mem::size_of::<u16>();
         std::mem::forget(units);
-        return 1;
+        1
     }
     #[cfg(not(windows))]
     0
