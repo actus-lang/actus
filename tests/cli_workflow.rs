@@ -378,6 +378,8 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1 passed; 0 failed"));
     assert!(stdout.contains("exit code 0"));
+    assert!(!stdout.contains("\x1b[32m"));
+    assert!(!stdout.contains("\x1b[31m"));
     let _ = fs::remove_dir_all(root);
 }
 

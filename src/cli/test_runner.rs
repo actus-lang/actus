@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Instant;
@@ -38,6 +39,7 @@ pub(super) fn test_command(mut arguments: impl Iterator<Item = String>) -> i32 {
 }
 
 fn run_tests(tests: Vec<DiscoveredTest>, configuration: &CompilerConfiguration) -> i32 {
+    let output_style = TestOutputStyle::detect();
     println!("running {} tests", tests.len());
     let mut passed = 0;
     for (index, test) in tests.iter().enumerate() {
@@ -47,37 +49,47 @@ fn run_tests(tests: Vec<DiscoveredTest>, configuration: &CompilerConfiguration) 
         match result {
             Ok(0) => {
                 passed += 1;
-                println!(
-                    "test {}::{} ... ok ({} ms, exit code 0)",
-                    test.path.display(),
-                    test.name,
-                    elapsed
-                );
+                let status = output_style.success(&format!("ok ({} ms, exit code 0)", elapsed));
+                println!("test {}::{} ... {}", test.path.display(), test.name, status);
             }
-            Ok(code) => println!(
-                "test {}::{} ... FAILED ({} ms, exit code {})",
-                test.path.display(),
-                test.name,
-                elapsed,
-                code
-            ),
-            Err(error) => println!(
-                "test {}::{} ... FAILED ({} ms, {})",
-                test.path.display(),
-                test.name,
-                elapsed,
-                error
-            ),
+            Ok(code) => {
+                let status =
+                    output_style.failure(&format!("FAILED ({} ms, exit code {})", elapsed, code));
+                println!("test {}::{} ... {}", test.path.display(), test.name, status);
+            }
+            Err(error) => {
+                let status = output_style.failure(&format!("FAILED ({} ms, {})", elapsed, error));
+                println!("test {}::{} ... {}", test.path.display(), test.name, status);
+            }
         }
     }
     let failed = tests.len() - passed;
-    println!(
-        "test result: {}. {} passed; {} failed",
-        if failed == 0 { "ok" } else { "FAILED" },
-        passed,
-        failed
-    );
+    let result =
+        if failed == 0 { output_style.success("ok") } else { output_style.failure("FAILED") };
+    println!("test result: {}. {} passed; {} failed", result, passed, failed);
     i32::from(failed != 0)
+}
+
+struct TestOutputStyle {
+    enabled: bool,
+}
+
+impl TestOutputStyle {
+    fn detect() -> Self {
+        Self { enabled: io::stdout().is_terminal() }
+    }
+
+    fn success(&self, text: &str) -> String {
+        self.paint("\x1b[32m", text)
+    }
+
+    fn failure(&self, text: &str) -> String {
+        self.paint("\x1b[31m", text)
+    }
+
+    fn paint(&self, color: &str, text: &str) -> String {
+        if self.enabled { format!("{color}{text}\x1b[0m") } else { text.to_owned() }
+    }
 }
 
 struct DiscoveredTest {
