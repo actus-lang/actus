@@ -16,7 +16,7 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
-verb exercise_file(dat file: File, abs path: Path) -> Int {
+verb write_file_payload(ins file: File) -> Int {
     erg payload = Buffer[0];
     append(payload, 65);
     append(payload, 66);
@@ -33,6 +33,10 @@ verb exercise_file(dat file: File, abs path: Path) -> Int {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
+    return 0;
+}
+
+verb rewind_and_read(ins file: File) -> Int {
     erg origin = SeekFrom.Start(0);
     erg moved = file.seek(from: dat origin);
     case dat moved {
@@ -57,6 +61,10 @@ verb exercise_file(dat file: File, abs path: Path) -> Int {
         },
         Result.Err(_) => { return 1; },
     };
+    return 0;
+}
+
+verb verify_file_positions(ins file: File) -> Int {
     erg current_offset = 0;
     erg current = file_seek_current(self: ins file, offset: abs current_offset);
     case dat current {
@@ -80,6 +88,25 @@ verb exercise_file(dat file: File, abs path: Path) -> Int {
         },
         Result.Err(_) => { return 1; },
     };
+    return 0;
+}
+
+verb exercise_file(dat file: File, abs path: Path) -> Int {
+    erg written = write_file_payload(file: ins file);
+    case written {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg read = rewind_and_read(file: ins file);
+    case read {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg verified = verify_file_positions(file: ins file);
+    case verified {
+        0 => { },
+        _ => { return 1; },
+    };
     drop(file);
     erg final_remove = remove_file(path: abs path);
     return case dat final_remove {
@@ -88,8 +115,7 @@ verb exercise_file(dat file: File, abs path: Path) -> Int {
     };
 }
 
-meta test
-verb file_handle_methods_and_seeker_origins() -> Int {
+verb handle_file_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 97);
     append(raw, 99);
@@ -114,7 +140,33 @@ verb file_handle_methods_and_seeker_origins() -> Int {
     append(raw, 105);
     append(raw, 110);
     append(raw, 0);
-    erg path = make_posix(raw: dat raw);
+    return make_posix(raw: dat raw);
+}
+
+verb handle_directory_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 103);
+    append(raw, 97);
+    append(raw, 116);
+    append(raw, 101);
+    append(raw, 54);
+    append(raw, 95);
+    append(raw, 100);
+    append(raw, 105);
+    append(raw, 114);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+meta test
+verb file_handle_methods_and_seeker_origins() -> Int {
+    erg path = handle_file_path();
     erg cleanup = remove_file(path: abs path);
     case dat cleanup {
         Result.Ok(_) => { },
@@ -129,24 +181,7 @@ verb file_handle_methods_and_seeker_origins() -> Int {
 
 meta test
 verb options_and_directory_operations_succeed() -> Int {
-    erg directory_raw = Buffer[0];
-    append(directory_raw, 97);
-    append(directory_raw, 99);
-    append(directory_raw, 116);
-    append(directory_raw, 117);
-    append(directory_raw, 115);
-    append(directory_raw, 95);
-    append(directory_raw, 103);
-    append(directory_raw, 97);
-    append(directory_raw, 116);
-    append(directory_raw, 101);
-    append(directory_raw, 54);
-    append(directory_raw, 95);
-    append(directory_raw, 100);
-    append(directory_raw, 105);
-    append(directory_raw, 114);
-    append(directory_raw, 0);
-    erg directory = make_posix(raw: dat directory_raw);
+    erg directory = handle_directory_path();
     erg removed = remove_dir(path: abs directory);
     case dat removed {
         Result.Ok(_) => { },

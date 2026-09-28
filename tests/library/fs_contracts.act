@@ -97,8 +97,7 @@ verb read_to_string_propagates_empty_path_error() -> Int {
     };
 }
 
-meta test
-verb write_file_propagates_empty_path_error() -> Int {
+verb library_path_prefix() -> Buffer {
     erg raw_path = Buffer[0];
     append(raw_path, 97);
     append(raw_path, 99);
@@ -117,22 +116,33 @@ verb write_file_propagates_empty_path_error() -> Int {
     append(raw_path, 112);
     append(raw_path, 97);
     append(raw_path, 114);
-    append(raw_path, 101);
+    append(raw_path, 121);
+    append(raw_path, 95);
+    return raw_path;
+}
+
+verb missing_parent_path() -> Path {
+    erg raw_path = library_path_prefix();
+    append(raw_path, 109);
+    append(raw_path, 105);
+    append(raw_path, 115);
+    append(raw_path, 115);
+    append(raw_path, 105);
     append(raw_path, 110);
-    append(raw_path, 116);
+    append(raw_path, 103);
     append(raw_path, 47);
     append(raw_path, 97);
     append(raw_path, 99);
     append(raw_path, 116);
     append(raw_path, 117);
     append(raw_path, 115);
-    append(raw_path, 95);
-    append(raw_path, 102);
-    append(raw_path, 105);
-    append(raw_path, 108);
-    append(raw_path, 101);
     append(raw_path, 0);
-    erg path = make_posix(raw: dat raw_path);
+    return make_posix(raw: dat raw_path);
+}
+
+meta test
+verb write_file_propagates_empty_path_error() -> Int {
+    erg path = missing_parent_path();
     erg contents = Buffer[0];
     erg written = write_file(path: abs path, contents: abs contents);
     return case dat written {
@@ -158,23 +168,8 @@ verb open_options_cover_all_modes() -> Int {
     };
 }
 
-meta test
-verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
-    erg raw_path = Buffer[0];
-    append(raw_path, 97);
-    append(raw_path, 99);
-    append(raw_path, 116);
-    append(raw_path, 117);
-    append(raw_path, 115);
-    append(raw_path, 95);
-    append(raw_path, 108);
-    append(raw_path, 105);
-    append(raw_path, 98);
-    append(raw_path, 114);
-    append(raw_path, 97);
-    append(raw_path, 114);
-    append(raw_path, 121);
-    append(raw_path, 95);
+verb round_trip_file_path() -> Path {
+    erg raw_path = library_path_prefix();
     append(raw_path, 114);
     append(raw_path, 111);
     append(raw_path, 117);
@@ -188,7 +183,24 @@ verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
     append(raw_path, 105);
     append(raw_path, 110);
     append(raw_path, 0);
-    erg path = make_posix(raw: dat raw_path);
+    return make_posix(raw: dat raw_path);
+}
+
+verb round_trip_copy_path() -> Path {
+    erg raw_copy_path = library_path_prefix();
+    append(raw_copy_path, 99);
+    append(raw_copy_path, 111);
+    append(raw_copy_path, 112);
+    append(raw_copy_path, 121);
+    append(raw_copy_path, 46);
+    append(raw_copy_path, 98);
+    append(raw_copy_path, 105);
+    append(raw_copy_path, 110);
+    append(raw_copy_path, 0);
+    return make_posix(raw: dat raw_copy_path);
+}
+
+verb write_round_trip_file(abs path: Path) -> Int {
     remove_file(path: abs path);
     erg contents = Buffer[0];
     append(contents, 65);
@@ -212,6 +224,10 @@ verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
         },
         Result.Err(_) => { return 1; },
     };
+    return 0;
+}
+
+verb verify_round_trip_reads(abs path: Path) -> Int {
     erg bytes = read_to_bytes(path: abs path);
     erg text = read_to_string(path: abs path);
     case dat bytes {
@@ -222,31 +238,10 @@ verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
-    erg raw_copy_path = Buffer[0];
-    append(raw_copy_path, 97);
-    append(raw_copy_path, 99);
-    append(raw_copy_path, 116);
-    append(raw_copy_path, 117);
-    append(raw_copy_path, 115);
-    append(raw_copy_path, 95);
-    append(raw_copy_path, 108);
-    append(raw_copy_path, 105);
-    append(raw_copy_path, 98);
-    append(raw_copy_path, 114);
-    append(raw_copy_path, 97);
-    append(raw_copy_path, 114);
-    append(raw_copy_path, 121);
-    append(raw_copy_path, 95);
-    append(raw_copy_path, 99);
-    append(raw_copy_path, 111);
-    append(raw_copy_path, 112);
-    append(raw_copy_path, 121);
-    append(raw_copy_path, 46);
-    append(raw_copy_path, 98);
-    append(raw_copy_path, 105);
-    append(raw_copy_path, 110);
-    append(raw_copy_path, 0);
-    erg copy_path = make_posix(raw: dat raw_copy_path);
+    return 0;
+}
+
+verb copy_round_trip_file(abs path: Path, abs copy_path: Path) -> Int {
     erg copied = copy_file(from: abs path, to: abs copy_path);
     case dat copied {
         Result.Ok(_) => { },
@@ -262,4 +257,21 @@ verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
         Result.Ok(_) => 0,
         Result.Err(_) => 1,
     };
+}
+
+meta test
+verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
+    erg path = round_trip_file_path();
+    erg copy_path = round_trip_copy_path();
+    erg written = write_round_trip_file(path: abs path);
+    case written {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg read = verify_round_trip_reads(path: abs path);
+    case read {
+        0 => { },
+        _ => { return 1; },
+    };
+    return copy_round_trip_file(path: abs path, copy_path: abs copy_path);
 }

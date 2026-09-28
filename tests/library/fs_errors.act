@@ -67,9 +67,7 @@ verb directory_path() -> Path {
     return make_posix(raw: dat raw);
 }
 
-meta test
-verb read_helpers_return_owned_buffers() -> Int {
-    erg path = file_path();
+verb prepare_file(abs path: Path) -> Int {
     erg stale = remove_file(path: abs path);
     case dat stale {
         Result.Ok(_) => { },
@@ -86,29 +84,59 @@ verb read_helpers_return_owned_buffers() -> Int {
         },
         Result.Err(_) => { return 1; },
     };
-    erg bytes = read_to_bytes(path: abs path);
-    case dat bytes {
+    return 0;
+}
+
+verb verify_owned_buffer(dat output: Buffer) -> Int {
+    erg length = actus_buffer_length(buffer: abs output);
+    drop(output);
+    return case length {
+        2 => 0,
+        _ => 1,
+    };
+}
+
+verb read_bytes_buffer(abs path: Path) -> Int {
+    erg loaded = read_to_bytes(path: abs path);
+    case dat loaded {
         Result.Ok(output) => {
-            erg length = actus_buffer_length(buffer: abs output);
-            drop(output);
-            case length {
-                2 => { },
-                _ => { return 1; },
-            };
+            erg status = verify_owned_buffer(dat output);
+            return status;
         },
         Result.Err(_) => { return 1; },
     };
-    erg text = read_to_string(path: abs path);
-    case dat text {
+    return 1;
+}
+
+verb read_text_buffer(abs path: Path) -> Int {
+    erg loaded = read_to_string(path: abs path);
+    case dat loaded {
         Result.Ok(output) => {
-            erg length = actus_buffer_length(buffer: abs output);
-            drop(output);
-            case length {
-                2 => { },
-                _ => { return 1; },
-            };
+            erg status = verify_owned_buffer(dat output);
+            return status;
         },
         Result.Err(_) => { return 1; },
+    };
+    return 1;
+}
+
+meta test
+verb read_helpers_return_owned_buffers() -> Int {
+    erg path = file_path();
+    erg prepared = prepare_file(path: abs path);
+    case prepared {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg bytes = read_bytes_buffer(path: abs path);
+    case bytes {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg text = read_text_buffer(path: abs path);
+    case text {
+        0 => { },
+        _ => { return 1; },
     };
     erg removed = remove_file(path: abs path);
     return case dat removed {
@@ -117,9 +145,7 @@ verb read_helpers_return_owned_buffers() -> Int {
     };
 }
 
-meta test
-verb invalid_text_returns_typed_error() -> Int {
-    erg path = file_path();
+verb write_invalid_file(abs path: Path) -> Int {
     erg stale = remove_file(path: abs path);
     case dat stale {
         Result.Ok(_) => { },
@@ -132,76 +158,43 @@ verb invalid_text_returns_typed_error() -> Int {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
+    return 0;
+}
+
+verb read_invalid_file(abs path: Path) -> Int {
     erg loaded = read_to_string(path: abs path);
     erg removed = remove_file(path: abs path);
     case dat removed {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
-    return case dat loaded {
+    case dat loaded {
         Result.Ok(output) => {
             drop(output);
             return 1;
         },
-        Result.Err(error) => case dat error {
-            IoError.InvalidData => 0,
-            _ => 1,
+        Result.Err(error) => {
+            return case dat error {
+                IoError.InvalidData => 0,
+                _ => 1,
+            };
         },
     };
+    return 1;
 }
 
 meta test
-verb create_new_rejects_existing_file() -> Int {
+verb invalid_text_returns_typed_error() -> Int {
     erg path = file_path();
-    erg stale = remove_file(path: abs path);
-    case dat stale {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
+    erg prepared = write_invalid_file(path: abs path);
+    case prepared {
+        0 => { },
+        _ => { return 1; },
     };
-    erg created = file_create(path: abs path);
-    case dat created {
-        Result.Ok(file) => { drop(file); },
-        Result.Err(_) => { return 1; },
-    };
-    erg options = options_new();
-    erg exclusive = options_create_new(dat options);
-    erg opened = options_open(options: dat exclusive, path: abs path);
-    case dat opened {
-        Result.Ok(file) => {
-            drop(file);
-            remove_file(path: abs path);
-            return 1;
-        },
-        Result.Err(_) => { },
-    };
-    erg removed = remove_file(path: abs path);
-    return case dat removed {
-        Result.Ok(_) => 0,
-        Result.Err(_) => 1,
-    };
+    return read_invalid_file(path: abs path);
 }
 
-meta test
-verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
-    erg directory = directory_path();
-    erg stale = remove_dir(path: abs directory);
-    case dat stale {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
-    };
-    erg created = create_dir(path: abs directory);
-    case dat created {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
-    };
-    erg info = metadata(path: abs directory);
-    case dat info {
-        Result.Ok(value) => case value.is_dir {
-            1 => { },
-            _ => { return 1; },
-        },
-        Result.Err(_) => { return 1; },
-    };
+verb directory_child_path() -> Path {
     erg child_raw = Buffer[0];
     append(child_raw, 97);
     append(child_raw, 99);
@@ -219,7 +212,31 @@ verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
     append(child_raw, 105);
     append(child_raw, 110);
     append(child_raw, 0);
-    erg child_name = make_posix(raw: dat child_raw);
+    return make_posix(raw: dat child_raw);
+}
+
+verb create_directory_fixture(abs directory: Path) -> Int {
+    erg stale = remove_dir(path: abs directory);
+    case dat stale {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg created = create_dir(path: abs directory);
+    case dat created {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg info = metadata(path: abs directory);
+    return case dat info {
+        Result.Ok(value) => case value.is_dir {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+verb remove_nonempty_directory(abs directory: Path, abs child_name: Path) -> Int {
     erg directory_for_child = directory_path();
     erg child_result = join(self: dat directory_for_child, other: abs child_name);
     return case dat child_result {
@@ -247,4 +264,16 @@ verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
             };
         },
     };
+}
+
+meta test
+verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
+    erg directory = directory_path();
+    erg created = create_directory_fixture(directory: abs directory);
+    case created {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg child_name = directory_child_path();
+    return remove_nonempty_directory(directory: abs directory, child_name: abs child_name);
 }

@@ -1,0 +1,59 @@
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb normalized_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 47);
+    append(raw, 46);
+    append(raw, 47);
+    append(raw, 98);
+    append(raw, 47);
+    append(raw, 46);
+    append(raw, 46);
+    append(raw, 47);
+    append(raw, 99);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+meta test
+verb path_iteration_and_normalization() -> Int {
+    erg raw_path = normalized_path();
+    erg normalized_result = normalize(dat raw_path);
+    return case dat normalized_result {
+        Result.Err(_) => 1,
+        Result.Ok(normalized) => {
+            erg iter = components(self: abs normalized);
+            erg first = next_component(iter: ins iter);
+            erg second = next_component(iter: ins iter);
+            case dat first {
+                Option.Some(component) => case component.length {
+                    1 => { },
+                    _ => { return 1; },
+                },
+                Option.None => { return 1; },
+            };
+            return case dat second {
+                Option.Some(component) => case component.length {
+                    1 => 0,
+                    _ => 1,
+                },
+                Option.None => 1,
+            };
+        },
+    };
+}

@@ -1,0 +1,141 @@
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb make_windows(dat raw: Buffer) -> Path {
+    erg result = path_from_windows_utf16(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[2],
+            platform: PathPlatform.Windows,
+            length: 0,
+            capacity: 2,
+            terminated: 1,
+        },
+    };
+}
+
+verb hidden_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 46);
+    append(raw, 101);
+    append(raw, 110);
+    append(raw, 118);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb root_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 47);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb windows_root_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 67);
+    append(raw, 0);
+    append(raw, 58);
+    append(raw, 0);
+    append(raw, 92);
+    append(raw, 0);
+    append(raw, 102);
+    append(raw, 0);
+    append(raw, 111);
+    append(raw, 0);
+    append(raw, 111);
+    append(raw, 0);
+    append(raw, 0);
+    append(raw, 0);
+    return make_windows(raw: dat raw);
+}
+
+verb verify_hidden_and_root() -> Int {
+    erg hidden = hidden_path();
+    erg hidden_stem = file_stem(self: abs hidden);
+    erg hidden_extension = extension(self: abs hidden);
+    case dat hidden_stem {
+        Option.None => { },
+        Option.Some(_) => { return 1; },
+    };
+    case dat hidden_extension {
+        Option.None => { },
+        Option.Some(_) => { return 1; },
+    };
+    erg root = root_path();
+    erg root_parent = parent(self: abs root);
+    return case dat root_parent {
+        Option.None => 0,
+        Option.Some(_) => 1,
+    };
+}
+
+verb verify_windows_root(abs windows: Path) -> Int {
+    erg root_kind = windows_root(abs windows);
+    case dat root_kind {
+        Result.Ok(kind) => case dat kind {
+            WindowsRoot.DriveAbsolute => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg slash = 47;
+    erg backslash = 92;
+    case windows_is_separator(byte: erg slash) {
+        1 => { },
+        _ => { return 1; },
+    };
+    return case windows_is_separator(byte: erg backslash) {
+        1 => 0,
+        _ => 1,
+    };
+}
+
+meta test
+verb path_rejects_embedded_null_and_accepts_empty() -> Int {
+    erg invalid = Buffer[0];
+    append(invalid, 97);
+    append(invalid, 0);
+    append(invalid, 98);
+    append(invalid, 0);
+    erg invalid_result = path_from_posix(storage: dat invalid);
+    case dat invalid_result {
+        Result.Ok(_) => { return 1; },
+        Result.Err(error) => case dat error {
+            PathError.EmbeddedNull => { },
+            _ => { return 1; },
+        },
+    };
+    erg empty = Buffer[0];
+    append(empty, 0);
+    erg empty_result = path_from_posix(storage: dat empty);
+    return case dat empty_result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb path_edge_cases_and_windows_roots() -> Int {
+    erg windows = windows_root_path();
+    erg posix = verify_hidden_and_root();
+    case posix {
+        0 => { },
+        _ => { return 1; },
+    };
+    return verify_windows_root(windows: abs windows);
+}

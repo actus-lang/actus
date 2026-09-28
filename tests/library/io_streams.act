@@ -73,17 +73,7 @@ verb buffered_writer_flushes_cursor_storage() -> Int {
     };
 }
 
-meta test
-verb buffer_utilities_preserve_reusable_storage() -> Int {
-    erg storage = Buffer[0];
-    erg capacity = 4;
-    erg reserved = reserve(buffer: ins storage, capacity: capacity);
-    case dat reserved {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
-    };
-    erg source = Buffer[0];
-    append(source, 65);
+verb append_and_clear_buffer(ins storage: Buffer, abs source: Buffer) -> Int {
     erg offset = 0;
     erg append_length = 1;
     erg appended = actus_buffer_append_range(
@@ -109,6 +99,24 @@ verb buffer_utilities_preserve_reusable_storage() -> Int {
 }
 
 meta test
+verb buffer_utilities_preserve_reusable_storage() -> Int {
+    erg storage = Buffer[0];
+    erg capacity = 4;
+    erg reserved = reserve(buffer: ins storage, capacity: capacity);
+    case dat reserved {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg source = Buffer[0];
+    append(source, 65);
+    erg status = append_and_clear_buffer(storage: ins storage, source: abs source);
+    return case status {
+        0 => 0,
+        _ => 1,
+    };
+}
+
+meta test
 verb stdin_eof_is_typed() -> Int {
     erg result = read_byte();
     return case dat result {
@@ -120,18 +128,11 @@ verb stdin_eof_is_typed() -> Int {
     };
 }
 
-meta test
-verb output_wrappers_return_typed_status() -> Int {
-    erg text = Buffer[0];
+verb emit_standard_output(abs text: Buffer) -> Int {
     erg value = 0;
     erg integer = print_int(value: value);
     erg printed = print(text: abs text);
     erg line = println(text: abs text);
-    erg error_integer = eprint_int(value: value);
-    erg error_text = eprint(text: abs text);
-    erg error_line = eprintln(text: abs text);
-    erg written = write(buffer: abs text);
-    erg flushed = flush();
     case dat integer {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
@@ -140,22 +141,34 @@ verb output_wrappers_return_typed_status() -> Int {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
-    case dat line {
+    return case dat line {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+verb emit_error_output(abs text: Buffer) -> Int {
+    erg value = 0;
+    erg integer = eprint_int(value: value);
+    erg printed = eprint(text: abs text);
+    erg line = eprintln(text: abs text);
+    case dat integer {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
-    case dat error_integer {
+    case dat printed {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
-    case dat error_text {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+    return case dat line {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
     };
-    case dat error_line {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
-    };
+}
+
+verb emit_buffer_output(abs text: Buffer) -> Int {
+    erg written = write(buffer: abs text);
+    erg flushed = flush();
     case dat written {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
@@ -164,4 +177,20 @@ verb output_wrappers_return_typed_status() -> Int {
         Result.Ok(_) => 0,
         Result.Err(_) => 1,
     };
+}
+
+meta test
+verb output_wrappers_return_typed_status() -> Int {
+    erg text = Buffer[0];
+    erg standard = emit_standard_output(text: abs text);
+    case standard {
+        0 => { },
+        _ => { return 1; },
+    };
+    erg error = emit_error_output(text: abs text);
+    case error {
+        0 => { },
+        _ => { return 1; },
+    };
+    return emit_buffer_output(text: abs text);
 }
