@@ -244,6 +244,48 @@ fn all_diagnostic_adapters_preserve_one_fixture() {
 }
 
 #[test]
+fn renderer_choice_preserves_order_validation_and_exit_status() {
+    let diagnostics = vec![
+        Diagnostic::error("E1003", SourceSpan::new(4, 5), "later")
+            .with_phase(DiagnosticPhase::Semantic)
+            .with_source_path("src/b.act"),
+        Diagnostic::error("E0001", SourceSpan::new(0, 1), "first")
+            .with_phase(DiagnosticPhase::Lexical)
+            .with_source_path("src/a.act"),
+    ];
+    let original = diagnostics.clone();
+    let mut ordered = diagnostics.clone();
+    sort_diagnostics(&mut ordered);
+    let expected_codes = ["E0001", "E1003"];
+
+    let plain = ordered
+        .iter()
+        .map(|diagnostic| render_diagnostic("source", diagnostic))
+        .collect::<Vec<_>>();
+    let colored = ordered
+        .iter()
+        .map(|diagnostic| render_colored_diagnostic("source", diagnostic, true))
+        .collect::<Vec<_>>();
+    assert!(plain[0].contains(expected_codes[0]) && plain[1].contains(expected_codes[1]));
+    assert!(colored[0].contains(expected_codes[0]) && colored[1].contains(expected_codes[1]));
+
+    let encoded = render_json_diagnostics(&diagnostics).expect("JSON renderer should succeed");
+    let json: serde_json::Value = serde_json::from_str(&encoded).expect("valid JSON output");
+    assert_eq!(json[0]["code"], expected_codes[0]);
+    assert_eq!(json[1]["code"], expected_codes[1]);
+    assert_eq!(diagnostics, original);
+
+    let plain_result = run_diagnostic_check();
+    let colored_result = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .env("TERM", "xterm-256color")
+        .args(["check", "tests/fixtures/diagnostics/invalid/unexpected_character.act"])
+        .output()
+        .expect("colored diagnostic check should start");
+    assert_eq!(plain_result.status.code(), Some(1));
+    assert_eq!(colored_result.status.code(), Some(1));
+}
+
+#[test]
 fn strict_codes_use_the_reserved_category_ranges() {
     assert_eq!(strict_code_category("E1800"), Some(StrictDiagnosticCategory::Configuration));
     assert_eq!(strict_code_category("E1810"), Some(StrictDiagnosticCategory::Frontend));
