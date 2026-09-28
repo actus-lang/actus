@@ -13,7 +13,7 @@ use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 
-use super::conformance::{ConformanceMode, parse_strict_option};
+use super::conformance::{ConformanceMode, parse_strict_option, validate_source_limits};
 
 const TEST_PROCESS_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -146,6 +146,9 @@ fn collect_tests(
     for path in files {
         let source = fs::read_to_string(&path)
             .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
+        if !validate_source_limits(&path, &source, mode) {
+            return Err(format!("strict source-limit validation failed for `{}`", path.display()));
+        }
         let (tokens, errors) = scan(&source);
         if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
             continue;

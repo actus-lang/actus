@@ -50,6 +50,24 @@ pub const STRICT_DOCUMENTATION_CONTRADICTION: &str = "E1844";
 /// Public documentation promises behavior the declaration cannot guarantee.
 pub const STRICT_DOCUMENTATION_MISREPRESENTATION: &str = "E1845";
 
+/// A source file exceeded the preferred size and needs decomposition evidence.
+pub const STRICT_SOURCE_FILE_DECOMPOSITION: &str = "E1850";
+
+/// A source file reached the strict split threshold.
+pub const STRICT_SOURCE_FILE_SPLIT_REQUIRED: &str = "E1851";
+
+/// A source file exceeded the hard size limit.
+pub const STRICT_SOURCE_FILE_HARD_LIMIT: &str = "E1852";
+
+/// A function exceeded the preferred size and needs decomposition evidence.
+pub const STRICT_SOURCE_FUNCTION_DECOMPOSITION: &str = "E1853";
+
+/// A function reached the strict split threshold.
+pub const STRICT_SOURCE_FUNCTION_SPLIT_REQUIRED: &str = "E1854";
+
+/// A function exceeded the hard size limit.
+pub const STRICT_SOURCE_FUNCTION_HARD_LIMIT: &str = "E1855";
+
 /// Classifies a strict-conformance code by its reserved `E18xx` range.
 pub fn strict_code_category(code: &str) -> Option<StrictDiagnosticCategory> {
     let number = code.strip_prefix('E')?.parse::<u16>().ok()?;

@@ -63,26 +63,48 @@ fn collect_act_files(directory: &Path, paths: &mut Vec<PathBuf>) {
 
 fn format_file(path: &Path, check_only: bool) -> i32 {
     let display = path.display();
-    let source = match fs::read_to_string(path) {
-        Ok(source) => source,
-        Err(error) => {
-            eprintln!("error: cannot read `{display}`: {error}");
-            return 1;
-        }
-    };
+    let Some(source) = read_format_source(path) else { return 1 };
     let (tokens, lex_errors) = scan(&source);
     if let Some(error) = lex_errors.first() {
         eprintln!("{display}: {}", render_lex_error(&source, error));
         return 1;
     }
-    let program = match parse(tokens) {
-        Ok(program) => program,
+    let Some(program) = parse_format_source(path, &source, tokens) else { return 1 };
+    format_program_source(path, &source, &program, check_only)
+}
+
+fn read_format_source(path: &Path) -> Option<String> {
+    match fs::read_to_string(path) {
+        Ok(source) => Some(source),
         Err(error) => {
-            eprintln!("{display}: {}", render_parse_error(&source, &error));
-            return 1;
+            eprintln!("error: cannot read `{}`: {error}", path.display());
+            None
         }
-    };
-    let formatted = format_program(&program);
+    }
+}
+
+fn parse_format_source(
+    path: &Path,
+    source: &str,
+    tokens: Vec<crate::lexer::Token>,
+) -> Option<crate::ast::Program> {
+    match parse(tokens) {
+        Ok(program) => Some(program),
+        Err(error) => {
+            eprintln!("{}: {}", path.display(), render_parse_error(source, &error));
+            None
+        }
+    }
+}
+
+fn format_program_source(
+    path: &Path,
+    source: &str,
+    program: &crate::ast::Program,
+    check_only: bool,
+) -> i32 {
+    let display = path.display();
+    let formatted = format_program(program);
     if check_only {
         if formatted == source {
             println!("{display} is formatted");

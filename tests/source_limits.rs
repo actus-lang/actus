@@ -1,0 +1,82 @@
+use std::path::{Path, PathBuf};
+
+use actus::conformance::{SourceLimitPolicy, inspect_source_tree, source_limit_diagnostics};
+use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
+
+fn lines(count: usize) -> String {
+    (0..count).map(|index| format!("line_{index}\n")).collect()
+}
+
+fn policy() -> SourceLimitPolicy {
+    SourceLimitPolicy::default()
+}
+
+#[test]
+fn preferred_file_limit_reports_decomposition_evidence() {
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.rs"), &lines(301), policy());
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code(), "E1850");
+    assert_eq!(diagnostics[0].source_path(), Some("src/example.rs"));
+    assert_eq!(diagnostics[0].phase(), DiagnosticPhase::Conformance);
+}
+
+#[test]
+fn strict_file_thresholds_escalate_and_stop_at_one_violation() {
+    let split = source_limit_diagnostics(Path::new("src/example.rs"), &lines(400), policy());
+    assert_eq!(split[0].code(), "E1851");
+    assert_eq!(split[0].severity(), DiagnosticSeverity::Error);
+
+    let hard = source_limit_diagnostics(Path::new("src/example.rs"), &lines(501), policy());
+    assert_eq!(hard[0].code(), "E1852");
+    assert_eq!(hard[0].severity(), DiagnosticSeverity::Error);
+}
+
+#[test]
+fn rust_functions_are_measured_without_counting_comment_text() {
+    let mut source = String::from("/* fn fake() {\nstill comment } */\nfn real() {\n");
+    source.push_str(&lines(40));
+    source.push_str("}\n");
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.rs"), &source, policy());
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1854"));
+    assert!(
+        diagnostics.iter().any(|diagnostic| diagnostic.severity() == DiagnosticSeverity::Error)
+    );
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.message().contains("real")));
+}
+
+#[test]
+fn actus_verbs_use_the_same_function_contract() {
+    let mut source = String::from("verb run() {\n");
+    source.push_str(&lines(60));
+    source.push_str("}\n");
+    let diagnostics =
+        source_limit_diagnostics(Path::new("library/std/src/run.act"), &source, policy());
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1855"));
+}
+
+#[test]
+fn short_sources_have_no_limit_diagnostics() {
+    let source = "verb main() { return; }\n";
+    assert!(source_limit_diagnostics(Path::new("main.act"), source, policy()).is_empty());
+}
+
+#[test]
+fn repository_sources_have_no_hard_limit_violations() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let source_root = manifest.join("src");
+    let library_root = manifest.join("library/std/src");
+    let diagnostics = inspect_source_tree(&[source_root.as_path(), library_root.as_path()])
+        .expect("repository source tree should be readable");
+    let hard_violations = diagnostics
+        .iter()
+        .filter(|diagnostic| matches!(diagnostic.code(), "E1852" | "E1855"))
+        .map(|diagnostic| {
+            format!("{}: {}", diagnostic.source_path().unwrap_or("<unknown>"), diagnostic.message())
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        hard_violations.is_empty(),
+        "hard source-limit diagnostics:\n{}",
+        hard_violations.join("\n")
+    );
+}

@@ -4,7 +4,7 @@ use crate::build_graph::invalidate_stale_artifact;
 use crate::codegen::NativeEmitError;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 
-use super::super::conformance::ConformanceMode;
+use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::artifacts::{default_output, write_artifact};
 use super::loading::{load_build_program, validate_strict_program};
 use super::options::EmitKind;
@@ -48,6 +48,9 @@ fn build_file_with_report(
     let Some((source, program)) = load_build_program(input, configuration) else {
         return 1;
     };
+    if !validate_source_limits(Path::new(input), &source, mode) {
+        return 1;
+    }
     let program = crate::semantic::filter_program_for_target(&program, configuration.target());
     if mode.is_strict() && !validate_strict_program(input, &source, &program) {
         return 1;

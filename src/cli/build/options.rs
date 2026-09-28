@@ -27,21 +27,14 @@ pub(crate) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
             return 2;
         }
     };
-    let input_configuration = match configuration_for_build(options.input.as_deref(), options.mode)
-    {
+    let input_configuration = match configured_build(&options) {
         Ok(configuration) => configuration,
         Err(error) => {
             eprintln!("error: {error}");
             return 1;
         }
     };
-    let input_configuration = match options.profile {
-        Some(profile) => input_configuration.with_profile(profile),
-        None => input_configuration,
-    };
-    let input = options
-        .input
-        .unwrap_or_else(|| input_configuration.default_entry_path().display().to_string());
+    let input = build_input(&options, &input_configuration);
     build_file_with_mode(
         &input,
         options.output.as_deref().map(Path::new),
@@ -49,6 +42,21 @@ pub(crate) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
         &input_configuration,
         options.mode,
     )
+}
+
+fn configured_build(options: &BuildOptions) -> Result<CompilerConfiguration, String> {
+    let configuration = configuration_for_build(options.input.as_deref(), options.mode)?;
+    Ok(options.profile.map_or_else(
+        || configuration.clone(),
+        |profile| configuration.clone().with_profile(profile),
+    ))
+}
+
+fn build_input(options: &BuildOptions, configuration: &CompilerConfiguration) -> String {
+    options
+        .input
+        .clone()
+        .unwrap_or_else(|| configuration.default_entry_path().display().to_string())
 }
 
 fn configuration_for_build(
@@ -82,56 +90,71 @@ fn configuration_for_build(
 fn parse_build_options(
     mut arguments: impl Iterator<Item = String>,
 ) -> Result<BuildOptions, String> {
-    let mut input = None;
-    let mut output = None;
-    let mut emit = EmitKind::Object;
-    let mut profile = None;
-    let mut mode = ConformanceMode::Standard;
+    let mut options = BuildOptions {
+        input: None,
+        output: None,
+        emit: EmitKind::Object,
+        profile: None,
+        mode: ConformanceMode::Standard,
+    };
     while let Some(argument) = arguments.next() {
-        match argument.as_str() {
-            "--strict" => {
-                parse_strict_option(&argument, &mut mode)?;
-            }
-            "--release" => {
-                if profile.replace(BuildProfile::Release).is_some() {
-                    return Err("duplicate or conflicting profile option".to_owned());
-                }
-            }
-            "--profile" => {
-                let Some(name) = arguments.next() else {
-                    return Err("missing value after `--profile`".to_owned());
-                };
-                let parsed_profile = match name.as_str() {
-                    "debug" => BuildProfile::Debug,
-                    "release" => BuildProfile::Release,
-                    _ => return Err(format!("unsupported build profile `{name}`")),
-                };
-                if profile.replace(parsed_profile).is_some() {
-                    return Err("duplicate or conflicting profile option".to_owned());
-                }
-            }
-            "-o" => {
-                if output.is_some() {
-                    return Err("duplicate output option".to_owned());
-                }
-                output = arguments.next();
-                if output.is_none() {
-                    return Err("missing output path after `-o`".to_owned());
-                }
-            }
-            "--emit" => {
-                let Some(kind) = arguments.next() else {
-                    return Err("missing value after `--emit`".to_owned());
-                };
-                emit = match kind.as_str() {
-                    "obj" => EmitKind::Object,
-                    "exe" => EmitKind::Executable,
-                    _ => return Err(format!("unsupported emission kind `{kind}`")),
-                };
-            }
-            _ if input.is_none() && !argument.starts_with('-') => input = Some(argument),
-            _ => return Err(format!("unexpected build argument `{argument}`")),
-        }
+        parse_build_argument(argument, &mut arguments, &mut options)?;
     }
-    Ok(BuildOptions { input, output, emit, profile, mode })
+    Ok(options)
+}
+
+fn parse_build_argument(
+    argument: String,
+    arguments: &mut impl Iterator<Item = String>,
+    options: &mut BuildOptions,
+) -> Result<(), String> {
+    match argument.as_str() {
+        "--strict" => parse_strict_option(&argument, &mut options.mode).map(|_| ())?,
+        "--release" => set_profile(options, BuildProfile::Release)?,
+        "--profile" => set_profile(options, parse_profile(arguments)?)?,
+        "-o" => set_output(options, arguments.next())?,
+        "--emit" => options.emit = parse_emit_kind(arguments.next())?,
+        _ if options.input.is_none() && !argument.starts_with('-') => {
+            options.input = Some(argument)
+        }
+        _ => return Err(format!("unexpected build argument `{argument}`")),
+    }
+    Ok(())
+}
+
+fn set_profile(options: &mut BuildOptions, profile: BuildProfile) -> Result<(), String> {
+    if options.profile.replace(profile).is_some() {
+        return Err("duplicate or conflicting profile option".to_owned());
+    }
+    Ok(())
+}
+
+fn parse_profile(arguments: &mut impl Iterator<Item = String>) -> Result<BuildProfile, String> {
+    let Some(name) = arguments.next() else {
+        return Err("missing value after `--profile`".to_owned());
+    };
+    match name.as_str() {
+        "debug" => Ok(BuildProfile::Debug),
+        "release" => Ok(BuildProfile::Release),
+        _ => Err(format!("unsupported build profile `{name}`")),
+    }
+}
+
+fn set_output(options: &mut BuildOptions, output: Option<String>) -> Result<(), String> {
+    if options.output.is_some() {
+        return Err("duplicate output option".to_owned());
+    }
+    options.output = output;
+    options.output.as_ref().map(|_| ()).ok_or_else(|| "missing output path after `-o`".to_owned())
+}
+
+fn parse_emit_kind(kind: Option<String>) -> Result<EmitKind, String> {
+    let Some(kind) = kind else {
+        return Err("missing value after `--emit`".to_owned());
+    };
+    match kind.as_str() {
+        "obj" => Ok(EmitKind::Object),
+        "exe" => Ok(EmitKind::Executable),
+        _ => Err(format!("unsupported emission kind `{kind}`")),
+    }
 }

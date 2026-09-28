@@ -3,6 +3,7 @@ pub mod build_graph;
 pub mod cli;
 pub mod codegen;
 pub mod configuration;
+pub mod conformance;
 pub mod diagnostics;
 pub mod documentation;
 pub mod ffi;

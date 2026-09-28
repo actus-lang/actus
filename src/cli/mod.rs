@@ -40,43 +40,26 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
 
 fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
     let arguments = arguments.into_iter();
-    if command == "build" {
-        return build::build_command(arguments);
+    match command {
+        "build" => build::build_command(arguments),
+        "run" => run::run_command(arguments),
+        "check" => check::check_command(arguments),
+        "new" => project::new_command(arguments),
+        "init" => project::init_command(arguments),
+        "test" => test_runner::test_command(arguments),
+        "fmt" => fmt::fmt_command(arguments),
+        "lsp" => lsp::lsp_command(arguments),
+        "publish" => publish::publish_command(arguments),
+        "watch" => watch::watch_command(arguments),
+        "parse" => parse_command(arguments),
+        _ => unknown_command(command),
     }
-    if command == "run" {
-        return run::run_command(arguments);
-    }
-    if command == "check" {
-        return check::check_command(arguments);
-    }
-    if command == "new" {
-        return project::new_command(arguments);
-    }
-    if command == "init" {
-        return project::init_command(arguments);
-    }
-    if command == "test" {
-        return test_runner::test_command(arguments);
-    }
-    if command == "fmt" {
-        return fmt::fmt_command(arguments);
-    }
-    if command == "lsp" {
-        return lsp::lsp_command(arguments);
-    }
-    if command == "publish" {
-        return publish::publish_command(arguments);
-    }
-    if command == "watch" {
-        return watch::watch_command(arguments);
-    }
+}
 
-    if command != "parse" {
-        eprintln!("error: unknown command `{command}`");
-        print_usage();
-        return 2;
-    }
-    parse_command(arguments)
+fn unknown_command(command: &str) -> i32 {
+    eprintln!("error: unknown command `{command}`");
+    print_usage();
+    2
 }
 
 fn parse_command(mut arguments: impl Iterator<Item = String>) -> i32 {

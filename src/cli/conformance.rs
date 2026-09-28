@@ -1,7 +1,23 @@
+use std::path::Path;
+
+use super::diagnostics::report_diagnostics;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ConformanceMode {
     Standard,
     Strict,
+}
+
+pub(super) fn validate_source_limits(path: &Path, source: &str, mode: ConformanceMode) -> bool {
+    if !mode.is_strict() {
+        return true;
+    }
+    let diagnostics = crate::conformance::inspect_source(path, source);
+    if diagnostics.is_empty() {
+        return true;
+    }
+    report_diagnostics(path, source, diagnostics);
+    false
 }
 
 impl ConformanceMode {

@@ -17,6 +17,22 @@ fn strict_check_accepts_a_semantically_valid_source() {
 }
 
 #[test]
+fn strict_check_rejects_a_source_that_reaches_the_split_threshold() {
+    let input =
+        std::env::temp_dir().join(format!("actus-strict-limits-{}.act", std::process::id()));
+    let mut source = (0..399).map(|index| format!("// filler {index}\n")).collect::<String>();
+    source.push_str("verb main() -> Int { return 42; }\n");
+    fs::write(&input, source).expect("write oversized source");
+
+    let result = run_with_args(
+        vec!["check".to_owned(), input.display().to_string(), "--strict".to_owned()].into_iter(),
+    );
+
+    assert_eq!(result, 1);
+    let _ = fs::remove_file(input);
+}
+
+#[test]
 fn strict_build_rejects_semantic_errors_before_emitting_output() {
     let root = std::env::temp_dir().join(format!("actus-strict-build-{}", std::process::id()));
     let input = root.with_extension("act");

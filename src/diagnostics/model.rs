@@ -7,6 +7,8 @@ use crate::lexer::SourceSpan;
 pub enum DiagnosticPhase {
     /// A configuration or workspace-policy validation failure.
     Configuration,
+    /// A repository or language-conformance validation failure.
+    Conformance,
     /// A lexical scanning failure.
     Lexical,
     /// A syntax parsing failure.
