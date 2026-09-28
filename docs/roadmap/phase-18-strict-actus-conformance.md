@@ -154,8 +154,9 @@ behavior around the existing language and runtime contracts.
       instead of defaulting to zero.
 - [x] Represent control-flow-only `case` blocks as explicit `Void` results
       instead of defaulting unresolved branch types to `Int`.
-- [x] Propagate unresolved native expression and binding types as codegen
-      errors instead of silently substituting `Int`.
+- [x] Propagate unresolved native expression, binding, signature, vtable, and
+      performance target types as codegen errors instead of silently
+      substituting `Int`.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.

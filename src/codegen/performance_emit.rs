@@ -24,7 +24,7 @@ pub(super) fn define_performances(
     vtable_data: &VtableDataIds,
 ) -> Result<(), NativeEmitError> {
     for definition in definitions {
-        let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts);
+        let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
         let key = dispatch_key(target_type, &definition.method.name);
         let meta = functions.get(&key).ok_or_else(|| {
             NativeEmitError(format!("missing performance function `{}`", definition.symbol))

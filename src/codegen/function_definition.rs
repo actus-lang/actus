@@ -18,6 +18,9 @@ use super::structs::copy_bytes;
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 
+type BoundParameters<'a> =
+    (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn define_function(
     module: &mut ObjectModule,
@@ -31,7 +34,7 @@ pub(super) fn define_function(
     vtable_data: &VtableDataIds,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = native_signature_for_definition(module, verb, layouts);
+    context.func.signature = native_signature_for_definition(module, verb, layouts)?;
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let mut string_values = declare_string_values(module, &mut context.func, string_data);
     string_values.extend(declare_vtable_values(module, &mut context.func, vtable_data));
@@ -42,14 +45,18 @@ pub(super) fn define_function(
         function.switch_to_block(block);
         function.append_block_params_for_function_params(block);
         let parameters = function.block_params(block).to_vec();
-        let return_type = verb.return_type.as_ref().map(|return_type| {
-            NativeType::from_type_name_with_layout(Some(&return_type.ty), layouts)
-        });
+        let return_type = verb
+            .return_type
+            .as_ref()
+            .map(|return_type| {
+                NativeType::from_type_name_with_layout(Some(&return_type.ty), layouts)
+            })
+            .transpose()?;
         let return_slot =
             return_type.filter(|ty| layouts.uses_return_slot(*ty)).map(|_| parameters[0]);
         let parameter_offset = usize::from(return_slot.is_some());
         let (locals, local_types) =
-            bind_parameters(&mut function, module, verb, &parameters[parameter_offset..], layouts);
+            bind_parameters(&mut function, module, verb, &parameters[parameter_offset..], layouts)?;
         function.seal_block(block);
         let flow = lower_body(
             &mut function,
@@ -161,7 +168,7 @@ fn bind_parameters<'a>(
     verb: &'a VerbDecl,
     parameters: &[cranelift_codegen::ir::Value],
     layouts: &LayoutRegistry,
-) -> (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>) {
+) -> Result<BoundParameters<'a>, NativeEmitError> {
     let mut locals = HashMap::new();
     let mut parameter_index = 0;
     for parameter in &verb.params {
@@ -191,14 +198,14 @@ fn bind_parameters<'a>(
         .iter()
         .map(|parameter| {
             let ty = if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
-                NativeType::FatPointer
+                Ok(NativeType::FatPointer)
             } else {
                 NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
             };
-            (&parameter.name, ty)
+            ty.map(|ty| (&parameter.name, ty))
         })
-        .collect();
-    (locals, local_types)
+        .collect::<Result<HashMap<_, _>, _>>()?;
+    Ok((locals, local_types))
 }
 
 fn declare_function_refs(

@@ -25,7 +25,7 @@ pub(super) fn define_vtables(
     functions: &HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
 ) -> Result<VtableDataIds, NativeEmitError> {
-    let mut vtables = group_definitions(definitions, layouts);
+    let mut vtables = group_definitions(definitions, layouts)?;
     vtables.sort_by(|left, right| left.symbol.cmp(&right.symbol));
     let mut data_ids = HashMap::new();
     for vtable in &vtables {
@@ -64,10 +64,10 @@ pub(super) fn declare_vtable_values(
 fn group_definitions(
     definitions: &[PerformanceDefinition<'_>],
     layouts: &LayoutRegistry,
-) -> Vec<VtableDefinition> {
+) -> Result<Vec<VtableDefinition>, NativeEmitError> {
     let mut grouped = HashMap::<(String, String), VtableDefinition>::new();
     for definition in definitions {
-        let target = NativeType::from_type_name_with_layout(Some(definition.target), layouts);
+        let target = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
         let key = (definition.role_name.clone(), definition.target.name.clone());
         grouped
             .entry(key)
@@ -80,7 +80,7 @@ fn group_definitions(
             .method_symbols
             .push(dispatch_key(target, &definition.method.name));
     }
-    grouped.into_values().collect()
+    Ok(grouped.into_values().collect())
 }
 
 pub(super) fn vtable_symbol(role: &str, target: &str) -> String {

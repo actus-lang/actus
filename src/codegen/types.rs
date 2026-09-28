@@ -2,6 +2,8 @@ use cranelift_codegen::ir::Type;
 
 use crate::ast::{BuiltinType, PrimitiveType, TypeName, lookup_builtin_type, primitive_type};
 
+use super::native::NativeEmitError;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NativeType {
     Int,
@@ -63,8 +65,10 @@ impl NativeType {
     pub(super) fn from_type_name_with_layout(
         type_name: Option<&TypeName>,
         layouts: &super::layout::LayoutRegistry,
-    ) -> Self {
-        Self::try_from_type_name_with_layout(type_name, layouts).unwrap_or(Self::Int)
+    ) -> Result<Self, NativeEmitError> {
+        let Some(type_name) = type_name else { return Ok(Self::Void) };
+        Self::try_from_type_name_with_layout(Some(type_name), layouts)
+            .ok_or_else(|| NativeEmitError(format!("unknown native type `{}`", type_name.name)))
     }
 
     pub(super) fn try_from_type_name_with_layout(

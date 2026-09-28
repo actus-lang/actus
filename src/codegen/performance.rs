@@ -133,11 +133,11 @@ pub(super) fn declare_performance_functions(
             module,
             definition.method,
             layouts,
-        );
+        )?;
         let id = module
             .declare_function(&definition.symbol, Linkage::Local, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
-        let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts);
+        let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
         metadata.insert(
             dispatch_key(target_type, &definition.method.name),
             FunctionMeta {
@@ -151,7 +151,7 @@ pub(super) fn declare_performance_functions(
                 return_type: NativeType::from_type_name_with_layout(
                     definition.method.return_type.as_ref().map(|return_type| &return_type.ty),
                     layouts,
-                ),
+                )?,
                 dynamic_params: definition
                     .method
                     .params
