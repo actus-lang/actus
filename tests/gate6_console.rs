@@ -10,21 +10,7 @@ use std::process::Command;
 fn project_workflow_runs_console_application_through_std_io() {
     let root = std::env::temp_dir().join(format!("actus-console-project-{}", std::process::id()));
     let output = root.join("console");
-    let standard_library = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std");
-    fs::create_dir_all(root.join("src")).expect("create project source directory");
-    fs::write(
-        root.join("Actus.toml"),
-        format!(
-            "[package]\nname = \"console\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[dependencies]\nio = {{ path = \"{}\" }}\n",
-            standard_library.display()
-        ),
-    )
-    .expect("write project manifest");
-    fs::write(
-        root.join("src/main.act"),
-        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 79); append(text, 75); println(text: abs text); eprintln(text: abs text); return 9; }\n",
-    )
-    .expect("write console application");
+    write_console_project(&root);
 
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
         .arg("check")
@@ -54,4 +40,23 @@ fn project_workflow_runs_console_application_through_std_io() {
     assert_eq!(run.stdout, b"OK\n");
     assert!(String::from_utf8_lossy(&run.stderr).contains("process exited with status 9"));
     let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+fn write_console_project(root: &Path) {
+    let standard_library = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std");
+    fs::create_dir_all(root.join("src")).expect("create project source directory");
+    fs::write(
+        root.join("Actus.toml"),
+        format!(
+            "[package]\nname = \"console\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[dependencies]\nio = {{ path = \"{}\" }}\n",
+            standard_library.display()
+        ),
+    )
+    .expect("write project manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 79); append(text, 75); println(text: abs text); eprintln(text: abs text); return 9; }\n",
+    )
+    .expect("write console application");
 }

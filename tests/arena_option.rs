@@ -39,7 +39,28 @@ fn executes_recursive_option_list_with_pointer_niche() {
     let root = std::env::temp_dir().join(format!("actus-arena-option-{}", std::process::id()));
     let input = root.with_extension("act");
     let output = root.with_extension("bin");
-    let source = r#"
+    fs::write(&input, recursive_option_source()).expect("write recursive option fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run option fixture");
+    assert_eq!(status.code(), Some(60));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+fn recursive_option_source() -> &'static str {
+    r#"
 struct ListNode {
     value: Int,
     next: Option[abs ListNode],
@@ -61,22 +82,5 @@ verb main() -> Int {
     abs root = ref head;
     return sum(node: abs root);
 }
-"#;
-    fs::write(&input, source).expect("write recursive option fixture");
-    let result = run_with_args(
-        vec![
-            "build".to_owned(),
-            input.display().to_string(),
-            "--emit".to_owned(),
-            "exe".to_owned(),
-            "-o".to_owned(),
-            output.display().to_string(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(result, 0);
-    let status = std::process::Command::new(&output).status().expect("run option fixture");
-    assert_eq!(status.code(), Some(60));
-    let _ = fs::remove_file(input);
-    let _ = fs::remove_file(output);
+"#
 }

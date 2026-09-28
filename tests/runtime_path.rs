@@ -274,7 +274,13 @@ fn posix_normalization_is_lexical_and_stays_inside_root() {
 
 #[test]
 fn windows_normalization_preserves_drive_forms() {
-    let cases = [
+    for (source, expected) in windows_normalization_cases() {
+        assert_windows_normalized(&source, &expected);
+    }
+}
+
+fn windows_normalization_cases() -> Vec<(Vec<u16>, Vec<u16>)> {
+    vec![
         (
             vec![
                 b'C' as u16,
@@ -308,22 +314,22 @@ fn windows_normalization_preserves_drive_forms() {
             vec![b'C' as u16, b'f' as u16, b'o' as u16, b'o' as u16, 0],
             vec![b'C' as u16, b'f' as u16, b'o' as u16, b'o' as u16, 0],
         ),
-    ];
-    for (source, expected) in cases {
-        let mut storage = source.iter().flat_map(|unit| unit.to_ne_bytes()).collect::<Vec<_>>();
-        let capacity = storage.capacity();
-        let mut buffer =
-            ActusBuffer { data: storage.as_mut_ptr(), length: storage.len(), capacity };
-        let mut path = ActusPath {
-            storage: &mut buffer,
-            platform: 1,
-            length: (source.len() - 1) as i32,
-            capacity: capacity as i32,
-            terminated: 1,
-        };
-        assert_eq!(unsafe { actus_path_normalize(&mut path) }, 0);
-        let (pairs, _) = storage[..expected.len() * 2].as_chunks::<2>();
-        let actual = pairs.iter().map(|pair| u16::from_ne_bytes(*pair)).collect::<Vec<_>>();
-        assert_eq!(actual, expected);
-    }
+    ]
+}
+
+fn assert_windows_normalized(source: &[u16], expected: &[u16]) {
+    let mut storage = source.iter().flat_map(|unit| unit.to_ne_bytes()).collect::<Vec<_>>();
+    let capacity = storage.capacity();
+    let mut buffer = ActusBuffer { data: storage.as_mut_ptr(), length: storage.len(), capacity };
+    let mut path = ActusPath {
+        storage: &mut buffer,
+        platform: 1,
+        length: (source.len() - 1) as i32,
+        capacity: capacity as i32,
+        terminated: 1,
+    };
+    assert_eq!(unsafe { actus_path_normalize(&mut path) }, 0);
+    let (pairs, _) = storage[..expected.len() * 2].as_chunks::<2>();
+    let actual = pairs.iter().map(|pair| u16::from_ne_bytes(*pair)).collect::<Vec<_>>();
+    assert_eq!(actual, expected);
 }
