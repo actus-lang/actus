@@ -1,5 +1,7 @@
 use super::super::contract::ABI_STATUS_FAILURE;
 use super::super::types::BufferHandle;
+#[cfg(windows)]
+use super::super::types::restore_buffer;
 
 const ASCII_LIMIT: u8 = 0x7f;
 
@@ -27,17 +29,17 @@ pub unsafe extern "C" fn actus_path_ascii_to_native(storage: BufferHandle) -> i3
     }
     #[cfg(windows)]
     {
-        let mut units = Vec::with_capacity(payload.len() + 1);
+        let mut units = Vec::with_capacity((payload.len() + 1) * std::mem::size_of::<u16>());
         for byte in payload {
-            units.push(u16::from(*byte));
+            units.extend_from_slice(&u16::from(*byte).to_ne_bytes());
         }
-        units.push(0);
+        units.extend_from_slice(&0u16.to_ne_bytes());
+        if units.as_ptr().align_offset(std::mem::align_of::<u16>()) != 0 {
+            return ABI_STATUS_FAILURE;
+        }
         let data = unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
         drop(data);
-        buffer.data = units.as_mut_ptr().cast();
-        buffer.length = units.len() * std::mem::size_of::<u16>();
-        buffer.capacity = units.capacity() * std::mem::size_of::<u16>();
-        std::mem::forget(units);
+        restore_buffer(buffer, units);
         1
     }
     #[cfg(not(windows))]
