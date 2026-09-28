@@ -475,10 +475,10 @@ String conversions.
 
 ### Sub-gate D: Predicates and Lexical Normalization
 
-- [ ] Implement `is_absolute`, `is_relative`, and `has_root` predicates.
-- [ ] Implement component-aware `starts_with` and `ends_with`.
-- [ ] Implement lexical `.` and `..` normalization without filesystem access.
-- [ ] Prevent root escape on absolute paths.
+- [x] Implement `is_absolute`, `is_relative`, and `has_root` predicates.
+- [x] Implement component-aware `starts_with` and `ends_with`.
+- [x] Implement lexical `.` and `..` normalization without filesystem access.
+- [x] Prevent root escape on absolute paths.
 
 ### Sub-gate E: Builders and In-Place Mutations
 

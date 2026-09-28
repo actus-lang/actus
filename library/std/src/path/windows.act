@@ -24,6 +24,11 @@ Return whether one raw Windows separator byte is accepted.
 `byte` is an `erg` scalar. ASCII slash `47` and backslash `92` return integer
 `1`; all other values return integer `0` without any text conversion.
 """
+"""Inspect one raw Windows UTF-16 code unit through the Rust runtime.
+
+`byte` is an `erg` scalar. The result is `1` for `/` (47) or `\\` (92),
+otherwise `0`; no UTF-8 conversion or allocation occurs.
+"""
 open unsafe extern "C" verb actus_windows_is_separator(erg byte: Int) -> Int;
 
 """Return `1` for raw Windows `/` or `\\` and `0` otherwise."""
@@ -37,6 +42,12 @@ Private runtime parser contract for Windows root classification.
 Zero means relative, one drive-relative, two drive-absolute, and three UNC.
 `-1` means an embedded null, `-2` invalid UTF-16 units, and `-3` an invalid
 drive or UNC prefix. The bridge receives raw UTF-16 storage only.
+"""
+"""Classify a borrowed Windows path root through the Rust runtime.
+
+`path` is an `abs` view. Statuses are `0` relative, `1` drive-relative,
+`2` drive-absolute, `3` UNC, `-1` embedded null, `-2` invalid UTF-16, and
+`-3` invalid path metadata.
 """
 open unsafe extern "C" verb actus_windows_root_kind(abs path: Path) -> Int;
 

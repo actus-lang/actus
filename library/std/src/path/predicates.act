@@ -1,0 +1,41 @@
+"""Runtime-backed path predicates and component-aware comparisons."""
+
+"""Inspect absolute-root state without consuming or allocating the path."""
+open unsafe extern "C" verb actus_path_is_absolute(abs self: Path) -> Bool;
+
+"""Inspect relative-root state without consuming or allocating the path."""
+open unsafe extern "C" verb actus_path_is_relative(abs self: Path) -> Bool;
+
+"""Inspect whether the path has any platform root without allocation."""
+open unsafe extern "C" verb actus_path_has_root(abs self: Path) -> Bool;
+
+"""Compare complete borrowed path components at the Rust ABI boundary."""
+open unsafe extern "C" verb actus_path_starts_with(abs self: Path, abs prefix: Path) -> Bool;
+
+"""Compare complete trailing borrowed components at the Rust ABI boundary."""
+open unsafe extern "C" verb actus_path_ends_with(abs self: Path, abs suffix: Path) -> Bool;
+
+"""Return `true` when `self` has an absolute platform root."""
+open verb is_absolute(abs self: Path) -> Bool {
+    return actus_path_is_absolute(self: abs self);
+}
+
+"""Return `true` when `self` is relative on its selected platform."""
+open verb is_relative(abs self: Path) -> Bool {
+    return actus_path_is_relative(self: abs self);
+}
+
+"""Return `true` when `self` has any platform root."""
+open verb has_root(abs self: Path) -> Bool {
+    return actus_path_has_root(self: abs self);
+}
+
+"""Return `true` when `prefix` matches complete leading components."""
+open verb starts_with(abs self: Path, abs prefix: Path) -> Bool {
+    return actus_path_starts_with(self: abs self, prefix: abs prefix);
+}
+
+"""Return `true` when `suffix` matches complete trailing components."""
+open verb ends_with(abs self: Path, abs suffix: Path) -> Bool {
+    return actus_path_ends_with(self: abs self, suffix: abs suffix);
+}

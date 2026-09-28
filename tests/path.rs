@@ -27,6 +27,12 @@ fn std_path_representation_module_exports_validated_storage_contracts() {
         ("enum", "WindowsRoot"),
         ("verb", "windows_is_separator"),
         ("verb", "windows_root"),
+        ("verb", "is_absolute"),
+        ("verb", "is_relative"),
+        ("verb", "has_root"),
+        ("verb", "starts_with"),
+        ("verb", "ends_with"),
+        ("verb", "normalize"),
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");
     }

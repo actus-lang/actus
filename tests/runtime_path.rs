@@ -1,7 +1,9 @@
 use actus::runtime::{
-    ActusBuffer, ActusPath, PathErrorCode, PosixRoot, WindowsRoot, actus_posix_is_separator,
-    actus_posix_root_kind, actus_windows_is_separator, actus_windows_root_kind, components,
-    extension, file_name, file_stem, posix_root, validate_posix, validate_windows, windows_root,
+    ActusBuffer, ActusPath, PathErrorCode, PosixRoot, WindowsRoot, actus_path_ends_with,
+    actus_path_has_root, actus_path_is_absolute, actus_path_is_relative, actus_path_normalize,
+    actus_path_starts_with, actus_posix_is_separator, actus_posix_root_kind,
+    actus_windows_is_separator, actus_windows_root_kind, components, extension, file_name,
+    file_stem, posix_root, validate_posix, validate_windows, windows_root,
 };
 
 fn bytes_buffer(bytes: &[u8]) -> (Vec<u8>, ActusBuffer) {
@@ -94,4 +96,120 @@ fn c_abi_root_classification_reads_the_real_raw_buffer() {
         terminated: 1,
     };
     assert_eq!(unsafe { actus_windows_root_kind(&path) }, 2);
+}
+
+#[test]
+fn predicates_compare_complete_components_and_roots() {
+    let (mut path_storage, mut path_buffer) = bytes_buffer(b"/usr/bin\0");
+    let path = ActusPath {
+        storage: &mut path_buffer,
+        platform: 0,
+        length: 8,
+        capacity: path_storage.capacity() as i32,
+        terminated: 1,
+    };
+    let (mut prefix_storage, mut prefix_buffer) = bytes_buffer(b"/usr\0");
+    let prefix = ActusPath {
+        storage: &mut prefix_buffer,
+        platform: 0,
+        length: 4,
+        capacity: prefix_storage.capacity() as i32,
+        terminated: 1,
+    };
+    let (mut partial_storage, mut partial_buffer) = bytes_buffer(b"/us\0");
+    let partial = ActusPath {
+        storage: &mut partial_buffer,
+        platform: 0,
+        length: 3,
+        capacity: partial_storage.capacity() as i32,
+        terminated: 1,
+    };
+    assert_eq!(unsafe { actus_path_is_absolute(&path) }, 1);
+    assert_eq!(unsafe { actus_path_is_relative(&path) }, 0);
+    assert_eq!(unsafe { actus_path_has_root(&path) }, 1);
+    assert_eq!(unsafe { actus_path_starts_with(&path, &prefix) }, 1);
+    assert_eq!(unsafe { actus_path_starts_with(&path, &partial) }, 0);
+    assert_eq!(unsafe { actus_path_ends_with(&path, &prefix) }, 0);
+    let _ = (&mut path_storage, &mut prefix_storage, &mut partial_storage);
+}
+
+#[test]
+fn posix_normalization_is_lexical_and_stays_inside_root() {
+    for (source, expected) in [
+        (&b"a/./b\0"[..], &b"a/b\0"[..]),
+        (&b"a/../b\0"[..], &b"b\0"[..]),
+        (&b"/a/../../b\0"[..], &b"/b\0"[..]),
+        (&b"a//b\0"[..], &b"a/b\0"[..]),
+        (&b".\0"[..], &b"\0"[..]),
+    ] {
+        let mut storage = source.to_vec();
+        let capacity = storage.capacity();
+        let mut buffer =
+            ActusBuffer { data: storage.as_mut_ptr(), length: storage.len(), capacity };
+        let mut path = ActusPath {
+            storage: &mut buffer,
+            platform: 0,
+            length: (source.len() - 1) as i32,
+            capacity: capacity as i32,
+            terminated: 1,
+        };
+        assert_eq!(unsafe { actus_path_normalize(&mut path) }, 0);
+        assert_eq!(&storage[..expected.len()], expected);
+    }
+}
+
+#[test]
+fn windows_normalization_preserves_drive_forms() {
+    let cases = [
+        (
+            vec![
+                b'C' as u16,
+                b':'.into(),
+                b'\\' as u16,
+                b'a' as u16,
+                b'\\' as u16,
+                b'.' as u16,
+                b'\\' as u16,
+                b'b' as u16,
+                0,
+            ],
+            vec![b'C' as u16, b':'.into(), b'\\' as u16, b'a' as u16, b'\\' as u16, b'b' as u16, 0],
+        ),
+        (
+            vec![
+                b'C' as u16,
+                b':'.into(),
+                b'\\' as u16,
+                b'a' as u16,
+                b'\\' as u16,
+                b'.' as u16,
+                b'.' as u16,
+                b'\\' as u16,
+                b'b' as u16,
+                0,
+            ],
+            vec![b'C' as u16, b':'.into(), b'\\' as u16, b'b' as u16, 0],
+        ),
+        (
+            vec![b'C' as u16, b'f' as u16, b'o' as u16, b'o' as u16, 0],
+            vec![b'C' as u16, b'f' as u16, b'o' as u16, b'o' as u16, 0],
+        ),
+    ];
+    for (source, expected) in cases {
+        let mut storage = source.iter().flat_map(|unit| unit.to_ne_bytes()).collect::<Vec<_>>();
+        let capacity = storage.capacity();
+        let mut buffer =
+            ActusBuffer { data: storage.as_mut_ptr(), length: storage.len(), capacity };
+        let mut path = ActusPath {
+            storage: &mut buffer,
+            platform: 1,
+            length: (source.len() - 1) as i32,
+            capacity: capacity as i32,
+            terminated: 1,
+        };
+        assert_eq!(unsafe { actus_path_normalize(&mut path) }, 0);
+        let (pairs, _) = storage[..expected.len() * 2].as_chunks::<2>();
+        let actual = pairs.iter().map(|pair| u16::from_ne_bytes(*pair)).collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 }

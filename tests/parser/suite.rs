@@ -58,6 +58,17 @@ fn attaches_block_docstrings_to_supported_declarations() {
 }
 
 #[test]
+fn attaches_block_docstrings_to_external_verbs() {
+    let program = parse_source(
+        "\"\"\"Reads a raw path without transcoding.\"\"\" unsafe extern \"C\" verb host(abs path: Buffer) -> Int;",
+    );
+    let TopLevelDecl::ExternalVerb(external) = &program.declarations[0] else {
+        panic!("expected external verb")
+    };
+    assert_eq!(external.doc.as_deref(), Some("Reads a raw path without transcoding."));
+}
+
+#[test]
 fn docstrings_inside_supported_bodies_are_consumed_as_documentation() {
     let program = parse_source(
         "struct Packet { \"\"\"Payload bytes.\"\"\" payload: Buffer, } enum Status { \"\"\"Ready state.\"\"\" Ready, } verb main() { \"\"\"This statement is documented.\"\"\" return 0; }",

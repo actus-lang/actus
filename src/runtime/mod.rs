@@ -6,6 +6,8 @@ mod contract;
 mod fs;
 mod input;
 mod path;
+mod path_normalize;
+mod path_predicates;
 mod stream;
 mod types;
 
@@ -44,6 +46,11 @@ pub use path::{
     actus_posix_is_separator, actus_posix_root_kind, actus_windows_is_separator,
     actus_windows_root_kind, components, extension, file_name, file_stem, posix_is_separator,
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
+};
+pub use path_normalize::actus_path_normalize;
+pub use path_predicates::{
+    actus_path_ends_with, actus_path_has_root, actus_path_is_absolute, actus_path_is_relative,
+    actus_path_starts_with,
 };
 pub use stream::{
     actus_buffer_length, actus_buffer_validate_utf8, actus_buffered_write_stdout,

@@ -5,25 +5,13 @@ use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text}
 
 impl Parser {
     pub(super) fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
-        let mut doc = self.take_doc_string();
+        let mut doc = self.take_doc_string_group();
         if self.check_simple(&TokenKind::Meta) {
             let metadata = self.parse_metadata()?;
             if doc.is_none() {
-                doc = self.take_doc_string();
+                doc = self.take_doc_string_group();
             }
-            if self.check_simple(&TokenKind::Verb) {
-                return Ok(TopLevelDecl::Verb(
-                    self.parse_verb_with_metadata(false, metadata, doc)?,
-                ));
-            }
-            if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
-                return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
-                    self.check_simple(&TokenKind::Unsafe),
-                    false,
-                    metadata,
-                )?));
-            }
-            return Err(self.error_at_current("a declaration after metadata"));
+            return self.parse_metadata_declaration(metadata, doc);
         }
         if self.check_simple(&TokenKind::Import) {
             return self.parse_import_decl();
@@ -32,18 +20,10 @@ impl Parser {
             return self.parse_open_top_level(doc);
         }
         if self.check_simple(&TokenKind::Unsafe) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
-                true,
-                false,
-                Vec::new(),
-            )?));
+            return self.parse_external_declaration(true, doc);
         }
         if self.check_simple(&TokenKind::Extern) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
-                false,
-                false,
-                Vec::new(),
-            )?));
+            return self.parse_external_declaration(false, doc);
         }
         if self.check_simple(&TokenKind::Struct) {
             return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
@@ -62,6 +42,38 @@ impl Parser {
         }
         let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
         Ok(TopLevelDecl::Verb(declaration))
+    }
+
+    fn parse_metadata_declaration(
+        &mut self,
+        metadata: Vec<crate::ast::MetaAttribute>,
+        doc: Option<String>,
+    ) -> Result<TopLevelDecl, ParseError> {
+        if self.check_simple(&TokenKind::Verb) {
+            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
+        }
+        if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
+            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
+                self.check_simple(&TokenKind::Unsafe),
+                false,
+                metadata,
+                doc,
+            )?));
+        }
+        Err(self.error_at_current("a declaration after metadata"))
+    }
+
+    fn parse_external_declaration(
+        &mut self,
+        unsafe_boundary: bool,
+        doc: Option<String>,
+    ) -> Result<TopLevelDecl, ParseError> {
+        Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
+            unsafe_boundary,
+            false,
+            Vec::new(),
+            doc,
+        )?))
     }
 
     fn parse_import_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
@@ -116,6 +128,7 @@ impl Parser {
                 self.check_simple(&TokenKind::Unsafe),
                 true,
                 Vec::new(),
+                doc,
             )?));
         }
         Err(self.error_at_current("a declaration after `open`"))
@@ -126,6 +139,7 @@ impl Parser {
         unsafe_boundary: bool,
         is_open: bool,
         metadata: Vec<crate::ast::MetaAttribute>,
+        doc: Option<String>,
     ) -> Result<ExternalVerbDecl, ParseError> {
         let start = if unsafe_boundary {
             let start = self.expect_keyword(TokenKind::Unsafe, "`unsafe`")?.span.start;
@@ -159,6 +173,7 @@ impl Parser {
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(ExternalVerbDecl {
             is_open,
+            doc,
             unsafe_boundary,
             abi,
             metadata,

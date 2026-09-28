@@ -9,6 +9,8 @@ open types;
 open error;
 open storage;
 open components;
+open predicates;
+open normalize;
 """Re-export POSIX raw separator and root classification."""
 open posix;
 """Re-export Windows raw separator and root classification."""

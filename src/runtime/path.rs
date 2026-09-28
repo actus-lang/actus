@@ -169,7 +169,7 @@ fn is_ascii_drive(unit: u16) -> bool {
     (b'a' as u16..=b'z' as u16).contains(&unit) || (b'A' as u16..=b'Z' as u16).contains(&unit)
 }
 
-unsafe fn valid_buffer(handle: BufferHandle) -> Option<&'static ActusBuffer> {
+pub(crate) unsafe fn valid_buffer(handle: BufferHandle) -> Option<&'static ActusBuffer> {
     if handle.is_null() {
         return None;
     }
@@ -180,7 +180,9 @@ unsafe fn valid_buffer(handle: BufferHandle) -> Option<&'static ActusBuffer> {
     Some(buffer)
 }
 
-unsafe fn path_units(path: *const ActusPath) -> Result<(&'static ActusBuffer, i32), i32> {
+pub(crate) unsafe fn path_units(
+    path: *const ActusPath,
+) -> Result<(&'static ActusBuffer, i32), i32> {
     if path.is_null() {
         return Err(PathErrorCode::InvalidLength as i32);
     }
@@ -324,6 +326,6 @@ pub unsafe extern "C" fn actus_windows_root_kind(path: *const ActusPath) -> i32 
     0
 }
 
-unsafe fn path_length(path: *const ActusPath, unit_width: usize) -> usize {
+pub(crate) unsafe fn path_length(path: *const ActusPath, unit_width: usize) -> usize {
     unsafe { (*path).length as usize * unit_width }
 }

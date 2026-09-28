@@ -145,6 +145,7 @@ pub enum StructFieldRole {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExternalVerbDecl {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub unsafe_boundary: bool,
     pub abi: ForeignAbi,
     pub metadata: Vec<MetaAttribute>,
