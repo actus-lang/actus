@@ -4,6 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
+use super::super::calls::CallLoweringContext;
 use super::super::calls::{lower_call, lower_method_call};
 use super::super::enums::{enum_receiver_name, lower_enum_constructor};
 use super::super::layout::LayoutRegistry;
@@ -25,17 +26,17 @@ pub(in crate::codegen) fn lower_construct(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
-        Expr::Call { callee, arguments, .. } => lower_call(
-            function,
-            callee,
-            arguments,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
+        Expr::Call { callee, arguments, .. } => {
+            let context = CallLoweringContext::new(
+                locals,
+                local_types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            );
+            lower_call(function, callee, arguments, &context)
+        }
         Expr::MethodCall { receiver, method, arguments, .. } => lower_method_construct(
             function,
             receiver,
@@ -158,18 +159,15 @@ fn lower_method_construct(
             layouts,
         )
     } else {
-        lower_method_call(
-            function,
-            receiver,
-            method,
-            arguments,
+        let context = CallLoweringContext::new(
             locals,
             local_types,
             functions,
             cleanup_schedule,
             string_data,
             layouts,
-        )
+        );
+        lower_method_call(function, receiver, method, arguments, &context)
     }
 }
 
