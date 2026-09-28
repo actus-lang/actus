@@ -1,5 +1,3 @@
-use crate::lexer::SourceSpan;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SemanticErrorKind {
     DuplicateBinding {
@@ -322,10 +320,4 @@ pub enum SemanticErrorKind {
         field: String,
         role: String,
     },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SemanticError {
-    pub kind: SemanticErrorKind,
-    pub span: SourceSpan,
 }
