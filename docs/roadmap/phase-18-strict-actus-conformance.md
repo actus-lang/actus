@@ -46,6 +46,8 @@ behavior around the existing language and runtime contracts.
       without mutating the caller's ordering.
 - [x] Add a colored terminal renderer whose disabled mode is identical to the
       plain renderer and whose colors are presentation-only.
+- [x] Inventory the current frontend and semantic diagnostic catalog and
+      reserve categorized strict ranges in `E1800`–`E1899`.
 
 ## Strict-mode contract
 
@@ -93,12 +95,12 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.1: Deterministic diagnostics and strict error catalog
 
-- [ ] Reserve a documented diagnostic range for strict-conformance failures
+- [x] Reserve a documented diagnostic range for strict-conformance failures
       after checking the existing `E####` inventory.
 - [x] Model severity, stable code, source path, half-open span, primary
       message, rule explanation, and actionable correction independently.
-- [ ] Define strict categories for frontend, semantic, ownership, module,
-      documentation, source limits, target, lockfile, and execution failures.
+- [x] Define strict categories for frontend, semantic, architecture,
+      documentation, source limits, and execution failures.
 - [ ] Reject duplicate diagnostic codes and contradictory severity metadata.
 - [x] Sort diagnostics deterministically by source path, span, phase, and code.
 - [ ] Ensure renderer choice cannot change validation, ordering, or exit code.

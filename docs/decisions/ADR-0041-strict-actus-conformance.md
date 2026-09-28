@@ -211,8 +211,9 @@ Every diagnostic must contain:
 - a rule-specific explanation;
 - an actionable correction where one can be stated deterministically.
 
-Phase 18 will reserve a strict-conformance diagnostic range after an inventory
-of existing codes. The planned categories are:
+The existing frontend and semantic code mappings are inventoried in the
+diagnostic renderer catalog. Phase 18 reserves `E1800`–`E1899` for strict-
+conformance diagnostics. The planned categories and sub-ranges are:
 
 | Category | Required coverage |
 | --- | --- |
@@ -222,6 +223,11 @@ of existing codes. The planned categories are:
 | strict documentation | missing or incomplete public contracts |
 | strict limits | file and function size violations |
 | strict execution | test, artifact, lockfile, and runtime contract violations |
+
+The implementation reserves `E1800`–`E1809` for configuration, `E1810`–`E1819`
+for frontend, `E1820`–`E1829` for semantic, `E1830`–`E1839` for architecture,
+`E1840`–`E1849` for documentation, `E1850`–`E1859` for limits, and
+`E1860`–`E1899` for execution and future strict expansion.
 
 Diagnostics must be deterministic in ordering and content. Terminal colors,
 LSP rendering, JSON output, and editor presentation are renderers only; they

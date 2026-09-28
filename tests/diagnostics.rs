@@ -1,7 +1,7 @@
 use actus::diagnostics::{
-    Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, render_colored_diagnostic,
-    render_diagnostic, render_json_diagnostics, render_semantic_error, semantic_diagnostic,
-    sort_diagnostics,
+    Diagnostic, DiagnosticPhase, DiagnosticSeverity, StrictDiagnosticCategory, lex_diagnostic,
+    render_colored_diagnostic, render_diagnostic, render_json_diagnostics, render_semantic_error,
+    semantic_diagnostic, sort_diagnostics, strict_code_category,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
@@ -101,6 +101,19 @@ fn colored_renderer_preserves_plain_output_when_disabled() {
         render_colored_diagnostic("x", &diagnostic, true),
         "\x1b[31merror[E1003]\x1b[0m at 1:1: undeclared name"
     );
+}
+
+#[test]
+fn strict_codes_use_the_reserved_category_ranges() {
+    assert_eq!(strict_code_category("E1800"), Some(StrictDiagnosticCategory::Configuration));
+    assert_eq!(strict_code_category("E1810"), Some(StrictDiagnosticCategory::Frontend));
+    assert_eq!(strict_code_category("E1829"), Some(StrictDiagnosticCategory::Semantic));
+    assert_eq!(strict_code_category("E1830"), Some(StrictDiagnosticCategory::Architecture));
+    assert_eq!(strict_code_category("E1840"), Some(StrictDiagnosticCategory::Documentation));
+    assert_eq!(strict_code_category("E1859"), Some(StrictDiagnosticCategory::Limits));
+    assert_eq!(strict_code_category("E1899"), Some(StrictDiagnosticCategory::Execution));
+    assert_eq!(strict_code_category("E1079"), None);
+    assert_eq!(strict_code_category("E18"), None);
 }
 
 #[test]
