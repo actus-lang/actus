@@ -62,6 +62,7 @@ verb posix_us_path() -> Path {
     return make_posix(raw: dat raw);
 }
 
+meta target("unix")
 meta test
 verb component_predicates_respect_boundaries() -> Int {
     erg path = posix_bin_path();
