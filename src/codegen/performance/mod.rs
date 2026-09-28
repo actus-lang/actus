@@ -88,35 +88,7 @@ impl PerformanceRegistry {
     ) -> Result<Vec<PerformanceDefinition<'a>>, NativeEmitError> {
         self.implementations
             .iter()
-            .map(|implementation| {
-                program
-                    .declarations
-                    .iter()
-                    .find_map(|declaration| {
-                        let TopLevelDecl::Perform(perform) = declaration else { return None };
-                        if perform.role_name != implementation.role_name
-                            || canonical_type_name(&perform.target) != implementation.target_type
-                        {
-                            return None;
-                        }
-                        perform
-                            .methods
-                            .iter()
-                            .find(|method| method.name == implementation.method_name)
-                            .map(|method| PerformanceDefinition {
-                                role_name: implementation.role_name.clone(),
-                                target: &perform.target,
-                                method,
-                                symbol: implementation.symbol.clone(),
-                            })
-                    })
-                    .ok_or_else(|| {
-                        NativeEmitError(format!(
-                            "reachable performance `{}` has no source definition",
-                            implementation.symbol
-                        ))
-                    })
-            })
+            .map(|implementation| find_definition(program, implementation))
             .collect()
     }
 
@@ -126,6 +98,34 @@ impl PerformanceRegistry {
     }
 }
 
+fn find_definition<'a>(
+    program: &'a Program,
+    implementation: &PerformanceImplementation,
+) -> Result<PerformanceDefinition<'a>, NativeEmitError> {
+    let definition = program.declarations.iter().find_map(|declaration| {
+        let TopLevelDecl::Perform(perform) = declaration else { return None };
+        if perform.role_name != implementation.role_name
+            || canonical_type_name(&perform.target) != implementation.target_type
+        {
+            return None;
+        }
+        perform.methods.iter().find(|method| method.name == implementation.method_name).map(
+            |method| PerformanceDefinition {
+                role_name: implementation.role_name.clone(),
+                target: &perform.target,
+                method,
+                symbol: implementation.symbol.clone(),
+            },
+        )
+    });
+    definition.ok_or_else(|| {
+        NativeEmitError(format!(
+            "reachable performance `{}` has no source definition",
+            implementation.symbol
+        ))
+    })
+}
+
 pub(super) fn declare_performance_functions(
     module: &mut ObjectModule,
     definitions: &[PerformanceDefinition<'_>],
@@ -133,48 +133,60 @@ pub(super) fn declare_performance_functions(
 ) -> Result<std::collections::HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = std::collections::HashMap::new();
     for definition in definitions {
-        let signature = super::declarations::native_signature_for_definition(
-            module,
-            definition.method,
-            layouts,
-        )?;
-        let id = module
-            .declare_function(&definition.symbol, Linkage::Local, &signature)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+        let meta = declare_performance_function(module, definition, layouts)?;
         let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
-        metadata.insert(
-            dispatch_key(target_type, &definition.method.name),
-            FunctionMeta {
-                id,
-                parameter_names: definition
-                    .method
-                    .params
-                    .iter()
-                    .map(|parameter| parameter.name.clone())
-                    .collect(),
-                return_type: NativeType::from_type_name_with_layout(
-                    definition.method.return_type.as_ref().map(|return_type| &return_type.ty),
-                    layouts,
-                )?,
-                dynamic_params: definition
-                    .method
-                    .params
-                    .iter()
-                    .map(|parameter| parameter.dispatch == crate::ast::DispatchMode::Dynamic)
-                    .collect(),
-                dynamic_roles: definition
-                    .method
-                    .params
-                    .iter()
-                    .map(|parameter| {
-                        (parameter.dispatch == crate::ast::DispatchMode::Dynamic)
-                            .then(|| parameter.ty.name.clone())
-                    })
-                    .collect(),
-            },
-        );
+        metadata.insert(dispatch_key(target_type, &definition.method.name), meta);
     }
     Ok(metadata)
+}
+
+fn declare_performance_function(
+    module: &mut ObjectModule,
+    definition: &PerformanceDefinition<'_>,
+    layouts: &LayoutRegistry,
+) -> Result<FunctionMeta, NativeEmitError> {
+    let signature =
+        super::declarations::native_signature_for_definition(module, definition.method, layouts)?;
+    let id = module
+        .declare_function(&definition.symbol, Linkage::Local, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))?;
+    let return_type = NativeType::from_type_name_with_layout(
+        definition.method.return_type.as_ref().map(|return_type| &return_type.ty),
+        layouts,
+    )?;
+    Ok(FunctionMeta {
+        id,
+        parameter_names: definition
+            .method
+            .params
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .collect(),
+        return_type,
+        dynamic_params: dynamic_parameters(definition),
+        dynamic_roles: dynamic_roles(definition),
+    })
+}
+
+fn dynamic_parameters(definition: &PerformanceDefinition<'_>) -> Vec<bool> {
+    definition
+        .method
+        .params
+        .iter()
+        .map(|parameter| parameter.dispatch == crate::ast::DispatchMode::Dynamic)
+        .collect()
+}
+
+fn dynamic_roles(definition: &PerformanceDefinition<'_>) -> Vec<Option<String>> {
+    definition
+        .method
+        .params
+        .iter()
+        .map(|parameter| {
+            (parameter.dispatch == crate::ast::DispatchMode::Dynamic)
+                .then(|| parameter.ty.name.clone())
+        })
+        .collect()
 }
 
 fn performance_symbol(role: &str, target: &str, method: &str) -> String {
