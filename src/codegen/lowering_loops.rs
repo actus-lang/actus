@@ -43,10 +43,7 @@ pub(super) fn lower_loop<'source>(
     let header = function.create_block();
     let body = function.create_block();
     let exit = function.create_block();
-    for _ in &carried {
-        function.append_block_param(header, types::I32);
-        function.append_block_param(exit, types::I32);
-    }
+    append_loop_parameters(function, &carried, header, exit);
     let initial_values = carried_values(locals, &carried)?;
     jump_with_values(function, header, initial_values);
     function.switch_to_block(header);
@@ -57,7 +54,7 @@ pub(super) fn lower_loop<'source>(
     let mut loop_types = types.clone();
     let header_values = function.block_params(header).to_vec();
     for (name, value) in carried.iter().zip(header_values) {
-        let binding = locals.keys().find(|binding| binding.as_str() == name).unwrap();
+        let binding = find_loop_binding(locals, name)?;
         loop_locals.insert(binding, value);
     }
     let flow = super::lowering_statements::lower_statements(
@@ -81,11 +78,34 @@ pub(super) fn lower_loop<'source>(
         function.seal_block(exit);
         let exit_values = function.block_params(exit).to_vec();
         for (name, value) in carried.iter().zip(exit_values) {
-            let binding = locals.keys().find(|binding| binding.as_str() == name).unwrap();
+            let binding = find_loop_binding(locals, name)?;
             locals.insert(binding, value);
         }
         Ok(Flow::Fallthrough)
     } else {
         Ok(flow)
+    }
+}
+
+fn find_loop_binding<'source>(
+    locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
+    name: &str,
+) -> Result<&'source String, NativeEmitError> {
+    locals
+        .keys()
+        .find(|binding| binding.as_str() == name)
+        .copied()
+        .ok_or_else(|| NativeEmitError(format!("loop binding `{name}` is unavailable")))
+}
+
+fn append_loop_parameters(
+    function: &mut FunctionBuilder<'_>,
+    carried: &[String],
+    header: cranelift_codegen::ir::Block,
+    exit: cranelift_codegen::ir::Block,
+) {
+    for _ in carried {
+        function.append_block_param(header, types::I32);
+        function.append_block_param(exit, types::I32);
     }
 }

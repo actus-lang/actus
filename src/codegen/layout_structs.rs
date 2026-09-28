@@ -170,7 +170,10 @@ impl LayoutRegistry {
             NativeType::FatPointer => self.pointer_size,
             NativeType::Void => 1,
             NativeType::Pack(id) => {
-                self.pack(id).map(|pack| self.alignment(pack.storage)).transpose()?.unwrap_or(1)
+                let pack = self
+                    .pack(id)
+                    .ok_or_else(|| NativeEmitError(format!("missing packed alignment `{id}`")))?;
+                self.alignment(pack.storage)?
             }
         })
     }

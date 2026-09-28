@@ -174,7 +174,11 @@ fn lower_call_arguments(
             layouts,
         )?;
         values.push(value);
-        if dynamic_params.get(index).copied().unwrap_or(false) {
+        let is_dynamic = dynamic_params
+            .get(index)
+            .copied()
+            .ok_or_else(|| NativeEmitError("call metadata is missing parameter mode".to_owned()))?;
+        if is_dynamic {
             let role = dynamic_roles
                 .get(index)
                 .and_then(Option::as_deref)

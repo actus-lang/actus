@@ -159,6 +159,8 @@ behavior around the existing language and runtime contracts.
       substituting `Int`.
 - [x] Reject missing packed layouts during native IR type resolution instead
       of silently substituting a scalar machine type.
+- [x] Reject missing loop bindings, call parameter modes, and packed alignment
+      metadata instead of relying on unchecked internal lookups or defaults.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.
