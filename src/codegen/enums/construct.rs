@@ -5,22 +5,17 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::enum_layout::{EnumFieldLayout, EnumVariantLayout};
-use super::expressions::lower_expression;
-use super::layout::LayoutRegistry;
-use super::literals::StringDataValues;
-use super::model::NativeCleanupSchedule;
-use super::native::{FunctionRef, NativeEmitError};
-use super::structs::emit_struct_drop;
-use super::types::NativeType;
-
-pub(super) fn enum_receiver_name(receiver: &Expr) -> Option<&str> {
-    let Expr::Identifier { name, .. } = receiver else { return None };
-    Some(name)
-}
+use super::super::enum_layout::{EnumFieldLayout, EnumVariantLayout};
+use super::super::expressions::lower_expression;
+use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataValues;
+use super::super::model::NativeCleanupSchedule;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::structs::copy_bytes;
+use super::super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_enum_constructor(
+pub(crate) fn lower_enum_constructor(
     function: &mut FunctionBuilder<'_>,
     receiver: &Expr,
     variant: &str,
@@ -32,7 +27,7 @@ pub(super) fn lower_enum_constructor(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let enum_name = enum_receiver_name(receiver)
+    let enum_name = super::types::enum_receiver_name(receiver)
         .ok_or_else(|| NativeEmitError("enum constructor requires a type receiver".to_owned()))?;
     let (enum_id, variant_layout) =
         layouts.enum_constructor(enum_name, variant).ok_or_else(|| {
@@ -78,7 +73,7 @@ fn lower_regular_enum_constructor(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-    enum_layout: &super::enum_layout::EnumLayout,
+    enum_layout: &super::super::enum_layout::EnumLayout,
     variant_layout: &EnumVariantLayout,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let allocator = functions
@@ -128,7 +123,7 @@ fn lower_enum_payload(
     payload_offset: u32,
     variant_layout: &EnumVariantLayout,
 ) -> Result<(), NativeEmitError> {
-    for (field, argument) in ordered_arguments(variant_layout.fields.as_slice(), arguments)? {
+    for (field, argument) in ordered_arguments(&variant_layout.fields, arguments)? {
         let value = lower_expression(
             function,
             &argument.expression,
@@ -219,126 +214,4 @@ fn store_payload(
         function.ins().store(MemFlagsData::new(), value, destination, 0);
     }
     Ok(())
-}
-
-fn copy_bytes(
-    function: &mut FunctionBuilder<'_>,
-    source: cranelift_codegen::ir::Value,
-    destination: cranelift_codegen::ir::Value,
-    size: u32,
-) {
-    for offset in 0..size {
-        let source_address = function.ins().iadd_imm_s(source, i64::from(offset));
-        let destination_address = function.ins().iadd_imm_s(destination, i64::from(offset));
-        let byte = function.ins().load(types::I8, MemFlagsData::new(), source_address, 0);
-        function.ins().store(MemFlagsData::new(), byte, destination_address, 0);
-    }
-}
-
-pub(super) fn enum_expression_type(
-    expression: &Expr,
-    layouts: &LayoutRegistry,
-) -> Option<NativeType> {
-    let (receiver, variant) = match expression {
-        Expr::MethodCall { receiver, method, .. } => (receiver.as_ref(), method.as_str()),
-        Expr::FieldAccess { object, field, .. } => (object.as_ref(), field.as_str()),
-        _ => return None,
-    };
-    let enum_name = enum_receiver_name(receiver)?;
-    let (id, _) = layouts.enum_constructor(enum_name, variant)?;
-    Some(NativeType::Enum(id))
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn emit_enum_payload_drop(
-    function: &mut FunctionBuilder<'_>,
-    subject: &str,
-    enum_name: &str,
-    variant: &str,
-    field: &str,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    let address = locals
-        .iter()
-        .find(|(binding, _)| binding.as_str() == subject)
-        .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{subject}` is unavailable")))?;
-    let enum_id = types
-        .iter()
-        .find(|(binding, ty)| binding.as_str() == subject && matches!(ty, NativeType::Enum(_)))
-        .and_then(|(_, ty)| match ty {
-            NativeType::Enum(id) => Some(*id),
-            _ => None,
-        })
-        .or_else(|| layouts.enum_constructor(enum_name, variant).map(|(id, _)| id))
-        .ok_or_else(|| NativeEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
-    let variant_layout = layouts
-        .enum_variant(enum_id, variant)
-        .ok_or_else(|| NativeEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
-    let enum_layout = layouts
-        .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
-    if enum_layout.niche_pointer {
-        return Ok(());
-    }
-    let field_layout = payload_field(variant_layout, field)?;
-    let field_address = function
-        .ins()
-        .iadd_imm_s(address, i64::from(enum_layout.payload_offset + field_layout.offset));
-    drop_enum_payload_field(function, field_layout.ty, field_address, functions, layouts)?;
-    Ok(())
-}
-
-fn drop_enum_payload_field(
-    function: &mut FunctionBuilder<'_>,
-    field_type: NativeType,
-    field_address: cranelift_codegen::ir::Value,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    match field_type {
-        NativeType::Buffer => {
-            let handle =
-                function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
-            let target = functions.get("actus_buffer_drop").ok_or_else(|| {
-                NativeEmitError(
-                    "native runtime function `actus_buffer_drop` is unavailable".to_owned(),
-                )
-            })?;
-            function.ins().call(target.reference, &[handle]);
-        }
-        NativeType::Struct(nested_id) => {
-            emit_struct_drop(function, field_address, nested_id, functions, layouts)?;
-        }
-        NativeType::Int
-        | NativeType::Integer { .. }
-        | NativeType::Float { .. }
-        | NativeType::Void
-        | NativeType::String
-        | NativeType::Enum(_)
-        | NativeType::Pack(_)
-        | NativeType::Arena(_)
-        | NativeType::FatPointer => {}
-    }
-    Ok(())
-}
-
-fn payload_field<'a>(
-    variant: &'a EnumVariantLayout,
-    field: &str,
-) -> Result<&'a EnumFieldLayout, NativeEmitError> {
-    if let Ok(index) = field.parse::<usize>() {
-        return variant
-            .fields
-            .get(index)
-            .ok_or_else(|| NativeEmitError(format!("unknown tuple payload field `{field}`")));
-    }
-    variant
-        .fields
-        .iter()
-        .find(|candidate| candidate.name.as_deref() == Some(field))
-        .ok_or_else(|| NativeEmitError(format!("unknown named payload field `{field}`")))
 }
