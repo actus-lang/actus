@@ -20,6 +20,9 @@ pub(super) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::UnexpectedToken => "E0003",
         ParseErrorCode::UnexpectedEndOfInput => "E0004",
         ParseErrorCode::DuplicateName => "E0005",
+        ParseErrorCode::UnknownMetadata => "E0006",
+        ParseErrorCode::UnsupportedTargetPlatform => "E0007",
+        ParseErrorCode::MetadataTargetNotAllowed => "E0008",
     }
 }
 

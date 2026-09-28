@@ -19,6 +19,9 @@ pub enum ParseErrorKind {
     UnexpectedToken { expected: String, found: TokenKind },
     UnexpectedEndOfInput { expected: String },
     DuplicateName { kind: String, name: String },
+    UnknownMetadata { name: String },
+    UnsupportedTargetPlatform { name: String },
+    MetadataTargetNotAllowed,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -26,6 +29,9 @@ pub enum ParseErrorCode {
     UnexpectedToken,
     UnexpectedEndOfInput,
     DuplicateName,
+    UnknownMetadata,
+    UnsupportedTargetPlatform,
+    MetadataTargetNotAllowed,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,20 +147,36 @@ impl Parser {
             }
             "target" => {
                 self.expect_simple(TokenKind::LeftParen, "`(` after `target`")?;
-                let selector = self.advance_required("target platform string")?;
-                let TokenKind::StringLiteral(selector) = selector.kind else {
-                    return Err(self.error_at_current("a target platform string"));
+                let selector_token = self.advance_required("target platform string")?;
+                let selector = match selector_token.kind {
+                    TokenKind::StringLiteral(selector) => selector,
+                    found => {
+                        return Err(ParseError {
+                            code: ParseErrorCode::UnexpectedToken,
+                            kind: ParseErrorKind::UnexpectedToken {
+                                expected: "a target platform string".to_owned(),
+                                found,
+                            },
+                            span: selector_token.span,
+                        });
+                    }
                 };
                 if !matches!(selector.as_str(), "unix" | "posix" | "windows") {
-                    return Err(
-                        self.error_at_current("supported target `unix`, `posix`, or `windows`")
-                    );
+                    return Err(ParseError {
+                        code: ParseErrorCode::UnsupportedTargetPlatform,
+                        kind: ParseErrorKind::UnsupportedTargetPlatform { name: selector },
+                        span: selector_token.span,
+                    });
                 }
                 self.expect_simple(TokenKind::RightParen, "`)` after target platform")?;
                 let _ = self.match_simple(TokenKind::Semicolon);
                 Ok(vec![MetaAttribute::Target(selector)])
             }
-            _ => Err(self.error_at_current("supported metadata names `test` or `target`")),
+            name => Err(ParseError {
+                code: ParseErrorCode::UnknownMetadata,
+                kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },
+                span: attribute.span,
+            }),
         }
     }
 

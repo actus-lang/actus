@@ -179,9 +179,12 @@ behavior around the existing language and runtime contracts.
 - [x] Reject unknown verbs and function calls with stable `E1069` diagnostics.
 - [x] Reject malformed internal generic type keys with stable `E1080`
       diagnostics instead of falling back to an unparsed type.
-- [ ] Reject unknown fields, modules, imports, and attributes with stable
-      diagnostics.
-- [ ] Reject malformed metadata and metadata attached to an invalid target.
+- [x] Reject unknown fields with stable `E1031` diagnostics.
+- [ ] Reject unknown modules and imports with stable module diagnostics.
+- [x] Reject unknown metadata attributes and target selectors with stable
+      `E0006`/`E0007` diagnostics.
+- [x] Reject malformed metadata and metadata attached to an invalid target
+      with stable parser diagnostics.
 - [x] Reject duplicate declarations across compiler namespaces and module
       siblings with stable diagnostics.
 - [x] Reject ambiguous positional calls and ambiguous module roots

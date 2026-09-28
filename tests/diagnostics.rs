@@ -72,6 +72,19 @@ fn renders_duplicate_pack_diagnostics_with_a_stable_code() {
 }
 
 #[test]
+fn renders_unknown_metadata_with_a_stable_code() {
+    let source = "meta experimental";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let error = parse(tokens).expect_err("unknown metadata should fail parsing");
+
+    assert_eq!(
+        render_parse_error(source, &error),
+        "error[E0006] at 1:6: unknown metadata attribute `experimental`"
+    );
+}
+
+#[test]
 fn diagnostic_model_is_independent_from_terminal_rendering() {
     let source = "ok\nvalue\n";
     let diagnostic = Diagnostic::warning("E1800", SourceSpan::new(3, 8), "strict warning")

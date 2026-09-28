@@ -50,7 +50,32 @@ fn rejects_unknown_target_metadata() {
     let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
     let error = parse(tokens).expect_err("unknown target should be rejected");
-    assert!(matches!(error.kind, ParseErrorKind::UnexpectedToken { .. }));
+    assert_eq!(error.code, ParseErrorCode::UnsupportedTargetPlatform);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnsupportedTargetPlatform { name } if name == "plan9"
+    ));
+}
+
+#[test]
+fn rejects_unknown_metadata_attributes() {
+    let (tokens, errors) = scan("meta experimental verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unknown metadata must be rejected");
+    assert_eq!(error.code, ParseErrorCode::UnknownMetadata);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::UnknownMetadata { name } if name == "experimental"
+    ));
+}
+
+#[test]
+fn rejects_metadata_attached_to_a_non_verb_declaration() {
+    let (tokens, errors) = scan("meta test struct Packet { payload: Buffer, }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("metadata must reject invalid declaration targets");
+    assert_eq!(error.code, ParseErrorCode::MetadataTargetNotAllowed);
+    assert!(matches!(error.kind, ParseErrorKind::MetadataTargetNotAllowed));
 }
 
 #[test]

@@ -63,7 +63,11 @@ impl Parser {
                 doc,
             )?));
         }
-        Err(self.error_at_current("a declaration after metadata"))
+        Err(ParseError {
+            code: ParseErrorCode::MetadataTargetNotAllowed,
+            kind: ParseErrorKind::MetadataTargetNotAllowed,
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
     }
 
     fn parse_external_declaration(
