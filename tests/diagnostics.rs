@@ -1,6 +1,6 @@
 use actus::diagnostics::{
     Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, render_diagnostic,
-    render_semantic_error, semantic_diagnostic, sort_diagnostics,
+    render_json_diagnostics, render_semantic_error, semantic_diagnostic, sort_diagnostics,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
@@ -60,6 +60,33 @@ fn diagnostics_sort_by_source_location_phase_and_code() {
     assert_eq!(diagnostics[0].code(), "E0001");
     assert_eq!(diagnostics[1].code(), "E1000");
     assert_eq!(diagnostics[2].code(), "E2000");
+}
+
+#[test]
+fn json_renderer_preserves_shared_diagnostic_metadata() {
+    let diagnostics = vec![
+        Diagnostic::warning("E1800", SourceSpan::new(3, 8), "strict warning")
+            .with_phase(DiagnosticPhase::Configuration)
+            .with_source_path("Actus.toml")
+            .with_explanation("strict mode rejects unresolved warnings")
+            .with_suggestion("resolve the warning before building"),
+        Diagnostic::error("E0001", SourceSpan::new(0, 1), "unexpected character")
+            .with_phase(DiagnosticPhase::Lexical)
+            .with_source_path("src/main.act"),
+    ];
+
+    let encoded = render_json_diagnostics(&diagnostics).expect("diagnostics should serialize");
+    let entries: serde_json::Value = serde_json::from_str(&encoded).expect("valid JSON output");
+
+    assert_eq!(entries[0]["code"], "E1800");
+    assert_eq!(entries[0]["phase"], "configuration");
+    assert_eq!(entries[0]["severity"], "warning");
+    assert_eq!(entries[0]["sourcePath"], "Actus.toml");
+    assert_eq!(entries[0]["span"]["start"], 3);
+    assert_eq!(entries[0]["explanation"], "strict mode rejects unresolved warnings");
+    assert_eq!(entries[1]["code"], "E0001");
+    assert_eq!(entries[1]["phase"], "lexical");
+    assert_eq!(diagnostics[0].code(), "E1800");
 }
 
 #[test]

@@ -1,4 +1,5 @@
 mod codes;
+mod json;
 
 use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::{ParseError, ParseErrorKind};
@@ -6,6 +7,8 @@ use crate::semantic::SemanticError;
 
 use super::{Diagnostic, DiagnosticPhase, DiagnosticSeverity};
 use codes::{lex_code, parse_code, semantic_code, semantic_message};
+
+pub use json::render_json_diagnostics;
 
 /// Converts a lexical failure into the stable diagnostic model.
 pub fn lex_diagnostic(error: &LexError) -> Diagnostic {

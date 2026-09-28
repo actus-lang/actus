@@ -42,6 +42,8 @@ behavior around the existing language and runtime contracts.
       `E1800` through `E1802`.
 - [x] Sort diagnostics deterministically by source path, span, compiler phase,
       and stable code in the shared model and LSP adapter.
+- [x] Add a stable JSON renderer that preserves shared diagnostic metadata
+      without mutating the caller's ordering.
 
 ## Strict-mode contract
 
