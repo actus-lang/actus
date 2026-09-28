@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::ast::{Block, Expr, MetaAttribute, Program, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::codegen::{emit_program_object_for_target, link_object};
@@ -14,6 +14,8 @@ use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 
 use super::conformance::{ConformanceMode, parse_strict_option};
+
+const TEST_PROCESS_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
     let mut mode = ConformanceMode::Standard;
@@ -46,26 +48,27 @@ pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
     collect_act_files(&configuration.project_root().join("tests"), &mut files);
     collect_act_files(configuration.source_root(), &mut files);
     files.sort();
-    let tests = match collect_tests(files, &configuration, mode) {
-        Ok(tests) => tests,
+    let collection = match collect_tests(files, &configuration, mode) {
+        Ok(collection) => collection,
         Err(error) => {
             eprintln!("error: {error}");
             return 1;
         }
     };
-    run_tests(tests, &configuration, mode)
+    run_tests(collection, &configuration, mode)
 }
 
 fn run_tests(
-    tests: Vec<DiscoveredTest>,
+    collection: TestCollection,
     configuration: &CompilerConfiguration,
     mode: ConformanceMode,
 ) -> i32 {
+    let tests = collection.tests;
     let output_style = TestOutputStyle::detect();
     if mode.is_strict() {
-        println!("running {} tests (strict)", tests.len());
+        println!("running {} tests (strict) ({} filtered)", tests.len(), collection.filtered);
     } else {
-        println!("running {} tests", tests.len());
+        println!("running {} tests ({} filtered)", tests.len(), collection.filtered);
     }
     let mut passed = 0;
     for (index, test) in tests.iter().enumerate() {
@@ -124,16 +127,22 @@ struct DiscoveredTest {
     program: Program,
 }
 
+struct TestCollection {
+    tests: Vec<DiscoveredTest>,
+    filtered: usize,
+}
+
 fn collect_tests(
     files: Vec<PathBuf>,
     configuration: &CompilerConfiguration,
     mode: ConformanceMode,
-) -> Result<Vec<DiscoveredTest>, String> {
+) -> Result<TestCollection, String> {
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),
     );
     let mut tests = Vec::new();
+    let mut filtered_tests = 0;
     for path in files {
         let source = fs::read_to_string(&path)
             .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
@@ -150,7 +159,9 @@ fn collect_tests(
             let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
             format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
         })?;
+        let declared_tests = test_count(&program);
         let program = filter_program_for_target(&program, configuration.target());
+        filtered_tests += declared_tests.saturating_sub(test_count(&program));
         if mode.is_strict() {
             crate::semantic::analyze(&program).map_err(|error| {
                 let diagnostic =
@@ -171,7 +182,17 @@ fn collect_tests(
         }
     }
     tests.sort_by(|left, right| left.path.cmp(&right.path).then(left.name.cmp(&right.name)));
-    Ok(tests)
+    Ok(TestCollection { tests, filtered: filtered_tests })
+}
+
+fn test_count(program: &Program) -> usize {
+    program
+        .declarations
+        .iter()
+        .filter(|declaration| {
+            matches!(declaration, TopLevelDecl::Verb(verb) if verb.metadata.contains(&MetaAttribute::Test))
+        })
+        .count()
 }
 
 fn run_test(
@@ -206,15 +227,27 @@ fn run_test(
         .map_err(|error| format!("cannot write test object: {error}"))?;
     let result = link_object(&object_path, &executable, configuration)
         .map_err(|error| error.to_string())
-        .and_then(|()| {
-            Command::new(&executable)
-                .stdin(Stdio::null())
-                .status()
-                .map_err(|error| error.to_string())
-        });
+        .and_then(|()| run_test_process(&executable));
     let _ = fs::remove_file(&object_path);
     let _ = fs::remove_file(&executable);
     result.map(|status| status.code().unwrap_or(1))
+}
+
+fn run_test_process(executable: &Path) -> Result<std::process::ExitStatus, String> {
+    let mut child =
+        Command::new(executable).stdin(Stdio::null()).spawn().map_err(|error| error.to_string())?;
+    let deadline = Instant::now() + TEST_PROCESS_TIMEOUT;
+    loop {
+        if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+            return Ok(status);
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!("timed out after {} seconds", TEST_PROCESS_TIMEOUT.as_secs()));
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
 }
 
 fn test_main(name: &str) -> TopLevelDecl {

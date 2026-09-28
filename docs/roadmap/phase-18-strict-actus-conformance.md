@@ -274,16 +274,16 @@ behavior around the existing language and runtime contracts.
 
 - [ ] Require explicit C-ABI status contracts and prevent raw statuses from
       leaking through public Actus APIs.
-- [ ] Validate target names and metadata before applying test or build filters.
+- [x] Validate target names and metadata before applying test or build filters.
 - [ ] Reject malformed, conflicting, or incompatible target declarations.
-- [ ] Make target filtering deterministic and verify referenced symbols exist.
+- [x] Make target filtering deterministic and verify referenced symbols exist.
 - [ ] Require native runtime tests for every changed code-generation or ABI
       contract.
 - [ ] Require positive and negative tests for every public standard-library
       contract affected by strict mode.
-- [ ] Make test discovery, filtered counts, pass counts, failure counts, and
+- [x] Make test discovery, filtered counts, pass counts, failure counts, and
       exit codes exact and deterministic.
-- [ ] Reject hangs, unbounded stdin waits, signal failures, and non-zero test
+- [x] Reject hangs, unbounded stdin waits, signal failures, and non-zero test
       processes as test failures.
 - [ ] Validate lockfiles against manifests and source content before build or
       test execution.
