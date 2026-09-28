@@ -32,6 +32,16 @@ returned as a typed validation failure.
 """
 open unsafe extern "C" verb actus_path_storage_capacity(abs storage: Buffer) -> Int;
 
+"""
+Convert a terminated ASCII path buffer to the host-native representation.
+
+`storage` is an `ins` buffer whose ownership remains with the caller. POSIX
+targets preserve the bytes; Windows targets replace them with native-endian
+UTF-16 code units. The bridge returns zero on success and rejects embedded
+null or non-ASCII bytes with `PathError.InvalidEncoding`.
+"""
+open unsafe extern "C" verb actus_path_ascii_to_native(ins storage: Buffer) -> Int;
+
 """Drop a rejected raw path buffer and return its typed validation error."""
 open verb reject_path_storage(dat storage: Buffer, dat error: PathError) -> Result[Path, PathError] {
     drop(storage);
@@ -103,6 +113,25 @@ open verb path_from_windows_utf16(dat storage: Buffer) -> Result[Path, PathError
                 terminated: 1,
             });
         },
+        _ => {
+            erg error = path_error_from_status(status: status);
+            return reject_path_storage(storage: dat storage, error: dat error);
+        },
+    };
+}
+
+"""
+Construct a host-native path from terminated ASCII bytes.
+
+`storage` is transferred with `dat`. This constructor is intended for stable
+cross-platform names and rejects non-ASCII input rather than guessing a text
+encoding. `Ok(Path)` owns the converted storage; `Err(PathError)` drops it.
+"""
+open verb path_from_ascii(dat storage: Buffer) -> Result[Path, PathError] {
+    erg status = actus_path_ascii_to_native(storage: ins storage);
+    return case status {
+        0 => path_from_posix(storage: dat storage),
+        1 => path_from_windows_utf16(storage: dat storage),
         _ => {
             erg error = path_error_from_status(status: status);
             return reject_path_storage(storage: dat storage, error: dat error);

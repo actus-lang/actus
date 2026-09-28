@@ -43,16 +43,16 @@ pub use fs::{
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use path::{
     ActusPath, ActusPathCView, ActusPathComponent, ActusPathComponents, ActusPathWideCView,
-    ComponentRange, Components, PathErrorCode, PosixRoot, WindowsRoot, actus_path_c_view,
-    actus_path_components, actus_path_ends_with, actus_path_extension, actus_path_file_name,
-    actus_path_file_stem, actus_path_has_root, actus_path_is_absolute, actus_path_is_relative,
-    actus_path_join, actus_path_next_component, actus_path_normalize, actus_path_parent,
-    actus_path_payload_length, actus_path_push, actus_path_reserve, actus_path_set_extension,
-    actus_path_set_file_name, actus_path_starts_with, actus_path_storage_capacity,
-    actus_path_validate_storage, actus_path_wide_c_view, actus_posix_is_separator,
-    actus_posix_root_kind, actus_windows_is_separator, actus_windows_root_kind, components,
-    extension, file_name, file_stem, posix_is_separator, posix_root, validate_posix,
-    validate_windows, windows_is_separator, windows_root,
+    ComponentRange, Components, PathErrorCode, PosixRoot, WindowsRoot, actus_path_ascii_to_native,
+    actus_path_c_view, actus_path_components, actus_path_ends_with, actus_path_extension,
+    actus_path_file_name, actus_path_file_stem, actus_path_has_root, actus_path_is_absolute,
+    actus_path_is_relative, actus_path_join, actus_path_next_component, actus_path_normalize,
+    actus_path_parent, actus_path_payload_length, actus_path_push, actus_path_reserve,
+    actus_path_set_extension, actus_path_set_file_name, actus_path_starts_with,
+    actus_path_storage_capacity, actus_path_validate_storage, actus_path_wide_c_view,
+    actus_posix_is_separator, actus_posix_root_kind, actus_windows_is_separator,
+    actus_windows_root_kind, components, extension, file_name, file_stem, posix_is_separator,
+    posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
 };
 pub use stream::{
     actus_buffer_length, actus_buffer_validate_utf8, actus_buffered_write_stdout,
