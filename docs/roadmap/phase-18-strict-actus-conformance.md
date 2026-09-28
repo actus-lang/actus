@@ -282,11 +282,11 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.9: Runtime, test runner, target, and lockfile integrity
 
-- [ ] Require explicit C-ABI status contracts and prevent raw statuses from
+- [x] Require explicit C-ABI status contracts and prevent raw statuses from
       leaking through public Actus APIs.
-- [ ] Validate target names and metadata before applying test or build filters.
-- [ ] Reject malformed, conflicting, or incompatible target declarations.
-- [ ] Make target filtering deterministic and verify referenced symbols exist.
+- [x] Validate target names and metadata before applying test or build filters.
+- [x] Reject malformed, conflicting, or incompatible target declarations.
+- [x] Make target filtering deterministic and verify referenced symbols exist.
 - [ ] Require native runtime tests for every changed code-generation or ABI
       contract.
 - [ ] Require positive and negative tests for every public standard-library

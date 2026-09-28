@@ -113,6 +113,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::UnsupportedTargetPlatform { name } => {
             format!("unsupported target platform `{name}`")
         }
+        ParseErrorKind::ConflictingTargetPlatforms { first, second } => {
+            format!("conflicting target platforms `{first}` and `{second}`")
+        }
         ParseErrorKind::MetadataTargetNotAllowed => {
             "metadata can only be attached to verbs or external verbs".to_owned()
         }

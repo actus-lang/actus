@@ -22,6 +22,7 @@ pub enum ParseErrorKind {
     UnknownKeyword { name: String },
     UnknownMetadata { name: String },
     UnsupportedTargetPlatform { name: String },
+    ConflictingTargetPlatforms { first: String, second: String },
     MetadataTargetNotAllowed,
 }
 
@@ -33,6 +34,7 @@ pub enum ParseErrorCode {
     UnknownKeyword,
     UnknownMetadata,
     UnsupportedTargetPlatform,
+    ConflictingTargetPlatforms,
     MetadataTargetNotAllowed,
 }
 
