@@ -36,6 +36,8 @@ behavior around the existing language and runtime contracts.
 - [x] Run source-aware semantic validation while collecting strict meta tests.
 - [x] Add positive and negative CLI/configuration regression tests for the
       implemented strict behaviors.
+- [x] Introduce a renderer-independent diagnostic model with stable metadata
+      and terminal rendering compatibility.
 
 ## Strict-mode contract
 
@@ -85,7 +87,7 @@ behavior around the existing language and runtime contracts.
 
 - [ ] Reserve a documented diagnostic range for strict-conformance failures
       after checking the existing `E####` inventory.
-- [ ] Model severity, stable code, source path, half-open span, primary
+- [x] Model severity, stable code, source path, half-open span, primary
       message, rule explanation, and actionable correction independently.
 - [ ] Define strict categories for frontend, semantic, ownership, module,
       documentation, source limits, target, lockfile, and execution failures.

@@ -1,5 +1,8 @@
-use actus::diagnostics::render_semantic_error;
-use actus::lexer::scan;
+use actus::diagnostics::{
+    Diagnostic, DiagnosticSeverity, lex_diagnostic, render_diagnostic, render_semantic_error,
+    semantic_diagnostic,
+};
+use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
 use actus::semantic::analyze;
 
@@ -14,6 +17,41 @@ fn renders_stable_semantic_error_codes_and_locations() {
     assert_eq!(
         render_semantic_error(source, &error),
         "error[E1003] at 2:12: undeclared identifier `missing`"
+    );
+    let diagnostic = semantic_diagnostic(&error);
+    assert_eq!(diagnostic.code(), "E1003");
+    assert_eq!(diagnostic.severity(), DiagnosticSeverity::Error);
+}
+
+#[test]
+fn diagnostic_model_is_independent_from_terminal_rendering() {
+    let source = "ok\nvalue\n";
+    let diagnostic = Diagnostic::warning("E1800", SourceSpan::new(3, 8), "strict warning")
+        .with_source_path("src/main.act")
+        .with_explanation("strict mode rejects unresolved warnings")
+        .with_suggestion("resolve the warning before building");
+
+    assert_eq!(diagnostic.code(), "E1800");
+    assert_eq!(diagnostic.severity(), DiagnosticSeverity::Warning);
+    assert_eq!(diagnostic.span(), SourceSpan::new(3, 8));
+    assert_eq!(diagnostic.source_path(), Some("src/main.act"));
+    assert_eq!(diagnostic.message(), "strict warning");
+    assert_eq!(diagnostic.explanation(), Some("strict mode rejects unresolved warnings"));
+    assert_eq!(diagnostic.suggestion(), Some("resolve the warning before building"));
+    assert_eq!(render_diagnostic(source, &diagnostic), "warning[E1800] at 2:1: strict warning");
+}
+
+#[test]
+fn lexical_diagnostics_have_stable_model_fields() {
+    let (_, errors) = scan("@");
+    let diagnostic = lex_diagnostic(&errors[0]);
+
+    assert_eq!(diagnostic.code(), "E0001");
+    assert_eq!(diagnostic.severity(), DiagnosticSeverity::Error);
+    assert_eq!(diagnostic.span(), SourceSpan::new(0, 1));
+    assert_eq!(
+        render_diagnostic("@", &diagnostic),
+        "error[E0001] at 1:1: unexpected character `@`"
     );
 }
 
