@@ -1,4 +1,7 @@
-use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
+use crate::diagnostics::{
+    Diagnostic, lex_diagnostic, parse_diagnostic, render_diagnostic, semantic_diagnostic,
+    sort_diagnostics,
+};
 use crate::lexer::scan;
 use crate::modules::{ModuleError, ModuleResolver, parse_module, resolve_imports};
 use crate::parser::parse;
@@ -71,25 +74,24 @@ fn check_source(
     input_path: &std::path::Path,
     mode: ConformanceMode,
 ) -> i32 {
-    let input = super::input::source_path(input_path);
+    let input = input_path.to_path_buf();
     let source = match fs::read_to_string(&input) {
         Ok(source) => source,
         Err(error) => {
-            eprintln!("error: cannot read `{input}`: {error}");
+            eprintln!("error: cannot read `{}`: {error}", input.display());
             return 1;
         }
     };
     let (tokens, lex_errors) = scan(&source);
     if !lex_errors.is_empty() {
-        for error in &lex_errors {
-            eprintln!("{input}: {}", render_lex_error(&source, error));
-        }
+        let diagnostics = lex_errors.iter().map(lex_diagnostic).collect::<Vec<_>>();
+        report_diagnostics(&input, &source, diagnostics);
         return 1;
     }
     let program = match parse(tokens) {
         Ok(program) => program,
         Err(error) => {
-            eprintln!("{input}: {}", render_parse_error(&source, &error));
+            report_diagnostic(&input, &source, parse_diagnostic(&error));
             return 1;
         }
     };
@@ -102,7 +104,7 @@ fn check_source(
     ) {
         Ok(program) => program,
         Err(error) => {
-            eprintln!("error: cannot resolve imports for `{input}`: {error}");
+            eprintln!("error: cannot resolve imports for `{}`: {error}", input.display());
             return 1;
         }
     };
@@ -110,14 +112,14 @@ fn check_source(
     match crate::semantic::analyze(&program) {
         Ok(_) => {
             if mode.is_strict() {
-                println!("checked `{input}` successfully (strict)");
+                println!("checked `{}` successfully (strict)", input.display());
             } else {
-                println!("checked `{input}` successfully");
+                println!("checked `{}` successfully", input.display());
             }
             0
         }
         Err(error) => {
-            eprintln!("{input}: {}", render_semantic_error(&source, &error));
+            report_diagnostic(&input, &source, semantic_diagnostic(&error));
             1
         }
     }
@@ -152,10 +154,25 @@ fn check_module(
             0
         }
         Err(error) => {
-            eprintln!("{}: {}", input_path.display(), render_semantic_error("", &error));
+            report_diagnostic(input_path, "", semantic_diagnostic(&error));
             1
         }
     }
+}
+
+fn report_diagnostics(path: &std::path::Path, source: &str, mut diagnostics: Vec<Diagnostic>) {
+    for diagnostic in &mut diagnostics {
+        let path = path.display().to_string();
+        *diagnostic = diagnostic.clone().with_source_path(path);
+    }
+    sort_diagnostics(&mut diagnostics);
+    for diagnostic in diagnostics {
+        report_diagnostic(path, source, diagnostic);
+    }
+}
+
+fn report_diagnostic(path: &std::path::Path, source: &str, diagnostic: Diagnostic) {
+    eprintln!("{}: {}", path.display(), render_diagnostic(source, &diagnostic));
 }
 
 fn report_module_error(module_path: &str, error: ModuleError) -> i32 {
