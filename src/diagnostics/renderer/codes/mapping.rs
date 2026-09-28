@@ -39,7 +39,13 @@ pub(crate) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
     if let Some(code) = ownership_semantic_code(kind) {
         return code;
     }
-    match kind {
+    declaration_semantic_code(kind)
+        .or_else(|| expression_semantic_code(kind))
+        .unwrap_or_else(|| unreachable!("extended semantic diagnostic code handled above"))
+}
+
+fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
         SemanticErrorKind::DuplicateStructName { .. } => "E1029",
         SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
@@ -49,6 +55,16 @@ pub(crate) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::UnknownStructField { .. } => "E1031",
         SemanticErrorKind::MissingStructField { .. } => "E1032",
         SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
+        _ => return None,
+    })
+}
+
+fn expression_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    expression_value_code(kind).or_else(|| expression_pattern_code(kind))
+}
+
+fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
         SemanticErrorKind::UnknownVerb { .. } => "E1069",
         SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
@@ -62,6 +78,12 @@ pub(crate) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::MissingReturnValue => "E1028",
         SemanticErrorKind::InvalidFieldAssignmentTarget { .. } => "E1034",
         SemanticErrorKind::FieldBorrowConflict { .. } => "E1035",
+        _ => return None,
+    })
+}
+
+fn expression_pattern_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
         SemanticErrorKind::UnknownMethod { .. } => "E1036",
         SemanticErrorKind::InvalidReceiver { .. } => "E1037",
         SemanticErrorKind::ReceiverTypeMismatch { .. } => "E1038",
@@ -75,11 +97,15 @@ pub(crate) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::DuplicatePattern { .. } => "E1047",
         SemanticErrorKind::PatternTypeMismatch { .. } => "E1048",
         SemanticErrorKind::PatternBindingTypeMismatch { .. } => "E1049",
-        _ => unreachable!("extended semantic diagnostic code handled above"),
-    }
+        _ => return None,
+    })
 }
 
 fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    ownership_binding_code(kind).or_else(|| ownership_call_code(kind))
+}
+
+fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<&'static str> {
     Some(match kind {
         SemanticErrorKind::DuplicateBinding { .. } => "E1001",
         SemanticErrorKind::ShadowedBinding { .. } => "E1002",
@@ -97,6 +123,12 @@ fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
         SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
         SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
+        _ => return None,
+    })
+}
+
+fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+    Some(match kind {
         SemanticErrorKind::InvalidAbsReturnOrigin { .. } => "E1066",
         SemanticErrorKind::InvalidIntrinsicArgument { .. } => "E1021",
         SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",

@@ -45,6 +45,10 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
+    ownership_argument_message(kind).or_else(|| ownership_state_message(kind))
+}
+
+fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
     Some(match kind {
         SemanticErrorKind::UnknownParameter { callee, name } => {
             format!("unknown parameter `{name}` in call to `{callee}`")
@@ -63,12 +67,28 @@ fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidAbsReturnOrigin { reason } => {
             format!("invalid abs return origin: {reason}")
         }
+        _ => return None,
+    })
+}
+
+fn ownership_state_message(kind: &SemanticErrorKind) -> Option<String> {
+    ownership_scope_message(kind).or_else(|| ownership_loan_message(kind))
+}
+
+fn ownership_scope_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
         SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter } => {
             format!("invalid `{parameter}` argument in intrinsic `{callee}`")
         }
         SemanticErrorKind::AmbiguousPositionalCall { callee } => {
             format!("positional call to `{callee}` is ambiguous")
         }
+        _ => return None,
+    })
+}
+
+fn ownership_loan_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
         SemanticErrorKind::BorrowedReturn { name } => {
             format!("borrow `{name}` cannot escape its scope")
         }

@@ -73,26 +73,46 @@ fn function_violation(
     function_name: &str,
     policy: SourceLimitPolicy,
 ) -> Option<(&'static str, String, &'static str)> {
-    if line_count > policy.hard_function_lines {
-        return Some((
-            STRICT_SOURCE_FUNCTION_HARD_LIMIT,
-            format!(
-                "function `{function_name}` has {line_count} lines; hard limit is {}",
-                policy.hard_function_lines
-            ),
-            "Split the function into responsibility-specific operations.",
-        ));
-    }
-    if line_count >= policy.function_split_lines {
-        return Some((
-            STRICT_SOURCE_FUNCTION_SPLIT_REQUIRED,
-            format!(
-                "function `{function_name}` has {line_count} lines; split is required at {}",
-                policy.function_split_lines
-            ),
-            "Extract independent validation or transformation stages into named functions.",
-        ));
-    }
+    hard_function_violation(line_count, function_name, policy)
+        .or_else(|| split_function_violation(line_count, function_name, policy))
+        .or_else(|| preferred_function_violation(line_count, function_name, policy))
+}
+
+fn hard_function_violation(
+    line_count: usize,
+    function_name: &str,
+    policy: SourceLimitPolicy,
+) -> Option<(&'static str, String, &'static str)> {
+    (line_count > policy.hard_function_lines).then_some((
+        STRICT_SOURCE_FUNCTION_HARD_LIMIT,
+        format!(
+            "function `{function_name}` has {line_count} lines; hard limit is {}",
+            policy.hard_function_lines
+        ),
+        "Split the function into responsibility-specific operations.",
+    ))
+}
+
+fn split_function_violation(
+    line_count: usize,
+    function_name: &str,
+    policy: SourceLimitPolicy,
+) -> Option<(&'static str, String, &'static str)> {
+    (line_count >= policy.function_split_lines).then_some((
+        STRICT_SOURCE_FUNCTION_SPLIT_REQUIRED,
+        format!(
+            "function `{function_name}` has {line_count} lines; split is required at {}",
+            policy.function_split_lines
+        ),
+        "Extract independent validation or transformation stages into named functions.",
+    ))
+}
+
+fn preferred_function_violation(
+    line_count: usize,
+    function_name: &str,
+    policy: SourceLimitPolicy,
+) -> Option<(&'static str, String, &'static str)> {
     (line_count > policy.preferred_function_lines).then_some((
         STRICT_SOURCE_FUNCTION_DECOMPOSITION,
         format!(

@@ -8,42 +8,59 @@ pub(super) struct FunctionRange {
 }
 
 pub(super) fn find_functions(source: &str) -> Vec<FunctionRange> {
-    let lines = source.lines().collect::<Vec<_>>();
-    let mut functions = Vec::new();
-    let mut active = None;
-    let mut depth = 0usize;
-    let mut body_started = false;
-    let mut in_block_comment = false;
-    for (index, line) in lines.iter().enumerate() {
-        let cleaned = strip_non_code(line, &mut in_block_comment);
-        if active.is_none()
+    FunctionScanner::scan(source)
+}
+
+#[derive(Default)]
+struct FunctionScanner {
+    functions: Vec<FunctionRange>,
+    active: Option<(usize, String)>,
+    depth: usize,
+    body_started: bool,
+}
+
+impl FunctionScanner {
+    fn scan(source: &str) -> Vec<FunctionRange> {
+        let lines = source.lines().collect::<Vec<_>>();
+        let mut scanner = Self::default();
+        let mut in_block_comment = false;
+        for (index, line) in lines.iter().enumerate() {
+            scanner.scan_line(index, line, &mut in_block_comment);
+        }
+        scanner.finish(lines.len());
+        scanner.functions
+    }
+
+    fn scan_line(&mut self, index: usize, line: &str, in_block_comment: &mut bool) {
+        let cleaned = strip_non_code(line, in_block_comment);
+        if self.active.is_none()
             && let Some(name) = declaration_name(&cleaned)
         {
-            active = Some((index + 1, name));
-            depth = 0;
-            body_started = false;
+            self.active = Some((index + 1, name));
+            self.depth = 0;
+            self.body_started = false;
         }
-        let Some((start_line, name)) = &active else { continue };
+        let Some((start_line, name)) = &self.active else { return };
         let (opens, closes) = brace_counts(&cleaned);
-        if opens > 0 {
-            body_started = true;
-        }
-        depth = depth.saturating_add(opens).saturating_sub(closes);
-        if body_started && depth == 0 {
-            functions.push(FunctionRange {
+        self.body_started |= opens > 0;
+        self.depth = self.depth.saturating_add(opens).saturating_sub(closes);
+        if self.body_started && self.depth == 0 {
+            self.functions.push(FunctionRange {
                 name: name.clone(),
                 start_line: *start_line,
                 end_line: index + 1,
             });
-            active = None;
-        } else if !body_started && cleaned.contains(';') {
-            active = None;
+            self.active = None;
+        } else if !self.body_started && cleaned.contains(';') {
+            self.active = None;
         }
     }
-    if let Some((start_line, name)) = active {
-        functions.push(FunctionRange { name, start_line, end_line: lines.len() });
+
+    fn finish(&mut self, line_count: usize) {
+        if let Some((start_line, name)) = self.active.take() {
+            self.functions.push(FunctionRange { name, start_line, end_line: line_count });
+        }
     }
-    functions
 }
 
 pub(super) fn line_span(source: &str, start_line: usize, end_line: usize) -> SourceSpan {
@@ -78,13 +95,8 @@ fn strip_non_code(line: &str, in_block_comment: &mut bool) -> String {
     while index < characters.len() {
         let character = characters[index];
         let next = characters.get(index + 1).copied();
-        if *in_block_comment {
-            if character == '*' && next == Some('/') {
-                *in_block_comment = false;
-                index += 2;
-            } else {
-                index += 1;
-            }
+        if let Some(next_index) = consume_block_comment(&characters, index, in_block_comment) {
+            index = next_index;
             continue;
         }
         if !in_string && character == '/' && next == Some('/') {
@@ -95,18 +107,43 @@ fn strip_non_code(line: &str, in_block_comment: &mut bool) -> String {
             index += 2;
             continue;
         }
-        if character == '"' && !escaped {
-            in_string = !in_string;
-        } else if !in_string {
-            output.push(character);
-        }
-        escaped = character == '\\' && !escaped;
-        if character != '\\' {
-            escaped = false;
-        }
+        append_visible_character(character, &mut in_string, &mut escaped, &mut output);
         index += 1;
     }
     output
+}
+
+fn append_visible_character(
+    character: char,
+    in_string: &mut bool,
+    escaped: &mut bool,
+    output: &mut String,
+) {
+    if character == '"' && !*escaped {
+        *in_string = !*in_string;
+    } else if !*in_string {
+        output.push(character);
+    }
+    *escaped = character == '\\' && !*escaped;
+    if character != '\\' {
+        *escaped = false;
+    }
+}
+
+fn consume_block_comment(
+    characters: &[char],
+    index: usize,
+    in_block_comment: &mut bool,
+) -> Option<usize> {
+    if !*in_block_comment {
+        return None;
+    }
+    if characters[index] == '*' && characters.get(index + 1) == Some(&'/') {
+        *in_block_comment = false;
+        Some(index + 2)
+    } else {
+        Some(index + 1)
+    }
 }
 
 fn line_starts(source: &str) -> Vec<usize> {
