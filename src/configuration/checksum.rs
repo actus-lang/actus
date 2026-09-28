@@ -41,7 +41,8 @@ fn collect_files(
 }
 
 fn ignored_dependency_entry(path: &Path) -> bool {
-    path.file_name().is_some_and(|name| matches!(name.to_str(), Some(".git" | "capsula")))
+    path.file_name()
+        .is_some_and(|name| matches!(name.to_str(), Some(".git" | "capsula" | "Actus.lock")))
 }
 
 fn relative_file(root: &Path, path: PathBuf) -> (String, PathBuf) {
