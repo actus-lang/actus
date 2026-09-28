@@ -8,6 +8,7 @@ use crate::parser::parse;
 mod build;
 mod check;
 mod conformance;
+mod diagnostics;
 mod fmt;
 mod input;
 mod lsp;

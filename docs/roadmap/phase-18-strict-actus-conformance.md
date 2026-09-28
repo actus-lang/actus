@@ -50,6 +50,8 @@ behavior around the existing language and runtime contracts.
       reserve categorized strict ranges in `E1800`–`E1899`.
 - [x] Reject duplicate diagnostic codes and contradictory severity metadata
       through the shared diagnostic catalog validator.
+- [x] Route `actus check` and `actus build` frontend/semantic diagnostics
+      through one source-aware CLI reporter.
 
 ## Strict-mode contract
 

@@ -4,13 +4,14 @@ use std::path::{Path, PathBuf};
 use crate::build_graph::{invalidate_stale_artifact, write_metadata};
 use crate::codegen::link_object;
 use crate::configuration::{BuildProfile, CompilerConfiguration, EntryContract};
-use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
+use crate::diagnostics::{lex_diagnostic, parse_diagnostic, semantic_diagnostic};
 use crate::lexer::scan;
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 
 use super::conformance::{ConformanceMode, parse_strict_option};
+use super::diagnostics::{report_diagnostic, report_diagnostics};
 
 #[derive(Clone, Copy)]
 pub(super) enum EmitKind {
@@ -211,15 +212,17 @@ fn load_build_program(
     };
     let (tokens, lex_errors) = scan(&source);
     if !lex_errors.is_empty() {
-        for error in &lex_errors {
-            eprintln!("{input}: {}", render_lex_error(&source, error));
-        }
+        report_diagnostics(
+            Path::new(input),
+            &source,
+            lex_errors.iter().map(lex_diagnostic).collect(),
+        );
         return None;
     }
     let program = match parse(tokens) {
         Ok(program) => program,
         Err(error) => {
-            eprintln!("{input}: {}", render_parse_error(&source, &error));
+            report_diagnostic(Path::new(input), &source, parse_diagnostic(&error));
             return None;
         }
     };
@@ -240,7 +243,7 @@ fn validate_strict_program(input: &str, source: &str, program: &crate::ast::Prog
     match crate::semantic::analyze(program) {
         Ok(_) => true,
         Err(error) => {
-            eprintln!("{input}: {}", render_semantic_error(source, &error));
+            report_diagnostic(Path::new(input), source, semantic_diagnostic(&error));
             false
         }
     }

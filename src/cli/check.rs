@@ -1,7 +1,4 @@
-use crate::diagnostics::{
-    Diagnostic, lex_diagnostic, parse_diagnostic, render_diagnostic, semantic_diagnostic,
-    sort_diagnostics,
-};
+use crate::diagnostics::{lex_diagnostic, parse_diagnostic, semantic_diagnostic};
 use crate::lexer::scan;
 use crate::modules::{ModuleError, ModuleResolver, parse_module, resolve_imports};
 use crate::parser::parse;
@@ -9,6 +6,7 @@ use crate::semantic::filter_program_for_target;
 use std::fs;
 
 use super::conformance::{ConformanceMode, parse_strict_option};
+use super::diagnostics::{report_diagnostic, report_diagnostics};
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_check_options(&mut arguments) {
@@ -158,21 +156,6 @@ fn check_module(
             1
         }
     }
-}
-
-fn report_diagnostics(path: &std::path::Path, source: &str, mut diagnostics: Vec<Diagnostic>) {
-    for diagnostic in &mut diagnostics {
-        let path = path.display().to_string();
-        *diagnostic = diagnostic.clone().with_source_path(path);
-    }
-    sort_diagnostics(&mut diagnostics);
-    for diagnostic in diagnostics {
-        report_diagnostic(path, source, diagnostic);
-    }
-}
-
-fn report_diagnostic(path: &std::path::Path, source: &str, diagnostic: Diagnostic) {
-    eprintln!("{}: {}", path.display(), render_diagnostic(source, &diagnostic));
 }
 
 fn report_module_error(module_path: &str, error: ModuleError) -> i32 {
