@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use actus::conformance::{SourceLimitPolicy, inspect_source_tree, source_limit_diagnostics};
+use actus::conformance::{
+    SourceLimitPolicy, inspect_source_tree, source_limit_diagnostics, source_paths,
+};
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
 
 fn lines(count: usize) -> String {
@@ -79,4 +81,15 @@ fn repository_sources_have_no_hard_limit_violations() {
         "hard source-limit diagnostics:\n{}",
         hard_violations.join("\n")
     );
+}
+
+#[test]
+fn repository_source_paths_are_sorted_and_include_supported_roots() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let roots = [manifest.join("src"), manifest.join("tests")];
+    let root_refs = roots.iter().map(PathBuf::as_path).collect::<Vec<_>>();
+    let paths = source_paths(&root_refs).expect("repository source paths should be readable");
+    assert!(paths.windows(2).all(|pair| pair[0] <= pair[1]));
+    assert!(paths.iter().any(|path| path.ends_with("src/lib.rs")));
+    assert!(paths.iter().any(|path| path.ends_with("tests/source_limits.rs")));
 }

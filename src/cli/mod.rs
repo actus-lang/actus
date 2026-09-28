@@ -47,6 +47,7 @@ fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
         "new" => project::new_command(arguments),
         "init" => project::init_command(arguments),
         "test" => test_runner::test_command(arguments),
+        "conformance" => conformance::conformance_command(arguments),
         "fmt" => fmt::fmt_command(arguments),
         "lsp" => lsp::lsp_command(arguments),
         "publish" => publish::publish_command(arguments),
@@ -137,7 +138,7 @@ fn is_help_flag(argument: &str) -> bool {
 }
 
 fn usage_text() -> &'static str {
-    "usage: actus <command> [options]\n\nCommands:\n  new      Create a new Actus project.\n  init     Initialize an existing directory as an Actus project.\n  check    Parse, resolve, and validate without code generation.\n  parse    Parse one source file and print its AST.\n  build    Compile an object or executable from a file or project.\n  run      Build and execute a program once.\n  watch    Re-check or rebuild after source changes.\n  test     Discover and run `meta test` verbs.\n  fmt      Format Actus sources, or check formatting.\n  lsp      Serve the Language Server Protocol over stdio.\n  publish  Validate and publish a local package archive.\n\nRun `actus <command> --help` for command-specific options."
+    "usage: actus <command> [options]\n\nCommands:\n  new      Create a new Actus project.\n  init     Initialize an existing directory as an Actus project.\n  check    Parse, resolve, and validate without code generation.\n  parse    Parse one source file and print its AST.\n  build    Compile an object or executable from a file or project.\n  run      Build and execute a program once.\n  watch    Re-check or rebuild after source changes.\n  test     Discover and run `meta test` verbs.\n  conformance  Report source structure and size conformance.\n  fmt      Format Actus sources, or check formatting.\n  lsp      Serve the Language Server Protocol over stdio.\n  publish  Validate and publish a local package archive.\n\nRun `actus <command> --help` for command-specific options."
 }
 
 fn command_help_text(command: &str) -> Option<&'static str> {
@@ -162,6 +163,9 @@ fn command_help_text(command: &str) -> Option<&'static str> {
             "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",
         ),
         "test" => Some("usage: actus test [--strict]\n\nCollect and run Actus meta tests."),
+        "conformance" => Some(
+            "usage: actus conformance [--strict]\n\nReport source structure and size conformance across the repository.",
+        ),
         "fmt" => Some(
             "usage: actus fmt [path] [--check]\n\nFormat Actus source files with canonical rules.",
         ),
@@ -186,7 +190,17 @@ mod tests {
     #[test]
     fn every_command_has_help_text() {
         for command in [
-            "new", "init", "check", "parse", "build", "run", "watch", "test", "fmt", "lsp",
+            "new",
+            "init",
+            "check",
+            "parse",
+            "build",
+            "run",
+            "watch",
+            "test",
+            "conformance",
+            "fmt",
+            "lsp",
             "publish",
         ] {
             assert!(command_help_text(command).is_some(), "missing help for {command}");
