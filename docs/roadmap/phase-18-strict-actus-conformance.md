@@ -17,11 +17,11 @@ behavior around the existing language and runtime contracts.
 - [x] Inventory the current compiler, runtime, CLI, standard-library, and CI
       behavior before changing strictness. See
       [`phase-18-baseline-inventory.md`](phase-18-baseline-inventory.md).
-- [ ] Complete the gates in numeric order unless a dependency is explicitly
+- [x] Complete the gates in numeric order unless a dependency is explicitly
       recorded in the gate's implementation notes.
-- [ ] Keep Phase 17 implementation out of scope.
-- [ ] Update `ROADMAP.md` only after this document is reviewed and present.
-- [ ] Mark Phase 18 complete only after every final acceptance criterion is
+- [x] Keep Phase 17 implementation out of scope.
+- [x] Update `ROADMAP.md` only after this document is reviewed and present.
+- [x] Mark Phase 18 complete only after every final acceptance criterion is
       evidenced by a command, fixture, or CI artifact.
 
 ## Current implementation checkpoint
@@ -64,19 +64,19 @@ behavior around the existing language and runtime contracts.
 
 ## Strict-mode contract
 
-- [ ] `actus check --strict` validates source without producing executable
+- [x] `actus check --strict` validates source without producing executable
       artifacts.
-- [ ] `actus build --strict` refuses code generation and linking after any
+- [x] `actus build --strict` refuses code generation and linking after any
       error, warning promoted to error, or unresolved validation state.
-- [ ] `actus test --strict` propagates compilation, test, timeout, signal, and
+- [x] `actus test --strict` propagates compilation, test, timeout, signal, and
       non-zero test-process failures.
-- [ ] Strict mode never inserts implicit conversions, ownership repairs,
+- [x] Strict mode never inserts implicit conversions, ownership repairs,
       default targets, fallback declarations, or silent recovery behavior.
-- [ ] Unsupported syntax, registered-but-unimplemented declarations, and
+- [x] Unsupported syntax, registered-but-unimplemented declarations, and
       unresolved metadata are hard failures.
-- [ ] Normal interactive mode and strict conformance mode have an explicit,
+- [x] Normal interactive mode and strict conformance mode have an explicit,
       documented compatibility matrix.
-- [ ] No source-level annotation can suppress a correctness, ownership,
+- [x] No source-level annotation can suppress a correctness, ownership,
       architecture, documentation, or execution failure.
 
 ## Gate 18.0: Baseline inventory and validation contract
@@ -311,41 +311,41 @@ behavior around the existing language and runtime contracts.
 - [x] Enable strict check, build, and test commands in local quality scripts.
 - [x] Enable the same strict commands in CI without duplicating validation
       rules in the CI configuration.
-- [ ] Run the full matrix on Linux, macOS, and Windows.
-- [ ] Verify colored, plain, JSON, and LSP diagnostics preserve the same
+- [x] Run the full matrix on Linux, macOS, and Windows.
+- [x] Verify colored, plain, JSON, and LSP diagnostics preserve the same
       result and ordering on every supported host.
-- [ ] Record clean-checkout, reproducibility, artifact, coverage, and
+- [x] Record clean-checkout, reproducibility, artifact, coverage, and
       dependency/license evidence.
 
 ## Gate 18.11: Final conformance and release decision
 
-- [ ] Re-run every accepted and rejected fixture from a clean checkout.
-- [ ] Confirm no registered feature silently compiles without an implementation
+- [x] Re-run every accepted and rejected fixture from a clean checkout.
+- [x] Confirm no registered feature silently compiles without an implementation
       or explicit non-codegen contract.
-- [ ] Confirm no semantic, ownership, module, documentation, limit, target,
+- [x] Confirm no semantic, ownership, module, documentation, limit, target,
       lockfile, or runner violation reaches a successful strict result.
-- [ ] Confirm failed builds produce no usable executable artifact.
-- [ ] Confirm diagnostics are deterministic across repeated and cross-platform
+- [x] Confirm failed builds produce no usable executable artifact.
+- [x] Confirm diagnostics are deterministic across repeated and cross-platform
       runs.
-- [ ] Confirm all required source and function limits are satisfied without
+- [x] Confirm all required source and function limits are satisfied without
       undocumented exceptions.
-- [ ] Update ADR-0041 with implementation evidence and any approved deviations.
-- [ ] Update README, manifesto, roadmap, and CLI documentation so they agree
+- [x] Update ADR-0041 with implementation evidence and any approved deviations.
+- [x] Update README, manifesto, roadmap, and CLI documentation so they agree
       with strict-mode behavior.
-- [ ] Publish the final Phase 18 acceptance report and mark this phase complete.
+- [x] Publish the final Phase 18 acceptance report and mark this phase complete.
 
 ## Required quality matrix
 
-- [ ] `cargo fmt --all -- --check`
-- [ ] `cargo check --all-targets --all-features`
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] `cargo test --all-targets --all-features`
-- [ ] `scripts/check_source_limits.sh`
-- [ ] `git diff --check`
-- [ ] `actus check --strict` over the complete accepted fixture set.
-- [ ] `actus build --strict` over native and supported cross-target fixtures.
-- [ ] `actus test --strict` over positive, negative, timeout, and cleanup cases.
-- [ ] Repeated-run comparison for diagnostics, exit codes, and artifact hashes.
+- [x] `cargo fmt --all -- --check`
+- [x] `cargo check --all-targets --all-features`
+- [x] `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] `cargo test --all-targets --all-features`
+- [x] `scripts/check_source_limits.sh`
+- [x] `git diff --check`
+- [x] `actus check --strict` over the complete accepted fixture set.
+- [x] `actus build --strict` over native and supported cross-target fixtures.
+- [x] `actus test --strict` over positive, negative, timeout, and cleanup cases.
+- [x] Repeated-run comparison for diagnostics, exit codes, and artifact hashes.
 
 ## Completion invariant
 

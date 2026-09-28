@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted as the governing design record for Phase 18. Implementation remains
-gated by the ordered roadmap and its evidence requirements.
+Accepted and implemented for Phase 18. Final evidence is recorded in the
+[Phase 18 acceptance report](../roadmap/phase-18-acceptance-report.md).
 
 ## Context
 

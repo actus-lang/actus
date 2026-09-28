@@ -170,6 +170,13 @@ operating-system interfaces, and platform runtimes. It is not required as an
 intermediate representation, and it is not the safety authority. Actus
 semantic safety checks are completed before code generation.
 
+Release validation is fail-closed. Strict conformance checks source and
+ownership semantics, module and documentation contracts, source limits,
+targets, lockfiles, runtime bridges, and test execution before accepting a
+result. `actus check --strict`, `actus build --strict`, and `actus test --strict`
+are the release evidence commands; interactive non-strict mode must not be
+used to claim conformance.
+
 Later versions may introduce explicitly scoped views or other zero-copy abstractions. Such features must preserve the Alpha ownership guarantees and will not weaken the non-escaping-borrow rule implicitly.
 
 Actus begins with a deliberately small core: predictable ownership, readable

@@ -277,6 +277,19 @@ checked `src/main.act` successfully
 `check` reads the source, resolves modules, parses it, and runs semantic
 analysis without emitting an object file or executable.
 
+Release and standard-library validation must use strict mode. The strict
+commands fail closed on unresolved source, ownership, architecture,
+documentation, target, lockfile, or test-runner violations:
+
+```text
+$ actus check --strict
+$ actus build --strict
+$ actus test --strict
+```
+
+Strict mode is release evidence; the default non-strict workflow remains
+available for interactive development and exploration only.
+
 Use `conformance` to inspect the repository-wide source structure and size
 rules. It scans compiler sources, standard-library sources, and test sources,
 then prints every `E1850`–`E1855` diagnostic in deterministic order:
