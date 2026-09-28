@@ -91,16 +91,16 @@ behavior around the existing language and runtime contracts.
       target-selection paths.
 - [x] Inventory standard-library public declarations and current documentation
       coverage.
-- [ ] Inventory source-limit checks, module-discovery checks, lockfile checks,
+- [x] Inventory source-limit checks, module-discovery checks, lockfile checks,
       and test-runner checks.
-- [ ] Record every existing accepted fallback and classify it as supported,
+- [x] Record every existing accepted fallback and classify it as supported,
       deprecated, or forbidden in strict mode.
 
 ### Conformance matrix
 
-- [ ] Define the accepted behavior for check, build, and test in normal and
+- [x] Define the accepted behavior for check, build, and test in normal and
       strict modes.
-- [ ] Define which diagnostics are errors in every command and mode.
+- [x] Define which diagnostics are errors in every command and mode.
 - [ ] Define stable exit-status categories for source, configuration, test,
       runtime, and infrastructure failures.
 - [ ] Define the minimum evidence required before a gate can be checked off.

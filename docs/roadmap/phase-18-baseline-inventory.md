@@ -66,14 +66,14 @@ The following paths were found and classified for the next strictness gates:
 
 | Location | Existing behavior | Phase 18 classification |
 | --- | --- | --- |
-| `src/codegen/case.rs` | Control-flow branches carry explicit fallback block values and unresolved inferred results are represented as `Void` in the current lowering contract. | Supported only where the semantic phase proves the control-flow-only case; otherwise forbidden unresolved state. Requires complete-AST/codegen evidence. |
-| `src/codegen/expressions.rs` | Unresolved expression inference has a `Void` fallback in a lowering helper. | Candidate implicit default; must become an explicit error or a proven non-codegen path. |
-| `src/codegen/layout.rs` | Unknown role/width matches contain default branches. | Candidate placeholder; each branch needs an exhaustive domain proof or a typed lowering error. |
-| `src/codegen/enum_layout.rs` | Layout selection contains default branches for unsupported layout states. | Candidate placeholder; must be audited with enum-layout fixtures. |
+| `src/codegen/case.rs` | Control-flow branches carry explicit fallback block values and unresolved inferred results are represented as `Void` in the current lowering contract. | The explicit control-flow value is supported; unresolved inference is forbidden in strict mode. Requires complete-AST/codegen evidence. |
+| `src/codegen/expressions.rs` | Unresolved expression inference has a `Void` fallback in a lowering helper. | Forbidden in strict mode until replaced by an explicit error or proven non-codegen path. |
+| `src/codegen/layout.rs` | Unknown role/width matches contain default branches. | Forbidden placeholder in strict mode; each branch needs an exhaustive domain proof or typed lowering error. |
+| `src/codegen/enum_layout.rs` | Layout selection contains default branches for unsupported layout states. | Forbidden placeholder in strict mode; requires enum-layout fixtures and explicit errors. |
 | `src/semantic/analyzer/mod.rs` | `Perform`, sibling `open`, and `import` declarations are intentionally non-codegen contracts. | Supported non-codegen meaning; must remain explicit and documented. |
-| `src/parser/` | `unreachable!` is used after token-kind checks establish an internal parser invariant. | Internal invariant, not source recovery; retain only where the invariant is mechanically established and tested. |
-| `src/semantic/` | `unwrap_or("unknown")` and similar values are used to format incomplete diagnostic context. | Diagnostic fallback only; it must never create an accepted semantic type or executable path. |
-| `src/runtime/` | `try_from(...).unwrap_or(-1)` maps unrepresentable results to the documented C-ABI failure status. | ABI contract, not a semantic default; preserve only with native boundary tests and explicit status documentation. |
+| `src/parser/` | `unreachable!` is used after token-kind checks establish an internal parser invariant. | Supported internal invariant, not source recovery; retain only where mechanically established and tested. |
+| `src/semantic/` | `unwrap_or("unknown")` and similar values are used to format incomplete diagnostic context. | Supported diagnostic-only fallback; it must never create an accepted semantic type or executable path. |
+| `src/runtime/` | `try_from(...).unwrap_or(-1)` maps unrepresentable results to the documented C-ABI failure status. | Supported ABI contract, not a semantic default; preserve only with native boundary tests and explicit status documentation. |
 
 This table separates supported language meaning from unresolved compiler state.
 Gate 18.3 must close the code-generation audit before strict mode can claim
@@ -112,6 +112,63 @@ counts, passes null stdin to native test processes, and terminates a process
 after its bounded timeout. A non-zero process, timeout, or failure contributes
 to a non-zero test result. Lockfile freshness, artifact determinism, and the
 full strict compatibility matrix remain unclosed.
+
+## Repository integrity checks
+
+The current source-limit script scans only `src/**/*.rs`. It enforces the
+500-line file hard limit and 60-line function hard limit, but it does not yet
+enforce the preferred 300-line size, the 400-line warning threshold, Actus
+`.act` files, or strict diagnostic reporting. The largest current Rust files
+remain below the hard limit, while several are at or above the warning range;
+decomposition is therefore still required before strict source-limit closure.
+
+Module discovery is deterministic at the resolver boundary: module segments
+must be valid identifiers, a directory module requires its `<module>.act`
+facade, a file root and directory root together are rejected as ambiguous,
+and sibling `.act` paths are sorted after discovery. I/O, missing-facade,
+invalid-path, and ambiguity failures remain explicit `ModuleResolutionError`
+variants.
+
+Lockfile validation parses `Actus.lock`, checks version and deterministic
+package ordering, regenerates the dependency graph from `Actus.toml`, and
+compares locked packages with the generated package set. Normal configuration
+can synchronize a missing lockfile; strict configuration requires the existing
+lockfile policy and rejects stale content. Source-content checksums and
+artifact reproducibility still require dedicated strict fixtures.
+
+The test runner recursively discovers `.act` files below `tests/` and the
+configured source root, excludes `fixtures` and `snapshots`, sorts files and
+test names, applies target filtering, and reports filtered counts. It sends
+null stdin to each native test process, applies a 30-second timeout, removes
+temporary object and executable files, and returns failure for non-zero exits
+or runner errors. Signal-specific reporting and cross-platform cleanup remain
+open integrity work.
+
+No existing fallback is classified as deprecated in this baseline. Every
+accepted compatibility path is either supported with a documented contract or
+is explicitly forbidden in strict mode as shown above; this prevents an
+unreviewed fallback from silently becoming a third behavior category.
+
+## Gate 18.0 conformance matrix
+
+The following is the target contract for the first strict-mode matrix. It
+defines expected results; it does not claim that every row is implemented yet.
+
+| Command | Normal mode | Strict mode |
+| --- | --- | --- |
+| `actus check` | Parse, resolve modules, apply target filtering, and run semantic validation; success is status `0`, source/configuration failure is `1`. | Perform the same validation with strict configuration and no executable artifact; unresolved policy state is a failure, success is status `0`. |
+| `actus build` | Complete validation followed by code generation and linking; source/configuration/build failure is `1`. | Complete strict validation before code generation; any error, promoted warning, unresolved state, or stale lockfile prevents a usable artifact and returns `1`. |
+| `actus test` | Discover, compile, and run meta tests; a failed, timed-out, signaled, or non-zero test returns `1`. | Apply strict configuration and semantic preflight before discovery/execution; the same runtime failures return `1`, with deterministic counts and filtering. |
+
+Across both modes, malformed command arguments return `2`; lexer, parser,
+module, semantic, ownership, and configuration violations return `1`; and a
+successful command returns `0`. Diagnostics are errors at the command
+boundary even when their renderer is text, color, JSON, or LSP. Renderer choice
+may change presentation only, never acceptance, ordering, or exit status.
+
+This matrix is intentionally limited to `check`, `build`, and `test`, the
+commands that currently accept `--strict`. The behavior of `run`, `watch`,
+`fmt`, `parse`, `lsp`, and `publish` must not be inferred from this matrix.
 
 ## Standard-library inventory
 
