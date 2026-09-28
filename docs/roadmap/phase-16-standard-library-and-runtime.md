@@ -450,21 +450,21 @@ String conversions.
 
 ### Sub-gate A: Path Representation and Storage
 
-- [ ] Define owned `Path` aggregate layout and platform discriminators.
-- [ ] Implement raw POSIX byte backing storage (`Buffer`, `u8`).
-- [ ] Implement raw Windows UTF-16 code-unit storage (`Buffer`, `u16`).
-- [ ] Enforce capacity, length, and trailing null-terminator invariants.
-- [ ] Implement embedded-null rejection and validation rules.
-- [ ] Add `PathError` type and error invariants.
-- [ ] Add unit and representation tests for Sub-gate A.
+- [x] Define owned `Path` aggregate layout and platform discriminators.
+- [x] Implement raw POSIX byte backing storage (`Buffer`, `u8`).
+- [x] Implement raw Windows UTF-16 code-unit storage (`Buffer`, `u16`).
+- [x] Enforce capacity, length, and trailing null-terminator invariants.
+- [x] Implement embedded-null rejection and validation rules.
+- [x] Add `PathError` type and error invariants.
+- [x] Add unit and representation tests for Sub-gate A.
 
 ### Sub-gate B: Borrowed Components and Views
 
-- [ ] Define non-owning `PathComponent` view.
-- [ ] Define `PathComponents` borrowed iterator state.
-- [ ] Enforce non-escaping borrow rules (`abs` propagation).
-- [ ] Implement component boundary detection.
-- [ ] Add parent, file_name, file_stem, and extension inspection.
+- [x] Define non-owning `PathComponent` view.
+- [x] Define `PathComponents` borrowed iterator state.
+- [x] Enforce non-escaping borrow rules (`abs` propagation).
+- [x] Implement component boundary detection.
+- [x] Add parent, file_name, file_stem, and extension inspection.
 
 ### Sub-gate C: Platform-Specific Parsers
 
@@ -500,8 +500,8 @@ String conversions.
 
 ### Gate 3.8 invariant
 
-- [ ] `Path` is entirely byte/code-unit-driven (no implicit `String` or UTF-8 transcoding).
-- [ ] Non-owning path inspection causes zero heap allocations.
+- [x] `Path` is entirely byte/code-unit-driven (no implicit `String` or UTF-8 transcoding).
+- [x] Non-owning path inspection causes zero heap allocations.
 
 ## Gate 4: Bare-Metal and Embedded HAL
 
