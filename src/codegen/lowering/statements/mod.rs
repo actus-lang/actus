@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{Expr, Role, Stmt};
+use crate::ast::{Expr, Stmt};
 use crate::semantic::LoopExitKind;
 
 use super::super::cleanup::emit_loop_cleanup;
-use super::super::expressions::{initializer_type, lower_expression};
+use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
-use super::super::structs::{emit_binding_drop, lower_field_assignment};
+use super::super::structs::emit_binding_drop;
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
+mod dispatch;
+mod owners;
 mod try_lowering;
 
 #[allow(clippy::too_many_arguments)]
@@ -30,7 +31,7 @@ pub(super) fn lower_statements<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     for statement in statements {
-        let flow = lower_statement(
+        let flow = dispatch::lower_statement(
             function,
             statement,
             locals,
@@ -49,93 +50,84 @@ pub(super) fn lower_statements<'source>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_statement<'source>(
+fn lower_return_statement(
     function: &mut FunctionBuilder<'_>,
-    statement: &'source Stmt,
-    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
-    types: &mut HashMap<&'source String, NativeType>,
+    expression: Option<&Expr>,
+    span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    match statement {
-        Stmt::OwnerDecl { role: Role::Erg | Role::Abs | Role::Ins, name, ty, initializer, .. } =>
-            lower_owner_declaration(function, name, ty.as_deref(), initializer, locals, types, functions, cleanup_schedule, string_data, layouts),
-        Stmt::Assignment { name, value, .. } =>
-            lower_assignment(function, name, value, locals, types, functions, cleanup_schedule, string_data, layouts),
-        Stmt::FieldAssignment { object, field, value, .. } => lower_field_assignment(
-            function, object, field, value, locals, types, functions, cleanup_schedule, string_data, layouts,
-        ).map(|()| Flow::Fallthrough),
-        Stmt::Return { value: Some(expression), span } => try_lowering::lower_return(
-            function, expression, *span, locals, types, functions, cleanup_schedule, string_data,
+    match expression {
+        Some(expression) => try_lowering::lower_return(
+            function,
+            expression,
+            span,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
             layouts,
         ),
-        Stmt::Return { value: None, span } => {
-            super::super::cleanup::emit_return_cleanup(
-                function, cleanup_schedule, *span, locals, types, functions, layouts,
-            )?;
-            Ok(Flow::VoidReturn)
+        None => {
+            lower_void_return(function, span, locals, types, functions, cleanup_schedule, layouts)
         }
-        Stmt::Expression { expression, span } if matches!(expression, Expr::Try { .. }) => {
-            try_lowering::lower_try_statement(
-                function, expression, *span, locals, types, functions, cleanup_schedule,
-                string_data, layouts,
-            )
-        }
-        Stmt::Expression { expression, .. } => {
-            lower_expression(function, expression, locals, types, functions, cleanup_schedule, string_data, layouts)?;
-            Ok(Flow::Fallthrough)
-        }
-        Stmt::Drop { name, .. } => lower_drop(function, name, locals, types, functions, layouts),
-        Stmt::Block(block) => super::scopes::lower_scoped_block(
-            function, block, locals, types, functions, targets, cleanup_schedule, string_data, layouts,
-        ),
-        Stmt::Loop(block) => super::loops::lower_loop(
-            function, block, locals, types, functions, cleanup_schedule, string_data, layouts,
-        ),
-        Stmt::Break { span } => {
-            emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Break, locals, types, functions, layouts)?;
-            super::loops::emit_loop_jump(function, targets, locals, false)
-        }
-        Stmt::Continue { span } => {
-            emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Continue, locals, types, functions, layouts)?;
-            super::loops::emit_loop_jump(function, targets, locals, true)
-        }
-        _ => Err(NativeEmitError("native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns".to_owned())),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_owner_declaration<'source>(
+fn lower_void_return(
     function: &mut FunctionBuilder<'_>,
-    name: &'source String,
-    declared_type: Option<&str>,
-    initializer: &Expr,
-    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
-    types: &mut HashMap<&'source String, NativeType>,
+    span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
+    super::super::cleanup::emit_return_cleanup(
+        function,
+        cleanup_schedule,
+        span,
+        locals,
+        types,
+        functions,
+        layouts,
+    )?;
+    Ok(Flow::VoidReturn)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_expression_statement(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let declared_native = declared_type
-        .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)));
-    let native_type = match declared_native {
-        Some(native_type) => native_type,
-        None => initializer_type(initializer, types, functions, layouts)?,
-    };
-    if let NativeType::Arena(capacity) = native_type {
-        let address = lower_arena_declaration(function, capacity, layouts)?;
-        locals.insert(name, address);
-        types.insert(name, native_type);
-        return Ok(Flow::Fallthrough);
+    if matches!(expression, Expr::Try { .. }) {
+        return lower_try_expression_statement(
+            function,
+            expression,
+            span,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        );
     }
-    let value = lower_owner_value(
+    lower_expression(
         function,
-        declared_native,
-        initializer,
+        expression,
         locals,
         types,
         functions,
@@ -143,74 +135,58 @@ fn lower_owner_declaration<'source>(
         string_data,
         layouts,
     )?;
-    locals.insert(name, value);
-    types.insert(name, native_type);
     Ok(Flow::Fallthrough)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_owner_value(
+fn lower_try_expression_statement(
     function: &mut FunctionBuilder<'_>,
-    declared_native: Option<NativeType>,
-    initializer: &Expr,
+    expression: &Expr,
+    span: crate::lexer::SourceSpan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let value = match (declared_native, initializer) {
-        (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
-            super::super::expressions::lower_wide_integer(function, value)?
-        }
-        (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) => {
-            super::super::expressions::lower_float_as(
-                function,
-                value,
-                layouts.ir_type(NativeType::Float { width })?,
-            )?
-        }
-        _ => lower_expression(
-            function,
-            initializer,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )?,
-    };
-    let value = match declared_native {
-        Some(declared) => super::super::expressions::coerce_to_ir_type(
-            function,
-            value,
-            layouts.ir_type(declared)?,
-        ),
-        None => value,
-    };
-    Ok(value)
+) -> Result<Flow, NativeEmitError> {
+    try_lowering::lower_try_statement(
+        function,
+        expression,
+        span,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
 }
 
-fn lower_arena_declaration(
+#[allow(clippy::too_many_arguments)]
+fn lower_loop_control(
     function: &mut FunctionBuilder<'_>,
-    capacity: u32,
+    span: crate::lexer::SourceSpan,
+    targets: Option<LoopTargets>,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let size = capacity
-        .checked_add(layouts.pointer_type.bytes())
-        .ok_or_else(|| NativeEmitError("arena storage size overflow".to_owned()))?;
-    let slot = function.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        size,
-        layouts.pointer_type.bytes().trailing_zeros() as u8,
-    ));
-    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
-    let offset_address = function.ins().iadd_imm_s(address, i64::from(capacity));
-    let zero = function.ins().iconst(layouts.pointer_type, 0);
-    function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), zero, offset_address, 0);
-    Ok(address)
+    continue_loop: bool,
+) -> Result<Flow, NativeEmitError> {
+    let exit_kind = if continue_loop { LoopExitKind::Continue } else { LoopExitKind::Break };
+    emit_loop_cleanup(
+        function,
+        cleanup_schedule,
+        span,
+        exit_kind,
+        locals,
+        types,
+        functions,
+        layouts,
+    )?;
+    super::loops::emit_loop_jump(function, targets, locals, continue_loop)
 }
 
 #[allow(clippy::too_many_arguments)]
