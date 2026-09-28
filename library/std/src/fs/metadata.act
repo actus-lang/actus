@@ -1,10 +1,11 @@
-"""
-Basic filesystem facts returned without exposing host-specific handles.
+"""Basic filesystem facts returned without exposing host-specific handles.
 
 `size` is the logical byte length. The remaining fields are scalar flags so
 the value can cross the runtime boundary in a deterministic C-compatible
 layout.
 """
+import io;
+import path;
 open struct Metadata {
     """Logical file length in bytes, not including any host metadata header."""
     erg size: Int,
@@ -23,8 +24,8 @@ Fill `output` with metadata for `path` without retaining either buffer.
 caller. The bridge returns zero on success and `-1` when the host cannot
 inspect the path; the public wrapper translates that status to `IoError`.
 """
-open unsafe extern "C" verb actus_file_metadata_buffer(
-    abs path: Buffer,
+open unsafe extern "C" verb actus_file_metadata_path(
+    abs path: Path,
     ins output: Metadata
 ) -> Int;
 
@@ -50,15 +51,23 @@ open role MetadataProvider {
     verb metadata(ins self: File) -> Result[Metadata, IoError];
 }
 
-"""Return typed metadata for a filesystem path."""
+"""Drop an incomplete metadata value before returning `IoError.Failed`."""
 open verb metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
     drop(output);
     return Result[Metadata, IoError].Err(IoError.Failed);
 }
 
-open verb metadata(abs path: Buffer) -> Result[Metadata, IoError] {
+"""
+Inspect one filesystem path without transferring path ownership.
+
+`path` is an `abs` view borrowed for the runtime bridge and never retained.
+`Ok(Metadata)` contains the copied scalar facts; `Err(IoError.Failed)` means
+the host could not inspect the path. The operation performs no path-string
+conversion and does not allocate an owned path representation.
+"""
+open verb metadata(abs path: Path) -> Result[Metadata, IoError] {
     erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
-    erg status = actus_file_metadata_buffer(path: abs path, output: ins output);
+    erg status = actus_file_metadata_path(path: abs path, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
         _ => Result[Metadata, IoError].Ok(output),

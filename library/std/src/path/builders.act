@@ -1,0 +1,142 @@
+"""
+Ownership-aware path builders.
+
+The runtime bridges operate on raw POSIX bytes or native-endian UTF-16 units.
+They never transcode path data to `String`. `join` consumes its owned receiver
+and returns that same storage after the combination; the mutation verbs use an
+`ins` loan and restore the caller's owner after the call.
+"""
+
+"""
+Ensure `self` has storage for at least `capacity` raw units.
+
+`self` is an exclusive `ins` loan. The C ABI returns zero on success or a
+typed-negative builder status for validation, platform, or capacity failure.
+"""
+open unsafe extern "C" verb actus_path_reserve(ins self: Path, erg capacity: Int) -> Int;
+
+"""
+Join `other` into the caller-owned `self` storage without string conversion.
+
+`self` is an `ins` loan and `other` is an `abs` view. The bridge returns zero
+or a typed-negative `PathError` status and retains neither borrowed contract.
+"""
+open unsafe extern "C" verb actus_path_join(ins self: Path, abs other: Path) -> Int;
+
+"""
+Append `other` to the caller-owned `self` storage in place.
+
+`self` is an `ins` loan and `other` is an `abs` view. The return status is
+translated by the facade into `Result[Int, PathError]`.
+"""
+open unsafe extern "C" verb actus_path_push(ins self: Path, abs other: Path) -> Int;
+
+"""
+Replace the final file-name extension using raw platform code units.
+
+`self` is an `ins` loan and `extension` is an `abs` view. The bridge returns
+zero or a typed-negative status; it never retains the borrowed extension.
+"""
+open unsafe extern "C" verb actus_path_set_extension(
+    ins self: Path,
+    abs extension: Path
+) -> Int;
+"""
+Replace the final file-name component using raw platform code units.
+
+`self` is an `ins` loan and `name` is an `abs` view. The bridge returns zero
+or a typed-negative status and performs no implicit UTF-8 transcoding.
+"""
+open unsafe extern "C" verb actus_path_set_file_name(
+    ins self: Path,
+    abs name: Path
+) -> Int;
+
+"""Translate a builder bridge status without exposing its numeric ABI."""
+open verb finish_builder(dat path: Path, erg status: Int) -> Result[Path, PathError] {
+    return case status {
+        0 => Result[Path, PathError].Ok(path),
+        _ => {
+            erg error = path_error_from_status(status: status);
+            discard_path(path: dat path);
+            return Result[Path, PathError].Err(error);
+        },
+    };
+}
+
+"""
+Join `other` to an owned `dat self` path.
+
+An absolute `other` replaces the receiver payload; a relative `other` is
+separated from the receiver using the platform's raw separator. The returned
+`Ok` path retains ownership of the receiver storage. `Err` reports
+`InvalidLength`, `CapacityExceeded`, or `UnsupportedPlatform` and drops the
+consumed receiver after the failed operation.
+"""
+open verb join(dat self: Path, abs other: Path) -> Result[Path, PathError] {
+    erg status = actus_path_join(self: ins self, other: abs other);
+    return finish_builder(path: dat self, status: status);
+}
+
+"""
+Append `other` in place through an exclusive `ins self` loan.
+
+The owner is restored to the caller after the bridge returns. `Ok(0)` denotes
+successful mutation; `Err` reports a typed path error and leaves ownership with
+the caller so the failed path can still be cleaned up deterministically.
+"""
+open verb push(ins self: Path, abs other: Path) -> Result[Int, PathError] {
+    erg status = actus_path_push(self: ins self, other: abs other);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}
+
+"""
+Reserve at least `capacity` units in the owned path storage.
+
+`self` is an exclusive `ins` loan and is restored to its caller after the
+operation. `Ok(0)` means the capacity invariant remains valid;
+`Err(PathError.CapacityExceeded)` or another typed `PathError` reports that
+the requested storage cannot be provided. Existing path bytes are preserved.
+"""
+open verb reserve_path(ins self: Path, erg capacity: Int) -> Result[Int, PathError] {
+    erg status = actus_path_reserve(self: ins self, capacity: capacity);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}
+
+"""
+Replace the final file-name component in place.
+
+`self` is an exclusive `ins` loan and `name` is an `abs` view; neither borrow
+escapes the call. `Ok(0)` means the path was updated. `Err(PathError)` reports
+invalid storage, embedded null data, incompatible platform units, or a
+capacity failure while preserving caller ownership of `self`.
+"""
+open verb set_file_name(ins self: Path, abs name: Path) -> Result[Int, PathError] {
+    erg status = actus_path_set_file_name(self: ins self, name: abs name);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}
+
+"""
+Replace the final extension through an exclusive `ins self` loan.
+
+`extension` is an `abs` view borrowed only for the operation. `Ok(0)`
+confirms the in-place update; `Err(PathError)` reports invalid storage,
+embedded nulls, incompatible platform units, or insufficient capacity while
+preserving the caller's path ownership.
+"""
+open verb set_extension(ins self: Path, abs extension: Path) -> Result[Int, PathError] {
+    erg status = actus_path_set_extension(self: ins self, extension: abs extension);
+    return case status {
+        0 => Result[Int, PathError].Ok(0),
+        _ => Result[Int, PathError].Err(path_error_from_status(status: status)),
+    };
+}

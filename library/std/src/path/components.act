@@ -1,0 +1,80 @@
+"""
+Non-owning path component views.
+
+`PathComponent` stores an `abs` source path together with a byte or UTF-16
+unit range. It owns no buffer and its lifetime is bounded by the source path.
+`PathComponents` carries the same source origin and an iterator offset; it
+must never be returned as an owned path or escape the source scope.
+"""
+open struct PathComponent {
+    """The single borrowed origin that keeps this component view alive."""
+    abs source: Path,
+    """Start byte or code-unit offset within the source path."""
+    erg offset: Int,
+    """Component length in the source representation's units."""
+    erg length: Int,
+}
+
+"""
+Borrowed component iterator state.
+
+`source` is an `abs` view and is never copied or transferred. `offset` and
+`limit` are cursor metadata only; iteration must inspect raw platform units
+and return components whose origin remains this source path.
+"""
+open struct PathComponents {
+    """The one source path from which every returned component originates."""
+    abs source: Path,
+    """Current byte or code-unit offset for the next component."""
+    erg offset: Int,
+    """Exclusive payload limit, excluding the source terminator."""
+    erg limit: Int,
+}
+
+"""Return the final parent component as a non-owning `abs` view, if present."""
+open unsafe extern "C" verb actus_path_parent(abs self: Path) -> Option[abs PathComponent];
+
+"""Return the final file-name component as a non-owning `abs` view, if present."""
+open unsafe extern "C" verb actus_path_file_name(abs self: Path) -> Option[abs PathComponent];
+
+"""Return the file stem as an `abs` component, excluding its final extension."""
+open unsafe extern "C" verb actus_path_file_stem(abs self: Path) -> Option[abs PathComponent];
+
+"""Return the final extension as an `abs` component, if the name has one."""
+open unsafe extern "C" verb actus_path_extension(abs self: Path) -> Option[abs PathComponent];
+
+"""Create zero-allocation iterator state rooted in the borrowed source path."""
+open unsafe extern "C" verb actus_path_components(abs self: Path) -> PathComponents;
+
+"""Advance a borrowed iterator and return its next source-origin component."""
+open unsafe extern "C" verb actus_path_next_component(ins iter: PathComponents) -> Option[abs PathComponent];
+
+"""Return the final parent component as a non-owning `abs` view, if present."""
+open verb parent(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_parent(self: abs self);
+}
+
+"""Return the final file-name component as a non-owning `abs` view, if present."""
+open verb file_name(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_file_name(self: abs self);
+}
+
+"""Return the file stem as an `abs` component, excluding its final extension."""
+open verb file_stem(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_file_stem(self: abs self);
+}
+
+"""Return the final extension as an `abs` component, if the name has one."""
+open verb extension(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_extension(self: abs self);
+}
+
+"""Create zero-allocation iterator state rooted in the borrowed source path."""
+open verb components(abs self: Path) -> PathComponents {
+    return actus_path_components(self: abs self);
+}
+
+"""Advance a borrowed iterator and return its next source-origin component."""
+open verb next_component(ins iter: PathComponents) -> Option[abs PathComponent] {
+    return actus_path_next_component(iter: ins iter);
+}

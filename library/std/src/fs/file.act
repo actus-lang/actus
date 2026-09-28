@@ -6,6 +6,7 @@ Result, and the Drop performance closes the underlying operating-system
 resource exactly once when ownership leaves scope.
 """
 import io;
+import path;
 open struct File {
     """Opaque host handle. Only runtime bridge verbs may interpret it."""
     erg handle: Int,
@@ -15,7 +16,7 @@ open struct File {
 Open a path using the runtime's read mode. `path` is an `abs` view and is
 not retained. The result is a new owned `File`, or `-1` on native failure.
 """
-open unsafe extern "C" verb actus_file_open_buffer(abs path: Buffer, abs mode: Int) -> Int;
+open unsafe extern "C" verb actus_file_open_path(abs path: Path, abs mode: Int) -> Int;
 
 """
 Read into the existing `ins` buffer. Non-negative values are byte counts;
@@ -45,20 +46,33 @@ open unsafe extern "C" verb actus_file_seek_buffer(
 """Consume an invalid scalar handle so constructor branches join cleanly."""
 open verb discard_handle(dat handle: Int) -> Int { return handle; }
 
-"""Open an existing path and transfer the resulting File to the caller."""
-open verb file_open(abs path: Buffer) -> Result[File, IoError] {
+"""
+Open an existing filesystem path for reading.
+
+`path` is an `abs` view borrowed only for the runtime call; it is not stored
+in the returned resource. `Ok(File)` transfers ownership of the new host
+handle to the caller, while `Err(IoError.Failed)` reports that the path could
+not be opened. The `File` Drop performance closes a successful handle once.
+"""
+open verb file_open(abs path: Path) -> Result[File, IoError] {
     erg mode = 0;
-    erg handle = actus_file_open_buffer(path: abs path, mode: abs mode);
+    erg handle = actus_file_open_path(path: abs path, mode: abs mode);
     return case handle {
         -1 => { discard_handle(handle: dat handle); return Err(IoError.Failed); },
         _ => Ok(File { handle: handle, }),
     };
 }
 
-"""Create or truncate a path and transfer the resulting File to the caller."""
-open verb file_create(abs path: Buffer) -> Result[File, IoError] {
+"""
+Create or truncate a filesystem path for writing.
+
+`path` is an `abs` view borrowed only for the runtime call. `Ok(File)` gives
+the caller ownership of the new host handle; `Err(IoError.Failed)` means the
+host rejected creation or truncation. No path buffer is retained by `File`.
+"""
+open verb file_create(abs path: Path) -> Result[File, IoError] {
     erg mode = 1;
-    erg handle = actus_file_open_buffer(path: abs path, mode: abs mode);
+    erg handle = actus_file_open_path(path: abs path, mode: abs mode);
     return case handle {
         -1 => { discard_handle(handle: dat handle); return Err(IoError.Failed); },
         _ => Ok(File { handle: handle, }),

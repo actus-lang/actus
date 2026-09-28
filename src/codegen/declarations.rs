@@ -119,7 +119,8 @@ fn signature_for(
     let mut signature = module.make_signature();
     let pointer_type = module.isa().pointer_type();
     let native_return = NativeType::from_type_name_with_layout(return_type, layouts);
-    if native_return.uses_sret() {
+    let uses_return_slot = layouts.uses_return_slot(native_return);
+    if uses_return_slot {
         signature.params.push(AbiParam::new(pointer_type));
     }
     for parameter in params {
@@ -136,7 +137,7 @@ fn signature_for(
         }
     }
     if return_type.is_some()
-        && !native_return.uses_sret()
+        && (!uses_return_slot || layouts.returns_borrowed_view(native_return))
         && !matches!(native_return, NativeType::Void)
     {
         signature.returns.push(AbiParam::new(layouts.ir_type(native_return)));

@@ -1,0 +1,230 @@
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb make_windows(dat raw: Buffer) -> Path {
+    erg result = path_from_windows_utf16(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[2],
+            platform: PathPlatform.Windows,
+            length: 0,
+            capacity: 2,
+            terminated: 1,
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb component_predicates_respect_boundaries() -> Int {
+    erg raw = Buffer[0];
+    append(raw, 47);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 114);
+    append(raw, 47);
+    append(raw, 98);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 0);
+    erg path = make_posix(raw: dat raw);
+    erg prefix_raw = Buffer[0];
+    append(prefix_raw, 47);
+    append(prefix_raw, 117);
+    append(prefix_raw, 115);
+    append(prefix_raw, 114);
+    append(prefix_raw, 0);
+    erg prefix = make_posix(raw: dat prefix_raw);
+    erg partial_raw = Buffer[0];
+    append(partial_raw, 47);
+    append(partial_raw, 117);
+    append(partial_raw, 115);
+    append(partial_raw, 0);
+    erg partial = make_posix(raw: dat partial_raw);
+    case starts_with(self: abs path, prefix: abs prefix) {
+        true => { },
+        _ => { return 1; },
+    };
+    case starts_with(self: abs path, prefix: abs partial) {
+        false => { },
+        _ => { return 1; },
+    };
+    case ends_with(self: abs path, suffix: abs prefix) {
+        false => { },
+        _ => { return 1; },
+    };
+    return case ends_with(self: abs path, suffix: abs partial) {
+        false => 0,
+        _ => 1,
+    };
+}
+
+meta target("windows")
+meta test
+verb windows_drive_forms_and_mixed_separators() -> Int {
+    erg relative_raw = Buffer[0];
+    append(relative_raw, 67);
+    append(relative_raw, 0);
+    append(relative_raw, 58);
+    append(relative_raw, 0);
+    append(relative_raw, 102);
+    append(relative_raw, 0);
+    append(relative_raw, 111);
+    append(relative_raw, 0);
+    append(relative_raw, 111);
+    append(relative_raw, 0);
+    append(relative_raw, 0);
+    append(relative_raw, 0);
+    erg relative = make_windows(raw: dat relative_raw);
+    erg relative_kind = windows_root(abs relative);
+    case dat relative_kind {
+        Result.Ok(kind) => case dat kind {
+            WindowsRoot.DriveRelative => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    case is_absolute(self: abs relative) {
+        false => { },
+        _ => { return 1; },
+    };
+    erg mixed_raw = Buffer[0];
+    append(mixed_raw, 67);
+    append(mixed_raw, 0);
+    append(mixed_raw, 58);
+    append(mixed_raw, 0);
+    append(mixed_raw, 92);
+    append(mixed_raw, 0);
+    append(mixed_raw, 97);
+    append(mixed_raw, 0);
+    append(mixed_raw, 47);
+    append(mixed_raw, 0);
+    append(mixed_raw, 98);
+    append(mixed_raw, 0);
+    append(mixed_raw, 0);
+    append(mixed_raw, 0);
+    erg mixed = make_windows(raw: dat mixed_raw);
+    case is_absolute(self: abs mixed) {
+        true => { },
+        _ => { return 1; },
+    };
+    erg name = file_name(self: abs mixed);
+    return case dat name {
+        Option.Some(component) => case component.length {
+            1 => 0,
+            _ => 1,
+        },
+        Option.None => 1,
+    };
+}
+
+meta target("windows")
+meta test
+verb windows_unc_and_normalization_preserve_units() -> Int {
+    erg unc_raw = Buffer[0];
+    append(unc_raw, 92);
+    append(unc_raw, 0);
+    append(unc_raw, 92);
+    append(unc_raw, 0);
+    append(unc_raw, 115);
+    append(unc_raw, 0);
+    append(unc_raw, 104);
+    append(unc_raw, 0);
+    append(unc_raw, 97);
+    append(unc_raw, 0);
+    append(unc_raw, 114);
+    append(unc_raw, 0);
+    append(unc_raw, 101);
+    append(unc_raw, 0);
+    append(unc_raw, 0);
+    append(unc_raw, 0);
+    erg unc = make_windows(raw: dat unc_raw);
+    erg kind = windows_root(abs unc);
+    case dat kind {
+        Result.Ok(root) => case dat root {
+            WindowsRoot.Unc => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg normalized_raw = Buffer[0];
+    append(normalized_raw, 67);
+    append(normalized_raw, 0);
+    append(normalized_raw, 58);
+    append(normalized_raw, 0);
+    append(normalized_raw, 92);
+    append(normalized_raw, 0);
+    append(normalized_raw, 97);
+    append(normalized_raw, 0);
+    append(normalized_raw, 92);
+    append(normalized_raw, 0);
+    append(normalized_raw, 46);
+    append(normalized_raw, 0);
+    append(normalized_raw, 92);
+    append(normalized_raw, 0);
+    append(normalized_raw, 98);
+    append(normalized_raw, 0);
+    append(normalized_raw, 92);
+    append(normalized_raw, 0);
+    append(normalized_raw, 46);
+    append(normalized_raw, 0);
+    append(normalized_raw, 46);
+    append(normalized_raw, 0);
+    append(normalized_raw, 92);
+    append(normalized_raw, 0);
+    append(normalized_raw, 99);
+    append(normalized_raw, 0);
+    append(normalized_raw, 0);
+    append(normalized_raw, 0);
+    erg candidate = make_windows(raw: dat normalized_raw);
+    erg normalized = normalize(dat candidate);
+    return case dat normalized {
+        Result.Ok(path) => case path.length {
+            6 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb invalid_utf16_and_non_utf8_posix_are_distinct() -> Int {
+    erg invalid_raw = Buffer[0];
+    append(invalid_raw, 255);
+    append(invalid_raw, 216);
+    append(invalid_raw, 0);
+    append(invalid_raw, 0);
+    erg invalid = path_from_windows_utf16(storage: dat invalid_raw);
+    case dat invalid {
+        Result.Ok(_) => { return 1; },
+        Result.Err(error) => case dat error {
+            PathError.InvalidEncoding => { },
+            _ => { return 1; },
+        },
+    };
+    erg raw = Buffer[0];
+    append(raw, 255);
+    append(raw, 0);
+    erg valid = path_from_posix(storage: dat raw);
+    return case dat valid {
+        Result.Ok(path) => case path.length {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}

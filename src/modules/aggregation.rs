@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -155,6 +155,7 @@ pub fn analyze_module_with_overlays(
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<SemanticModel, ModuleError> {
     let program = parse_module_with_overlays(resolver, module_path, overlays)?;
+    let program = resolve_imports(&program, resolver)?;
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
@@ -210,11 +211,15 @@ pub fn resolve_imports(
     resolver: &ModuleResolver,
 ) -> Result<Program, ModuleError> {
     let mut declarations = Vec::new();
+    let mut imported_paths = HashSet::new();
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else {
             declarations.push(declaration.clone());
             continue;
         };
+        if !imported_paths.insert(import.path.clone()) {
+            continue;
+        }
         let imported = parse_module(resolver, &import.path)?;
         let exports = exports_module(resolver, &import.path)?;
         declarations.extend(imported.declarations.into_iter().filter(|candidate| {

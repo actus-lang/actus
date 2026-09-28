@@ -35,6 +35,17 @@ fn parses_target_metadata_into_the_verb_ast() {
 }
 
 #[test]
+fn parses_target_and_test_metadata_together() {
+    let program = parse_source(
+        "meta target(\"windows\") meta test verb platform_test() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(verb.metadata.len(), 2);
+    assert!(verb.metadata.contains(&MetaAttribute::Target("windows".to_owned())));
+    assert!(verb.metadata.contains(&MetaAttribute::Test));
+}
+
+#[test]
 fn rejects_unknown_target_metadata() {
     let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
@@ -55,6 +66,17 @@ fn attaches_block_docstrings_to_supported_declarations() {
     assert_eq!(structure.doc.as_deref(), Some("Stores bytes."));
     let TopLevelDecl::Role(role) = &program.declarations[2] else { panic!("expected role") };
     assert_eq!(role.doc.as_deref(), Some("Defines a reader contract."));
+}
+
+#[test]
+fn attaches_block_docstrings_to_external_verbs() {
+    let program = parse_source(
+        "\"\"\"Reads a raw path without transcoding.\"\"\" unsafe extern \"C\" verb host(abs path: Buffer) -> Int;",
+    );
+    let TopLevelDecl::ExternalVerb(external) = &program.declarations[0] else {
+        panic!("expected external verb")
+    };
+    assert_eq!(external.doc.as_deref(), Some("Reads a raw path without transcoding."));
 }
 
 #[test]

@@ -65,6 +65,14 @@ impl Parser {
         Some(doc)
     }
 
+    fn take_doc_string_group(&mut self) -> Option<String> {
+        let mut documents = Vec::new();
+        while let Some(document) = self.take_doc_string() {
+            documents.push(document);
+        }
+        (!documents.is_empty()).then(|| documents.join("\n\n"))
+    }
+
     fn skip_doc_strings(&mut self) {
         while self.peek().is_some_and(|token| matches!(token.kind, TokenKind::DocString(_))) {
             self.cursor += 1;

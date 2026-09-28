@@ -1,3 +1,5 @@
 open io;
+"""Re-export raw, platform-aware path representation."""
+open path;
 """Re-export hosted file-system I/O."""
 open fs;

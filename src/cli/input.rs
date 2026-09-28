@@ -22,3 +22,20 @@ pub(super) fn entry_path(configuration: &CompilerConfiguration, input: Option<&s
 pub(super) fn source_path(path: &Path) -> String {
     path.display().to_string()
 }
+
+pub(super) fn module_path_for_file(source_root: &Path, file: &Path) -> Option<String> {
+    let mut directory = file.parent()?;
+    while directory.starts_with(source_root) && directory != source_root {
+        let name = directory.file_name()?.to_str()?;
+        if directory.join(format!("{name}.act")).is_file() {
+            let relative = directory.strip_prefix(source_root).ok()?;
+            let segments = relative
+                .components()
+                .map(|component| component.as_os_str().to_str())
+                .collect::<Option<Vec<_>>>()?;
+            return Some(segments.join("::"));
+        }
+        directory = directory.parent()?;
+    }
+    None
+}

@@ -5,11 +5,19 @@ verb copy_transfers_cursor_streams() -> Int {
     erg input_bytes = Buffer[0];
     append(input_bytes, 65);
     append(input_bytes, 66);
-    erg reader = cursor(dat input_bytes);
-    erg output_bytes = Buffer[2];
-    erg writer = cursor(dat output_bytes);
+    erg reader: Cursor = Cursor { buffer: input_bytes, position: 0, };
+    erg output_bytes = Buffer[0];
+    erg writer: Cursor = Cursor { buffer: output_bytes, position: 0, };
     erg result = copy(reader: ins reader, writer: ins writer);
-    return case dat result {
+    case dat result {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg offset = 0;
+    writer.seek(offset: offset);
+    erg copied = Buffer[0];
+    erg read_back = writer.read(buffer: ins copied);
+    return case dat read_back {
         Result.Ok(count) => case count {
             2 => 0,
             _ => 1,
@@ -37,9 +45,15 @@ verb buffered_reader_refills_cursor_storage() -> Int {
 
 meta test
 verb buffered_writer_flushes_cursor_storage() -> Int {
-    erg output_bytes = Buffer[2];
+    erg output_bytes = Buffer[0];
     erg target = cursor(dat output_bytes);
-    erg storage = Buffer[2];
+    erg storage = Buffer[0];
+    erg storage_capacity = 2;
+    erg reserved = reserve(buffer: ins storage, capacity: storage_capacity);
+    case dat reserved {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
     erg writer = buffered_writer(dat target, dat storage);
     erg input = Buffer[0];
     append(input, 65);

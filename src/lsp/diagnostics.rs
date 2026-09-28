@@ -37,10 +37,30 @@ pub fn analyze_document(
     if let Some(result) = analyze_package_module(uri, overlays) {
         return package_diagnostics(source, &index, result);
     }
+    if let Some(result) = analyze_test_fixture(uri, &program) {
+        return package_diagnostics(source, &index, result);
+    }
     if let Err(error) = analyze(&program) {
         return vec![diagnostic(source, &index, error.span, render_semantic_error(source, &error))];
     }
     Vec::new()
+}
+
+fn analyze_test_fixture(
+    uri: &str,
+    program: &crate::ast::Program,
+) -> Option<Result<(), ModuleError>> {
+    let path = file_uri_to_path(uri)?;
+    let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
+    let tests_root = configuration.project_root().join("tests");
+    if !path.starts_with(tests_root) {
+        return None;
+    }
+    let resolver = ModuleResolver::with_dependencies(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+    );
+    Some(crate::modules::analyze_with_imports(program, &resolver).map(|_| ()))
 }
 
 fn analyze_package_module(

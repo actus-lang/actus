@@ -3,11 +3,15 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use super::types::BufferHandle;
 
 mod operations;
+mod path_open;
 pub use operations::{
-    actus_file_copy_buffer, actus_file_create_dir_buffer, actus_file_metadata_buffer,
-    actus_file_metadata_handle_buffer, actus_file_remove_buffer, actus_file_remove_dir_buffer,
-    actus_file_rename_buffer,
+    actus_file_copy_buffer, actus_file_copy_path, actus_file_create_dir_buffer,
+    actus_file_create_dir_path, actus_file_metadata_buffer, actus_file_metadata_handle_buffer,
+    actus_file_metadata_path, actus_file_remove_buffer, actus_file_remove_dir_buffer,
+    actus_file_remove_dir_path, actus_file_remove_path, actus_file_rename_buffer,
+    actus_file_rename_path,
 };
+pub use path_open::{actus_file_open_options_path, actus_file_open_path};
 
 const MODE_CREATE: u32 = 1;
 const WHENCE_START: i32 = 0;

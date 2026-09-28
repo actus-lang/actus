@@ -1,0 +1,36 @@
+"""
+The public path representation used by `std::path` and `std::fs`.
+
+`Path` owns its backing `Buffer` through the `erg storage` field. The buffer
+contains raw POSIX bytes when `platform` is `PathPlatform.Posix`, or raw
+target-endian UTF-16 code-unit bytes when it is `PathPlatform.Windows`.
+`length` excludes the trailing null terminator and `capacity` is the backing
+buffer capacity. Callers must construct paths through the validated factory
+verbs rather than manufacturing inconsistent metadata.
+"""
+open struct Path {
+    """Owned raw path storage; the `erg` owner drops it with the path."""
+    erg storage: Buffer,
+    """Platform discriminator selecting POSIX bytes or Windows UTF-16 units."""
+    erg platform: PathPlatform,
+    """Logical payload length; the trailing null terminator is excluded."""
+    erg length: Int,
+    """Total storage capacity available to the owned path."""
+    erg capacity: Int,
+    """One when storage ends with the required platform null terminator."""
+    erg terminated: Int,
+}
+
+"""
+Identifies the raw path representation and platform separator contract.
+
+The discriminator is metadata only; it never converts bytes to UTF-8 or
+converts UTF-16 code units to a string. `Posix` stores arbitrary non-null
+bytes. `Windows` stores validated UTF-16 code units in the target ABI layout.
+"""
+open enum PathPlatform {
+    """POSIX path bytes using `/` as the root and separator character."""
+    Posix,
+    """Windows UTF-16 code units using drive and UNC root rules."""
+    Windows,
+}

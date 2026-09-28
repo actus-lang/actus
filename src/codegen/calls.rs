@@ -103,6 +103,11 @@ pub(super) fn lower_call(
     }
     let call = function.ins().call(target.reference, &values);
     if let Some(address) = result_address {
+        if layouts.returns_borrowed_view(target.return_type) {
+            return function.inst_results(call).first().copied().ok_or_else(|| {
+                NativeEmitError("borrowed view call returned no pointer".to_owned())
+            });
+        }
         return Ok(address);
     }
     if matches!(target.return_type, NativeType::Void) {
@@ -120,7 +125,7 @@ fn allocate_return_address(
     return_type: NativeType,
     layouts: &LayoutRegistry,
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
-    if !return_type.uses_sret() {
+    if !layouts.uses_return_slot(return_type) {
         return Ok(None);
     }
     let slot = if let NativeType::Struct(id) = return_type {
@@ -130,7 +135,7 @@ fn allocate_return_address(
         function.func.create_sized_stack_slot(layouts.stack_slot(layout))
     } else {
         let size = layouts
-            .type_size(return_type)
+            .return_slot_size(return_type)
             .ok_or_else(|| NativeEmitError("missing sret return layout".to_owned()))?;
         function.func.create_sized_stack_slot(StackSlotData::new(
             StackSlotKind::ExplicitSlot,

@@ -1,9 +1,30 @@
 import io;
 import fs;
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb empty_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
 
 meta test
 verb metadata_rejects_empty_path() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg result = metadata(path: abs path);
     return case dat result {
         Result.Ok(_) => 1,
@@ -13,7 +34,7 @@ verb metadata_rejects_empty_path() -> Int {
 
 meta test
 verb file_open_and_create_reject_empty_path() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg opened = file_open(path: abs path);
     erg created = file_create(path: abs path);
     case dat opened {
@@ -28,7 +49,7 @@ verb file_open_and_create_reject_empty_path() -> Int {
 
 meta test
 verb path_operations_reject_empty_paths() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg removed = remove_file(path: abs path);
     erg renamed = rename(from: abs path, to: abs path);
     erg copied = copy_file(from: abs path, to: abs path);
@@ -58,7 +79,7 @@ verb path_operations_reject_empty_paths() -> Int {
 
 meta test
 verb read_to_bytes_propagates_empty_path_error() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg bytes = read_to_bytes(path: abs path);
     return case dat bytes {
         Result.Ok(_) => { return 1; },
@@ -68,7 +89,7 @@ verb read_to_bytes_propagates_empty_path_error() -> Int {
 
 meta test
 verb read_to_string_propagates_empty_path_error() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg text = read_to_string(path: abs path);
     return case dat text {
         Result.Ok(_) => 1,
@@ -78,38 +99,40 @@ verb read_to_string_propagates_empty_path_error() -> Int {
 
 meta test
 verb write_file_propagates_empty_path_error() -> Int {
-    erg path = Buffer[0];
-    append(path, 97);
-    append(path, 99);
-    append(path, 116);
-    append(path, 117);
-    append(path, 115);
-    append(path, 95);
-    append(path, 109);
-    append(path, 105);
-    append(path, 115);
-    append(path, 115);
-    append(path, 105);
-    append(path, 110);
-    append(path, 103);
-    append(path, 95);
-    append(path, 112);
-    append(path, 97);
-    append(path, 114);
-    append(path, 101);
-    append(path, 110);
-    append(path, 116);
-    append(path, 47);
-    append(path, 97);
-    append(path, 99);
-    append(path, 116);
-    append(path, 117);
-    append(path, 115);
-    append(path, 95);
-    append(path, 102);
-    append(path, 105);
-    append(path, 108);
-    append(path, 101);
+    erg raw_path = Buffer[0];
+    append(raw_path, 97);
+    append(raw_path, 99);
+    append(raw_path, 116);
+    append(raw_path, 117);
+    append(raw_path, 115);
+    append(raw_path, 95);
+    append(raw_path, 109);
+    append(raw_path, 105);
+    append(raw_path, 115);
+    append(raw_path, 115);
+    append(raw_path, 105);
+    append(raw_path, 110);
+    append(raw_path, 103);
+    append(raw_path, 95);
+    append(raw_path, 112);
+    append(raw_path, 97);
+    append(raw_path, 114);
+    append(raw_path, 101);
+    append(raw_path, 110);
+    append(raw_path, 116);
+    append(raw_path, 47);
+    append(raw_path, 97);
+    append(raw_path, 99);
+    append(raw_path, 116);
+    append(raw_path, 117);
+    append(raw_path, 115);
+    append(raw_path, 95);
+    append(raw_path, 102);
+    append(raw_path, 105);
+    append(raw_path, 108);
+    append(raw_path, 101);
+    append(raw_path, 0);
+    erg path = make_posix(raw: dat raw_path);
     erg contents = Buffer[0];
     erg written = write_file(path: abs path, contents: abs contents);
     return case dat written {
@@ -120,7 +143,7 @@ verb write_file_propagates_empty_path_error() -> Int {
 
 meta test
 verb open_options_cover_all_modes() -> Int {
-    erg path = Buffer[0];
+    erg path = empty_path();
     erg empty = options_new();
     erg readable = options_read(dat empty);
     erg writable = options_write(dat readable);
@@ -137,33 +160,35 @@ verb open_options_cover_all_modes() -> Int {
 
 meta test
 verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
-    erg path = Buffer[0];
-    append(path, 97);
-    append(path, 99);
-    append(path, 116);
-    append(path, 117);
-    append(path, 115);
-    append(path, 95);
-    append(path, 108);
-    append(path, 105);
-    append(path, 98);
-    append(path, 114);
-    append(path, 97);
-    append(path, 114);
-    append(path, 121);
-    append(path, 95);
-    append(path, 114);
-    append(path, 111);
-    append(path, 117);
-    append(path, 110);
-    append(path, 100);
-    append(path, 114);
-    append(path, 105);
-    append(path, 112);
-    append(path, 46);
-    append(path, 98);
-    append(path, 105);
-    append(path, 110);
+    erg raw_path = Buffer[0];
+    append(raw_path, 97);
+    append(raw_path, 99);
+    append(raw_path, 116);
+    append(raw_path, 117);
+    append(raw_path, 115);
+    append(raw_path, 95);
+    append(raw_path, 108);
+    append(raw_path, 105);
+    append(raw_path, 98);
+    append(raw_path, 114);
+    append(raw_path, 97);
+    append(raw_path, 114);
+    append(raw_path, 121);
+    append(raw_path, 95);
+    append(raw_path, 114);
+    append(raw_path, 111);
+    append(raw_path, 117);
+    append(raw_path, 110);
+    append(raw_path, 100);
+    append(raw_path, 114);
+    append(raw_path, 105);
+    append(raw_path, 112);
+    append(raw_path, 46);
+    append(raw_path, 98);
+    append(raw_path, 105);
+    append(raw_path, 110);
+    append(raw_path, 0);
+    erg path = make_posix(raw: dat raw_path);
     remove_file(path: abs path);
     erg contents = Buffer[0];
     append(contents, 65);
@@ -197,29 +222,31 @@ verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },
     };
-    erg copy_path = Buffer[0];
-    append(copy_path, 97);
-    append(copy_path, 99);
-    append(copy_path, 116);
-    append(copy_path, 117);
-    append(copy_path, 115);
-    append(copy_path, 95);
-    append(copy_path, 108);
-    append(copy_path, 105);
-    append(copy_path, 98);
-    append(copy_path, 114);
-    append(copy_path, 97);
-    append(copy_path, 114);
-    append(copy_path, 121);
-    append(copy_path, 95);
-    append(copy_path, 99);
-    append(copy_path, 111);
-    append(copy_path, 112);
-    append(copy_path, 121);
-    append(copy_path, 46);
-    append(copy_path, 98);
-    append(copy_path, 105);
-    append(copy_path, 110);
+    erg raw_copy_path = Buffer[0];
+    append(raw_copy_path, 97);
+    append(raw_copy_path, 99);
+    append(raw_copy_path, 116);
+    append(raw_copy_path, 117);
+    append(raw_copy_path, 115);
+    append(raw_copy_path, 95);
+    append(raw_copy_path, 108);
+    append(raw_copy_path, 105);
+    append(raw_copy_path, 98);
+    append(raw_copy_path, 114);
+    append(raw_copy_path, 97);
+    append(raw_copy_path, 114);
+    append(raw_copy_path, 121);
+    append(raw_copy_path, 95);
+    append(raw_copy_path, 99);
+    append(raw_copy_path, 111);
+    append(raw_copy_path, 112);
+    append(raw_copy_path, 121);
+    append(raw_copy_path, 46);
+    append(raw_copy_path, 98);
+    append(raw_copy_path, 105);
+    append(raw_copy_path, 110);
+    append(raw_copy_path, 0);
+    erg copy_path = make_posix(raw: dat raw_copy_path);
     erg copied = copy_file(from: abs path, to: abs copy_path);
     case dat copied {
         Result.Ok(_) => { },

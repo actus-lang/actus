@@ -45,7 +45,8 @@ pub(super) fn define_function(
         let return_type = verb.return_type.as_ref().map(|return_type| {
             NativeType::from_type_name_with_layout(Some(&return_type.ty), layouts)
         });
-        let return_slot = return_type.filter(|ty| ty.uses_sret()).map(|_| parameters[0]);
+        let return_slot =
+            return_type.filter(|ty| layouts.uses_return_slot(*ty)).map(|_| parameters[0]);
         let parameter_offset = usize::from(return_slot.is_some());
         let (locals, local_types) =
             bind_parameters(&mut function, module, verb, &parameters[parameter_offset..], layouts);
@@ -87,6 +88,14 @@ fn emit_flow(
             copy_bytes(function, result, destination, size);
             function.ins().return_(&[]);
         }
+        (Some(return_type), Some(destination), super::lowering::Flow::Return(result))
+            if layouts.returns_borrowed_view(return_type) =>
+        {
+            let size = layouts
+                .return_slot_size(return_type)
+                .ok_or_else(|| NativeEmitError("missing borrowed view return layout".to_owned()))?;
+            emit_borrowed_view_return(function, destination, result, size);
+        }
         (Some(_), None, super::lowering::Flow::Return(result)) => {
             function.ins().return_(&[result]);
         }
@@ -117,6 +126,33 @@ fn emit_flow(
         }
     };
     Ok(())
+}
+
+fn emit_borrowed_view_return(
+    function: &mut FunctionBuilder<'_>,
+    destination: cranelift_codegen::ir::Value,
+    result: cranelift_codegen::ir::Value,
+    size: u32,
+) {
+    let some = function.create_block();
+    let none = function.create_block();
+    let merge = function.create_block();
+    let pointer_type = function.func.dfg.value_type(destination);
+    function.append_block_param(merge, pointer_type);
+    function.ins().brif(result, some, &[], none, &[]);
+    function.switch_to_block(some);
+    super::structs::copy_bytes(function, result, destination, size);
+    let some_argument = cranelift_codegen::ir::BlockArg::Value(destination);
+    function.ins().jump(merge, [&some_argument]);
+    function.seal_block(some);
+    function.switch_to_block(none);
+    let none_argument = cranelift_codegen::ir::BlockArg::Value(result);
+    function.ins().jump(merge, [&none_argument]);
+    function.seal_block(none);
+    function.switch_to_block(merge);
+    let returned = function.block_params(merge)[0];
+    function.ins().return_(&[returned]);
+    function.seal_block(merge);
 }
 
 fn bind_parameters<'a>(

@@ -443,6 +443,85 @@ portable, documented, and safe to consume from native code.
 - [x] Public standard-library failures cannot expose raw host/C status codes.
 - [x] Compiler and tooling checks are green before Gate 4 begins.
 
+## Gate 3.8: `std::path` Module and Cross-Platform Resolution
+
+Define and implement production-grade, zero-allocation path handling without
+String conversions.
+
+### Sub-gate A: Path Representation and Storage
+
+- [x] Define owned `Path` aggregate layout and platform discriminators.
+- [x] Implement raw POSIX byte backing storage (`Buffer`, `u8`).
+- [x] Implement raw Windows UTF-16 code-unit storage (`Buffer`, `u16`).
+- [x] Enforce capacity, length, and trailing null-terminator invariants.
+- [x] Implement embedded-null rejection and validation rules.
+- [x] Add `PathError` type and error invariants.
+- [x] Add unit and representation tests for Sub-gate A.
+
+### Sub-gate B: Borrowed Components and Views
+
+- [x] Define non-owning `PathComponent` view.
+- [x] Define `PathComponents` borrowed iterator state.
+- [x] Enforce non-escaping borrow rules (`abs` propagation).
+- [x] Implement component boundary detection.
+- [x] Add parent, file_name, file_stem, and extension inspection.
+
+### Sub-gate C: Platform-Specific Parsers
+
+- [x] Implement POSIX root (`/`) and separator rules.
+- [x] Implement Windows drive (`C:`, `C:\`) and UNC (`\\server\\share`) rules.
+- [x] Support mixed separators on Windows where permitted.
+- [x] Add platform-independent parser fixtures.
+
+### Sub-gate D: Predicates and Lexical Normalization
+
+- [x] Implement `is_absolute`, `is_relative`, and `has_root` predicates.
+- [x] Implement component-aware `starts_with` and `ends_with`.
+- [x] Implement lexical `.` and `..` normalization without filesystem access.
+- [x] Prevent root escape on absolute paths.
+
+### Sub-gate E: Builders and In-Place Mutations
+
+- [x] Implement consuming transformations (`dat self`): `join`, `normalize`.
+- [x] Implement in-place mutations (`ins self`): `push`, `set_extension`, `set_file_name`.
+- [x] Implement explicit capacity checks and `reserve`.
+
+### Sub-gate F: C ABI Boundary Integration
+
+- [x] Implement `PathCView` null-terminated byte pointer contract for POSIX.
+- [x] Implement `PathCView` wide null-terminated pointer contract for Windows.
+- [x] Validate zero-allocation C-bridge handoff.
+
+### Sub-gate G: `std::fs` Integration
+
+- [x] Update `std::fs` verbs to accept `abs Path` instead of raw `Buffer`.
+- [x] Preserve `Result[T, IoError]` contracts and error mappings.
+- [x] Verify deterministic RAII cleanup across filesystem operations with paths.
+
+### Sub-gate H: Standard-Library Positive and Negative Conformance Matrix
+
+- [x] Inventory every facade-exported `std::io`, `std::fs`, and `std::path`
+      type, role, verb, and runtime bridge.
+- [x] Add executable positive fixtures under `tests/library/` for every public
+      operation family and ownership contract.
+- [x] Add executable negative fixtures under `tests/library/` for invalid
+      inputs, typed error results, rejected ownership calls, and platform
+      mismatches.
+- [x] Execute every Actus `meta test` fixture in `tests/library/` through the
+      repository's native `actus test` command; `tests/library/` remains
+      Actus-only.
+- [x] Verify facade imports and sibling-module diagnostics for every library
+      directory before the gate is accepted.
+- [x] Record deterministic pass/fail counts for the current fixture matrix
+      and keep all Actus test logic in `tests/library/`, outside `library/std`
+      implementation files. Current result: 35 passed, 0 failed on Unix;
+      Windows-target fixtures are filtered by `meta target("windows")`.
+
+### Gate 3.8 invariant
+
+- [x] `Path` is entirely byte/code-unit-driven (no implicit `String` or UTF-8 transcoding).
+- [x] Non-owning path inspection causes zero heap allocations.
+
 ## Gate 4: Bare-Metal and Embedded HAL
 
 Implement ADR-0026 for MMIO registers and deterministic protocol layouts. The
@@ -526,7 +605,7 @@ application code, then run the complete portability and quality matrix.
 - [ ] Verify deterministic build artifacts and lockfile behavior.
 - [ ] Document a complete beginner-to-running-program workflow.
 
-### Gate 5 invariant
+### Gate 6 invariant
 
 - [ ] A real Actus application can use I/O and filesystem services through
       public library APIs without compiler-specific source code.

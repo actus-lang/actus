@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
 use crate::ast::{
-    BuiltinType, EnumDef, LayoutEndianness, PackDecl, Program, StructDef, StructFieldRole,
-    TopLevelDecl, TypeName, lookup_builtin_type, primitive_type,
+    EnumDef, LayoutEndianness, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl,
+    TypeName,
 };
 use crate::semantic::GenericInstance;
 
@@ -12,6 +12,9 @@ use super::enum_layout::EnumLayout;
 use super::generic_definitions::{canonical_type_name, specialized_enums, specialized_structs};
 use super::native::NativeEmitError;
 use super::types::NativeType;
+
+#[path = "layout_structs.rs"]
+mod layout_structs;
 
 #[derive(Clone, Debug)]
 pub(super) struct FieldLayout {
@@ -165,7 +168,9 @@ impl LayoutRegistry {
 
     pub(super) fn type_for_type_name(&self, type_name: &TypeName) -> Option<NativeType> {
         let canonical = canonical_type_name(type_name);
-        self.type_for_name(&canonical).or_else(|| self.type_for_name(&type_name.name))
+        self.type_for_name(&canonical)
+            .or_else(|| self.type_for_name(&type_name.name))
+            .or_else(|| NativeType::from_name(&type_name.name))
     }
 
     pub(super) fn stack_slot(&self, layout: &StructLayout) -> StackSlotData {
@@ -176,168 +181,47 @@ impl LayoutRegistry {
         )
     }
 
-    fn layout_for(
-        &self,
-        definition: &StructDef,
-        visiting: &mut Vec<String>,
-    ) -> Result<StructLayout, NativeEmitError> {
-        if visiting.contains(&definition.name) {
-            return Err(NativeEmitError(format!(
-                "recursive struct layout for `{}` is not supported",
-                definition.name
-            )));
-        }
-        visiting.push(definition.name.clone());
-        let mut fields = Vec::new();
-        let mut offset = 0;
-        let mut alignment = 1;
-        for field in &definition.fields {
-            let indirect = matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins);
-            let ty = if indirect {
-                self.type_for_type_name(&field.ty).ok_or_else(|| {
-                    NativeEmitError(format!("unknown reference field type `{}`", field.ty.name))
-                })?
-            } else {
-                self.native_type_for_type_name(&field.ty, visiting)?
-            };
-            let (size, field_alignment) = if indirect {
-                (self.pointer_size, self.pointer_size)
-            } else {
-                self.type_layout(ty)?
-            };
-            offset = align_up(offset, field_alignment);
-            fields.push(FieldLayout {
-                name: field.name.clone(),
-                offset,
-                ty,
-                owned: matches!(field.role, StructFieldRole::Erg),
-                indirect,
-            });
-            offset += size;
-            alignment = alignment.max(field_alignment);
-        }
-        visiting.pop();
-        Ok(StructLayout { size: align_up(offset, alignment), alignment, fields })
+    pub(super) fn uses_return_slot(&self, ty: NativeType) -> bool {
+        ty.uses_sret() || self.is_borrowed_view_option(ty)
     }
 
-    pub(super) fn native_type(
-        &self,
-        name: &str,
-        visiting: &mut Vec<String>,
-    ) -> Result<NativeType, NativeEmitError> {
-        if let Some(primitive) = primitive_type(name) {
-            return Ok(NativeType::from_primitive(primitive));
-        }
-        if let Some(ty) = lookup_builtin_type(name) {
-            return match ty {
-                BuiltinType::Int => Ok(NativeType::Int),
-                BuiltinType::Bool => Ok(NativeType::Int),
-                BuiltinType::String => Ok(NativeType::String),
-                BuiltinType::Buffer => Ok(NativeType::Buffer),
-                BuiltinType::Array | BuiltinType::Map => {
-                    Err(NativeEmitError(format!("unsupported layout type `{name}`")))
-                }
-            };
-        }
-        if let Some(enum_id) = self.enum_id_for(name) {
-            let definition = self
-                .enum_definitions
-                .get(enum_id)
-                .ok_or_else(|| NativeEmitError(format!("missing enum layout type `{name}`")))?;
-            self.enum_layout_for(definition, visiting)?;
-            return Ok(NativeType::Enum(enum_id));
-        }
-        if let Some(pack_id) = self.pack_ids.get(name).copied() {
-            return Ok(NativeType::Pack(pack_id));
-        }
-        let id = self
-            .id_for(name)
-            .ok_or_else(|| NativeEmitError(format!("unknown layout type `{name}`")))?;
-        if visiting.iter().any(|candidate| candidate == name) {
-            return Err(NativeEmitError(format!(
-                "recursive struct layout for `{name}` is not supported"
-            )));
-        }
-        let definition = self
-            .definitions
-            .get(id)
-            .ok_or_else(|| NativeEmitError(format!("missing layout type `{name}`")))?;
-        self.layout_for(definition, visiting)?;
-        Ok(NativeType::Struct(id))
+    pub(super) fn returns_borrowed_view(&self, ty: NativeType) -> bool {
+        self.is_borrowed_view_option(ty)
     }
 
-    pub(super) fn native_type_for_type_name(
-        &self,
-        type_name: &TypeName,
-        visiting: &mut Vec<String>,
-    ) -> Result<NativeType, NativeEmitError> {
-        if let Some(native_type) = self.type_for_type_name(type_name) {
-            return Ok(native_type);
+    pub(super) fn return_slot_size(&self, ty: NativeType) -> Option<u32> {
+        if let NativeType::Enum(id) = ty
+            && self.is_borrowed_view_option(ty)
+        {
+            return self.niche_payload_type(id).and_then(|payload| self.type_size(payload));
         }
-        self.native_type(&type_name.name, visiting)
+        self.type_size(ty)
     }
 
-    pub(super) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {
-        Ok(match ty {
-            NativeType::Int => (4, 4),
-            NativeType::Integer { width, .. } => {
-                let bytes = integer_storage_bytes(width);
-                (bytes, bytes)
-            }
-            NativeType::Float { width } => {
-                let bytes = u32::from(width / 8);
-                (bytes, bytes)
-            }
-            NativeType::Void => (0, 1),
-            NativeType::String | NativeType::Buffer => (self.pointer_size, self.pointer_size),
-            NativeType::FatPointer => (self.pointer_size * 2, self.pointer_size),
-            NativeType::Struct(id) => {
-                let definition = self.definitions.get(id).ok_or_else(|| {
-                    NativeEmitError(format!("missing nested struct layout `{id}`"))
-                })?;
-                let layout = self.layout_for(definition, &mut Vec::new())?;
-                (layout.size, layout.alignment)
-            }
-            NativeType::Enum(id) => {
-                let layout = if let Some(layout) = self.enum_layout(id) {
-                    layout.clone()
-                } else {
-                    let definition = self
-                        .enum_definitions
-                        .get(id)
-                        .ok_or_else(|| NativeEmitError(format!("missing enum layout `{id}`")))?;
-                    self.enum_layout_for(definition, &mut Vec::new())?
-                };
-                (layout.size, layout.alignment)
-            }
-            NativeType::Pack(id) => self
-                .pack(id)
-                .map(|pack| self.type_layout(pack.storage))
-                .transpose()?
-                .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?,
-            NativeType::Arena(capacity) => (capacity + self.pointer_size, self.pointer_size),
-        })
+    fn is_borrowed_view_option(&self, ty: NativeType) -> bool {
+        let NativeType::Enum(id) = ty else { return false };
+        let Some(layout) = self.enum_layout(id) else { return false };
+        layout.niche_pointer
+            && self
+                .niche_payload_type(id)
+                .is_some_and(|payload| self.is_borrowed_descriptor(payload))
     }
 
-    pub(super) fn alignment(&self, ty: NativeType) -> Result<u32, NativeEmitError> {
-        Ok(match ty {
-            NativeType::Struct(id) => self
-                .get(id)
-                .map(|layout| layout.alignment)
-                .ok_or_else(|| NativeEmitError("missing struct alignment".to_owned()))?,
-            NativeType::Enum(id) => self
-                .enum_layout(id)
-                .map(|layout| layout.alignment)
-                .ok_or_else(|| NativeEmitError("missing enum alignment".to_owned()))?,
-            NativeType::Integer { width, .. } => integer_storage_bytes(width),
-            NativeType::Float { width } => u32::from(width / 8),
-            NativeType::Int => 4,
-            NativeType::String | NativeType::Buffer | NativeType::Arena(_) => self.pointer_size,
-            NativeType::FatPointer => self.pointer_size,
-            NativeType::Void => 1,
-            NativeType::Pack(id) => {
-                self.pack(id).map(|pack| self.alignment(pack.storage)).transpose()?.unwrap_or(1)
-            }
+    fn niche_payload_type(&self, id: usize) -> Option<NativeType> {
+        let definition = self.enum_definitions.get(id)?;
+        let variant = definition.variants.iter().find(|variant| variant.name == "Some")?;
+        let crate::ast::EnumPayload::Tuple(types) = &variant.payload else { return None };
+        let payload = types.first()?;
+        self.type_for_type_name(payload)
+    }
+
+    fn is_borrowed_descriptor(&self, ty: NativeType) -> bool {
+        let NativeType::Struct(id) = ty else { return false };
+        self.definitions.get(id).is_some_and(|definition| {
+            definition
+                .fields
+                .iter()
+                .any(|field| matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins))
         })
     }
 }
@@ -404,45 +288,4 @@ fn base_definitions(program: &Program) -> (Vec<StructDef>, Vec<EnumDef>) {
 
 fn align_up(offset: u32, alignment: u32) -> u32 {
     offset.div_ceil(alignment) * alignment
-}
-
-#[cfg(test)]
-mod tests {
-    use super::LayoutRegistry;
-    use crate::lexer::scan;
-    use crate::parser::parse;
-    use cranelift_codegen::ir::types;
-
-    #[test]
-    fn calculates_natural_offsets_and_trailing_padding() {
-        let (tokens, errors) = scan("struct Point { x: Int, y: Int, }");
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("struct should parse");
-        let layouts =
-            LayoutRegistry::from_program(&program, types::I64).expect("layout should pass");
-        let layout =
-            layouts.get(layouts.id_for("Point").expect("Point layout should exist")).unwrap();
-
-        assert_eq!(layout.alignment, 4);
-        assert_eq!(layout.size, 8);
-        assert_eq!(layout.fields[0].offset, 0);
-        assert_eq!(layout.fields[1].offset, 4);
-    }
-
-    #[test]
-    fn calculates_nested_struct_offsets() {
-        let (tokens, errors) =
-            scan("struct Inner { x: Int, y: Int, } struct Outer { inner: Inner, tag: Int, }");
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("nested structs should parse");
-        let layouts =
-            LayoutRegistry::from_program(&program, types::I64).expect("layout should pass");
-        let outer =
-            layouts.get(layouts.id_for("Outer").expect("Outer layout should exist")).unwrap();
-
-        assert_eq!(outer.alignment, 4);
-        assert_eq!(outer.size, 12);
-        assert_eq!(outer.fields[0].offset, 0);
-        assert_eq!(outer.fields[1].offset, 8);
-    }
 }

@@ -1,4 +1,6 @@
 use std::fs;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use actus::cli::run_with_args;
@@ -20,16 +22,76 @@ fn library_file(relative: &str) -> String {
     fs::read_to_string(path).expect("standard library source should exist")
 }
 
+#[cfg(unix)]
 fn path_literal(path: &Path) -> String {
-    path.to_string_lossy()
+    let mut source = path
+        .to_string_lossy()
         .bytes()
-        .map(|byte| format!("append(path, {});", byte))
+        .map(|byte| format!("append(raw, {});", byte))
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    source.push_str(" append(raw, 0);");
+    source.push_str(" erg path = make_path(raw: dat raw);");
+    source
+}
+
+#[cfg(windows)]
+fn path_literal(path: &Path) -> String {
+    let mut source = path
+        .as_os_str()
+        .encode_wide()
+        .flat_map(u16::to_ne_bytes)
+        .map(|byte| format!("append(raw, {});", byte))
+        .collect::<Vec<_>>()
+        .join(" ");
+    source.push_str(" append(raw, 0); append(raw, 0);");
+    source.push_str(" erg path = make_path(raw: dat raw);");
+    source
+}
+
+#[cfg(unix)]
+fn path_constructor() -> &'static str {
+    "path_from_posix"
+}
+
+#[cfg(windows)]
+fn path_constructor() -> &'static str {
+    "path_from_windows_utf16"
+}
+
+#[cfg(unix)]
+fn fallback_path_fields() -> (&'static str, &'static str, &'static str) {
+    ("Buffer[1]", "PathPlatform.Posix", "1")
+}
+
+#[cfg(windows)]
+fn fallback_path_fields() -> (&'static str, &'static str, &'static str) {
+    ("Buffer[2]", "PathPlatform.Windows", "2")
+}
+
+fn make_path_source() -> String {
+    let (storage, platform, capacity) = fallback_path_fields();
+    format!(
+        "verb make_path(dat raw: Buffer) -> Path {{ erg result = {}(storage: dat raw); return case dat result {{ Result.Ok(value) => value, Result.Err(_) => Path {{ storage: {storage}, platform: {platform}, length: 0, capacity: {capacity}, terminated: 1, }}, }}; }}",
+        path_constructor(),
+    )
 }
 
 fn path_literal_for(path: &Path, binding: &str) -> String {
-    path_literal(path).replace("path,", &format!("{binding},"))
+    let raw_binding = format!("{binding}_raw");
+    path_literal(path).replace("raw,", &format!("{raw_binding},")).replace(
+        "erg path = make_path(raw: dat raw);",
+        &format!("erg {binding} = make_path(raw: dat {raw_binding});"),
+    )
+}
+
+fn prepare_source(source: &str) -> String {
+    let source = source
+        .replace("erg path = Buffer[0];", "erg raw = Buffer[0];")
+        .replace("erg renamed = Buffer[0];", "erg renamed_raw = Buffer[0];")
+        .replace("erg source = Buffer[0];", "erg source_raw = Buffer[0];")
+        .replace("import io; import fs;", "import io; import path; import fs;");
+    format!("{source}\n{}", make_path_source())
 }
 
 fn copy_std_library(root: &Path) {
@@ -53,6 +115,16 @@ fn copy_std_library(root: &Path) {
         ("fs/operations.act", library_file("fs/operations.act")),
         ("fs/seek.act", library_file("fs/seek.act")),
         ("fs/options.act", library_file("fs/options.act")),
+        ("path/path.act", library_file("path/path.act")),
+        ("path/types.act", library_file("path/types.act")),
+        ("path/storage.act", library_file("path/storage.act")),
+        ("path/error.act", library_file("path/error.act")),
+        ("path/components.act", library_file("path/components.act")),
+        ("path/posix.act", library_file("path/posix.act")),
+        ("path/windows.act", library_file("path/windows.act")),
+        ("path/predicates.act", library_file("path/predicates.act")),
+        ("path/normalize.act", library_file("path/normalize.act")),
+        ("path/builders.act", library_file("path/builders.act")),
     ];
     copy_library(root, &relative_files);
 }
@@ -67,7 +139,7 @@ fn write_fixture(root: &Path, name: &str, source: &str) -> (PathBuf, PathBuf) {
     .expect("write fixture manifest");
     copy_std_library(root);
     let input = source_root.join(name);
-    fs::write(&input, source).expect("write Actus fixture");
+    fs::write(&input, prepare_source(source)).expect("write Actus fixture");
     (input, root.join("fixture"))
 }
 
@@ -106,7 +178,7 @@ fn std_fs_api_builds_with_reader_writer_and_drop_contracts() {
         "import io; import fs; verb round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg payload = Buffer[0]; append(payload, 65); append(payload, 66); erg created_result = file_create(path: abs path); case dat created_result {{ Result.Ok(created) => {{ erg file: File = created; file.write(buffer: abs payload); file.flush(); }}, Result.Err(_) => {{ return Result[Int, IoError].Ok(0); }}, }}; erg reopened_result = file_open(path: abs path); case dat reopened_result {{ Result.Ok(reopened) => {{ erg file: File = reopened; erg destination = Buffer[128]; erg read_result = file.read(buffer: ins destination); return case dat read_result {{ Result.Ok(count) => Result[Int, IoError].Ok(count), Result.Err(_) => Result[Int, IoError].Ok(0), }}; }}, Result.Err(_) => {{ return Result[Int, IoError].Ok(0); }}, }}; return Result[Int, IoError].Ok(0); }} verb main() -> Int {{ round_trip(); return 0; }}"
     );
     let input = source_root.join("main.act");
-    fs::write(&input, source).expect("write Actus fixture");
+    fs::write(&input, prepare_source(&source)).expect("write Actus fixture");
     let output = root.join("fixture");
     let status = run_with_args(
         [
@@ -193,7 +265,7 @@ fn std_fs_rename_and_remove_file_execute_natively() {
     let remove_source = format!(
         "import io; import fs; verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg removed = remove_file(path: abs renamed); return case dat removed {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
     );
-    fs::write(&input, remove_source).expect("write remove fixture");
+    fs::write(&input, prepare_source(&remove_source)).expect("write remove fixture");
     build_and_run(&input, &output);
     assert!(!renamed_path.exists());
     fs::remove_dir_all(root).expect("remove rename fixture");

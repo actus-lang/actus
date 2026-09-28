@@ -1,0 +1,43 @@
+"""Lexical path normalization without filesystem or symlink resolution."""
+
+"""Normalize an owned path in place through the Rust runtime.
+
+`self` is an `ins` call-scope loan at the ABI boundary so the runtime can
+rewrite the existing owned buffer without allocation. The public `normalize`
+verb retains the `dat` ownership contract and returns `Result[Path, PathError]`.
+"""
+open unsafe extern "C" verb actus_path_normalize(ins self: Path) -> Int;
+
+"""Remove lexical dot components and repeated separators from an owned path.
+
+`self` is transferred with `dat`. Success returns the same owned `Path` after
+in-place normalization; errors return `PathError` and preserve no filesystem
+side effects. Absolute roots cannot escape through `..`.
+"""
+open verb normalize(dat self: Path) -> Result[Path, PathError] {
+    erg status = actus_path_normalize(self: ins self);
+    return finish_normalized(path: dat self, status: status);
+}
+
+"""Translate runtime normalization status while consuming the owned path."""
+open verb finish_normalized(dat path: Path, erg status: Int) -> Result[Path, PathError] {
+    return case status {
+        0 => Ok(path),
+        _ => {
+            erg error = path_error_from_status(status: status);
+            discard_path(path: dat path);
+            return Err(error);
+        },
+    };
+}
+
+"""Consume a failed normalization path through normal ownership cleanup.
+
+`path` is transferred with `dat`, explicitly dropped, and converted to the
+zero status required by the native lowering contract. The caller ignores this
+status after the path has been destroyed.
+"""
+open verb discard_path(dat path: Path) -> Int {
+    drop(path);
+    return 0;
+}

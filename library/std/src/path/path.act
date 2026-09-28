@@ -1,0 +1,19 @@
+"""
+The public `std::path` facade.
+
+It re-exports the owned raw path representation, platform discriminator,
+typed validation errors, and validated storage constructors. Component views,
+normalization, and builders are exposed through typed facade wrappers; C ABI
+views belong to a later Gate 3.8 sub-gate.
+"""
+open types;
+open error;
+open storage;
+open components;
+open predicates;
+open normalize;
+open builders;
+"""Re-export POSIX raw separator and root classification."""
+open posix;
+"""Re-export Windows raw separator and root classification."""
+open windows;

@@ -1,0 +1,21 @@
+"""
+Typed validation failures for owned path representation.
+
+Public path constructors return `Result[Path, PathError]`; no raw runtime or
+C status is exposed. The variants distinguish malformed storage, unsupported
+platform metadata, and insufficient owned capacity.
+"""
+open enum PathError {
+    """The raw storage contains a zero unit before its terminator."""
+    EmbeddedNull,
+    """The raw storage is not valid for the selected platform encoding."""
+    InvalidEncoding,
+    """The payload length or UTF-16 unit width is inconsistent."""
+    InvalidLength,
+    """The required platform null terminator is absent."""
+    MissingTerminator,
+    """The supplied capacity cannot hold the payload and terminator."""
+    CapacityExceeded,
+    """The requested platform representation is not available on the target."""
+    UnsupportedPlatform,
+}

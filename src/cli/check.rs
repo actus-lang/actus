@@ -1,6 +1,6 @@
 use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
 use crate::lexer::scan;
-use crate::modules::{ModuleResolver, resolve_imports};
+use crate::modules::{ModuleError, ModuleResolver, parse_module, resolve_imports};
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 use std::fs;
@@ -19,7 +19,28 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
         }
     };
     let input_path = super::input::entry_path(&configuration, explicit_input.as_deref());
-    let input = super::input::source_path(&input_path);
+    check_input(&configuration, &input_path, explicit_input.is_some())
+}
+
+fn check_input(
+    configuration: &crate::configuration::CompilerConfiguration,
+    input_path: &std::path::Path,
+    explicit: bool,
+) -> i32 {
+    if explicit
+        && let Some(module_path) =
+            super::input::module_path_for_file(configuration.source_root(), input_path)
+    {
+        return check_module(configuration, input_path, &module_path);
+    }
+    check_source(configuration, input_path)
+}
+
+fn check_source(
+    configuration: &crate::configuration::CompilerConfiguration,
+    input_path: &std::path::Path,
+) -> i32 {
+    let input = super::input::source_path(input_path);
     let source = match fs::read_to_string(&input) {
         Ok(source) => source,
         Err(error) => {
@@ -64,4 +85,38 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
             1
         }
     }
+}
+
+fn check_module(
+    configuration: &crate::configuration::CompilerConfiguration,
+    input_path: &std::path::Path,
+    module_path: &str,
+) -> i32 {
+    let resolver = ModuleResolver::with_dependencies(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+    );
+    let program = match parse_module(&resolver, module_path) {
+        Ok(program) => program,
+        Err(error) => return report_module_error(module_path, error),
+    };
+    let program = match resolve_imports(&program, &resolver) {
+        Ok(program) => program,
+        Err(error) => return report_module_error(module_path, error),
+    };
+    match crate::semantic::analyze(&filter_program_for_target(&program, configuration.target())) {
+        Ok(_) => {
+            println!("checked `{}` successfully", input_path.display());
+            0
+        }
+        Err(error) => {
+            eprintln!("{}: {}", input_path.display(), render_semantic_error("", &error));
+            1
+        }
+    }
+}
+
+fn report_module_error(module_path: &str, error: ModuleError) -> i32 {
+    eprintln!("error: cannot check module `{module_path}`: {error}");
+    1
 }

@@ -13,6 +13,51 @@ use super::types::NativeType;
 pub(super) type BranchLocals<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);
 
+pub(super) fn add_payload_types<'a>(
+    branch: &'a crate::ast::CaseBranch,
+    subject_type: NativeType,
+    types: &mut HashMap<&'a String, NativeType>,
+    layouts: &LayoutRegistry,
+) {
+    let crate::ast::Pattern::Variant { enum_name: _, variant, payload, .. } = &branch.pattern
+    else {
+        return;
+    };
+    let NativeType::Enum(enum_id) = subject_type else { return };
+    let Some(variant_layout) = layouts.enum_variant(enum_id, variant) else { return };
+    match payload {
+        crate::ast::VariantPayload::Positional(items) => {
+            for (index, item) in items.iter().enumerate() {
+                let Some(field) = variant_layout.fields.get(index) else { continue };
+                insert_payload_type(types, &item.name, field.ty);
+            }
+        }
+        crate::ast::VariantPayload::Named(items) => {
+            for item in items {
+                let Some(field) = variant_layout
+                    .fields
+                    .iter()
+                    .find(|field| field.name.as_deref() == Some(item.name.as_str()))
+                else {
+                    continue;
+                };
+                insert_payload_type(types, &item.binding.name, field.ty);
+            }
+        }
+        crate::ast::VariantPayload::Unit => {}
+    }
+}
+
+fn insert_payload_type<'a>(
+    types: &mut HashMap<&'a String, NativeType>,
+    binding: &'a String,
+    ty: NativeType,
+) {
+    if binding != "_" {
+        types.insert(binding, ty);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn bind_payload<'a>(
     function: &mut FunctionBuilder<'_>,
