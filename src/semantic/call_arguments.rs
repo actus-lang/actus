@@ -1,4 +1,6 @@
-use crate::ast::{Argument, DispatchMode, Expr, PrimitiveType, Role, primitive_type};
+use crate::ast::{
+    Argument, DispatchMode, Expr, PrimitiveType, Role, lookup_builtin_type, primitive_type,
+};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -130,7 +132,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let valid = match role {
             Role::Dat => true,
-            Role::Erg => self.is_owner_argument(expression),
+            Role::Erg => self.is_active_owner_argument(expression),
             Role::Abs => self.is_borrow_argument(expression),
             Role::Ins => self.is_exclusive_owner(expression),
         };
@@ -157,6 +159,19 @@ impl Analyzer {
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
             && matches!(self.model.bindings[index].access, AccessState::Mutable);
         owner
+            && (!matches!(expression, Expr::FieldAccess { .. })
+                || self.expression_type(expression).is_some())
+    }
+
+    fn is_active_owner_argument(&self, expression: &Expr) -> bool {
+        let Some(index) = self.root_binding_index(expression) else { return false };
+        let role_allowed = matches!(self.model.bindings[index].role, Role::Erg | Role::Dat)
+            || (self.model.bindings[index].role == Role::Ins
+                && matches!(expression, Expr::FieldAccess { .. })
+                && self.expression_type_name(expression).is_some_and(|name| is_scalar_name(&name)));
+        role_allowed
+            && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
+            && matches!(self.model.bindings[index].access, AccessState::Mutable)
             && (!matches!(expression, Expr::FieldAccess { .. })
                 || self.expression_type(expression).is_some())
     }
@@ -204,6 +219,20 @@ impl Analyzer {
         };
         self.binding(name, *span).ok()
     }
+}
+
+fn is_scalar_name(name: &str) -> bool {
+    matches!(
+        lookup_builtin_type(name),
+        Some(
+            crate::ast::BuiltinType::Int
+                | crate::ast::BuiltinType::Bool
+                | crate::ast::BuiltinType::String
+        )
+    ) || matches!(
+        primitive_type(name),
+        Some(PrimitiveType::Integer { .. } | PrimitiveType::Float { .. })
+    )
 }
 
 fn argument_type_matches(expected: &str, found: &str, expression: &Expr) -> bool {

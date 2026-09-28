@@ -107,6 +107,7 @@ fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
         SemanticErrorKind::SuspendedAccess { .. } => "E1064",
         SemanticErrorKind::ExclusiveLoanAlias { .. } => "E1065",
+        SemanticErrorKind::EscapingLoan { .. } => "E1082",
         _ => return None,
     })
 }
@@ -209,6 +210,9 @@ fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::BorrowedReturn { name } => {
             format!("borrow `{name}` cannot escape its scope")
+        }
+        SemanticErrorKind::EscapingLoan { name } => {
+            format!("exclusive loan `{name}` cannot escape its call scope")
         }
         SemanticErrorKind::InvalidOwnerInitializer { name } => {
             format!("invalid owner initializer `{name}`")

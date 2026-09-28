@@ -39,6 +39,7 @@ impl Analyzer {
         };
         let index = self.binding(name, *span)?;
         self.ensure_access_available(index, name, *span)?;
+        self.reject_ins_return(index, name, *span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::BorrowedReturn { name: name.clone() },
@@ -59,6 +60,18 @@ impl Analyzer {
         }
         self.plan_return_unwind(statement_span);
         Ok(())
+    }
+
+    fn reject_ins_return(
+        &self,
+        index: usize,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.model.bindings[index].role != Role::Ins {
+            return Ok(());
+        }
+        Err(SemanticError { kind: SemanticErrorKind::EscapingLoan { name: name.to_owned() }, span })
     }
 
     fn validate_return_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {

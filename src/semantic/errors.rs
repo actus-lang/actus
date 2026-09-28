@@ -77,6 +77,9 @@ pub enum SemanticErrorKind {
     BorrowedReturn {
         name: String,
     },
+    EscapingLoan {
+        name: String,
+    },
     InvalidOwnerInitializer {
         name: String,
     },

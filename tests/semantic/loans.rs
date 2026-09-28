@@ -94,6 +94,54 @@ fn rejects_duplicate_ins_and_ins_abs_aliases() {
 }
 
 #[test]
+fn rejects_ins_loan_escape_through_owner_initialization_and_return() {
+    let initialized = analyze_source("verb broken(ins input: Buffer) { erg stored = input; }")
+        .expect_err("an ins loan must not initialize an escaping owner");
+    assert!(matches!(
+        initialized.kind,
+        SemanticErrorKind::EscapingLoan { ref name } if name == "input"
+    ));
+
+    let returned = analyze_source("verb broken(ins input: Buffer) -> Buffer { return input; }")
+        .expect_err("an ins loan must not escape through a return");
+    assert!(matches!(
+        returned.kind,
+        SemanticErrorKind::EscapingLoan { ref name } if name == "input"
+    ));
+    assert_eq!(actus::diagnostics::semantic_diagnostic(&returned).code(), "E1082");
+}
+
+#[test]
+fn rejects_ins_loan_as_owner_or_dat_transfer_argument() {
+    let owner = analyze_source(
+        "verb accept(erg input: Buffer) { } verb main() { erg buffer = Buffer[1]; accept(input: ins buffer); }",
+    )
+    .expect_err("an ins loan must not become an erg argument");
+    assert!(matches!(
+        owner.kind,
+        SemanticErrorKind::InvalidArgumentRole { parameter, .. } if parameter == "input"
+    ));
+
+    let transfer = analyze_source(
+        "verb consume(dat input: Buffer) { } verb main(ins buffer: Buffer) { consume(input: buffer); }",
+    )
+    .expect_err("an ins loan must not become a dat transfer");
+    assert!(matches!(
+        transfer.kind,
+        SemanticErrorKind::EscapingLoan { name } if name == "buffer"
+    ));
+
+    let field_transfer = analyze_source(
+        "struct Holder { erg payload: Buffer, } verb consume(dat input: Buffer) { } verb main(ins holder: Holder) { consume(input: holder.payload); }",
+    )
+    .expect_err("an ins loan field must not become a dat transfer");
+    assert!(matches!(
+        field_transfer.kind,
+        SemanticErrorKind::EscapingLoan { name } if name == "holder"
+    ));
+}
+
+#[test]
 fn assigns_deterministic_loan_ids_and_resumes_each_call_once() {
     let model = analyze_source(
         "verb mutate(ins buffer: Buffer) { } verb main() { erg first = Buffer[1]; erg second = Buffer[1]; mutate(buffer: ins first); mutate(buffer: ins second); inspect(view: abs first); inspect(view: abs second); }",

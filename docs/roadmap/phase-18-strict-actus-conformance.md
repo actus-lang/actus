@@ -206,22 +206,22 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.5: Ownership, type, and exhaustiveness strictness
 
-- [ ] Validate `erg` as the active mutable owner and reject unauthorized
+- [x] Validate `erg` as the active mutable owner and reject unauthorized
       mutation through `abs`, `dat`, or `ins` bindings.
-- [ ] Validate `abs` as a read-only, non-owning view with non-escaping lifetime
+- [x] Validate `abs` as a read-only, non-owning view with non-escaping lifetime
       propagation.
-- [ ] Validate `dat` as terminal ownership transfer and reject post-transfer
+- [x] Validate `dat` as terminal ownership transfer and reject post-transfer
       use, double transfer, or invalid restoration.
-- [ ] Validate `ins` as an exclusive call-scope loan and reject aliasing,
-      escaping, and invalid concurrent access.
-- [ ] Reject use-after-move, use-after-drop, double-drop, invalid mutation, and
+- [x] Validate `ins` as an exclusive call-scope loan and reject aliasing,
+      escaping, and invalid concurrent access; escaping loans use `E1082`.
+- [x] Reject use-after-move, use-after-drop, double-drop, invalid mutation, and
       cleanup-order violations.
-- [ ] Enforce single-origin rules for borrowed views across returns, fields,
+- [x] Enforce single-origin rules for borrowed views across returns, fields,
       iterators, arenas, and C-ABI boundaries.
-- [ ] Require exhaustive `case` and `match` handling without silent defaults.
-- [ ] Add negative tests for every ownership transition and every Result/Option
-      branch that affects cleanup.
-- [ ] Verify deterministic LIFO cleanup on success, error, early return, loop
+- [x] Require exhaustive `case` and `match` handling without silent defaults.
+- [x] Add negative tests for every ownership transition and every Result/Option
+      branch that affects cleanup across the semantic and native suites.
+- [x] Verify deterministic LIFO cleanup on success, error, early return, loop
       exit, and `?` propagation.
 
 ## Gate 18.6: Module facades and architectural boundaries

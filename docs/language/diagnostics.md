@@ -14,6 +14,7 @@ edition.
 | `E1034`–`E1035` | Struct mutation and field borrow conflicts |
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enum patterns, roles, generics, packs, and arenas |
+| `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
 | `E1100`–`E1103` | Module path validation, facade discovery, and module I/O |
 | `E1104` | Unknown sibling referenced by a module facade |
 | `E1105` | Module source read failure or defensive module-source fallback |

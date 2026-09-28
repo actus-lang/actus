@@ -56,7 +56,7 @@ ordering, or exit status.
 
 Known implementation-specific entries that require continued catalog review
 include malformed generic-name handling (`E1080`), duplicate packed-layout
-handling (`E1081`), and strict empty-enum validation (`E1810`). The next
+handling (`E1081`), escaping exclusive loans (`E1082`), and strict empty-enum validation (`E1810`). The next
 catalog pass must verify that each such entry has one documented meaning, one
 renderer mapping, and an accepted or rejected fixture.
 
