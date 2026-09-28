@@ -1,3 +1,4 @@
+use super::super::contract::{ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
 use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
 use super::path_bridge::{with_host_path, with_host_paths};
@@ -14,14 +15,14 @@ pub unsafe extern "C" fn actus_file_metadata_buffer(
     output: *mut ActusMetadata,
 ) -> i32 {
     if path.is_null() || output.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let path = unsafe { &*path };
     if path.length > 0 && path.data.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let bytes = unsafe { buffer_bytes(path) };
-    let Ok(metadata) = host_path(bytes).metadata() else { return -1 };
+    let Ok(metadata) = host_path(bytes).metadata() else { return ABI_STATUS_FAILURE };
     unsafe { write_metadata(output, &metadata) }
 }
 
@@ -36,12 +37,12 @@ pub unsafe extern "C" fn actus_file_metadata_path(
     output: *mut ActusMetadata,
 ) -> i32 {
     if output.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let result = unsafe { with_host_path(path, |native| native.metadata()) };
     match result {
         Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
-        _ => -1,
+        _ => ABI_STATUS_FAILURE,
     }
 }
 
@@ -55,10 +56,12 @@ pub unsafe extern "C" fn actus_file_metadata_handle_buffer(
     output: *mut ActusMetadata,
 ) -> i32 {
     if output.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     with_file(actus_handle(handle), |file| {
-        file.metadata().map_or(-1, |metadata| unsafe { write_metadata(output, &metadata) }) as i64
+        file.metadata().map_or(ABI_STATUS_FAILURE as i64, |metadata| unsafe {
+            write_metadata(output, &metadata) as i64
+        })
     }) as i32
 }
 
@@ -79,7 +82,7 @@ pub unsafe extern "C" fn actus_file_remove_buffer(path: BufferHandle) -> i32 {
 pub unsafe extern "C" fn actus_file_remove_path(path: *const ActusPath) -> i32 {
     unsafe { with_host_path(path, |value| std::fs::remove_file(value)) }
         .and_then(Result::ok)
-        .map_or(-1, |_| 0)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
 /// Renames a path using the host filesystem's atomic rename operation.
@@ -104,7 +107,7 @@ pub unsafe extern "C" fn actus_file_rename_path(
 ) -> i32 {
     unsafe { with_host_paths(from, to, |source, destination| std::fs::rename(source, destination)) }
         .and_then(Result::ok)
-        .map_or(-1, |_| 0)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
 /// Copies a file and returns the number of copied bytes, or `-1` on failure.
@@ -126,7 +129,7 @@ pub unsafe extern "C" fn actus_file_copy_buffer(from: BufferHandle, to: BufferHa
 pub unsafe extern "C" fn actus_file_copy_path(from: *const ActusPath, to: *const ActusPath) -> i32 {
     unsafe { with_host_paths(from, to, |source, destination| std::fs::copy(source, destination)) }
         .and_then(Result::ok)
-        .map_or(-1, |count| i32::try_from(count).unwrap_or(-1))
+        .map_or(ABI_STATUS_FAILURE, |count| i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE))
 }
 
 /// Creates one directory at the requested path.
@@ -146,7 +149,7 @@ pub unsafe extern "C" fn actus_file_create_dir_buffer(path: BufferHandle) -> i32
 pub unsafe extern "C" fn actus_file_create_dir_path(path: *const ActusPath) -> i32 {
     unsafe { with_host_path(path, |value| std::fs::create_dir(value)) }
         .and_then(Result::ok)
-        .map_or(-1, |_| 0)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
 /// Removes one empty directory at the requested path.
@@ -166,7 +169,7 @@ pub unsafe extern "C" fn actus_file_remove_dir_buffer(path: BufferHandle) -> i32
 pub unsafe extern "C" fn actus_file_remove_dir_path(path: *const ActusPath) -> i32 {
     unsafe { with_host_path(path, |value| std::fs::remove_dir(value)) }
         .and_then(Result::ok)
-        .map_or(-1, |_| 0)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
 unsafe fn buffer_bytes(buffer: &super::super::types::ActusBuffer) -> &[u8] {
@@ -193,7 +196,7 @@ fn host_path(bytes: &[u8]) -> std::path::PathBuf {
 }
 
 unsafe fn write_metadata(output: *mut ActusMetadata, metadata: &std::fs::Metadata) -> i32 {
-    let Ok(size) = i32::try_from(metadata.len()) else { return -1 };
+    let Ok(size) = i32::try_from(metadata.len()) else { return ABI_STATUS_FAILURE };
     unsafe {
         *output = ActusMetadata {
             size,
@@ -202,7 +205,7 @@ unsafe fn write_metadata(output: *mut ActusMetadata, metadata: &std::fs::Metadat
             readonly: i32::from(metadata.permissions().readonly()),
         };
     }
-    0
+    ABI_STATUS_SUCCESS
 }
 
 unsafe fn path_operation<F>(path: BufferHandle, operation: F) -> i32
@@ -210,29 +213,31 @@ where
     F: FnOnce(&std::path::Path) -> std::io::Result<()>,
 {
     if path.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
     let path = unsafe { &*path };
     if path.length > 0 && path.data.is_null() {
-        return -1;
+        return ABI_STATUS_FAILURE;
     }
-    operation(&host_path(unsafe { buffer_bytes(path) })).map_or(-1, |_| 0)
+    operation(&host_path(unsafe { buffer_bytes(path) }))
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
 unsafe fn two_path_operation<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
 where
     F: FnOnce(&std::path::Path, &std::path::Path) -> std::io::Result<()>,
 {
-    let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return -1 };
-    operation(&from, &to).map_or(-1, |_| 0)
+    let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return ABI_STATUS_FAILURE };
+    operation(&from, &to).map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
 unsafe fn two_path_operation_value<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
 where
     F: FnOnce(&std::path::Path, &std::path::Path) -> std::io::Result<u64>,
 {
-    let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return -1 };
-    operation(&from, &to).map_or(-1, |count| i32::try_from(count).unwrap_or(-1))
+    let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return ABI_STATUS_FAILURE };
+    operation(&from, &to)
+        .map_or(ABI_STATUS_FAILURE, |count| i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE))
 }
 
 unsafe fn path_pair(

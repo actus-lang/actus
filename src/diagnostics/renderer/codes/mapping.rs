@@ -22,6 +22,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::UnknownKeyword => "E0009",
         ParseErrorCode::UnknownMetadata => "E0006",
         ParseErrorCode::UnsupportedTargetPlatform => "E0007",
+        ParseErrorCode::ConflictingTargetPlatforms => "E0010",
         ParseErrorCode::MetadataTargetNotAllowed => "E0008",
     }
 }

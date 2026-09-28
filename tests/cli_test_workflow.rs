@@ -23,6 +23,22 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
 
 #[cfg(unix)]
 #[test]
+fn test_isolates_child_output_from_deterministic_runner_report() {
+    let root = create_test_project(
+        "runner-output",
+        "noisy.act",
+        "meta test\nverb noisy() -> Int { print(0); return 0; }\n",
+    );
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert_eq!(stdout.lines().filter(|line| *line == "0").count(), 0, "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_reports_target_filtered_counts_deterministically() {
     let root = create_test_project(
         "runner-targets",

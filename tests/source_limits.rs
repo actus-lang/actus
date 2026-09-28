@@ -1,7 +1,9 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use actus::conformance::{
-    SourceLimitPolicy, inspect_source_tree, source_limit_diagnostics, source_paths,
+    SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_tree, source_limit_diagnostics,
+    source_paths, validate_source_exception_manifest,
 };
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
 
@@ -60,6 +62,34 @@ fn actus_verbs_use_the_same_function_contract() {
 fn short_sources_have_no_limit_diagnostics() {
     let source = "verb main() { return; }\n";
     assert!(source_limit_diagnostics(Path::new("main.act"), source, policy()).is_empty());
+}
+
+#[test]
+fn source_local_limit_suppression_is_rejected() {
+    let source = "// actus: allow(source-limit)\nverb main() { return; }\n";
+    let diagnostics = source_limit_diagnostics(Path::new("main.act"), source, policy());
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1856"));
+}
+
+#[test]
+fn rust_logic_in_library_fixture_tree_is_rejected() {
+    let root = std::env::temp_dir().join(format!("actus-fixture-policy-{}", std::process::id()));
+    let fixture = root.join("tests/library/embedded.rs");
+    fs::create_dir_all(fixture.parent().expect("fixture parent should exist"))
+        .expect("fixture directory should be created");
+    fs::write(&fixture, "fn hidden_test() {}\n").expect("fixture should be written");
+    let diagnostics = fixture_tree_diagnostics(&root).expect("fixture tree should be scanned");
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code(), "E1834");
+    fs::remove_dir_all(root).expect("fixture tree should be removed");
+}
+
+#[test]
+fn source_exception_manifest_requires_review_fields() {
+    let valid = "version = 1\n[[exceptions]]\npath = \"tests/fixture.act\"\ncategory = \"tabular\"\nowner = \"compiler-team\"\nscope = \"fixture only\"\nreason = \"generated compatibility table\"\nreplacement_plan = \"split before Phase 19\"\n";
+    assert!(validate_source_exception_manifest(valid).is_ok());
+    let invalid = "version = 1\n[[exceptions]]\npath = \"tests/fixture.act\"\ncategory = \"manual\"\nowner = \"team\"\nscope = \"fixture\"\nreason = \"reason\"\nreplacement_plan = \"plan\"\n";
+    assert!(validate_source_exception_manifest(invalid).is_err());
 }
 
 #[test]

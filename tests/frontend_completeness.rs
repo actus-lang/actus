@@ -46,6 +46,12 @@ fn parser_declaration_and_metadata_rules_have_positive_and_negative_fixtures() {
     assert_eq!(unknown_target.code, ParseErrorCode::UnsupportedTargetPlatform);
     assert_eq!(parse_diagnostic(&unknown_target).code(), "E0007");
 
+    let conflicting_targets =
+        parse_source("meta target(\"unix\") meta target(\"windows\") verb main() { return 0; }")
+            .expect_err("conflicting targets should be rejected");
+    assert_eq!(conflicting_targets.code, ParseErrorCode::ConflictingTargetPlatforms);
+    assert_eq!(parse_diagnostic(&conflicting_targets).code(), "E0010");
+
     let invalid_target =
         parse_source("meta test struct Packet { byte: Int, }").expect_err("metadata on a struct");
     assert_eq!(invalid_target.code, ParseErrorCode::MetadataTargetNotAllowed);

@@ -58,6 +58,20 @@ fn rejects_unknown_target_metadata() {
 }
 
 #[test]
+fn rejects_conflicting_target_metadata() {
+    let (tokens, errors) =
+        scan("meta target(\"unix\") meta target(\"windows\") verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("conflicting targets should be rejected");
+    assert_eq!(error.code, ParseErrorCode::ConflictingTargetPlatforms);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::ConflictingTargetPlatforms { first, second }
+            if first == "unix" && second == "windows"
+    ));
+}
+
+#[test]
 fn rejects_unknown_metadata_attributes() {
     let (tokens, errors) = scan("meta experimental verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

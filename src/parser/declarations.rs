@@ -30,9 +30,37 @@ impl Parser {
     fn parse_metadata_group(&mut self) -> Result<Vec<crate::ast::MetaAttribute>, ParseError> {
         let mut metadata = Vec::new();
         while self.check_simple(&TokenKind::Meta) {
-            metadata.extend(self.parse_metadata()?);
+            let metadata_start = self.peek().map_or(0, |token| token.span.start);
+            let parsed = self.parse_metadata()?;
+            self.reject_conflicting_targets(&metadata, &parsed, metadata_start)?;
+            metadata.extend(parsed);
         }
         Ok(metadata)
+    }
+
+    fn reject_conflicting_targets(
+        &self,
+        existing: &[crate::ast::MetaAttribute],
+        parsed: &[crate::ast::MetaAttribute],
+        span: usize,
+    ) -> Result<(), ParseError> {
+        let Some(first) = existing.iter().find_map(target_selector) else {
+            return Ok(());
+        };
+        let Some(second) = parsed.iter().find_map(target_selector) else {
+            return Ok(());
+        };
+        if first == second {
+            return Ok(());
+        }
+        Err(ParseError {
+            code: ParseErrorCode::ConflictingTargetPlatforms,
+            kind: ParseErrorKind::ConflictingTargetPlatforms {
+                first: first.to_owned(),
+                second: second.to_owned(),
+            },
+            span: SourceSpan::new(span, span),
+        })
     }
 
     fn parse_keyword_declaration(
@@ -264,5 +292,12 @@ impl Parser {
         let return_type = self.parse_return_type()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(ExternalVerbSignature { name, generic_parameters, params, return_type, end })
+    }
+}
+
+fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
+    match attribute {
+        crate::ast::MetaAttribute::Target(selector) => Some(selector),
+        crate::ast::MetaAttribute::Test => None,
     }
 }

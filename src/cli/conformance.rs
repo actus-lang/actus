@@ -37,6 +37,19 @@ pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i3
             return 1;
         }
     };
+    if mode.is_strict() {
+        let root = match env::current_dir() {
+            Ok(root) => root,
+            Err(error) => {
+                eprintln!("error: cannot determine repository root: {error}");
+                return 1;
+            }
+        };
+        if let Err(error) = crate::conformance::validate_repository_source_exceptions(&root) {
+            eprintln!("error: {error}");
+            return 1;
+        }
+    }
     let diagnostics_count = match scan_conformance_paths(&paths) {
         Ok(count) => count,
         Err(error) => {
@@ -72,6 +85,16 @@ fn scan_conformance_paths(paths: &[PathBuf]) -> Result<usize, String> {
         if !diagnostics.is_empty() {
             report_diagnostics(path, &source, diagnostics);
         }
+    }
+    let root =
+        env::current_dir().map_err(|error| format!("cannot determine repository root: {error}"))?;
+    for diagnostic in crate::conformance::fixture_tree_diagnostics(&root)
+        .map_err(|error| format!("cannot scan Actus fixture tree: {error}"))?
+    {
+        diagnostics_count += 1;
+        let source_path =
+            diagnostic.source_path().map(str::to_owned).unwrap_or_else(|| "<unknown>".to_owned());
+        report_diagnostics(Path::new(&source_path), "", vec![diagnostic]);
     }
     Ok(diagnostics_count)
 }

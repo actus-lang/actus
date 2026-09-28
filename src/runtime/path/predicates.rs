@@ -1,3 +1,4 @@
+use super::super::contract::ABI_STATUS_FAILURE;
 use super::{ActusPath, path_length, path_units};
 
 #[unsafe(no_mangle)]
@@ -6,7 +7,7 @@ use super::{ActusPath, path_length, path_units};
 /// # Safety
 /// `path` must be null or a valid `ActusPath` with live storage.
 pub unsafe extern "C" fn actus_path_is_absolute(path: *const ActusPath) -> i32 {
-    let Ok((_, platform)) = (unsafe { path_units(path) }) else { return -1 };
+    let Ok((_, platform)) = (unsafe { path_units(path) }) else { return ABI_STATUS_FAILURE };
     let kind = if platform == 0 {
         unsafe { super::actus_posix_root_kind(path) }
     } else {
@@ -23,7 +24,7 @@ pub unsafe extern "C" fn actus_path_is_absolute(path: *const ActusPath) -> i32 {
 /// `path` must be null or a valid `ActusPath` with live storage.
 pub unsafe extern "C" fn actus_path_is_relative(path: *const ActusPath) -> i32 {
     let absolute = unsafe { actus_path_is_absolute(path) };
-    if absolute < 0 { -1 } else { i32::from(absolute == 0) }
+    if absolute < 0 { ABI_STATUS_FAILURE } else { i32::from(absolute == 0) }
 }
 
 #[unsafe(no_mangle)]
@@ -32,7 +33,7 @@ pub unsafe extern "C" fn actus_path_is_relative(path: *const ActusPath) -> i32 {
 /// # Safety
 /// `path` must be null or a valid `ActusPath` with live storage.
 pub unsafe extern "C" fn actus_path_has_root(path: *const ActusPath) -> i32 {
-    let Ok((_, platform)) = (unsafe { path_units(path) }) else { return -1 };
+    let Ok((_, platform)) = (unsafe { path_units(path) }) else { return ABI_STATUS_FAILURE };
     let kind = if platform == 0 {
         unsafe { super::actus_posix_root_kind(path) }
     } else {
@@ -66,8 +67,12 @@ pub unsafe extern "C" fn actus_path_ends_with(
 }
 
 unsafe fn compare_components(path: *const ActusPath, other: *const ActusPath, ending: bool) -> i32 {
-    let Ok((path_buffer, path_platform)) = (unsafe { path_units(path) }) else { return -1 };
-    let Ok((other_buffer, other_platform)) = (unsafe { path_units(other) }) else { return -1 };
+    let Ok((path_buffer, path_platform)) = (unsafe { path_units(path) }) else {
+        return ABI_STATUS_FAILURE;
+    };
+    let Ok((other_buffer, other_platform)) = (unsafe { path_units(other) }) else {
+        return ABI_STATUS_FAILURE;
+    };
     if path_platform != other_platform {
         return 0;
     }
