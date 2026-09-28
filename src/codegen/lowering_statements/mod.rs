@@ -168,7 +168,7 @@ fn lower_owner_value(
             super::super::expression_literals::lower_float_as(
                 function,
                 value,
-                layouts.ir_type(NativeType::Float { width }),
+                layouts.ir_type(NativeType::Float { width })?,
             )?
         }
         _ => lower_expression(
@@ -182,13 +182,15 @@ fn lower_owner_value(
             layouts,
         )?,
     };
-    Ok(declared_native.map_or(value, |declared| {
-        super::super::expression_literals::coerce_to_ir_type(
+    let value = match declared_native {
+        Some(declared) => super::super::expression_literals::coerce_to_ir_type(
             function,
             value,
-            layouts.ir_type(declared),
-        )
-    }))
+            layouts.ir_type(declared)?,
+        ),
+        None => value,
+    };
+    Ok(value)
 }
 
 fn lower_arena_declaration(

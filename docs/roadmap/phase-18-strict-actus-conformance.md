@@ -157,6 +157,8 @@ behavior around the existing language and runtime contracts.
 - [x] Propagate unresolved native expression, binding, signature, vtable, and
       performance target types as codegen errors instead of silently
       substituting `Int`.
+- [x] Reject missing packed layouts during native IR type resolution instead
+      of silently substituting a scalar machine type.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.

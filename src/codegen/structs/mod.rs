@@ -165,7 +165,7 @@ pub(super) fn lower_field_access(
         return Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)));
     }
     Ok(function.ins().load(
-        layouts.ir_type(field_layout.ty),
+        layouts.ir_type(field_layout.ty)?,
         MemFlagsData::new(),
         address,
         field_layout.offset as i32,

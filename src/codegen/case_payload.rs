@@ -196,7 +196,7 @@ fn load_payload_binding<'a>(
     let address = function.ins().iadd_imm_s(subject, i64::from(payload_offset + field.offset));
     let value = match field.ty {
         NativeType::Struct(_) | NativeType::Enum(_) => address,
-        _ => function.ins().load(layouts.ir_type(field.ty), MemFlagsData::new(), address, 0),
+        _ => function.ins().load(layouts.ir_type(field.ty)?, MemFlagsData::new(), address, 0),
     };
     let key = branch_binding(branch, binding)
         .ok_or_else(|| NativeEmitError("missing case binding".to_owned()))?;

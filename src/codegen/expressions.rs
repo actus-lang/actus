@@ -261,7 +261,7 @@ fn emit_try_control_flow(
     let ok_block = function.create_block();
     let err_block = function.create_block();
     let merge = function.create_block();
-    function.append_block_param(merge, try_payload_ir_type(field_type, layouts));
+    function.append_block_param(merge, try_payload_ir_type(field_type, layouts)?);
     function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
 
     function.switch_to_block(err_block);
@@ -293,7 +293,7 @@ fn load_try_payload(
             Ok(function.ins().load(types::I32, MemFlagsData::new(), payload_address, 0))
         }
         NativeType::Integer { width, .. } => Ok(function.ins().load(
-            layouts.ir_type(NativeType::Integer { signed: false, width }),
+            layouts.ir_type(NativeType::Integer { signed: false, width })?,
             MemFlagsData::new(),
             payload_address,
             0,
@@ -303,14 +303,14 @@ fn load_try_payload(
                 .pack(id)
                 .ok_or_else(|| NativeEmitError("missing packed payload layout".to_owned()))?;
             Ok(function.ins().load(
-                layouts.ir_type(pack.storage),
+                layouts.ir_type(pack.storage)?,
                 MemFlagsData::new(),
                 payload_address,
                 0,
             ))
         }
         NativeType::Float { width } => Ok(function.ins().load(
-            layouts.ir_type(NativeType::Float { width }),
+            layouts.ir_type(NativeType::Float { width })?,
             MemFlagsData::new(),
             payload_address,
             0,
@@ -328,8 +328,12 @@ fn load_try_payload(
 fn try_payload_ir_type(
     field_type: NativeType,
     layouts: &LayoutRegistry,
-) -> cranelift_codegen::ir::Type {
-    if matches!(field_type, NativeType::Void) { types::I32 } else { layouts.ir_type(field_type) }
+) -> Result<cranelift_codegen::ir::Type, NativeEmitError> {
+    if matches!(field_type, NativeType::Void) {
+        Ok(types::I32)
+    } else {
+        layouts.ir_type(field_type)
+    }
 }
 
 pub(super) fn initializer_type(

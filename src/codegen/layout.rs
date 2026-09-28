@@ -148,14 +148,14 @@ impl LayoutRegistry {
         self.pack_ids.get(name).copied()
     }
 
-    pub(super) fn ir_type(&self, ty: NativeType) -> Type {
+    pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, NativeEmitError> {
         match ty {
             NativeType::Pack(id) => self
                 .pack(id)
-                .map(|pack| self.ir_type(pack.storage))
-                .unwrap_or(cranelift_codegen::ir::types::I32),
-            NativeType::Arena(_) => self.pointer_type,
-            _ => ty.ir_type(self.pointer_type),
+                .ok_or_else(|| NativeEmitError(format!("missing packed layout `{id}`")))
+                .and_then(|pack| self.ir_type(pack.storage)),
+            NativeType::Arena(_) => Ok(self.pointer_type),
+            _ => Ok(ty.ir_type(self.pointer_type)),
         }
     }
 

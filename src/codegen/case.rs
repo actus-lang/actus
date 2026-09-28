@@ -38,7 +38,7 @@ pub(super) fn lower_case(
     let merge = function.create_block();
     let subject_type = initializer_type(subject, local_types, functions, layouts)?;
     let result_type = branch_type(branches, subject_type, local_types, functions, layouts)?;
-    function.append_block_param(merge, layouts.ir_type(result_type));
+    function.append_block_param(merge, layouts.ir_type(result_type)?);
     emit_case_branches(
         function,
         branches,
@@ -81,7 +81,7 @@ fn emit_case_branches(
         let condition =
             match_pattern(function, subject_value, subject_type, &branch.pattern, layouts)?;
         if following == merge {
-            let fallback = function.ins().iconst(layouts.ir_type(result_type), 0);
+            let fallback = function.ins().iconst(layouts.ir_type(result_type)?, 0);
             let fallback_arg = cranelift_codegen::ir::BlockArg::Value(fallback);
             function.ins().brif(condition, matched, &[], following, [&fallback_arg]);
         } else {
@@ -243,7 +243,7 @@ fn lower_case_branch<'a>(
             layouts,
         )?;
         let body = function.create_block();
-        emit_guard_branch(function, condition, body, following, merge, result_type, layouts);
+        emit_guard_branch(function, condition, body, following, merge, result_type, layouts)?;
         function.seal_block(function.current_block().expect("guard block is active"));
         function.switch_to_block(body);
         let branch_value = lower_case_body(
@@ -279,14 +279,15 @@ fn emit_guard_branch(
     merge: cranelift_codegen::ir::Block,
     result_type: NativeType,
     layouts: &LayoutRegistry,
-) {
+) -> Result<(), NativeEmitError> {
     if following == merge {
-        let fallback = function.ins().iconst(layouts.ir_type(result_type), 0);
+        let fallback = function.ins().iconst(layouts.ir_type(result_type)?, 0);
         let fallback_arg = cranelift_codegen::ir::BlockArg::Value(fallback);
         function.ins().brif(condition, body, &[], following, [&fallback_arg]);
     } else {
         function.ins().brif(condition, body, &[], following, &[]);
     }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -326,7 +327,7 @@ fn lower_case_body<'a>(
                 function.ins().return_(&[value]);
                 return Ok(None);
             }
-            Flow::Fallthrough => function.ins().iconst(layouts.ir_type(result_type), 0),
+            Flow::Fallthrough => function.ins().iconst(layouts.ir_type(result_type)?, 0),
             Flow::VoidReturn => {
                 function.ins().return_(&[]);
                 return Ok(None);
