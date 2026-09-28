@@ -81,7 +81,7 @@ pub fn validate_windows(units: &[u16]) -> Result<(), PathErrorCode> {
     validate_windows_units(units.iter().copied())
 }
 
-fn validate_windows_units<I>(units: I) -> Result<(), PathErrorCode>
+pub(crate) fn validate_windows_units<I>(units: I) -> Result<(), PathErrorCode>
 where
     I: Iterator<Item = u16>,
 {

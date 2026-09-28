@@ -1,6 +1,8 @@
 use actus::runtime::{
-    ActusBuffer, ActusPath, PathErrorCode, PosixRoot, WindowsRoot, actus_path_ends_with,
-    actus_path_has_root, actus_path_is_absolute, actus_path_is_relative, actus_path_normalize,
+    ActusBuffer, ActusPath, ActusPathComponent, ActusPathComponents, PathErrorCode, PosixRoot,
+    WindowsRoot, actus_path_components, actus_path_ends_with, actus_path_extension,
+    actus_path_file_name, actus_path_file_stem, actus_path_has_root, actus_path_is_absolute,
+    actus_path_is_relative, actus_path_next_component, actus_path_normalize, actus_path_parent,
     actus_path_starts_with, actus_posix_is_separator, actus_posix_root_kind,
     actus_windows_is_separator, actus_windows_root_kind, components, extension, file_name,
     file_stem, posix_root, validate_posix, validate_windows, windows_root,
@@ -71,6 +73,100 @@ fn component_iterator_is_borrowed_and_platform_aware() {
     );
     assert_eq!(actus_posix_is_separator(47), 1);
     assert_eq!(actus_windows_is_separator(92), 1);
+}
+
+#[test]
+fn c_abi_component_writers_use_caller_slots_and_source_offsets() {
+    let (storage, mut buffer) = bytes_buffer(b"/usr/archive.tar.gz\0");
+    let path = ActusPath {
+        storage: &mut buffer,
+        platform: 0,
+        length: 19,
+        capacity: storage.capacity() as i32,
+        terminated: 1,
+    };
+    let mut component = ActusPathComponent { source: std::ptr::null(), offset: 0, length: 0 };
+    assert!(std::ptr::eq(unsafe { actus_path_parent(&mut component, &path) }, &component));
+    assert_eq!((component.offset, component.length), (1, 3));
+    assert!(std::ptr::eq(component.source, &path));
+    assert!(std::ptr::eq(unsafe { actus_path_file_name(&mut component, &path) }, &component));
+    assert_eq!((component.offset, component.length), (5, 14));
+    assert!(std::ptr::eq(unsafe { actus_path_file_stem(&mut component, &path) }, &component));
+    assert_eq!((component.offset, component.length), (5, 11));
+    assert!(std::ptr::eq(unsafe { actus_path_extension(&mut component, &path) }, &component));
+    assert_eq!((component.offset, component.length), (17, 2));
+
+    let mut iterator = ActusPathComponents { source: std::ptr::null(), offset: 0, limit: 0 };
+    unsafe { actus_path_components(&mut iterator, &path) };
+    assert!(std::ptr::eq(iterator.source, &path));
+    assert_eq!(iterator.limit, 19);
+    assert!(std::ptr::eq(
+        unsafe { actus_path_next_component(&mut component, &mut iterator) },
+        &component,
+    ));
+    assert_eq!((component.offset, component.length), (1, 3));
+    assert!(std::ptr::eq(
+        unsafe { actus_path_next_component(&mut component, &mut iterator) },
+        &component,
+    ));
+    assert_eq!((component.offset, component.length), (5, 14));
+    assert!(unsafe { actus_path_next_component(&mut component, &mut iterator) }.is_null());
+    assert_eq!(storage[0], b'/');
+}
+
+#[test]
+fn c_abi_component_writers_handle_windows_units_without_utf8_conversion() {
+    let units = [
+        b'C' as u16,
+        b':' as u16,
+        b'\\' as u16,
+        b'f' as u16,
+        b'o' as u16,
+        b'o' as u16,
+        b'/' as u16,
+        b'b' as u16,
+        b'a' as u16,
+        b'r' as u16,
+        0,
+    ];
+    let (storage, mut buffer) = units_buffer(&units);
+    let path = ActusPath {
+        storage: &mut buffer,
+        platform: 1,
+        length: 10,
+        capacity: storage.capacity() as i32,
+        terminated: 1,
+    };
+    let mut component = ActusPathComponent { source: std::ptr::null(), offset: 0, length: 0 };
+    assert!(std::ptr::eq(unsafe { actus_path_file_name(&mut component, &path) }, &component));
+    assert_eq!((component.offset, component.length), (7, 3));
+    assert!(std::ptr::eq(unsafe { actus_path_parent(&mut component, &path) }, &component));
+    assert_eq!((component.offset, component.length), (3, 3));
+}
+
+#[test]
+fn c_abi_component_writers_reject_root_only_and_embedded_null_paths() {
+    let (root_storage, mut root_buffer) = bytes_buffer(b"/\0");
+    let root = ActusPath {
+        storage: &mut root_buffer,
+        platform: 0,
+        length: 1,
+        capacity: root_storage.capacity() as i32,
+        terminated: 1,
+    };
+    let mut component = ActusPathComponent { source: std::ptr::null(), offset: 0, length: 0 };
+    assert!(unsafe { actus_path_parent(&mut component, &root) }.is_null());
+    assert!(unsafe { actus_path_file_name(&mut component, &root) }.is_null());
+
+    let (invalid_storage, mut invalid_buffer) = bytes_buffer(b"a\0b\0");
+    let invalid = ActusPath {
+        storage: &mut invalid_buffer,
+        platform: 0,
+        length: 3,
+        capacity: invalid_storage.capacity() as i32,
+        terminated: 1,
+    };
+    assert!(unsafe { actus_path_file_name(&mut component, &invalid) }.is_null());
 }
 
 #[test]
