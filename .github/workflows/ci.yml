@@ -49,6 +49,7 @@ jobs:
           $vcLinkDirectory = Join-Path $vcToolset.FullName 'bin\Hostx64\x64'
           $msvcLinker = Join-Path $vcLinkDirectory 'link.exe'
           "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ACTUS_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $env:Path = "$vcLinkDirectory;$env:Path"
           "PATH=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $linker = (Get-Command link.exe -ErrorAction Stop).Source
