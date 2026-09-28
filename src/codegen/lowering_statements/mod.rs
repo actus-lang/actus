@@ -122,49 +122,73 @@ fn lower_owner_declaration<'source>(
 ) -> Result<Flow, NativeEmitError> {
     let declared_native = declared_type
         .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)));
-    let native_type =
-        declared_native.unwrap_or_else(|| initializer_type(initializer, types, functions, layouts));
+    let native_type = match declared_native {
+        Some(native_type) => native_type,
+        None => initializer_type(initializer, types, functions, layouts)?,
+    };
     if let NativeType::Arena(capacity) = native_type {
         let address = lower_arena_declaration(function, capacity, layouts)?;
         locals.insert(name, address);
         types.insert(name, native_type);
         return Ok(Flow::Fallthrough);
     }
-    let value =
-        if let (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) =
-            (declared_native, initializer)
-        {
+    let value = lower_owner_value(
+        function,
+        declared_native,
+        initializer,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    locals.insert(name, value);
+    types.insert(name, native_type);
+    Ok(Flow::Fallthrough)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_owner_value(
+    function: &mut FunctionBuilder<'_>,
+    declared_native: Option<NativeType>,
+    initializer: &Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let value = match (declared_native, initializer) {
+        (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
             super::super::expression_literals::lower_wide_integer(function, value)?
-        } else if let (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) =
-            (declared_native, initializer)
-        {
+        }
+        (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) => {
             super::super::expression_literals::lower_float_as(
                 function,
                 value,
                 layouts.ir_type(NativeType::Float { width }),
             )?
-        } else {
-            lower_expression(
-                function,
-                initializer,
-                locals,
-                types,
-                functions,
-                cleanup_schedule,
-                string_data,
-                layouts,
-            )?
-        };
-    let value = declared_native.map_or(value, |declared| {
+        }
+        _ => lower_expression(
+            function,
+            initializer,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?,
+    };
+    Ok(declared_native.map_or(value, |declared| {
         super::super::expression_literals::coerce_to_ir_type(
             function,
             value,
             layouts.ir_type(declared),
         )
-    });
-    locals.insert(name, value);
-    types.insert(name, native_type);
-    Ok(Flow::Fallthrough)
+    }))
 }
 
 fn lower_arena_declaration(

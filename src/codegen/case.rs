@@ -36,8 +36,8 @@ pub(super) fn lower_case(
         layouts,
     )?;
     let merge = function.create_block();
-    let subject_type = initializer_type(subject, local_types, functions, layouts);
-    let result_type = branch_type(branches, subject_type, local_types, functions, layouts);
+    let subject_type = initializer_type(subject, local_types, functions, layouts)?;
+    let result_type = branch_type(branches, subject_type, local_types, functions, layouts)?;
     function.append_block_param(merge, layouts.ir_type(result_type));
     emit_case_branches(
         function,
@@ -124,37 +124,30 @@ fn branch_type(
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> NativeType {
-    let block_types = branches.iter().map(|branch| {
+) -> Result<NativeType, NativeEmitError> {
+    let mut inferred = None;
+    for branch in branches {
         let mut branch_types = local_types.clone();
         add_payload_types(branch, subject_type, &mut branch_types, layouts);
-        match &branch.body {
+        let candidate = match &branch.body {
             CaseBody::Expression(expression) => {
-                Some(initializer_type(expression, &branch_types, functions, layouts))
-            }
-            CaseBody::Block(block) => {
-                block.statements.iter().find_map(|statement| match statement {
-                    crate::ast::Stmt::Return { value: Some(expression), .. } => {
-                        Some(initializer_type(expression, &branch_types, functions, layouts))
-                    }
-                    _ => None,
-                })
-            }
-        }
-    });
-    let mut types = block_types.collect::<Vec<_>>();
-    if types.iter().all(Option::is_some) {
-        return types.remove(0).expect("all case branches have a type");
-    }
-    branches
-        .iter()
-        .find_map(|branch| match &branch.body {
-            CaseBody::Expression(expression) => {
-                Some(initializer_type(expression, local_types, functions, layouts))
+                Some(initializer_type(expression, &branch_types, functions, layouts)?)
             }
             CaseBody::Block(_) => None,
-        })
-        .unwrap_or(NativeType::Int)
+        };
+        if let Some(candidate) = candidate {
+            if let Some(expected) = inferred {
+                if expected != candidate {
+                    return Err(NativeEmitError(
+                        "case branches have different native types".to_owned(),
+                    ));
+                }
+            } else {
+                inferred = Some(candidate);
+            }
+        }
+    }
+    Ok(inferred.unwrap_or(NativeType::Void))
 }
 
 fn match_pattern(

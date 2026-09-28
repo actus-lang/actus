@@ -212,7 +212,7 @@ fn lower_try_expression(
         string_data,
         layouts,
     )?;
-    let NativeType::Enum(enum_id) = initializer_type(expression, local_types, functions, layouts)
+    let NativeType::Enum(enum_id) = initializer_type(expression, local_types, functions, layouts)?
     else {
         return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
     };
@@ -337,38 +337,60 @@ pub(super) fn initializer_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> NativeType {
+) -> Result<NativeType, NativeEmitError> {
     match expression {
-        Expr::Identifier { name, .. } => types.get(name).copied().unwrap_or(NativeType::Int),
-        Expr::BufferLiteral { .. } => NativeType::Buffer,
+        Expr::Identifier { name, .. } => types.get(name).copied().ok_or_else(|| {
+            NativeEmitError(format!("native type for binding `{name}` is unavailable"))
+        }),
+        Expr::Integer { .. } => Ok(NativeType::Int),
+        Expr::BufferLiteral { .. } => Ok(NativeType::Buffer),
+        Expr::FloatLiteral { .. } => Ok(NativeType::Float { width: 64 }),
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             initializer_type(expression, types, functions, layouts)
         }
+        Expr::Unary { expression, .. } => initializer_type(expression, types, functions, layouts),
+        Expr::Binary { left, .. } => initializer_type(left, types, functions, layouts),
+        Expr::StringLiteral { .. } => Ok(NativeType::String),
+        _ => infer_complex_initializer_type(expression, types, functions, layouts),
+    }
+}
+
+fn infer_complex_initializer_type(
+    expression: &Expr,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    match expression {
         Expr::Try { expression, .. } => {
-            let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts)
+            let NativeType::Enum(enum_id) =
+                initializer_type(expression, types, functions, layouts)?
             else {
-                return NativeType::Int;
+                return Err(NativeEmitError("try operand is not a native enum value".to_owned()));
             };
             layouts
                 .enum_variant(enum_id, "Ok")
                 .and_then(|variant| variant.fields.first().map(|field| field.ty))
-                .unwrap_or(NativeType::Int)
+                .ok_or_else(|| NativeEmitError("try operand has no Result.Ok payload".to_owned()))
         }
-        Expr::Call { callee, .. } => {
-            functions.get(callee).map(|function| function.return_type).unwrap_or(NativeType::Int)
-        }
-        Expr::MethodCall { receiver, arguments, .. }
-            if is_arena(receiver, types, functions, layouts) =>
-        {
-            arena_place_type(arguments, types, functions, layouts)
-        }
+        Expr::Call { callee, .. } => functions
+            .get(callee)
+            .map(|function| function.return_type)
+            .ok_or_else(|| NativeEmitError(format!("native function `{callee}` is unavailable"))),
         Expr::MethodCall { receiver, method, .. } => {
-            let receiver_type = initializer_type(receiver, types, functions, layouts);
+            if let Some(enum_type) = enum_expression_type(expression, layouts) {
+                return Ok(enum_type);
+            }
+            let receiver_type = initializer_type(receiver, types, functions, layouts)?;
+            if matches!(receiver_type, NativeType::Arena(_)) && method == "place" {
+                return arena_place_type(expression, types, functions, layouts);
+            }
             let dispatch_name = super::performance::dispatch_key(receiver_type, method);
-            enum_expression_type(expression, layouts)
-                .or_else(|| functions.get(&dispatch_name).map(|function| function.return_type))
+            functions
+                .get(&dispatch_name)
+                .map(|function| function.return_type)
                 .or_else(|| functions.get(method).map(|function| function.return_type))
-                .unwrap_or(NativeType::Int)
+                .ok_or_else(|| NativeEmitError(format!("native method `{method}` is unavailable")))
         }
         Expr::StructLit { name, type_arguments, .. } => {
             let type_name = crate::ast::TypeName {
@@ -377,36 +399,61 @@ pub(super) fn initializer_type(
                 reference_role: None,
                 span: crate::lexer::SourceSpan::new(0, 0),
             };
-            layouts.type_for_type_name(&type_name).unwrap_or(NativeType::Int)
+            layouts.type_for_type_name(&type_name).ok_or_else(|| {
+                NativeEmitError(format!("native layout for struct `{name}` is unavailable"))
+            })
         }
         Expr::FieldAccess { object, field, .. } => expression_native_type(object, types, layouts)
             .and_then(|ty| field_type(ty, field, layouts))
             .or_else(|| enum_expression_type(expression, layouts))
-            .unwrap_or(NativeType::Int),
-        Expr::FloatLiteral { .. } => NativeType::Int,
-        _ => NativeType::Int,
+            .ok_or_else(|| NativeEmitError(format!("native field `{field}` is unavailable"))),
+        Expr::Case { branches, .. } => infer_case_type(branches, types, functions, layouts),
+        _ => Err(NativeEmitError("unsupported native type expression".to_owned())),
     }
 }
 
-fn is_arena(
+fn arena_place_type(
     expression: &Expr,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> bool {
-    matches!(initializer_type(expression, types, functions, layouts), NativeType::Arena(_))
-}
-
-fn arena_place_type(
-    arguments: &[crate::ast::Argument],
-    types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> NativeType {
+) -> Result<NativeType, NativeEmitError> {
+    let Expr::MethodCall { arguments, .. } = expression else {
+        return Err(NativeEmitError("arena placement requires a method call".to_owned()));
+    };
     arguments
         .first()
         .map(|argument| initializer_type(&argument.expression, types, functions, layouts))
-        .unwrap_or(NativeType::Int)
+        .ok_or_else(|| NativeEmitError("place requires one value".to_owned()))?
+}
+
+fn infer_case_type(
+    branches: &[crate::ast::CaseBranch],
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    let mut inferred = None;
+    for branch in branches {
+        let candidate = match &branch.body {
+            crate::ast::CaseBody::Expression(expression) => {
+                Some(initializer_type(expression, types, functions, layouts)?)
+            }
+            crate::ast::CaseBody::Block(_) => None,
+        };
+        if let Some(candidate) = candidate {
+            if let Some(expected) = inferred {
+                if expected != candidate {
+                    return Err(NativeEmitError(
+                        "case branches have different native types".to_owned(),
+                    ));
+                }
+            } else {
+                inferred = Some(candidate);
+            }
+        }
+    }
+    Ok(inferred.unwrap_or(NativeType::Void))
 }
 
 pub(super) fn emit_buffer_drop(

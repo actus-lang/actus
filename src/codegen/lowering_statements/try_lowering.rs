@@ -82,7 +82,7 @@ fn lower_try_return(
         string_data,
         layouts,
     )?;
-    let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts) else {
+    let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts)? else {
         return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
     };
     let layout = layouts
@@ -146,7 +146,7 @@ pub(super) fn lower_try_statement(
         string_data,
         layouts,
     )?;
-    let NativeType::Enum(enum_id) = initializer_type(source_expression, types, functions, layouts)
+    let NativeType::Enum(enum_id) = initializer_type(source_expression, types, functions, layouts)?
     else {
         return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
     };
