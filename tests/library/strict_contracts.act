@@ -1,0 +1,32 @@
+import io;
+
+meta test
+verb strict_positive_ownership_contract() -> Int {
+    erg source = Buffer[0];
+    append(source, 65);
+    erg writer_storage = Buffer[0];
+    erg writer = cursor(dat writer_storage);
+    erg written = writer.write(buffer: abs source);
+    return case dat written {
+        Result.Ok(count) => case count {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb strict_negative_result_contract() -> Int {
+    erg empty = Buffer[0];
+    erg reader = cursor(dat empty);
+    erg destination = Buffer[1];
+    erg read_result = reader.read(buffer: ins destination);
+    return case dat read_result {
+        Result.Ok(_) => 1,
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => 0,
+            _ => 1,
+        },
+    };
+}
