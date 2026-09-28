@@ -27,18 +27,70 @@ pub(crate) fn lower_field_access(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
-        let storage = lower_expression(
+        return lower_pack_field_access(
             function,
             object,
+            field,
+            id,
             locals,
             local_types,
             functions,
             cleanup_schedule,
             string_data,
             layouts,
-        )?;
-        return super::packs::lower_pack_field(function, storage, id, field, layouts);
+        );
     }
+    lower_struct_field_access(
+        function,
+        object,
+        field,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_pack_field_access(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    id: usize,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let storage = lower_expression(
+        function,
+        object,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    super::packs::lower_pack_field(function, storage, id, field, layouts)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_struct_field_access(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let (address, field_layout) = lower_field_address(
         function,
         object,
@@ -50,6 +102,15 @@ pub(crate) fn lower_field_access(
         string_data,
         layouts,
     )?;
+    load_struct_field(function, address, &field_layout, layouts)
+}
+
+fn load_struct_field(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    field_layout: &super::super::layout::FieldLayout,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     if field_layout.indirect {
         return Ok(function.ins().load(
             layouts.pointer_type,
@@ -70,34 +131,19 @@ pub(crate) fn lower_field_access(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn lower_field_assignment(
+pub(crate) fn lower_field_assignment<'source>(
     function: &mut FunctionBuilder<'_>,
     object: &Expr,
     field: &str,
     value: &Expr,
-    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
-    if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
-        return super::packs::lower_pack_field_assignment(
-            function,
-            object,
-            field,
-            value,
-            id,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        );
-    }
-    lower_struct_field_assignment(
+    let context = FieldAssignmentContext {
         function,
         object,
         field,
@@ -108,43 +154,79 @@ pub(crate) fn lower_field_assignment(
         cleanup_schedule,
         string_data,
         layouts,
+    };
+    match expression_native_type(object, local_types, layouts) {
+        Some(NativeType::Pack(id)) => lower_pack_field_assignment(context, id),
+        _ => lower_struct_field_assignment(context),
+    }
+}
+
+struct FieldAssignmentContext<'input, 'source, 'function> {
+    function: &'input mut FunctionBuilder<'function>,
+    object: &'input Expr,
+    field: &'input str,
+    value: &'input Expr,
+    locals: &'input mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &'input HashMap<&'source String, NativeType>,
+    functions: &'input HashMap<String, FunctionRef>,
+    cleanup_schedule: &'input NativeCleanupSchedule,
+    string_data: &'input StringDataValues,
+    layouts: &'input LayoutRegistry,
+}
+
+fn lower_pack_field_assignment(
+    context: FieldAssignmentContext<'_, '_, '_>,
+    id: usize,
+) -> Result<(), NativeEmitError> {
+    super::packs::lower_pack_field_assignment(
+        context.function,
+        context.object,
+        context.field,
+        context.value,
+        id,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn lower_struct_field_assignment(
-    function: &mut FunctionBuilder<'_>,
-    object: &Expr,
-    field: &str,
-    value: &Expr,
-    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
+    context: FieldAssignmentContext<'_, '_, '_>,
 ) -> Result<(), NativeEmitError> {
     let (address, field_layout) = lower_field_address(
-        function,
-        object,
-        field,
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
+        context.function,
+        context.object,
+        context.field,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
     )?;
     let value = lower_expression(
-        function,
-        value,
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
+        context.function,
+        context.value,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
     )?;
+    store_struct_field(context.function, address, value, &field_layout, context.layouts)
+}
+
+fn store_struct_field(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    value: cranelift_codegen::ir::Value,
+    field_layout: &super::super::layout::FieldLayout,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     if field_layout.indirect
         || matches!(field_layout.ty, NativeType::Enum(id) if layouts.is_niche_option(id))
     {

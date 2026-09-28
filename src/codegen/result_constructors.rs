@@ -78,16 +78,10 @@ fn normalize_statement(
 ) {
     match statement {
         Stmt::OwnerDecl { name, ty, initializer, .. } => {
-            let expected =
-                ty.as_deref().and_then(|name| parse_type_name(name, initializer_span(initializer)));
-            normalize_expression(initializer, expected.as_ref(), signatures, locals);
-            if let Some(expected) = expected {
-                locals.insert(name.clone(), expected);
-            }
+            normalize_owner_declaration(name, ty.as_deref(), initializer, signatures, locals)
         }
         Stmt::Assignment { name, value, .. } => {
-            let expected = locals.get(name).cloned();
-            normalize_expression(value, expected.as_ref(), signatures, locals);
+            normalize_assignment(name, value, signatures, locals)
         }
         Stmt::FieldAssignment { value, .. } => {
             normalize_expression(value, None, signatures, locals);
@@ -108,6 +102,31 @@ fn normalize_statement(
     }
 }
 
+fn normalize_owner_declaration(
+    name: &str,
+    declared_type: Option<&str>,
+    initializer: &mut Expr,
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+    locals: &mut HashMap<String, TypeName>,
+) {
+    let expected =
+        declared_type.and_then(|name| parse_type_name(name, initializer_span(initializer)));
+    normalize_expression(initializer, expected.as_ref(), signatures, locals);
+    if let Some(expected) = expected {
+        locals.insert(name.to_owned(), expected);
+    }
+}
+
+fn normalize_assignment(
+    name: &str,
+    value: &mut Expr,
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+    locals: &mut HashMap<String, TypeName>,
+) {
+    let expected = locals.get(name).cloned();
+    normalize_expression(value, expected.as_ref(), signatures, locals);
+}
+
 fn normalize_expression(
     expression: &mut Expr,
     expected: Option<&TypeName>,
@@ -117,10 +136,7 @@ fn normalize_expression(
     match expression {
         Expr::Call { .. } => normalize_call(expression, expected, signatures, locals),
         Expr::MethodCall { receiver, arguments, .. } => {
-            normalize_expression(receiver, None, signatures, locals);
-            for argument in arguments {
-                normalize_expression(&mut argument.expression, None, signatures, locals);
-            }
+            normalize_method_call(receiver, arguments, signatures, locals)
         }
         Expr::Grouping { expression, .. }
         | Expr::Borrow { expression, .. }
@@ -129,15 +145,10 @@ fn normalize_expression(
             normalize_expression(expression, expected, signatures, locals);
         }
         Expr::Binary { left, right, .. } => {
-            normalize_expression(left, None, signatures, locals);
-            normalize_expression(right, None, signatures, locals);
+            normalize_binary(left, right, signatures, locals);
         }
         Expr::Case { .. } => normalize_case(expression, expected, signatures, locals),
-        Expr::StructLit { fields, .. } => {
-            for field in fields {
-                normalize_expression(&mut field.value, None, signatures, locals);
-            }
-        }
+        Expr::StructLit { fields, .. } => normalize_struct_fields(fields, signatures, locals),
         Expr::FieldAccess { object, .. } => {
             normalize_expression(object, None, signatures, locals);
         }
@@ -149,13 +160,45 @@ fn normalize_expression(
     }
 }
 
+fn normalize_method_call(
+    receiver: &mut Expr,
+    arguments: &mut [Argument],
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+    locals: &mut HashMap<String, TypeName>,
+) {
+    normalize_expression(receiver, None, signatures, locals);
+    for argument in arguments {
+        normalize_expression(&mut argument.expression, None, signatures, locals);
+    }
+}
+
+fn normalize_binary(
+    left: &mut Expr,
+    right: &mut Expr,
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+    locals: &mut HashMap<String, TypeName>,
+) {
+    normalize_expression(left, None, signatures, locals);
+    normalize_expression(right, None, signatures, locals);
+}
+
+fn normalize_struct_fields(
+    fields: &mut [crate::ast::StructFieldInit],
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+    locals: &mut HashMap<String, TypeName>,
+) {
+    for field in fields {
+        normalize_expression(&mut field.value, None, signatures, locals);
+    }
+}
+
 fn normalize_call(
     expression: &mut Expr,
     expected: Option<&TypeName>,
     signatures: &HashMap<String, Vec<(String, TypeName)>>,
     locals: &mut HashMap<String, TypeName>,
 ) {
-    let Expr::Call { callee, arguments, span } = expression else { return };
+    let Expr::Call { callee, arguments, .. } = expression else { return };
     let Some(result_type) =
         expected.filter(|type_name| type_name.name == "Result" && type_name.arguments.len() == 2)
     else {
@@ -166,6 +209,16 @@ fn normalize_call(
         normalize_arguments(callee, arguments, signatures, locals);
         return;
     }
+    rewrite_result_call(expression, result_type, signatures, locals);
+}
+
+fn rewrite_result_call(
+    expression: &mut Expr,
+    result_type: &TypeName,
+    signatures: &HashMap<String, Vec<(String, TypeName)>>,
+    locals: &mut HashMap<String, TypeName>,
+) {
+    let Expr::Call { callee, arguments, span } = expression else { return };
     let payload_index = usize::from(callee == "Err");
     normalize_expression(
         &mut arguments[0].expression,
