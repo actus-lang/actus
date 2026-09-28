@@ -1,0 +1,147 @@
+# Phase 18 Baseline Inventory
+
+This inventory records the behavior that existed before the remaining strict
+conformance work. It is the evidence boundary for Gate 18.0. The inventory is
+descriptive: it does not treat a discovered fallback, compatibility path, or
+documentation gap as acceptable strict behavior.
+
+## Evidence sources
+
+The inventory was checked against the following repository sources:
+
+- `src/diagnostics/renderer/codes.rs` and `src/diagnostics/renderer/module.rs`;
+- `src/parser/`, `src/semantic/`, `src/codegen/`, and `src/runtime/`;
+- `src/cli/`, `src/configuration/`, and `src/modules/`;
+- `library/std/src/` and `tests/library/`;
+- `scripts/check_source_limits.sh`;
+- `docs/language/diagnostics.md` and `docs/decisions/ADR-0041-strict-actus-conformance.md`.
+
+The repeatable inventory commands are:
+
+```sh
+rg -o 'E[0-9]{4}' src tests docs | sort -u
+find library/std/src -type f -name '*.act' | sort
+find library/std/src -type f -name '*.act' -print0 | sort -z | xargs -0 wc -l
+scripts/check_source_limits.sh
+```
+
+## Diagnostic catalog
+
+`docs/language/diagnostics.md` is the public catalog and assigns these stable
+ranges:
+
+| Range | Current responsibility |
+| --- | --- |
+| `E0001`–`E0002` | Lexer failures |
+| `E0003`–`E0004` | Parser token and end-of-input failures |
+| `E0005`–`E0009` | Parser declarations, keywords, and metadata |
+| `E1001`–`E1028` | Bindings, ownership, calls, types, and returns |
+| `E1029`–`E1033` | Struct declarations and initialization |
+| `E1034`–`E1035` | Struct mutation and field borrowing |
+| `E1036`–`E1038` | Method lookup and receiver validation |
+| `E1040`–`E1079` | Enums, roles, generics, packs, and arenas |
+| `E1100`–`E1107` | Module paths, facades, sibling declarations, and module I/O |
+| `E1800`–`E1809` | Strict configuration and policy |
+| `E1810`–`E1819` | Strict frontend validation |
+| `E1820`–`E1829` | Strict semantic validation |
+| `E1830`–`E1839` | Strict architecture validation |
+| `E1840`–`E1849` | Strict documentation validation |
+| `E1850`–`E1859` | Strict source-limit validation |
+| `E1860`–`E1899` | Strict execution and reserved expansion |
+
+The catalog and renderer are separate from presentation. The terminal, JSON,
+colored, and LSP renderers consume the same diagnostic model. The remaining
+Gate 18.1 task must prove that selecting a renderer cannot change validation,
+ordering, or exit status.
+
+Known implementation-specific entries that require continued catalog review
+include malformed generic-name handling (`E1080`), duplicate packed-layout
+handling (`E1081`), and strict empty-enum validation (`E1810`). The next
+catalog pass must verify that each such entry has one documented meaning, one
+renderer mapping, and an accepted or rejected fixture.
+
+## Recovery, fallback, and placeholder inventory
+
+The following paths were found and classified for the next strictness gates:
+
+| Location | Existing behavior | Phase 18 classification |
+| --- | --- | --- |
+| `src/codegen/case.rs` | Control-flow branches carry explicit fallback block values and unresolved inferred results are represented as `Void` in the current lowering contract. | Supported only where the semantic phase proves the control-flow-only case; otherwise forbidden unresolved state. Requires complete-AST/codegen evidence. |
+| `src/codegen/expressions.rs` | Unresolved expression inference has a `Void` fallback in a lowering helper. | Candidate implicit default; must become an explicit error or a proven non-codegen path. |
+| `src/codegen/layout.rs` | Unknown role/width matches contain default branches. | Candidate placeholder; each branch needs an exhaustive domain proof or a typed lowering error. |
+| `src/codegen/enum_layout.rs` | Layout selection contains default branches for unsupported layout states. | Candidate placeholder; must be audited with enum-layout fixtures. |
+| `src/semantic/analyzer/mod.rs` | `Perform`, sibling `open`, and `import` declarations are intentionally non-codegen contracts. | Supported non-codegen meaning; must remain explicit and documented. |
+| `src/parser/` | `unreachable!` is used after token-kind checks establish an internal parser invariant. | Internal invariant, not source recovery; retain only where the invariant is mechanically established and tested. |
+| `src/semantic/` | `unwrap_or("unknown")` and similar values are used to format incomplete diagnostic context. | Diagnostic fallback only; it must never create an accepted semantic type or executable path. |
+| `src/runtime/` | `try_from(...).unwrap_or(-1)` maps unrepresentable results to the documented C-ABI failure status. | ABI contract, not a semantic default; preserve only with native boundary tests and explicit status documentation. |
+
+This table separates supported language meaning from unresolved compiler state.
+Gate 18.3 must close the code-generation audit before strict mode can claim
+that every accepted syntax form is either executable or explicitly non-codegen.
+
+## CLI, statuses, filtering, and targets
+
+The command dispatcher currently exposes `new`, `init`, `check`, `parse`,
+`build`, `run`, `watch`, `test`, `fmt`, `lsp`, and `publish`. Unknown commands,
+missing command arguments, extra arguments, and malformed command options use
+status `2`. Source, configuration, module, semantic, build, and runtime
+failures use status `1`; successful commands use status `0`.
+
+Strict mode is currently accepted by `check`, `build`, and `test`. It is parsed
+once, rejects duplicate `--strict`, uses strict configuration policy, and is
+shown in successful command output. `parse`, `run`, `watch`, `fmt`, `lsp`, and
+`publish` do not currently participate in the strict conformance contract.
+That boundary must be documented in the eventual compatibility matrix rather
+than inferred from command names.
+
+Build and test input discovery can walk to a parent `Actus.toml`. Strict
+configuration rejects legacy `Arca.toml` manifests and validates the lockfile
+policy. Module resolution requires the directory facade named after the
+module, rejects ambiguous file/directory roots, sorts sibling declarations,
+and reports unknown or duplicate module declarations through module-specific
+diagnostics.
+
+Target metadata is applied before semantic validation. Unknown target selectors
+are parser failures, and non-matching declarations are filtered before the
+remaining program is analyzed. The current implementation has regression
+coverage for target filtering and symbol references; malformed or conflicting
+target declarations remain a later Gate 18.9 task.
+
+The test runner discovers `meta test` verbs, reports discovered and filtered
+counts, passes null stdin to native test processes, and terminates a process
+after its bounded timeout. A non-zero process, timeout, or failure contributes
+to a non-zero test result. Lockfile freshness, artifact determinism, and the
+full strict compatibility matrix remain unclosed.
+
+## Standard-library inventory
+
+`library/std/src/` currently contains 29 Actus files and 1,941 lines:
+
+| Facade/module | Files and responsibility |
+| --- | --- |
+| `io/io.act` | Public facade for stdin, stdout, stderr, errors, readers, writers, cursor, copying, and buffering. |
+| `fs/fs.act` | Public facade for files, metadata, operations, options, and seeking. |
+| `path/path.act` | Public facade for path types, storage, errors, components, platform parsers, predicates, normalization, and builders. |
+| `lib.act` | Standard-library root facade. |
+
+The current syntactic count is 195 public-looking declarations in the `io`,
+`fs`, and `path` trees and 290 `"""`/`///` documentation markers. These are
+inventory counts, not a coverage result: one block may document a declaration,
+an ABI bridge, or a grouping comment. Gate 18.10 must perform declaration-level
+matching and require documentation for purpose, ownership roles, return/error
+contracts, side effects, and ABI relationships.
+
+The public standard-library boundary is Actus code. Native behavior is reached
+through typed `unsafe extern "C"` declarations and runtime implementations;
+the inventory therefore records both the facade declaration and the native
+test evidence as separate obligations. Standard-library fixtures belong under
+`tests/library/`; Rust tests must not replace Actus contract fixtures.
+
+## Baseline decision
+
+The first four Gate 18.0 inventory tasks are evidenced by this document. The
+remaining inventory tasks are intentionally open: source-limit enforcement,
+module discovery, lockfile validation, test-runner validation, and the complete
+fallback classification require implementation or additional fixtures. No
+later gate is considered complete merely because a related implementation
+already exists.

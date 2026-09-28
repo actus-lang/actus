@@ -14,8 +14,9 @@ behavior around the existing language and runtime contracts.
 ## Phase status and sequencing
 
 - [x] Adopt ADR-0041 as the governing design record for this phase.
-- [ ] Inventory the current compiler, runtime, CLI, standard-library, and CI
-      behavior before changing strictness.
+- [x] Inventory the current compiler, runtime, CLI, standard-library, and CI
+      behavior before changing strictness. See
+      [`phase-18-baseline-inventory.md`](phase-18-baseline-inventory.md).
 - [ ] Complete the gates in numeric order unless a dependency is explicitly
       recorded in the gate's implementation notes.
 - [ ] Keep Phase 17 implementation out of scope.
@@ -82,13 +83,13 @@ behavior around the existing language and runtime contracts.
 
 ### Compiler and runtime inventory
 
-- [ ] Inventory every existing diagnostic code and identify duplicate or
+- [x] Inventory every existing diagnostic code and identify duplicate or
       unstable meanings.
-- [ ] Inventory warnings, parser recovery paths, semantic fallbacks, and
+- [x] Inventory warnings, parser recovery paths, semantic fallbacks, and
       code-generation placeholder paths.
-- [ ] Inventory all CLI commands, exit statuses, filtering options, and
+- [x] Inventory all CLI commands, exit statuses, filtering options, and
       target-selection paths.
-- [ ] Inventory standard-library public declarations and current documentation
+- [x] Inventory standard-library public declarations and current documentation
       coverage.
 - [ ] Inventory source-limit checks, module-discovery checks, lockfile checks,
       and test-runner checks.
@@ -274,16 +275,16 @@ behavior around the existing language and runtime contracts.
 
 - [ ] Require explicit C-ABI status contracts and prevent raw statuses from
       leaking through public Actus APIs.
-- [x] Validate target names and metadata before applying test or build filters.
+- [ ] Validate target names and metadata before applying test or build filters.
 - [ ] Reject malformed, conflicting, or incompatible target declarations.
-- [x] Make target filtering deterministic and verify referenced symbols exist.
+- [ ] Make target filtering deterministic and verify referenced symbols exist.
 - [ ] Require native runtime tests for every changed code-generation or ABI
       contract.
 - [ ] Require positive and negative tests for every public standard-library
       contract affected by strict mode.
-- [x] Make test discovery, filtered counts, pass counts, failure counts, and
+- [ ] Make test discovery, filtered counts, pass counts, failure counts, and
       exit codes exact and deterministic.
-- [x] Reject hangs, unbounded stdin waits, signal failures, and non-zero test
+- [ ] Reject hangs, unbounded stdin waits, signal failures, and non-zero test
       processes as test failures.
 - [ ] Validate lockfiles against manifests and source content before build or
       test execution.
