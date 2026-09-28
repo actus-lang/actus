@@ -168,7 +168,7 @@ fn match_pattern(
         Pattern::Wildcard { .. } => Ok(function.ins().iconst(types::I8, 1)),
         Pattern::Literal { value, .. } => {
             let expected = match value {
-                crate::ast::LiteralPattern::Integer(value) => value.parse().unwrap_or_default(),
+                crate::ast::LiteralPattern::Integer(value) => parse_integer_pattern(value)?,
                 crate::ast::LiteralPattern::Bool(value) => i64::from(*value),
             };
             Ok(function.ins().icmp_imm_s(IntCC::Equal, subject, expected))
@@ -204,6 +204,20 @@ fn match_pattern(
             ))
         }
     }
+}
+
+fn parse_integer_pattern(value: &str) -> Result<i64, NativeEmitError> {
+    let (negative, digits) =
+        value.strip_prefix('-').map_or((false, value), |digits| (true, digits));
+    let magnitude = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+        .map_or_else(|| digits.parse::<i128>(), |hex| i128::from_str_radix(hex, 16))
+        .map_err(|_| NativeEmitError(format!("invalid integer pattern `{value}`")))?;
+    let signed = if negative { magnitude.checked_neg() } else { Some(magnitude) }
+        .ok_or_else(|| NativeEmitError(format!("integer pattern `{value}` overflows")))?;
+    i64::try_from(signed)
+        .map_err(|_| NativeEmitError(format!("integer pattern `{value}` overflows")))
 }
 
 #[allow(clippy::too_many_arguments)]

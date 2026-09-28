@@ -40,6 +40,7 @@ pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
         SemanticErrorKind::DuplicateStructName { .. } => "E1029",
         SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
+        SemanticErrorKind::EmptyEnum { .. } => "E1810",
         SemanticErrorKind::DuplicateStructField { .. } => "E1030",
         SemanticErrorKind::UnknownStructField { .. } => "E1031",
         SemanticErrorKind::MissingStructField { .. } => "E1032",
@@ -252,6 +253,9 @@ fn enum_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::DuplicateEnumName { name } => {
             format!("duplicate enum declaration `{name}`")
+        }
+        SemanticErrorKind::EmptyEnum { name } => {
+            format!("enum `{name}` must declare at least one variant")
         }
         SemanticErrorKind::UnknownEnumVariant { enum_name, variant } => {
             format!("unknown variant `{variant}` for enum `{enum_name}`")

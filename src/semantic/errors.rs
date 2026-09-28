@@ -140,6 +140,9 @@ pub enum SemanticErrorKind {
     DuplicateEnumName {
         name: String,
     },
+    EmptyEnum {
+        name: String,
+    },
     DuplicateStructField {
         struct_name: String,
         field: String,

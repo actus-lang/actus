@@ -76,6 +76,16 @@ fn rejects_unknown_and_recursive_enum_payload_types() {
 }
 
 #[test]
+fn rejects_empty_enums_before_codegen() {
+    let error = analyze_source("enum Nothing { } verb main() -> Int { return 0; }")
+        .expect_err("empty enums must not enter code generation");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::EmptyEnum { name } if name == "Nothing"
+    ));
+}
+
+#[test]
 fn validates_exhaustive_enum_patterns_and_payload_bindings() {
     analyze_source(
         "enum Color { Red, Green, } enum Message { Move(Int, Int), Write { text: String, }, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Green => 2, }; } verb read(erg message: Message) -> Int { return case message { Message.Move(x, y) => x + y, Message.Write(text: text) => print(text), }; }",

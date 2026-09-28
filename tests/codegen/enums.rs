@@ -35,6 +35,16 @@ fn lowers_enum_case_discriminant_switch_to_native_code() {
 }
 
 #[test]
+fn lowers_hex_integer_case_patterns_without_defaulting_to_zero() {
+    let source = "verb main(erg value: Int) -> Int { return case value { 0x10 => 1, _ => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("hex pattern program should parse");
+    let object = emit_program_object(&program, "main").expect("hex pattern should emit");
+    object::File::parse(object.as_slice()).expect("hex pattern should emit a native object");
+}
+
+#[test]
 fn lowers_pattern_guard_failure_to_the_next_case_branch() {
     let source = "enum Color { Red, Green, } verb main(erg ready: Bool, erg color: Color) -> Int { return case color { Color.Red if ready => 1, _ => 0, }; }";
     let (tokens, errors) = scan(source);

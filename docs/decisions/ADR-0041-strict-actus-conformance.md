@@ -82,8 +82,10 @@ Strict mode has the following non-negotiable rules:
   architecture, or conformance error.
 - Parser recovery may collect additional diagnostics, but recovered syntax may
   never be passed to code generation as if it were valid source.
-- An empty or placeholder implementation may not be emitted as successful
-  native code.
+- An empty declaration that requires members, or a placeholder implementation,
+  may not be emitted as successful native code. Empty structs and method-less
+  marker roles are valid only where their explicit zero-sized or marker
+  semantics are defined below.
 - A process that returns a non-zero test exit code is always a failed test.
 - A missing, stale, malformed, or non-deterministic lockfile is an error.
 
@@ -98,7 +100,8 @@ Strict validation must reject:
 - unknown keywords, types, verbs, fields, modules, imports, and attributes;
 - malformed metadata or metadata attached to an invalid declaration;
 - unsupported syntax that was accepted only for parser recovery;
-- declarations that are empty, incomplete, duplicated, or unreachable;
+- declarations that are empty where their language contract requires members,
+  incomplete, duplicated, or unreachable;
 - implicit return paths that do not satisfy the declared return contract;
 - unsupported generic applications or unresolved generic bounds;
 - unknown target names or malformed target specifications;
@@ -108,6 +111,30 @@ Strict validation must reject:
 All accepted syntax must have a defined AST, semantic rule, and codegen or
 explicitly documented non-codegen meaning. Registration alone is not an
 implementation.
+
+### Declaration completeness classification
+
+The compiler classifies top-level declarations before code generation rather
+than treating every declaration as an executable definition:
+
+- an `enum` must declare at least one variant. An empty enum has no constructible
+  value or runtime pattern and is rejected with `E1810`;
+- an empty `struct` is a valid zero-sized aggregate and remains available to
+  type checking and layout computation;
+- a method-less `role` is a valid marker contract, and an empty `perform` for
+  that role is a valid explicit implementation of the marker contract;
+- `unsafe extern` declarations describe imported ABI symbols and deliberately
+  have no Actus body to lower;
+- `import` declarations and module-facade `open` declarations control module
+  visibility and deliberately do not lower to native functions;
+- no separate placeholder declaration exists in the AST. A declaration is
+  either validated under one of the contracts above or rejected before
+  codegen.
+
+These non-codegen meanings are explicit contracts, not code-generation
+fallbacks. Any future declaration kind must add its AST, semantic rule,
+code-generation behavior or non-codegen classification, and positive and
+negative tests before it is accepted.
 
 ## Layer 2: ownership, type, and exhaustiveness correctness
 

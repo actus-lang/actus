@@ -78,6 +78,7 @@ fn strict_build_rejects_declaration_contract_violations_without_artifact() {
         std::env::temp_dir().join(format!("actus-strict-declarations-{}", std::process::id()));
     let cases = [
         ("duplicate", "verb main() -> Int { return 0; } verb main() -> Int { return 0; }\n"),
+        ("empty_enum", "enum Nothing { } verb main() -> Int { return 0; }\n"),
         (
             "incomplete",
             "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; verb flush(abs self: File); } perform Writer for File { verb write(abs self: File) -> Int { return 0; } } verb main() -> Int { return 0; }\n",
