@@ -43,3 +43,4 @@ gated implementation roadmaps:
 - [x] [Phase 15.6: CLI Developer Workflow Polish](docs/roadmap/phase-15.6-cli-developer-workflow.md)
 - [ ] [Phase 16: Standard Library, Runtime, and Tooling Stabilization](docs/roadmap/phase-16-standard-library-and-runtime.md)
 - [ ] [Phase 17: Extension Platform and Developer Experience](docs/roadmap/phase-17-extension-platform-and-developer-experience.md)
+- [ ] [Phase 18: Strict Actus Conformance and Fail-Closed Compilation](docs/roadmap/phase-18-strict-actus-conformance.md)
