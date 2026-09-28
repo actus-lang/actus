@@ -41,6 +41,9 @@ pub enum SemanticErrorKind {
         callee: String,
         name: String,
     },
+    UnknownVerb {
+        name: String,
+    },
     DuplicateArgument {
         name: String,
     },

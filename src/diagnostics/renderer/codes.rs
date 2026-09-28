@@ -46,6 +46,7 @@ pub(super) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
         SemanticErrorKind::MissingStructField { .. } => "E1032",
         SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
         SemanticErrorKind::TypeMismatch { .. } => "E1025",
+        SemanticErrorKind::UnknownVerb { .. } => "E1069",
         SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
         SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
         SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
@@ -180,6 +181,7 @@ fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::UnknownParameter { callee, name } => {
             format!("unknown parameter `{name}` in call to `{callee}`")
         }
+        SemanticErrorKind::UnknownVerb { name } => format!("unknown verb `{name}`"),
         SemanticErrorKind::DuplicateArgument { name } => format!("duplicate argument `{name}`"),
         SemanticErrorKind::MixedArgumentModes { callee } => {
             format!("cannot mix named and positional arguments in `{callee}`")

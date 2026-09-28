@@ -6,7 +6,8 @@ use actus::semantic::{AccessState, OwnershipState, SemanticErrorKind, analyze};
 fn analyze_source(
     source: &str,
 ) -> Result<actus::semantic::SemanticModel, actus::semantic::SemanticError> {
-    let (tokens, errors) = scan(source);
+    let source = format!("unsafe extern \"C\" verb inspect(abs view: Buffer); {source}");
+    let (tokens, errors) = scan(&source);
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
     analyze(&parse(tokens).expect("source should parse"))
 }
@@ -14,7 +15,7 @@ fn analyze_source(
 #[test]
 fn accepts_explicit_ins_call_and_restores_the_owner() {
     let model = analyze_source(
-        "verb mutate(ins buffer: Buffer) { } verb main() { erg buffer = Buffer[1]; mutate(buffer: ins buffer); inspect(buffer); }",
+        "verb mutate(ins buffer: Buffer) { } verb main() { erg buffer = Buffer[1]; mutate(buffer: ins buffer); inspect(view: abs buffer); }",
     )
     .expect("exclusive call should pass");
     assert_eq!(model.exclusive_loans.len(), 1);
@@ -48,7 +49,7 @@ fn forwards_ins_through_multiple_named_helpers() {
 #[test]
 fn joins_case_branches_after_sequential_exclusive_loans() {
     analyze_source(
-        "enum Color { Red, Green, } verb mutate(ins buffer: Buffer) { } verb main(erg color: Color) { erg buffer = Buffer[1]; case abs color { Color.Red => { mutate(buffer: ins buffer); }, Color.Green => { mutate(buffer: ins buffer); }, }; inspect(buffer); }",
+        "enum Color { Red, Green, } verb mutate(ins buffer: Buffer) { } verb main(erg color: Color) { erg buffer = Buffer[1]; case abs color { Color.Red => { mutate(buffer: ins buffer); }, Color.Green => { mutate(buffer: ins buffer); }, }; inspect(view: abs buffer); }",
     )
     .expect("case branch snapshots should restore the owner after each loan");
 }
@@ -95,7 +96,7 @@ fn rejects_duplicate_ins_and_ins_abs_aliases() {
 #[test]
 fn assigns_deterministic_loan_ids_and_resumes_each_call_once() {
     let model = analyze_source(
-        "verb mutate(ins buffer: Buffer) { } verb main() { erg first = Buffer[1]; erg second = Buffer[1]; mutate(buffer: ins first); mutate(buffer: ins second); inspect(first); inspect(second); }",
+        "verb mutate(ins buffer: Buffer) { } verb main() { erg first = Buffer[1]; erg second = Buffer[1]; mutate(buffer: ins first); mutate(buffer: ins second); inspect(view: abs first); inspect(view: abs second); }",
     )
     .expect("sequential exclusive calls should pass");
     assert_eq!(model.exclusive_loans.iter().map(|loan| loan.id).collect::<Vec<_>>(), vec![0, 1]);

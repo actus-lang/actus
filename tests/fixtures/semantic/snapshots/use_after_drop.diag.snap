@@ -1,1 +1,1 @@
-error[E1006] at 4:13: use of dropped binding `value`
+error[E1006] at 7:13: use of dropped binding `value`

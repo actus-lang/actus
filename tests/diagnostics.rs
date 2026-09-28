@@ -29,6 +29,21 @@ fn renders_stable_semantic_error_codes_and_locations() {
 }
 
 #[test]
+fn renders_unknown_verb_diagnostics_with_a_stable_code() {
+    let source = "verb main() { missing_verb(1); }\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = analyze(&program).expect_err("unknown verbs must fail semantic analysis");
+
+    assert_eq!(
+        render_semantic_error(source, &error),
+        "error[E1069] at 1:15: unknown verb `missing_verb`"
+    );
+    assert_eq!(semantic_diagnostic(&error).code(), "E1069");
+}
+
+#[test]
 fn diagnostic_model_is_independent_from_terminal_rendering() {
     let source = "ok\nvalue\n";
     let diagnostic = Diagnostic::warning("E1800", SourceSpan::new(3, 8), "strict warning")

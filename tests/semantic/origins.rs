@@ -49,7 +49,7 @@ fn counts_only_non_scalar_abs_parameters_as_origins() {
 }
 
 #[test]
-fn rejects_local_temporary_and_unknown_view_origins() {
+fn rejects_local_temporary_and_unknown_view_calls() {
     let temporary = analyze_source(
         "verb bad(abs input: Buffer) -> abs Buffer { erg temporary = Buffer[4]; return temporary; }",
     )
@@ -62,7 +62,7 @@ fn rejects_local_temporary_and_unknown_view_origins() {
         analyze_source("verb bad(abs input: Buffer) -> abs Buffer { return unknown_view(input); }")
             .expect_err("an unknown call cannot establish view provenance");
     assert!(
-        matches!(unknown.kind, SemanticErrorKind::InvalidAbsReturnOrigin { reason } if reason.contains("unknown origin"))
+        matches!(unknown.kind, SemanticErrorKind::UnknownVerb { name } if name == "unknown_view")
     );
 }
 

@@ -135,6 +135,16 @@ fn rejects_unknown_declared_types() {
 }
 
 #[test]
+fn rejects_calls_to_unknown_verbs() {
+    let error = analyze_source("verb main() { missing_verb(1); }")
+        .expect_err("calls must resolve to a declared verb or intrinsic");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UnknownVerb { name } if name == "missing_verb"
+    ));
+}
+
+#[test]
 fn accepts_registered_collection_types() {
     analyze_source("verb main(erg items: Array, erg index: Map) { }")
         .expect("registered collection types should pass semantic analysis");
