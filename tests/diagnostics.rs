@@ -1,8 +1,8 @@
 use actus::diagnostics::{
     Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase, DiagnosticSeverity,
     StrictDiagnosticCategory, lex_diagnostic, render_colored_diagnostic, render_diagnostic,
-    render_json_diagnostics, render_semantic_error, semantic_diagnostic, sort_diagnostics,
-    strict_code_category, validate_diagnostic_catalog,
+    render_json_diagnostics, render_lex_error, render_parse_error, render_semantic_error,
+    semantic_diagnostic, sort_diagnostics, strict_code_category, validate_diagnostic_catalog,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::lsp::analyze_document;
@@ -200,6 +200,29 @@ fn lexical_diagnostics_have_stable_model_fields() {
         render_diagnostic("@", &diagnostic),
         "error[E0001] at 1:1: unexpected character `@`"
     );
+}
+
+#[test]
+fn matches_lexical_diagnostic_snapshot() {
+    let source = include_str!("fixtures/diagnostics/invalid/unexpected_character.act");
+    let (_, errors) = scan(source);
+    assert_eq!(errors.len(), 1);
+    let actual = render_lex_error(source, &errors[0]);
+    let expected = include_str!("fixtures/diagnostics/snapshots/unexpected_character.diag.snap");
+
+    assert_eq!(actual.trim_end(), expected.trim_end());
+}
+
+#[test]
+fn matches_parser_diagnostic_snapshot() {
+    let source = include_str!("fixtures/parser/invalid/missing_semicolon.act");
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let error = parse(tokens).expect_err("fixture must fail parsing");
+    let actual = render_parse_error(source, &error);
+    let expected = include_str!("fixtures/diagnostics/snapshots/missing_semicolon.diag.snap");
+
+    assert_eq!(actual.trim_end(), expected.trim_end());
 }
 
 #[test]
