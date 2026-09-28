@@ -161,6 +161,8 @@ behavior around the existing language and runtime contracts.
       of silently substituting a scalar machine type.
 - [x] Reject missing loop bindings, call parameter modes, and packed alignment
       metadata instead of relying on unchecked internal lookups or defaults.
+- [x] Reject invalid primitive widths during native IR mapping instead of
+      silently selecting a different machine type.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.

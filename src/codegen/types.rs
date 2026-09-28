@@ -90,32 +90,35 @@ impl NativeType {
         })
     }
 
-    pub(super) fn ir_type(self, pointer_type: Type) -> Type {
+    pub(super) fn ir_type(self, pointer_type: Type) -> Result<Type, NativeEmitError> {
         match self {
-            Self::Int => cranelift_codegen::ir::types::I32,
+            Self::Int => Ok(cranelift_codegen::ir::types::I32),
             Self::Integer { width, .. } => integer_ir_type(width),
-            Self::Float { width: 32 } => cranelift_codegen::ir::types::F32,
-            Self::Float { width: 64 } => cranelift_codegen::ir::types::F64,
-            Self::Float { .. } => cranelift_codegen::ir::types::F64,
-            Self::Void => cranelift_codegen::ir::types::I8,
+            Self::Float { width: 32 } => Ok(cranelift_codegen::ir::types::F32),
+            Self::Float { width: 64 } => Ok(cranelift_codegen::ir::types::F64),
+            Self::Float { width } => {
+                Err(NativeEmitError(format!("invalid native float width `{width}`")))
+            }
+            Self::Void => Ok(cranelift_codegen::ir::types::I8),
             Self::String
             | Self::Buffer
             | Self::Struct(_)
             | Self::Enum(_)
             | Self::Pack(_)
             | Self::Arena(_)
-            | Self::FatPointer => pointer_type,
+            | Self::FatPointer => Ok(pointer_type),
         }
     }
 }
 
-fn integer_ir_type(width: u8) -> Type {
+fn integer_ir_type(width: u8) -> Result<Type, NativeEmitError> {
     match width {
-        1..=8 => cranelift_codegen::ir::types::I8,
-        9..=16 => cranelift_codegen::ir::types::I16,
-        17..=32 => cranelift_codegen::ir::types::I32,
-        65..=128 => cranelift_codegen::ir::types::I128,
-        _ => cranelift_codegen::ir::types::I64,
+        1..=8 => Ok(cranelift_codegen::ir::types::I8),
+        9..=16 => Ok(cranelift_codegen::ir::types::I16),
+        17..=32 => Ok(cranelift_codegen::ir::types::I32),
+        33..=64 => Ok(cranelift_codegen::ir::types::I64),
+        65..=128 => Ok(cranelift_codegen::ir::types::I128),
+        _ => Err(NativeEmitError(format!("invalid native integer width `{width}`"))),
     }
 }
 
@@ -126,19 +129,28 @@ mod tests {
 
     #[test]
     fn maps_primitive_widths_to_deterministic_machine_types() {
-        assert_eq!(NativeType::Integer { signed: false, width: 8 }.ir_type(types::I64), types::I8);
-        assert_eq!(NativeType::Integer { signed: true, width: 16 }.ir_type(types::I64), types::I16);
         assert_eq!(
-            NativeType::Integer { signed: false, width: 32 }.ir_type(types::I64),
+            NativeType::Integer { signed: false, width: 8 }.ir_type(types::I64).unwrap(),
+            types::I8
+        );
+        assert_eq!(
+            NativeType::Integer { signed: true, width: 16 }.ir_type(types::I64).unwrap(),
+            types::I16
+        );
+        assert_eq!(
+            NativeType::Integer { signed: false, width: 32 }.ir_type(types::I64).unwrap(),
             types::I32
         );
-        assert_eq!(NativeType::Integer { signed: true, width: 64 }.ir_type(types::I64), types::I64);
         assert_eq!(
-            NativeType::Integer { signed: false, width: 128 }.ir_type(types::I64),
+            NativeType::Integer { signed: true, width: 64 }.ir_type(types::I64).unwrap(),
+            types::I64
+        );
+        assert_eq!(
+            NativeType::Integer { signed: false, width: 128 }.ir_type(types::I64).unwrap(),
             types::I128
         );
-        assert_eq!(NativeType::Float { width: 32 }.ir_type(types::I64), types::F32);
-        assert_eq!(NativeType::Float { width: 64 }.ir_type(types::I64), types::F64);
-        assert_eq!(NativeType::Void.ir_type(types::I64), types::I8);
+        assert_eq!(NativeType::Float { width: 32 }.ir_type(types::I64).unwrap(), types::F32);
+        assert_eq!(NativeType::Float { width: 64 }.ir_type(types::I64).unwrap(), types::F64);
+        assert_eq!(NativeType::Void.ir_type(types::I64).unwrap(), types::I8);
     }
 }

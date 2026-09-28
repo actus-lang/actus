@@ -155,7 +155,7 @@ impl LayoutRegistry {
                 .ok_or_else(|| NativeEmitError(format!("missing packed layout `{id}`")))
                 .and_then(|pack| self.ir_type(pack.storage)),
             NativeType::Arena(_) => Ok(self.pointer_type),
-            _ => Ok(ty.ir_type(self.pointer_type)),
+            _ => ty.ir_type(self.pointer_type),
         }
     }
 
