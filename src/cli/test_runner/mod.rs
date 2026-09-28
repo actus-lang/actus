@@ -26,6 +26,7 @@ pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
     collection::collect_act_files(&configuration.project_root().join("tests"), &mut files);
     collection::collect_act_files(configuration.source_root(), &mut files);
     files.sort();
+    files.dedup();
     let tests = match collection::collect_tests(files, &configuration, mode) {
         Ok(tests) => tests,
         Err(error) => {

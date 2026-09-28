@@ -9,7 +9,7 @@ use crate::lexer::SourceSpan;
 use super::super::conformance::ConformanceMode;
 use super::collection::{DiscoveredTest, TestCollection};
 use super::output::TestOutputStyle;
-use super::process::run_test_process;
+use super::process::{TestProcessResult, run_test_process};
 
 pub(super) fn run_tests(
     collection: TestCollection,
@@ -39,19 +39,25 @@ fn print_test_header(total: usize, filtered: usize, mode: ConformanceMode) {
 
 fn report_test_result(
     test: &DiscoveredTest,
-    result: Result<i32, String>,
+    result: Result<TestProcessResult, String>,
     started: Instant,
     output_style: &TestOutputStyle,
 ) -> bool {
     let elapsed = started.elapsed().as_millis();
     match result {
-        Ok(0) => {
+        Ok(TestProcessResult::Exited(0)) => {
             let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));
             println!("test {}::{} ... {status}", test.path.display(), test.name);
             true
         }
-        Ok(code) => {
+        Ok(TestProcessResult::Exited(code)) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, exit code {code})"));
+            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            false
+        }
+        Ok(TestProcessResult::Signaled) => {
+            let status =
+                output_style.failure(&format!("FAILED ({elapsed} ms, terminated by signal)"));
             println!("test {}::{} ... {status}", test.path.display(), test.name);
             false
         }
@@ -75,7 +81,7 @@ fn run_test(
     test: &DiscoveredTest,
     configuration: &CompilerConfiguration,
     index: usize,
-) -> Result<i32, String> {
+) -> Result<TestProcessResult, String> {
     let verb = test_verb(test)?;
     validate_test_verb(verb)?;
     let program = test_program(test)?;
@@ -87,13 +93,19 @@ fn run_test(
     )
     .map_err(|error| error.to_string())?;
     let paths = TestArtifactPaths::new(index);
-    fs::write(&paths.object, object)
-        .map_err(|error| format!("cannot write test object: {error}"))?;
-    let result = link_object(&paths.object, &paths.executable, configuration)
-        .map_err(|error| error.to_string())
+    let result = fs::write(&paths.object, object)
+        .map_err(|error| format!("cannot write test object: {error}"))
+        .and_then(|()| {
+            link_object(&paths.object, &paths.executable, configuration)
+                .map_err(|error| error.to_string())
+        })
         .and_then(|()| run_test_process(&paths.executable));
-    paths.cleanup();
-    result.map(|status| status.code().unwrap_or(1))
+    match (result, paths.cleanup()) {
+        (Ok(process), Ok(())) => Ok(process),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(_), Err(error)) => Err(error),
+        (Err(run_error), Err(cleanup_error)) => Err(format!("{run_error}; {cleanup_error}")),
+    }
 }
 
 fn test_verb(test: &DiscoveredTest) -> Result<&crate::ast::VerbDecl, String> {
@@ -138,9 +150,17 @@ impl TestArtifactPaths {
         Self { object: root.with_extension("o"), executable: root.with_extension("bin") }
     }
 
-    fn cleanup(&self) {
-        let _ = fs::remove_file(&self.object);
-        let _ = fs::remove_file(&self.executable);
+    fn cleanup(&self) -> Result<(), String> {
+        remove_artifact(&self.object)?;
+        remove_artifact(&self.executable)
+    }
+}
+
+fn remove_artifact(path: &std::path::Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("cannot clean up `{}`: {error}", path.display())),
     }
 }
 
