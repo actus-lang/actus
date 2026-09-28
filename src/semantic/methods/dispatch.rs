@@ -12,22 +12,45 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if let Some(role_name) = self.dynamic_role_for_expression(receiver) {
-            return self.visit_dynamic_method_call(receiver, &role_name, method, arguments, span);
-        }
-        if let Some(role_name) = self.generic_role_for_expression(receiver) {
-            return self
-                .visit_generic_bound_method_call(receiver, &role_name, method, arguments, span);
-        }
-        if let Some(result) = self.try_visit_arena_place(receiver, method, arguments, span) {
+        if let Some(result) = self.visit_special_method_call(receiver, method, arguments, span) {
             return result;
         }
+        self.visit_static_method_call(receiver, method, arguments, span)
+    }
+
+    fn visit_special_method_call(
+        &mut self,
+        receiver: &Expr,
+        method: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Option<Result<(), SemanticError>> {
+        if let Some(role_name) = self.dynamic_role_for_expression(receiver) {
+            return Some(
+                self.visit_dynamic_method_call(receiver, &role_name, method, arguments, span),
+            );
+        }
+        if let Some(role_name) = self.generic_role_for_expression(receiver) {
+            return Some(
+                self.visit_generic_bound_method_call(receiver, &role_name, method, arguments, span),
+            );
+        }
+        if let Some(result) = self.try_visit_arena_place(receiver, method, arguments, span) {
+            return Some(result);
+        }
         if self.enum_receiver_name(receiver).is_some() {
-            return self.validate_enum_constructor(receiver, method, arguments, span);
+            return Some(self.validate_enum_constructor(receiver, method, arguments, span));
         }
-        if method == "raw_slice" {
-            return self.visit_raw_slice_call(receiver, arguments, span);
-        }
+        (method == "raw_slice").then(|| self.visit_raw_slice_call(receiver, arguments, span))
+    }
+
+    fn visit_static_method_call(
+        &mut self,
+        receiver: &Expr,
+        method: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         self.visit_expression(receiver)?;
         let Some(actual_type) = self.expression_struct_type(receiver) else {
             return Err(SemanticError {
@@ -43,26 +66,47 @@ impl Analyzer {
                 kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
                 span,
             })?;
-        if &actual_type != receiver_type {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::ReceiverTypeMismatch {
-                    method: method.to_owned(),
-                    expected: receiver_type.clone(),
-                    found: actual_type,
-                },
-                span,
-            });
-        }
+        self.validate_receiver_type(&actual_type, receiver_type, method, span)?;
         let combined = self.method_arguments(receiver, receiver_role, receiver_name, arguments);
         if performance.is_some() {
-            if let Some(role_name) = self.performance_role(&actual_type, method).map(str::to_owned)
-            {
-                self.mark_reachable_performance(&actual_type, method, &role_name);
-            }
-            self.visit_call_with_signature(method, &combined, span, &signature)
+            self.dispatch_performance_method(&actual_type, method, &combined, span, &signature)
         } else {
             self.visit_call(method, &combined, span)
         }
+    }
+
+    fn validate_receiver_type(
+        &self,
+        actual_type: &str,
+        receiver_type: &str,
+        method: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if actual_type == receiver_type {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::ReceiverTypeMismatch {
+                method: method.to_owned(),
+                expected: receiver_type.to_owned(),
+                found: actual_type.to_owned(),
+            },
+            span,
+        })
+    }
+
+    fn dispatch_performance_method(
+        &mut self,
+        actual_type: &str,
+        method: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+        signature: &super::super::calls::VerbSignature,
+    ) -> Result<(), SemanticError> {
+        if let Some(role_name) = self.performance_role(actual_type, method).map(str::to_owned) {
+            self.mark_reachable_performance(actual_type, method, &role_name);
+        }
+        self.visit_call_with_signature(method, arguments, span, signature)
     }
 
     fn method_signature(

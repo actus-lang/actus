@@ -77,11 +77,7 @@ impl Analyzer {
             | Expr::Borrow { expression, .. }
             | Expr::Unary { expression, .. }
             | Expr::Try { expression, .. } => self.arena_provenances(expression),
-            Expr::Binary { left, right, .. } => {
-                let mut arenas = self.arena_provenances(left);
-                arenas.extend(self.arena_provenances(right));
-                arenas
-            }
+            Expr::Binary { left, right, .. } => self.binary_arena_provenances(left, right),
             Expr::StructLit { fields, .. } => {
                 fields.iter().flat_map(|field| self.arena_provenances(&field.value)).collect()
             }
@@ -90,28 +86,45 @@ impl Analyzer {
                 .and_then(|index| self.field_arena_provenance.get(&(index, field.clone())).copied())
                 .into_iter()
                 .collect(),
-            Expr::Case { subject, branches, .. } => {
-                let mut arenas = self.arena_provenances(subject);
-                for branch in branches {
-                    match &branch.body {
-                        crate::ast::CaseBody::Expression(expression) => {
-                            arenas.extend(self.arena_provenances(expression));
-                        }
-                        crate::ast::CaseBody::Block(block) => {
-                            for statement in &block.statements {
-                                if let crate::ast::Stmt::Return {
-                                    value: Some(expression), ..
-                                } = statement
-                                {
-                                    arenas.extend(self.arena_provenances(expression));
-                                }
-                            }
-                        }
+            Expr::Case { subject, branches, .. } => self.case_arena_provenances(subject, branches),
+            _ => HashSet::new(),
+        }
+    }
+
+    fn binary_arena_provenances(&self, left: &Expr, right: &Expr) -> HashSet<usize> {
+        let mut arenas = self.arena_provenances(left);
+        arenas.extend(self.arena_provenances(right));
+        arenas
+    }
+
+    fn case_arena_provenances(
+        &self,
+        subject: &Expr,
+        branches: &[crate::ast::CaseBranch],
+    ) -> HashSet<usize> {
+        let mut arenas = self.arena_provenances(subject);
+        for branch in branches {
+            self.extend_case_branch_arenas(&mut arenas, branch);
+        }
+        arenas
+    }
+
+    fn extend_case_branch_arenas(
+        &self,
+        arenas: &mut HashSet<usize>,
+        branch: &crate::ast::CaseBranch,
+    ) {
+        match &branch.body {
+            crate::ast::CaseBody::Expression(expression) => {
+                arenas.extend(self.arena_provenances(expression));
+            }
+            crate::ast::CaseBody::Block(block) => {
+                for statement in &block.statements {
+                    if let crate::ast::Stmt::Return { value: Some(expression), .. } = statement {
+                        arenas.extend(self.arena_provenances(expression));
                     }
                 }
-                arenas
             }
-            _ => HashSet::new(),
         }
     }
 }

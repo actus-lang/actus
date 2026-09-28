@@ -12,6 +12,20 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        let struct_name = self.validate_assignment_target(object, field, span)?;
+        if self.pack_field(&struct_name, field).is_some() {
+            return self.validate_pack_field_assignment(&struct_name, field, value, span);
+        }
+        self.validate_struct_field_assignment(&struct_name, field, value, span)?;
+        self.record_field_arena_provenance(object, field, value, span)
+    }
+
+    fn validate_assignment_target(
+        &mut self,
+        object: &Expr,
+        field: &str,
+        span: SourceSpan,
+    ) -> Result<String, SemanticError> {
         let Some((name, object_span)) = super::access::root_binding(object) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
@@ -19,6 +33,29 @@ impl Analyzer {
             });
         };
         let binding_index = self.binding(name, object_span)?;
+        self.validate_assignment_owner(binding_index, name, field, span)?;
+        self.ensure_mutable(binding_index, name, object_span)?;
+        if !matches!(object, Expr::Identifier { .. }) {
+            self.visit_expression(object)?;
+        }
+        let Some(struct_name) =
+            self.expression_struct_type(object).or_else(|| self.expression_pack_type(object))
+        else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
+                span,
+            });
+        };
+        Ok(struct_name)
+    }
+
+    fn validate_assignment_owner(
+        &self,
+        binding_index: usize,
+        name: &str,
+        field: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         self.ensure_access_available(binding_index, name, span)?;
         if !matches!(self.model.bindings[binding_index].role, Role::Erg | Role::Ins) {
             return Err(SemanticError {
@@ -38,23 +75,7 @@ impl Analyzer {
                 span,
             });
         }
-        self.ensure_mutable(binding_index, name, object_span)?;
-        if !matches!(object, Expr::Identifier { .. }) {
-            self.visit_expression(object)?;
-        }
-        let Some(struct_name) =
-            self.expression_struct_type(object).or_else(|| self.expression_pack_type(object))
-        else {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
-                span,
-            });
-        };
-        if self.pack_field(&struct_name, field).is_some() {
-            return self.validate_pack_field_assignment(&struct_name, field, value, span);
-        }
-        self.validate_struct_field_assignment(&struct_name, field, value, span)?;
-        self.record_field_arena_provenance(object, field, value, span)
+        Ok(())
     }
 
     fn validate_struct_field_assignment(

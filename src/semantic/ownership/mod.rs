@@ -13,6 +13,26 @@ impl Analyzer {
         subject: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        let (index, name) = self.validate_dat_case_subject(subject, span)?;
+        match self.model.bindings[index].ownership {
+            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::PartiallyMoved { .. }
+            | OwnershipState::Moved
+            | OwnershipState::Dropped => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
+                    span,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_dat_case_subject(
+        &self,
+        subject: &Expr,
+        span: SourceSpan,
+    ) -> Result<(usize, String), SemanticError> {
         let Expr::Identifier { name, span: subject_span } = subject else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidCaseRole {
@@ -43,6 +63,17 @@ impl Analyzer {
             });
         }
         self.ensure_arena_references_inactive(index, name, span)?;
+        Ok((index, name.clone()))
+    }
+
+    pub(super) fn initialize_owner(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some((index, name)) = self.validate_owner_source(expression, span)? else {
+            return Ok(());
+        };
         match self.model.bindings[index].ownership {
             OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
             OwnershipState::PartiallyMoved { .. }
@@ -57,12 +88,12 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn initialize_owner(
-        &mut self,
+    fn validate_owner_source(
+        &self,
         expression: &Expr,
         span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Expr::Identifier { name, span: identifier_span } = expression else { return Ok(()) };
+    ) -> Result<Option<(usize, String)>, SemanticError> {
+        let Expr::Identifier { name, span: identifier_span } = expression else { return Ok(None) };
         let index = self.binding(name, *identifier_span)?;
         self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Ins {
@@ -86,18 +117,7 @@ impl Analyzer {
                 span,
             });
         }
-        match self.model.bindings[index].ownership {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
-            OwnershipState::PartiallyMoved { .. }
-            | OwnershipState::Moved
-            | OwnershipState::Dropped => {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::UseAfterMove { name: name.clone() },
-                    span,
-                });
-            }
-        }
-        Ok(())
+        Ok(Some((index, name.clone())))
     }
 
     pub(super) fn ensure_readable(

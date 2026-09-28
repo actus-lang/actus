@@ -37,28 +37,33 @@ impl Analyzer {
             self.plan_return_unwind(statement_span);
             return Ok(());
         };
-        let index = self.binding(name, *span)?;
-        self.ensure_access_available(index, name, *span)?;
-        self.reject_ins_return(index, name, *span)?;
+        self.move_returned_binding(name, *span)?;
+        self.plan_return_unwind(statement_span);
+        Ok(())
+    }
+
+    fn move_returned_binding(&mut self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
+        let index = self.binding(name, span)?;
+        self.ensure_access_available(index, name, span)?;
+        self.reject_ins_return(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
-                kind: SemanticErrorKind::BorrowedReturn { name: name.clone() },
-                span: *span,
+                kind: SemanticErrorKind::BorrowedReturn { name: name.to_owned() },
+                span,
             });
         }
         if self.model.bindings[index].access.is_frozen() {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MoveFrozen {
-                    name: name.clone(),
+                    name: name.to_owned(),
                     borrow_ids: self.blocking_borrow_ids(index),
                 },
-                span: *span,
+                span,
             });
         }
         if matches!(self.model.bindings[index].ownership, OwnershipState::Active) {
             self.model.bindings[index].ownership = OwnershipState::Moved;
         }
-        self.plan_return_unwind(statement_span);
         Ok(())
     }
 
@@ -105,32 +110,7 @@ impl Analyzer {
         if let Some(expected) = self.current_return_type_name.as_ref()
             && expected.name == "Result"
         {
-            let valid = if matches!(expression, Expr::Try { .. }) {
-                expected
-                    .arguments
-                    .first()
-                    .and_then(|type_name| crate::ast::lookup_builtin_type(&type_name.name))
-                    == self.expression_type(expression)
-            } else if let Expr::Case { branches, .. } = expression {
-                branches.iter().all(|branch| self.case_branch_returns_result(branch, expected))
-            } else {
-                let found = self.expression_type_name(expression);
-                found.as_deref()
-                    == Some(super::super::analyzer::canonical_type_name(expected).as_str())
-                    || (expected.name == "Result" && found.as_deref() == Some("Result"))
-            };
-            if valid {
-                return Ok(());
-            }
-            return Err(SemanticError {
-                kind: SemanticErrorKind::ReturnTypeMismatch {
-                    expected: super::super::analyzer::canonical_type_name(expected),
-                    found: self
-                        .expression_type_name(expression)
-                        .unwrap_or_else(|| "unknown".to_owned()),
-                },
-                span: expression_span(expression),
-            });
+            return self.validate_result_return_type(expected, expression);
         }
         let Some(expected) = self.current_return_type_name.as_ref() else { return Ok(()) };
         let expected_name = super::super::analyzer::canonical_type_name(expected);
@@ -140,6 +120,38 @@ impl Analyzer {
         }
         Err(SemanticError {
             kind: SemanticErrorKind::ReturnTypeMismatch { expected: expected_name, found },
+            span: expression_span(expression),
+        })
+    }
+
+    fn validate_result_return_type(
+        &self,
+        expected: &crate::ast::TypeName,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        let valid = if matches!(expression, Expr::Try { .. }) {
+            expected
+                .arguments
+                .first()
+                .and_then(|type_name| crate::ast::lookup_builtin_type(&type_name.name))
+                == self.expression_type(expression)
+        } else if let Expr::Case { branches, .. } = expression {
+            branches.iter().all(|branch| self.case_branch_returns_result(branch, expected))
+        } else {
+            let found = self.expression_type_name(expression);
+            found.as_deref() == Some(super::super::analyzer::canonical_type_name(expected).as_str())
+                || found.as_deref() == Some("Result")
+        };
+        if valid {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::ReturnTypeMismatch {
+                expected: super::super::analyzer::canonical_type_name(expected),
+                found: self
+                    .expression_type_name(expression)
+                    .unwrap_or_else(|| "unknown".to_owned()),
+            },
             span: expression_span(expression),
         })
     }

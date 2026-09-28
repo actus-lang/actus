@@ -22,39 +22,58 @@ impl Analyzer {
             Expr::Identifier { name, span } => {
                 self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
             }
-            Expr::Call { callee, span, .. } => match lookup_call_intrinsic(callee) {
-                Some(IntrinsicKind::Append) => Some(BuiltinType::Int),
-                Some(IntrinsicKind::Print) => Some(BuiltinType::Int),
-                Some(IntrinsicKind::Drop) => None,
-                None => self
-                    .inferred_expression_types
-                    .get(&(span.start, span.end))
-                    .and_then(|type_name| lookup_builtin_type(&type_name.name))
-                    .or_else(|| {
-                        self.signatures.get(callee).and_then(|signature| signature.return_type)
-                    }),
-            },
+            Expr::Call { callee, span, .. } => self.call_expression_type(callee, *span),
             Expr::MethodCall { receiver, method, .. } if method == "raw_slice" => {
                 (self.expression_type(receiver) == Some(BuiltinType::Buffer))
                     .then_some(BuiltinType::Buffer)
             }
-            Expr::MethodCall { method, span, .. } => self
+            Expr::MethodCall { method, span, .. } => self.method_expression_type(method, *span),
+            Expr::StructLit { .. } => None,
+            Expr::FieldAccess { object, field, .. } => self.field_expression_type(object, field),
+            Expr::Case { branches, .. } => self.case_expression_type(branches),
+        }
+    }
+
+    fn call_expression_type(
+        &self,
+        callee: &str,
+        span: crate::lexer::SourceSpan,
+    ) -> Option<BuiltinType> {
+        match lookup_call_intrinsic(callee) {
+            Some(IntrinsicKind::Append | IntrinsicKind::Print) => Some(BuiltinType::Int),
+            Some(IntrinsicKind::Drop) => None,
+            None => self
                 .inferred_expression_types
                 .get(&(span.start, span.end))
                 .and_then(|type_name| lookup_builtin_type(&type_name.name))
                 .or_else(|| {
-                    self.signatures.get(method).and_then(|signature| signature.return_type)
+                    self.signatures.get(callee).and_then(|signature| signature.return_type)
                 }),
-            Expr::StructLit { .. } => None,
-            Expr::FieldAccess { object, field, .. } => self
-                .expression_struct_type(object)
-                .and_then(|name| self.struct_field(&name, field))
-                .and_then(|field| lookup_builtin_type(&field.ty.name)),
-            Expr::Case { branches, .. } => branches.iter().find_map(|branch| match &branch.body {
-                CaseBody::Expression(expression) => self.expression_type(expression),
-                CaseBody::Block(_) => None,
-            }),
         }
+    }
+
+    fn method_expression_type(
+        &self,
+        method: &str,
+        span: crate::lexer::SourceSpan,
+    ) -> Option<BuiltinType> {
+        self.inferred_expression_types
+            .get(&(span.start, span.end))
+            .and_then(|type_name| lookup_builtin_type(&type_name.name))
+            .or_else(|| self.signatures.get(method).and_then(|signature| signature.return_type))
+    }
+
+    fn field_expression_type(&self, object: &Expr, field: &str) -> Option<BuiltinType> {
+        self.expression_struct_type(object)
+            .and_then(|name| self.struct_field(&name, field))
+            .and_then(|field| lookup_builtin_type(&field.ty.name))
+    }
+
+    fn case_expression_type(&self, branches: &[crate::ast::CaseBranch]) -> Option<BuiltinType> {
+        branches.iter().find_map(|branch| match &branch.body {
+            CaseBody::Expression(expression) => self.expression_type(expression),
+            CaseBody::Block(_) => None,
+        })
     }
 
     pub(crate) fn expression_type_name(&self, expression: &Expr) -> Option<String> {

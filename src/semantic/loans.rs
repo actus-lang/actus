@@ -8,6 +8,8 @@ use super::model::ExclusiveLoan;
 use super::state::AccessState;
 use crate::ast::{Argument, Role};
 
+type PendingExclusiveLoan = (usize, usize, String, usize, crate::lexer::SourceSpan);
+
 impl Analyzer {
     pub(super) fn validate_exclusive_aliases(
         &self,
@@ -43,30 +45,13 @@ impl Analyzer {
         parameter_indices: &[usize],
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
-        let mut loans = Vec::new();
+        let mut loans: Vec<PendingExclusiveLoan> = Vec::new();
         for (argument, parameter_index) in arguments.iter().zip(parameter_indices) {
-            if signature.params[*parameter_index].1 != Role::Ins {
-                continue;
-            }
-            let Some(root) = self.root_binding_index(&argument.expression) else {
-                continue;
-            };
-            let loan_id = self.next_loan_id;
-            self.next_loan_id += 1;
-            let owner = self.model.bindings[root].name.clone();
-            if !matches!(self.model.bindings[root].access, AccessState::Mutable)
-                || !self.model.bindings[root].ownership.is_live()
+            if let Some(loan) =
+                self.prepare_exclusive_loan(callee, argument, *parameter_index, signature)?
             {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::InvalidArgumentRole {
-                        callee: callee.to_owned(),
-                        parameter: signature.params[*parameter_index].0.clone(),
-                    },
-                    span: argument_span(argument),
-                });
+                loans.push(loan);
             }
-            self.model.bindings[root].access = AccessState::Suspended { loan_id };
-            loans.push((root, loan_id, owner, parameter_index, argument_span(argument)));
         }
         for (root, loan_id, owner, parameter_index, span) in loans {
             let resumed = self.model.bindings[root].access == AccessState::Suspended { loan_id };
@@ -77,11 +62,40 @@ impl Analyzer {
                 id: loan_id,
                 owner,
                 callee: callee.to_owned(),
-                parameter: signature.params[*parameter_index].0.clone(),
+                parameter: signature.params[parameter_index].0.clone(),
                 origin_span: span,
             });
         }
         Ok(())
+    }
+
+    fn prepare_exclusive_loan(
+        &mut self,
+        callee: &str,
+        argument: &Argument,
+        parameter_index: usize,
+        signature: &VerbSignature,
+    ) -> Result<Option<PendingExclusiveLoan>, SemanticError> {
+        if signature.params[parameter_index].1 != Role::Ins {
+            return Ok(None);
+        }
+        let Some(root) = self.root_binding_index(&argument.expression) else { return Ok(None) };
+        if !matches!(self.model.bindings[root].access, AccessState::Mutable)
+            || !self.model.bindings[root].ownership.is_live()
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidArgumentRole {
+                    callee: callee.to_owned(),
+                    parameter: signature.params[parameter_index].0.clone(),
+                },
+                span: argument_span(argument),
+            });
+        }
+        let loan_id = self.next_loan_id;
+        self.next_loan_id += 1;
+        let owner = self.model.bindings[root].name.clone();
+        self.model.bindings[root].access = AccessState::Suspended { loan_id };
+        Ok(Some((root, loan_id, owner, parameter_index, argument_span(argument))))
     }
 }
 

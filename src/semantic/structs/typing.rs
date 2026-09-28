@@ -17,10 +17,8 @@ impl Analyzer {
     }
 
     pub(crate) fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
-        if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
-            && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
-        {
-            return Some(type_name.clone());
+        if let Some(type_name) = self.inferred_call_type(expression) {
+            return Some(type_name);
         }
         match expression {
             Expr::StructLit { name, type_arguments, span, .. } => Some(TypeName {
@@ -29,21 +27,7 @@ impl Analyzer {
                 reference_role: None,
                 span: *span,
             }),
-            Expr::Identifier { name, span } => self.binding(name, *span).ok().and_then(|index| {
-                self.binding_type_names
-                    .get(&index)
-                    .cloned()
-                    .or_else(|| self.binding_enum_type_applications.get(&index).cloned())
-                    .or_else(|| self.binding_struct_type_applications.get(&index).cloned())
-                    .or_else(|| {
-                        self.binding_struct_types.get(&index).map(|name| TypeName {
-                            name: name.clone(),
-                            arguments: Vec::new(),
-                            reference_role: None,
-                            span: *span,
-                        })
-                    })
-            }),
+            Expr::Identifier { name, span } => self.identifier_type_name(name, *span),
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
                 self.resolved_type_name(expression)
             }
@@ -55,6 +39,30 @@ impl Analyzer {
                 .and_then(|type_name| self.specialized_field_type(&type_name, field)),
             _ => None,
         }
+    }
+
+    fn inferred_call_type(&self, expression: &Expr) -> Option<TypeName> {
+        let (Expr::Call { span, .. } | Expr::MethodCall { span, .. }) = expression else {
+            return None;
+        };
+        self.inferred_expression_types.get(&(span.start, span.end)).cloned()
+    }
+
+    fn identifier_type_name(&self, name: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
+        let index = self.binding(name, span).ok()?;
+        self.binding_type_names
+            .get(&index)
+            .cloned()
+            .or_else(|| self.binding_enum_type_applications.get(&index).cloned())
+            .or_else(|| self.binding_struct_type_applications.get(&index).cloned())
+            .or_else(|| {
+                self.binding_struct_types.get(&index).map(|name| TypeName {
+                    name: name.clone(),
+                    arguments: Vec::new(),
+                    reference_role: None,
+                    span,
+                })
+            })
     }
 
     fn specialized_field_type(&self, type_name: &TypeName, field: &str) -> Option<TypeName> {

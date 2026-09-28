@@ -25,7 +25,26 @@ impl Analyzer {
                 span: *span,
             });
         };
-        let candidate_payload = candidate.payload.clone();
+        self.register_variant_cleanup(
+            binding_index,
+            enum_name,
+            variant,
+            candidate.payload.clone(),
+            payload,
+            substitution.as_ref(),
+        );
+        Ok(())
+    }
+
+    fn register_variant_cleanup(
+        &mut self,
+        binding_index: usize,
+        enum_name: &str,
+        variant: &str,
+        candidate_payload: EnumPayload,
+        payload: &VariantPayload,
+        substitution: Option<&super::type_substitution::TypeSubstitution>,
+    ) {
         match (candidate_payload, payload) {
             (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => self
                 .register_tuple_cleanup(
@@ -34,7 +53,7 @@ impl Analyzer {
                     variant,
                     types,
                     bindings,
-                    substitution.as_ref(),
+                    substitution,
                 ),
             (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => self
                 .register_named_cleanup(
@@ -43,11 +62,10 @@ impl Analyzer {
                     variant,
                     fields,
                     patterns,
-                    substitution.as_ref(),
+                    substitution,
                 ),
             _ => {}
         }
-        Ok(())
     }
 
     fn enum_substitution_for_binding(
