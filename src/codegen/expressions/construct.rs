@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
@@ -7,36 +5,11 @@ use crate::ast::{Argument, Expr};
 use super::super::calls::CallLoweringContext;
 use super::super::calls::{lower_call, lower_method_call};
 use super::super::enums::{enum_receiver_name, lower_enum_constructor};
-use super::super::layout::LayoutRegistry;
-use super::super::literals::StringDataValues;
-use super::super::model::NativeCleanupSchedule;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::NativeEmitError;
 use super::super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
 use super::super::types::NativeType;
 
-#[allow(clippy::too_many_arguments)]
 pub(in crate::codegen) fn lower_construct(
-    function: &mut FunctionBuilder<'_>,
-    expression: &Expr,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let context = CallLoweringContext::new(
-        locals,
-        local_types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-    );
-    lower_construct_with_context(function, expression, &context)
-}
-
-fn lower_construct_with_context(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,

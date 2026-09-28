@@ -5,6 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
+use super::calls::CallLoweringContext;
 use super::case::lower_case;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -40,71 +41,48 @@ pub(super) fn lower_expression(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Value, NativeEmitError> {
-    match expression {
-        Expr::Integer { value, .. } => lower_integer(function, value),
-        Expr::BufferLiteral { length, .. } => lower_buffer_literal(
-            function,
-            length,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-        Expr::FloatLiteral { value, .. } => lower_float(function, value),
-        Expr::StringLiteral { value, .. } => lower_string(function, value, string_data),
-        Expr::Identifier { name, .. } => lower_identifier(name, locals),
-        Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => lower_expression(
-            function,
-            expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-        _ => lower_complex_expression(
-            function,
-            expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn lower_buffer_literal(
-    function: &mut FunctionBuilder<'_>,
-    length: &Expr,
-    locals: &HashMap<&String, Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
-    let length = lower_expression(
-        function,
-        length,
+    let context = CallLoweringContext::new(
         locals,
         local_types,
         functions,
         cleanup_schedule,
         string_data,
         layouts,
-    )?;
-    let length = if function.func.dfg.value_type(length) == layouts.pointer_type {
+    );
+    lower_expression_with_context(function, expression, &context)
+}
+
+fn lower_expression_with_context(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, NativeEmitError> {
+    match expression {
+        Expr::Integer { value, .. } => lower_integer(function, value),
+        Expr::BufferLiteral { length, .. } => lower_buffer_literal(function, length, context),
+        Expr::FloatLiteral { value, .. } => lower_float(function, value),
+        Expr::StringLiteral { value, .. } => lower_string(function, value, context.string_data),
+        Expr::Identifier { name, .. } => lower_identifier(name, context.locals),
+        Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
+            lower_expression_with_context(function, expression, context)
+        }
+        _ => lower_complex_expression(function, expression, context),
+    }
+}
+
+fn lower_buffer_literal(
+    function: &mut FunctionBuilder<'_>,
+    length: &Expr,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, NativeEmitError> {
+    let length = lower_expression_with_context(function, length, context)?;
+    let length = if function.func.dfg.value_type(length) == context.layouts.pointer_type {
         length
     } else {
-        function.ins().uextend(layouts.pointer_type, length)
+        function.ins().uextend(context.layouts.pointer_type, length)
     };
-    let allocator = functions
+    let allocator = context
+        .functions
         .get("__actus_buffer_allocate")
         .ok_or_else(|| NativeEmitError("native buffer allocator is unavailable".to_owned()))?;
     let call = function.ins().call(allocator.reference, &[length]);
@@ -115,88 +93,69 @@ fn lower_buffer_literal(
         .ok_or_else(|| NativeEmitError("native buffer allocator returned no value".to_owned()))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn lower_complex_expression(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
-    locals: &HashMap<&String, Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
+    context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     match expression {
         Expr::Try { expression, span } => lower_try_expression(
             function,
             expression,
             *span,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
+            context.locals,
+            context.local_types,
+            context.functions,
+            context.cleanup_schedule,
+            context.string_data,
+            context.layouts,
         ),
         Expr::Unary { .. } | Expr::Binary { .. } => lower_operation(
             function,
             expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
+            context.locals,
+            context.local_types,
+            context.functions,
+            context.cleanup_schedule,
+            context.string_data,
+            context.layouts,
         ),
-        _ => lower_construct_or_case(
-            function,
-            expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
+        _ => lower_construct_or_case(function, expression, context),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn lower_construct_or_case(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
-    locals: &HashMap<&String, Value>,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
-    string_data: &StringDataValues,
-    layouts: &LayoutRegistry,
+    context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     match expression {
         Expr::Call { .. }
         | Expr::MethodCall { .. }
         | Expr::StructLit { .. }
-        | Expr::FieldAccess { .. } => lower_construct(
-            function,
-            expression,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-        Expr::Case { subject, branches, .. } => lower_case(
-            function,
-            subject,
-            branches,
-            locals,
-            local_types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
+        | Expr::FieldAccess { .. } => lower_construct(function, expression, context),
+        Expr::Case { subject, branches, .. } => {
+            lower_case_expression(function, subject, branches, context)
+        }
         _ => Err(NativeEmitError("unsupported native expression".to_owned())),
     }
+}
+
+fn lower_case_expression(
+    function: &mut FunctionBuilder<'_>,
+    subject: &Expr,
+    branches: &[crate::ast::CaseBranch],
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, NativeEmitError> {
+    lower_case(
+        function,
+        subject,
+        branches,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )
 }
