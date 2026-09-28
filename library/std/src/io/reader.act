@@ -5,6 +5,6 @@ The static read contract used by buffered input adapters.
 `ins buffer` is the caller-owned destination filled without allocation.
 """
 open role Reader {
-    """Read into caller storage; `Self` is statically bound to each implementor."""
+    """Read through ins receiver and buffer loans, returning count or typed error."""
     verb read(ins self: Self, ins buffer: Buffer) -> Result[Int, IoError];
 }

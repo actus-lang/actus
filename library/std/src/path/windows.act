@@ -31,7 +31,7 @@ otherwise `0`; no UTF-8 conversion or allocation occurs.
 """
 open unsafe extern "C" verb actus_windows_is_separator(erg byte: Int) -> Int;
 
-"""Return `1` for raw Windows `/` or `\\` and `0` otherwise."""
+"""Return `1` for the erg byte representing raw Windows `/` or `\\` and `0` otherwise."""
 open verb windows_is_separator(erg byte: Int) -> Int {
     return actus_windows_is_separator(byte: erg byte);
 }

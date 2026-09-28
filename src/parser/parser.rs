@@ -87,10 +87,6 @@ impl Parser {
         }
     }
 
-    fn parse_verb(&mut self, is_open: bool) -> Result<VerbDecl, ParseError> {
-        self.parse_verb_with_metadata(is_open, Vec::new(), None)
-    }
-
     fn parse_verb_with_metadata(
         &mut self,
         is_open: bool,

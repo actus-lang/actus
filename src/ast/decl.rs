@@ -24,6 +24,7 @@ pub enum TopLevelDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OpenSiblingDecl {
+    pub doc: Option<String>,
     pub name: String,
     pub span: SourceSpan,
 }
@@ -45,6 +46,7 @@ pub struct RoleDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleMethod {
+    pub doc: Option<String>,
     pub name: String,
     pub params: Vec<Param>,
     pub return_type: Option<ReturnType>,
@@ -54,6 +56,7 @@ pub struct RoleMethod {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerformDecl {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub role_name: String,
     pub target: TypeName,
     pub methods: Vec<VerbDecl>,
@@ -63,6 +66,7 @@ pub struct PerformDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnumDef {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
     pub variants: Vec<EnumVariant>,
@@ -71,6 +75,7 @@ pub struct EnumDef {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnumVariant {
+    pub doc: Option<String>,
     pub name: String,
     pub payload: EnumPayload,
     pub span: SourceSpan,
@@ -85,6 +90,7 @@ pub enum EnumPayload {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnumField {
+    pub doc: Option<String>,
     pub name: String,
     pub ty: TypeName,
     pub span: SourceSpan,
@@ -102,6 +108,7 @@ pub struct StructDef {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructField {
+    pub doc: Option<String>,
     pub role: StructFieldRole,
     pub name: String,
     pub ty: TypeName,
@@ -111,7 +118,10 @@ pub struct StructField {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PackDecl {
     pub is_open: bool,
+    pub doc: Option<String>,
     pub name: String,
+    pub storage_name: String,
+    pub storage_doc: Option<String>,
     pub storage: TypeName,
     pub endianness: LayoutEndianness,
     pub fields: Vec<PackField>,
@@ -120,6 +130,7 @@ pub struct PackDecl {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PackField {
+    pub doc: Option<String>,
     pub role: Role,
     pub name: String,
     pub ty: TypeName,
@@ -231,15 +242,18 @@ pub fn builtin_enum_definitions() -> Vec<EnumDef> {
     vec![
         EnumDef {
             is_open: false,
+            doc: None,
             name: "Option".to_owned(),
             generic_parameters: vec![generic_parameter("T")],
             variants: vec![
                 EnumVariant {
+                    doc: None,
                     name: "Some".to_owned(),
                     payload: EnumPayload::Tuple(vec![type_name("T")]),
                     span: zero_span(),
                 },
                 EnumVariant {
+                    doc: None,
                     name: "None".to_owned(),
                     payload: EnumPayload::Unit,
                     span: zero_span(),
@@ -249,15 +263,18 @@ pub fn builtin_enum_definitions() -> Vec<EnumDef> {
         },
         EnumDef {
             is_open: false,
+            doc: None,
             name: "Result".to_owned(),
             generic_parameters: vec![generic_parameter("T"), generic_parameter("E")],
             variants: vec![
                 EnumVariant {
+                    doc: None,
                     name: "Ok".to_owned(),
                     payload: EnumPayload::Tuple(vec![type_name("T")]),
                     span: zero_span(),
                 },
                 EnumVariant {
+                    doc: None,
                     name: "Err".to_owned(),
                     payload: EnumPayload::Tuple(vec![type_name("E")]),
                     span: zero_span(),

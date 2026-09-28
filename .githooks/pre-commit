@@ -14,5 +14,8 @@ echo "Checking source limits..."
 echo "Checking architecture boundaries..."
 ./scripts/check_architecture.sh
 
+echo "Checking public Actus documentation..."
+./scripts/check_documentation.sh
+
 echo "Scanning tracked files for secrets..."
 ./scripts/check_secrets.sh

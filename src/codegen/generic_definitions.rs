@@ -63,6 +63,7 @@ pub(super) fn specialized_enums(
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(EnumDef {
                 is_open: false,
+                doc: definition.doc.clone(),
                 name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
                 variants,
@@ -171,6 +172,7 @@ fn specialize_field(
     generic_names: &HashSet<String>,
 ) -> Result<StructField, NativeEmitError> {
     Ok(StructField {
+        doc: field.doc.clone(),
         role: field.role.clone(),
         name: field.name.clone(),
         ty: specialize_type(&substitution.apply(&field.ty), generic_names),
@@ -195,6 +197,7 @@ fn specialize_variant(
             fields
                 .iter()
                 .map(|field| crate::ast::EnumField {
+                    doc: field.doc.clone(),
                     name: field.name.clone(),
                     ty: specialize_type(&substitution.apply(&field.ty), generic_names),
                     span: field.span,
@@ -202,7 +205,12 @@ fn specialize_variant(
                 .collect(),
         ),
     };
-    Ok(EnumVariant { name: variant.name.clone(), payload, span: variant.span })
+    Ok(EnumVariant {
+        doc: variant.doc.clone(),
+        name: variant.name.clone(),
+        payload,
+        span: variant.span,
+    })
 }
 
 fn specialize_type(type_name: &TypeName, generic_names: &HashSet<String>) -> TypeName {

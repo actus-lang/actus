@@ -35,6 +35,21 @@ pub const STRICT_LEGACY_MANIFEST: &str = "E1801";
 /// by strict configuration loading.
 pub const STRICT_LEGACY_DEPENDENCY: &str = "E1802";
 
+/// Missing or empty public block documentation.
+pub const STRICT_DOCUMENTATION_MISSING: &str = "E1840";
+
+/// A required public documentation contract section is absent.
+pub const STRICT_DOCUMENTATION_SECTION: &str = "E1841";
+
+/// Public documentation is an incomplete or signature-restating summary.
+pub const STRICT_DOCUMENTATION_RESTATEMENT: &str = "E1842";
+
+/// Public documentation contradicts an ownership contract.
+pub const STRICT_DOCUMENTATION_CONTRADICTION: &str = "E1844";
+
+/// Public documentation promises behavior the declaration cannot guarantee.
+pub const STRICT_DOCUMENTATION_MISREPRESENTATION: &str = "E1845";
+
 /// Classifies a strict-conformance code by its reserved `E18xx` range.
 pub fn strict_code_category(code: &str) -> Option<StrictDiagnosticCategory> {
     let number = code.strip_prefix('E')?.parse::<u16>().ok()?;

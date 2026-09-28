@@ -17,6 +17,7 @@ open read;
 open write;
 """Re-export static reader and writer contracts."""
 open reader;
+"""Re-export the static writer contract."""
 open writer;
 """Re-export the in-memory cursor stream."""
 open cursor;

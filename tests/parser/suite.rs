@@ -125,6 +125,44 @@ fn docstrings_inside_supported_bodies_are_consumed_as_documentation() {
 }
 
 #[test]
+fn preserves_nested_and_performance_documentation_in_the_ast() {
+    let program = parse_source(
+        r#"
+        """Packet storage contract.""" open struct Packet {
+            """Owned payload bytes.""" erg payload: Buffer,
+        }
+        """Status contract.""" open enum Status {
+            """Ready variant.""" Ready,
+        }
+        """Reader contract.""" open role Reader {
+            """Read through an ins loan.""" verb read(ins self: Self) -> Int;
+        }
+        """Reader performance.""" open perform Reader for Packet {
+            """Read the packet.""" verb read(ins self: Packet) -> Int { return 0; }
+        }
+        """Exported sibling.""" open stream;
+        "#,
+    );
+    let TopLevelDecl::Struct(packet) = &program.declarations[0] else { panic!("expected struct") };
+    assert_eq!(packet.doc.as_deref(), Some("Packet storage contract."));
+    assert_eq!(packet.fields[0].doc.as_deref(), Some("Owned payload bytes."));
+    let TopLevelDecl::Enum(status) = &program.declarations[1] else { panic!("expected enum") };
+    assert_eq!(status.doc.as_deref(), Some("Status contract."));
+    assert_eq!(status.variants[0].doc.as_deref(), Some("Ready variant."));
+    let TopLevelDecl::Role(reader) = &program.declarations[2] else { panic!("expected role") };
+    assert_eq!(reader.methods[0].doc.as_deref(), Some("Read through an ins loan."));
+    let TopLevelDecl::Perform(perform) = &program.declarations[3] else {
+        panic!("expected perform")
+    };
+    assert_eq!(perform.doc.as_deref(), Some("Reader performance."));
+    assert_eq!(perform.methods[0].doc.as_deref(), Some("Read the packet."));
+    let TopLevelDecl::OpenSibling(sibling) = &program.declarations[4] else {
+        panic!("expected sibling")
+    };
+    assert_eq!(sibling.doc.as_deref(), Some("Exported sibling."));
+}
+
+#[test]
 fn parses_instrumental_parameters_and_call_site_roles() {
     let program = parse_source(
         "verb update(ins buffer: Buffer) { } verb main(erg buffer: Buffer) { update(buffer: ins buffer); }",

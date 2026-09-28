@@ -21,6 +21,6 @@ The positional stream contract for owned file handles.
 transfer or duplicate the underlying resource.
 """
 open role Seeker {
-    """Move the stream and return its resulting absolute byte position."""
+    """Move through an ins handle and dat origin, returning position or typed error."""
     verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError];
 }

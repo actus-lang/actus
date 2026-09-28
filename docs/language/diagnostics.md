@@ -36,3 +36,8 @@ New diagnostics must use a new stable code, include a focused positive or
 negative test, and document the code's category here. Strict-conformance codes
 must remain inside the reserved `E1800`–`E1899` range and use the category
 sub-range assigned above.
+
+The documentation validator currently reports `E1840` for a missing or empty
+block, `E1841` for a missing contract section, `E1842` for an incomplete or
+signature-restating summary, `E1844` for an ownership contradiction, and
+`E1845` for a result guarantee that misrepresents implementation behavior.

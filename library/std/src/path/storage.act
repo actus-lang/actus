@@ -27,7 +27,8 @@ open unsafe extern "C" verb actus_path_payload_length(abs storage: Buffer) -> In
 Return the total capacity of validated raw storage.
 
 The result includes space reserved for the trailing null terminator. A
-negative result means that the runtime rejected the buffer metadata.
+negative result means that the runtime rejected the buffer metadata and is
+returned as a typed validation failure.
 """
 open unsafe extern "C" verb actus_path_storage_capacity(abs storage: Buffer) -> Int;
 
@@ -84,6 +85,8 @@ Validate and own Windows raw UTF-16 code-unit bytes.
 
 `storage` is transferred with `dat`; each code unit occupies two bytes in the
 target ABI layout. No UTF-8 conversion or temporary text allocation occurs.
+`Ok(Path)` returns owned validated storage; `Err(PathError)` reports the
+precise validation failure after rejected storage is dropped.
 """
 open verb path_from_windows_utf16(dat storage: Buffer) -> Result[Path, PathError] {
     erg unit_width = 2;

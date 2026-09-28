@@ -239,12 +239,11 @@ checkbox is marked complete.
 | `path/path.act` | Public facade for path types, storage, errors, components, platform parsers, predicates, normalization, and builders. |
 | `lib.act` | Standard-library root facade. |
 
-The current syntactic count is 195 public-looking declarations in the `io`,
-`fs`, and `path` trees and 290 `"""`/`///` documentation markers. These are
-inventory counts, not a coverage result: one block may document a declaration,
-an ABI bridge, or a grouping comment. Gate 18.10 must perform declaration-level
-matching and require documentation for purpose, ownership roles, return/error
-contracts, side effects, and ABI relationships.
+The baseline contained 195 public-looking declarations in the `io`, `fs`, and
+`path` trees. Gate 18.7 now performs declaration-level matching through the
+parsed AST and validates the current 349 `"""`/`///` markers with accepted and
+rejected fixtures. The marker count remains an inventory fact, not a coverage
+substitute: each public declaration and member is checked independently.
 
 The public standard-library boundary is Actus code. Native behavior is reached
 through typed `unsafe extern "C"` declarations and runtime implementations;

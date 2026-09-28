@@ -5,6 +5,10 @@ so the host runtime receives one complete, immutable open request.
 """
 import io;
 import path;
+"""
+An owned set of erg scalar switches consumed by an open operation.
+The record has no external resource and is returned after each builder.
+"""
 open struct OpenOptions {
     """Permit reading from the opened handle when set to one."""
     erg read: Int,
@@ -68,7 +72,11 @@ open verb options_append(dat options: OpenOptions) -> OpenOptions {
     };
 }
 
-"""Enable truncation when opening an existing file."""
+"""
+Enable truncation while consuming `dat options`. The returned options retain
+owned configuration storage; the consumed value is not leaked and no path is
+allocated. The option is applied only when a later open uses it.
+"""
 open verb options_truncate(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
         read: options.read,
@@ -80,7 +88,11 @@ open verb options_truncate(dat options: OpenOptions) -> OpenOptions {
     };
 }
 
-"""Allow creation when the requested path does not exist."""
+"""
+Enable creation while consuming `dat options`. `OpenOptions` is returned with
+the updated owned flags; no path conversion or hidden allocation occurs, and
+the original options are not reused after the transfer.
+"""
 open verb options_create(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
         read: options.read,
@@ -92,7 +104,11 @@ open verb options_create(dat options: OpenOptions) -> OpenOptions {
     };
 }
 
-"""Require creation of a new path and reject an existing path."""
+"""
+Require creation of a new path while consuming `dat options`. The returned
+owned flags are deterministic; no path allocation occurs here. A later open
+returns `Err(IoError.Failed)` when the target already exists.
+"""
 open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
         read: options.read,
@@ -110,7 +126,8 @@ Open `path` using every flag in the consumed `options` value.
 The path is an `abs` view. The scalar flags are passed by value to the
 runtime, which returns an opaque handle or `-1` on failure. A successful
 handle becomes an owned `File`; the raw failure code is translated to
-`IoError.Failed` and is never exposed by the public API.
+`IoError.Failed` and is never exposed by the public API. No path bytes are
+copied or allocated at this ABI boundary.
 """
 open unsafe extern "C" verb actus_file_open_options_path(
     abs path: Path,
@@ -122,7 +139,11 @@ open unsafe extern "C" verb actus_file_open_options_path(
     abs create_new: Int
 ) -> Int;
 
-"""Consume options and return an owned File or a typed I/O failure."""
+"""
+Consume `dat options` and inspect an `abs path` without copying or allocating
+path text. `Ok(File)` transfers ownership of the opened handle; `Err` reports
+the typed `IoError` and all consumed resources are cleaned up.
+"""
 open verb options_open(dat options: OpenOptions, abs path: Path) -> Result[File, IoError] {
     erg handle = actus_file_open_options_path(
         path: abs path,

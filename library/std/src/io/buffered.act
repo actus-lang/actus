@@ -7,7 +7,7 @@ adapter for one call and fills the existing storage without allocation.
 open struct BufferedReader[Source: Reader] {
     """Concrete stream selected by static dispatch and owned by the adapter."""
     erg source: Source,
-    """Reusable storage filled by `refill`; it is never returned by the source."""
+    """Owned erg reusable storage filled by `refill`; it is never returned by the source."""
     erg buffer: Buffer,
 }
 
@@ -28,7 +28,7 @@ open struct BufferedWriter[Target: Writer] {
 Construct a buffered reader from an owned source and reusable buffer.
 
 Both `dat` arguments transfer ownership into the reader, which performs
-deterministic cleanup for the source and buffer.
+deterministic cleanup for the source and buffer and returns the new reader.
 """
 open verb buffered_reader[Source: Reader](dat source: Source, dat buffer: Buffer) -> BufferedReader[Source] {
     return BufferedReader[Source] { source: source, buffer: buffer, };
@@ -38,7 +38,7 @@ open verb buffered_reader[Source: Reader](dat source: Source, dat buffer: Buffer
 Construct a buffered writer from an owned target and reusable buffer.
 
 Both `dat` arguments transfer ownership into the writer. No second
-allocation is performed by the constructor.
+allocation is performed by the constructor, which returns the new writer.
 """
 open verb buffered_writer[Target: Writer](dat target: Target, dat buffer: Buffer) -> BufferedWriter[Target] {
     return BufferedWriter[Target] { target: target, buffer: buffer, };
@@ -64,16 +64,16 @@ open unsafe extern "C" verb actus_buffer_reserve(
     erg capacity: Int
 ) -> Int;
 
-"""Return reserved capacity, or `-1` for a null or invalid buffer handle."""
+"""Return reserved capacity through the C ABI, or `-1` for an invalid buffer handle."""
 open unsafe extern "C" verb actus_buffer_capacity(abs buffer: Buffer) -> Int;
 
-"""Return logical byte length, or `-1` for a null or invalid buffer handle."""
+"""Return logical byte length through the C ABI, or `-1` for an invalid buffer handle."""
 open unsafe extern "C" verb actus_buffer_length(abs buffer: Buffer) -> Int;
 
 """
 Append at most `length` bytes beginning at `offset` from the borrowed source.
 The `ins` target is never reallocated; the return value is the exact appended
-count, zero means full capacity, and `-1` means invalid handles or bounds.
+count from the C ABI, zero means full capacity, and `-1` means invalid handles or bounds.
 """
 open unsafe extern "C" verb actus_buffer_append_range(
     ins target: Buffer,
@@ -82,13 +82,14 @@ open unsafe extern "C" verb actus_buffer_append_range(
     erg length: Int
 ) -> Int;
 
-"""Clear logical length while retaining capacity; return cleared byte count or `-1`."""
+"""Clear an ins buffer's logical length through the C ABI while retaining capacity; return cleared byte count or `-1`."""
 open unsafe extern "C" verb actus_buffer_clear(ins buffer: Buffer) -> Int;
 
 """
 Reserve reusable storage for a buffered writer.
 
 The buffer length is preserved; only its backing capacity is increased.
+The verb returns the resulting capacity or a typed failure.
 """
 open verb reserve(ins buffer: Buffer, erg capacity: Int) -> Result[Int, IoError] {
     erg status = actus_buffer_reserve(buffer: ins buffer, capacity: capacity);
@@ -104,7 +105,7 @@ Write an immutable source through the selected writer target.
 The adapter first appends bytes to its fixed-capacity internal buffer. When
 that buffer becomes full, it is flushed through the selected target before
 more source bytes are accepted. The target is never called for a partial
-buffer merely because this verb returns.
+buffer merely because this verb returns; typed errors are propagated to the caller.
 """
 open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target],

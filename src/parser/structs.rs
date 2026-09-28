@@ -32,11 +32,11 @@ impl Parser {
             if self.at_end() {
                 return Err(self.error_at_current("`}`"));
             }
-            self.skip_doc_strings();
+            let doc = self.take_doc_string_group();
             if self.check_simple(&TokenKind::RightBrace) {
                 break;
             }
-            fields.push(self.parse_struct_field()?);
+            fields.push(self.parse_struct_field(doc)?);
             if !self.match_simple(TokenKind::Comma) {
                 break;
             }
@@ -44,7 +44,7 @@ impl Parser {
         Ok(fields)
     }
 
-    fn parse_struct_field(&mut self) -> Result<StructField, ParseError> {
+    fn parse_struct_field(&mut self, doc: Option<String>) -> Result<StructField, ParseError> {
         let first = self.advance_required("struct field")?;
         let (role, start) = match first.kind {
             TokenKind::Erg => (StructFieldRole::Erg, first.span.start),
@@ -79,7 +79,7 @@ impl Parser {
         };
         self.expect_simple(TokenKind::Colon, "`:`")?;
         let ty = self.parse_type_name()?;
-        Ok(StructField { role, name, span: SourceSpan::new(start, ty.span.end), ty })
+        Ok(StructField { doc, role, name, span: SourceSpan::new(start, ty.span.end), ty })
     }
 
     pub(super) fn parse_struct_literal(

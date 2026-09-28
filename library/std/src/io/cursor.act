@@ -15,14 +15,14 @@ open verb cursor(dat buffer: Buffer) -> Cursor {
     return Cursor { buffer: buffer, position: 0, };
 }
 
-"""Read bytes from a buffer position into a caller-owned destination."""
+"""Read bytes through the C ABI from a buffer position into a caller-owned destination, returning count or failure."""
 open unsafe extern "C" verb actus_cursor_read(
     abs source: Buffer,
     erg position: Int,
     ins target: Buffer
 ) -> Int;
 
-"""Write a borrowed source buffer at a buffer position."""
+"""Write a borrowed source buffer through the C ABI at a buffer position, returning count or failure."""
 open unsafe extern "C" verb actus_cursor_write(
     ins target: Buffer,
     erg position: Int,
@@ -34,7 +34,7 @@ Validate `position` against the backing storage in `buffer`.
 
 `buffer` is exclusively borrowed for the bounds check and remains owned by
 the cursor. Zero means the position is valid; `-1` means it is outside the
-buffer and is translated to `IoError.Failed`.
+buffer and is translated to `IoError.Failed` by the C ABI wrapper.
 """
 open unsafe extern "C" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int;
 
@@ -46,7 +46,7 @@ returns zero for success or `-1` for a rejected operation.
 """
 open unsafe extern "C" verb actus_cursor_flush(ins target: Buffer) -> Int;
 
-"""Read from an in-memory cursor into an exclusive caller buffer."""
+"""Read from an in-memory cursor into an exclusive caller buffer and return count or error."""
 open verb cursor_read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
     erg status = actus_cursor_read(source: abs self.buffer, position: self.position, target: ins buffer);
     case status {
@@ -60,7 +60,11 @@ open verb cursor_read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoErr
     };
 }
 
-"""Write an immutable source at the cursor's current position."""
+"""
+Write an `abs` source through an `ins` cursor loan at the current position.
+The backing buffer is mutated in place without allocating a second buffer.
+`Ok(count)` is the exact count; `Err(IoError.Failed)` reports rejection.
+"""
 open verb cursor_write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError] {
     erg status = actus_cursor_write(target: ins self.buffer, position: self.position, source: abs buffer);
     case status {
@@ -73,7 +77,11 @@ open verb cursor_write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoEr
     };
 }
 
-"""Move a cursor to an absolute byte position within its backing buffer."""
+"""
+Move the cursor through an `ins` loan to an absolute byte position. This
+mutates cursor state without allocating; `Ok(position)` reports the new state
+and `Err(IoError.Failed)` reports an out-of-bounds request.
+"""
 open verb seek(ins self: Cursor, erg offset: Int) -> Result[Int, IoError] {
     erg status = actus_cursor_seek(buffer: ins self.buffer, position: offset);
     return case status {
@@ -93,6 +101,11 @@ open verb cursor_flush(ins self: Cursor) -> Result[Int, IoError] {
 
 """Satisfy the static Reader contract for Cursor."""
 open perform Reader for Cursor {
+    """
+    Read through `ins` cursor and destination loans without allocating. The
+    destination owner is restored after the call; `Ok(count)` is the byte
+    count and `Err` is the typed I/O failure.
+    """
     verb read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_cursor_read(source: abs self.buffer, position: self.position, target: ins buffer);
         case status {
@@ -109,6 +122,11 @@ open perform Reader for Cursor {
 
 """Satisfy the static Writer contract for Cursor."""
 open perform Writer for Cursor {
+    """
+    Write an `abs` source through an `ins` cursor loan without allocating.
+    `Ok(count)` is the exact byte count; `Err` reports the typed I/O failure
+    after the cursor owner is restored.
+    """
     verb write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError] {
         erg status = actus_cursor_write(target: ins self.buffer, position: self.position, source: abs buffer);
         case status {
@@ -121,6 +139,7 @@ open perform Writer for Cursor {
         };
     }
 
+    """Flush through an ins cursor loan and return zero or typed failure."""
     verb flush(ins self: Cursor) -> Result[Int, IoError] {
         erg status = actus_cursor_flush(target: ins self.buffer);
         return case status {

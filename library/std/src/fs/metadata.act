@@ -6,6 +6,10 @@ layout.
 """
 import io;
 import path;
+"""
+An owned scalar metadata record returned by filesystem inspection.
+Its erg fields are copied facts and require no host-handle cleanup.
+"""
 open struct Metadata {
     """Logical file length in bytes, not including any host metadata header."""
     erg size: Int,
@@ -48,6 +52,7 @@ The path-level `metadata` verb below remains the canonical free operation;
 open handles satisfy this same operation through static performance dispatch.
 """
 open role MetadataProvider {
+    """Inspect an ins file handle and return metadata facts or typed failure."""
     verb metadata(ins self: File) -> Result[Metadata, IoError];
 }
 

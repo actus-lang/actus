@@ -4,16 +4,21 @@ use crate::lexer::{SourceSpan, TokenKind};
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
 
 impl Parser {
-    pub(super) fn parse_pack_decl(&mut self, is_open: bool) -> Result<PackDecl, ParseError> {
+    pub(super) fn parse_pack_decl(
+        &mut self,
+        is_open: bool,
+        doc: Option<String>,
+    ) -> Result<PackDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Pack, "`pack`")?.span.start;
         let name = identifier_text(&self.take_identifier("pack name")?.kind);
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
 
+        let storage_doc = self.take_doc_string_group();
         let storage_role = self.advance_required("pack storage role")?;
         if !matches!(storage_role.kind, TokenKind::Erg) {
             return Err(unexpected(storage_role.kind, storage_role.span, "`erg` storage role"));
         }
-        let _storage_name = self.take_identifier("storage field name")?;
+        let storage_name = identifier_text(&self.take_identifier("storage field name")?.kind);
         self.expect_simple(TokenKind::Colon, "`:`")?;
         let storage = self.parse_type_name()?;
         self.expect_simple(TokenKind::Semicolon, "`;`")?;
@@ -29,7 +34,10 @@ impl Parser {
 
         Ok(PackDecl {
             is_open,
+            doc,
             name,
+            storage_name,
+            storage_doc,
             storage,
             endianness,
             fields,
@@ -49,12 +57,13 @@ impl Parser {
     fn parse_pack_fields(&mut self) -> Result<Vec<PackField>, ParseError> {
         let mut fields = Vec::new();
         while !self.check_simple(&TokenKind::RightBrace) {
-            fields.push(self.parse_pack_field()?);
+            let doc = self.take_doc_string_group();
+            fields.push(self.parse_pack_field(doc)?);
         }
         Ok(fields)
     }
 
-    fn parse_pack_field(&mut self) -> Result<PackField, ParseError> {
+    fn parse_pack_field(&mut self, doc: Option<String>) -> Result<PackField, ParseError> {
         let role_token = self.advance_required("pack field role")?;
         let role = match role_token.kind {
             TokenKind::Erg => Role::Erg,
@@ -73,6 +82,7 @@ impl Parser {
             self.match_simple(TokenKind::Equals).then(|| self.parse_expression()).transpose()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(PackField {
+            doc,
             role,
             name,
             ty,

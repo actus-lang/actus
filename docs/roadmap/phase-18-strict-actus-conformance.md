@@ -248,20 +248,20 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.7: Public documentation conformance
 
-- [ ] Discover every public Actus type, enum, field, performance, verb,
+- [x] Discover every public Actus type, enum, field, performance, verb,
       external bridge, and facade export.
-- [ ] Require a complete `"""` block docstring for each discovered public
+- [x] Require a complete `"""` block docstring for each discovered public
       declaration where ADR-0025 applies.
-- [ ] Require documentation of purpose, `erg`/`abs`/`dat`/`ins` ownership,
+- [x] Require documentation of purpose, `erg`/`abs`/`dat`/`ins` ownership,
       lifetime or scope behavior, return variants, errors, mutation,
       allocation, cleanup, ABI, and platform effects when relevant.
-- [ ] Reject missing, empty, one-line restatement, contradictory, or
+- [x] Reject missing, empty, one-line restatement, contradictory, or
       implementation-misrepresenting documentation.
-- [ ] Require `///` documentation for public Rust APIs introduced by strict
+- [x] Require `///` documentation for public Rust APIs introduced by strict
       validation infrastructure.
-- [ ] Add accepted and rejected documentation fixtures for each declaration
+- [x] Add accepted and rejected documentation fixtures for each declaration
       category.
-- [ ] Ensure documentation diagnostics point to the declaration and identify
+- [x] Ensure documentation diagnostics point to the declaration and identify
       the missing contract section.
 
 ## Gate 18.8: Source structure and size conformance

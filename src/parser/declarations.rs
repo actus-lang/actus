@@ -32,16 +32,16 @@ impl Parser {
             return Ok(TopLevelDecl::Struct(self.parse_struct_def(false, doc)?));
         }
         if self.check_simple(&TokenKind::Pack) {
-            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(false)?));
+            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(false, doc)?));
         }
         if self.check_simple(&TokenKind::Enum) {
-            return Ok(TopLevelDecl::Enum(self.parse_enum_def(false)?));
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def(false, doc)?));
         }
         if self.check_simple(&TokenKind::Role) {
             return Ok(TopLevelDecl::Role(self.parse_role_decl(false, doc)?));
         }
         if self.check_simple(&TokenKind::Perform) {
-            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false)?));
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(false, doc)?));
         }
         if let Some(Token { kind: TokenKind::Identifier(name), span }) = self.peek() {
             return Err(ParseError {
@@ -111,6 +111,7 @@ impl Parser {
             let name = identifier_text(&self.take_identifier("sibling module name")?.kind);
             let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
             return Ok(TopLevelDecl::OpenSibling(crate::ast::OpenSiblingDecl {
+                doc,
                 name,
                 span: SourceSpan::new(start, end),
             }));
@@ -123,16 +124,16 @@ impl Parser {
             return Ok(TopLevelDecl::Struct(self.parse_struct_def(true, doc)?));
         }
         if self.check_simple(&TokenKind::Pack) {
-            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(true)?));
+            return Ok(TopLevelDecl::Pack(self.parse_pack_decl(true, doc)?));
         }
         if self.check_simple(&TokenKind::Enum) {
-            return Ok(TopLevelDecl::Enum(self.parse_enum_def(true)?));
+            return Ok(TopLevelDecl::Enum(self.parse_enum_def(true, doc)?));
         }
         if self.check_simple(&TokenKind::Role) {
             return Ok(TopLevelDecl::Role(self.parse_role_decl(true, doc)?));
         }
         if self.check_simple(&TokenKind::Perform) {
-            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(true)?));
+            return Ok(TopLevelDecl::Perform(self.parse_perform_decl(true, doc)?));
         }
         if self.check_simple(&TokenKind::Verb) {
             return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(true, Vec::new(), doc)?));
