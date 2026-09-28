@@ -146,18 +146,15 @@ fn lower_method_construct(
         .and_then(|name| layouts.enum_constructor(name, method))
         .is_some()
     {
-        lower_enum_constructor(
-            function,
-            receiver,
-            method,
-            arguments,
+        let context = CallLoweringContext::new(
             locals,
             local_types,
             functions,
             cleanup_schedule,
             string_data,
             layouts,
-        )
+        );
+        lower_enum_constructor(function, receiver, method, arguments, &context)
     } else {
         let context = CallLoweringContext::new(
             locals,
@@ -218,18 +215,15 @@ fn lower_field_construct(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     if enum_receiver_name(object).and_then(|name| layouts.enum_constructor(name, field)).is_some() {
-        lower_enum_constructor(
-            function,
-            object,
-            field,
-            &[],
+        let context = CallLoweringContext::new(
             locals,
             local_types,
             functions,
             cleanup_schedule,
             string_data,
             layouts,
-        )
+        );
+        lower_enum_constructor(function, object, field, &[], &context)
     } else {
         lower_field_access(
             function,
