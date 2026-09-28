@@ -488,9 +488,9 @@ String conversions.
 
 ### Sub-gate F: C ABI Boundary Integration
 
-- [ ] Implement `PathCView` null-terminated byte pointer contract for POSIX.
-- [ ] Implement `PathCView` wide null-terminated pointer contract for Windows.
-- [ ] Validate zero-allocation C-bridge handoff.
+- [x] Implement `PathCView` null-terminated byte pointer contract for POSIX.
+- [x] Implement `PathCView` wide null-terminated pointer contract for Windows.
+- [x] Validate zero-allocation C-bridge handoff.
 
 ### Sub-gate G: `std::fs` Integration
 

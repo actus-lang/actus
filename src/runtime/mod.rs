@@ -7,6 +7,7 @@ mod fs;
 mod input;
 mod path;
 mod path_builders;
+mod path_c_view;
 mod path_components;
 mod path_normalize;
 mod path_predicates;
@@ -52,6 +53,9 @@ pub use path::{
 pub use path_builders::{
     actus_path_join, actus_path_push, actus_path_reserve, actus_path_set_extension,
     actus_path_set_file_name,
+};
+pub use path_c_view::{
+    ActusPathCView, ActusPathWideCView, actus_path_c_view, actus_path_wide_c_view,
 };
 pub use path_components::{
     ActusPathComponent, ActusPathComponents, actus_path_components, actus_path_extension,
