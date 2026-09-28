@@ -32,19 +32,49 @@ open struct PathComponents {
 }
 
 """Return the final parent component as a non-owning `abs` view, if present."""
-open unsafe extern "C" verb parent(abs self: Path) -> Option[abs PathComponent];
+open unsafe extern "C" verb actus_path_parent(abs self: Path) -> Option[abs PathComponent];
 
 """Return the final file-name component as a non-owning `abs` view, if present."""
-open unsafe extern "C" verb file_name(abs self: Path) -> Option[abs PathComponent];
+open unsafe extern "C" verb actus_path_file_name(abs self: Path) -> Option[abs PathComponent];
 
 """Return the file stem as an `abs` component, excluding its final extension."""
-open unsafe extern "C" verb file_stem(abs self: Path) -> Option[abs PathComponent];
+open unsafe extern "C" verb actus_path_file_stem(abs self: Path) -> Option[abs PathComponent];
 
 """Return the final extension as an `abs` component, if the name has one."""
-open unsafe extern "C" verb extension(abs self: Path) -> Option[abs PathComponent];
+open unsafe extern "C" verb actus_path_extension(abs self: Path) -> Option[abs PathComponent];
 
 """Create zero-allocation iterator state rooted in the borrowed source path."""
-open unsafe extern "C" verb components(abs self: Path) -> PathComponents;
+open unsafe extern "C" verb actus_path_components(abs self: Path) -> PathComponents;
 
 """Advance a borrowed iterator and return its next source-origin component."""
-open unsafe extern "C" verb next_component(ins iter: PathComponents) -> Option[abs PathComponent];
+open unsafe extern "C" verb actus_path_next_component(ins iter: PathComponents) -> Option[abs PathComponent];
+
+"""Return the final parent component as a non-owning `abs` view, if present."""
+open verb parent(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_parent(self: abs self);
+}
+
+"""Return the final file-name component as a non-owning `abs` view, if present."""
+open verb file_name(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_file_name(self: abs self);
+}
+
+"""Return the file stem as an `abs` component, excluding its final extension."""
+open verb file_stem(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_file_stem(self: abs self);
+}
+
+"""Return the final extension as an `abs` component, if the name has one."""
+open verb extension(abs self: Path) -> Option[abs PathComponent] {
+    return actus_path_extension(self: abs self);
+}
+
+"""Create zero-allocation iterator state rooted in the borrowed source path."""
+open verb components(abs self: Path) -> PathComponents {
+    return actus_path_components(self: abs self);
+}
+
+"""Advance a borrowed iterator and return its next source-origin component."""
+open verb next_component(ins iter: PathComponents) -> Option[abs PathComponent] {
+    return actus_path_next_component(iter: ins iter);
+}

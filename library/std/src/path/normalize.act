@@ -31,7 +31,13 @@ open verb finish_normalized(dat path: Path, erg status: Int) -> Result[Path, Pat
     };
 }
 
-"""Consume a failed normalization path through the normal ownership cleanup."""
-open verb discard_path(dat path: Path) {
-    return;
+"""Consume a failed normalization path through normal ownership cleanup.
+
+`path` is transferred with `dat`, explicitly dropped, and converted to the
+zero status required by the native lowering contract. The caller ignores this
+status after the path has been destroyed.
+"""
+open verb discard_path(dat path: Path) -> Int {
+    drop(path);
+    return 0;
 }
