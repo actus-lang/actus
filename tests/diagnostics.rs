@@ -1,6 +1,6 @@
 use actus::diagnostics::{
-    Diagnostic, DiagnosticSeverity, lex_diagnostic, render_diagnostic, render_semantic_error,
-    semantic_diagnostic,
+    Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, render_diagnostic,
+    render_semantic_error, semantic_diagnostic, sort_diagnostics,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
@@ -39,6 +39,27 @@ fn diagnostic_model_is_independent_from_terminal_rendering() {
     assert_eq!(diagnostic.explanation(), Some("strict mode rejects unresolved warnings"));
     assert_eq!(diagnostic.suggestion(), Some("resolve the warning before building"));
     assert_eq!(render_diagnostic(source, &diagnostic), "warning[E1800] at 2:1: strict warning");
+}
+
+#[test]
+fn diagnostics_sort_by_source_location_phase_and_code() {
+    let mut diagnostics = vec![
+        Diagnostic::error("E2000", SourceSpan::new(4, 5), "later")
+            .with_phase(DiagnosticPhase::Semantic)
+            .with_source_path("src/b.act"),
+        Diagnostic::error("E1000", SourceSpan::new(0, 1), "first")
+            .with_phase(DiagnosticPhase::Parser)
+            .with_source_path("src/a.act"),
+        Diagnostic::error("E0001", SourceSpan::new(0, 1), "lexical")
+            .with_phase(DiagnosticPhase::Lexical)
+            .with_source_path("src/a.act"),
+    ];
+
+    sort_diagnostics(&mut diagnostics);
+
+    assert_eq!(diagnostics[0].code(), "E0001");
+    assert_eq!(diagnostics[1].code(), "E1000");
+    assert_eq!(diagnostics[2].code(), "E2000");
 }
 
 #[test]

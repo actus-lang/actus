@@ -1,6 +1,23 @@
 use crate::lexer::SourceSpan;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// The compiler phase that produced a validation diagnostic.
+pub enum DiagnosticPhase {
+    /// A configuration or workspace-policy validation failure.
+    Configuration,
+    /// A lexical scanning failure.
+    Lexical,
+    /// A syntax parsing failure.
+    Parser,
+    /// A module discovery or import-resolution failure.
+    Module,
+    /// A semantic validation failure.
+    Semantic,
+    /// A diagnostic whose producer has not assigned a phase yet.
+    Unclassified,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 /// The severity used by a validation diagnostic.
 pub enum DiagnosticSeverity {
     /// A violation that makes the current validation result unsuccessful.
@@ -19,6 +36,7 @@ pub enum DiagnosticSeverity {
 pub struct Diagnostic {
     code: String,
     severity: DiagnosticSeverity,
+    phase: DiagnosticPhase,
     span: SourceSpan,
     source_path: Option<String>,
     message: String,
@@ -43,6 +61,12 @@ impl Diagnostic {
         self
     }
 
+    /// Attaches the compiler phase that produced this diagnostic.
+    pub fn with_phase(mut self, phase: DiagnosticPhase) -> Self {
+        self.phase = phase;
+        self
+    }
+
     /// Attaches a stable explanation of the violated language or architecture
     /// rule.
     pub fn with_explanation(mut self, explanation: impl Into<String>) -> Self {
@@ -64,6 +88,11 @@ impl Diagnostic {
     /// Returns the validation severity.
     pub const fn severity(&self) -> DiagnosticSeverity {
         self.severity
+    }
+
+    /// Returns the compiler phase that produced this diagnostic.
+    pub const fn phase(&self) -> DiagnosticPhase {
+        self.phase
     }
 
     /// Returns the half-open byte span in the original source.
@@ -100,6 +129,7 @@ impl Diagnostic {
         Self {
             code: code.into(),
             severity,
+            phase: DiagnosticPhase::Unclassified,
             span,
             source_path: None,
             message: message.into(),
@@ -107,4 +137,20 @@ impl Diagnostic {
             suggestion: None,
         }
     }
+}
+
+/// Sorts diagnostics by stable source identity, location, phase, and code.
+///
+/// The message is used only as a final tie-breaker so repeated diagnostics
+/// with identical primary metadata still have a deterministic order.
+pub fn sort_diagnostics(diagnostics: &mut [Diagnostic]) {
+    diagnostics.sort_by(|left, right| {
+        left.source_path()
+            .cmp(&right.source_path())
+            .then(left.span().start.cmp(&right.span().start))
+            .then(left.span().end.cmp(&right.span().end))
+            .then(left.phase().cmp(&right.phase()))
+            .then(left.code().cmp(right.code()))
+            .then(left.message().cmp(right.message()))
+    });
 }

@@ -3,7 +3,8 @@ use std::path::Path;
 
 use super::{CompilerConfiguration, ConfigurationError, manifest};
 use crate::diagnostics::{
-    Diagnostic, STRICT_CONFIGURATION_FAILURE, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST,
+    Diagnostic, DiagnosticPhase, STRICT_CONFIGURATION_FAILURE, STRICT_LEGACY_DEPENDENCY,
+    STRICT_LEGACY_MANIFEST,
 };
 use crate::lexer::SourceSpan;
 
@@ -26,7 +27,12 @@ impl StrictConfigurationError {
         } else {
             STRICT_CONFIGURATION_FAILURE
         };
-        Self { diagnostic: Box::new(Diagnostic::error(code, SourceSpan::new(0, 0), message)) }
+        Self {
+            diagnostic: Box::new(
+                Diagnostic::error(code, SourceSpan::new(0, 0), message)
+                    .with_phase(DiagnosticPhase::Configuration),
+            ),
+        }
     }
 
     fn legacy_manifest(path: &Path) -> Self {
@@ -37,6 +43,7 @@ impl StrictConfigurationError {
                     SourceSpan::new(0, 0),
                     "strict mode rejects deprecated `Arca.toml`; rename it to `Actus.toml`",
                 )
+                .with_phase(DiagnosticPhase::Configuration)
                 .with_source_path(path.display().to_string()),
             ),
         }

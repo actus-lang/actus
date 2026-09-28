@@ -40,6 +40,8 @@ behavior around the existing language and runtime contracts.
       and terminal rendering compatibility.
 - [x] Define and use the initial strict configuration diagnostic codes
       `E1800` through `E1802`.
+- [x] Sort diagnostics deterministically by source path, span, compiler phase,
+      and stable code in the shared model and LSP adapter.
 
 ## Strict-mode contract
 
@@ -94,7 +96,7 @@ behavior around the existing language and runtime contracts.
 - [ ] Define strict categories for frontend, semantic, ownership, module,
       documentation, source limits, target, lockfile, and execution failures.
 - [ ] Reject duplicate diagnostic codes and contradictory severity metadata.
-- [ ] Sort diagnostics deterministically by source path, span, phase, and code.
+- [x] Sort diagnostics deterministically by source path, span, phase, and code.
 - [ ] Ensure renderer choice cannot change validation, ordering, or exit code.
 - [ ] Add text, colored, JSON, and LSP diagnostic tests from the same fixtures.
 - [ ] Add golden tests for stable messages and stable source locations.

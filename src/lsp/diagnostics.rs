@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use crate::configuration::CompilerConfiguration;
-use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_error};
+use crate::diagnostics::{
+    Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, parse_diagnostic,
+    render_diagnostic, semantic_diagnostic, sort_diagnostics,
+};
 use crate::lexer::scan;
 use crate::modules::{ModuleError, ModuleResolver};
 use crate::parser::parse;
@@ -15,33 +18,43 @@ pub fn analyze_document(
     source: &str,
     overlays: &std::collections::HashMap<PathBuf, String>,
 ) -> Vec<LspDiagnostic> {
-    let (tokens, lex_errors) = scan(source);
+    let diagnostics = collect_diagnostics(uri, source, overlays);
     let index = LineIndex::new(source);
+    diagnostics
+        .into_iter()
+        .map(|diagnostic| to_lsp_diagnostic(source, &index, &diagnostic))
+        .collect()
+}
+
+fn collect_diagnostics(
+    uri: &str,
+    source: &str,
+    overlays: &std::collections::HashMap<PathBuf, String>,
+) -> Vec<Diagnostic> {
+    let (tokens, lex_errors) = scan(source);
     if !lex_errors.is_empty() {
-        return lex_errors
-            .iter()
-            .map(|error| diagnostic(source, &index, error.span, render_lex_error(source, error)))
-            .collect();
+        let mut diagnostics: Vec<Diagnostic> = lex_errors.iter().map(lex_diagnostic).collect();
+        sort_diagnostics(&mut diagnostics);
+        return diagnostics;
     }
     let program = match parse(tokens) {
         Ok(program) => program,
         Err(error) => {
-            return vec![diagnostic(
-                source,
-                &index,
-                error.span,
-                render_parse_error(source, &error),
-            )];
+            return vec![parse_diagnostic(&error)];
         }
     };
     if let Some(result) = analyze_package_module(uri, overlays) {
-        return package_diagnostics(source, &index, result);
+        let mut diagnostics = package_diagnostics(result);
+        sort_diagnostics(&mut diagnostics);
+        return diagnostics;
     }
     if let Some(result) = analyze_test_fixture(uri, &program) {
-        return package_diagnostics(source, &index, result);
+        let mut diagnostics = package_diagnostics(result);
+        sort_diagnostics(&mut diagnostics);
+        return diagnostics;
     }
     if let Err(error) = analyze(&program) {
-        return vec![diagnostic(source, &index, error.span, render_semantic_error(source, &error))];
+        return vec![semantic_diagnostic(&error)];
     }
     Vec::new()
 }
@@ -79,23 +92,14 @@ fn analyze_package_module(
     )
 }
 
-fn package_diagnostics(
-    source: &str,
-    index: &LineIndex,
-    result: Result<(), ModuleError>,
-) -> Vec<LspDiagnostic> {
+fn package_diagnostics(result: Result<(), ModuleError>) -> Vec<Diagnostic> {
     match result {
         Ok(()) => Vec::new(),
-        Err(ModuleError::Semantic(error)) => {
-            let span = clamp_span(error.span, source.len());
-            vec![diagnostic(source, index, span, render_semantic_error(source, &error))]
-        }
-        Err(error) => vec![diagnostic(
-            source,
-            index,
-            crate::lexer::SourceSpan::new(0, 0),
-            format!("error[E1000]: {error}"),
-        )],
+        Err(ModuleError::Semantic(error)) => vec![semantic_diagnostic(&error)],
+        Err(error) => vec![
+            Diagnostic::error("E1000", crate::lexer::SourceSpan::new(0, 0), error.to_string())
+                .with_phase(DiagnosticPhase::Module),
+        ],
     }
 }
 
@@ -135,38 +139,34 @@ fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
     Some(PathBuf::from(path))
 }
 
-fn diagnostic(
-    source: &str,
-    index: &LineIndex,
-    span: crate::lexer::SourceSpan,
-    message: String,
-) -> LspDiagnostic {
+fn to_lsp_diagnostic(source: &str, index: &LineIndex, diagnostic: &Diagnostic) -> LspDiagnostic {
+    let span = clamp_span(diagnostic.span(), source.len());
     let start = index.position(source, span.start);
     let end = index.position(source, span.end.max(span.start));
     LspDiagnostic {
         range: LspRange { start, end },
-        severity: 1,
-        code: diagnostic_code(&message),
+        severity: lsp_severity(diagnostic.severity()),
+        code: Some(diagnostic.code().to_owned()),
         source: Some("actus".to_owned()),
-        message,
+        message: render_diagnostic(source, diagnostic),
     }
 }
 
-fn diagnostic_code(message: &str) -> Option<String> {
-    let start = message.find('[')? + 1;
-    let end = message[start..].find(']')? + start;
-    Some(message[start..end].to_owned())
+fn lsp_severity(severity: DiagnosticSeverity) -> u8 {
+    match severity {
+        DiagnosticSeverity::Error => 1,
+        DiagnosticSeverity::Warning => 2,
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::diagnostic_code;
+    use super::lsp_severity;
+    use crate::diagnostics::DiagnosticSeverity;
 
     #[test]
-    fn preserves_ownership_diagnostic_codes_for_lsp() {
-        for code in ["E1064", "E1065", "E1066", "E1009", "E1011"] {
-            let message = format!("error[{code}] at 1:1: ownership violation");
-            assert_eq!(diagnostic_code(&message).as_deref(), Some(code));
-        }
+    fn maps_diagnostic_severity_to_lsp_values() {
+        assert_eq!(lsp_severity(DiagnosticSeverity::Error), 1);
+        assert_eq!(lsp_severity(DiagnosticSeverity::Warning), 2);
     }
 }

@@ -4,22 +4,25 @@ use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::{ParseError, ParseErrorKind};
 use crate::semantic::SemanticError;
 
-use super::{Diagnostic, DiagnosticSeverity};
+use super::{Diagnostic, DiagnosticPhase, DiagnosticSeverity};
 use codes::{lex_code, parse_code, semantic_code, semantic_message};
 
 /// Converts a lexical failure into the stable diagnostic model.
 pub fn lex_diagnostic(error: &LexError) -> Diagnostic {
     Diagnostic::error(format!("E000{}", lex_code(error)), error.span, lex_message(error))
+        .with_phase(DiagnosticPhase::Lexical)
 }
 
 /// Converts a parser failure into the stable diagnostic model.
 pub fn parse_diagnostic(error: &ParseError) -> Diagnostic {
     Diagnostic::error(parse_code(error.code), error.span, parse_message(error))
+        .with_phase(DiagnosticPhase::Parser)
 }
 
 /// Converts a semantic failure into the stable diagnostic model.
 pub fn semantic_diagnostic(error: &SemanticError) -> Diagnostic {
     Diagnostic::error(semantic_code(&error.kind), error.span, semantic_message(&error.kind))
+        .with_phase(DiagnosticPhase::Semantic)
 }
 
 pub fn render_lex_error(source: &str, error: &LexError) -> String {
