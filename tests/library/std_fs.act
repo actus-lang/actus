@@ -1,5 +1,6 @@
 import io;
 import fs;
+import path;
 
 meta test
 verb empty_path_is_rejected_by_file_open() -> Int {

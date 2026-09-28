@@ -498,6 +498,24 @@ String conversions.
 - [x] Preserve `Result[T, IoError]` contracts and error mappings.
 - [x] Verify deterministic RAII cleanup across filesystem operations with paths.
 
+### Sub-gate H: Standard-Library Positive and Negative Conformance Matrix
+
+- [ ] Inventory every facade-exported `std::io`, `std::fs`, and `std::path`
+      type, role, verb, and runtime bridge.
+- [ ] Add executable positive fixtures under `tests/library/` for every public
+      operation family and ownership contract.
+- [ ] Add executable negative fixtures under `tests/library/` for invalid
+      inputs, typed error results, rejected ownership calls, and platform
+      mismatches.
+- [x] Execute every Actus `meta test` fixture in `tests/library/` through the
+      repository's native `actus test` command; `tests/library/` remains
+      Actus-only.
+- [x] Verify facade imports and sibling-module diagnostics for every library
+      directory before the gate is accepted.
+- [x] Record deterministic pass/fail counts for the current fixture matrix
+      and keep all Actus test logic in `tests/library/`, outside `library/std`
+      implementation files. Current result: 25 passed, 0 failed.
+
 ### Gate 3.8 invariant
 
 - [x] `Path` is entirely byte/code-unit-driven (no implicit `String` or UTF-8 transcoding).

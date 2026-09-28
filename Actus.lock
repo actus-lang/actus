@@ -13,3 +13,10 @@ version = "0.1.0"
 source = "path"
 path = "library/std"
 checksum = "2106f22dc8805939"
+
+[[package]]
+name = "path"
+version = "0.1.0"
+source = "path"
+path = "library/std"
+checksum = "2106f22dc8805939"

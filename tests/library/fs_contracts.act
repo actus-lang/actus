@@ -1,5 +1,6 @@
 import io;
 import fs;
+import path;
 
 meta test
 verb metadata_rejects_empty_path() -> Int {

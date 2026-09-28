@@ -172,7 +172,7 @@ fn is_ascii_drive(unit: u16) -> bool {
 }
 
 pub(crate) unsafe fn valid_buffer(handle: BufferHandle) -> Option<&'static ActusBuffer> {
-    if handle.is_null() {
+    if handle.is_null() || !(handle as usize).is_multiple_of(std::mem::align_of::<ActusBuffer>()) {
         return None;
     }
     let buffer = unsafe { &*handle };

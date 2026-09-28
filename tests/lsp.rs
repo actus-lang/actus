@@ -373,6 +373,28 @@ fn lsp_resolves_std_fs_imports_for_open_documents() {
 }
 
 #[test]
+fn lsp_resolves_standard_library_test_fixture_imports() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fs_path = root.join("tests/library/fs_contracts.act");
+    let path_path = root.join("tests/library/path_contracts.act");
+    let fs_uri = file_uri(&fs_path);
+    let path_uri = file_uri(&path_path);
+    let fs_source = fs::read_to_string(&fs_path).expect("read fs fixture");
+    let path_source = fs::read_to_string(&path_path).expect("read path fixture");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":fs_uri,"version":1,"text":fs_source}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":path_uri,"version":1,"text":path_source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(!stdout.contains("E1023"), "stdout: {stdout}");
+    assert!(!stdout.contains("E1045"), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_uses_unsaved_sibling_overlay_for_package_diagnostics() {
     let root = temp_root();
     let module = root.join("src/math");
