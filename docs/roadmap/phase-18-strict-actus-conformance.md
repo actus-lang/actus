@@ -163,6 +163,8 @@ behavior around the existing language and runtime contracts.
       metadata instead of relying on unchecked internal lookups or defaults.
 - [x] Reject invalid primitive widths during native IR mapping instead of
       silently selecting a different machine type.
+- [x] Reject unresolved or mismatched semantic argument, initializer, and
+      assignment types instead of allowing fail-open `Ok(())` paths.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.

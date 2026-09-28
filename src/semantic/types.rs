@@ -124,45 +124,73 @@ impl Analyzer {
         if self.struct_types.contains_key(&expected_type.name)
             || self.pack_types.contains_key(&expected_type.name)
         {
-            let found = self
-                .expression_struct_type(initializer)
-                .or_else(|| self.expression_pack_type(initializer))
-                .unwrap_or_else(|| "unknown".to_owned());
-            if found != expected_name {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::BindingTypeMismatch {
-                        binding: name.to_owned(),
-                        expected: expected_name.clone(),
-                        found,
-                    },
-                    span,
-                });
-            }
-            return Ok(());
+            return self.validate_aggregate_initializer(name, &expected_name, initializer, span);
         }
         if self.enum_types.contains_key(&expected_type.name) {
-            let found =
-                self.expression_type_name(initializer).unwrap_or_else(|| "unknown".to_owned());
-            if found != expected_name {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::BindingTypeMismatch {
-                        binding: name.to_owned(),
-                        expected: expected_name.clone(),
-                        found,
-                    },
-                    span,
-                });
-            }
-            return Ok(());
+            return self.validate_enum_initializer(name, &expected_name, initializer, span);
         }
+        self.validate_scalar_initializer(name, expected_type, &expected_name, initializer, span)
+    }
+
+    fn validate_aggregate_initializer(
+        &self,
+        name: &str,
+        expected: &str,
+        initializer: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let found = self
+            .expression_struct_type(initializer)
+            .or_else(|| self.expression_pack_type(initializer))
+            .unwrap_or_else(|| "unknown".to_owned());
+        self.ensure_named_binding_type(name, expected, found, span)
+    }
+
+    fn validate_enum_initializer(
+        &self,
+        name: &str,
+        expected: &str,
+        initializer: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let found = self.expression_type_name(initializer).unwrap_or_else(|| "unknown".to_owned());
+        self.ensure_named_binding_type(name, expected, found, span)
+    }
+
+    fn validate_scalar_initializer(
+        &self,
+        name: &str,
+        expected_type: &TypeName,
+        expected: &str,
+        initializer: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
         self.validate_expected_literal(initializer, expected_type)?;
         if primitive_type(&expected_type.name).is_some() {
+            return self.validate_named_value_type(name, expected_type, initializer, span);
+        }
+        let found = self.expression_type_name(initializer).unwrap_or_else(|| "unknown".to_owned());
+        self.ensure_named_binding_type(name, expected, found, span)
+    }
+
+    fn ensure_named_binding_type(
+        &self,
+        name: &str,
+        expected: &str,
+        found: String,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if type_names_match(expected, &found) {
             return Ok(());
         }
-        let Some(found) = self.expression_type(initializer) else { return Ok(()) };
-        let expected =
-            lookup_builtin_type(&expected_type.name).expect("declared type was validated");
-        self.ensure_binding_type(name, expected, found, span)
+        Err(SemanticError {
+            kind: SemanticErrorKind::BindingTypeMismatch {
+                binding: name.to_owned(),
+                expected: expected.to_owned(),
+                found,
+            },
+            span,
+        })
     }
 
     pub(super) fn validate_binding_assignment(
@@ -172,6 +200,9 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if let Some(expected) = self.binding_type_names.get(&index) {
+            return self.validate_named_value_type(name, expected, value, span);
+        }
         if let Some(expected) = self.binding_enum_types.get(&index) {
             let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
             if &found == expected {
@@ -187,8 +218,44 @@ impl Analyzer {
             });
         }
         let Some(expected) = self.model.bindings[index].ty else { return Ok(()) };
-        let Some(found) = self.expression_type(value) else { return Ok(()) };
+        let Some(found) = self.expression_type(value) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::BindingTypeMismatch {
+                    binding: name.to_owned(),
+                    expected: expected.spec().name.to_owned(),
+                    found: "unknown".to_owned(),
+                },
+                span,
+            });
+        };
         self.ensure_binding_type(name, expected, found, span)
+    }
+
+    fn validate_named_value_type(
+        &self,
+        binding: &str,
+        expected: &TypeName,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let expected_name = super::analyzer::canonical_type_name(expected);
+        let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
+        let literal_matches = match primitive_type(&expected.name) {
+            Some(PrimitiveType::Integer { .. }) => integer_literal(value).is_some(),
+            Some(PrimitiveType::Float { .. }) => matches!(value, Expr::FloatLiteral { .. }),
+            Some(PrimitiveType::Void) | None => false,
+        };
+        if literal_matches || type_names_match(&expected_name, &found) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::BindingTypeMismatch {
+                binding: binding.to_owned(),
+                expected: expected_name,
+                found,
+            },
+            span,
+        })
     }
 
     fn ensure_binding_type(
@@ -264,6 +331,9 @@ impl Analyzer {
     }
 
     pub(super) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
+        if matches!(expression, Expr::FloatLiteral { .. }) {
+            return Some("f64".to_owned());
+        }
         if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
             && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
         {
@@ -332,4 +402,17 @@ fn signed_literal_fits(magnitude: u128, negative: bool, width: u8) -> bool {
 
 fn format_literal(literal: &str, negative: bool) -> String {
     if negative { format!("-{literal}") } else { literal.to_owned() }
+}
+
+fn type_names_match(expected: &str, found: &str) -> bool {
+    strip_reference_role(expected) == strip_reference_role(found)
+}
+
+fn strip_reference_role(type_name: &str) -> &str {
+    type_name
+        .strip_prefix("abs ")
+        .or_else(|| type_name.strip_prefix("ins "))
+        .or_else(|| type_name.strip_prefix("erg "))
+        .or_else(|| type_name.strip_prefix("dat "))
+        .unwrap_or(type_name)
 }

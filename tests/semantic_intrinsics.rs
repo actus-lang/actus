@@ -80,6 +80,29 @@ fn rejects_primitive_integer_overflow_and_unsigned_underflow() {
 }
 
 #[test]
+fn rejects_mismatched_primitive_calls_and_assignments() {
+    let call_error = analyze_source(
+        "verb consume(erg sample: f32) { } verb main() { erg sample: f64 = 1.5; consume(sample: sample); }",
+    )
+    .expect_err("primitive call types must match");
+    assert!(matches!(
+        call_error.kind,
+        SemanticErrorKind::TypeMismatch { expected, found, .. }
+            if expected == "f32" && found == "f64"
+    ));
+
+    let assignment_error = analyze_source(
+        "verb main() { erg sample: f32 = 1.5; erg other: f64 = 1.5; sample = other; }",
+    )
+    .expect_err("primitive assignment types must match");
+    assert!(matches!(
+        assignment_error.kind,
+        SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
+            if expected == "f32" && found == "f64"
+    ));
+}
+
+#[test]
 fn validates_void_as_a_zero_value_return_type() {
     analyze_source("verb main() -> Void { return; }").expect("Void may return without a value");
     let error = analyze_source("verb main() -> Void { return 0; }")

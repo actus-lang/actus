@@ -1,4 +1,4 @@
-use crate::ast::{Argument, DispatchMode, Expr, Role, lookup_builtin_type};
+use crate::ast::{Argument, DispatchMode, Expr, PrimitiveType, Role, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -16,7 +16,8 @@ impl Analyzer {
         expression: &Expr,
     ) -> Result<(), SemanticError> {
         if dispatch == DispatchMode::Dynamic {
-            let Some(found) = self.expression_type_name(expression) else { return Ok(()) };
+            let found =
+                self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
             if self.has_performance(
                 expected,
                 &crate::ast::TypeName {
@@ -33,9 +34,8 @@ impl Analyzer {
                 span: expression_span(expression),
             });
         }
-        let Some(found) = self.expression_type(expression) else { return Ok(()) };
-        let Some(expected_type) = lookup_builtin_type(expected) else { return Ok(()) };
-        if found == expected_type {
+        let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
+        if argument_type_matches(expected, &found, expression) {
             return Ok(());
         }
         Err(SemanticError {
@@ -43,7 +43,7 @@ impl Analyzer {
                 callee: callee.to_owned(),
                 parameter: parameter.to_owned(),
                 expected: expected.to_owned(),
-                found: found.spec().name.to_owned(),
+                found,
             },
             span: expression_span(expression),
         })
@@ -204,6 +204,38 @@ impl Analyzer {
         };
         self.binding(name, *span).ok()
     }
+}
+
+fn argument_type_matches(expected: &str, found: &str, expression: &Expr) -> bool {
+    let expected = strip_reference_role(expected);
+    if strip_reference_role(found) == expected {
+        return true;
+    }
+    match primitive_type(expected) {
+        Some(PrimitiveType::Integer { .. }) => is_integer_literal(expression),
+        Some(PrimitiveType::Float { .. }) => matches!(expression, Expr::FloatLiteral { .. }),
+        Some(PrimitiveType::Void) => false,
+        None => false,
+    }
+}
+
+fn is_integer_literal(expression: &Expr) -> bool {
+    match expression {
+        Expr::Integer { .. } => true,
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            is_integer_literal(expression)
+        }
+        _ => false,
+    }
+}
+
+fn strip_reference_role(type_name: &str) -> &str {
+    type_name
+        .strip_prefix("abs ")
+        .or_else(|| type_name.strip_prefix("ins "))
+        .or_else(|| type_name.strip_prefix("erg "))
+        .or_else(|| type_name.strip_prefix("dat "))
+        .unwrap_or(type_name)
 }
 
 pub(super) fn argument_span(argument: &Argument) -> SourceSpan {
