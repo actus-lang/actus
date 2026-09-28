@@ -136,18 +136,18 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.3: Fail-closed compiler pipeline
 
-- [ ] Prevent parser recovery nodes from reaching semantic analysis as valid
+- [x] Prevent parser recovery nodes from reaching semantic analysis as valid
       declarations or expressions.
 - [x] Prevent semantic errors from reaching code generation or linking in the
       strict build flow.
 - [ ] Reject empty, incomplete, duplicate, unreachable, or placeholder
       declarations where the language contract requires implementation.
-- [ ] Reject unsupported constructs instead of emitting partial code.
+- [x] Reject unsupported constructs instead of emitting partial code.
 - [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
       code-generation path, or an explicit non-codegen meaning.
 - [ ] Remove implicit default branches that conceal unresolved compiler state.
 - [x] Add a regression test proving a strict semantic failure emits no artifact.
-- [ ] Verify failed builds leave deterministic, bounded cleanup artifacts.
+- [x] Verify failed builds leave deterministic, bounded cleanup artifacts.
 
 ## Gate 18.4: Frontend and declaration completeness
 

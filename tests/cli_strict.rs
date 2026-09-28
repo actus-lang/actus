@@ -41,6 +41,38 @@ fn strict_build_rejects_semantic_errors_before_emitting_output() {
 }
 
 #[test]
+fn strict_build_fails_closed_before_codegen_and_cleans_failed_outputs() {
+    let root = std::env::temp_dir().join(format!("actus-strict-frontend-{}", std::process::id()));
+    let cases = [
+        ("lexical", "verb main() -> Int { return @; }\n"),
+        ("parser", "verb main() -> Int { return 0 }\n"),
+    ];
+
+    for (name, source) in cases {
+        let input = root.with_extension(format!("{name}.act"));
+        let output = root.with_extension(format!("{name}.o"));
+        fs::write(&input, source).expect("write invalid source");
+        for _ in 0..2 {
+            let result = run_with_args(
+                vec![
+                    "build".to_owned(),
+                    input.display().to_string(),
+                    "--strict".to_owned(),
+                    "-o".to_owned(),
+                    output.display().to_string(),
+                ]
+                .into_iter(),
+            );
+            assert_eq!(result, 1);
+            assert!(!output.exists());
+            assert!(!output.with_extension("actmeta").exists());
+        }
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[test]
 fn strict_options_are_rejected_when_repeated() {
     assert_eq!(
         run_with_args(
