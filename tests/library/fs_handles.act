@@ -1,0 +1,173 @@
+import io;
+import fs;
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb exercise_file(dat file: File, abs path: Path) -> Int {
+    erg payload = Buffer[0];
+    append(payload, 65);
+    append(payload, 66);
+    erg written = file.write(buffer: abs payload);
+    case dat written {
+        Result.Ok(count) => case count {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg flushed = file.flush();
+    case dat flushed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg origin = SeekFrom.Start(0);
+    erg moved = file.seek(from: dat origin);
+    case dat moved {
+        Result.Ok(position) => case position {
+            0 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg destination = Buffer[0];
+    erg destination_capacity = 2;
+    erg reserved = reserve(buffer: ins destination, capacity: destination_capacity);
+    case dat reserved {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg read_result = file.read(buffer: ins destination);
+    case dat read_result {
+        Result.Ok(count) => case count {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg current_offset = 0;
+    erg current = file_seek_current(self: ins file, offset: abs current_offset);
+    case dat current {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg end_offset = 0;
+    erg end = file_seek_end(self: ins file, offset: abs end_offset);
+    case dat end {
+        Result.Ok(position) => case position {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg information = file.metadata();
+    case dat information {
+        Result.Ok(metadata) => case metadata.size {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    drop(file);
+    erg final_remove = remove_file(path: abs path);
+    return case dat final_remove {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb file_handle_methods_and_seeker_origins() -> Int {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 103);
+    append(raw, 97);
+    append(raw, 116);
+    append(raw, 101);
+    append(raw, 54);
+    append(raw, 95);
+    append(raw, 104);
+    append(raw, 97);
+    append(raw, 110);
+    append(raw, 100);
+    append(raw, 108);
+    append(raw, 101);
+    append(raw, 46);
+    append(raw, 98);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 0);
+    erg path = make_posix(raw: dat raw);
+    erg cleanup = remove_file(path: abs path);
+    case dat cleanup {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg opened = file_create(path: abs path);
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(file) => exercise_file(file: dat file, path: abs path),
+    };
+}
+
+meta test
+verb options_and_directory_operations_succeed() -> Int {
+    erg directory_raw = Buffer[0];
+    append(directory_raw, 97);
+    append(directory_raw, 99);
+    append(directory_raw, 116);
+    append(directory_raw, 117);
+    append(directory_raw, 115);
+    append(directory_raw, 95);
+    append(directory_raw, 103);
+    append(directory_raw, 97);
+    append(directory_raw, 116);
+    append(directory_raw, 101);
+    append(directory_raw, 54);
+    append(directory_raw, 95);
+    append(directory_raw, 100);
+    append(directory_raw, 105);
+    append(directory_raw, 114);
+    append(directory_raw, 0);
+    erg directory = make_posix(raw: dat directory_raw);
+    erg removed = remove_dir(path: abs directory);
+    case dat removed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg created = create_dir(path: abs directory);
+    case dat created {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg options = options_new();
+    erg writable = options_write(dat options);
+    erg creatable = options_create(dat writable);
+    erg opened = options_open(options: dat creatable, path: abs directory);
+    case dat opened {
+        Result.Ok(file) => { drop(file); return 1; },
+        Result.Err(_) => { },
+    };
+    erg final_remove = remove_dir(path: abs directory);
+    return case dat final_remove {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}

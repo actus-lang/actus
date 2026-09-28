@@ -500,11 +500,11 @@ String conversions.
 
 ### Sub-gate H: Standard-Library Positive and Negative Conformance Matrix
 
-- [ ] Inventory every facade-exported `std::io`, `std::fs`, and `std::path`
+- [x] Inventory every facade-exported `std::io`, `std::fs`, and `std::path`
       type, role, verb, and runtime bridge.
-- [ ] Add executable positive fixtures under `tests/library/` for every public
+- [x] Add executable positive fixtures under `tests/library/` for every public
       operation family and ownership contract.
-- [ ] Add executable negative fixtures under `tests/library/` for invalid
+- [x] Add executable negative fixtures under `tests/library/` for invalid
       inputs, typed error results, rejected ownership calls, and platform
       mismatches.
 - [x] Execute every Actus `meta test` fixture in `tests/library/` through the
@@ -514,7 +514,8 @@ String conversions.
       directory before the gate is accepted.
 - [x] Record deterministic pass/fail counts for the current fixture matrix
       and keep all Actus test logic in `tests/library/`, outside `library/std`
-      implementation files. Current result: 25 passed, 0 failed.
+      implementation files. Current result: 35 passed, 0 failed on Unix;
+      Windows-target fixtures are filtered by `meta target("windows")`.
 
 ### Gate 3.8 invariant
 

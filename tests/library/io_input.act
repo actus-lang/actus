@@ -1,0 +1,23 @@
+import io;
+
+meta test
+verb stdin_line_and_stream_reads_report_typed_eof() -> Int {
+    erg line_buffer = Buffer[0];
+    erg line_result = read_line(buffer: ins line_buffer);
+    case dat line_result {
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => { },
+            _ => { },
+        },
+        Result.Ok(_) => { return 1; },
+    };
+    erg stream_buffer = Buffer[0];
+    erg stream_result = read(buffer: ins stream_buffer);
+    return case dat stream_result {
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => 0,
+            _ => 0,
+        },
+        Result.Ok(_) => 1,
+    };
+}

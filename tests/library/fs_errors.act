@@ -1,0 +1,250 @@
+import io;
+import fs;
+import path;
+
+verb make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb file_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 103);
+    append(raw, 97);
+    append(raw, 116);
+    append(raw, 101);
+    append(raw, 54);
+    append(raw, 95);
+    append(raw, 99);
+    append(raw, 111);
+    append(raw, 110);
+    append(raw, 116);
+    append(raw, 114);
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 46);
+    append(raw, 98);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+verb directory_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 103);
+    append(raw, 97);
+    append(raw, 116);
+    append(raw, 101);
+    append(raw, 54);
+    append(raw, 95);
+    append(raw, 100);
+    append(raw, 105);
+    append(raw, 114);
+    append(raw, 0);
+    return make_posix(raw: dat raw);
+}
+
+meta test
+verb read_helpers_return_owned_buffers() -> Int {
+    erg path = file_path();
+    erg stale = remove_file(path: abs path);
+    case dat stale {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg contents = Buffer[0];
+    append(contents, 65);
+    append(contents, 66);
+    erg written = write_file(path: abs path, contents: abs contents);
+    case dat written {
+        Result.Ok(count) => case count {
+            2 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg bytes = read_to_bytes(path: abs path);
+    case dat bytes {
+        Result.Ok(output) => {
+            erg length = actus_buffer_length(buffer: abs output);
+            drop(output);
+            case length {
+                2 => { },
+                _ => { return 1; },
+            };
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg text = read_to_string(path: abs path);
+    case dat text {
+        Result.Ok(output) => {
+            erg length = actus_buffer_length(buffer: abs output);
+            drop(output);
+            case length {
+                2 => { },
+                _ => { return 1; },
+            };
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg removed = remove_file(path: abs path);
+    return case dat removed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb invalid_text_returns_typed_error() -> Int {
+    erg path = file_path();
+    erg stale = remove_file(path: abs path);
+    case dat stale {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg invalid = Buffer[0];
+    append(invalid, 255);
+    erg written = write_file(path: abs path, contents: abs invalid);
+    case dat written {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg loaded = read_to_string(path: abs path);
+    erg removed = remove_file(path: abs path);
+    case dat removed {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    return case dat loaded {
+        Result.Ok(output) => {
+            drop(output);
+            1;
+        },
+        Result.Err(error) => case dat error {
+            IoError.InvalidData => 0,
+            _ => 1,
+        },
+    };
+}
+
+meta test
+verb create_new_rejects_existing_file() -> Int {
+    erg path = file_path();
+    erg stale = remove_file(path: abs path);
+    case dat stale {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg created = file_create(path: abs path);
+    case dat created {
+        Result.Ok(file) => { drop(file); },
+        Result.Err(_) => { return 1; },
+    };
+    erg options = options_new();
+    erg exclusive = options_create_new(dat options);
+    erg opened = options_open(options: dat exclusive, path: abs path);
+    case dat opened {
+        Result.Ok(file) => {
+            drop(file);
+            remove_file(path: abs path);
+            return 1;
+        },
+        Result.Err(_) => { },
+    };
+    erg removed = remove_file(path: abs path);
+    return case dat removed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
+    erg directory = directory_path();
+    erg stale = remove_dir(path: abs directory);
+    case dat stale {
+        Result.Ok(_) => { },
+        Result.Err(_) => { },
+    };
+    erg created = create_dir(path: abs directory);
+    case dat created {
+        Result.Ok(_) => { },
+        Result.Err(_) => { return 1; },
+    };
+    erg info = metadata(path: abs directory);
+    case dat info {
+        Result.Ok(value) => case value.is_dir {
+            1 => { },
+            _ => { return 1; },
+        },
+        Result.Err(_) => { return 1; },
+    };
+    erg child_raw = Buffer[0];
+    append(child_raw, 97);
+    append(child_raw, 99);
+    append(child_raw, 116);
+    append(child_raw, 117);
+    append(child_raw, 115);
+    append(child_raw, 95);
+    append(child_raw, 99);
+    append(child_raw, 104);
+    append(child_raw, 105);
+    append(child_raw, 108);
+    append(child_raw, 100);
+    append(child_raw, 46);
+    append(child_raw, 98);
+    append(child_raw, 105);
+    append(child_raw, 110);
+    append(child_raw, 0);
+    erg child_name = make_posix(raw: dat child_raw);
+    erg directory_for_child = directory_path();
+    erg child_result = join(self: dat directory_for_child, other: abs child_name);
+    return case dat child_result {
+        Result.Err(_) => 1,
+        Result.Ok(child) => {
+            erg created_file = file_create(path: abs child);
+            case dat created_file {
+                Result.Ok(file) => { drop(file); },
+                Result.Err(_) => { return 1; },
+            };
+            erg nonempty = remove_dir(path: abs directory);
+            case dat nonempty {
+                Result.Ok(_) => { return 1; },
+                Result.Err(_) => { },
+            };
+            erg child_removed = remove_file(path: abs child);
+            case dat child_removed {
+                Result.Ok(_) => { },
+                Result.Err(_) => { return 1; },
+            };
+            erg removed = remove_dir(path: abs directory);
+            return case dat removed {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 1,
+            };
+        },
+    };
+}

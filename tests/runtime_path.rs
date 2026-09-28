@@ -61,6 +61,13 @@ fn windows_runtime_distinguishes_drive_and_unc_roots() {
 }
 
 #[test]
+fn windows_storage_rejects_unpaired_surrogate_code_units() {
+    let (storage, mut buffer) = bytes_buffer(&[255, 216, 0, 0]);
+    assert_eq!(unsafe { actus_path_validate_storage(&mut buffer, 2) }, -2);
+    drop(storage);
+}
+
+#[test]
 fn component_iterator_is_borrowed_and_platform_aware() {
     let units = b"a\\b/c".iter().map(|byte| u16::from(*byte)).collect::<Vec<_>>();
     let ranges = components(&units, true).collect::<Vec<_>>();

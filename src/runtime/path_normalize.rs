@@ -65,7 +65,7 @@ fn normalize_units(
             continue;
         }
         if is_dot_dot(&bytes[start..end], width) {
-            if remove_previous(bytes, &mut output, width, root_prefix) {
+            if remove_previous(bytes, &mut output, width, root_prefix, windows) {
                 continue;
             }
             if absolute {
@@ -97,14 +97,24 @@ fn root_prefix(bytes: &[u8], width: usize, windows: bool, absolute: bool) -> usi
     width * 2
 }
 
-fn remove_previous(bytes: &mut [u8], output: &mut usize, width: usize, root_prefix: usize) -> bool {
+fn remove_previous(
+    bytes: &mut [u8],
+    output: &mut usize,
+    width: usize,
+    root_prefix: usize,
+    windows: bool,
+) -> bool {
     if *output <= root_prefix {
         return false;
     }
-    *output = output.saturating_sub(width);
-    while *output > root_prefix && !is_separator(read_unit(bytes, *output - width, width), true) {
-        *output -= width;
+    let mut cursor = *output;
+    while cursor > root_prefix && !is_separator(read_unit(bytes, cursor - width, width), windows) {
+        cursor -= width;
     }
+    while cursor > root_prefix && is_separator(read_unit(bytes, cursor - width, width), windows) {
+        cursor -= width;
+    }
+    *output = cursor;
     true
 }
 

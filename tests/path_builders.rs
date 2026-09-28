@@ -82,3 +82,13 @@ fn builders_reject_incompatible_platforms_and_path_separators() {
     let invalid_extension = raw_path(b"bad.ext\0", 0);
     assert_eq!(unsafe { actus_path_set_extension(left, invalid_extension) }, 0);
 }
+
+#[test]
+fn extension_replacement_after_file_name_replacement_preserves_storage() {
+    let left = raw_path(b"a/b/c/c\0", 0);
+    let name = raw_path(b"final\0", 0);
+    let extension = raw_path(b"log\0", 0);
+    assert_eq!(unsafe { actus_path_set_file_name(left, name) }, 0);
+    assert_eq!(unsafe { actus_path_set_extension(left, extension) }, 0);
+    assert_eq!(path_bytes(left), b"a/b/c/final.log\0");
+}

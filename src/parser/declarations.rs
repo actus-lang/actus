@@ -7,7 +7,10 @@ impl Parser {
     pub(super) fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
         let mut doc = self.take_doc_string_group();
         if self.check_simple(&TokenKind::Meta) {
-            let metadata = self.parse_metadata()?;
+            let mut metadata = Vec::new();
+            while self.check_simple(&TokenKind::Meta) {
+                metadata.extend(self.parse_metadata()?);
+            }
             if doc.is_none() {
                 doc = self.take_doc_string_group();
             }

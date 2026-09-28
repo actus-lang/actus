@@ -237,7 +237,8 @@ pub unsafe extern "C" fn actus_path_validate_storage(
         return -2;
     }
     let (pairs, _) = payload.as_chunks::<2>();
-    validate_windows_units(pairs.iter().map(|pair| u16::from_ne_bytes(*pair))).map_or(-1, |_| 0)
+    validate_windows_units(pairs.iter().map(|pair| u16::from_ne_bytes(*pair)))
+        .map_or_else(|error| error as i32, |_| 0)
 }
 
 #[unsafe(no_mangle)]

@@ -49,7 +49,7 @@ unsafe fn replace_payload(path: *mut ActusPath, bytes: &[u8]) -> Result<(), i32>
         let mut storage =
             unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
         storage
-            .try_reserve_exact(required - storage.capacity())
+            .try_reserve_exact(required - storage.len())
             .map_err(|_| failure(PathErrorCode::CapacityExceeded))?;
         restore_buffer(buffer, storage);
     }
@@ -221,7 +221,7 @@ pub unsafe extern "C" fn actus_path_reserve(path: *mut ActusPath, capacity: i32)
         return 0;
     }
     let mut storage = unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
-    if storage.try_reserve_exact(requested - storage.capacity()).is_err() {
+    if storage.try_reserve_exact(requested - storage.len()).is_err() {
         restore_buffer(buffer, storage);
         return failure(PathErrorCode::CapacityExceeded);
     }

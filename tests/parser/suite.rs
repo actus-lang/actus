@@ -35,6 +35,17 @@ fn parses_target_metadata_into_the_verb_ast() {
 }
 
 #[test]
+fn parses_target_and_test_metadata_together() {
+    let program = parse_source(
+        "meta target(\"windows\") meta test verb platform_test() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(verb.metadata.len(), 2);
+    assert!(verb.metadata.contains(&MetaAttribute::Target("windows".to_owned())));
+    assert!(verb.metadata.contains(&MetaAttribute::Test));
+}
+
+#[test]
 fn rejects_unknown_target_metadata() {
     let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

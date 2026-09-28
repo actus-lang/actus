@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Instant;
 
 use crate::ast::{Block, Expr, MetaAttribute, Program, Stmt, TopLevelDecl, TypeName, VerbDecl};
@@ -9,6 +9,7 @@ use crate::configuration::CompilerConfiguration;
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleResolver, resolve_imports};
 use crate::parser::parse;
+use crate::semantic::filter_program_for_target;
 
 pub(super) fn test_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     if arguments.next().is_some() {
@@ -108,6 +109,7 @@ fn collect_tests(
             .map_err(|error| format!("cannot parse `{}`: {error:?}", path.display()))?;
         let program = resolve_imports(&program, &resolver)
             .map_err(|error| format!("cannot resolve `{}`: {error}", path.display()))?;
+        let program = filter_program_for_target(&program, configuration.target());
         for declaration in &program.declarations {
             if let TopLevelDecl::Verb(verb) = declaration
                 && verb.metadata.contains(&MetaAttribute::Test)
@@ -156,7 +158,12 @@ fn run_test(
         .map_err(|error| format!("cannot write test object: {error}"))?;
     let result = link_object(&object_path, &executable, configuration)
         .map_err(|error| error.to_string())
-        .and_then(|()| Command::new(&executable).status().map_err(|error| error.to_string()));
+        .and_then(|()| {
+            Command::new(&executable)
+                .stdin(Stdio::null())
+                .status()
+                .map_err(|error| error.to_string())
+        });
     let _ = fs::remove_file(&object_path);
     let _ = fs::remove_file(&executable);
     result.map(|status| status.code().unwrap_or(1))
@@ -182,13 +189,10 @@ fn test_main(name: &str) -> TopLevelDecl {
             span,
         }),
         body: Block {
-            statements: vec![
-                Stmt::Expression {
-                    expression: Expr::Call { callee: name.to_owned(), arguments: Vec::new(), span },
-                    span,
-                },
-                Stmt::Return { value: Some(Expr::Integer { value: "0".to_owned(), span }), span },
-            ],
+            statements: vec![Stmt::Return {
+                value: Some(Expr::Call { callee: name.to_owned(), arguments: Vec::new(), span }),
+                span,
+            }],
             span,
         },
         span,

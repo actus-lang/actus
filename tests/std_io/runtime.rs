@@ -11,6 +11,7 @@ fn std_io_buffered_runtime_flushes_full_and_partial_chunks() {
     assert!(!source.is_null());
     unsafe {
         assert_eq!(actus_buffer_reserve(target, 4), 4);
+        assert!((*target).capacity >= 4);
         for byte in b"abcdef" {
             assert!(actus_buffer_append(source, *byte));
         }

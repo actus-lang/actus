@@ -58,7 +58,7 @@ pub unsafe extern "C" fn actus_buffer_reserve(
     let mut data = unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
     let requested = requested_capacity as usize;
     let result = if requested > data.capacity() {
-        data.try_reserve_exact(requested - data.capacity()).map(|_| requested_capacity)
+        data.try_reserve_exact(requested - data.len()).map(|_| requested_capacity)
     } else {
         Ok(requested_capacity)
     };

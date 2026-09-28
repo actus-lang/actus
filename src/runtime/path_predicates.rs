@@ -12,7 +12,8 @@ pub unsafe extern "C" fn actus_path_is_absolute(path: *const ActusPath) -> i32 {
     } else {
         unsafe { super::path::actus_windows_root_kind(path) }
     };
-    i32::from(kind == 1 || (platform == 1 && (kind == 2 || kind == 3)))
+    let absolute = if platform == 0 { kind == 1 } else { kind == 2 || kind == 3 };
+    i32::from(absolute)
 }
 
 #[unsafe(no_mangle)]

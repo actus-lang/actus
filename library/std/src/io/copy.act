@@ -16,7 +16,11 @@ open verb copy[R: Reader, W: Writer](
 ) -> Result[Int, IoError] {
     erg scratch = Buffer[0];
     erg capacity = 4096;
-    actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
+    erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
+    case reserved {
+        -1 => { return Result[Int, IoError].Err(IoError.Failed); },
+        _ => { },
+    };
     erg total = 0;
     loop {
         erg read_result: Result[Int, IoError] = reader.read(buffer: ins scratch);
