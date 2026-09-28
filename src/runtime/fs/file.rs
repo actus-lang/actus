@@ -130,7 +130,7 @@ pub(super) fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> 
         use std::os::unix::io::IntoRawFd;
         return options
             .open(std::ffi::OsStr::from_bytes(bytes))
-            .map_or(-1, |file| file.into_raw_fd() as i64);
+            .map_or(ABI_HANDLE_FAILURE, |file| file.into_raw_fd() as i64);
     }
     #[cfg(windows)]
     {
@@ -139,7 +139,7 @@ pub(super) fn open_with_options(bytes: &[u8], options: std::fs::OpenOptions) -> 
         let wide = String::from_utf8_lossy(bytes).encode_utf16().collect::<Vec<_>>();
         return options
             .open(std::ffi::OsString::from_wide(&wide))
-            .map_or(-1, |file| file.into_raw_handle() as i64);
+            .map_or(ABI_HANDLE_FAILURE, |file| file.into_raw_handle() as i64);
     }
     #[allow(unreachable_code)]
     -1
