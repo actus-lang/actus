@@ -1,6 +1,7 @@
 use actus::diagnostics::{
-    Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, render_diagnostic,
-    render_json_diagnostics, render_semantic_error, semantic_diagnostic, sort_diagnostics,
+    Diagnostic, DiagnosticPhase, DiagnosticSeverity, lex_diagnostic, render_colored_diagnostic,
+    render_diagnostic, render_json_diagnostics, render_semantic_error, semantic_diagnostic,
+    sort_diagnostics,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
@@ -87,6 +88,19 @@ fn json_renderer_preserves_shared_diagnostic_metadata() {
     assert_eq!(entries[1]["code"], "E0001");
     assert_eq!(entries[1]["phase"], "lexical");
     assert_eq!(diagnostics[0].code(), "E1800");
+}
+
+#[test]
+fn colored_renderer_preserves_plain_output_when_disabled() {
+    let diagnostic = Diagnostic::error("E1003", SourceSpan::new(0, 1), "undeclared name")
+        .with_phase(DiagnosticPhase::Semantic);
+    let plain = render_diagnostic("x", &diagnostic);
+
+    assert_eq!(render_colored_diagnostic("x", &diagnostic, false), plain);
+    assert_eq!(
+        render_colored_diagnostic("x", &diagnostic, true),
+        "\x1b[31merror[E1003]\x1b[0m at 1:1: undeclared name"
+    );
 }
 
 #[test]

@@ -44,6 +44,8 @@ behavior around the existing language and runtime contracts.
       and stable code in the shared model and LSP adapter.
 - [x] Add a stable JSON renderer that preserves shared diagnostic metadata
       without mutating the caller's ordering.
+- [x] Add a colored terminal renderer whose disabled mode is identical to the
+      plain renderer and whose colors are presentation-only.
 
 ## Strict-mode contract
 

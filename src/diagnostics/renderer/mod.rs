@@ -44,11 +44,41 @@ pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
 /// and source location.
 pub fn render_diagnostic(source: &str, diagnostic: &Diagnostic) -> String {
     let (line, column) = line_column(source, diagnostic.span().start);
-    let severity = match diagnostic.severity() {
+    let severity = severity_name(diagnostic.severity());
+    format!("{severity}[{}] at {line}:{column}: {}", diagnostic.code(), diagnostic.message())
+}
+
+/// Renders one diagnostic with optional ANSI severity coloring.
+///
+/// When `enabled` is false, the result is byte-for-byte identical to the
+/// plain renderer. Only the severity label and code receive presentation
+/// coloring; the diagnostic content remains unchanged.
+pub fn render_colored_diagnostic(source: &str, diagnostic: &Diagnostic, enabled: bool) -> String {
+    if !enabled {
+        return render_diagnostic(source, diagnostic);
+    }
+    let (line, column) = line_column(source, diagnostic.span().start);
+    let severity = severity_name(diagnostic.severity());
+    let color = severity_color(diagnostic.severity());
+    format!(
+        "{color}{severity}[{}]\x1b[0m at {line}:{column}: {}",
+        diagnostic.code(),
+        diagnostic.message()
+    )
+}
+
+fn severity_name(severity: DiagnosticSeverity) -> &'static str {
+    match severity {
         DiagnosticSeverity::Error => "error",
         DiagnosticSeverity::Warning => "warning",
-    };
-    format!("{severity}[{}] at {line}:{column}: {}", diagnostic.code(), diagnostic.message())
+    }
+}
+
+fn severity_color(severity: DiagnosticSeverity) -> &'static str {
+    match severity {
+        DiagnosticSeverity::Error => "\x1b[31m",
+        DiagnosticSeverity::Warning => "\x1b[33m",
+    }
 }
 
 fn lex_message(error: &LexError) -> String {
