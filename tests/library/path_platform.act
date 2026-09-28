@@ -28,7 +28,6 @@ verb make_windows(dat raw: Buffer) -> Path {
     };
 }
 
-meta target("unix")
 verb posix_bin_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 47);

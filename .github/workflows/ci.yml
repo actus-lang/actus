@@ -38,6 +38,24 @@ jobs:
               "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             }
           }
+          $vcToolsRoot = Join-Path $installation 'VC\Tools\MSVC'
+          $vcToolset = Get-ChildItem -Path $vcToolsRoot -Directory |
+            Sort-Object Name -Descending |
+            Where-Object { Test-Path (Join-Path $_.FullName 'bin\Hostx64\x64\link.exe') } |
+            Select-Object -First 1
+          if (-not $vcToolset) {
+            throw "An x64 MSVC toolset was not found under $vcToolsRoot"
+          }
+          $vcLinkDirectory = Join-Path $vcToolset.FullName 'bin\Hostx64\x64'
+          $msvcLinker = Join-Path $vcLinkDirectory 'link.exe'
+          "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ACTUS_CI_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $env:Path = "$vcLinkDirectory;$env:Path"
+          "PATH=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $linker = (Get-Command link.exe -ErrorAction Stop).Source
+          if (-not $linker.StartsWith($vcLinkDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "MSVC linker was not selected: $linker"
+          }
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -58,3 +76,7 @@ jobs:
       - name: Scan tracked files for secrets
         if: runner.os != 'Windows'
         run: ./scripts/check_secrets.sh
+
+      - name: Check standard library conformance
+        shell: bash
+        run: ./scripts/check_stdlib.sh

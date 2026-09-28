@@ -12,6 +12,5 @@ path = { path = "library/std" }
 [build]
 target = "host"
 profile = "debug"
-linker = "cc"
 native_module = "actus"
 position_independent = true

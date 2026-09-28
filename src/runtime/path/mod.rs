@@ -44,6 +44,7 @@ pub struct ComponentRange {
 }
 
 mod abi;
+mod ascii;
 mod builders;
 mod c_abi_views;
 mod component_views;
@@ -57,6 +58,7 @@ pub use abi::{
     actus_posix_is_separator, actus_posix_root_kind, actus_windows_is_separator,
     actus_windows_root_kind,
 };
+pub use ascii::actus_path_ascii_to_native;
 pub use builders::{
     actus_path_join, actus_path_push, actus_path_reserve, actus_path_set_extension,
     actus_path_set_file_name,

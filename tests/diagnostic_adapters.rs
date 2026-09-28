@@ -1,6 +1,6 @@
 use actus::diagnostics::{
-    DiagnosticSeverity, render_colored_diagnostic, render_diagnostic, render_json_diagnostics,
-    semantic_diagnostic,
+    DiagnosticSeverity, lex_diagnostic, render_colored_diagnostic, render_diagnostic,
+    render_json_diagnostics, semantic_diagnostic, sort_diagnostics,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::lsp::analyze_document;
@@ -29,6 +29,39 @@ fn all_diagnostic_adapters_preserve_one_fixture() {
     );
     assert_json_metadata(&diagnostic);
     assert_lsp_metadata(source);
+}
+
+#[test]
+fn all_diagnostic_adapters_preserve_order_for_multiple_errors() {
+    let source = "verb main() -> Int { return @ + #; }\n";
+    let (tokens, errors) = scan(source);
+    assert!(!tokens.is_empty());
+    assert_eq!(errors.len(), 2);
+    let mut diagnostics = errors.iter().map(lex_diagnostic).collect::<Vec<_>>();
+    sort_diagnostics(&mut diagnostics);
+
+    let plain = diagnostics
+        .iter()
+        .map(|diagnostic| render_diagnostic(source, diagnostic))
+        .collect::<Vec<_>>();
+    let colored = diagnostics
+        .iter()
+        .map(|diagnostic| render_colored_diagnostic(source, diagnostic, true))
+        .collect::<Vec<_>>();
+    let json: serde_json::Value = serde_json::from_str(
+        &render_json_diagnostics(&diagnostics).expect("diagnostics should serialize"),
+    )
+    .expect("JSON diagnostics should parse");
+    let lsp =
+        analyze_document("file:///tmp/actus-diagnostic-parity.act", source, &Default::default());
+
+    for (index, diagnostic) in diagnostics.iter().enumerate() {
+        assert!(plain[index].contains(diagnostic.code()));
+        assert!(colored[index].contains(diagnostic.code()));
+        assert_eq!(json[index]["code"], diagnostic.code());
+        assert_eq!(lsp[index].code.as_deref(), Some(diagnostic.code()));
+        assert_eq!(lsp[index].range.start.character, diagnostic.span().start as u32);
+    }
 }
 
 fn assert_json_metadata(diagnostic: &actus::diagnostics::Diagnostic) {

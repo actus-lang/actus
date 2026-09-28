@@ -139,13 +139,7 @@ fn std_io_stream_result_chain_propagates_success() {
         "import io; verb stream() -> Result[Int, IoError] { erg buffer = Buffer[0]; append(buffer, 115); append(buffer, 116); append(buffer, 114); append(buffer, 101); append(buffer, 97); append(buffer, 109); write(buffer: abs buffer)?; return Result[Int, IoError].Ok(0); } verb main() -> Int { stream(); return 42; }\n",
     );
     build(&input, &output);
-    let mut child = Command::new(&output)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("stream fixture should run");
-    child.stdin.take().expect("stream stdin should exist").write_all(b"stream\n").unwrap();
-    let execution = child.wait_with_output().expect("wait for stream fixture");
+    let execution = Command::new(&output).output().expect("stream fixture should run");
     assert_eq!(execution.status.code(), Some(42));
     let _ = fs::remove_dir_all(root);
 }

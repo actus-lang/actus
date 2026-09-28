@@ -1,11 +1,12 @@
 use actus::runtime::{
     ActusBuffer, ActusPath, ActusPathComponent, ActusPathComponents, PathErrorCode, PosixRoot,
-    WindowsRoot, actus_path_components, actus_path_ends_with, actus_path_extension,
-    actus_path_file_name, actus_path_file_stem, actus_path_has_root, actus_path_is_absolute,
-    actus_path_is_relative, actus_path_next_component, actus_path_normalize, actus_path_parent,
-    actus_path_starts_with, actus_path_validate_storage, actus_posix_is_separator,
-    actus_posix_root_kind, actus_windows_is_separator, actus_windows_root_kind, components,
-    extension, file_name, file_stem, posix_root, validate_posix, validate_windows, windows_root,
+    WindowsRoot, actus_path_ascii_to_native, actus_path_components, actus_path_ends_with,
+    actus_path_extension, actus_path_file_name, actus_path_file_stem, actus_path_has_root,
+    actus_path_is_absolute, actus_path_is_relative, actus_path_next_component,
+    actus_path_normalize, actus_path_parent, actus_path_starts_with, actus_path_validate_storage,
+    actus_posix_is_separator, actus_posix_root_kind, actus_windows_is_separator,
+    actus_windows_root_kind, components, extension, file_name, file_stem, posix_root,
+    validate_posix, validate_windows, windows_root,
 };
 
 fn bytes_buffer(bytes: &[u8]) -> (Vec<u8>, ActusBuffer) {
@@ -44,6 +45,33 @@ fn terminated_storage_may_use_its_full_capacity() {
         capacity: storage.capacity(),
     };
     assert_eq!(unsafe { actus_path_validate_storage(&mut buffer, 1) }, 0);
+}
+
+#[test]
+fn ascii_path_conversion_selects_the_host_native_representation() {
+    let (storage, mut buffer) = bytes_buffer(b"actus-ci\0");
+    #[cfg(windows)]
+    std::mem::forget(storage);
+    let status = unsafe { actus_path_ascii_to_native(&mut buffer) };
+    #[cfg(unix)]
+    {
+        assert_eq!(status, 0);
+        assert_eq!(
+            unsafe { std::slice::from_raw_parts(buffer.data, buffer.length) },
+            b"actus-ci\0"
+        );
+        drop(storage);
+    }
+    #[cfg(windows)]
+    {
+        assert_eq!(status, 1);
+        let units =
+            unsafe { std::slice::from_raw_parts(buffer.data.cast::<u16>(), buffer.length / 2) };
+        assert_eq!(units, &[97, 99, 116, 117, 115, 45, 99, 105, 0]);
+        unsafe {
+            let _ = Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity);
+        }
+    }
 }
 
 #[test]

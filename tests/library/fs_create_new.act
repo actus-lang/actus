@@ -3,7 +3,7 @@ import fs;
 import path;
 
 verb make_posix(dat raw: Buffer) -> Path {
-    erg result = path_from_posix(storage: dat raw);
+    erg result = path_from_ascii(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
         Result.Err(_) => Path {

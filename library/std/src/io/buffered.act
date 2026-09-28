@@ -110,40 +110,61 @@ buffer merely because this verb returns; typed errors are propagated to the call
 open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target], abs input: Buffer
 ) -> Result[Int, IoError] {
-    erg source_length = actus_buffer_length(buffer: abs input); erg total = 0;
+    erg source_length = actus_buffer_length(buffer: abs input);
+    case source_length { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };
+    erg total = 0;
     loop {
         erg remaining = source_length - total;
         case remaining {
             0 => { return Result[Int, IoError].Ok(total); },
             _ => { },
         };
-        erg accepted = actus_buffer_append_range(target: ins writer.buffer, source: abs input,
-            offset: total, length: remaining);
-        case accepted {
-            -1 => { return Result[Int, IoError].Err(IoError.Failed); },
-            0 => { return Result[Int, IoError].Err(IoError.InvalidData); },
-            _ => { },
-        };
+        erg accepted = append_buffered_chunk(
+            target: ins writer.buffer, source: abs input, offset: total, length: remaining
+        )?;
         total = total + accepted;
-        erg capacity = actus_buffer_capacity(buffer: abs writer.buffer);
-        erg buffered = actus_buffer_length(buffer: abs writer.buffer);
-        case capacity {
-            -1 => { return Result[Int, IoError].Err(IoError.Failed); },
-            _ => { },
-        };
-        case buffered {
-            -1 => { return Result[Int, IoError].Err(IoError.Failed); },
-            _ => { },
-        };
-        erg remaining_capacity = buffered - capacity;
-        case remaining_capacity {
-            0 => {
-                flush_buffer(writer: ins writer)?;
-            },
-            _ => { },
-        };
+        erg full = buffered_storage_is_full(buffer: abs writer.buffer)?;
+        case full { 1 => { flush_buffer(writer: ins writer)?; }, _ => { }, };
     }
     return Result[Int, IoError].Ok(total);
+}
+
+"""
+Append one source chunk to the writer's existing storage.
+
+The target remains an `ins` buffer owned by the enclosing writer. The source
+is an `abs` view and is never retained. The result is the exact number of
+bytes accepted, or a typed error when the bridge rejects the operation.
+"""
+open verb append_buffered_chunk(
+    ins target: Buffer, abs source: Buffer, erg offset: Int, erg length: Int
+) -> Result[Int, IoError] {
+    erg accepted = actus_buffer_append_range(
+        target: ins target, source: abs source, offset: offset, length: length
+    );
+    return case accepted {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        0 => Result[Int, IoError].Err(IoError.InvalidData),
+        _ => Result[Int, IoError].Ok(accepted),
+    };
+}
+
+"""
+Determine whether a buffered writer has consumed its available capacity.
+
+The `abs buffer` view is read-only and does not allocate or mutate storage.
+The result is `Ok(1)` when the buffer is full, `Ok(0)` otherwise, or a typed
+failure when either runtime inspection bridge rejects the buffer.
+"""
+open verb buffered_storage_is_full(abs buffer: Buffer) -> Result[Int, IoError] {
+    erg capacity = actus_buffer_capacity(buffer: abs buffer);
+    erg buffered = actus_buffer_length(buffer: abs buffer);
+    case capacity { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };
+    case buffered { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };
+    return case capacity - buffered {
+        0 => Result[Int, IoError].Ok(1),
+        _ => Result[Int, IoError].Ok(0),
+    };
 }
 
 """

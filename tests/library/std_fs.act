@@ -5,7 +5,7 @@ import path;
 verb empty_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 0);
-    erg result = path_from_posix(storage: dat raw);
+    erg result = path_from_ascii(storage: dat raw);
     return case dat result {
         Result.Ok(value) => value,
         Result.Err(_) => Path {
