@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use actus::conformance::{
     SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_tree, source_limit_diagnostics,
-    source_paths,
+    source_paths, validate_source_exception_manifest,
 };
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
 
@@ -82,6 +82,14 @@ fn rust_logic_in_library_fixture_tree_is_rejected() {
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].code(), "E1834");
     fs::remove_dir_all(root).expect("fixture tree should be removed");
+}
+
+#[test]
+fn source_exception_manifest_requires_review_fields() {
+    let valid = "version = 1\n[[exceptions]]\npath = \"tests/fixture.act\"\ncategory = \"tabular\"\nowner = \"compiler-team\"\nscope = \"fixture only\"\nreason = \"generated compatibility table\"\nreplacement_plan = \"split before Phase 19\"\n";
+    assert!(validate_source_exception_manifest(valid).is_ok());
+    let invalid = "version = 1\n[[exceptions]]\npath = \"tests/fixture.act\"\ncategory = \"manual\"\nowner = \"team\"\nscope = \"fixture\"\nreason = \"reason\"\nreplacement_plan = \"plan\"\n";
+    assert!(validate_source_exception_manifest(invalid).is_err());
 }
 
 #[test]

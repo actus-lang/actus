@@ -275,7 +275,7 @@ behavior around the existing language and runtime contracts.
 - [x] Reject functions above the 60-line hard limit.
 - [x] Keep tests in `tests/` and Actus library fixtures in `tests/library/`;
       reject Rust logic embedded in Actus fixture trees.
-- [ ] Define narrowly scoped exceptions only for generated or intentionally
+- [x] Define narrowly scoped exceptions only for generated or intentionally
       tabular artifacts, with owner, scope, reason, and replacement plan.
 - [x] Reject source-local comments or annotations that attempt to suppress
       architectural limits.
