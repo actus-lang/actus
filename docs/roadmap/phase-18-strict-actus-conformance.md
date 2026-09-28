@@ -200,9 +200,12 @@ behavior around the existing language and runtime contracts.
       combinations before code generation.
 - [x] Validate primitive widths, signedness, literal ranges, and overflow
       behavior without silent truncation.
-- [ ] Add positive and negative fixtures for every declared frontend rule.
-- [ ] Add a completeness report identifying validated and intentionally
-      non-codegen declarations.
+- [x] Add positive and negative fixtures for every declared frontend rule. See
+      [`phase-18-frontend-completeness.md`](phase-18-frontend-completeness.md)
+      and `tests/frontend_completeness.rs`.
+- [x] Add a completeness report identifying validated and intentionally
+      non-codegen declarations. See
+      [`phase-18-frontend-completeness.md`](phase-18-frontend-completeness.md).
 
 ## Gate 18.5: Ownership, type, and exhaustiveness strictness
 
