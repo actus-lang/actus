@@ -45,42 +45,54 @@ pub(crate) unsafe fn with_host_paths<T>(
     operation: impl FnOnce(&Path, &Path) -> T,
 ) -> Option<T> {
     #[cfg(unix)]
-    {
-        use std::os::unix::ffi::OsStrExt;
-        let mut source = ActusPathCView { data: std::ptr::null(), length: 0 };
-        let mut destination = ActusPathCView { data: std::ptr::null(), length: 0 };
-        if unsafe { actus_path_c_view(&mut source, from) }.is_null()
-            || unsafe { actus_path_c_view(&mut destination, to) }.is_null()
-        {
-            return None;
-        }
-        let source_bytes =
-            unsafe { std::slice::from_raw_parts(source.data, source.length as usize) };
-        let destination_bytes =
-            unsafe { std::slice::from_raw_parts(destination.data, destination.length as usize) };
-        return Some(operation(
-            Path::new(std::ffi::OsStr::from_bytes(source_bytes)),
-            Path::new(std::ffi::OsStr::from_bytes(destination_bytes)),
-        ));
-    }
+    return unsafe { with_unix_host_paths(from, to, operation) };
     #[cfg(windows)]
-    {
-        use std::os::windows::ffi::OsStringExt;
-        let mut source = ActusPathWideCView { data: std::ptr::null(), length: 0 };
-        let mut destination = ActusPathWideCView { data: std::ptr::null(), length: 0 };
-        if unsafe { actus_path_wide_c_view(&mut source, from) }.is_null()
-            || unsafe { actus_path_wide_c_view(&mut destination, to) }.is_null()
-        {
-            return None;
-        }
-        let source_units =
-            unsafe { std::slice::from_raw_parts(source.data, source.length as usize) };
-        let destination_units =
-            unsafe { std::slice::from_raw_parts(destination.data, destination.length as usize) };
-        let source_path = std::ffi::OsString::from_wide(source_units);
-        let destination_path = std::ffi::OsString::from_wide(destination_units);
-        return Some(operation(Path::new(&source_path), Path::new(&destination_path)));
-    }
+    return unsafe { with_windows_host_paths(from, to, operation) };
     #[allow(unreachable_code)]
     None
+}
+
+#[cfg(unix)]
+unsafe fn with_unix_host_paths<T>(
+    from: *const ActusPath,
+    to: *const ActusPath,
+    operation: impl FnOnce(&Path, &Path) -> T,
+) -> Option<T> {
+    use std::os::unix::ffi::OsStrExt;
+    let mut source = ActusPathCView { data: std::ptr::null(), length: 0 };
+    let mut destination = ActusPathCView { data: std::ptr::null(), length: 0 };
+    if unsafe { actus_path_c_view(&mut source, from) }.is_null()
+        || unsafe { actus_path_c_view(&mut destination, to) }.is_null()
+    {
+        return None;
+    }
+    let source_bytes = unsafe { std::slice::from_raw_parts(source.data, source.length as usize) };
+    let destination_bytes =
+        unsafe { std::slice::from_raw_parts(destination.data, destination.length as usize) };
+    Some(operation(
+        Path::new(std::ffi::OsStr::from_bytes(source_bytes)),
+        Path::new(std::ffi::OsStr::from_bytes(destination_bytes)),
+    ))
+}
+
+#[cfg(windows)]
+unsafe fn with_windows_host_paths<T>(
+    from: *const ActusPath,
+    to: *const ActusPath,
+    operation: impl FnOnce(&Path, &Path) -> T,
+) -> Option<T> {
+    use std::os::windows::ffi::OsStringExt;
+    let mut source = ActusPathWideCView { data: std::ptr::null(), length: 0 };
+    let mut destination = ActusPathWideCView { data: std::ptr::null(), length: 0 };
+    if unsafe { actus_path_wide_c_view(&mut source, from) }.is_null()
+        || unsafe { actus_path_wide_c_view(&mut destination, to) }.is_null()
+    {
+        return None;
+    }
+    let source_units = unsafe { std::slice::from_raw_parts(source.data, source.length as usize) };
+    let destination_units =
+        unsafe { std::slice::from_raw_parts(destination.data, destination.length as usize) };
+    let source_path = std::ffi::OsString::from_wide(source_units);
+    let destination_path = std::ffi::OsString::from_wide(destination_units);
+    Some(operation(Path::new(&source_path), Path::new(&destination_path)))
 }

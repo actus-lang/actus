@@ -6,16 +6,10 @@ impl<'source> Scanner<'source> {
     pub(super) fn scan_token(&mut self) {
         let start = self.cursor;
         let character = self.advance().expect("scan_token called at end of input");
+        if self.scan_simple_token(character, start) {
+            return;
+        }
         match character {
-            '{' => self.push_simple(TokenKind::LeftBrace, start),
-            '}' => self.push_simple(TokenKind::RightBrace, start),
-            '(' => self.push_simple(TokenKind::LeftParen, start),
-            ')' => self.push_simple(TokenKind::RightParen, start),
-            '[' => self.push_simple(TokenKind::LeftBracket, start),
-            ']' => self.push_simple(TokenKind::RightBracket, start),
-            ':' => self.push_simple(TokenKind::Colon, start),
-            ',' => self.push_simple(TokenKind::Comma, start),
-            ';' => self.push_simple(TokenKind::Semicolon, start),
             '<' if self.match_character('=') => self.push_simple(TokenKind::LessEquals, start),
             '<' => self.push_simple(TokenKind::LessThan, start),
             '=' if self.match_character('>') => self.push_simple(TokenKind::FatArrow, start),
@@ -46,6 +40,23 @@ impl<'source> Scanner<'source> {
                 SourceSpan::new(start, self.cursor),
             )),
         }
+    }
+
+    fn scan_simple_token(&mut self, character: char, start: usize) -> bool {
+        let kind = match character {
+            '{' => TokenKind::LeftBrace,
+            '}' => TokenKind::RightBrace,
+            '(' => TokenKind::LeftParen,
+            ')' => TokenKind::RightParen,
+            '[' => TokenKind::LeftBracket,
+            ']' => TokenKind::RightBracket,
+            ':' => TokenKind::Colon,
+            ',' => TokenKind::Comma,
+            ';' => TokenKind::Semicolon,
+            _ => return false,
+        };
+        self.push_simple(kind, start);
+        true
     }
 
     pub(super) fn skip_whitespace_and_comments(&mut self) {

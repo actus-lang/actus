@@ -210,15 +210,29 @@ fn check_doc(
     issues: &mut Vec<DocumentationIssue>,
 ) {
     let Some(doc) = doc.map(str::trim).filter(|doc| !doc.is_empty()) else {
-        issues.push(issue(
-            STRICT_DOCUMENTATION_MISSING,
-            declaration,
-            DocumentationSection::Purpose,
-            span,
-            "missing or empty block docstring",
-        ));
+        report_missing_doc(declaration, span, issues);
         return;
     };
+    check_doc_content(doc, declaration, span, contract, issues);
+}
+
+fn report_missing_doc(declaration: String, span: SourceSpan, issues: &mut Vec<DocumentationIssue>) {
+    issues.push(issue(
+        STRICT_DOCUMENTATION_MISSING,
+        declaration,
+        DocumentationSection::Purpose,
+        span,
+        "missing or empty block docstring",
+    ));
+}
+
+fn check_doc_content(
+    doc: &str,
+    declaration: String,
+    span: SourceSpan,
+    contract: Contract,
+    issues: &mut Vec<DocumentationIssue>,
+) {
     if word_count(doc) < 4 || is_signature_restatement(doc, &declaration) {
         issues.push(issue(
             STRICT_DOCUMENTATION_RESTATEMENT,
@@ -228,18 +242,38 @@ fn check_doc(
             "documentation is an incomplete or signature-restating summary",
         ));
     }
+    check_required_sections(doc, &declaration, span, &contract, issues);
+    check_doc_claims(doc, declaration, span, &contract, issues);
+}
+
+fn check_required_sections(
+    doc: &str,
+    declaration: &str,
+    span: SourceSpan,
+    contract: &Contract,
+    issues: &mut Vec<DocumentationIssue>,
+) {
     for section in contract.required_sections() {
-        if !contains_section(doc, section, &contract) {
+        if !contains_section(doc, section, contract) {
             issues.push(issue(
                 STRICT_DOCUMENTATION_SECTION,
-                declaration.clone(),
+                declaration.to_owned(),
                 section,
                 span,
                 format!("documentation does not describe the {} contract", section.label()),
             ));
         }
     }
-    if has_contradiction(doc, &contract) {
+}
+
+fn check_doc_claims(
+    doc: &str,
+    declaration: String,
+    span: SourceSpan,
+    contract: &Contract,
+    issues: &mut Vec<DocumentationIssue>,
+) {
+    if has_contradiction(doc, contract) {
         issues.push(issue(
             STRICT_DOCUMENTATION_CONTRADICTION,
             declaration.clone(),
@@ -248,7 +282,7 @@ fn check_doc(
             "documentation contradicts the declaration ownership contract",
         ));
     }
-    if is_misrepresenting(doc, &contract) {
+    if is_misrepresenting(doc, contract) {
         issues.push(issue(
             STRICT_DOCUMENTATION_MISREPRESENTATION,
             declaration,
