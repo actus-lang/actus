@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::semantic::GenericInstance;
 
-use super::native::NativeEmitError;
+use super::super::native::NativeEmitError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GenericFieldLayout {

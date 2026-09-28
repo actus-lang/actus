@@ -42,7 +42,7 @@ pub(crate) fn lower_pack_literal(
         string_data,
         layouts,
     )?;
-    Ok(super::super::expression_literals::coerce_to_ir_type(
+    Ok(super::super::expressions::coerce_to_ir_type(
         function,
         value,
         layouts.ir_type(pack.storage)?,
@@ -128,7 +128,7 @@ pub(crate) fn lower_pack_field(
     };
     let mask_value = function.ins().iconst(storage_type, bit_mask(field_layout.width));
     let masked = function.ins().band(shifted, mask_value);
-    Ok(super::super::expression_literals::coerce_to_ir_type(
+    Ok(super::super::expressions::coerce_to_ir_type(
         function,
         masked,
         layouts.ir_type(field_layout.ty)?,
@@ -156,8 +156,7 @@ fn lower_pack_field_write(
     let shifted_mask = shift_value(function, mask_value, bit_offset, storage_type);
     let inverse_mask = function.ins().bnot(shifted_mask);
     let cleared = function.ins().band(storage, inverse_mask);
-    let value =
-        super::super::expression_literals::coerce_to_ir_type(function, new_value, storage_type);
+    let value = super::super::expressions::coerce_to_ir_type(function, new_value, storage_type);
     let value = function.ins().band(value, mask_value);
     let value = shift_value(function, value, bit_offset, storage_type);
     Ok(function.ins().bor(cleared, value))

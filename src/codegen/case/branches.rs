@@ -5,7 +5,6 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::CaseBody;
 
-use super::super::case_payload::{BranchLocals, bind_payload};
 use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
@@ -13,6 +12,7 @@ use super::super::lowering::{Flow, lower_case_block};
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::matching::match_pattern;
+use super::payload::{BranchLocals, bind_payload};
 
 const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
 

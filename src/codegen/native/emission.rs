@@ -5,12 +5,12 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
-use super::super::generic_layout::GenericLayoutRegistry;
+use super::super::generic::GenericLayoutRegistry;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::define_string_data;
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::performance::PerformanceRegistry;
-use super::super::performance_emit::define_performances;
+use super::super::performance::define_performances;
 use super::super::result_constructors::normalize_program;
 use super::NativeEmitError;
 use super::declarations::{
@@ -31,7 +31,7 @@ pub(super) fn emit_program_object_for_target(
     let semantic = analyze(program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
     let codegen_program =
-        super::super::generic_verbs::specialize_program(program, &semantic.generic_instances)?;
+        super::super::generic::specialize_program(program, &semantic.generic_instances)?;
     let program = &codegen_program;
     validate_cleanup_plans(&semantic)
         .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;

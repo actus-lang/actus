@@ -85,7 +85,7 @@ fn infer_complex_initializer_type(
             .or_else(|| enum_expression_type(expression, layouts))
             .ok_or_else(|| NativeEmitError(format!("native field `{field}` is unavailable"))),
         Expr::Case { branches, .. } => {
-            super::super::case_types::infer_case_type(branches, types, functions, layouts)
+            super::super::case::infer_case_type(branches, types, functions, layouts)
         }
         _ => Err(NativeEmitError("unsupported native type expression".to_owned())),
     }

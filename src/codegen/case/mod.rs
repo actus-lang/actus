@@ -4,7 +4,6 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::case_types::branch_type;
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
@@ -13,6 +12,11 @@ use super::types::NativeType;
 
 mod branches;
 mod matching;
+mod payload;
+mod types;
+
+use self::types::branch_type;
+pub(super) use types::infer_case_type;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_case(

@@ -3,17 +3,17 @@ use std::collections::HashMap;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_object::ObjectModule;
 
-use super::function_definition::define_function;
-use super::layout::LayoutRegistry;
-use super::literals::StringDataIds;
-use super::model::NativeCleanupSchedule;
-use super::native::{FunctionMeta, NativeEmitError};
-use super::performance::{PerformanceDefinition, dispatch_key};
-use super::types::NativeType;
-use super::vtable::VtableDataIds;
+use super::super::function_definition::define_function;
+use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataIds;
+use super::super::model::NativeCleanupSchedule;
+use super::super::native::{FunctionMeta, NativeEmitError};
+use super::super::types::NativeType;
+use super::super::vtable::VtableDataIds;
+use super::{PerformanceDefinition, dispatch_key};
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn define_performances(
+pub(in crate::codegen) fn define_performances(
     module: &mut ObjectModule,
     frontend_config: TargetFrontendConfig,
     definitions: &[PerformanceDefinition<'_>],

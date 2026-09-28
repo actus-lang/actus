@@ -5,15 +5,15 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr, UnaryOp};
 
-use super::expressions::lower_expression;
-use super::layout::LayoutRegistry;
-use super::literals::StringDataValues;
-use super::model::NativeCleanupSchedule;
-use super::native::{FunctionRef, NativeEmitError};
-use super::types::NativeType;
+use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataValues;
+use super::super::model::NativeCleanupSchedule;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
+use super::lower_expression;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_operation(
+pub(in crate::codegen) fn lower_operation(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,

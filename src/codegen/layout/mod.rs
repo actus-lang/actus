@@ -9,12 +9,11 @@ use crate::ast::{
 use crate::semantic::GenericInstance;
 
 use super::enum_layout::EnumLayout;
-use super::generic_definitions::{canonical_type_name, specialized_enums, specialized_structs};
+use super::generic::{canonical_type_name, specialized_enums, specialized_structs};
 use super::native::NativeEmitError;
 use super::types::NativeType;
 
-#[path = "layout_structs.rs"]
-mod layout_structs;
+mod structs;
 
 #[derive(Clone, Debug)]
 pub(super) struct FieldLayout {

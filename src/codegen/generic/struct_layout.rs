@@ -1,11 +1,11 @@
 use crate::ast::{StructDef, StructFieldRole, TypeName};
 use crate::semantic::TypeSubstitution;
 
-use super::generic_layout::{
+use super::super::native::NativeEmitError;
+use super::layout::{
     GenericFieldLayout, GenericLayoutRegistry, GenericStructLayout, align_up, application_key,
     enter_layout,
 };
-use super::native::NativeEmitError;
 
 impl GenericLayoutRegistry {
     pub(super) fn layout_struct(

@@ -4,17 +4,17 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::calls::{lower_call, lower_method_call};
-use super::enums::{enum_receiver_name, lower_enum_constructor};
-use super::layout::LayoutRegistry;
-use super::literals::StringDataValues;
-use super::model::NativeCleanupSchedule;
-use super::native::{FunctionRef, NativeEmitError};
-use super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
-use super::types::NativeType;
+use super::super::calls::{lower_call, lower_method_call};
+use super::super::enums::{enum_receiver_name, lower_enum_constructor};
+use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataValues;
+use super::super::model::NativeCleanupSchedule;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
+use super::super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_construct(
+pub(in crate::codegen) fn lower_construct(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
@@ -188,13 +188,13 @@ fn lower_arena_method(
 ) -> Option<Result<cranelift_codegen::ir::Value, NativeEmitError>> {
     if method != "place"
         || !matches!(
-            super::structs::expression_native_type(receiver, local_types, layouts),
+            super::super::structs::expression_native_type(receiver, local_types, layouts),
             Some(NativeType::Arena(_))
         )
     {
         return None;
     }
-    Some(super::arenas::lower_place(
+    Some(super::super::arenas::lower_place(
         function,
         receiver,
         arguments,

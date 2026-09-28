@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::literals::StringDataValues;
-use super::native::NativeEmitError;
+use super::super::literals::StringDataValues;
+use super::super::native::NativeEmitError;
 
-pub(super) fn lower_integer(
+pub(in crate::codegen) fn lower_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -28,7 +28,7 @@ pub(super) fn lower_integer(
     Err(NativeEmitError("integer literal exceeds native lowering width".to_owned()))
 }
 
-pub(super) fn lower_float(
+pub(in crate::codegen) fn lower_float(
     function: &mut FunctionBuilder<'_>,
     value: &str,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -38,7 +38,7 @@ pub(super) fn lower_float(
         .map_err(|error| NativeEmitError(format!("invalid floating-point literal: {error}")))
 }
 
-pub(super) fn lower_wide_integer(
+pub(in crate::codegen) fn lower_wide_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -60,7 +60,7 @@ pub(super) fn lower_wide_integer(
     Ok(address)
 }
 
-pub(super) fn lower_float_as(
+pub(in crate::codegen) fn lower_float_as(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     target: Type,
@@ -75,7 +75,7 @@ pub(super) fn lower_float_as(
     })
 }
 
-pub(super) fn coerce_to_ir_type(
+pub(in crate::codegen) fn coerce_to_ir_type(
     function: &mut FunctionBuilder<'_>,
     value: cranelift_codegen::ir::Value,
     target: Type,
@@ -94,7 +94,7 @@ pub(super) fn coerce_to_ir_type(
     value
 }
 
-pub(super) fn lower_string(
+pub(in crate::codegen) fn lower_string(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     string_data: &StringDataValues,
@@ -106,7 +106,7 @@ pub(super) fn lower_string(
         .ok_or_else(|| NativeEmitError(format!("string literal `{value}` has no native data")))
 }
 
-pub(super) fn lower_identifier(
+pub(in crate::codegen) fn lower_identifier(
     name: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {

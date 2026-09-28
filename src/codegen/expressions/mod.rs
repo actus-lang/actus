@@ -6,9 +6,6 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::Expr;
 
 use super::case::lower_case;
-use super::expression_construct::lower_construct;
-use super::expression_literals::{lower_float, lower_identifier, lower_integer, lower_string};
-use super::expression_operations::lower_operation;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
@@ -16,11 +13,20 @@ use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
 mod buffer;
+mod construct;
 mod initializer_types;
+mod literals;
+mod operations;
 mod try_lowering;
 
 pub(super) use buffer::emit_buffer_drop;
+pub(super) use construct::lower_construct;
 pub(super) use initializer_types::initializer_type;
+pub(super) use literals::{
+    coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
+    lower_wide_integer,
+};
+pub(super) use operations::lower_operation;
 pub(super) use try_lowering::lower_try_expression;
 
 #[allow(clippy::too_many_arguments)]

@@ -1,14 +1,10 @@
-#[path = "lowering_body.rs"]
-mod lowering_body;
-#[path = "lowering_loops.rs"]
-mod lowering_loops;
-#[path = "lowering_scopes.rs"]
-mod lowering_scopes;
-#[path = "lowering_statements/mod.rs"]
-mod lowering_statements;
+mod body;
+mod loops;
+mod scopes;
+mod statements;
 
 pub(super) use super::model::NativeCleanupSchedule;
-pub(super) use lowering_body::{lower_body, lower_case_block};
+pub(super) use body::{lower_body, lower_case_block};
 
 #[derive(Clone, Copy)]
 pub(super) enum Flow {

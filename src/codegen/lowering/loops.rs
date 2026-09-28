@@ -57,7 +57,7 @@ pub(super) fn lower_loop<'source>(
         let binding = find_loop_binding(locals, name)?;
         loop_locals.insert(binding, value);
     }
-    let flow = super::lowering_statements::lower_statements(
+    let flow = super::statements::lower_statements(
         function,
         &block.statements,
         &mut loop_locals,

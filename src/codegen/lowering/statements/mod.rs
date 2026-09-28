@@ -89,19 +89,19 @@ fn lower_statement<'source>(
             Ok(Flow::Fallthrough)
         }
         Stmt::Drop { name, .. } => lower_drop(function, name, locals, types, functions, layouts),
-        Stmt::Block(block) => super::lowering_scopes::lower_scoped_block(
+        Stmt::Block(block) => super::scopes::lower_scoped_block(
             function, block, locals, types, functions, targets, cleanup_schedule, string_data, layouts,
         ),
-        Stmt::Loop(block) => super::lowering_loops::lower_loop(
+        Stmt::Loop(block) => super::loops::lower_loop(
             function, block, locals, types, functions, cleanup_schedule, string_data, layouts,
         ),
         Stmt::Break { span } => {
             emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Break, locals, types, functions, layouts)?;
-            super::lowering_loops::emit_loop_jump(function, targets, locals, false)
+            super::loops::emit_loop_jump(function, targets, locals, false)
         }
         Stmt::Continue { span } => {
             emit_loop_cleanup(function, cleanup_schedule, *span, LoopExitKind::Continue, locals, types, functions, layouts)?;
-            super::lowering_loops::emit_loop_jump(function, targets, locals, true)
+            super::loops::emit_loop_jump(function, targets, locals, true)
         }
         _ => Err(NativeEmitError("native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns".to_owned())),
     }
@@ -162,10 +162,10 @@ fn lower_owner_value(
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let value = match (declared_native, initializer) {
         (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
-            super::super::expression_literals::lower_wide_integer(function, value)?
+            super::super::expressions::lower_wide_integer(function, value)?
         }
         (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) => {
-            super::super::expression_literals::lower_float_as(
+            super::super::expressions::lower_float_as(
                 function,
                 value,
                 layouts.ir_type(NativeType::Float { width })?,
@@ -183,7 +183,7 @@ fn lower_owner_value(
         )?,
     };
     let value = match declared_native {
-        Some(declared) => super::super::expression_literals::coerce_to_ir_type(
+        Some(declared) => super::super::expressions::coerce_to_ir_type(
             function,
             value,
             layouts.ir_type(declared)?,

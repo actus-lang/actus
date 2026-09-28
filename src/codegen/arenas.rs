@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::expression_literals::coerce_to_ir_type;
+use super::expressions::coerce_to_ir_type;
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;

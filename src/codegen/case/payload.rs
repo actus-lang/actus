@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
-use super::enum_layout::EnumVariantLayout;
-use super::layout::LayoutRegistry;
-use super::native::NativeEmitError;
-use super::types::NativeType;
+use super::super::enum_layout::EnumVariantLayout;
+use super::super::layout::LayoutRegistry;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 
 pub(super) type BranchLocals<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);

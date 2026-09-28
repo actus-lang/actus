@@ -24,7 +24,7 @@ pub(crate) fn lower_body(
 ) -> Result<Flow, NativeEmitError> {
     let mut locals = initial_locals.clone();
     let mut types = initial_types.clone();
-    match super::lowering_statements::lower_statements(
+    match super::statements::lower_statements(
         function,
         statements,
         &mut locals,
@@ -56,7 +56,7 @@ pub(crate) fn lower_case_block<'source>(
 ) -> Result<Flow, NativeEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
-    let flow = super::lowering_statements::lower_statements(
+    let flow = super::statements::lower_statements(
         function,
         &block.statements,
         &mut branch_locals,

@@ -1,13 +1,13 @@
 use crate::ast::{Block, Expr, Param, Program, ReturnType, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::generic_definitions::canonical_type_name;
-use super::native::NativeEmitError;
+use super::super::native::NativeEmitError;
+use super::definitions::canonical_type_name;
 
 /// Materializes generic verbs for concrete type applications discovered by the
 /// semantic pass. The resulting declarations have no generic parameters and
 /// can therefore enter the ordinary Cranelift declaration pipeline.
-pub(super) fn specialize_program(
+pub(in crate::codegen) fn specialize_program(
     program: &Program,
     instances: &[GenericInstance],
 ) -> Result<Program, NativeEmitError> {

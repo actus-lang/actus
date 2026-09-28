@@ -25,7 +25,7 @@ pub(super) fn lower_scoped_block<'source>(
 ) -> Result<Flow, NativeEmitError> {
     let mut nested_locals = locals.clone();
     let mut nested_types = types.clone();
-    let flow = super::lowering_statements::lower_statements(
+    let flow = super::statements::lower_statements(
         function,
         &block.statements,
         &mut nested_locals,

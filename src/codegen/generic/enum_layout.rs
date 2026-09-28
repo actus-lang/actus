@@ -1,11 +1,11 @@
 use crate::ast::{EnumDef, EnumPayload, TypeName};
 use crate::semantic::TypeSubstitution;
 
-use super::generic_layout::{
+use super::super::native::NativeEmitError;
+use super::layout::{
     GenericEnumLayout, GenericEnumVariantLayout, GenericFieldLayout, GenericLayoutRegistry,
     align_up, application_key, enter_layout,
 };
-use super::native::NativeEmitError;
 
 impl GenericLayoutRegistry {
     pub(super) fn layout_enum(

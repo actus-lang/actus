@@ -10,6 +10,10 @@ use super::types::NativeType;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
+mod emit;
+
+pub(super) use emit::define_performances;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct PerformanceImplementation {
     pub(super) role_name: String,
