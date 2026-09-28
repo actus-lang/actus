@@ -137,6 +137,36 @@ fn rejects_non_exhaustive_enum_and_primitive_patterns() {
 }
 
 #[test]
+fn guarded_patterns_do_not_provide_exhaustiveness() {
+    let primitive_error = analyze_source(
+        "verb choose(erg ready: Bool, erg value: Int) -> Int { return case value { _ if ready => 1, }; }",
+    )
+    .expect_err("a guarded primitive wildcard must not cover every value");
+    assert!(matches!(
+        primitive_error.kind,
+        SemanticErrorKind::NonExhaustiveMatch { subject, .. } if subject == "primitive"
+    ));
+
+    let enum_error = analyze_source(
+        "enum Color { Red, Green, } verb choose(erg ready: Bool, erg color: Color) -> Int { return case color { Color.Red if ready => 1, Color.Green => 2, }; }",
+    )
+    .expect_err("a guarded enum variant must remain uncovered");
+    assert!(matches!(
+        enum_error.kind,
+        SemanticErrorKind::NonExhaustiveMatch { subject, missing }
+            if subject == "Color" && missing == vec!["Red"]
+    ));
+}
+
+#[test]
+fn guarded_patterns_can_fall_through_to_an_unguarded_wildcard() {
+    analyze_source(
+        "verb choose(erg ready: Bool, erg value: Int) -> Int { return case value { _ if ready => 1, _ => 2, }; }",
+    )
+    .expect("an unguarded wildcard must close the guarded case");
+}
+
+#[test]
 fn accepts_plain_scalar_case_without_ownership_annotation() {
     let model = analyze_source(
         "verb choose(erg status: Int) -> Int { return case status { 0 => 1, _ => 2, }; }",

@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{InstBuilder, MemFlagsData, condcodes::IntCC, types};
+use cranelift_codegen::ir::{InstBuilder, MemFlagsData, TrapCode, condcodes::IntCC, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBody, Expr, Pattern};
 
-use super::case_payload::{BranchLocals, add_payload_types, bind_payload};
+use super::case_payload::{BranchLocals, bind_payload};
+use super::case_types::branch_type;
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::lowering::{Flow, lower_case_block};
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
+
+const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_case(
@@ -81,9 +84,9 @@ fn emit_case_branches(
         let condition =
             match_pattern(function, subject_value, subject_type, &branch.pattern, layouts)?;
         if following == merge {
-            let fallback = function.ins().iconst(layouts.ir_type(result_type)?, 0);
-            let fallback_arg = cranelift_codegen::ir::BlockArg::Value(fallback);
-            function.ins().brif(condition, matched, &[], following, [&fallback_arg]);
+            let failure = function.create_block();
+            function.ins().brif(condition, matched, &[], failure, &[]);
+            emit_case_exhaustiveness_trap(function, failure);
         } else {
             function.ins().brif(condition, matched, &[], following, &[]);
         }
@@ -116,38 +119,6 @@ fn emit_case_branches(
         }
     }
     Ok(())
-}
-
-fn branch_type(
-    branches: &[crate::ast::CaseBranch],
-    subject_type: NativeType,
-    local_types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
-    let mut inferred = None;
-    for branch in branches {
-        let mut branch_types = local_types.clone();
-        add_payload_types(branch, subject_type, &mut branch_types, layouts);
-        let candidate = match &branch.body {
-            CaseBody::Expression(expression) => {
-                Some(initializer_type(expression, &branch_types, functions, layouts)?)
-            }
-            CaseBody::Block(_) => None,
-        };
-        if let Some(candidate) = candidate {
-            if let Some(expected) = inferred {
-                if expected != candidate {
-                    return Err(NativeEmitError(
-                        "case branches have different native types".to_owned(),
-                    ));
-                }
-            } else {
-                inferred = Some(candidate);
-            }
-        }
-    }
-    Ok(inferred.unwrap_or(NativeType::Void))
 }
 
 fn match_pattern(
@@ -243,7 +214,7 @@ fn lower_case_branch<'a>(
             layouts,
         )?;
         let body = function.create_block();
-        emit_guard_branch(function, condition, body, following, merge, result_type, layouts)?;
+        emit_guard_branch(function, condition, body, following, merge)?;
         function.seal_block(function.current_block().expect("guard block is active"));
         function.switch_to_block(body);
         let branch_value = lower_case_body(
@@ -277,17 +248,24 @@ fn emit_guard_branch(
     body: cranelift_codegen::ir::Block,
     following: cranelift_codegen::ir::Block,
     merge: cranelift_codegen::ir::Block,
-    result_type: NativeType,
-    layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     if following == merge {
-        let fallback = function.ins().iconst(layouts.ir_type(result_type)?, 0);
-        let fallback_arg = cranelift_codegen::ir::BlockArg::Value(fallback);
-        function.ins().brif(condition, body, &[], following, [&fallback_arg]);
+        let failure = function.create_block();
+        function.ins().brif(condition, body, &[], failure, &[]);
+        emit_case_exhaustiveness_trap(function, failure);
     } else {
         function.ins().brif(condition, body, &[], following, &[]);
     }
     Ok(())
+}
+
+fn emit_case_exhaustiveness_trap(
+    function: &mut FunctionBuilder<'_>,
+    failure: cranelift_codegen::ir::Block,
+) {
+    function.switch_to_block(failure);
+    function.ins().trap(CASE_EXHAUSTIVENESS_TRAP);
+    function.seal_block(failure);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -327,7 +305,14 @@ fn lower_case_body<'a>(
                 function.ins().return_(&[value]);
                 return Ok(None);
             }
-            Flow::Fallthrough => function.ins().iconst(layouts.ir_type(result_type)?, 0),
+            Flow::Fallthrough if matches!(result_type, NativeType::Void) => {
+                function.ins().iconst(types::I8, 0)
+            }
+            Flow::Fallthrough => {
+                return Err(NativeEmitError(
+                    "case block must return a value in a value-producing case".to_owned(),
+                ));
+            }
             Flow::VoidReturn => {
                 function.ins().return_(&[]);
                 return Ok(None);

@@ -411,7 +411,9 @@ fn infer_complex_initializer_type(
             .and_then(|ty| field_type(ty, field, layouts))
             .or_else(|| enum_expression_type(expression, layouts))
             .ok_or_else(|| NativeEmitError(format!("native field `{field}` is unavailable"))),
-        Expr::Case { branches, .. } => infer_case_type(branches, types, functions, layouts),
+        Expr::Case { branches, .. } => {
+            super::case_types::infer_case_type(branches, types, functions, layouts)
+        }
         _ => Err(NativeEmitError("unsupported native type expression".to_owned())),
     }
 }
@@ -429,35 +431,6 @@ fn arena_place_type(
         .first()
         .map(|argument| initializer_type(&argument.expression, types, functions, layouts))
         .ok_or_else(|| NativeEmitError("place requires one value".to_owned()))?
-}
-
-fn infer_case_type(
-    branches: &[crate::ast::CaseBranch],
-    types: &HashMap<&String, NativeType>,
-    functions: &HashMap<String, FunctionRef>,
-    layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
-    let mut inferred = None;
-    for branch in branches {
-        let candidate = match &branch.body {
-            crate::ast::CaseBody::Expression(expression) => {
-                Some(initializer_type(expression, types, functions, layouts)?)
-            }
-            crate::ast::CaseBody::Block(_) => None,
-        };
-        if let Some(candidate) = candidate {
-            if let Some(expected) = inferred {
-                if expected != candidate {
-                    return Err(NativeEmitError(
-                        "case branches have different native types".to_owned(),
-                    ));
-                }
-            } else {
-                inferred = Some(candidate);
-            }
-        }
-    }
-    Ok(inferred.unwrap_or(NativeType::Void))
 }
 
 pub(super) fn emit_buffer_drop(

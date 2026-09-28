@@ -243,7 +243,13 @@ impl LayoutRegistry {
                     })?;
                 let role = match field.role {
                     crate::ast::Role::Erg => StructFieldRole::Erg,
-                    _ => StructFieldRole::Value,
+                    crate::ast::Role::Abs => StructFieldRole::Value,
+                    crate::ast::Role::Dat | crate::ast::Role::Ins => {
+                        return Err(NativeEmitError(format!(
+                            "invalid packed field role for `{}`",
+                            field.name
+                        )));
+                    }
                 };
                 Ok(PackFieldLayout {
                     name: field.name.clone(),
@@ -258,14 +264,14 @@ impl LayoutRegistry {
     }
 }
 
-fn integer_storage_bytes(width: u8) -> u32 {
+pub(super) fn integer_storage_bytes(width: u8) -> Option<u32> {
     match width {
-        1..=8 => 1,
-        9..=16 => 2,
-        17..=32 => 4,
-        33..=64 => 8,
-        65..=128 => 16,
-        _ => 0,
+        1..=8 => Some(1),
+        9..=16 => Some(2),
+        17..=32 => Some(4),
+        33..=64 => Some(8),
+        65..=128 => Some(16),
+        _ => None,
     }
 }
 

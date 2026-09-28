@@ -75,6 +75,18 @@ fn lowers_case_block_body_with_return_cleanup_path() {
 }
 
 #[test]
+fn lowers_mixed_case_body_forms_with_explicit_return_path() {
+    let source =
+        "verb main(erg value: Int) -> Int { return case value { 0 => 1, _ => { return 2; }, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("mixed case body program should parse");
+    let object = emit_program_object(&program, "main")
+        .expect("mixed case body forms with a returning block should emit");
+    object::File::parse(object.as_slice()).expect("mixed case body should emit a native object");
+}
+
+#[test]
 fn lowers_case_payload_cleanup_without_double_drop() {
     let source = "enum Message { Move { payload: Buffer, keep: Buffer, }, } verb main(erg message: Message) -> Int { return case dat message { Message.Move(payload: moved, keep: _) => { drop(moved); return 1; }, }; }";
     let (tokens, errors) = scan(source);

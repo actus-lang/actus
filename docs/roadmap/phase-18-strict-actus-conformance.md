@@ -167,9 +167,14 @@ behavior around the existing language and runtime contracts.
 - [x] Reject unresolved or mismatched semantic argument, initializer,
       assignment, and return types instead of allowing fail-open `Ok(())`
       paths.
-- [ ] Ensure every accepted syntax form has a complete AST, semantic rule, and
-      code-generation path, or an explicit non-codegen meaning.
-- [ ] Remove implicit default branches that conceal unresolved compiler state.
+- [x] Ensure every accepted syntax form has a complete AST, semantic rule, and
+      code-generation path, or an explicit non-codegen meaning; mixed `case`
+      expression/block bodies lower when block branches have explicit return
+      paths.
+- [x] Remove implicit default branches that conceal unresolved compiler state;
+      unmatched native `case` paths trap, invalid packed roles and integer
+      widths return typed codegen errors, and guarded patterns do not imply
+      exhaustiveness.
 - [x] Add a regression test proving a strict semantic failure emits no artifact.
 - [x] Verify failed builds leave deterministic, bounded cleanup artifacts.
 

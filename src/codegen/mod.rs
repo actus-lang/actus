@@ -3,6 +3,7 @@ mod arenas;
 mod calls;
 mod case;
 mod case_payload;
+mod case_types;
 mod cleanup;
 mod control_flow;
 mod declarations;

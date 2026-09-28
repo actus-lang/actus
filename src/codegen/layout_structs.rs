@@ -115,7 +115,9 @@ impl LayoutRegistry {
         Ok(match ty {
             NativeType::Int => (4, 4),
             NativeType::Integer { width, .. } => {
-                let bytes = integer_storage_bytes(width);
+                let bytes = integer_storage_bytes(width).ok_or_else(|| {
+                    NativeEmitError(format!("invalid native integer width `{width}`"))
+                })?;
                 (bytes, bytes)
             }
             NativeType::Float { width } => {
@@ -163,7 +165,9 @@ impl LayoutRegistry {
                 .enum_layout(id)
                 .map(|layout| layout.alignment)
                 .ok_or_else(|| NativeEmitError("missing enum alignment".to_owned()))?,
-            NativeType::Integer { width, .. } => integer_storage_bytes(width),
+            NativeType::Integer { width, .. } => integer_storage_bytes(width).ok_or_else(|| {
+                NativeEmitError(format!("invalid native integer width `{width}`"))
+            })?,
             NativeType::Float { width } => u32::from(width / 8),
             NativeType::Int => 4,
             NativeType::String | NativeType::Buffer | NativeType::Arena(_) => self.pointer_size,
