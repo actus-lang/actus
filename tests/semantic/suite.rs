@@ -6,7 +6,8 @@ use actus::semantic::{CleanupAction, LoopExitKind, OwnershipState, SemanticError
 fn analyze_source(
     source: &str,
 ) -> Result<actus::semantic::SemanticModel, actus::semantic::SemanticError> {
-    let (tokens, errors) = scan(source);
+    let source = format!("unsafe extern \"C\" verb make() -> Buffer; {source}");
+    let (tokens, errors) = scan(&source);
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
     let program = parse(tokens).expect("source should parse");
     analyze(&program)

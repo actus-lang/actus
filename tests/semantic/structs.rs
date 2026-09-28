@@ -28,6 +28,19 @@ fn validates_mutable_struct_field_assignment() {
 }
 
 #[test]
+fn rejects_assignment_between_inferred_struct_types() {
+    let error = analyze_source(
+        "struct Left { value: Int, } struct Right { value: Int, } verb main() { erg left = Left { value: 1, }; erg right = Right { value: 2, }; left = right; }",
+    )
+    .expect_err("inferred struct assignments must preserve the concrete type");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
+            if expected == "Left" && found == "Right"
+    ));
+}
+
+#[test]
 fn registers_structs_and_validates_owned_literals() {
     let model = analyze_source(
         "struct Point { x: Int, y: Int, } verb main() { erg point = Point { x: 1, y: 2, }; inspect(point.x); }",

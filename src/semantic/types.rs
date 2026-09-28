@@ -1,5 +1,5 @@
 use crate::ast::{
-    BuiltinType, CaseBody, Expr, IntrinsicKind, PrimitiveType, TypeName, lookup_builtin_type,
+    BuiltinType, CaseBody, Expr, IntrinsicKind, PrimitiveType, Stmt, TypeName, lookup_builtin_type,
     lookup_call_intrinsic, primitive_type,
 };
 use crate::lexer::SourceSpan;
@@ -200,22 +200,8 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if let Some(expected) = self.binding_type_names.get(&index) {
-            return self.validate_named_value_type(name, expected, value, span);
-        }
-        if let Some(expected) = self.binding_enum_types.get(&index) {
-            let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
-            if &found == expected {
-                return Ok(());
-            }
-            return Err(SemanticError {
-                kind: SemanticErrorKind::BindingTypeMismatch {
-                    binding: name.to_owned(),
-                    expected: expected.clone(),
-                    found,
-                },
-                span,
-            });
+        if let Some(expected) = self.named_binding_type(index) {
+            return self.validate_named_value_type(name, &expected, value, span);
         }
         let Some(expected) = self.model.bindings[index].ty else { return Ok(()) };
         let Some(found) = self.expression_type(value) else {
@@ -229,6 +215,28 @@ impl Analyzer {
             });
         };
         self.ensure_binding_type(name, expected, found, span)
+    }
+
+    fn named_binding_type(&self, index: usize) -> Option<TypeName> {
+        if let Some(type_name) = self.binding_type_names.get(&index) {
+            return Some(type_name.clone());
+        }
+        if let Some(type_name) = self.binding_struct_type_applications.get(&index) {
+            return Some(type_name.clone());
+        }
+        if let Some(type_name) = self.binding_enum_type_applications.get(&index) {
+            return Some(type_name.clone());
+        }
+        let name = self
+            .binding_struct_types
+            .get(&index)
+            .or_else(|| self.binding_enum_types.get(&index))?;
+        Some(TypeName {
+            name: name.clone(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: SourceSpan::new(0, 0),
+        })
     }
 
     fn validate_named_value_type(
@@ -363,7 +371,12 @@ impl Analyzer {
         let Expr::Case { branches, .. } = expression else { return None };
         branches.iter().find_map(|branch| match &branch.body {
             CaseBody::Expression(expression) => self.expression_type_name(expression),
-            CaseBody::Block(_) => None,
+            CaseBody::Block(block) => block.statements.iter().rev().find_map(|statement| {
+                let Stmt::Return { value: Some(expression), .. } = statement else {
+                    return None;
+                };
+                self.expression_type_name(expression)
+            }),
         })
     }
 }

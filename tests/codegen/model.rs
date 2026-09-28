@@ -7,7 +7,7 @@ use actus::semantic::analyze;
 
 #[test]
 fn lowers_semantic_cleanup_plans_without_changing_order() {
-    let source = "verb cleanup() { erg first = make(); erg second = make(); }";
+    let source = "unsafe extern \"C\" verb make() -> Buffer; verb cleanup() { erg first = make(); erg second = make(); }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
@@ -26,8 +26,7 @@ fn lowers_semantic_cleanup_plans_without_changing_order() {
 
 #[test]
 fn lowers_return_and_loop_unwinds_without_changing_scope_order() {
-    let source =
-        "verb control() { erg outer = make(); loop { erg inner = make(); break; } return; }";
+    let source = "unsafe extern \"C\" verb make() -> Buffer; verb control() { erg outer = make(); loop { erg inner = make(); break; } return; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");

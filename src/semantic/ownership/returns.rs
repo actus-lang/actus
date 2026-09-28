@@ -21,12 +21,8 @@ impl Analyzer {
             self.plan_return_unwind(statement_span);
             return Ok(());
         };
-        let expected_return = self.current_return_type_name.clone();
-        self.visit_expression_with_expected(expression, expected_return.as_ref())?;
-        self.validate_return_type(expression)?;
-        self.reject_arena_escape(expression)?;
+        self.validate_return_expression(expression)?;
         if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
-            self.validate_abs_return(expression)?;
             self.plan_return_unwind(statement_span);
             return Ok(());
         }
@@ -63,6 +59,16 @@ impl Analyzer {
         }
         self.plan_return_unwind(statement_span);
         Ok(())
+    }
+
+    fn validate_return_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+        let expected_return = self.current_return_type_name.clone();
+        self.visit_expression_with_expected(expression, expected_return.as_ref())?;
+        if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
+            self.validate_abs_return(expression)?;
+        }
+        self.validate_return_type(expression)?;
+        self.reject_arena_escape(expression)
     }
 
     fn reject_arena_escape(&self, expression: &Expr) -> Result<(), SemanticError> {
@@ -156,6 +162,14 @@ fn return_value_matches(
     expression: &Expr,
 ) -> bool {
     if strip_reference_role(expected_name) == strip_reference_role(found) {
+        return true;
+    }
+    if strip_reference_role(expected_name) == "Int"
+        && matches!(
+            primitive_type(strip_reference_role(found)),
+            Some(PrimitiveType::Integer { .. })
+        )
+    {
         return true;
     }
     match primitive_type(&expected.name) {

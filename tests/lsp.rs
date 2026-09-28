@@ -423,7 +423,7 @@ fn lsp_uses_unsaved_sibling_overlay_for_package_diagnostics() {
     ];
     let stdout = run_lsp(messages.to_vec());
     assert!(
-        stdout.contains("E1003"),
+        stdout.contains("E1026"),
         "overlay diagnostics did not use unsaved sibling text: {stdout}"
     );
     let _ = fs::remove_dir_all(root);

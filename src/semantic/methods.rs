@@ -306,10 +306,35 @@ impl Analyzer {
             kind: SemanticErrorKind::UnknownMethod { method: method_name.to_owned() },
             span,
         })?;
+        let Some(receiver_parameter) = method.params.first() else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: method_name.to_owned() },
+                span,
+            });
+        };
+        if receiver_parameter.role != Role::Abs
+            || self
+                .root_binding_index(receiver)
+                .is_none_or(|index| self.model.bindings[index].role != Role::Abs)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidReceiver { method: method_name.to_owned() },
+                span,
+            });
+        }
+        self.visit_expression(receiver)?;
         let signature = super::dynamic::role_method_signature(&method);
-        let combined = self.method_arguments(receiver, &Role::Abs, "self", arguments);
+        let mut parameters = signature.params;
+        let mut dispatch = signature.dynamic_params;
+        parameters.remove(0);
+        dispatch.remove(0);
+        let signature = super::calls::VerbSignature {
+            params: parameters,
+            dynamic_params: dispatch,
+            ..signature
+        };
         self.mark_dynamic_role_performances(role_name, method.name.as_str());
-        self.visit_call_with_signature(method.name.as_str(), &combined, span, &signature)
+        self.visit_call_with_signature(method.name.as_str(), arguments, span, &signature)
     }
 
     fn method_signature(
