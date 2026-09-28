@@ -68,7 +68,9 @@ fn ascii_path_conversion_selects_the_host_native_representation() {
         let units =
             unsafe { std::slice::from_raw_parts(buffer.data.cast::<u16>(), buffer.length / 2) };
         assert_eq!(units, &[97, 99, 116, 117, 115, 45, 99, 105, 0]);
-        unsafe { actus::runtime::actus_buffer_drop(&mut buffer) };
+        unsafe {
+            let _ = Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity);
+        }
     }
 }
 
