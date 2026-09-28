@@ -25,32 +25,13 @@ impl Parser {
     fn parse_primary_expression(&mut self) -> Result<Expr, ParseError> {
         let token = self.advance_required("expression")?;
         let expression = match token.kind {
-            TokenKind::Minus => {
-                let expression = self.parse_primary_expression()?;
-                let span = SourceSpan::new(token.span.start, expression_span(&expression).end);
-                Ok(Expr::Unary {
-                    operator: UnaryOp::Negate,
-                    expression: Box::new(expression),
-                    span,
-                })
-            }
-            TokenKind::LeftParen => {
-                let expression = self.parse_expression()?;
-                let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
-                Ok(Expr::Grouping {
-                    expression: Box::new(expression),
-                    span: SourceSpan::new(token.span.start, end),
-                })
-            }
+            TokenKind::Minus => self.parse_unary_prefix(token.span),
+            TokenKind::LeftParen => self.parse_grouped_prefix(token.span),
             TokenKind::Identifier(name) => self.parse_identifier_expression(name, token.span),
             TokenKind::Integer(value) => Ok(Expr::Integer { value, span: token.span }),
             TokenKind::FloatLiteral(value) => Ok(Expr::FloatLiteral { value, span: token.span }),
             TokenKind::StringLiteral(value) => Ok(Expr::StringLiteral { value, span: token.span }),
-            TokenKind::Ref => {
-                let expression = self.parse_primary_expression()?;
-                let span = SourceSpan::new(token.span.start, expression_span(&expression).end);
-                Ok(Expr::Borrow { expression: Box::new(expression), span })
-            }
+            TokenKind::Ref => self.parse_borrow_prefix(token.span),
             TokenKind::Case => self.parse_case_expression(),
             found => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
@@ -61,40 +42,94 @@ impl Parser {
         self.parse_field_access(expression)
     }
 
+    fn parse_unary_prefix(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
+        let expression = self.parse_primary_expression()?;
+        let span = SourceSpan::new(start.start, expression_span(&expression).end);
+        Ok(Expr::Unary { operator: UnaryOp::Negate, expression: Box::new(expression), span })
+    }
+
+    fn parse_grouped_prefix(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
+        let expression = self.parse_expression()?;
+        let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
+        Ok(Expr::Grouping {
+            expression: Box::new(expression),
+            span: SourceSpan::new(start.start, end),
+        })
+    }
+
+    fn parse_borrow_prefix(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
+        let expression = self.parse_primary_expression()?;
+        let span = SourceSpan::new(start.start, expression_span(&expression).end);
+        Ok(Expr::Borrow { expression: Box::new(expression), span })
+    }
+
     fn parse_identifier_expression(
         &mut self,
         name: String,
         span: SourceSpan,
     ) -> Result<Expr, ParseError> {
-        if name == "Buffer" && self.match_simple(TokenKind::LeftBracket) {
-            let length = self.parse_expression()?;
-            let end = self.expect_simple(TokenKind::RightBracket, "`]`")?.span.end;
-            return Ok(Expr::BufferLiteral {
-                length: Box::new(length),
-                span: SourceSpan::new(span.start, end),
-            });
+        if let Some(buffer) = self.parse_buffer_literal(&name, span)? {
+            return Ok(buffer);
         }
         let type_arguments = if self.match_simple(TokenKind::LeftBracket) {
             self.parse_type_arguments()?
         } else {
             Vec::new()
         };
+        if let Some(call) = self.parse_identifier_call(&name, &type_arguments, span)? {
+            return Ok(call);
+        }
+        self.parse_identifier_suffix(name, type_arguments, span)
+    }
+
+    fn parse_buffer_literal(
+        &mut self,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<Option<Expr>, ParseError> {
+        if name != "Buffer" || !self.match_simple(TokenKind::LeftBracket) {
+            return Ok(None);
+        }
+        let length = self.parse_expression()?;
+        let end = self.expect_simple(TokenKind::RightBracket, "`]`")?.span.end;
+        Ok(Some(Expr::BufferLiteral {
+            length: Box::new(length),
+            span: SourceSpan::new(span.start, end),
+        }))
+    }
+
+    fn parse_identifier_call(
+        &mut self,
+        name: &str,
+        type_arguments: &[crate::ast::TypeName],
+        span: SourceSpan,
+    ) -> Result<Option<Expr>, ParseError> {
         if self.match_simple(TokenKind::LeftParen) {
             if !type_arguments.is_empty() && name != "Arena" {
                 return Err(self.error_at_current("a struct literal after type arguments"));
             }
             let arguments = self.parse_arguments()?;
             let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
-            return Ok(Expr::Call {
-                callee: if type_arguments.is_empty() {
-                    name
-                } else {
-                    format_type_application(&name, &type_arguments)
-                },
+            let callee = if type_arguments.is_empty() {
+                name.to_owned()
+            } else {
+                format_type_application(name, type_arguments)
+            };
+            return Ok(Some(Expr::Call {
+                callee,
                 arguments,
                 span: SourceSpan::new(span.start, end),
-            });
+            }));
         }
+        Ok(None)
+    }
+
+    fn parse_identifier_suffix(
+        &mut self,
+        name: String,
+        type_arguments: Vec<crate::ast::TypeName>,
+        span: SourceSpan,
+    ) -> Result<Expr, ParseError> {
         if !type_arguments.is_empty() && self.check_simple(&TokenKind::Dot) {
             let qualified_name = format_type_application(&name, &type_arguments);
             return Ok(Expr::Identifier { name: qualified_name, span });
@@ -120,24 +155,30 @@ impl Parser {
                 break;
             }
             let field_token = self.take_identifier("field name after `.`")?;
-            let field = identifier_text(&field_token.kind);
-            if self.match_simple(TokenKind::LeftParen) {
-                let start = expression_span(&expression).start;
-                let arguments = self.parse_arguments()?;
-                let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
-                expression = Expr::MethodCall {
-                    receiver: Box::new(expression),
-                    method: field,
-                    arguments,
-                    span: SourceSpan::new(start, end),
-                };
-            } else {
-                let span =
-                    SourceSpan::new(expression_span(&expression).start, field_token.span.end);
-                expression = Expr::FieldAccess { object: Box::new(expression), field, span };
-            }
+            expression = self.parse_member_access(expression, field_token)?;
         }
         Ok(expression)
+    }
+
+    fn parse_member_access(
+        &mut self,
+        expression: Expr,
+        field_token: crate::lexer::Token,
+    ) -> Result<Expr, ParseError> {
+        let field = identifier_text(&field_token.kind);
+        if self.match_simple(TokenKind::LeftParen) {
+            let start = expression_span(&expression).start;
+            let arguments = self.parse_arguments()?;
+            let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
+            return Ok(Expr::MethodCall {
+                receiver: Box::new(expression),
+                method: field,
+                arguments,
+                span: SourceSpan::new(start, end),
+            });
+        }
+        let span = SourceSpan::new(expression_span(&expression).start, field_token.span.end);
+        Ok(Expr::FieldAccess { object: Box::new(expression), field, span })
     }
 
     fn binary_operator(&self) -> Option<(BinaryOp, u8)> {

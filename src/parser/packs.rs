@@ -13,24 +13,8 @@ impl Parser {
         let name = identifier_text(&self.take_identifier("pack name")?.kind);
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
 
-        let storage_doc = self.take_doc_string_group();
-        let storage_role = self.advance_required("pack storage role")?;
-        if !matches!(storage_role.kind, TokenKind::Erg) {
-            return Err(unexpected(storage_role.kind, storage_role.span, "`erg` storage role"));
-        }
-        let storage_name = identifier_text(&self.take_identifier("storage field name")?.kind);
-        self.expect_simple(TokenKind::Colon, "`:`")?;
-        let storage = self.parse_type_name()?;
-        self.expect_simple(TokenKind::Semicolon, "`;`")?;
-
-        self.expect_named_identifier("layout")?;
-        let endianness = self.parse_endianness()?;
-        self.expect_simple(TokenKind::Semicolon, "`;`")?;
-        self.expect_named_identifier("fields")?;
-        self.expect_simple(TokenKind::LeftBrace, "`{`")?;
-        let fields = self.parse_pack_fields()?;
-        self.expect_simple(TokenKind::RightBrace, "`}")?;
-        let end = self.expect_simple(TokenKind::RightBrace, "`}")?.span.end;
+        let (storage_doc, storage_name, storage) = self.parse_pack_storage()?;
+        let (endianness, fields, end) = self.parse_pack_layout()?;
 
         Ok(PackDecl {
             is_open,
@@ -43,6 +27,35 @@ impl Parser {
             fields,
             span: SourceSpan::new(start, end),
         })
+    }
+
+    fn parse_pack_layout(
+        &mut self,
+    ) -> Result<(LayoutEndianness, Vec<PackField>, usize), ParseError> {
+        self.expect_named_identifier("layout")?;
+        let endianness = self.parse_endianness()?;
+        self.expect_simple(TokenKind::Semicolon, "`;`")?;
+        self.expect_named_identifier("fields")?;
+        self.expect_simple(TokenKind::LeftBrace, "`{`")?;
+        let fields = self.parse_pack_fields()?;
+        self.expect_simple(TokenKind::RightBrace, "`}")?;
+        let end = self.expect_simple(TokenKind::RightBrace, "`}")?.span.end;
+        Ok((endianness, fields, end))
+    }
+
+    fn parse_pack_storage(
+        &mut self,
+    ) -> Result<(Option<String>, String, crate::ast::TypeName), ParseError> {
+        let storage_doc = self.take_doc_string_group();
+        let storage_role = self.advance_required("pack storage role")?;
+        if !matches!(storage_role.kind, TokenKind::Erg) {
+            return Err(unexpected(storage_role.kind, storage_role.span, "`erg` storage role"));
+        }
+        let storage_name = identifier_text(&self.take_identifier("storage field name")?.kind);
+        self.expect_simple(TokenKind::Colon, "`:`")?;
+        let storage = self.parse_type_name()?;
+        self.expect_simple(TokenKind::Semicolon, "`;`")?;
+        Ok((storage_doc, storage_name, storage))
     }
 
     fn parse_endianness(&mut self) -> Result<LayoutEndianness, ParseError> {

@@ -47,6 +47,10 @@ impl Parser {
             return self.parse_drop_statement();
         }
         let expression = self.parse_expression()?;
+        self.parse_expression_statement(expression)
+    }
+
+    fn parse_expression_statement(&mut self, expression: Expr) -> Result<Stmt, ParseError> {
         if self.match_simple(TokenKind::Equals) {
             return self.parse_assignment(expression);
         }
@@ -101,6 +105,14 @@ impl Parser {
     }
 
     fn parse_owner_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let (role, name, ty, start) = self.parse_owner_header()?;
+        self.expect_simple(TokenKind::Equals, "`=`")?;
+        let initializer = self.parse_owner_initializer(&role, start)?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(Stmt::OwnerDecl { role, name, ty, initializer, span: SourceSpan::new(start, end) })
+    }
+
+    fn parse_owner_header(&mut self) -> Result<(Role, String, Option<String>, usize), ParseError> {
         let role_token = self.advance_required("binding role")?;
         let role = match role_token.kind {
             TokenKind::Erg => Role::Erg,
@@ -124,23 +136,19 @@ impl Parser {
         } else {
             None
         };
-        self.expect_simple(TokenKind::Equals, "`=`")?;
-        let initializer = if role == Role::Abs {
+        Ok((role, name, ty, role_token.span.start))
+    }
+
+    fn parse_owner_initializer(&mut self, role: &Role, start: usize) -> Result<Expr, ParseError> {
+        let initializer = if *role == Role::Abs {
             self.expect_simple(TokenKind::Ref, "`ref`")?;
             let expression = self.parse_expression()?;
-            let span = SourceSpan::new(role_token.span.start, expression_span(&expression).end);
+            let span = SourceSpan::new(start, expression_span(&expression).end);
             Expr::Borrow { expression: Box::new(expression), span }
         } else {
             self.parse_expression()?
         };
-        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(Stmt::OwnerDecl {
-            role,
-            name,
-            ty,
-            initializer,
-            span: SourceSpan::new(role_token.span.start, end),
-        })
+        Ok(initializer)
     }
 }
 
