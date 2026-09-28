@@ -56,6 +56,8 @@ behavior around the existing language and runtime contracts.
       shared diagnostic model with source-aware rendering.
 - [x] Add negative execution tests for unknown strict forms and extra
       arguments across `check`, `build`, and `test`.
+- [x] Make strict mode visible in successful `check`, `build`, and `test`
+      command output.
 
 ## Strict-mode contract
 

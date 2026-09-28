@@ -53,12 +53,20 @@ pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
             return 1;
         }
     };
-    run_tests(tests, &configuration)
+    run_tests(tests, &configuration, mode)
 }
 
-fn run_tests(tests: Vec<DiscoveredTest>, configuration: &CompilerConfiguration) -> i32 {
+fn run_tests(
+    tests: Vec<DiscoveredTest>,
+    configuration: &CompilerConfiguration,
+    mode: ConformanceMode,
+) -> i32 {
     let output_style = TestOutputStyle::detect();
-    println!("running {} tests", tests.len());
+    if mode.is_strict() {
+        println!("running {} tests (strict)", tests.len());
+    } else {
+        println!("running {} tests", tests.len());
+    }
     let mut passed = 0;
     for (index, test) in tests.iter().enumerate() {
         let started = Instant::now();

@@ -196,7 +196,8 @@ fn build_file_with_report(
         .or_else(|| hosted_entry_symbol(configuration, fallback_symbol))
         .unwrap_or(fallback_symbol)
         .to_owned();
-    emit_and_write(input, output, emit, configuration, &program, &symbol, report_output)
+    let report_mode = report_output.then_some(mode);
+    emit_and_write(input, output, emit, configuration, &program, &symbol, report_mode)
 }
 
 fn load_build_program(
@@ -256,7 +257,7 @@ fn emit_and_write(
     configuration: &CompilerConfiguration,
     program: &crate::ast::Program,
     symbol: &str,
-    report_output: bool,
+    report_mode: Option<ConformanceMode>,
 ) -> i32 {
     if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
         eprintln!("error: {error}");
@@ -279,8 +280,12 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    if report_output {
-        println!("built `{}`", output.display());
+    if let Some(mode) = report_mode {
+        if mode.is_strict() {
+            println!("built `{}` (strict)", output.display());
+        } else {
+            println!("built `{}`", output.display());
+        }
     }
     0
 }
