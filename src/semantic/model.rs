@@ -86,7 +86,7 @@ pub struct DynamicRoleType {
     pub layout: FatPointerLayout,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SemanticModel {
     pub bindings: Vec<Binding>,
     pub borrows: Vec<BorrowRecord>,

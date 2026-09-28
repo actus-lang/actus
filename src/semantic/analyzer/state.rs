@@ -12,6 +12,7 @@ pub(crate) struct ScopeFrame {
     pub(crate) payload_cleanup: Vec<(usize, String, String, String)>,
 }
 
+#[derive(Default)]
 pub(crate) struct Analyzer {
     pub(crate) model: SemanticModel,
     pub(crate) scopes: Vec<ScopeFrame>,
