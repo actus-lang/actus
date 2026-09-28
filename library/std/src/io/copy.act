@@ -11,6 +11,38 @@ are returned to the caller unchanged.
 open unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
 
 """
+Translate a writer failure into the public copy result contract.
+
+The `dat error` payload is consumed during exhaustive mapping and is not
+retained. `Err` preserves the concrete `IoError` variant for the caller.
+"""
+open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
+    return case dat error { IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+}
+
+"""
+Translate a reader failure into the public copy result contract.
+
+The `dat error` payload is consumed. `EndOfStream` returns the accumulated
+byte count as success; every other variant remains a typed failure.
+"""
+open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoError] {
+    return case dat error { IoError.EndOfStream => Result[Int, IoError].Ok(total), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+}
+
+"""
+Validate one completed writer chunk and calculate the next total.
+
+The `erg` count arguments are copied scalar values. `Ok` returns the updated
+byte total only when the writer consumed the complete chunk; otherwise the
+verb returns `Err(IoError.Failed)` without retaining any input state.
+"""
+open verb copy_written_chunk(erg total: Int, erg expected: Int, erg actual: Int) -> Result[Int, IoError] {
+    erg difference = actual - expected;
+    return case difference { 0 => Result[Int, IoError].Ok(total + actual), _ => Result[Int, IoError].Err(IoError.Failed), };
+}
+
+"""
 Copy chunks through ins reader and writer loans using one reusable allocation.
 The result is the exact count or a typed error; EndOfStream is handled as the
 successful termination condition and all scratch storage is cleaned up.
@@ -18,10 +50,7 @@ successful termination condition and all scratch storage is cleaned up.
 open verb copy[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
     erg scratch = Buffer[0]; erg capacity = 4096;
     erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
-    case reserved {
-        -1 => { return Result[Int, IoError].Err(IoError.Failed); },
-        _ => { },
-    };
+    case reserved { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };
     erg total = 0;
     loop {
         erg read_result: Result[Int, IoError] = reader.read(buffer: ins scratch);
@@ -32,19 +61,16 @@ open verb copy[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int
                     erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
                     case dat write_result {
                         Result.Ok(written) => {
-                            erg difference = written - count;
-                            case difference { 0 => { total = total + written; }, _ => {
-                                return Result[Int, IoError].Err(IoError.Failed);
-                            }, };
+                            total = copy_written_chunk(total: total, expected: count, actual: written)?;
                         },
                         Result.Err(error) => {
-                            return case dat error { IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+                            return copy_write_error(error: dat error);
                         },
                     };
                 },
             },
             Result.Err(error) => {
-                return case dat error { IoError.EndOfStream => Result[Int, IoError].Ok(total), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+                return copy_read_error(error: dat error, total: total);
             },
         };
     }

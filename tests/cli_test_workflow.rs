@@ -39,6 +39,24 @@ fn test_isolates_child_output_from_deterministic_runner_report() {
 
 #[cfg(unix)]
 #[test]
+fn lock_command_synchronizes_and_validates_dependency_state() {
+    let root = create_test_project(
+        "lock-command",
+        "smoke.act",
+        "meta test\nverb smoke() -> Int { return 0; }\n",
+    );
+    let update = run_in_project(&root, &["lock"]);
+    assert!(update.success());
+    let check = run_in_project(&root, &["lock", "--check"]);
+    assert!(check.success());
+    fs::write(root.join("Actus.lock"), "lockfile_version = 1\n").expect("corrupt lockfile");
+    let stale = run_in_project(&root, &["lock", "--check"]);
+    assert!(!stale.success());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_reports_target_filtered_counts_deterministically() {
     let root = create_test_project(
         "runner-targets",

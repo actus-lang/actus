@@ -302,14 +302,14 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.10: Standard-library migration and CI enforcement
 
-- [ ] Run strict check over every `library/std` facade and sibling module.
+- [x] Run strict check over every `library/std` facade and sibling module.
 - [ ] Add complete positive and negative strict fixtures under `tests/library/`.
-- [ ] Verify every standard-library public declaration has the required block
+- [x] Verify every standard-library public declaration has the required block
       documentation and ownership contract.
 - [ ] Verify standard-library tests use Actus fixtures rather than Rust logic
       embedded in the library test tree.
-- [ ] Enable strict check, build, and test commands in local quality scripts.
-- [ ] Enable the same strict commands in CI without duplicating validation
+- [x] Enable strict check, build, and test commands in local quality scripts.
+- [x] Enable the same strict commands in CI without duplicating validation
       rules in the CI configuration.
 - [ ] Run the full matrix on Linux, macOS, and Windows.
 - [ ] Verify colored, plain, JSON, and LSP diagnostics preserve the same

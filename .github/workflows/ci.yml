@@ -58,3 +58,7 @@ jobs:
       - name: Scan tracked files for secrets
         if: runner.os != 'Windows'
         run: ./scripts/check_secrets.sh
+
+      - name: Check standard library conformance
+        shell: bash
+        run: ./scripts/check_stdlib.sh

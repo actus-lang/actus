@@ -11,6 +11,7 @@ mod conformance;
 mod diagnostics;
 mod fmt;
 mod input;
+mod lock;
 mod lsp;
 mod project;
 mod publish;
@@ -50,6 +51,7 @@ fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
         "conformance" => conformance::conformance_command(arguments),
         "fmt" => fmt::fmt_command(arguments),
         "lsp" => lsp::lsp_command(arguments),
+        "lock" => lock::lock_command(arguments),
         "publish" => publish::publish_command(arguments),
         "watch" => watch::watch_command(arguments),
         "parse" => parse_command(arguments),
@@ -138,7 +140,7 @@ fn is_help_flag(argument: &str) -> bool {
 }
 
 fn usage_text() -> &'static str {
-    "usage: actus <command> [options]\n\nCommands:\n  new      Create a new Actus project.\n  init     Initialize an existing directory as an Actus project.\n  check    Parse, resolve, and validate without code generation.\n  parse    Parse one source file and print its AST.\n  build    Compile an object or executable from a file or project.\n  run      Build and execute a program once.\n  watch    Re-check or rebuild after source changes.\n  test     Discover and run `meta test` verbs.\n  conformance  Report source structure and size conformance.\n  fmt      Format Actus sources, or check formatting.\n  lsp      Serve the Language Server Protocol over stdio.\n  publish  Validate and publish a local package archive.\n\nRun `actus <command> --help` for command-specific options."
+    "usage: actus <command> [options]\n\nCommands:\n  new      Create a new Actus project.\n  init     Initialize an existing directory as an Actus project.\n  check    Parse, resolve, and validate without code generation.\n  parse    Parse one source file and print its AST.\n  build    Compile an object or executable from a file or project.\n  run      Build and execute a program once.\n  watch    Re-check or rebuild after source changes.\n  test     Discover and run `meta test` verbs.\n  conformance  Report source structure and size conformance.\n  fmt      Format Actus sources, or check formatting.\n  lsp      Serve the Language Server Protocol over stdio.\n  lock     Synchronize or validate Actus.lock.\n  publish  Validate and publish a local package archive.\n\nRun `actus <command> --help` for command-specific options."
 }
 
 fn command_help_text(command: &str) -> Option<&'static str> {
@@ -170,6 +172,9 @@ fn command_help_text(command: &str) -> Option<&'static str> {
             "usage: actus fmt [path] [--check]\n\nFormat Actus source files with canonical rules.",
         ),
         "lsp" => Some("usage: actus lsp\n\nServe the Language Server Protocol over stdio."),
+        "lock" => Some(
+            "usage: actus lock [--check]\n\nSynchronize or validate the deterministic Actus.lock dependency file.",
+        ),
         "publish" => Some(
             "usage: actus publish [path]\n\nValidate and publish a local deterministic package archive.",
         ),
@@ -201,6 +206,7 @@ mod tests {
             "conformance",
             "fmt",
             "lsp",
+            "lock",
             "publish",
         ] {
             assert!(command_help_text(command).is_some(), "missing help for {command}");
