@@ -38,6 +38,13 @@ jobs:
               "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             }
           }
+          $vcLinkDirectory = Join-Path $env:VCToolsInstallDir 'bin\Hostx64\x64'
+          $env:Path = "$vcLinkDirectory;$env:Path"
+          "PATH=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $linker = (Get-Command link.exe -ErrorAction Stop).Source
+          if (-not $linker.StartsWith($vcLinkDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "MSVC linker was not selected: $linker"
+          }
 
       - name: Check formatting
         run: cargo fmt --all -- --check
