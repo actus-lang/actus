@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
-use super::super::enum_layout::EnumVariantLayout;
+use super::super::enum_layout::{EnumLayout, EnumVariantLayout};
 use super::super::layout::LayoutRegistry;
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
@@ -27,24 +27,40 @@ pub(super) fn add_payload_types<'a>(
     let Some(variant_layout) = layouts.enum_variant(enum_id, variant) else { return };
     match payload {
         crate::ast::VariantPayload::Positional(items) => {
-            for (index, item) in items.iter().enumerate() {
-                let Some(field) = variant_layout.fields.get(index) else { continue };
-                insert_payload_type(types, &item.name, field.ty);
-            }
+            add_positional_payload_types(items, variant_layout, types)
         }
         crate::ast::VariantPayload::Named(items) => {
-            for item in items {
-                let Some(field) = variant_layout
-                    .fields
-                    .iter()
-                    .find(|field| field.name.as_deref() == Some(item.name.as_str()))
-                else {
-                    continue;
-                };
-                insert_payload_type(types, &item.binding.name, field.ty);
-            }
+            add_named_payload_types(items, variant_layout, types)
         }
         crate::ast::VariantPayload::Unit => {}
+    }
+}
+
+fn add_positional_payload_types<'a>(
+    items: &'a [crate::ast::PatternBinding],
+    variant_layout: &super::super::enum_layout::EnumVariantLayout,
+    types: &mut HashMap<&'a String, NativeType>,
+) {
+    for (index, item) in items.iter().enumerate() {
+        let Some(field) = variant_layout.fields.get(index) else { continue };
+        insert_payload_type(types, &item.name, field.ty);
+    }
+}
+
+fn add_named_payload_types<'a>(
+    items: &'a [crate::ast::NamedPattern],
+    variant_layout: &super::super::enum_layout::EnumVariantLayout,
+    types: &mut HashMap<&'a String, NativeType>,
+) {
+    for item in items {
+        let Some(field) = variant_layout
+            .fields
+            .iter()
+            .find(|field| field.name.as_deref() == Some(item.name.as_str()))
+        else {
+            continue;
+        };
+        insert_payload_type(types, &item.binding.name, field.ty);
     }
 }
 
@@ -70,19 +86,51 @@ pub(super) fn bind_payload<'a>(
 ) -> Result<BranchLocals<'a>, NativeEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = local_types.clone();
-    let Pattern::Variant { variant, payload, .. } = &branch.pattern else {
-        return Ok((branch_locals, branch_types));
-    };
-    let NativeType::Enum(enum_id) = subject_type else {
-        return Ok((branch_locals, branch_types));
-    };
+    bind_variant_case(
+        function,
+        subject,
+        subject_type,
+        branch,
+        &mut branch_locals,
+        &mut branch_types,
+        layouts,
+    )?;
+    Ok((branch_locals, branch_types))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bind_variant_case<'a>(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    branch: &'a CaseBranch,
+    locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'a String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let Pattern::Variant { variant, payload, .. } = &branch.pattern else { return Ok(()) };
+    let NativeType::Enum(enum_id) = subject_type else { return Ok(()) };
     let enum_layout = layouts
         .enum_layout(enum_id)
         .ok_or_else(|| NativeEmitError("missing enum layout".to_owned()))?;
     let variant_layout = layouts
         .enum_variant(enum_id, variant)
         .ok_or_else(|| NativeEmitError("missing case variant layout".to_owned()))?;
-    let bindings = match payload {
+    bind_variant_payload(
+        function,
+        subject,
+        enum_layout,
+        payload_bindings(payload),
+        branch,
+        variant_layout,
+        locals,
+        types,
+        layouts,
+    )
+}
+
+fn payload_bindings(payload: &VariantPayload) -> Vec<(Option<&str>, &String)> {
+    match payload {
         VariantPayload::Positional(items) => {
             items.iter().map(|item| (None, &item.name)).collect::<Vec<_>>()
         }
@@ -91,17 +139,23 @@ pub(super) fn bind_payload<'a>(
             .map(|item| (Some(item.name.as_str()), &item.binding.name))
             .collect::<Vec<_>>(),
         VariantPayload::Unit => Vec::new(),
-    };
-    if enum_layout.niche_pointer && variant == "Some" {
-        bind_niche_payload(
-            branch,
-            bindings,
-            subject,
-            variant_layout,
-            &mut branch_locals,
-            &mut branch_types,
-        )?;
-        return Ok((branch_locals, branch_types));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bind_variant_payload<'a>(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    enum_layout: &EnumLayout,
+    bindings: Vec<(Option<&str>, &'a String)>,
+    branch: &'a CaseBranch,
+    variant_layout: &EnumVariantLayout,
+    locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'a String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    if enum_layout.niche_pointer && branch_variant(branch) == Some("Some") {
+        return bind_niche_payload(branch, bindings, subject, variant_layout, locals, types);
     }
     bind_regular_payload(
         function,
@@ -110,11 +164,15 @@ pub(super) fn bind_payload<'a>(
         bindings,
         branch,
         variant_layout,
-        &mut branch_locals,
-        &mut branch_types,
+        locals,
+        types,
         layouts,
-    )?;
-    Ok((branch_locals, branch_types))
+    )
+}
+
+fn branch_variant(branch: &CaseBranch) -> Option<&str> {
+    let Pattern::Variant { variant, .. } = &branch.pattern else { return None };
+    Some(variant.as_str())
 }
 
 fn bind_niche_payload<'a>(
