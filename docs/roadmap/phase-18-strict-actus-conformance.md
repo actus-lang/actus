@@ -54,6 +54,8 @@ behavior around the existing language and runtime contracts.
       through one source-aware CLI reporter.
 - [x] Route strict `actus test` semantic preflight diagnostics through the
       shared diagnostic model with source-aware rendering.
+- [x] Add negative execution tests for unknown strict forms and extra
+      arguments across `check`, `build`, and `test`.
 
 ## Strict-mode contract
 

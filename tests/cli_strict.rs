@@ -60,3 +60,32 @@ fn strict_options_are_rejected_when_repeated() {
         2
     );
 }
+
+#[test]
+fn strict_commands_reject_unknown_forms_and_extra_arguments() {
+    for command in ["check", "build", "test"] {
+        assert_eq!(
+            run_with_args(vec![command.to_owned(), "--strict=true".to_owned()].into_iter()),
+            2,
+            "{command} must reject --strict=value"
+        );
+    }
+    assert_eq!(
+        run_with_args(
+            vec![
+                "check".to_owned(),
+                "--strict".to_owned(),
+                "first.act".to_owned(),
+                "extra.act".to_owned()
+            ]
+            .into_iter(),
+        ),
+        2
+    );
+    assert_eq!(
+        run_with_args(
+            vec!["test".to_owned(), "--strict".to_owned(), "unexpected.act".to_owned()].into_iter(),
+        ),
+        2
+    );
+}
