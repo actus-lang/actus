@@ -99,27 +99,10 @@ fn lower_complex_expression(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     match expression {
-        Expr::Try { expression, span } => lower_try_expression(
-            function,
-            expression,
-            *span,
-            context.locals,
-            context.local_types,
-            context.functions,
-            context.cleanup_schedule,
-            context.string_data,
-            context.layouts,
-        ),
-        Expr::Unary { .. } | Expr::Binary { .. } => lower_operation(
-            function,
-            expression,
-            context.locals,
-            context.local_types,
-            context.functions,
-            context.cleanup_schedule,
-            context.string_data,
-            context.layouts,
-        ),
+        Expr::Try { expression, span } => {
+            lower_try_expression(function, expression, *span, context)
+        }
+        Expr::Unary { .. } | Expr::Binary { .. } => lower_operation(function, expression, context),
         _ => lower_construct_or_case(function, expression, context),
     }
 }
