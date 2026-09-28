@@ -192,6 +192,7 @@ verb path_builders_and_platform_parsers() -> Int {
                 0 => 0,
                 _ => 1,
             };
+            return 0;
         },
     };
 }
