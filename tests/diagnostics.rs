@@ -1,3 +1,5 @@
+use std::process::{Command, Output};
+
 use actus::diagnostics::{
     Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase, DiagnosticSeverity,
     StrictDiagnosticCategory, lex_diagnostic, render_colored_diagnostic, render_diagnostic,
@@ -223,6 +225,23 @@ fn matches_parser_diagnostic_snapshot() {
     let expected = include_str!("fixtures/diagnostics/snapshots/missing_semicolon.diag.snap");
 
     assert_eq!(actual.trim_end(), expected.trim_end());
+}
+
+#[test]
+fn repeated_clean_checks_produce_identical_diagnostics() {
+    let first = run_diagnostic_check();
+    let second = run_diagnostic_check();
+
+    assert_eq!(first.status, second.status);
+    assert_eq!(first.stdout, second.stdout);
+    assert_eq!(first.stderr, second.stderr);
+}
+
+fn run_diagnostic_check() -> Output {
+    Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", "tests/fixtures/diagnostics/invalid/unexpected_character.act"])
+        .output()
+        .expect("diagnostic check should start")
 }
 
 #[test]

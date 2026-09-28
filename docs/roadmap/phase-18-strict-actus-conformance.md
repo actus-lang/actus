@@ -118,12 +118,12 @@ behavior around the existing language and runtime contracts.
 - [ ] Ensure renderer choice cannot change validation, ordering, or exit code.
 - [x] Add text, colored, JSON, and LSP diagnostic tests from the same fixture.
 - [x] Add golden tests for stable messages and stable source locations.
-- [ ] Verify diagnostics remain deterministic across repeated clean runs.
+- [x] Verify diagnostics remain deterministic across repeated clean runs.
 
 ## Gate 18.2: Strict CLI and configuration enforcement
 
 - [x] Parse `--strict` consistently for `check`, `build`, and `test`.
-- [ ] Reject unknown, duplicated, conflicting, or misplaced strict-mode flags.
+- [x] Reject unknown, duplicated, conflicting, or misplaced strict-mode flags.
 - [ ] Ensure strict configuration is visible in command diagnostics and test
       metadata.
 - [ ] Prevent environment or workspace defaults from silently disabling strict
@@ -131,7 +131,7 @@ behavior around the existing language and runtime contracts.
 - [ ] Define the precedence of command-line, workspace, package, and target
       configuration.
 - [ ] Reject malformed configuration before source compilation begins.
-- [ ] Test successful and rejected invocations for every affected command.
+- [x] Test successful and rejected invocations for every affected command.
 - [ ] Document the migration path from permissive checks to strict checks.
 
 ## Gate 18.3: Fail-closed compiler pipeline

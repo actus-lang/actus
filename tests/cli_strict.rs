@@ -63,12 +63,14 @@ fn strict_options_are_rejected_when_repeated() {
 
 #[test]
 fn strict_commands_reject_unknown_forms_and_extra_arguments() {
-    for command in ["check", "build", "test"] {
-        assert_eq!(
-            run_with_args(vec![command.to_owned(), "--strict=true".to_owned()].into_iter()),
-            2,
-            "{command} must reject --strict=value"
-        );
+    for form in ["--strict=true", "--strict=false", "--strict="] {
+        for command in ["check", "build", "test"] {
+            assert_eq!(
+                run_with_args(vec![command.to_owned(), form.to_owned()].into_iter()),
+                2,
+                "{command} must reject {form}"
+            );
+        }
     }
     assert_eq!(
         run_with_args(
@@ -85,6 +87,34 @@ fn strict_commands_reject_unknown_forms_and_extra_arguments() {
     assert_eq!(
         run_with_args(
             vec!["test".to_owned(), "--strict".to_owned(), "unexpected.act".to_owned()].into_iter(),
+        ),
+        2
+    );
+}
+
+#[test]
+fn strict_commands_reject_misplaced_and_conflicting_forms() {
+    assert_eq!(
+        run_with_args(
+            vec![
+                "check".to_owned(),
+                "input.act".to_owned(),
+                "--strict".to_owned(),
+                "extra.act".to_owned(),
+            ]
+            .into_iter(),
+        ),
+        2
+    );
+    assert_eq!(
+        run_with_args(
+            vec!["build".to_owned(), "--strict".to_owned(), "--strict=true".to_owned()].into_iter(),
+        ),
+        2
+    );
+    assert_eq!(
+        run_with_args(
+            vec!["test".to_owned(), "unexpected.act".to_owned(), "--strict".to_owned()].into_iter(),
         ),
         2
     );
