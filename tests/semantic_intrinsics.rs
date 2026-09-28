@@ -204,6 +204,17 @@ fn rejects_typed_initializer_and_assignment_mismatches() {
 }
 
 #[test]
+fn rejects_assignment_that_changes_an_inferred_primitive_type() {
+    let error = analyze_source("verb main() { erg sample = 1.5; sample = 1; }")
+        .expect_err("inferred primitive bindings must keep their type");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
+            if expected == "f64" && found == "Int"
+    ));
+}
+
+#[test]
 fn enforces_return_value_contracts() {
     let missing = analyze_source("verb main() -> Int { erg value = 1; }")
         .expect_err("value-returning verbs must return a value");
