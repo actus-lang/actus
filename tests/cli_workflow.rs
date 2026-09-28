@@ -105,6 +105,46 @@ fn check_validates_source_without_emitting_code() {
 }
 
 #[test]
+fn strict_commands_report_mode_in_success_metadata() {
+    let root = std::env::temp_dir().join(format!("actus-strict-metadata-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::create_dir_all(root.join("tests")).expect("create test directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"strict-metadata\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+        .expect("write entry source");
+    fs::write(root.join("tests/smoke.act"), "meta test\nverb smoke() -> Int { return 0; }\n")
+        .expect("write test source");
+
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("run strict check");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "obj"])
+        .current_dir(&root)
+        .output()
+        .expect("run strict build");
+    let test = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["test", "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("run strict tests");
+
+    assert!(check.status.success());
+    assert!(build.status.success());
+    assert!(test.status.success());
+    assert!(String::from_utf8_lossy(&check.stdout).contains("(strict)"));
+    assert!(String::from_utf8_lossy(&build.stdout).contains("(strict)"));
+    assert!(String::from_utf8_lossy(&test.stdout).contains("(strict)"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn check_validates_a_module_sibling_through_its_facade() {
     let root = std::env::temp_dir().join(format!("actus-check-module-{}", std::process::id()));
     let module = root.join("src/path");

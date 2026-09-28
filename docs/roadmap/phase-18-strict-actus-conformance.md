@@ -124,13 +124,13 @@ behavior around the existing language and runtime contracts.
 
 - [x] Parse `--strict` consistently for `check`, `build`, and `test`.
 - [x] Reject unknown, duplicated, conflicting, or misplaced strict-mode flags.
-- [ ] Ensure strict configuration is visible in command diagnostics and test
+- [x] Ensure strict configuration is visible in command diagnostics and test
       metadata.
 - [ ] Prevent environment or workspace defaults from silently disabling strict
       validation.
 - [ ] Define the precedence of command-line, workspace, package, and target
       configuration.
-- [ ] Reject malformed configuration before source compilation begins.
+- [x] Reject malformed configuration before source compilation begins.
 - [x] Test successful and rejected invocations for every affected command.
 - [ ] Document the migration path from permissive checks to strict checks.
 

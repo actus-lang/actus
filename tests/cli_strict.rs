@@ -1,4 +1,5 @@
 use std::fs;
+use std::process::Command;
 
 use actus::cli::run_with_args;
 
@@ -118,4 +119,24 @@ fn strict_commands_reject_misplaced_and_conflicting_forms() {
         ),
         2
     );
+}
+
+#[test]
+fn strict_check_rejects_malformed_configuration_before_source_compilation() {
+    let root = std::env::temp_dir().join(format!("actus-strict-malformed-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(root.join("Actus.toml"), "[package\ninvalid").expect("write malformed manifest");
+    let input = root.join("src/main.act");
+    fs::write(&input, "verb main() -> Int { return ; }\n").expect("write invalid source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", input.to_str().unwrap(), "--strict"])
+        .output()
+        .expect("run strict check");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("E1800"));
+    assert!(!stderr.contains("E0003"));
+    let _ = fs::remove_dir_all(root);
 }
