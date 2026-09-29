@@ -1,0 +1,7 @@
+[
+  {"id":1,"jsonrpc":"2.0","protocol_version":1,"schema_version":1,"result_state":"available","result_kind":"object","error_code":null},
+  {"id":2,"jsonrpc":"2.0","protocol_version":1,"schema_version":1,"result_state":"available","result_kind":"object","error_code":null},
+  {"id":3,"jsonrpc":"2.0","protocol_version":1,"schema_version":1,"result_state":"available","result_kind":"array","error_code":null},
+  {"id":4,"jsonrpc":"2.0","protocol_version":1,"schema_version":1,"result_state":"invalid","result_kind":"error","error_code":-32602},
+  {"id":5,"jsonrpc":"2.0","protocol_version":1,"schema_version":1,"result_state":"available","result_kind":"null","error_code":null}
+]

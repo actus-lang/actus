@@ -3,8 +3,8 @@ mod renderer;
 mod strict_codes;
 
 pub use model::{
-    Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase, DiagnosticSeverity,
-    sort_diagnostics, validate_diagnostic_catalog,
+    Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase,
+    DiagnosticRelatedLocation, DiagnosticSeverity, sort_diagnostics, validate_diagnostic_catalog,
 };
 pub use renderer::{
     lex_diagnostic, module_diagnostic, parse_diagnostic, render_colored_diagnostic,

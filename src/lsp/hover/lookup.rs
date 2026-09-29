@@ -6,20 +6,24 @@ use crate::configuration::CompilerConfiguration;
 use crate::lexer::{SourceSpan, Token};
 use crate::modules::ModuleResolver;
 use crate::parser::parse;
+use crate::semantic::{AccessState, OwnershipState};
+use crate::target::TargetSpec;
 
 use super::super::position::{LineIndex, LspPosition};
+use super::super::uri::file_uri_to_path;
 use super::formatting::{
     block_info, declaration_documentation, declaration_signature, format_markdown, pack_field_info,
-    parameter_info,
+    parameter_info, role_name,
 };
 use super::model::SymbolInfo;
-use super::tokens::{file_uri_to_path, identifier_at, operator_at, range};
+use super::tokens::{identifier_at, operator_at, range};
 
 pub(crate) fn find_hover(
     uri: &str,
     source: &str,
     position: &LspPosition,
     overlays: &HashMap<PathBuf, String>,
+    target: &TargetSpec,
 ) -> Option<super::HoverInfo> {
     let tokens = crate::lexer::scan(source).0;
     let offset = LineIndex::new(source).byte_offset(source, position)?;
@@ -30,7 +34,7 @@ pub(crate) fn find_hover(
         });
     }
     let (name, name_span) = identifier_at(&tokens, offset)?;
-    let program = parse(tokens.clone()).ok()?;
+    let program = crate::semantic::filter_program_for_target(&parse(tokens.clone()).ok()?, target);
     if crate::ast::primitive_type(&name).is_some() {
         return Some(super::HoverInfo {
             contents: format!("```actus\ntype {name}\n```"),
@@ -45,13 +49,116 @@ pub(crate) fn find_hover(
             range: range(source, name_span),
         });
     }
-    let info = intrinsic_info(&name)
+    if let Some(info) = semantic_binding_info(source, &program, &name, offset) {
+        return Some(super::HoverInfo {
+            contents: format_markdown(&info, source, info.span.start),
+            range: range(source, name_span),
+        });
+    }
+    let mut info = intrinsic_info(&name)
         .or_else(|| local_info(source, &program, &name, offset))
-        .or_else(|| imported_info(uri, &program, &name, overlays))?;
+        .or_else(|| imported_info(uri, &program, &name, overlays, target))?;
+    append_target_details(&mut info, target);
     Some(super::HoverInfo {
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
     })
+}
+
+fn append_target_details(info: &mut SymbolInfo, target: &TargetSpec) {
+    if info.signature.starts_with("pack ") {
+        let details = format!(
+            "Target data model: `{}`; pointer width `{:?}`; endianness `{:?}`; entry contract `{}`.",
+            target.triple(),
+            target.pointer_width,
+            target.endianness,
+            match target.entry_contract() {
+                crate::target::EntryContract::Hosted => "hosted",
+                crate::target::EntryContract::Freestanding => "freestanding",
+            },
+        );
+        info.documentation = Some(match info.documentation.take() {
+            Some(documentation) => format!("{documentation}\n\n{details}"),
+            None => details,
+        });
+    }
+}
+
+fn semantic_binding_info(
+    source: &str,
+    program: &Program,
+    name: &str,
+    offset: usize,
+) -> Option<SymbolInfo> {
+    let model = crate::semantic::analyze(program).ok()?;
+    let (index, binding) = model
+        .bindings
+        .iter()
+        .enumerate()
+        .filter(|(_, binding)| binding.name == name && binding.span.start <= offset)
+        .max_by_key(|(_, binding)| binding.span.start)?;
+    let type_name = model
+        .binding_type_names
+        .get(&index)
+        .map(format_type_name)
+        .or_else(|| binding.ty.map(|ty| ty.spec().name.to_owned()))?;
+    let identifier =
+        super::tokens::identifier_span(source, binding.span, name).unwrap_or(binding.span);
+    let documentation = indexed_type_documentation(&type_name);
+    Some(SymbolInfo {
+        signature: format!(
+            "{} {name}: {type_name} [ownership: {}; access: {}]",
+            role_name(&binding.role),
+            ownership_name(&binding.ownership),
+            access_name(&binding.access),
+        ),
+        span: identifier,
+        documentation,
+    })
+}
+
+fn indexed_type_documentation(type_name: &str) -> Option<String> {
+    if type_name == "Buffer" {
+        return Some(
+            "Compiler facts: element type `u8`; valid dynamic indexes satisfy `0 <= index < length`; out-of-bounds access uses the deterministic runtime trap.".to_owned(),
+        );
+    }
+    let arguments =
+        type_name.strip_prefix("Array[")?.strip_suffix(']')?.split(", ").collect::<Vec<_>>();
+    (arguments.len() == 2).then(|| format!(
+        "Compiler facts: element type `{}`; capacity `{}`; valid dynamic indexes satisfy `0 <= index < {}`; out-of-bounds access uses the deterministic runtime trap.",
+        arguments[0], arguments[1], arguments[1]
+    ))
+}
+
+fn format_type_name(type_name: &crate::ast::TypeName) -> String {
+    if type_name.arguments.is_empty() {
+        return type_name.name.clone();
+    }
+    format!(
+        "{}[{}]",
+        type_name.name,
+        type_name.arguments.iter().map(format_type_name).collect::<Vec<_>>().join(", ")
+    )
+}
+
+fn ownership_name(state: &OwnershipState) -> String {
+    match state {
+        OwnershipState::Active => "Active".to_owned(),
+        OwnershipState::PartiallyMoved { fields } => {
+            format!("PartiallyMoved({})", fields.join(", "))
+        }
+        OwnershipState::Moved => "Moved".to_owned(),
+        OwnershipState::Dropped => "Dropped".to_owned(),
+    }
+}
+
+fn access_name(state: &AccessState) -> String {
+    match state {
+        AccessState::Mutable => "Mutable".to_owned(),
+        AccessState::Frozen { borrow_ids } => format!("Frozen({})", borrow_ids.len()),
+        AccessState::Suspended { loan_id } => format!("Suspended({loan_id})"),
+    }
 }
 
 fn operator_documentation(operator: &str) -> &'static str {
@@ -183,6 +290,7 @@ fn imported_info(
     program: &Program,
     name: &str,
     overlays: &HashMap<PathBuf, String>,
+    target: &TargetSpec,
 ) -> Option<SymbolInfo> {
     let current_path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&current_path).ok()?;
@@ -200,7 +308,10 @@ fn imported_info(
                 continue;
             }
             let module_source = super::super::module_scope::source_for_path(path, overlays)?;
-            let module_program = parse(crate::lexer::scan(&module_source).0).ok()?;
+            let module_program = crate::semantic::filter_program_for_target(
+                &parse(crate::lexer::scan(&module_source).0).ok()?,
+                target,
+            );
             if let Some(declaration) = module_program
                 .declarations
                 .iter()

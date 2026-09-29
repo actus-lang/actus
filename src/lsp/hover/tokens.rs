@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::lexer::{SourceSpan, Token, TokenKind, scan};
 
 use super::super::position::{LineIndex, LspRange};
@@ -73,14 +71,4 @@ pub(super) fn identifier_span(source: &str, span: SourceSpan, name: &str) -> Opt
 pub(super) fn range(source: &str, span: SourceSpan) -> LspRange {
     let index = LineIndex::new(source);
     LspRange { start: index.position(source, span.start), end: index.position(source, span.end) }
-}
-
-pub(super) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    let path = uri.strip_prefix("file://")?;
-    #[cfg(windows)]
-    {
-        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
-    }
-    #[cfg(not(windows))]
-    Some(PathBuf::from(path))
 }

@@ -28,6 +28,186 @@ The architectural decisions for this phase are grouped under
 
 ## Gate 17.0: Shared Extension Platform
 
+Gate 17.0 is the compiler-backed LSP foundation. The server must provide a
+Rust-analyzer-grade semantic platform for Actus rather than a collection of
+independent text features. The compiler remains authoritative for parsing,
+types, ownership, modules, targets, layouts, and diagnostics; the LSP is an
+adapter and query surface over that information.
+
+### Gate 17.0.1: Protocol lifecycle and versioned contracts
+
+See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bounded-responses.md).
+
+- [x] Establish the initial Actus initialize contract with protocol version,
+      schema version, selected target, and explicit result-state vocabulary.
+- [x] Return a structured JSON-RPC invalid-params error for request payloads
+      that fail the server's typed parameter contract without terminating the
+      LSP process.
+- [x] Implement complete `initialize`, `initialized`, `shutdown`, and `exit`
+      lifecycle behavior with deterministic error responses.
+- [x] Add protocol fixtures for initialize metadata, capability negotiation,
+      invalid params, unknown methods, and lifecycle errors.
+- [x] Attach protocol, schema, compiler, target, and current document
+      URI/version metadata to JSON-RPC responses and structured errors.
+- [x] Define request identifiers, response correlation, notification handling,
+      and structured JSON-RPC error contracts.
+- [x] Add cancellation and progress handling for every potentially expensive
+      request; canceled work must not publish stale results.
+- [x] Define capability negotiation for compiler, server, client, and target
+      versions, including graceful degradation for older clients.
+- [x] Add versioned response metadata containing compiler version, protocol
+      schema version, target profile, document URI, and document version.
+- [x] Define explicit `available`, `stale`, `partial`, `unsupported`, and
+      `invalid` result states instead of silently returning empty data.
+- [x] Add JSON fixtures for successful, degraded, rejected, and canceled
+      protocol exchanges.
+
+### Gate 17.0.2: Incremental workspace and semantic model
+
+- [x] Build a versioned workspace model for open documents, package manifests,
+      module facades, siblings, imports, and target configuration.
+- [x] Preserve full, incremental, and close overlay updates with strict
+      document-version validation.
+- [x] Recompute only affected modules and dependents after an overlay change;
+      unrelated documents must retain valid cached results.
+- [x] Add deterministic module and symbol indexes for package-local and
+      workspace-wide queries.
+- [x] Make every compiler-backed query cancelable and invalidate results when
+      a newer document version supersedes the request.
+- [x] Bound overlay size, workspace traversal, result count, and cache memory;
+      report bounded or partial results explicitly.
+- [x] Test unsaved edits, deleted files, renamed modules, facade changes,
+      dependency changes, and concurrent document updates.
+
+### Gate 17.0.3: Navigation and symbol intelligence
+
+- [x] Implement definition, declaration, type definition, implementation,
+      references, document symbols, workspace symbols, and call hierarchy.
+- [x] Resolve local symbols, imported facade exports, private sibling symbols,
+      generic instantiations, pack fields, and runtime-backed declarations.
+- [x] Preserve exact source spans and normalized cross-platform URIs for every
+      navigation result.
+- [x] Index symbols incrementally and return deterministic ordering with
+      bounded result sets.
+- [x] Add accepted and rejected tests for private visibility, stale overlays,
+      duplicate symbols, ambiguous imports, and missing definitions.
+
+### Gate 17.0.4: Code intelligence and type information
+
+- [x] Implement context-aware completion for declarations, fields, modules,
+      facade exports, operators, ownership roles, and target-specific symbols.
+- [x] Add completion item resolution with documentation, detail, source span,
+      ownership contract, and replacement edits.
+- [x] Implement signature help with parameter ownership, generic parameters,
+      result types, error variants, and active-parameter tracking.
+- [x] Expose inferred types, ownership states, borrow states, pack layouts,
+      array capacities, buffer element types, and target-dependent types.
+- [x] Keep completion and hover results synchronized with the same semantic
+      snapshot used by diagnostics and definition queries.
+- [x] Add negative coverage for incomplete syntax, invalid ownership, private
+      declarations, unsupported targets, and stale semantic snapshots.
+
+### Gate 17.0.5: Editing, refactoring, and source workflows
+
+- [x] Implement rename and prepare-rename with compiler-validated symbol
+      identity across modules, facades, overlays, and generated references.
+- [x] Add compiler-backed source actions for formatting, organize-imports,
+      and safe module-facade edits without duplicating compiler semantic rules
+      in the LSP; semantic quick fixes remain gated on compiler-provided edits.
+- [x] Add document formatting and range formatting with stable, idempotent
+      output and explicit refusal for invalid or incomplete source.
+- [x] Add organize-imports and module-facade edits with atomic workspace edits.
+- [x] Implement CodeLens for supported entry points and executable verbs only
+      after source version and target capability validation.
+- [x] Display stdout, stderr, exit code, cancellation, and diagnostics for
+      source workflows through structured results.
+- [x] Test invalid source, unsaved edits, cross-module rename, path validation,
+      ambiguous declarations, and unsupported targets/providers.
+
+### Gate 17.0.6: Diagnostics and recovery
+
+- [x] Unify lexer, parser, semantic, ownership, target, and code-generation
+      diagnostics behind stable codes, ranges, severity, and related data.
+- [x] Add deterministic recovery for incomplete source so editor queries remain
+      useful without hiding real compiler errors.
+- [x] Publish diagnostics only for the current document version and clear them
+      deterministically on close or successful replacement.
+- [x] Include actionable related locations, notes, ownership transitions, and
+      suggested fixes where the compiler provides them.
+- [x] Never let the semantic analyzer or code generator write directly to the
+      terminal; LSP rendering remains an independent adapter concern.
+- [x] Test malformed tokens, incomplete declarations, invalid imports, type
+      errors, ownership failures, target filtering, and recovery boundaries.
+
+### Gate 17.0.7: Actus semantic intelligence
+
+- [x] Expose `erg`, `abs`, `dat`, and `ins` roles without changing ownership
+      semantics or inventing editor-only states.
+- [x] Render active, frozen, suspended, moved, and dropped transitions from
+      compiler ownership records, including cleanup and reborrow edges.
+- [x] Explain `Array` and `Buffer` element types, dynamic-index bounds,
+      checked casts, and deterministic trap behavior.
+- [x] Expose `pack` backing types, field offsets, widths, masks, ranges,
+      reserved fields, and target data-model information.
+- [x] Show target-filtered declarations and explain unavailable host,
+      freestanding, board, and runtime capabilities.
+- [x] Keep all displayed facts traceable to compiler source spans and semantic
+      snapshots; the extension must not infer or repair compiler behavior.
+- [x] Add fixtures for ownership moves, loans, cleanup, arenas, packs, arrays,
+      buffers, generics, target declarations, and error propagation.
+
+### Gate 17.0.8: Performance, cancellation, and bounded behavior
+
+- [x] Introduce a query-oriented cache boundary so repeated requests reuse
+      parsed and analyzed data without stale cross-version results.
+- [x] Propagate cancellation through parsing, module aggregation, semantic
+      analysis, indexing, formatting, and result serialization.
+- [x] Debounce only at the editor/client boundary; compiler queries themselves
+      must remain deterministic and independently testable.
+- [x] Enforce bounded workspace traversal, symbol indexing, diagnostics,
+      completion items, hover payloads, and serialized responses.
+- [x] Add large-workspace benchmarks and regression thresholds for latency,
+      memory, cancellation completion, and cache invalidation.
+- [x] Verify that partial or timed-out results are explicitly labeled and never
+      presented as complete semantic facts.
+
+### Gate 17.0.9: Cross-platform and protocol correctness
+
+- [x] Normalize file URIs, paths, and source locations correctly on Linux,
+      macOS, and Windows, including UTF-8/UTF-16 editor positions.
+- [x] Test CRLF/LF documents, Unicode identifiers and comments, non-ASCII
+      paths, drive prefixes, UNC paths, and case-sensitive module resolution.
+- [x] Run the complete LSP contract suite on all supported host platforms.
+- [x] Verify that target-specific features never silently fall back to host
+      runtime behavior.
+- [x] Add protocol compatibility fixtures for old schema versions, missing
+      optional capabilities, malformed client payloads, and unknown requests.
+
+### Gate 17.0.10: Production verification
+
+- [x] Add unit, semantic, native, protocol, and end-to-end tests for every
+      Gate 17.0 contract and its negative cases.
+- [x] Add deterministic JSON fixtures and snapshot review for all public
+      response schemas.
+- [x] Verify no private compiler declaration, raw bridge, backend type, or
+      implementation-only field leaks through public LSP data.
+- [x] Run formatting, compilation, Clippy, full tests, source limits, diff
+      checks, and standard-library conformance checks.
+- [x] Record Linux, macOS, and Windows CI evidence for the complete LSP suite.
+- [x] Update the relevant extension ADRs, language reference, protocol
+      documentation, and compatibility policy only after tests are green.
+
+Gate 17.0.10 evidence is split by responsibility: `src/lsp/position.rs` and
+`src/lsp/uri.rs` provide unit-level source-location and URI coverage;
+`tests/lsp/semantic.rs`, `tests/lsp/semantic_states.rs`, and
+`tests/lsp/platform.rs` cover compiler-backed semantic and cross-platform
+behavior; `tests/lsp/production.rs` locks public response families and
+diagnostics notifications to reviewed JSON contract snapshots;
+`tests/lsp/protocol.rs` covers compatibility and lifecycle failures; and
+`tests/lsp_workflow.rs` covers process-level stdio execution and navigation.
+The CI matrix runs the isolated 64-test LSP suite and the complete workspace
+suite on Linux, macOS, and Windows.
+
 ### Workspace and package integration
 
 - [ ] Define extension package identity, supported VS Code versions, and

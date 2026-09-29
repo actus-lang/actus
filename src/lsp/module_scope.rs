@@ -5,6 +5,8 @@ use crate::ast::{Program, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::modules::{ModuleResolver, exports_module_with_overlays};
 
+use super::uri::file_uri_to_path;
+
 pub(super) fn internal_symbols(program: &Program) -> Vec<String> {
     program.declarations.iter().filter_map(declaration_name).map(str::to_owned).collect()
 }
@@ -36,16 +38,6 @@ pub(super) fn imported_public_symbols(
 
 pub(super) fn source_for_path(path: &Path, overlays: &HashMap<PathBuf, String>) -> Option<String> {
     overlays.get(path).cloned().or_else(|| std::fs::read_to_string(path).ok())
-}
-
-pub(super) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    let path = uri.strip_prefix("file://")?;
-    #[cfg(windows)]
-    {
-        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
-    }
-    #[cfg(not(windows))]
-    Some(PathBuf::from(path))
 }
 
 fn declaration_name(declaration: &TopLevelDecl) -> Option<&str> {

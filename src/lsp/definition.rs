@@ -8,6 +8,7 @@ use crate::modules::ModuleResolver;
 use crate::parser::parse;
 
 use super::position::{LineIndex, LspPosition, LspRange};
+use super::uri::{file_uri_to_path, path_to_file_uri};
 
 #[derive(Clone, Debug)]
 pub struct DefinitionLocation {
@@ -149,7 +150,7 @@ fn imported_definition(
                 continue;
             }
             if let Some(span) = top_level_span(&module_source, &module_program, name) {
-                return Some(location(&path_to_uri(path), &module_source, span));
+                return Some(location(&path_to_file_uri(path), &module_source, span));
             }
         }
     }
@@ -201,24 +202,5 @@ fn location(uri: &str, source: &str, span: SourceSpan) -> DefinitionLocation {
             start: index.position(source, span.start),
             end: index.position(source, span.end),
         },
-    }
-}
-
-fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    let path = uri.strip_prefix("file://")?;
-    #[cfg(windows)]
-    {
-        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
-    }
-    #[cfg(not(windows))]
-    Some(PathBuf::from(path))
-}
-
-fn path_to_uri(path: &Path) -> String {
-    let normalized = path.to_string_lossy().replace('\\', "/");
-    if normalized.as_bytes().get(1) == Some(&b':') {
-        format!("file:///{}", normalized.trim_start_matches('/'))
-    } else {
-        format!("file://{normalized}")
     }
 }

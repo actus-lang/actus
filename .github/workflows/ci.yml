@@ -69,6 +69,17 @@ jobs:
       - name: Run tests
         run: cargo test --all-targets --all-features -- --test-threads=1
 
+      - name: Run LSP contract suite
+        run: cargo test --test lsp --all-features -- --test-threads=1
+
+      - name: Record LSP platform evidence
+        shell: bash
+        run: |
+          {
+            echo "## LSP contract evidence (${RUNNER_OS})"
+            echo "- cargo test --test lsp --all-features -- --test-threads=1 passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check source limits
         if: runner.os != 'Windows'
         run: ./scripts/check_source_limits.sh

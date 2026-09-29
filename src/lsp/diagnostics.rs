@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::configuration::CompilerConfiguration;
@@ -5,14 +6,17 @@ use crate::diagnostics::{
     Diagnostic, DiagnosticSeverity, lex_diagnostic, module_diagnostic, parse_diagnostic,
     render_diagnostic, semantic_diagnostic, sort_diagnostics,
 };
-use crate::lexer::scan;
+use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleError, ModuleResolver};
-use crate::parser::parse;
+use crate::parser::{ParseError, ParseErrorKind, parse};
 use crate::semantic::{analyze, filter_program_for_target};
 use crate::target::TargetSpec;
 
 use super::position::{LineIndex, LspRange};
-use super::protocol::LspDiagnostic;
+use super::protocol::{LspDiagnostic, LspLocation, LspRelatedInformation};
+use super::uri::{file_uri_to_path, path_to_file_uri};
+
+const MAX_DIAGNOSTICS: usize = 512;
 
 /// Analyzes one document and converts the shared diagnostic model to LSP values.
 ///
@@ -40,6 +44,7 @@ pub fn analyze_document_for_target(
     diagnostics
         .into_iter()
         .map(|diagnostic| to_lsp_diagnostic(source, &index, &diagnostic))
+        .take(MAX_DIAGNOSTICS)
         .collect()
 }
 
@@ -58,7 +63,7 @@ fn collect_diagnostics(
     let program = match parse(tokens) {
         Ok(program) => program,
         Err(error) => {
-            return vec![parse_diagnostic(&error)];
+            return vec![recovered_parse_diagnostic(source, &error)];
         }
     };
     if let Some(result) = analyze_package_module(uri, &program, overlays, target) {
@@ -176,14 +181,17 @@ fn path_components(path: &Path) -> Vec<String> {
         .collect()
 }
 
-fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    let path = uri.strip_prefix("file://")?;
-    #[cfg(windows)]
-    {
-        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
+fn recovered_parse_diagnostic(source: &str, error: &ParseError) -> Diagnostic {
+    let diagnostic = parse_diagnostic(error);
+    if matches!(
+        error.kind,
+        ParseErrorKind::UnexpectedEndOfInput { .. }
+            | ParseErrorKind::UnexpectedToken { found: TokenKind::Eof, .. }
+    ) {
+        diagnostic.with_span(SourceSpan::new(source.len(), source.len()))
+    } else {
+        diagnostic
     }
-    #[cfg(not(windows))]
-    Some(PathBuf::from(path))
 }
 
 fn to_lsp_diagnostic(source: &str, index: &LineIndex, diagnostic: &Diagnostic) -> LspDiagnostic {
@@ -196,6 +204,42 @@ fn to_lsp_diagnostic(source: &str, index: &LineIndex, diagnostic: &Diagnostic) -
         code: Some(diagnostic.code().to_owned()),
         source: Some("actus".to_owned()),
         message: render_diagnostic(source, diagnostic),
+        related_information: diagnostic
+            .related_locations()
+            .iter()
+            .map(|location| related_information(source, diagnostic, location))
+            .collect(),
+    }
+}
+
+fn related_information(
+    source: &str,
+    diagnostic: &Diagnostic,
+    location: &crate::diagnostics::DiagnosticRelatedLocation,
+) -> LspRelatedInformation {
+    let related_source = location
+        .source_path()
+        .and_then(|path| fs::read_to_string(path).ok())
+        .unwrap_or_else(|| source.to_owned());
+    let related_index = LineIndex::new(&related_source);
+    let span = clamp_span(location.span(), related_source.len());
+    let uri =
+        location.source_path().map_or_else(String::new, |path| path_to_file_uri(Path::new(path)));
+    LspRelatedInformation {
+        location: LspLocation {
+            uri: if uri.is_empty() {
+                diagnostic
+                    .source_path()
+                    .map_or_else(String::new, |path| path_to_file_uri(Path::new(path)))
+            } else {
+                uri
+            },
+            range: LspRange {
+                start: related_index.position(&related_source, span.start),
+                end: related_index.position(&related_source, span.end),
+            },
+        },
+        message: location.message().to_owned(),
     }
 }
 

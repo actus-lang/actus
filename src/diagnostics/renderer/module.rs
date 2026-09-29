@@ -1,6 +1,8 @@
 use crate::lexer::SourceSpan;
 use crate::modules::{ModuleError, ModuleResolutionError};
 
+use crate::diagnostics::DiagnosticRelatedLocation;
+
 use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, semantic_diagnostic};
 
 /// Converts a module, import, or facade failure into the shared diagnostic model.
@@ -30,6 +32,11 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         ModuleError::DuplicateDeclaration(diagnostic) => {
             module_error("E1106", error.to_string(), diagnostic.second.span)
                 .with_source_path(diagnostic.second.path.display().to_string())
+                .with_related_location(DiagnosticRelatedLocation::new(
+                    Some(diagnostic.first.path.display().to_string()),
+                    diagnostic.first.span,
+                    "first declaration is here",
+                ))
         }
         ModuleError::SymbolCollision { .. } => {
             module_error("E1110", error.to_string(), SourceSpan::new(0, 0))
