@@ -207,6 +207,8 @@ fn lsp_exposes_pack_registers_in_hover_completion_and_tokens() {
     let stdout = run_lsp(messages.to_vec());
     assert!(stdout.contains("pack ControlRegister"), "stdout: {stdout}");
     assert!(stdout.contains("\"label\":\"enabled\""), "stdout: {stdout}");
+    assert!(stdout.contains("pack ControlRegister field"), "pack field metadata missing: {stdout}");
+    assert!(stdout.contains("offset: 0"), "pack field offset missing: {stdout}");
     assert!(stdout.contains("pack-keyword"), "stdout: {stdout}");
 }
 

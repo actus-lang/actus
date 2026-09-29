@@ -36,6 +36,8 @@ fn is_query_method(method: &str) -> bool {
         "textDocument/definition"
             | "textDocument/hover"
             | "textDocument/completion"
+            | "completionItem/resolve"
+            | "textDocument/signatureHelp"
             | "textDocument/semanticTokens/full"
             | "textDocument/formatting"
             | "textDocument/declaration"
@@ -201,6 +203,8 @@ fn query_request<W: Write>(
         "textDocument/definition" => definition(id, params, context),
         "textDocument/hover" => hover(id, params, context),
         "textDocument/completion" => completion(id, params, context),
+        "completionItem/resolve" => resolve_completion(id, params, context),
+        "textDocument/signatureHelp" => signature_help(id, params, context),
         "textDocument/semanticTokens/full" => semantic_tokens_full(id, params, context),
         "textDocument/formatting" => formatting(id, params, context),
         _ => Ok(()),
@@ -231,6 +235,7 @@ fn hover<W: Write>(
         id,
         params,
         context.store,
+        context.target,
         context.output,
         context.metadata.clone(),
         context.cancellation,
@@ -246,10 +251,41 @@ fn completion<W: Write>(
         id,
         params,
         context.store,
+        context.target,
         context.output,
         context.metadata.clone(),
         context.cancellation,
     )
+}
+
+fn signature_help<W: Write>(
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::signature_help::dispatch(
+        params,
+        context.store,
+        context.target,
+        context.output,
+        id,
+        context.metadata.clone(),
+        context.cancellation,
+    )
+}
+
+fn resolve_completion<W: Write>(
+    id: Option<Value>,
+    mut params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    let stale =
+        super::query_handlers::resolve_completion(&mut params, context.store, context.target);
+    let mut metadata = context.metadata.clone();
+    if stale {
+        metadata.result_state = "stale";
+    }
+    super::server::respond(context.output, id, params, metadata, context.cancellation)
 }
 
 fn semantic_tokens_full<W: Write>(

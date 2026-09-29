@@ -30,7 +30,8 @@ pub(super) fn initialize_result(target: &TargetSpec, params: &Value) -> Value {
             "workspaceSymbolProvider": true,
             "callHierarchyProvider": true,
             "hoverProvider": true,
-            "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
+            "completionProvider": {"triggerCharacters": ["u", "i", "f"], "resolveProvider": true},
+            "signatureHelpProvider": {"triggerCharacters": ["(", ","]},
             "semanticTokensProvider": {
                 "full": true,
                 "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": ["inactive-target"]}
@@ -63,8 +64,15 @@ fn compatibility(params: &Value) -> Value {
 }
 
 pub(super) fn negotiated_capabilities(params: &Value) -> Vec<&'static str> {
-    const SUPPORTED: &[&str] =
-        &["documentSync", "completion", "definition", "hover", "semanticTokens", "formatting"];
+    const SUPPORTED: &[&str] = &[
+        "documentSync",
+        "completion",
+        "signatureHelp",
+        "definition",
+        "hover",
+        "semanticTokens",
+        "formatting",
+    ];
     let Some(requested) = params
         .get("initializationOptions")
         .and_then(|options| options.get("actus"))

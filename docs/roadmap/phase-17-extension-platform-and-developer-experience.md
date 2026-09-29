@@ -94,17 +94,17 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.4: Code intelligence and type information
 
-- [ ] Implement context-aware completion for declarations, fields, modules,
+- [x] Implement context-aware completion for declarations, fields, modules,
       facade exports, operators, ownership roles, and target-specific symbols.
-- [ ] Add completion item resolution with documentation, detail, source span,
+- [x] Add completion item resolution with documentation, detail, source span,
       ownership contract, and replacement edits.
-- [ ] Implement signature help with parameter ownership, generic parameters,
+- [x] Implement signature help with parameter ownership, generic parameters,
       result types, error variants, and active-parameter tracking.
-- [ ] Expose inferred types, ownership states, borrow states, pack layouts,
+- [x] Expose inferred types, ownership states, borrow states, pack layouts,
       array capacities, buffer element types, and target-dependent types.
-- [ ] Keep completion and hover results synchronized with the same semantic
+- [x] Keep completion and hover results synchronized with the same semantic
       snapshot used by diagnostics and definition queries.
-- [ ] Add negative coverage for incomplete syntax, invalid ownership, private
+- [x] Add negative coverage for incomplete syntax, invalid ownership, private
       declarations, unsupported targets, and stale semantic snapshots.
 
 ### Gate 17.0.5: Editing, refactoring, and source workflows

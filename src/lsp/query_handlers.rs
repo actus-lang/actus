@@ -14,19 +14,24 @@ use super::query_bounds::{
     truncate_array_preserving_edges, truncate_text,
 };
 use super::semantic_tokens::full as semantic_tokens;
+use crate::lexer::scan;
+use crate::parser::parse;
 use crate::target::TargetSpec;
 
 pub(super) fn completion(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
+    target: &TargetSpec,
     output: &mut impl Write,
     mut metadata: ResponseMetadata,
     cancellation: Option<&CancellationToken>,
 ) -> io::Result<()> {
     let uri =
         params.get("textDocument").and_then(|document| document.get("uri")).and_then(Value::as_str);
-    let source = uri.and_then(|value| store.get(value)).map(|document| document.text.as_str());
+    let document = uri.and_then(|value| store.get(value));
+    let source = document.map(|value| value.text.as_str());
+    let document_version = document.map(|value| value.version);
     let overlays = store.source_overlays();
     if source.is_none() {
         metadata.result_state = "unsupported";
@@ -42,14 +47,34 @@ pub(super) fn completion(
             cancellation,
         );
     }
+    let position =
+        params.get("position").and_then(|value| serde_json::from_value(value.clone()).ok());
     let (result, partial) = truncate_array_preserving_edges(
-        items(uri.unwrap_or_default(), source, &overlays),
+        items(
+            uri.unwrap_or_default(),
+            source,
+            &overlays,
+            position.as_ref(),
+            target,
+            document_version,
+        ),
         MAX_COMPLETION_ITEMS,
     );
     if partial {
         metadata.result_state = "partial";
     }
+    if source.is_some_and(|text| parse(scan(text).0).is_err()) {
+        metadata.result_state = "partial";
+    }
     super::server::respond(output, id, result, metadata, cancellation)
+}
+
+pub(super) fn resolve_completion(
+    item: &mut Value,
+    store: &DocumentStore,
+    target: &TargetSpec,
+) -> bool {
+    super::completion::resolve_item(item, store, target)
 }
 
 pub(super) fn semantic_tokens_full(
@@ -127,6 +152,7 @@ pub(super) fn hover(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
+    target: &TargetSpec,
     output: &mut impl Write,
     mut metadata: ResponseMetadata,
     cancellation: Option<&CancellationToken>,
@@ -146,6 +172,7 @@ pub(super) fn hover(
         &document.text,
         &params.position,
         &store.source_overlays(),
+        target,
     )
     .map(|info| {
         let (contents, partial) = truncate_text(&info.contents, MAX_HOVER_BYTES);

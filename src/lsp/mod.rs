@@ -16,6 +16,7 @@ mod query_handlers;
 mod request_dispatch;
 mod semantic_tokens;
 mod server;
+mod signature_help;
 mod transport;
 mod workspace;
 

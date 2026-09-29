@@ -45,6 +45,108 @@ fn lsp_hover_and_formatting_return_compiler_information() {
 }
 
 #[test]
+fn lsp_signature_help_exposes_roles_types_and_active_parameter() {
+    let uri = "file:///tmp/actus-lsp-signature-help.act";
+    let source = "verb combine(abs left: Int, ins right: Buffer) -> Int { return left; }\nverb caller() -> Int { return combine(left: 1, right: Buffer[0]); }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":uri},"position":position_after(source, "left: 1,")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("signatureHelpProvider"), "stdout: {stdout}");
+    assert!(stdout.contains("abs left: Int"), "stdout: {stdout}");
+    assert!(stdout.contains("ins right: Buffer"), "stdout: {stdout}");
+    assert!(stdout.contains("\"activeParameter\":1"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_signature_help_exposes_generics_and_result_contract() {
+    let uri = "file:///tmp/actus-lsp-generic-signature.act";
+    let source = "verb convert[T: Reader](abs input: T) -> Result[Buffer, IoError] { return Result.Ok(input); }\nverb main() -> Void { convert(input: input); }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":uri},"position":position_after(source, "convert(input")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("convert[T: Reader]("), "stdout: {stdout}");
+    assert!(stdout.contains("Result[Buffer, IoError]"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_signature_help_rejects_stale_document_versions() {
+    let uri = "file:///tmp/actus-lsp-signature-stale.act";
+    let source = "verb add(abs value: Int) -> Int { return value; }\nverb main() -> Int { return add(value: 1); }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":2,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":uri,"version":1},"position":position_after(source, "add(value")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"resultState\":\"stale\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"id\":2"), "stdout: {stdout}");
+    assert!(stdout.contains("\"result\":null"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_completion_items_support_context_edits_and_resolution() {
+    let uri = "file:///tmp/actus-lsp-completion-resolution.act";
+    let source = "/// Adds a value from the current module.\nverb add(abs value: Int) -> Int { return value; }\nverb main() -> Int { return add(value: 1); }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":30}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"completionItem/resolve","params":{"label":"add","data":{"uri":uri,"symbol":"add"}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("resolveProvider"), "stdout: {stdout}");
+    assert!(stdout.contains("\"textEdit\""), "stdout: {stdout}");
+    assert!(stdout.contains("Adds a value from the current module."), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_completion_resolution_rejects_a_stale_document_snapshot() {
+    let uri = "file:///tmp/actus-lsp-completion-stale.act";
+    let source = "/// Adds a value.\nverb add(abs value: Int) -> Int { return value; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":0}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":source}]}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"completionItem/resolve","params":{"label":"add","data":{"uri":uri,"symbol":"add","version":1}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"resultState\":\"stale\""), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_completion_marks_incomplete_source_as_partial_without_hiding_intrinsics() {
+    let uri = "file:///tmp/actus-lsp-incomplete-completion.act";
+    let source = "verb broken(abs value: Int) -> Int { return value\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":45}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"resultState\":\"partial\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"Buffer\""), "intrinsic completion missing: {stdout}");
+}
+
+#[test]
 fn lsp_initialize_exposes_versioned_contract_and_rejects_invalid_params() {
     let messages =
         fixture_messages(include_str!("../fixtures/lsp/protocol/initialize_contract.json"));

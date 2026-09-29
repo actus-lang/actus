@@ -7,5 +7,7 @@ mod lsp_navigation;
 mod lsp_protocol;
 #[path = "lsp/semantic.rs"]
 mod lsp_semantic;
+#[path = "lsp/semantic_states.rs"]
+mod lsp_semantic_states;
 #[path = "lsp/workspace.rs"]
 mod lsp_workspace;
