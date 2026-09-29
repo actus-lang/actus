@@ -25,6 +25,7 @@ pub(crate) fn lower_call(
         &target.parameter_names,
         &target.dynamic_params,
         &target.dynamic_roles,
+        &target.ins_params,
         context,
     )?;
     let target = resolve_call_target(function, callee, target, &values, context.functions)?;

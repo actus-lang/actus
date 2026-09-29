@@ -14,12 +14,20 @@ pub(super) enum NativeType {
     Buffer,
     Struct(usize),
     Pack(usize),
+    Array(usize),
     Arena(u32),
     Enum(usize),
     FatPointer,
 }
 
 impl NativeType {
+    pub(super) fn uses_indirect_ins(self) -> bool {
+        matches!(
+            self,
+            Self::Int | Self::Integer { width: 1..=64, .. } | Self::Float { .. } | Self::Pack(_)
+        )
+    }
+
     pub(super) fn uses_sret(self) -> bool {
         matches!(self, Self::Struct(_) | Self::Integer { width: 65..=128, .. })
     }
@@ -105,6 +113,7 @@ impl NativeType {
             | Self::Struct(_)
             | Self::Enum(_)
             | Self::Pack(_)
+            | Self::Array(_)
             | Self::Arena(_)
             | Self::FatPointer => Ok(pointer_type),
         }

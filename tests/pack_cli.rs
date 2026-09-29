@@ -51,6 +51,12 @@ fn executes_big_endian_network_frame_layout_natively() {
 }
 
 #[cfg(unix)]
+#[test]
+fn sign_extends_signed_pack_fields_after_native_extraction() {
+    run_pack_fixture("actus-signed-pack", signed_pack_source(), 1);
+}
+
+#[cfg(unix)]
 fn network_frame_source() -> &'static str {
     r#"
 pack NetworkHeader {
@@ -69,6 +75,27 @@ verb main() -> Int {
     header.version = 4;
     header.total_length = 150;
     return header.version + header.total_length;
+}
+"#
+}
+
+#[cfg(unix)]
+fn signed_pack_source() -> &'static str {
+    r#"
+pack SignedControl {
+    erg storage: u8;
+    layout little;
+    fields {
+        erg negative: i4 at 0;
+        erg positive: i4 at 4;
+    }
+}
+
+verb main() -> Int {
+    erg control = SignedControl { storage: 0, };
+    control.negative = -1;
+    control.positive = 2;
+    return control.negative + control.positive;
 }
 "#
 }

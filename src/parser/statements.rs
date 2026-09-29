@@ -68,10 +68,13 @@ impl Parser {
             Expr::FieldAccess { object, field, .. } => {
                 Ok(Stmt::FieldAssignment { object: *object, field, value, span })
             }
+            Expr::Index { target, index, .. } => {
+                Ok(Stmt::IndexAssignment { target: *target, index: *index, value, span })
+            }
             _ => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
-                    expected: "assignable binding or field".to_owned(),
+                    expected: "assignable binding, field, or index".to_owned(),
                     found: self.peek().map(|token| token.kind.clone()).unwrap_or(TokenKind::Eof),
                 },
                 span,

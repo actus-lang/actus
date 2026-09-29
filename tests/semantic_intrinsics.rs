@@ -146,7 +146,7 @@ fn rejects_calls_to_unknown_verbs() {
 
 #[test]
 fn accepts_registered_collection_types() {
-    analyze_source("verb main(erg items: Array, erg index: Map) { }")
+    analyze_source("verb main(erg items: Array[Int, 4], erg index: Map) { }")
         .expect("registered collection types should pass semantic analysis");
 }
 

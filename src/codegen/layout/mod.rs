@@ -13,8 +13,11 @@ use super::generic::{canonical_type_name, specialized_enums, specialized_structs
 use super::native::NativeEmitError;
 use super::types::NativeType;
 
+mod arrays;
 mod packs;
 mod structs;
+
+pub(super) use arrays::array_definitions;
 
 #[derive(Clone, Debug)]
 pub(super) struct FieldLayout {
@@ -48,6 +51,14 @@ pub(super) struct PackLayout {
     pub(super) fields: Vec<PackFieldLayout>,
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct ArrayLayout {
+    pub(super) element: NativeType,
+    pub(super) capacity: u32,
+    pub(super) size: u32,
+    pub(super) alignment: u32,
+}
+
 pub struct LayoutRegistry {
     pub(super) pointer_type: Type,
     pub(super) pointer_size: u32,
@@ -60,6 +71,9 @@ pub struct LayoutRegistry {
     pack_definitions: Vec<PackDecl>,
     pub(super) pack_layouts: Vec<PackLayout>,
     pack_ids: HashMap<String, usize>,
+    array_definitions: Vec<TypeName>,
+    array_layouts: Vec<ArrayLayout>,
+    array_ids: HashMap<String, usize>,
 }
 
 impl LayoutRegistry {
@@ -79,7 +93,14 @@ impl LayoutRegistry {
     ) -> Result<Self, NativeEmitError> {
         let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
         let pack_definitions = pack_definitions(program);
-        let mut registry = Self::new(pointer_type, definitions, enum_definitions, pack_definitions);
+        let array_definitions = array_definitions(program);
+        let mut registry = Self::new(
+            pointer_type,
+            definitions,
+            enum_definitions,
+            pack_definitions,
+            array_definitions,
+        );
         registry.populate_layouts()?;
         Ok(registry)
     }
@@ -89,6 +110,7 @@ impl LayoutRegistry {
         definitions: Vec<StructDef>,
         enum_definitions: Vec<EnumDef>,
         pack_definitions: Vec<PackDecl>,
+        array_definitions: Vec<TypeName>,
     ) -> Self {
         let ids = named_ids(&definitions, |definition| &definition.name);
         let enum_ids = named_ids(&enum_definitions, |definition| &definition.name);
@@ -105,6 +127,9 @@ impl LayoutRegistry {
             pack_definitions,
             pack_layouts: Vec::new(),
             pack_ids,
+            array_ids: array_ids(&array_definitions),
+            array_definitions,
+            array_layouts: Vec::new(),
         }
     }
 
@@ -119,6 +144,11 @@ impl LayoutRegistry {
             .pack_definitions
             .iter()
             .map(|pack| self.pack_layout_for(pack))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.array_layouts = self
+            .array_definitions
+            .iter()
+            .map(|array| self.array_layout_for(array))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(())
     }
@@ -139,12 +169,21 @@ impl LayoutRegistry {
         self.pack_ids.get(name).copied()
     }
 
+    pub(super) fn array(&self, id: usize) -> Option<&ArrayLayout> {
+        self.array_layouts.get(id)
+    }
+
+    pub(super) fn array_id(&self, canonical: &str) -> Option<usize> {
+        self.array_ids.get(canonical).copied()
+    }
+
     pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, NativeEmitError> {
         match ty {
             NativeType::Pack(id) => self
                 .pack(id)
                 .ok_or_else(|| NativeEmitError(format!("missing packed layout `{id}`")))
                 .and_then(|pack| self.ir_type(pack.storage)),
+            NativeType::Array(_) => Ok(self.pointer_type),
             NativeType::Arena(_) => Ok(self.pointer_type),
             _ => ty.ir_type(self.pointer_type),
         }
@@ -160,6 +199,7 @@ impl LayoutRegistry {
     pub(super) fn type_for_type_name(&self, type_name: &TypeName) -> Option<NativeType> {
         let canonical = canonical_type_name(type_name);
         self.type_for_name(&canonical)
+            .or_else(|| self.array_ids.get(&canonical).copied().map(NativeType::Array))
             .or_else(|| self.type_for_name(&type_name.name))
             .or_else(|| NativeType::from_name(&type_name.name))
     }
@@ -263,6 +303,14 @@ fn pack_definitions(program: &Program) -> Vec<PackDecl> {
             TopLevelDecl::Pack(pack) => Some(pack.clone()),
             _ => None,
         })
+        .collect()
+}
+
+fn array_ids(definitions: &[TypeName]) -> HashMap<String, usize> {
+    definitions
+        .iter()
+        .enumerate()
+        .map(|(index, definition)| (canonical_type_name(definition), index))
         .collect()
 }
 

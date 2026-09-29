@@ -36,6 +36,14 @@ impl Formatter {
             Stmt::FieldAssignment { object, field, value, .. } => {
                 self.field_assignment(object, field, value);
             }
+            Stmt::IndexAssignment { target, index, value, .. } => {
+                self.expression(target);
+                self.output.push('[');
+                self.expression(index);
+                self.output.push_str("] = ");
+                self.expression(value);
+                self.output.push(';');
+            }
             Stmt::Expression { expression, .. } => {
                 self.expression(expression);
                 self.output.push(';');

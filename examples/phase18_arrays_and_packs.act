@@ -1,0 +1,54 @@
+// Phase 18 systems-primitives demonstration.
+// This program exercises bounded arrays, dynamic indexing, aggregate element
+// assignment, arena placement, native pack mutation, and indexed `ins` loans.
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+pack ControlRegister {
+    erg storage: u32;
+    layout little;
+    fields {
+        erg enabled: u1 at 0;
+        abs ready: u1 at 1;
+        abs _reserved: u30 at 2 = 0;
+    }
+}
+
+verb write_slot(ins slot: Int) {
+    slot = 0;
+}
+
+verb array_total() -> Int {
+    erg values: Array[Int, 4] = Array[Int, 4]();
+    erg dynamic_index = 2;
+    values[dynamic_index] = 41;
+    write_slot(slot: ins values[0]);
+    return values[dynamic_index] + 1;
+}
+
+verb aggregate_total() -> Int {
+    erg points: Array[Point, 2] = Array[Point, 2]();
+    points[1] = Point { x: 19, y: 23, };
+    return points[1].x + points[1].y;
+}
+
+verb pack_total() -> Int {
+    erg controls: Array[ControlRegister, 2] = Array[ControlRegister, 2]();
+    controls[1] = ControlRegister { storage: 0, };
+    controls[1].enabled = 1;
+    return controls[1].enabled + controls[1].ready;
+}
+
+verb arena_total() -> Int {
+    erg arena: Arena[256] = Arena[256]();
+    erg arena_values: Array[Int, 2] = arena.place(value: Array[Int, 2]());
+    arena_values[1] = 7;
+    return arena_values[1];
+}
+
+verb main() -> Int {
+    return array_total() + aggregate_total() + pack_total() + arena_total();
+}

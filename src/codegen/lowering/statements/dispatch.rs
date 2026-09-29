@@ -138,16 +138,18 @@ fn lower_other_value_statement<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Option<Flow>, NativeEmitError> {
     match statement {
-        Stmt::FieldAssignment { .. } | Stmt::Return { .. } => Ok(Some(lower_field_or_return(
-            function,
-            statement,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )?)),
+        Stmt::FieldAssignment { .. } | Stmt::IndexAssignment { .. } | Stmt::Return { .. } => {
+            Ok(Some(lower_field_or_return(
+                function,
+                statement,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )?))
+        }
         Stmt::Expression { .. } | Stmt::Drop { .. } => Ok(Some(lower_expression_or_drop(
             function,
             statement,
@@ -184,6 +186,21 @@ fn lower_field_or_return<'source>(
             string_data,
             layouts,
         ),
+        Stmt::IndexAssignment { target, index, value, .. } => {
+            super::super::super::arrays::lower_array_assignment(
+                function,
+                target,
+                index,
+                value,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+            .map(|()| Flow::Fallthrough)
+        }
         Stmt::Return { value, span } => super::lower_return_statement(
             function,
             value.as_ref(),

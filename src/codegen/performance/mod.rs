@@ -165,6 +165,16 @@ fn declare_performance_function(
         return_type,
         dynamic_params: dynamic_parameters(definition),
         dynamic_roles: dynamic_roles(definition),
+        ins_params: definition
+            .method
+            .params
+            .iter()
+            .map(|parameter| {
+                parameter.role == crate::ast::Role::Ins
+                    && NativeType::try_from_type_name_with_layout(Some(&parameter.ty), layouts)
+                        .is_some_and(NativeType::uses_indirect_ins)
+            })
+            .collect(),
     })
 }
 
@@ -216,6 +226,7 @@ fn native_type_key(target: NativeType) -> String {
         NativeType::Buffer => "buffer".to_owned(),
         NativeType::FatPointer => "fat_pointer".to_owned(),
         NativeType::Pack(id) => format!("pack_{id}"),
+        NativeType::Array(id) => format!("array_{id}"),
         NativeType::Arena(capacity) => format!("arena_{capacity}"),
     }
 }

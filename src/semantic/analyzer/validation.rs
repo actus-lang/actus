@@ -92,7 +92,7 @@ fn contains_loop_exit(block: &Block) -> bool {
     })
 }
 
-pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
+pub(crate) fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
@@ -108,6 +108,7 @@ pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
         | Expr::Case { span, .. } => *span,
     }
 }

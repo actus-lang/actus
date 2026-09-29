@@ -2,6 +2,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
+use super::super::arrays::lower_array_constructor;
 use super::super::calls::CallLoweringContext;
 use super::super::calls::{lower_call, lower_method_call};
 use super::super::enums::{enum_receiver_name, lower_enum_constructor};
@@ -15,7 +16,9 @@ pub(in crate::codegen) fn lower_construct(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match expression {
-        Expr::Call { callee, arguments, .. } => lower_call(function, callee, arguments, context),
+        Expr::Call { callee, arguments, .. } => {
+            lower_call_or_array_constructor(function, callee, arguments, context)
+        }
         Expr::MethodCall { receiver, method, arguments, .. } => {
             lower_method_construct(function, receiver, method, arguments, context)
         }
@@ -24,6 +27,20 @@ pub(in crate::codegen) fn lower_construct(
         }
         _ => Err(NativeEmitError("unsupported native construct".to_owned())),
     }
+}
+
+fn lower_call_or_array_constructor(
+    function: &mut FunctionBuilder<'_>,
+    callee: &str,
+    arguments: &[Argument],
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if arguments.is_empty()
+        && let Some(id) = context.layouts.array_id(callee)
+    {
+        return lower_array_constructor(function, id, context.layouts);
+    }
+    lower_call(function, callee, arguments, context)
 }
 
 fn lower_data_construct(

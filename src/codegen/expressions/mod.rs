@@ -62,10 +62,27 @@ fn lower_expression_with_context(
         Expr::BufferLiteral { length, .. } => lower_buffer_literal(function, length, context),
         Expr::FloatLiteral { value, .. } => lower_float(function, value),
         Expr::StringLiteral { value, .. } => lower_string(function, value, context.string_data),
-        Expr::Identifier { name, .. } => lower_identifier(name, context.locals),
+        Expr::Identifier { name, .. } => lower_identifier(
+            function,
+            name,
+            context.locals,
+            context.local_types,
+            context.layouts.pointer_type,
+        ),
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             lower_expression_with_context(function, expression, context)
         }
+        Expr::Index { target, index, .. } => super::arrays::lower_array_index(
+            function,
+            target,
+            index,
+            context.locals,
+            context.local_types,
+            context.functions,
+            context.cleanup_schedule,
+            context.string_data,
+            context.layouts,
+        ),
         _ => lower_complex_expression(function, expression, context),
     }
 }

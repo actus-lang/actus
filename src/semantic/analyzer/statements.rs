@@ -22,6 +22,9 @@ impl Analyzer {
             Stmt::FieldAssignment { object, field, value, span } => {
                 self.validate_field_assignment(object, field, value, *span)
             }
+            Stmt::IndexAssignment { target, index, value, .. } => {
+                self.visit_index_assignment(target, index, value)
+            }
             Stmt::Expression { expression, span } => self.visit_expr_statement(expression, *span),
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => self.visit_loop(block),
@@ -47,6 +50,24 @@ impl Analyzer {
         self.visit_expression(value)?;
         self.validate_arena_provenance_target(index, name, value, span)?;
         self.record_binding_arena_provenance(index, value);
+        self.plan_try_unwind(value);
+        Ok(())
+    }
+
+    fn visit_index_assignment(
+        &mut self,
+        target: &Expr,
+        index: &Expr,
+        value: &Expr,
+    ) -> Result<(), SemanticError> {
+        if let Expr::Identifier { name, span: target_span } = target {
+            let binding = self.binding(name, *target_span)?;
+            self.ensure_mutable(binding, name, *target_span)?;
+        }
+        self.visit_expression(target)?;
+        self.visit_expression(index)?;
+        self.validate_index_value(target, index, value)?;
+        self.visit_expression(value)?;
         self.plan_try_unwind(value);
         Ok(())
     }

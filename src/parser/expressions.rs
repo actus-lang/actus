@@ -71,7 +71,8 @@ impl Parser {
         if let Some(buffer) = self.parse_buffer_literal(&name, span)? {
             return Ok(buffer);
         }
-        let type_arguments = if self.match_simple(TokenKind::LeftBracket) {
+        let type_arguments = if self.should_parse_type_arguments() {
+            self.expect_simple(TokenKind::LeftBracket, "`[`")?;
             self.parse_type_arguments()?
         } else {
             Vec::new()
@@ -80,6 +81,43 @@ impl Parser {
             return Ok(call);
         }
         self.parse_identifier_suffix(name, type_arguments, span)
+    }
+
+    fn should_parse_type_arguments(&self) -> bool {
+        if !self.check_simple(&TokenKind::LeftBracket) {
+            return false;
+        }
+        let mut depth = 0usize;
+        let mut closing = None;
+        for (offset, token) in self.tokens[self.cursor..].iter().enumerate() {
+            match token.kind {
+                TokenKind::LeftBracket => depth += 1,
+                TokenKind::RightBracket => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        closing = Some(self.cursor + offset);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(closing) = closing else { return false };
+        let Some(next) = self.tokens.get(closing + 1) else { return false };
+        if matches!(next.kind, TokenKind::LeftParen | TokenKind::LeftBrace) {
+            return true;
+        }
+        matches!(next.kind, TokenKind::Dot) && self.tokens.get(self.cursor + 1).is_some_and(|token| {
+            matches!(&token.kind, TokenKind::Identifier(name) if name.chars().next().is_some_and(char::is_uppercase))
+                || matches!(
+                    token.kind,
+                    TokenKind::IntType { .. }
+                        | TokenKind::FloatType { .. }
+                        | TokenKind::VoidType
+                        | TokenKind::Abs
+                        | TokenKind::Ins
+                )
+        })
     }
 
     fn parse_buffer_literal(
@@ -105,7 +143,7 @@ impl Parser {
         span: SourceSpan,
     ) -> Result<Option<Expr>, ParseError> {
         if self.match_simple(TokenKind::LeftParen) {
-            if !type_arguments.is_empty() && name != "Arena" {
+            if !type_arguments.is_empty() && !matches!(name, "Arena" | "Array") {
                 return Err(self.error_at_current("a struct literal after type arguments"));
             }
             let arguments = self.parse_arguments()?;
@@ -145,6 +183,14 @@ impl Parser {
 
     fn parse_field_access(&mut self, mut expression: Expr) -> Result<Expr, ParseError> {
         loop {
+            if self.match_simple(TokenKind::LeftBracket) {
+                let index = self.parse_expression()?;
+                let end = self.expect_simple(TokenKind::RightBracket, "`]`")?.span.end;
+                let span = SourceSpan::new(expression_span(&expression).start, end);
+                expression =
+                    Expr::Index { target: Box::new(expression), index: Box::new(index), span };
+                continue;
+            }
             if self.match_simple(TokenKind::Question) {
                 let span =
                     SourceSpan::new(expression_span(&expression).start, self.previous().span.end);

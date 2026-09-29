@@ -1,0 +1,185 @@
+use std::collections::HashMap;
+
+use cranelift_codegen::ir::{
+    InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, TrapCode, Value, condcodes::IntCC,
+};
+use cranelift_frontend::FunctionBuilder;
+
+use crate::ast::Expr;
+
+use super::expressions::lower_expression;
+use super::layout::LayoutRegistry;
+use super::literals::StringDataValues;
+use super::model::NativeCleanupSchedule;
+use super::native::{FunctionRef, NativeEmitError};
+use super::structs::copy_bytes;
+use super::types::NativeType;
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_array_index(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
+    let (address, element) = lower_array_address(
+        function,
+        target,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    if matches!(element, NativeType::Struct(_) | NativeType::Array(_)) {
+        return Ok(address);
+    }
+    Ok(function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_array_assignment(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    value: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let (address, element) = lower_array_address(
+        function,
+        target,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let value = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    if matches!(element, NativeType::Struct(_) | NativeType::Array(_)) {
+        let size = layouts
+            .type_size(element)
+            .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
+        copy_bytes(function, value, address, size);
+    } else {
+        function.ins().store(MemFlagsData::new(), value, address, 0);
+    }
+    Ok(())
+}
+
+pub(super) fn lower_array_constructor(
+    function: &mut FunctionBuilder<'_>,
+    id: usize,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
+    let layout =
+        layouts.array(id).ok_or_else(|| NativeEmitError(format!("missing array layout `{id}")))?;
+    let slot = function.func.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        layout.size,
+        layout.alignment.trailing_zeros() as u8,
+    ));
+    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    let zero = function.ins().iconst(cranelift_codegen::ir::types::I8, 0);
+    for offset in 0..layout.size {
+        function.ins().store(MemFlagsData::new(), zero, address, offset as i32);
+    }
+    Ok(address)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_array_address(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(Value, NativeType), NativeEmitError> {
+    let NativeType::Array(id) =
+        super::structs::expression_native_type(target, local_types, layouts)
+            .ok_or_else(|| NativeEmitError("indexed target has no native array type".to_owned()))?
+    else {
+        return Err(NativeEmitError("indexed target is not a native array".to_owned()));
+    };
+    let array =
+        layouts.array(id).ok_or_else(|| NativeEmitError("missing array layout".to_owned()))?;
+    let base = lower_expression(
+        function,
+        target,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let index = lower_expression(
+        function,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let index = coerce_index(function, index, layouts.pointer_type);
+    let capacity = function.ins().iconst(layouts.pointer_type, i64::from(array.capacity));
+    let in_bounds = function.ins().icmp(IntCC::UnsignedLessThan, index, capacity);
+    let ok_block = function.create_block();
+    let trap_block = function.create_block();
+    function.ins().brif(in_bounds, ok_block, &[], trap_block, &[]);
+    function.switch_to_block(trap_block);
+    function.ins().trap(TrapCode::HEAP_OUT_OF_BOUNDS);
+    function.seal_block(trap_block);
+    function.switch_to_block(ok_block);
+    let element_size = layouts
+        .type_size(array.element)
+        .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
+    let byte_offset = function.ins().imul_imm_u(index, i64::from(element_size));
+    let address = function.ins().iadd(base, byte_offset);
+    function.seal_block(ok_block);
+    Ok((address, array.element))
+}
+
+fn coerce_index(
+    function: &mut FunctionBuilder<'_>,
+    index: Value,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Value {
+    let source = function.func.dfg.value_type(index);
+    if source == pointer_type {
+        return index;
+    }
+    if source.bytes() < pointer_type.bytes() {
+        function.ins().uextend(pointer_type, index)
+    } else {
+        function.ins().ireduce(pointer_type, index)
+    }
+}

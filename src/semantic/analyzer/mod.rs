@@ -8,7 +8,9 @@ mod validation;
 mod verb;
 
 pub(crate) use state::{Analyzer, ScopeFrame};
-pub(crate) use validation::{canonical_type_name, is_origin_return_expression, try_type_mismatch};
+pub(crate) use validation::{
+    canonical_type_name, expression_span, is_origin_return_expression, try_type_mismatch,
+};
 
 use super::errors::SemanticError;
 use super::model::SemanticModel;

@@ -85,6 +85,9 @@ impl Analyzer {
         if name == "Arena" {
             return self.resolve_arena_type(type_name);
         }
+        if name == "Array" {
+            return self.resolve_array_type(type_name);
+        }
         if let Some(generic) = self.resolve_generic_parameter(type_name)? {
             return Ok(generic);
         }
@@ -110,6 +113,30 @@ impl Analyzer {
         Ok(ResolvedType::Applied {
             name: type_name.name.clone(),
             arguments: vec![ResolvedType::Concrete(type_name.arguments[0].name.clone())],
+        })
+    }
+
+    fn resolve_array_type(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
+        if type_name.arguments.len() != 2 {
+            return Err(arity_error("Array", 2, type_name.arguments.len(), type_name.span));
+        }
+        let element = &type_name.arguments[0];
+        let capacity = &type_name.arguments[1];
+        let parsed_capacity = capacity.name.parse::<usize>().ok();
+        if capacity.reference_role.is_some()
+            || !capacity.arguments.is_empty()
+            || parsed_capacity.is_none()
+            || parsed_capacity == Some(0)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidArrayCapacity { capacity: capacity.name.clone() },
+                span: capacity.span,
+            });
+        }
+        let resolved_element = self.resolve_type_reference(element)?;
+        Ok(ResolvedType::Applied {
+            name: "Array".to_owned(),
+            arguments: vec![resolved_element, ResolvedType::Concrete(capacity.name.clone())],
         })
     }
 

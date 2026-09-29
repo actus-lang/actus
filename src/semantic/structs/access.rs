@@ -8,6 +8,7 @@ pub(super) fn root_binding(expression: &Expr) -> Option<(&str, SourceSpan)> {
     match expression {
         Expr::Identifier { name, span } => Some((name, *span)),
         Expr::FieldAccess { object, .. } => root_binding(object),
+        Expr::Index { target, .. } => root_binding(target),
         _ => None,
     }
 }

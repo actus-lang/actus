@@ -66,8 +66,11 @@ fn declared_native_type(
     declared_type: Option<&str>,
     layouts: &LayoutRegistry,
 ) -> Option<NativeType> {
-    declared_type
-        .and_then(|name| NativeType::from_name(name).or_else(|| layouts.type_for_name(name)))
+    declared_type.and_then(|name| {
+        NativeType::from_name(name)
+            .or_else(|| layouts.type_for_name(name))
+            .or_else(|| layouts.array_id(name).map(NativeType::Array))
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -147,6 +150,19 @@ fn lower_special_initializer(
     layouts: &LayoutRegistry,
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     let value = match (declared_native, initializer) {
+        (Some(NativeType::Array(id)), Expr::Call { callee, arguments, .. })
+            if arguments.is_empty() =>
+        {
+            let expected = layouts
+                .array_id(callee)
+                .ok_or_else(|| NativeEmitError(format!("missing array layout for `{callee}`")))?;
+            if expected != id {
+                return Err(NativeEmitError(
+                    "array initializer type does not match binding".to_owned(),
+                ));
+            }
+            Some(super::super::super::arrays::lower_array_constructor(function, id, layouts)?)
+        }
         (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
             Some(super::super::super::expressions::lower_wide_integer(function, value)?)
         }

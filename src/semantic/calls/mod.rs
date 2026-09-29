@@ -87,6 +87,17 @@ impl Analyzer {
             self.inferred_expression_types.insert((span.start, span.end), type_name);
             return Ok(Some(Ok(())));
         }
+        if let Some(type_name) = array_constructor_type(callee, span) {
+            self.validate_type_reference(&type_name)?;
+            if !arguments.is_empty() {
+                return Ok(Some(Err(SemanticError {
+                    kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
+                    span,
+                })));
+            }
+            self.inferred_expression_types.insert((span.start, span.end), type_name);
+            return Ok(Some(Ok(())));
+        }
         if matches!(callee, "Ok" | "Err") && !self.signatures.contains_key(callee) {
             return Ok(Some(self.visit_result_constructor(callee, arguments, span)));
         }
@@ -285,4 +296,8 @@ fn invalid_call_role(
 
 fn arena_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
     callee.starts_with("Arena[").then(|| parse_type_name_key(callee, span)).flatten()
+}
+
+fn array_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
+    callee.starts_with("Array[").then(|| parse_type_name_key(callee, span)).flatten()
 }
