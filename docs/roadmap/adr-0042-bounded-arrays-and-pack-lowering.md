@@ -71,9 +71,9 @@ complete.
 
 ## Gate 6: Native execution and end-to-end quality verification
 
-- [ ] Execute arrays and indexed pack fields through native binaries.
+- [x] Execute arrays and indexed pack fields through native binaries.
 - [ ] Verify `ins` slot mutation and caller reuse without allocation.
-- [ ] Verify deterministic artifacts and repeated-run results.
+- [x] Verify deterministic artifacts and repeated-run results.
 - [ ] Add hosted and freestanding target evidence where supported.
 - [ ] Run formatter, check, clippy, tests, source limits, and diff checks.
 - [ ] Update ADR-0042 with implementation evidence and approved deviations.

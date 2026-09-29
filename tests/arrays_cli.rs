@@ -56,6 +56,41 @@ fn mutates_indexed_pack_fields_in_place() {
 }
 
 #[cfg(unix)]
+#[test]
+fn emits_identical_objects_for_repeated_array_builds() {
+    let root = std::env::temp_dir().join(format!("actus-array-repeat-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let first = root.with_extension("first.o");
+    let second = root.with_extension("second.o");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); values[1] = 41; return values[1] + 1; }",
+    )
+    .expect("write deterministic array fixture");
+    for output in [&first, &second] {
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--emit".to_owned(),
+                "obj".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0);
+    }
+    assert_eq!(
+        fs::read(&first).expect("read first object"),
+        fs::read(&second).expect("read second object")
+    );
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(first);
+    let _ = fs::remove_file(second);
+}
+
+#[cfg(unix)]
 fn run_array_fixture(name: &str, source: &str) -> std::process::ExitStatus {
     let root = std::env::temp_dir().join(format!("actus-{name}-{}", std::process::id()));
     let input = root.with_extension("act");
