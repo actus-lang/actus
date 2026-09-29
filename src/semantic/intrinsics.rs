@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::ast::{Argument, Expr, IntrinsicKind, lookup_call_intrinsic, lookup_intrinsic};
+use crate::ast::{
+    Argument, Expr, IntrinsicKind, PrimitiveType, lookup_call_intrinsic, lookup_intrinsic,
+    primitive_type,
+};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -37,17 +40,35 @@ impl Analyzer {
                         span: expression_span(handle),
                     });
                 }
-                self.require_intrinsic_type(
-                    callee,
-                    parameters[1],
-                    crate::ast::BuiltinType::Int,
-                    &arguments[1].expression,
-                )?;
+                self.require_append_byte_type(callee, parameters[1], &arguments[1].expression)?;
                 Ok(true)
             }
             IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
         }
+    }
+
+    fn require_append_byte_type(
+        &self,
+        callee: &str,
+        parameter: &str,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        let is_integer = self.expression_type_name(expression).is_some_and(|name| {
+            name == "Int"
+                || primitive_type(&name)
+                    .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { .. }))
+        });
+        if is_integer {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                callee: callee.to_owned(),
+                parameter: parameter.to_owned(),
+            },
+            span: expression_span(expression),
+        })
     }
 
     fn validate_print(
@@ -175,25 +196,6 @@ impl Analyzer {
         Err(SemanticError {
             kind: SemanticErrorKind::DuplicateArgument { name: "intrinsic parameter".to_owned() },
             span,
-        })
-    }
-
-    fn require_intrinsic_type(
-        &self,
-        callee: &str,
-        parameter: &str,
-        expected: crate::ast::BuiltinType,
-        expression: &Expr,
-    ) -> Result<(), SemanticError> {
-        if self.expression_type(expression) == Some(expected) {
-            return Ok(());
-        }
-        Err(SemanticError {
-            kind: SemanticErrorKind::InvalidIntrinsicArgument {
-                callee: callee.to_owned(),
-                parameter: parameter.to_owned(),
-            },
-            span: expression_span(expression),
         })
     }
 }

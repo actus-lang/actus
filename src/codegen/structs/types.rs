@@ -46,6 +46,19 @@ pub(crate) fn field_type(
     field: &str,
     layouts: &LayoutRegistry,
 ) -> Option<NativeType> {
-    let NativeType::Struct(id) = ty else { return None };
-    layouts.get(id)?.fields.iter().find(|candidate| candidate.name == field).map(|field| field.ty)
+    match ty {
+        NativeType::Struct(id) => layouts
+            .get(id)?
+            .fields
+            .iter()
+            .find(|candidate| candidate.name == field)
+            .map(|candidate| candidate.ty),
+        NativeType::Pack(id) => layouts
+            .pack(id)?
+            .fields
+            .iter()
+            .find(|candidate| candidate.name == field)
+            .map(|candidate| candidate.ty),
+        _ => None,
+    }
 }
