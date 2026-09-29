@@ -1,6 +1,6 @@
 # ADR-0044: Equality, Logical, Remainder, and Bitwise Operators
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-29
 - Scope: Equality, remainder, logical short-circuiting, bitwise operations,
   and compiler-tooling synchronization
@@ -185,7 +185,7 @@ The stable diagnostic baseline is `E1025` for invalid operator operands,
 statically provable shift count outside the destination width. Runtime-only
 remainder and shift failures retain deterministic native traps.
 
-## Gate 7 LSP Scope Evidence
+## Gate 7 Evidence
 
 The compiler repository's LSP now exposes the implemented ADR-0042, ADR-0043,
 and ADR-0044 surface through semantic tokens, completion, hover, formatting,
@@ -194,5 +194,20 @@ operator hover explains operand and failure contracts; completion includes the
 operator vocabulary; and intrinsic hover documents length-aware `Buffer`
 output. Workflow tests cover checked casts, unsigned indexing, packs, slot
 roles, relational and short-circuit operators, `E1092`, and nested-control
-diagnostics. VS Code and Tree-sitter remain separate, intentionally unmodified
-follow-up scopes.
+diagnostics.
+
+The VS Code extension synchronizes the complete operator surface in its
+TextMate grammar and delegates completion, hover, diagnostics, and formatting
+to the synchronized Actus LSP. Its typecheck, build, and VSIX packaging checks
+pass; the verified extension commit is `d14613c` in
+`vscode-actus`.
+
+Tree-sitter synchronizes precedence, generated parser artifacts, operator
+highlight captures, and ADR-0044 corpus fixtures. Its complete corpus passes
+12/12; the verified commit is `0afbfb1` in `tree-sitter-actus`.
+
+Cross-repository verification passed with Actus LSP workflow tests 2/2,
+Tree-sitter corpus tests 12/12, and VS Code check/build/package. The main
+compiler tooling commit is `6dbffb1`; all three integrations expose only
+syntax accepted by the compiler and the final editor synchronization gate is
+closed.

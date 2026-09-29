@@ -93,11 +93,11 @@ Code extension, and Tree-sitter.
       length-aware Buffer documentation to LSP support.
 - [x] Add ADR-0044 equality, remainder, logical, and bitwise operators to LSP
       tokenization, completion, hover, formatting, and diagnostics.
-- [ ] Update the VS Code extension grammar, highlighting, completion, hover,
+- [x] Update the VS Code extension grammar, highlighting, completion, hover,
       diagnostics, and formatter integration.
 - [x] Update Tree-sitter grammar, precedence, generated parser artifacts, and
       corpus fixtures for the combined operator surface.
-- [ ] Run cross-repository synchronization checks and reject drift between
+- [x] Run cross-repository synchronization checks and reject drift between
       compiler, LSP, VS Code, and Tree-sitter definitions.
-- [ ] Record end-to-end editor evidence and close ADR-0044 only after every
+- [x] Record end-to-end editor evidence and close ADR-0044 only after every
       prior gate and all three tooling integrations are green.
