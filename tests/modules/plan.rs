@@ -1,0 +1,73 @@
+use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use actus::lexer::scan;
+use actus::modules::{ModuleResolver, build_compilation_plan};
+use actus::parser::parse;
+
+struct Fixture(PathBuf);
+
+impl Fixture {
+    fn new() -> Self {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("actus-plan-{stamp}"));
+        fs::create_dir_all(&root).unwrap();
+        Self(root)
+    }
+
+    fn write(&self, relative: &str, source: &str) {
+        let path = self.0.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, source).unwrap();
+    }
+}
+
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn compilation_plan_separates_public_caller_and_internal_module_units() {
+    let fixture = Fixture::new();
+    fixture.write("math/math.act", "open ops;");
+    fixture.write(
+        "math/ops.act",
+        "verb hidden() -> Int { return 41; } open verb add() -> Int { return hidden() + 1; }",
+    );
+    let (tokens, errors) = scan("import math; verb main() -> Int { return add(); }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    assert_eq!(plan.units().len(), 1);
+    assert!(plan.caller().declarations.iter().all(|declaration| {
+        !matches!(declaration, actus::ast::TopLevelDecl::Verb(verb) if verb.name == "hidden")
+    }));
+    assert!(plan.units()[0].implementation().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::Verb(verb) if verb.name == "hidden")
+    }));
+}
+
+#[test]
+fn compilation_plan_deduplicates_repeated_module_imports() {
+    let fixture = Fixture::new();
+    fixture.write("math/math.act", "open ops;");
+    fixture.write("math/ops.act", "open verb add() -> Int { return 1; }");
+    let (tokens, errors) = scan("import math; import math; verb main() -> Int { return add(); }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    assert_eq!(plan.units().len(), 1);
+    assert_eq!(
+        plan.caller()
+            .declarations
+            .iter()
+            .filter(|declaration| matches!(declaration, actus::ast::TopLevelDecl::Verb(verb) if verb.name == "add"))
+            .count(),
+        1
+    );
+}

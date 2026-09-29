@@ -157,6 +157,8 @@ reported later as an importer-side unknown type.
 
 ## Gate 20.4: Code generation and implementation emission
 
+- [x] Introduce a compilation plan that keeps the caller's public program
+      separate from each imported module's internal implementation unit.
 - [ ] Generate public wrappers from their validated module implementation
       unit, including required private dependencies.
 - [ ] Emit each module implementation once when multiple callers import it.
@@ -168,6 +170,16 @@ reported later as an importer-side unknown type.
 - [ ] Add negative tests proving private bridge calls fail before linking.
 - [ ] Verify deterministic object output and symbol ownership across repeated
       compilation.
+
+### Gate 20.4 progress evidence
+
+`ModuleCompilationPlan` now separates the public caller program from the
+internal `ModuleUnit` list used for implementation emission. Repeated imports
+are deduplicated by module path, while each retained unit still contains all
+private declarations required by its public wrappers. The existing
+`resolve_imports` API delegates to the plan's public caller view, preserving
+the importer namespace while making the internal units available to the next
+code-generation slice. Object emission and multi-object linking remain open.
 
 ## Gate 20.5: Standard-library migration
 

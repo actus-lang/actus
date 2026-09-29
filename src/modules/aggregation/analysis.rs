@@ -1,14 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::ast::{Program, TopLevelDecl};
+use crate::ast::Program;
 use crate::semantic::{SemanticModel, analyze, filter_program_for_target};
 
 use super::super::resolver::ModuleResolver;
 use super::parsing::parse_module_with_overlays;
+use super::plan::build_compilation_plan;
 use super::types::ModuleError;
 use super::unit::{ModuleUnit, load_module_unit};
-use super::visibility::validate_import_visibility;
 
 pub fn analyze_module(
     resolver: &ModuleResolver,
@@ -66,26 +66,5 @@ pub fn resolve_imports(
     program: &Program,
     resolver: &ModuleResolver,
 ) -> Result<Program, ModuleError> {
-    let mut declarations = Vec::new();
-    let mut imported_paths = HashSet::new();
-    for declaration in &program.declarations {
-        let TopLevelDecl::Import(import) = declaration else {
-            declarations.push(declaration.clone());
-            continue;
-        };
-        if !imported_paths.insert(import.path.clone()) {
-            continue;
-        }
-        let unit = load_module_unit(resolver, &import.path)?;
-        validate_import_visibility(program, &import.path, &unit)?;
-        let imported = unit.implementation().clone();
-        let exports = unit.exports();
-        declarations.extend(imported.declarations.into_iter().filter(|candidate| {
-            let Some((kind, name)) = super::validation::export_identity(candidate) else {
-                return false;
-            };
-            exports.contains(kind, &name)
-        }));
-    }
-    Ok(Program { declarations })
+    Ok(build_compilation_plan(program, resolver)?.caller().clone())
 }

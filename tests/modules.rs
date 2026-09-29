@@ -8,5 +8,7 @@ mod compilation_unit;
 mod facade;
 #[path = "modules/imports.rs"]
 mod imports;
+#[path = "modules/plan.rs"]
+mod plan;
 #[path = "modules/resolver.rs"]
 mod resolver;
