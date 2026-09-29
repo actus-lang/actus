@@ -14,6 +14,7 @@ use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
 mod buffer;
+mod cast;
 mod construct;
 mod initializer_types;
 mod literals;
@@ -71,6 +72,9 @@ fn lower_expression_with_context(
         ),
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             lower_expression_with_context(function, expression, context)
+        }
+        Expr::Cast { expression, target, .. } => {
+            cast::lower_cast(function, expression, target, context)
         }
         Expr::Index { target, index, .. } => match super::structs::expression_native_type(
             target,

@@ -25,6 +25,7 @@ pub(crate) fn initializer_type(
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             initializer_type(expression, types, functions, layouts)
         }
+        Expr::Cast { target, .. } => NativeType::from_type_name_with_layout(Some(target), layouts),
         Expr::Unary { expression, .. } => initializer_type(expression, types, functions, layouts),
         Expr::Binary { left, .. } => initializer_type(left, types, functions, layouts),
         Expr::StringLiteral { .. } => Ok(NativeType::String),

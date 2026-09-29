@@ -193,6 +193,14 @@ pub enum SemanticErrorKind {
         ty: String,
         literal: String,
     },
+    InvalidPrimitiveCast {
+        source: String,
+        target: String,
+    },
+    PrimitiveCastOutOfRange {
+        target: String,
+        literal: String,
+    },
     InvalidArenaCapacity {
         capacity: String,
     },

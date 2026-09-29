@@ -70,6 +70,8 @@ fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::UnknownVerb { .. } => "E1069",
         SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
         SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
+        SemanticErrorKind::InvalidPrimitiveCast { .. } => "E1090",
+        SemanticErrorKind::PrimitiveCastOutOfRange { .. } => "E1091",
         SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
         SemanticErrorKind::ArenaReferenceEscape { .. } => "E1077",
         SemanticErrorKind::CrossArenaReference { .. } => "E1078",

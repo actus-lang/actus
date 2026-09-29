@@ -31,6 +31,7 @@ impl Analyzer {
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
                 self.resolved_type_name(expression)
             }
+            Expr::Cast { target, .. } => Some(target.clone()),
             Expr::Try { expression, .. } => self
                 .enum_type_application(expression)
                 .and_then(|result| result.arguments.first().cloned()),

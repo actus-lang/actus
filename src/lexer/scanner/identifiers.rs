@@ -56,6 +56,7 @@ fn keyword_or_identifier(text: &str) -> TokenKind {
         "import" => TokenKind::Import,
         "for" => TokenKind::For,
         "case" => TokenKind::Case,
+        "as" => TokenKind::As,
         "if" => TokenKind::If,
         "true" => TokenKind::True,
         "false" => TokenKind::False,

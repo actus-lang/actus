@@ -26,6 +26,48 @@ fn reads_first_and_last_buffer_bytes_with_dynamic_indexing() {
 
 #[cfg(unix)]
 #[test]
+fn accepts_u8_and_u32_dynamic_indices() {
+    let status = run_array_fixture(
+        "unsigned-indices",
+        "verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[1] = 20; erg array_index: u32 = 1; erg bytes: Buffer = Buffer[0]; append(bytes, 22); erg buffer_index: u8 = 0; return values[array_index] + bytes[buffer_index]; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_checked_integer_casts() {
+    let status = run_array_fixture(
+        "checked-casts",
+        "verb main() -> Int { erg value = 41; erg narrowed = value as u8; return narrowed as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn traps_on_runtime_integer_cast_overflow() {
+    let status = run_array_fixture(
+        "checked-cast-overflow",
+        "verb main() -> Int { erg value = 256; erg narrowed = value as u8; return narrowed as Int; }",
+    );
+    assert!(!status.success());
+    assert!(status.code().is_none(), "integer overflow should be a native trap: {status:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn traps_on_runtime_integer_cast_underflow() {
+    let status = run_array_fixture(
+        "checked-cast-underflow",
+        "verb main() -> Int { erg value = -1; erg narrowed = value as u8; return narrowed as Int; }",
+    );
+    assert!(!status.success());
+    assert!(status.code().is_none(), "integer underflow should be a native trap: {status:?}");
+}
+
+#[cfg(unix)]
+#[test]
 fn traps_deterministically_on_buffer_bounds_failure() {
     let status = run_array_fixture(
         "buffer-index-bounds",

@@ -24,6 +24,7 @@ pub fn primitive_type(name: &str) -> Option<PrimitiveType> {
         return Some(PrimitiveType::Integer { signed: prefix == "i", width: width as u8 });
     }
     match name {
+        "Usize" => Some(PrimitiveType::Integer { signed: false, width: 64 }),
         "f32" => Some(PrimitiveType::Float { width: 32 }),
         "f64" => Some(PrimitiveType::Float { width: 64 }),
         "Void" => Some(PrimitiveType::Void),

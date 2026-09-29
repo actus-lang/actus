@@ -79,7 +79,8 @@ pub(super) fn argument_span(argument: &Argument) -> SourceSpan {
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
-        | Expr::Case { span, .. } => *span,
+        | Expr::Case { span, .. }
+        | Expr::Cast { span, .. } => *span,
     }
 }
 

@@ -101,6 +101,7 @@ pub(crate) fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::StringLiteral { span, .. }
         | Expr::Grouping { span, .. }
         | Expr::Unary { span, .. }
+        | Expr::Cast { span, .. }
         | Expr::Binary { span, .. }
         | Expr::Borrow { span, .. }
         | Expr::Try { span, .. }

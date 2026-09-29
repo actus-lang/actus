@@ -14,6 +14,7 @@ impl Analyzer {
             Expr::Grouping { expression, .. }
             | Expr::Borrow { expression, .. }
             | Expr::Unary { expression, .. } => self.expression_type(expression),
+            Expr::Cast { target, .. } => lookup_builtin_type(&target.name),
             Expr::Try { expression, .. } => self
                 .enum_type_application(expression)
                 .and_then(|type_name| type_name.arguments.first().cloned())
@@ -88,6 +89,9 @@ impl Analyzer {
             && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
         {
             return Some(super::super::analyzer::canonical_type_name(type_name));
+        }
+        if let Expr::Cast { target, .. } = expression {
+            return Some(super::super::analyzer::canonical_type_name(target));
         }
         self.binding_type_name(expression)
             .or_else(|| self.index_type_name(expression))

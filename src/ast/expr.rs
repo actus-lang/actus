@@ -36,6 +36,11 @@ pub enum Expr {
         expression: Box<Expr>,
         span: SourceSpan,
     },
+    Cast {
+        expression: Box<Expr>,
+        target: TypeName,
+        span: SourceSpan,
+    },
     Binary {
         left: Box<Expr>,
         operator: BinaryOp,

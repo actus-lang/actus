@@ -101,6 +101,7 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
             collect_expression_arrays(index, definitions);
         }
         Expr::FieldAccess { object, .. }
+        | Expr::Cast { expression: object, .. }
         | Expr::Borrow { expression: object, .. }
         | Expr::Grouping { expression: object, .. }
         | Expr::Unary { expression: object, .. }
