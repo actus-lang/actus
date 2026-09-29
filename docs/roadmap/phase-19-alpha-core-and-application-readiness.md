@@ -164,7 +164,7 @@ contracts that the future platform is allowed to consume.
 
 ### Runtime boundaries
 
-- [ ] Verify every public fallible I/O operation returns a typed Actus result.
+- [x] Verify every public fallible I/O operation returns a typed Actus result.
 - [ ] Verify raw POSIX, Windows, and linker statuses remain private to runtime
       bridges.
 - [x] Verify C-ABI status contracts use documented explicit values.
@@ -207,6 +207,12 @@ Borrowed path inspection is covered by `tests/runtime_zero_alloc.rs`, which
 counts allocations around predicates, component views, iteration, and C-view
 construction. Builders are intentionally excluded because their explicit
 capacity-growth contract permits reallocation.
+
+The public fallible standard-library surface is audited by
+`tests/stdlib_result_surface.rs`: every open fallible verb and public
+performance method returns `Result` or `Option`, while explicitly infallible
+constructors, predicates, configuration helpers, and drop operations remain
+value- or unit-returning by contract.
 
 Cleanup evidence is distributed across `tests/semantic/`, `tests/codegen/`,
 `tests/buffer_cli.rs`, `tests/fs.rs`, `tests/std_io/`, and `tests/cli.rs`;
