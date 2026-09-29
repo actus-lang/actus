@@ -69,7 +69,10 @@ fn resolves_a_local_package_namespace_from_actus_manifest() {
     )
     .expect("resolve local package import");
     assert!(expanded.declarations.iter().any(|declaration| {
-        matches!(declaration, actus::ast::TopLevelDecl::Verb(verb) if verb.name == "add")
+        matches!(
+            declaration,
+            actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "add"
+        )
     }));
 }
 

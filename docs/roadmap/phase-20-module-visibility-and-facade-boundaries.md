@@ -168,10 +168,10 @@ reported later as an importer-side unknown type.
 - [ ] Emit each module implementation once when multiple callers import it.
 - [ ] Preserve C ABI declarations and typed status translation at the runtime
       boundary.
-- [ ] Prevent private Actus declarations from appearing in caller namespaces
+- [x] Prevent private Actus declarations from appearing in caller namespaces
       or public generated interfaces.
-- [ ] Add native tests proving a public wrapper can call a private bridge.
-- [ ] Add negative tests proving private bridge calls fail before linking.
+- [x] Add native tests proving a public wrapper can call a private implementation.
+- [x] Add negative tests proving private bridge calls fail before linking.
 - [ ] Verify deterministic object output and symbol ownership across repeated
       compilation.
 
@@ -189,7 +189,12 @@ declarations remain absent from caller lookup. The linker also accepts an
 ordered object list and rejects an empty link input. The plan rejects
 cross-module native symbol collisions with `E1110` before codegen. Per-module
 object emission and deterministic symbol namespacing remain open rather than
-allowing ambiguous ABI symbols to reach the linker.
+allowing ambiguous ABI symbols to reach the linker. Native application tests
+now prove that a public module wrapper can execute a private implementation,
+while a direct private bridge call fails with `E1109` before code generation.
+Imported public verbs are represented in the caller scope by signature-only
+declarations; their bodies are analyzed and emitted only from the owning
+module implementation unit.
 
 ## Gate 20.5: Standard-library migration
 

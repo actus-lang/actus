@@ -131,3 +131,44 @@ fn negative_application_proves_missing_file_is_typed() {
     assert_eq!(execution.stderr, b"");
     fs::remove_dir_all(root).expect("remove negative application project");
 }
+
+#[test]
+fn module_application_executes_public_wrapper_with_private_implementation() {
+    let source = "import math; verb main() -> Int { return add(); }\n";
+    let (root, input, output) = project("module-wrapper", source);
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(
+        root.join("src/math/api.act"),
+        "open verb add() -> Int { return hidden(); } verb hidden() -> Int { return 42; }\n",
+    )
+    .expect("write module implementation");
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(42));
+    assert_eq!(execution.stdout, b"");
+    assert_eq!(execution.stderr, b"");
+    fs::remove_dir_all(root).expect("remove module project");
+}
+
+#[test]
+fn module_application_rejects_private_bridge_before_codegen() {
+    let source = "import runtime; verb main() -> Int { return private_bridge(); }\n";
+    let (root, input, _output) = project("private-bridge", source);
+    fs::create_dir_all(root.join("src/runtime")).expect("create runtime module directory");
+    fs::write(root.join("src/runtime/runtime.act"), "open api;\n").expect("write runtime facade");
+    fs::write(
+        root.join("src/runtime/api.act"),
+        "open verb read() -> Int { return private_bridge(); } unsafe extern \"C\" verb private_bridge() -> Int;\n",
+    )
+    .expect("write runtime implementation");
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", input.to_str().expect("source path"), "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("check private bridge application");
+    assert!(!check.status.success());
+    let diagnostics = String::from_utf8_lossy(&check.stderr);
+    assert!(diagnostics.contains("E1109"), "diagnostics: {diagnostics}");
+    fs::remove_dir_all(root).expect("remove private bridge project");
+}

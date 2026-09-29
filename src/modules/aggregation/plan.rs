@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Program, TopLevelDecl};
+use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 
 use super::super::resolver::ModuleResolver;
 use super::types::ModuleError;
@@ -156,6 +156,24 @@ fn append_public_declarations(target: &mut Vec<TopLevelDecl>, unit: &ModuleUnit)
                 let Some((kind, name)) = export_identity(declaration) else { return false };
                 unit.exports().contains(kind, &name)
             })
-            .cloned(),
+            .map(caller_declaration),
     );
+}
+
+fn caller_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
+    match declaration {
+        TopLevelDecl::Verb(verb) => TopLevelDecl::ExternalVerb(ExternalVerbDecl {
+            is_open: verb.is_open,
+            doc: verb.doc.clone(),
+            unsafe_boundary: false,
+            abi: ForeignAbi::C,
+            metadata: verb.metadata.clone(),
+            name: verb.name.clone(),
+            generic_parameters: verb.generic_parameters.clone(),
+            params: verb.params.clone(),
+            return_type: verb.return_type.clone(),
+            span: verb.span,
+        }),
+        _ => declaration.clone(),
+    }
 }

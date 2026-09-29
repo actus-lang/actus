@@ -66,7 +66,15 @@ fn compilation_plan_deduplicates_repeated_module_imports() {
         plan.caller()
             .declarations
             .iter()
-            .filter(|declaration| matches!(declaration, actus::ast::TopLevelDecl::Verb(verb) if verb.name == "add"))
+            .filter(|declaration| {
+                matches!(
+                    declaration,
+                    actus::ast::TopLevelDecl::Verb(verb) if verb.name == "add"
+                ) || matches!(
+                    declaration,
+                    actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "add"
+                )
+            })
             .count(),
         1
     );
