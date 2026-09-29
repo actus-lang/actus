@@ -76,5 +76,11 @@ pub(super) fn range(source: &str, span: SourceSpan) -> LspRange {
 }
 
 pub(super) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    uri.strip_prefix("file://").map(PathBuf::from)
+    let path = uri.strip_prefix("file://")?;
+    #[cfg(windows)]
+    {
+        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
+    }
+    #[cfg(not(windows))]
+    Some(PathBuf::from(path))
 }
