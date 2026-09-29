@@ -116,10 +116,14 @@ fn analyze_package_module(
             target,
         ),
         None if path.parent() == Some(configuration.source_root()) => {
-            crate::modules::analyze_with_imports_for_target(program, &resolver, target)
+            crate::modules::analyze_with_imports_with_overlays_for_target(
+                program, &resolver, overlays, target,
+            )
         }
         None if is_project_entry_with_imports(&path, program, configuration.project_root()) => {
-            crate::modules::analyze_with_imports_for_target(program, &resolver, target)
+            crate::modules::analyze_with_imports_with_overlays_for_target(
+                program, &resolver, overlays, target,
+            )
         }
         None => return None,
     };

@@ -396,6 +396,19 @@ standard-library conformance, source limits, and diff checks pass.
 
 ## Gate 20.6: Tooling, compatibility, and closure
 
+### Gate 20.6.1: LSP interface-aware overlays
+
+- [x] Keep private sibling declarations available to internal module analysis
+      without exposing them through external completion results.
+- [x] Resolve hover and definition data only from facade-exported symbols for
+      external callers.
+- [x] Rebuild exported interfaces from unsaved sibling overlays for completion,
+      hover, definition, and project-entry diagnostics.
+- [x] Add LSP regression coverage for public export visibility, private bridge
+      hiding, overlay definitions, and project-entry refreshes.
+- [ ] Apply the same scope-aware symbol model to semantic-token classification
+      and generated API metadata.
+
 - [ ] Update LSP completion, hover, definition, semantic tokens, and
       diagnostics to use internal scope only inside a module and public
       interface outside it.
