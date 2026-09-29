@@ -274,16 +274,31 @@ and native resource cleanup.
 ### Clean-checkout acceptance
 
 - [ ] Re-run all Rust quality checks from a clean checkout.
-- [ ] Re-run all Actus strict, semantic, native, and application tests.
-- [ ] Re-run standard-library, package, and lockfile checks.
+- [x] Re-run all Actus strict, semantic, native, and application tests.
+- [x] Re-run standard-library, package, and lockfile checks.
 - [ ] Re-run Linux, macOS, and Windows CI checks.
-- [ ] Re-run coverage and dependency/license policy checks.
-- [ ] Verify source and function size limits and `git diff --check`.
+- [ ] Re-run coverage checks.
+- [x] Re-run dependency and license policy checks.
+- [x] Verify source and function size limits and `git diff --check`.
 
 ### Reproducibility
 
+The local Gate 19.6 acceptance run was executed from a clean working tree
+after commit `b002d55`. `cargo test --all-targets --all-features` passed all
+Rust unit and integration suites, including native applications. The strict
+Actus runner passed 37 tests, standard-library conformance and documentation
+tests passed, `actus lock --check` passed, and source-limit and diff checks
+passed. This is working-tree evidence, not yet a fresh-checkout or
+cross-platform release-candidate result.
+
+`cargo deny check advisories licenses bans sources` passed using an isolated
+Cargo home; advisory, ban, license, and source policies are green. Two
+`--release --emit obj` builds of `examples/hello.act` produced byte-identical
+objects with SHA-256
+`a1c361bcaf8abc697517675f4036f2669a51fc7fb5ce4a30611c4bba0d63cf5f`.
+
 - [ ] Recreate lockfiles from clean workspaces and compare canonical output.
-- [ ] Rebuild release artifacts twice under the same target contract.
+- [x] Rebuild release artifacts twice under the same target contract.
 - [ ] Record compiler version, target, profile, source revision, and artifact
       checksums in the acceptance report.
 - [ ] Ensure the acceptance report contains real command output or linked CI
@@ -313,7 +328,7 @@ and native resource cleanup.
 - [ ] Gates 19.0 through 19.6 are complete.
 - [ ] Phase 16 Gate 6 is complete or all deferrals are explicitly accepted.
 - [ ] Remaining Phase 11 struct items are complete or explicitly deferred.
-- [ ] At least two real Actus applications pass native execution checks.
+- [x] At least two real Actus applications pass native execution checks.
 - [ ] Supported host quality evidence is recorded.
 - [ ] Alpha compatibility and diagnostic policies are published.
 - [ ] A clean checkout reproduces the documented acceptance report.
