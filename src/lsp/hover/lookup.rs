@@ -10,12 +10,13 @@ use crate::semantic::{AccessState, OwnershipState};
 use crate::target::TargetSpec;
 
 use super::super::position::{LineIndex, LspPosition};
+use super::super::uri::file_uri_to_path;
 use super::formatting::{
     block_info, declaration_documentation, declaration_signature, format_markdown, pack_field_info,
     parameter_info, role_name,
 };
 use super::model::SymbolInfo;
-use super::tokens::{file_uri_to_path, identifier_at, operator_at, range};
+use super::tokens::{identifier_at, operator_at, range};
 
 pub(crate) fn find_hover(
     uri: &str,

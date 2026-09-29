@@ -8,6 +8,7 @@ use crate::lexer::scan;
 use crate::parser::parse;
 
 use super::documents::Document;
+use super::uri::file_uri_to_path;
 
 pub(super) const MAX_OPEN_DOCUMENTS: usize = 256;
 pub(super) const MAX_DOCUMENT_BYTES: usize = 1024 * 1024;
@@ -45,10 +46,12 @@ impl WorkspaceModel {
         text: &str,
     ) -> Result<(), String> {
         validate_overlay(document_count, self.overlay_bytes, 0, text.len())?;
-        self.invalidate_dependents(uri_to_path(uri)?.as_path());
+        self.invalidate_dependents(
+            file_uri_to_path(uri).ok_or_else(|| invalid_uri(uri))?.as_path(),
+        );
         self.overlay_bytes += text.len();
         self.generation += 1;
-        self.invalidated.insert(uri_to_path(uri)?);
+        self.invalidated.insert(file_uri_to_path(uri).ok_or_else(|| invalid_uri(uri))?);
         Ok(())
     }
 
@@ -59,17 +62,19 @@ impl WorkspaceModel {
         new_length: usize,
     ) -> Result<(), String> {
         validate_overlay(0, self.overlay_bytes, old_length, new_length)?;
-        self.invalidate_dependents(uri_to_path(uri)?.as_path());
+        self.invalidate_dependents(
+            file_uri_to_path(uri).ok_or_else(|| invalid_uri(uri))?.as_path(),
+        );
         self.overlay_bytes = self.overlay_bytes - old_length + new_length;
         self.generation += 1;
-        self.invalidated.insert(uri_to_path(uri)?);
+        self.invalidated.insert(file_uri_to_path(uri).ok_or_else(|| invalid_uri(uri))?);
         Ok(())
     }
 
     pub(super) fn close(&mut self, uri: &str, old_length: usize) {
         self.overlay_bytes = self.overlay_bytes.saturating_sub(old_length);
         self.generation += 1;
-        if let Ok(path) = uri_to_path(uri) {
+        if let Some(path) = file_uri_to_path(uri) {
             self.invalidate_dependents(&path);
             self.remove_module(&path);
             self.invalidated.insert(path);
@@ -104,7 +109,7 @@ impl WorkspaceModel {
         documents
             .iter()
             .filter_map(|(uri, document)| {
-                uri_to_path(uri).ok().map(|path| (path, document.text.clone()))
+                file_uri_to_path(uri).map(|path| (path, document.text.clone()))
             })
             .collect()
     }
@@ -279,19 +284,10 @@ fn document_for_path<'a>(
     path: &Path,
 ) -> Option<(&'a str, &'a Document)> {
     documents.iter().find_map(|(uri, document)| {
-        (uri_to_path(uri).ok().as_deref() == Some(path)).then_some((uri.as_str(), document))
+        (file_uri_to_path(uri).as_deref() == Some(path)).then_some((uri.as_str(), document))
     })
 }
 
-fn uri_to_path(uri: &str) -> Result<PathBuf, String> {
-    let path =
-        uri.strip_prefix("file://").ok_or_else(|| format!("unsupported document URI `{uri}`"))?;
-    #[cfg(windows)]
-    {
-        Ok(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
-    }
-    #[cfg(not(windows))]
-    {
-        Ok(PathBuf::from(path))
-    }
+fn invalid_uri(uri: &str) -> String {
+    format!("unsupported document URI `{uri}`")
 }

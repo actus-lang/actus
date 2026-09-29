@@ -24,6 +24,7 @@ mod server;
 mod signature_help;
 mod source_queries;
 mod transport;
+mod uri;
 mod workflow;
 mod workspace;
 

@@ -28,11 +28,27 @@ pub(crate) fn temp_root() -> PathBuf {
 
 pub(crate) fn file_uri(path: &Path) -> String {
     let normalized = path.to_string_lossy().replace('\\', "/");
-    if normalized.as_bytes().get(1) == Some(&b':') {
-        format!("file:///{}", normalized.trim_start_matches('/'))
+    let uri_path = if normalized.starts_with("//") {
+        normalized.trim_start_matches('/').to_owned()
+    } else if normalized.as_bytes().get(1) == Some(&b':') {
+        format!("/{}", normalized.trim_start_matches('/'))
+    } else if normalized.starts_with('/') {
+        normalized
     } else {
-        format!("file://{normalized}")
-    }
+        format!("/{normalized}")
+    };
+    format!("file://{}", encode_uri_path(&uri_path))
+}
+
+fn encode_uri_path(path: &str) -> String {
+    path.bytes().fold(String::new(), |mut encoded, byte| {
+        if byte.is_ascii_alphanumeric() || b"-._~/".contains(&byte) || byte == b':' {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+        encoded
+    })
 }
 
 pub(crate) fn run_lsp(messages: Vec<Value>) -> String {

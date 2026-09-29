@@ -7,6 +7,8 @@ mod lsp_diagnostics;
 mod lsp_navigation;
 #[path = "lsp/performance.rs"]
 mod lsp_performance;
+#[path = "lsp/platform.rs"]
+mod lsp_platform;
 #[path = "lsp/protocol.rs"]
 mod lsp_protocol;
 #[path = "lsp/semantic.rs"]

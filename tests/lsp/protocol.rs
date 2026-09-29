@@ -296,6 +296,16 @@ fn lsp_rejects_incompatible_contracts_and_unknown_requests_structurally() {
 }
 
 #[test]
+fn lsp_preserves_compatibility_for_optional_fields_and_malformed_payloads() {
+    let messages =
+        fixture_messages(include_str!("../fixtures/lsp/protocol/compatibility_boundaries.json"));
+    let stdout = run_lsp(messages);
+    assert!(stdout.contains("\"protocolVersion\":1"), "initialize contract missing: {stdout}");
+    assert!(stdout.contains("\"code\":-32601"), "unknown request was accepted: {stdout}");
+    assert!(stdout.contains("\"code\":-32602"), "malformed payload was accepted: {stdout}");
+}
+
+#[test]
 fn lsp_negotiates_supported_capabilities_and_enforces_lifecycle() {
     let messages =
         fixture_messages(include_str!("../fixtures/lsp/protocol/lifecycle_and_capabilities.json"));

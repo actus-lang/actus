@@ -14,6 +14,7 @@ use crate::target::TargetSpec;
 
 use super::position::{LineIndex, LspRange};
 use super::protocol::{LspDiagnostic, LspLocation, LspRelatedInformation};
+use super::uri::{file_uri_to_path, path_to_file_uri};
 
 const MAX_DIAGNOSTICS: usize = 512;
 
@@ -180,16 +181,6 @@ fn path_components(path: &Path) -> Vec<String> {
         .collect()
 }
 
-fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
-    let path = uri.strip_prefix("file://")?;
-    #[cfg(windows)]
-    {
-        Some(PathBuf::from(path.trim_start_matches('/').replace('/', "\\")))
-    }
-    #[cfg(not(windows))]
-    Some(PathBuf::from(path))
-}
-
 fn recovered_parse_diagnostic(source: &str, error: &ParseError) -> Diagnostic {
     let diagnostic = parse_diagnostic(error);
     if matches!(
@@ -232,11 +223,14 @@ fn related_information(
         .unwrap_or_else(|| source.to_owned());
     let related_index = LineIndex::new(&related_source);
     let span = clamp_span(location.span(), related_source.len());
-    let uri = location.source_path().map_or_else(String::new, path_to_uri);
+    let uri =
+        location.source_path().map_or_else(String::new, |path| path_to_file_uri(Path::new(path)));
     LspRelatedInformation {
         location: LspLocation {
             uri: if uri.is_empty() {
-                diagnostic.source_path().map_or_else(String::new, path_to_uri)
+                diagnostic
+                    .source_path()
+                    .map_or_else(String::new, |path| path_to_file_uri(Path::new(path)))
             } else {
                 uri
             },
@@ -246,15 +240,6 @@ fn related_information(
             },
         },
         message: location.message().to_owned(),
-    }
-}
-
-fn path_to_uri(path: &str) -> String {
-    let normalized = path.replace('\\', "/");
-    if normalized.starts_with('/') {
-        format!("file://{normalized}")
-    } else {
-        format!("file:///{normalized}")
     }
 }
 

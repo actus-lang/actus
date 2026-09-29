@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 
 use super::cancellation::CancellationToken;
 use super::documents::DocumentStore;
-use super::module_scope::file_uri_to_path;
 use super::protocol::{LspDiagnostic, ResponseMetadata};
+use super::uri::file_uri_to_path;
 use crate::configuration::CompilerConfiguration;
 use crate::target::TargetSpec;
 

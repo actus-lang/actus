@@ -8,8 +8,8 @@ use crate::semantic::filter_program_for_target;
 use crate::target::TargetSpec;
 
 use super::documents::DocumentStore;
-use super::module_scope::file_uri_to_path;
 use super::position::{LineIndex, LspRange};
+use super::uri::file_uri_to_path;
 
 const MAX_CODE_LENSES: usize = 16;
 

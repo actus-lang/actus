@@ -173,14 +173,14 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.9: Cross-platform and protocol correctness
 
-- [ ] Normalize file URIs, paths, and source locations correctly on Linux,
+- [x] Normalize file URIs, paths, and source locations correctly on Linux,
       macOS, and Windows, including UTF-8/UTF-16 editor positions.
-- [ ] Test CRLF/LF documents, Unicode identifiers and comments, non-ASCII
+- [x] Test CRLF/LF documents, Unicode identifiers and comments, non-ASCII
       paths, drive prefixes, UNC paths, and case-sensitive module resolution.
-- [ ] Run the complete LSP contract suite on all supported host platforms.
-- [ ] Verify that target-specific features never silently fall back to host
+- [x] Run the complete LSP contract suite on all supported host platforms.
+- [x] Verify that target-specific features never silently fall back to host
       runtime behavior.
-- [ ] Add protocol compatibility fixtures for old schema versions, missing
+- [x] Add protocol compatibility fixtures for old schema versions, missing
       optional capabilities, malformed client payloads, and unknown requests.
 
 ### Gate 17.0.10: Production verification
