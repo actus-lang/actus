@@ -165,8 +165,10 @@ contracts that the future platform is allowed to consume.
 ### Runtime boundaries
 
 - [x] Verify every public fallible I/O operation returns a typed Actus result.
-- [ ] Verify raw POSIX, Windows, and linker statuses remain private to runtime
-      bridges.
+- [deferred] Verify raw POSIX, Windows, and linker statuses remain private to
+      runtime bridges. Deferred to Phase 20 Gate 20.3 and Gate 20.4, where
+      module-internal scope and facade-bounded visibility will be implemented
+      under ADR-0047.
 - [x] Verify C-ABI status contracts use documented explicit values.
 - [x] Verify no hidden allocation is introduced in zero-allocation contracts.
 - [x] Verify ownership restoration across runtime failures and early returns.
@@ -193,7 +195,7 @@ contracts that the future platform is allowed to consume.
 - [x] Platform-specific claims have command output or native execution evidence
       for the verified Linux host slice.
 - [x] Failure behavior is deterministic and diagnostically actionable.
-- [ ] No host-specific workaround is hidden in shared compiler layers.
+- [x] No host-specific workaround is hidden in shared compiler layers.
 
 The initial runtime boundary slice is covered by the explicit null-handle
 failure matrix in `tests/runtime_failure_matrix.rs`. The Linux host slice was
@@ -213,6 +215,20 @@ The public fallible standard-library surface is audited by
 performance method returns `Result` or `Option`, while explicitly infallible
 constructors, predicates, configuration helpers, and drop operations remain
 value- or unit-returning by contract.
+
+Raw platform and linker status privacy is explicitly deferred to Phase 20.
+The current flattened module-import representation cannot both keep private
+runtime bridges available to standard-library wrappers and hide them from
+external Actus callers. ADR-0047 defines the required module compilation-unit
+and public-interface split; Gate 19.4 must not claim this invariant until that
+work is implemented and tested.
+
+Target selection is covered by
+`tests/target.rs::target_contracts_select_platform_behavior_without_host_cfg_branches`.
+The test verifies Linux, macOS, Windows MSVC, Windows GNU, and freestanding
+target contracts through `TargetSpec`, including linker flavor, entry contract,
+and platform selectors. Shared compiler target behavior is therefore derived
+from the target contract rather than from the host operating system.
 
 Native ownership restoration after a typed failure is covered by
 `tests/buffer_cli.rs::restores_an_ins_buffer_after_a_typed_failure_return`.
