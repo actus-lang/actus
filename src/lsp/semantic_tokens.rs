@@ -26,6 +26,22 @@ fn token_type(tokens: &[crate::lexer::Token], index: usize) -> Option<u32> {
         return Some(6);
     }
     if let TokenKind::Identifier(name) = kind {
+        if matches!(
+            name.as_str(),
+            "Int"
+                | "Bool"
+                | "Char"
+                | "String"
+                | "Buffer"
+                | "Array"
+                | "Arena"
+                | "Option"
+                | "Result"
+                | "Map"
+                | "Usize"
+        ) {
+            return Some(0);
+        }
         if matches!(name.as_str(), "layout" | "fields" | "storage" | "at" | "little" | "big") {
             return Some(6);
         }
@@ -47,6 +63,7 @@ fn token_type(tokens: &[crate::lexer::Token], index: usize) -> Option<u32> {
         TokenKind::Abs => Some(3),
         TokenKind::Dat => Some(4),
         TokenKind::Ins => Some(5),
+        TokenKind::As => Some(9),
         _ => None,
     }
 }

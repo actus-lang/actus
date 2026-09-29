@@ -180,6 +180,27 @@ fn lsp_exposes_gate_36_primitives_in_hover_completion_and_tokens() {
 }
 
 #[test]
+fn lsp_exposes_gate_7_and_gate_8_indexing_and_casts() {
+    let uri = "file:///tmp/actus-lsp-gate8.act";
+    let source = "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); erg index: Usize = 0; erg bytes: Buffer = Buffer[0]; append(bytes, 41); erg byte_index: u8 = 0; return (values[index] as Int) + (bytes[byte_index] as Int); }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"label\":\"Array\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"Arena\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"Result\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"Usize\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"as\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"operator\""), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_exposes_pack_registers_in_hover_completion_and_tokens() {
     let uri = "file:///tmp/actus-lsp-pack.act";
     let source = "pack ControlRegister { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs ready: u1 at 1; abs _reserved: u30 at 2 = 0; } }\n";
