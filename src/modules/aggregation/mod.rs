@@ -1,5 +1,6 @@
 mod analysis;
 mod exports;
+mod identity;
 mod parsing;
 mod plan;
 mod signature_visibility;
@@ -14,6 +15,7 @@ pub use analysis::{
     resolve_imports,
 };
 pub use exports::exports_module;
+pub use identity::ModuleNamespace;
 pub use parsing::parse_module;
 pub use plan::{ModuleCompilationPlan, build_compilation_plan};
 pub use types::{DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation};

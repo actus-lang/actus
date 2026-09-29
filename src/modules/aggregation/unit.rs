@@ -7,17 +7,23 @@ use crate::parser::parse;
 
 use super::super::resolver::ModuleResolver;
 use super::exports::exports_module;
+use super::identity::ModuleNamespace;
 use super::parsing::parse_module;
 use super::signature_visibility::validate_exported_signatures;
 use super::types::{ModuleError, ModuleExports};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleIdentity {
+    namespace: ModuleNamespace,
     module_path: String,
     source_key: String,
 }
 
 impl ModuleIdentity {
+    pub fn namespace(&self) -> &ModuleNamespace {
+        &self.namespace
+    }
+
     pub fn module_path(&self) -> &str {
         &self.module_path
     }
@@ -95,8 +101,10 @@ pub fn load_module_unit(
     let sources = load_sources(resolved.facade(), resolved.siblings())?;
     let source_key =
         sources.iter().map(|source| normalize(source.path())).collect::<Vec<_>>().join("|");
+    let namespace =
+        ModuleNamespace::from_module_path(module_path).map_err(ModuleError::Resolution)?;
     let unit = ModuleUnit {
-        identity: ModuleIdentity { module_path: module_path.to_owned(), source_key },
+        identity: ModuleIdentity { namespace, module_path: module_path.to_owned(), source_key },
         facade: resolved.facade().to_owned(),
         sources,
         implementation,

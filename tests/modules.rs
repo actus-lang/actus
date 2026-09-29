@@ -6,6 +6,8 @@ mod baseline;
 mod compilation_unit;
 #[path = "modules/facade.rs"]
 mod facade;
+#[path = "modules/identity.rs"]
+mod identity;
 #[path = "modules/imports.rs"]
 mod imports;
 #[path = "modules/plan.rs"]

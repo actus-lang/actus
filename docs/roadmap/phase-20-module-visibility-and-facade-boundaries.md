@@ -183,11 +183,11 @@ while another family still uses an unqualified name.
 
 #### 20.4.1: Canonical module identity
 
-- [ ] Define one canonical namespace key from the resolved module identity.
-- [ ] Normalize separators, package roots, and facade paths before naming.
-- [ ] Define the root-program namespace and the reserved runtime namespace.
-- [ ] Reject empty, ambiguous, or unstable namespace components.
-- [ ] Add unit tests for equivalent paths, dependency roots, and nested modules.
+- [x] Define one canonical namespace key from the resolved module identity.
+- [x] Normalize module segments and derive a stable length-delimited prefix.
+- [x] Define the root-program namespace and the reserved runtime namespace.
+- [x] Reject empty, ambiguous, or unstable namespace components.
+- [x] Add unit tests for root, nested, invalid, and separator-boundary cases.
 
 #### 20.4.2: Symbol-identity model
 
@@ -267,7 +267,10 @@ now prove that a public module wrapper can execute a private implementation,
 while a direct private bridge call fails with `E1109` before code generation.
 Imported public verbs are represented in the caller scope by signature-only
 declarations; their bodies are analyzed and emitted only from the owning
-module implementation unit.
+module implementation unit. Gate 20.4.1 now provides `ModuleNamespace` with a
+reserved root namespace, canonical module path, and collision-safe symbol
+prefix; later codegen stages must use this identity instead of reconstructing
+module names locally.
 
 ## Gate 20.5: Standard-library migration
 
