@@ -191,14 +191,15 @@ while another family still uses an unqualified name.
 
 #### 20.4.2: Symbol-identity model
 
-- [ ] Add a codegen-only symbol identity type carrying namespace, declaration
+- [x] Add a codegen-only symbol identity type carrying namespace, declaration
       kind, source name, and generic specialization identity.
-- [ ] Define escaping for identifiers and separators without collisions.
-- [ ] Define stable identities for verbs, external bridges, structs, packs,
+- [x] Define escaping for identifiers and separators without collisions.
+- [x] Define stable identities for verbs, external bridges, structs, packs,
       enums, roles, performances, vtables, layouts, and generated data.
-- [ ] Make symbol construction pure and independent of declaration order.
-- [ ] Replace the current collision-only guard with identity-based validation.
-- [ ] Add accepted and rejected collision tests for every declaration family.
+- [x] Make symbol construction pure and independent of declaration order.
+- [x] Add identity-based duplicate validation through a deterministic registry.
+- [x] Add accepted and rejected identity tests across declaration families and
+      generic specializations.
 
 #### 20.4.3: Frontend-to-codegen symbol propagation
 
@@ -270,7 +271,11 @@ declarations; their bodies are analyzed and emitted only from the owning
 module implementation unit. Gate 20.4.1 now provides `ModuleNamespace` with a
 reserved root namespace, canonical module path, and collision-safe symbol
 prefix; later codegen stages must use this identity instead of reconstructing
-module names locally.
+module names locally. Gate 20.4.2 now provides a codegen-only
+`SymbolIdentity`/`SymbolRegistry` model with declaration-family tags,
+collision-free escaping, generic specialization keys, and declaration-order
+independent duplicate validation. The model is not yet wired into emission;
+that is the explicit scope of Gate 20.4.3.
 
 ## Gate 20.5: Standard-library migration
 
