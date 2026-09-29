@@ -213,6 +213,7 @@ impl Analyzer {
                             | OwnershipState::Dropped
                     )
             }
+            Expr::Index { .. } => self.is_readable_owner(expression),
             Expr::Borrow { expression, .. } => self.is_readable_owner(expression),
             _ => false,
         }
@@ -239,6 +240,7 @@ impl Analyzer {
         let (name, span) = match expression {
             Expr::Identifier { name, span } => (name, span),
             Expr::FieldAccess { object, .. } => return self.root_binding_index(object),
+            Expr::Index { target, .. } => return self.root_binding_index(target),
             Expr::Borrow { expression, .. } => return self.root_binding_index(expression),
             _ => return None,
         };

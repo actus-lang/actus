@@ -30,6 +30,44 @@ fn accepts_explicit_ins_call_and_restores_the_owner() {
 }
 
 #[test]
+fn accepts_abs_and_ins_indexed_slot_views() {
+    analyze_source(
+        "verb inspect_slot(abs slot: Int) { } verb mutate_slot(ins slot: Int) { } verb main(erg values: Array[Int, 4]) { inspect_slot(slot: abs values[1]); mutate_slot(slot: ins values[2]); inspect_slot(slot: abs values[3]); }",
+    )
+    .expect("indexed abs and ins views should preserve the array owner");
+}
+
+#[test]
+fn restores_array_access_after_an_indexed_ins_loan() {
+    let model = analyze_source(
+        "verb mutate_slot(ins slot: Int) { } verb main(erg values: Array[Int, 4]) { mutate_slot(slot: ins values[2]); values[2] = 7; }")
+        .expect("the array should become mutable after the slot loan returns");
+    let values = model.bindings.iter().find(|binding| binding.name == "values").unwrap();
+    assert_eq!(values.access, AccessState::Mutable);
+    assert_eq!(values.ownership, OwnershipState::Active);
+}
+
+#[test]
+fn rejects_aliasing_indexed_slot_loans_from_one_array() {
+    let error = analyze_source(
+        "verb merge_slots(ins left: Int, ins right: Int) { } verb main(erg values: Array[Int, 4]) { merge_slots(left: ins values[0], right: ins values[1]); }")
+        .expect_err("two exclusive indexed slots from one array must not alias");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ExclusiveLoanAlias { name } if name == "values")
+    );
+}
+
+#[test]
+fn rejects_ins_indexed_slot_from_abs_array() {
+    let error = analyze_source(
+        "verb mutate_slot(ins slot: Int) { } verb main(abs values: Array[Int, 4]) { mutate_slot(slot: ins values[0]); }")
+        .expect_err("an abs array cannot provide an exclusive indexed slot");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidArgumentRole { parameter, .. } if parameter == "slot")
+    );
+}
+
+#[test]
 fn allows_nested_ins_forwarding() {
     analyze_source(
         "verb inner(ins buffer: Buffer) { } verb outer(ins buffer: Buffer) { inner(buffer: ins buffer); }",

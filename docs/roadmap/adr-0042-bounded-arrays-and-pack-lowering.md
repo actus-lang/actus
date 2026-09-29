@@ -43,12 +43,12 @@ complete.
 
 ## Gate 3: Ownership and slot loans
 
-- [ ] Define `abs array[index]` as a read-only, non-escaping slot view.
-- [ ] Define `ins array[index]` as an exclusive call-scope slot loan.
-- [ ] Preserve array provenance through slot views and nested calls.
-- [ ] Reject slot aliasing, escaping views, relocation, and drop while loaned.
-- [ ] Prove that slot loans do not copy the complete array.
-- [ ] Add ownership transition and cleanup tests for success and early exit.
+- [x] Define `abs array[index]` as a read-only, non-escaping slot view.
+- [x] Define `ins array[index]` as an exclusive call-scope slot loan.
+- [x] Preserve array provenance through slot views and nested calls.
+- [x] Reject slot aliasing, escaping views, relocation, and drop while loaned.
+- [x] Prove that slot loans do not copy the complete array.
+- [x] Add ownership transition and cleanup tests for success and early exit.
 
 ## Gate 4: Cranelift native pack lowering
 
