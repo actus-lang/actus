@@ -31,6 +31,16 @@ the form `Pattern if condition => body`. The current lexer also recognizes the
 implemented punctuation and operators, including `->`, `=>`, comparisons,
 equality, `!`, arithmetic operators, and field access with `.`.
 
+Relational operators are `<`, `<=`, `>`, and `>=`. They bind below arithmetic
+operators and produce `Bool`. The operands must belong to the same numeric
+family: signed integers, unsigned integers (including `Usize`), or the same
+floating-point width. Signed and unsigned values, or integers and floats, are
+not implicitly converted for comparison.
+
+`print(abs text: Buffer)` is length-aware: it writes exactly the Buffer's live
+length, including embedded zero bytes, and does not require a trailing null
+terminator. String output retains its separate text ABI.
+
 `for` is reserved by the lexer but has no parser construct. `else`, `while`,
 and `in` are not active language constructs. `self` remains an identifier; a
 receiver role is expressed by an ordinary parameter in the current syntax.

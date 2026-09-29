@@ -20,7 +20,7 @@
 - [x] Lower signed integer comparisons with signed Cranelift conditions.
 - [x] Lower unsigned integer comparisons with unsigned Cranelift conditions.
 - [x] Lower floating-point comparisons with `fcmp`.
-- [ ] Add native execution tests for all operator families.
+- [x] Add native execution tests for all operator families.
 
 ## Gate 4: Nested loop-control CFG
 
@@ -37,6 +37,23 @@
 
 ## Gate 6: Quality and documentation closure
 
-- [ ] Update public language and runtime documentation.
-- [ ] Run formatting, compilation, clippy, native tests, source limits, and diff checks.
-- [ ] Close all ADR-0043 invariants with recorded command output.
+- [x] Update public language and runtime documentation.
+- [x] Run formatting, compilation, clippy, native tests, source limits, and diff checks.
+- [x] Close all ADR-0043 invariants with recorded command output.
+
+## Verification evidence
+
+The closure checks completed successfully on the ADR-0043 branch:
+
+```text
+cargo fmt --all -- --check                              passed
+cargo check --all-targets --all-features                passed
+cargo clippy --all-targets --all-features -- -D warnings passed
+cargo test --all-targets --all-features                  passed
+scripts/check_source_limits.sh                           passed
+git diff --check                                         passed
+```
+
+Native execution coverage includes signed integer, unsigned integer, and
+floating-point relational comparisons. Runtime output coverage verifies exact
+Buffer length and embedded zero bytes.
