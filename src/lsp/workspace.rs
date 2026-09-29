@@ -263,6 +263,7 @@ fn module_files(path: &Path, source_root: &Path) -> (Option<PathBuf>, Vec<PathBu
         .ok()
         .into_iter()
         .flat_map(|entries| entries.filter_map(Result::ok).map(|entry| entry.path()))
+        .take(MAX_MODULE_SIBLINGS)
         .filter(|candidate| candidate.extension().and_then(|ext| ext.to_str()) == Some("act"))
         .filter(|candidate| Some(candidate) != facade.as_ref())
         .collect::<Vec<_>>();
@@ -270,7 +271,6 @@ fn module_files(path: &Path, source_root: &Path) -> (Option<PathBuf>, Vec<PathBu
         siblings.clear();
     }
     siblings.sort();
-    siblings.truncate(MAX_MODULE_SIBLINGS);
     (facade, siblings)
 }
 

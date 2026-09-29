@@ -3,28 +3,39 @@ use std::path::PathBuf;
 
 use serde_json::json;
 
+use super::cancellation::CancellationToken;
+use super::documents::DocumentStore;
 use super::position::{LineIndex, LspPosition};
+use super::query_cache::ParseSnapshot;
 use crate::ast::TopLevelDecl;
 use crate::lexer::{SourceSpan, TokenKind, scan};
-use crate::parser::parse;
 use crate::target::TargetSpec;
+
+pub(super) struct Context<'a> {
+    pub(super) target: &'a TargetSpec,
+    pub(super) document_version: Option<i64>,
+    pub(super) store: &'a DocumentStore,
+    pub(super) cancellation: Option<&'a CancellationToken>,
+}
 
 pub(super) fn items(
     uri: &str,
     source: Option<&str>,
     overlays: &HashMap<PathBuf, String>,
     position: Option<&LspPosition>,
-    target: &TargetSpec,
-    document_version: Option<i64>,
+    context: Context<'_>,
 ) -> serde_json::Value {
+    if context.cancellation.is_some_and(CancellationToken::checkpoint) {
+        return serde_json::Value::Array(Vec::new());
+    }
     let mut labels = builtin_labels();
     let mut semantic_items = Vec::new();
     labels.extend((1..=128).map(|width| format!("u{width}")));
     labels.extend((1..=128).map(|width| format!("i{width}")));
-    if let Some(source) = source
-        && let Ok(program) = parse(scan(source).0)
+    if source.is_some()
+        && let Some(ParseSnapshot::Valid(program)) = context.store.parse_snapshot(uri)
     {
-        let program = crate::semantic::filter_program_for_target(&program, target);
+        let program = crate::semantic::filter_program_for_target(&program, context.target);
         labels.extend(super::module_scope::internal_symbols(&program));
         labels.extend(super::module_scope::imported_public_symbols(uri, &program, overlays));
         semantic_items.extend(binding_items(&program));
@@ -45,7 +56,7 @@ pub(super) fn items(
                 "label": label,
                 "kind": 25,
                 "detail": "Actus symbol",
-                "data": {"uri": uri, "symbol": label, "version": document_version},
+                "data": {"uri": uri, "symbol": label, "version": context.document_version},
             });
             if let Some(range) = replacement.clone() {
                 item["textEdit"] = json!({"range": range, "newText": item["label"]});

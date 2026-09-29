@@ -3,6 +3,7 @@ use serde_json::Value;
 pub(super) const MAX_COMPLETION_ITEMS: usize = 512;
 pub(super) const MAX_SEMANTIC_TOKEN_VALUES: usize = 100_000;
 pub(super) const MAX_HOVER_BYTES: usize = 64 * 1024;
+pub(super) const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 
 pub(super) fn truncate_array(mut result: Value, limit: usize) -> (Value, bool) {
     let Some(items) = result.as_array_mut() else { return (result, false) };

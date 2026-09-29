@@ -158,17 +158,17 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.8: Performance, cancellation, and bounded behavior
 
-- [ ] Introduce a query-oriented cache boundary so repeated requests reuse
+- [x] Introduce a query-oriented cache boundary so repeated requests reuse
       parsed and analyzed data without stale cross-version results.
-- [ ] Propagate cancellation through parsing, module aggregation, semantic
+- [x] Propagate cancellation through parsing, module aggregation, semantic
       analysis, indexing, formatting, and result serialization.
-- [ ] Debounce only at the editor/client boundary; compiler queries themselves
+- [x] Debounce only at the editor/client boundary; compiler queries themselves
       must remain deterministic and independently testable.
-- [ ] Enforce bounded workspace traversal, symbol indexing, diagnostics,
+- [x] Enforce bounded workspace traversal, symbol indexing, diagnostics,
       completion items, hover payloads, and serialized responses.
-- [ ] Add large-workspace benchmarks and regression thresholds for latency,
+- [x] Add large-workspace benchmarks and regression thresholds for latency,
       memory, cancellation completion, and cache invalidation.
-- [ ] Verify that partial or timed-out results are explicitly labeled and never
+- [x] Verify that partial or timed-out results are explicitly labeled and never
       presented as complete semantic facts.
 
 ### Gate 17.0.9: Cross-platform and protocol correctness

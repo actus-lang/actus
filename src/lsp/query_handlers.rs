@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use serde_json::{Value, json};
 
 use super::cancellation::CancellationToken;
-use super::completion::items;
+use super::completion::{Context as CompletionContext, items};
 use super::definition::find_definition;
 use super::documents::DocumentStore;
 use super::formatting::format_document;
@@ -16,9 +16,8 @@ use super::query_bounds::{
     MAX_COMPLETION_ITEMS, MAX_HOVER_BYTES, MAX_SEMANTIC_TOKEN_VALUES, truncate_array,
     truncate_array_preserving_edges, truncate_text,
 };
+use super::query_cache::ParseSnapshot;
 use super::semantic_tokens::full as semantic_tokens;
-use crate::lexer::scan;
-use crate::parser::parse;
 use crate::target::TargetSpec;
 
 pub(super) fn completion(
@@ -58,15 +57,16 @@ pub(super) fn completion(
             source,
             &overlays,
             position.as_ref(),
-            target,
-            document_version,
+            CompletionContext { target, document_version, store, cancellation },
         ),
         MAX_COMPLETION_ITEMS,
     );
     if partial {
         metadata.result_state = "partial";
     }
-    if source.is_some_and(|text| parse(scan(text).0).is_err()) {
+    if source.is_some_and(|_| {
+        matches!(store.parse_snapshot(uri.unwrap_or_default()), Some(ParseSnapshot::Invalid) | None)
+    }) {
         metadata.result_state = "partial";
     }
     super::server::respond(output, id, result, metadata, cancellation)
@@ -221,7 +221,8 @@ pub(super) fn formatting(
         metadata.result_state = "stale";
         return super::server::respond(output, id, serde_json::json!([]), metadata, cancellation);
     }
-    let source_is_valid = parse(scan(&document.text).0).is_ok();
+    let source_is_valid =
+        matches!(store.parse_snapshot(&params.text_document.uri), Some(ParseSnapshot::Valid(_)));
     let edits = format_document(&document.text)
         .map(|(range, new_text)| vec![TextEdit { range, new_text }])
         .unwrap_or_default();
@@ -255,7 +256,8 @@ pub(super) fn range_formatting(
         metadata.result_state = "stale";
         return super::server::respond(output, id, json!([]), metadata, cancellation);
     }
-    let source_is_valid = parse(scan(&document.text).0).is_ok();
+    let source_is_valid =
+        matches!(store.parse_snapshot(&params.text_document.uri), Some(ParseSnapshot::Valid(_)));
     let edits = format_range(&document.text, &params.range)
         .map(|(range, new_text)| vec![TextEdit { range, new_text }])
         .unwrap_or_default();

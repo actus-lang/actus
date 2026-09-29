@@ -35,6 +35,13 @@ pub(super) fn dispatch(
         metadata.result_state = "stale";
         return super::server::respond(output, id, Value::Null, metadata, cancellation);
     }
-    let result = super::semantic_model::query(uri, &document.text, store, target);
+    if cancellation.is_some_and(CancellationToken::checkpoint) {
+        metadata.result_state = "partial";
+        return super::server::respond(output, id, Value::Null, metadata, cancellation);
+    }
+    let result = super::semantic_model::query(uri, &document.text, store, target, cancellation);
+    if cancellation.is_some_and(CancellationToken::checkpoint) {
+        metadata.result_state = "partial";
+    }
     super::server::respond(output, id, result, metadata, cancellation)
 }

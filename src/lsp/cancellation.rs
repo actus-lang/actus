@@ -36,6 +36,10 @@ impl CancellationToken {
     pub(super) fn is_canceled(&self) -> bool {
         self.registry.canceled.lock().map(|canceled| canceled.contains(&self.key)).unwrap_or(true)
     }
+
+    pub(super) fn checkpoint(&self) -> bool {
+        self.is_canceled()
+    }
 }
 
 impl Drop for CancellationToken {

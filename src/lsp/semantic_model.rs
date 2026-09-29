@@ -1,24 +1,46 @@
 use serde_json::{Value, json};
 
 use crate::ast::{MetaAttribute, Program, TopLevelDecl, TypeName, primitive_type};
-use crate::lexer::{SourceSpan, scan};
-use crate::parser::parse;
+use crate::lexer::SourceSpan;
 use crate::semantic::{
     AccessState, CleanupAction, OwnershipState, SemanticModel, analyze, filter_program_for_target,
 };
 use crate::target::{EntryContract, TargetSpec};
 
+use super::cancellation::CancellationToken;
 use super::documents::DocumentStore;
 use super::position::{LineIndex, LspRange};
+use super::query_cache::ParseSnapshot;
 
 /// Builds the compiler-owned semantic snapshot exposed by `actus/semanticModel`.
-pub(super) fn query(uri: &str, source: &str, store: &DocumentStore, target: &TargetSpec) -> Value {
-    let tokens = scan(source).0;
-    let Ok(program) = parse(tokens) else { return json!({"state":"invalid","facts":[]}) };
+pub(super) fn query(
+    uri: &str,
+    source: &str,
+    store: &DocumentStore,
+    target: &TargetSpec,
+    cancellation: Option<&CancellationToken>,
+) -> Value {
+    if cancellation.is_some_and(CancellationToken::checkpoint) {
+        return json!({"state":"partial","reason":"canceled","facts":[]});
+    }
+    let version = store.get(uri).map(|document| document.version).unwrap_or_default();
+    let target_name = target.triple().to_string();
+    if let Some(result) = store.cached_semantic(uri, &target_name, version) {
+        return result;
+    }
+    let Some(ParseSnapshot::Valid(program)) = store.parse_snapshot(uri) else {
+        return json!({"state":"invalid","facts":[]});
+    };
+    if cancellation.is_some_and(CancellationToken::checkpoint) {
+        return json!({"state":"partial","reason":"canceled","facts":[]});
+    }
     let target_program = filter_program_for_target(&program, target);
     let Ok(model) = analyze(&target_program) else { return json!({"state":"invalid","facts":[]}) };
+    if cancellation.is_some_and(CancellationToken::checkpoint) {
+        return json!({"state":"partial","reason":"canceled","facts":[]});
+    }
     let index = LineIndex::new(source);
-    json!({
+    let result = json!({
         "state": "available",
         "document": {"uri": uri, "version": store.get(uri).map(|document| document.version)},
         "target": target_capabilities(target),
@@ -28,7 +50,9 @@ pub(super) fn query(uri: &str, source: &str, store: &DocumentStore, target: &Tar
         "cleanup": cleanup(source, &index, &model),
         "packs": packs(source, &index, &target_program),
         "declarations": declarations(source, &index, &program, target),
-    })
+    });
+    store.cache_semantic(uri, &target_name, version, result.clone());
+    result
 }
 
 fn bindings(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {

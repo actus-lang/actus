@@ -12,6 +12,7 @@ use super::protocol::{
     PublishDiagnosticsParams, Request, Response, ResponseMetadata,
 };
 use super::protocol_contract::{SessionState, response_metadata};
+use super::query_bounds::MAX_RESPONSE_BYTES;
 use super::request_dispatch::{dispatch_request, is_expensive};
 use super::transport::{spawn_reader, write_message};
 use crate::target::TargetSpec;
@@ -212,11 +213,20 @@ pub(super) fn respond(
     if cancellation.is_some_and(CancellationToken::is_canceled) {
         return write_error(output, id, -32800, "request canceled".to_owned(), actus);
     }
-    write_message(
-        output,
-        &serde_json::to_value(Response { jsonrpc: "2.0", id, result, actus })
-            .map_err(invalid_params)?,
-    )
+    let fallback_metadata = ResponseMetadata { result_state: "partial", ..actus.clone() };
+    let response = serde_json::to_value(Response { jsonrpc: "2.0", id, result, actus })
+        .map_err(invalid_params)?;
+    let encoded = serde_json::to_vec(&response).map_err(invalid_params)?;
+    if encoded.len() > MAX_RESPONSE_BYTES {
+        return write_error(
+            output,
+            response["id"].clone(),
+            -32801,
+            format!("response exceeds {MAX_RESPONSE_BYTES} byte limit"),
+            fallback_metadata,
+        );
+    }
+    write_message(output, &response)
 }
 
 pub(super) fn write_error(
@@ -228,7 +238,7 @@ pub(super) fn write_error(
 ) -> io::Result<()> {
     let result_state = match code {
         -32601 => "unsupported",
-        -32800 => "partial",
+        -32800 | -32801 => "partial",
         _ => "invalid",
     };
     let actus = ResponseMetadata { result_state, ..actus };

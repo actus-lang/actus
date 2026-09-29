@@ -15,6 +15,8 @@ use crate::target::TargetSpec;
 use super::position::{LineIndex, LspRange};
 use super::protocol::{LspDiagnostic, LspLocation, LspRelatedInformation};
 
+const MAX_DIAGNOSTICS: usize = 512;
+
 /// Analyzes one document and converts the shared diagnostic model to LSP values.
 ///
 /// `uri` identifies the document, `source` is the current document text, and
@@ -41,6 +43,7 @@ pub fn analyze_document_for_target(
     diagnostics
         .into_iter()
         .map(|diagnostic| to_lsp_diagnostic(source, &index, &diagnostic))
+        .take(MAX_DIAGNOSTICS)
         .collect()
 }
 

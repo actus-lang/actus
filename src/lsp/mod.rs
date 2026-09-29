@@ -13,6 +13,7 @@ mod progress;
 mod protocol;
 mod protocol_contract;
 mod query_bounds;
+mod query_cache;
 mod query_handlers;
 mod rename;
 mod request_dispatch;

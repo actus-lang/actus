@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 use super::position::{LspRange, byte_range};
+use super::query_cache::{ParseSnapshot, QueryCache};
 use super::workspace::{MAX_DOCUMENT_BYTES, MAX_OPEN_DOCUMENTS, WorkspaceModel};
 use crate::target::TargetSpec;
 
@@ -15,6 +16,7 @@ pub struct Document {
 pub struct DocumentStore {
     documents: BTreeMap<String, Document>,
     workspace: WorkspaceModel,
+    cache: std::cell::RefCell<QueryCache>,
 }
 
 impl DocumentStore {
@@ -31,6 +33,7 @@ impl DocumentStore {
                 ));
             }
             self.workspace.replace(&uri, old_length, text.len())?;
+            self.cache.borrow_mut().invalidate(&uri);
         } else {
             if self.documents.len() >= MAX_OPEN_DOCUMENTS {
                 return Err(format!("workspace has more than {MAX_OPEN_DOCUMENTS} open documents"));
@@ -44,6 +47,7 @@ impl DocumentStore {
 
     pub fn close(&mut self, uri: &str) {
         if let Some(document) = self.documents.remove(uri) {
+            self.cache.borrow_mut().invalidate(uri);
             self.workspace.close(uri, document.text.len());
             self.workspace.refresh(&self.documents);
         }
@@ -74,6 +78,7 @@ impl DocumentStore {
             }
         }
         self.workspace.replace(uri, document.text.len(), updated_text.len())?;
+        self.cache.borrow_mut().invalidate(uri);
         let document = self.documents.get_mut(uri).expect("document checked above");
         document.text = updated_text;
         document.version = version;
@@ -99,6 +104,30 @@ impl DocumentStore {
 
     pub fn source_overlays(&self) -> HashMap<PathBuf, String> {
         self.workspace.overlays(&self.documents)
+    }
+
+    pub(super) fn parse_snapshot(&self, uri: &str) -> Option<ParseSnapshot> {
+        let document = self.documents.get(uri)?;
+        Some(self.cache.borrow_mut().parse(uri, document.version, &document.text))
+    }
+
+    pub(super) fn cached_semantic(
+        &self,
+        uri: &str,
+        target: &str,
+        version: i64,
+    ) -> Option<serde_json::Value> {
+        self.cache.borrow().semantic(uri, target, version)
+    }
+
+    pub(super) fn cache_semantic(
+        &self,
+        uri: &str,
+        target: &str,
+        version: i64,
+        result: serde_json::Value,
+    ) {
+        self.cache.borrow_mut().store_semantic(uri, target, version, result);
     }
 }
 
