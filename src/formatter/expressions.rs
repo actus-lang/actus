@@ -16,7 +16,7 @@ impl Formatter {
             }
             Expr::StringLiteral { value, .. } => self.string_literal(value),
             Expr::Grouping { expression, .. } => self.grouping(expression),
-            Expr::Unary { expression, .. } => self.unary(expression),
+            Expr::Unary { operator, expression, .. } => self.unary(operator, expression),
             Expr::Cast { expression, target, .. } => {
                 self.expression(expression);
                 self.output.push_str(" as ");
@@ -58,8 +58,12 @@ impl Formatter {
         self.output.push(')');
     }
 
-    fn unary(&mut self, expression: &Expr) {
-        self.output.push('-');
+    fn unary(&mut self, operator: &crate::ast::UnaryOp, expression: &Expr) {
+        self.output.push_str(match operator {
+            crate::ast::UnaryOp::Negate => "-",
+            crate::ast::UnaryOp::LogicalNot => "!",
+            crate::ast::UnaryOp::BitwiseNot => "~",
+        });
         self.expression(expression);
     }
 
@@ -70,10 +74,20 @@ impl Formatter {
             crate::ast::BinaryOp::Subtract => " - ",
             crate::ast::BinaryOp::Multiply => " * ",
             crate::ast::BinaryOp::Divide => " / ",
+            crate::ast::BinaryOp::Remainder => " % ",
+            crate::ast::BinaryOp::BitwiseAnd => " & ",
+            crate::ast::BinaryOp::BitwiseOr => " | ",
+            crate::ast::BinaryOp::BitwiseXor => " ^ ",
+            crate::ast::BinaryOp::ShiftLeft => " << ",
+            crate::ast::BinaryOp::ShiftRight => " >> ",
             crate::ast::BinaryOp::LessThan => " < ",
             crate::ast::BinaryOp::LessEquals => " <= ",
             crate::ast::BinaryOp::GreaterThan => " > ",
             crate::ast::BinaryOp::GreaterEquals => " >= ",
+            crate::ast::BinaryOp::Equals => " == ",
+            crate::ast::BinaryOp::NotEquals => " != ",
+            crate::ast::BinaryOp::LogicalAnd => " && ",
+            crate::ast::BinaryOp::LogicalOr => " || ",
         });
         self.expression(right);
     }

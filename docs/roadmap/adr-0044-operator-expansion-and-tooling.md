@@ -19,15 +19,15 @@ Code extension, and Tree-sitter.
 
 ## Gate 1: Lexer, parser, and AST operator surface
 
-- [ ] Add deterministic token handling for `==`, `!=`, `%`, `&&`, `||`, `&`,
+- [x] Add deterministic token handling for `==`, `!=`, `%`, `&&`, `||`, `&`,
       `|`, `^`, `~`, `<<`, and `>>`.
-- [ ] Add AST variants for equality, remainder, logical, bitwise, and shift
+- [x] Add AST variants for equality, remainder, logical, bitwise, and shift
       expressions.
-- [ ] Parse the complete precedence table without changing ADR-0043
+- [x] Parse the complete precedence table without changing ADR-0043
       relational precedence.
-- [ ] Parse unary `!` and `~` without confusing them with existing syntax.
-- [ ] Preserve complete source spans and formatter round-tripping.
-- [ ] Add accepted, malformed, precedence, associativity, and ambiguity tests.
+- [x] Parse unary `!` and `~` without confusing them with existing syntax.
+- [x] Preserve complete source spans and formatter round-tripping.
+- [x] Add accepted, malformed, precedence, associativity, and ambiguity tests.
 
 ## Gate 2: Semantic typing and invalid-program rejection
 

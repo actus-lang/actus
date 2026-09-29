@@ -37,6 +37,9 @@ fn lower_unary(
     let value = lower_expression_with_context(function, expression, context)?;
     match operator {
         UnaryOp::Negate => Ok(function.ins().ineg(value)),
+        UnaryOp::LogicalNot | UnaryOp::BitwiseNot => {
+            Err(NativeEmitError("operator is not available in native lowering yet".to_owned()))
+        }
     }
 }
 
