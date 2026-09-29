@@ -16,6 +16,7 @@ impl Analyzer {
         if self.pack_field(&struct_name, field).is_some() {
             return self.validate_pack_field_assignment(&struct_name, field, value, span);
         }
+        self.ensure_struct_field_mutable(&struct_name, field, span)?;
         self.validate_struct_field_assignment(&struct_name, field, value, span)?;
         self.record_field_arena_provenance(object, field, value, span)
     }
@@ -36,6 +37,7 @@ impl Analyzer {
         self.validate_assignment_owner(binding_index, name, field, span)?;
         self.ensure_mutable(binding_index, name, object_span)?;
         if !matches!(object, Expr::Identifier { .. }) {
+            self.validate_mutable_field_path(object, span)?;
             self.visit_expression(object)?;
         }
         let Some(struct_name) =
@@ -47,6 +49,29 @@ impl Analyzer {
             });
         };
         Ok(struct_name)
+    }
+
+    fn validate_mutable_field_path(
+        &self,
+        object: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Expr::FieldAccess { object: parent, field, .. } = object else {
+            return Ok(());
+        };
+        self.validate_mutable_field_path(parent, span)?;
+        let Some(parent_type) = self.expression_struct_type(parent) else { return Ok(()) };
+        self.ensure_struct_field_mutable(&parent_type, field, span)
+    }
+
+    fn ensure_struct_field_mutable(
+        &self,
+        struct_name: &str,
+        field: &str,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(definition) = self.struct_field(struct_name, field) else { return Ok(()) };
+        super::roles::ensure_field_mutable(struct_name, definition, span)
     }
 
     fn validate_assignment_owner(

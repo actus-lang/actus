@@ -58,7 +58,7 @@ contracts that the future platform is allowed to consume.
 - [ ] Define `dat` field moves and the containing-owner state afterward.
 - [x] Define whether `ins` may loan a field or indexed field slot: persistent
       `ins` fields are rejected; loans remain call-scope operations.
-- [ ] Reject mutation through frozen or moved field paths.
+- [x] Reject mutation through frozen or moved field paths.
 
 ### Copy, move, and assignment
 

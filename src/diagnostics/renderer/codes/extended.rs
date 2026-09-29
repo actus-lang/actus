@@ -201,6 +201,9 @@ fn struct_field_message(kind: &SemanticErrorKind) -> Option<String> {
                 "struct field `{field}` in `{struct_name}` cannot persist the `{role}` ownership role"
             )
         }
+        SemanticErrorKind::FrozenStructField { struct_name, field } => {
+            format!("cannot mutate read-only `abs` field `{field}` on struct `{struct_name}`")
+        }
         SemanticErrorKind::InvalidFieldAssignmentTarget { field } => {
             format!("field `{field}` can only be assigned through an erg owner")
         }

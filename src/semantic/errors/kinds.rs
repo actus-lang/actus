@@ -176,6 +176,10 @@ pub enum SemanticErrorKind {
         field: String,
         role: String,
     },
+    FrozenStructField {
+        struct_name: String,
+        field: String,
+    },
     TypeMismatch {
         callee: String,
         parameter: String,

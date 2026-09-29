@@ -28,6 +28,29 @@ fn validates_mutable_struct_field_assignment() {
 }
 
 #[test]
+fn rejects_mutation_through_abs_struct_fields() {
+    let direct = analyze_source(
+        "struct Inner { value: Int, } struct Holder { abs view: Inner, } verb main() { erg holder = Holder { view: Inner { value: 1, }, }; holder.view = Inner { value: 2, }; }",
+    )
+    .expect_err("an abs field itself must remain read-only");
+    assert!(matches!(
+        direct.kind,
+        SemanticErrorKind::FrozenStructField { struct_name, field }
+            if struct_name == "Holder" && field == "view"
+    ));
+
+    let nested = analyze_source(
+        "struct Inner { value: Int, } struct Holder { abs view: Inner, } verb main() { erg holder = Holder { view: Inner { value: 1, }, }; holder.view.value = 2; }",
+    )
+    .expect_err("nested mutation through an abs field must remain read-only");
+    assert!(matches!(
+        nested.kind,
+        SemanticErrorKind::FrozenStructField { struct_name, field }
+            if struct_name == "Holder" && field == "view"
+    ));
+}
+
+#[test]
 fn rejects_assignment_between_inferred_struct_types() {
     let error = analyze_source(
         "struct Left { value: Int, } struct Right { value: Int, } verb main() { erg left = Left { value: 1, }; erg right = Right { value: 2, }; left = right; }",

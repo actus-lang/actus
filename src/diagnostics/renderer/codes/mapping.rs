@@ -57,6 +57,7 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::MissingStructField { .. } => "E1032",
         SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
         SemanticErrorKind::InvalidStructFieldRole { .. } => "E1094",
+        SemanticErrorKind::FrozenStructField { .. } => "E1095",
         _ => return None,
     })
 }
