@@ -87,11 +87,11 @@ Code extension, and Tree-sitter.
 
 ## Gate 7: LSP, VS Code, and Tree-sitter synchronization (final gate)
 
-- [ ] Add all ADR-0042 Gate 1–8 syntax and semantic surface to LSP support,
+- [x] Add all ADR-0042 Gate 1–8 syntax and semantic surface to LSP support,
       including arrays, Buffer indexing, casts, packs, and slot loans.
-- [ ] Add all ADR-0043 relational operators, nested-control diagnostics, and
+- [x] Add all ADR-0043 relational operators, nested-control diagnostics, and
       length-aware Buffer documentation to LSP support.
-- [ ] Add ADR-0044 equality, remainder, logical, and bitwise operators to LSP
+- [x] Add ADR-0044 equality, remainder, logical, and bitwise operators to LSP
       tokenization, completion, hover, formatting, and diagnostics.
 - [ ] Update the VS Code extension grammar, highlighting, completion, hover,
       diagnostics, and formatter integration.

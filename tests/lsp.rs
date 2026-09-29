@@ -220,6 +220,53 @@ fn lsp_exposes_pack_registers_in_hover_completion_and_tokens() {
 }
 
 #[test]
+fn lsp_exposes_adr44_operators_and_length_aware_buffer_hover() {
+    let uri = "file:///tmp/actus-lsp-adr44.act";
+    let source = "verb main() -> Bool { erg left: u8 = 1; erg right: u8 = 2; erg text = Buffer[1]; append(text, 65); print(text); return left < right && left != 0; }\n";
+    let operator_position = position_after(source, "<");
+    let print_position = position_after(source, "print");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":operator_position}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":print_position}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("relational operator -> Bool"), "stdout: {stdout}");
+    assert!(stdout.contains("Writes exactly the Buffer live length"), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"&&\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"label\":\"%\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"operator\""), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_publishes_stable_adr44_diagnostics() {
+    let diagnostics = [
+        (
+            "file:///tmp/actus-lsp-adr44-errors.act",
+            "verb main() -> Int { return 7 % 0; }\n",
+            "E1092",
+        ),
+        ("file:///tmp/actus-lsp-adr43-errors.act", "verb main() { break; }\n", "E1020"),
+    ];
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":diagnostics[0].0,"version":1,"text":diagnostics[0].1}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":diagnostics[1].0,"version":1,"text":diagnostics[1].1}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    for (_, _, code) in diagnostics {
+        assert!(stdout.contains(code), "stdout: {stdout}");
+    }
+}
+
+#[test]
 fn lsp_resolves_pack_fields_and_renders_hardware_aware_hover() {
     let uri = "file:///tmp/actus-lsp-pack-field.act";
     let source = "pack Control { erg storage: u32; layout little; fields { erg prescaler: u4 at 2; abs _reserved: u26 at 6 = 0; } }\nverb main() -> Int { erg control = Control { storage: 0, }; control.prescaler = 3; return control.prescaler; }\n";

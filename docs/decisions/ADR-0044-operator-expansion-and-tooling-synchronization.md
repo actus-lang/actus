@@ -184,3 +184,15 @@ The stable diagnostic baseline is `E1025` for invalid operator operands,
 `E1092` for a statically provable remainder by zero, and `E1093` for a
 statically provable shift count outside the destination width. Runtime-only
 remainder and shift failures retain deterministic native traps.
+
+## Gate 7 LSP Scope Evidence
+
+The compiler repository's LSP now exposes the implemented ADR-0042, ADR-0043,
+and ADR-0044 surface through semantic tokens, completion, hover, formatting,
+and shared compiler diagnostics. Operator tokens are classified uniformly;
+operator hover explains operand and failure contracts; completion includes the
+operator vocabulary; and intrinsic hover documents length-aware `Buffer`
+output. Workflow tests cover checked casts, unsigned indexing, packs, slot
+roles, relational and short-circuit operators, `E1092`, and nested-control
+diagnostics. VS Code and Tree-sitter remain separate, intentionally unmodified
+follow-up scopes.

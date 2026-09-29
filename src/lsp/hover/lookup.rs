@@ -12,7 +12,7 @@ use super::formatting::{
     parameter_info,
 };
 use super::model::SymbolInfo;
-use super::tokens::{file_uri_to_path, identifier_at, range};
+use super::tokens::{file_uri_to_path, identifier_at, operator_at, range};
 
 pub(crate) fn find_hover(
     uri: &str,
@@ -21,6 +21,12 @@ pub(crate) fn find_hover(
 ) -> Option<super::HoverInfo> {
     let tokens = crate::lexer::scan(source).0;
     let offset = LineIndex::new(source).byte_offset(source, position)?;
+    if let Some((operator, span)) = operator_at(&tokens, offset) {
+        return Some(super::HoverInfo {
+            contents: operator_documentation(operator).to_owned(),
+            range: range(source, span),
+        });
+    }
     let (name, name_span) = identifier_at(&tokens, offset)?;
     let program = parse(tokens.clone()).ok()?;
     if crate::ast::primitive_type(&name).is_some() {
@@ -37,11 +43,57 @@ pub(crate) fn find_hover(
             range: range(source, name_span),
         });
     }
-    let info = local_info(source, &program, &name, offset)
+    let info = intrinsic_info(&name)
+        .or_else(|| local_info(source, &program, &name, offset))
         .or_else(|| imported_info(uri, &program, &name))?;
     Some(super::HoverInfo {
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
+    })
+}
+
+fn operator_documentation(operator: &str) -> &'static str {
+    match operator {
+        "&&" | "||" => {
+            "```actus\nlogical operator: Bool -> Bool\n```\n\nShort-circuits the right operand."
+        }
+        "as" => {
+            "```actus\nchecked integer cast: expr as Type\n```\n\nRejects constant overflow and traps on dynamic overflow."
+        }
+        "==" | "!=" => {
+            "```actus\nequality operator -> Bool\n```\n\nRequires compatible operand families without implicit conversion."
+        }
+        "%" => {
+            "```actus\ninteger remainder\n```\n\nZero divisors are rejected when statically provable or trapped at runtime."
+        }
+        "<<" | ">>" => {
+            "```actus\ninteger shift\n```\n\nThe count must be unsigned and smaller than the destination width."
+        }
+        "<" | "<=" | ">" | ">=" => {
+            "```actus\nrelational operator -> Bool\n```\n\nSignedness and numeric family must match."
+        }
+        _ => {
+            "```actus\ninteger bitwise operator\n```\n\nPreserves the validated integer family and width."
+        }
+    }
+}
+
+fn intrinsic_info(name: &str) -> Option<SymbolInfo> {
+    let (signature, documentation) = match name {
+        "print" => (
+            "print(abs text: Buffer) -> Result[Int, IoError]",
+            "Writes exactly the Buffer live length, including embedded zero bytes; no null terminator is required.",
+        ),
+        "println" => (
+            "println(abs text: Buffer) -> Result[Int, IoError]",
+            "Writes the Buffer live length and a line ending; output is length-aware and binary-safe.",
+        ),
+        _ => return None,
+    };
+    Some(SymbolInfo {
+        signature: signature.to_owned(),
+        span: SourceSpan::new(0, 0),
+        documentation: Some(documentation.to_owned()),
     })
 }
 

@@ -27,6 +27,39 @@ pub(super) fn identifier_at(tokens: &[Token], offset: usize) -> Option<(String, 
     })
 }
 
+pub(super) fn operator_at(tokens: &[Token], offset: usize) -> Option<(&'static str, SourceSpan)> {
+    tokens.iter().find_map(|token| {
+        if token.span.start > offset || offset > token.span.end {
+            return None;
+        }
+        let operator = match token.kind {
+            TokenKind::As => "as",
+            TokenKind::LessThan => "<",
+            TokenKind::LessEquals => "<=",
+            TokenKind::GreaterThan => ">",
+            TokenKind::GreaterEquals => ">=",
+            TokenKind::DoubleEquals => "==",
+            TokenKind::BangEquals => "!=",
+            TokenKind::Bang => "!",
+            TokenKind::Percent => "%",
+            TokenKind::AndAnd => "&&",
+            TokenKind::OrOr => "||",
+            TokenKind::Ampersand => "&",
+            TokenKind::Pipe => "|",
+            TokenKind::Caret => "^",
+            TokenKind::Tilde => "~",
+            TokenKind::ShiftLeft => "<<",
+            TokenKind::ShiftRight => ">>",
+            TokenKind::Plus => "+",
+            TokenKind::Minus => "-",
+            TokenKind::Star => "*",
+            TokenKind::Slash => "/",
+            _ => return None,
+        };
+        Some((operator, token.span))
+    })
+}
+
 pub(super) fn identifier_span(source: &str, span: SourceSpan, name: &str) -> Option<SourceSpan> {
     let (tokens, _) = scan(source.get(span.start..span.end)?);
     tokens.into_iter().find_map(|token| match token.kind {

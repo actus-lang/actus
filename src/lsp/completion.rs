@@ -27,6 +27,21 @@ pub(super) fn items(source: Option<&str>) -> serde_json::Value {
         "Map".to_owned(),
         "Usize".to_owned(),
         "as".to_owned(),
+        "<".to_owned(),
+        "<=".to_owned(),
+        ">".to_owned(),
+        ">=".to_owned(),
+        "==".to_owned(),
+        "!=".to_owned(),
+        "%".to_owned(),
+        "&&".to_owned(),
+        "||".to_owned(),
+        "&".to_owned(),
+        "|".to_owned(),
+        "^".to_owned(),
+        "~".to_owned(),
+        "<<".to_owned(),
+        ">>".to_owned(),
     ];
     labels.extend((1..=128).map(|width| format!("u{width}")));
     labels.extend((1..=128).map(|width| format!("i{width}")));

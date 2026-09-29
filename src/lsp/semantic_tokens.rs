@@ -63,7 +63,34 @@ fn token_type(tokens: &[crate::lexer::Token], index: usize) -> Option<u32> {
         TokenKind::Abs => Some(3),
         TokenKind::Dat => Some(4),
         TokenKind::Ins => Some(5),
-        TokenKind::As => Some(9),
-        _ => None,
+        _ => operator_token_type(kind),
     }
+}
+
+fn operator_token_type(kind: &TokenKind) -> Option<u32> {
+    matches!(
+        kind,
+        TokenKind::As
+            | TokenKind::LessThan
+            | TokenKind::LessEquals
+            | TokenKind::GreaterThan
+            | TokenKind::GreaterEquals
+            | TokenKind::DoubleEquals
+            | TokenKind::BangEquals
+            | TokenKind::Bang
+            | TokenKind::Percent
+            | TokenKind::AndAnd
+            | TokenKind::OrOr
+            | TokenKind::Ampersand
+            | TokenKind::Pipe
+            | TokenKind::Caret
+            | TokenKind::Tilde
+            | TokenKind::ShiftLeft
+            | TokenKind::ShiftRight
+            | TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Star
+            | TokenKind::Slash
+    )
+    .then_some(9)
 }
