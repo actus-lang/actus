@@ -20,6 +20,7 @@ pub enum ModuleError {
     Lex { path: PathBuf, errors: Vec<LexError> },
     Parse { path: PathBuf, error: ParseError },
     DuplicateDeclaration(Box<DuplicateDeclaration>),
+    PrivateDeclarationAccess { module: String, symbol: String, facade: PathBuf, span: SourceSpan },
     Semantic(Box<crate::semantic::SemanticError>),
 }
 
@@ -77,6 +78,11 @@ impl Display for ModuleError {
                 diagnostic.name,
                 diagnostic.first.path.display(),
                 diagnostic.second.path.display()
+            ),
+            Self::PrivateDeclarationAccess { module, symbol, facade, .. } => write!(
+                formatter,
+                "private declaration `{symbol}` from module `{module}` is not exported by facade `{}`",
+                facade.display()
             ),
             Self::Semantic(error) => write!(
                 formatter,

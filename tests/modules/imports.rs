@@ -64,7 +64,28 @@ fn rejects_private_imported_types() {
 
     let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect_err("closed sibling declarations must not cross the import boundary");
-    assert!(matches!(error, ModuleError::Semantic(_)));
+    assert!(
+        matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "HiddenBank")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
+}
+
+#[test]
+fn rejects_direct_calls_to_private_runtime_bridges() {
+    let fixture = Fixture::new();
+    fixture.write("runtime/runtime.act", "open api;");
+    fixture.write(
+        "runtime/api.act",
+        "open verb read() -> Int { return private_bridge(); } unsafe extern \"C\" verb private_bridge() -> Int;",
+    );
+    let program = parse_source("import runtime; verb main() -> Int { return private_bridge(); }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("raw runtime bridge must remain private");
+    assert!(
+        matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "private_bridge")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
 }
 
 #[test]

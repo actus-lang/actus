@@ -83,6 +83,12 @@ out of the internal namespace. Unresolved internal references fail before
 code generation. Cyclic importer graphs remain an interface-resolution
 concern for the next gate and are not treated as sibling-scope declarations.
 
+Gate 20.3 adds importer-side visibility validation before semantic analysis.
+Calls to closed helpers or raw runtime bridges and construction of closed
+struct types are rejected with stable `E1109` diagnostics that identify the
+module and canonical facade. Exported-signature validation remains a required
+follow-up in this gate so private types cannot leak through public contracts.
+
 ### 1. Introduce a module compilation unit boundary
 
 Module aggregation shall produce a logical module unit with at least these

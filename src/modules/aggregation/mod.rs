@@ -4,6 +4,7 @@ mod parsing;
 mod types;
 mod unit;
 mod validation;
+mod visibility;
 
 pub use analysis::{
     analyze_module, analyze_module_unit, analyze_module_with_overlays,

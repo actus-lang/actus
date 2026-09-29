@@ -129,17 +129,29 @@ tracked for Gate 20.3 rather than being hidden inside internal scope logic.
 
 ## Gate 20.3: Public interface and visibility diagnostics
 
-- [ ] Build an importer-facing interface from explicit facade exports only.
-- [ ] Keep closed siblings and closed declarations out of external lookup.
-- [ ] Keep raw `unsafe extern "C"` bridges private unless a future ADR
+- [x] Build an importer-facing interface from explicit facade exports only.
+- [x] Keep closed siblings and closed declarations out of external lookup.
+- [x] Keep raw `unsafe extern "C"` bridges private unless a future ADR
       explicitly defines a public interop contract.
-- [ ] Reject direct external calls to private helpers and raw bridges.
-- [ ] Reject private types, constants, and implementation details leaking into
-      public signatures.
-- [ ] Add a stable visibility diagnostic containing symbol, module, and
+- [x] Reject direct external calls to private helpers and raw bridges.
+- [deferred] Reject private types, constants, and implementation details leaking into
+      public signatures; this requires exported-signature validation and is the
+      remaining Gate 20.3 implementation slice.
+- [x] Add a stable visibility diagnostic containing symbol, module, and
       facade guidance.
-- [ ] Verify caller-side type, ownership, generic, and error contracts use the
+- [x] Verify caller-side type, ownership, generic, and error contracts use the
       public interface without importing private bodies.
+
+### Gate 20.3 progress evidence
+
+The importer now validates references against the module's explicit export
+table before semantic analysis. Direct calls to closed helpers and raw
+`unsafe extern "C"` bridges, as well as construction of closed struct types,
+produce `E1109` with the symbol, module, and canonical facade in the diagnostic
+message. Public wrappers continue to be analyzed from the module's complete
+internal implementation unit. Exported-signature leakage remains open until
+the interface validator checks every exported type, role, generic, and result
+position; it must not be hidden behind generic unknown-type diagnostics.
 
 ## Gate 20.4: Code generation and implementation emission
 
