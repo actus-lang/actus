@@ -31,6 +31,7 @@ pub(crate) fn expression_native_type(
         Expr::Index { target, .. } => expression_native_type(target, local_types, layouts)
             .and_then(|ty| match ty {
                 NativeType::Array(id) => layouts.array(id).map(|array| array.element),
+                NativeType::Buffer => Some(NativeType::Integer { signed: false, width: 8 }),
                 _ => None,
             }),
         Expr::MethodCall { .. } => super::super::enums::enum_expression_type(expression, layouts),

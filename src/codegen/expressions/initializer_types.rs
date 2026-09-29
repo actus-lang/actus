@@ -28,6 +28,8 @@ pub(crate) fn initializer_type(
         Expr::Unary { expression, .. } => initializer_type(expression, types, functions, layouts),
         Expr::Binary { left, .. } => initializer_type(left, types, functions, layouts),
         Expr::StringLiteral { .. } => Ok(NativeType::String),
+        Expr::Index { .. } => expression_native_type(expression, types, layouts)
+            .ok_or_else(|| NativeEmitError("indexed expression has no native type".to_owned())),
         _ => infer_complex_initializer_type(expression, types, functions, layouts),
     }
 }

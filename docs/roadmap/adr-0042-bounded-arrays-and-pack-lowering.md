@@ -78,3 +78,25 @@ complete.
 - [x] Run formatter, check, clippy, tests, source limits, and diff checks.
 - [x] Update ADR-0042 with implementation evidence and approved deviations.
 - [x] Mark this roadmap complete after all diagnostics and native tests pass.
+
+## Gate 7: First-Class Buffer Indexing and Aggregate `ins` Calls
+
+- [x] Specify `Buffer[index] -> u8` in the AST, semantic model, and ownership
+      rules for `erg` and `abs` buffers.
+- [x] Reject non-integer indices, statically invalid indices, and invalid
+      buffer access forms with stable diagnostics.
+- [x] Lower dynamic buffer indexing to a checked native byte load using the
+      buffer length and data pointer, with the ADR-0042 bounds trap contract.
+- [x] Add the runtime buffer layout contract required by native indexing;
+      temporary application-specific C bridges are not permitted.
+- [x] Validate `ins Array[T, N]` parameters as exclusive aggregate loans and
+      suspend and restore the caller binding across the call.
+- [x] Pass aggregate `ins` arrays by base address without copying the array
+      and preserve in-place indexed mutation in the callee.
+- [x] Add checked integer narrowing for assignments to `u8` fields, including
+      packed fields, and reject values outside `0..=255`.
+- [x] Add isolated positive and negative semantic tests for each primitive.
+- [x] Add native execution tests for first/last buffer bytes, buffer traps,
+      aggregate `ins` mutation, and checked `u8` assignment.
+- [x] Run the complete quality matrix and record terminal evidence before
+      advancing to the Twin-E learning example.
