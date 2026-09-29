@@ -5,7 +5,7 @@ use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 use super::super::resolver::ModuleResolver;
 use super::object_plan::{ModuleObjectPlan, build_object_plan};
 use super::types::ModuleError;
-use super::unit::{ModuleUnit, load_module_unit};
+use super::unit::ModuleUnit;
 use super::validation::export_identity;
 use super::visibility::validate_import_visibility;
 
@@ -57,6 +57,14 @@ pub fn build_compilation_plan(
     program: &Program,
     resolver: &ModuleResolver,
 ) -> Result<ModuleCompilationPlan, ModuleError> {
+    build_compilation_plan_with_overlays(program, resolver, &HashMap::new())
+}
+
+pub fn build_compilation_plan_with_overlays(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<std::path::PathBuf, String>,
+) -> Result<ModuleCompilationPlan, ModuleError> {
     let mut caller_declarations = Vec::new();
     let mut local_declarations = Vec::new();
     let mut units = Vec::new();
@@ -74,6 +82,7 @@ pub fn build_compilation_plan(
             &import.path,
             program,
             resolver,
+            overlays,
             &mut imported_paths,
             &mut units,
             &mut caller_declarations,
@@ -128,11 +137,12 @@ fn collect_unit(
     module_path: &str,
     importer: &Program,
     resolver: &ModuleResolver,
+    overlays: &HashMap<std::path::PathBuf, String>,
     imported_paths: &mut HashSet<String>,
     units: &mut Vec<ModuleUnit>,
     caller_declarations: &mut Vec<TopLevelDecl>,
 ) -> Result<(), ModuleError> {
-    let unit = load_module_unit(resolver, module_path)?;
+    let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
     validate_import_visibility(importer, module_path, &unit)?;
     for declaration in &unit.implementation().declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
@@ -141,6 +151,7 @@ fn collect_unit(
                 &import.path,
                 unit.implementation(),
                 resolver,
+                overlays,
                 imported_paths,
                 units,
                 caller_declarations,

@@ -125,6 +125,24 @@ fn object_plan_orders_root_and_imported_units_by_canonical_module_path() {
 }
 
 #[test]
+fn object_metadata_lists_only_facade_exported_verbs() {
+    let fixture = Fixture::new();
+    fixture.write("runtime/runtime.act", "open api;");
+    fixture.write(
+        "runtime/api.act",
+        "open verb read() -> Int { return private_bridge(); } verb private_bridge() -> Int { return 1; }",
+    );
+    let (tokens, errors) = scan("import runtime; verb main() -> Int { return read(); }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    let exported = objects.units()[1].exported_verbs();
+    assert_eq!(exported, &["read".to_owned()]);
+}
+
+#[test]
 fn imported_object_program_excludes_module_directives() {
     let fixture = Fixture::new();
     fixture.write("math/math.act", "open ops;");

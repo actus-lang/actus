@@ -73,29 +73,52 @@ verb buffered_writer_flushes_cursor_storage() -> Int {
     };
 }
 
-verb append_and_clear_buffer(ins storage: Buffer, abs source: Buffer) -> Int {
+verb append_one_byte(ins storage: Buffer, abs source: Buffer) -> Int {
     erg offset = 0;
     erg append_length = 1;
-    erg appended = actus_buffer_append_range(
+    erg appended = buffer_append_range(
         target: ins storage,
         source: abs source,
         offset: offset,
         length: append_length
     );
-    case appended {
-        1 => { },
-        _ => { return 1; },
+    return case dat appended {
+        Result.Ok(count) => case count {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
     };
-    erg length = actus_buffer_length(buffer: abs storage);
-    erg cleared = actus_buffer_clear(buffer: ins storage);
-    case length {
-        1 => { },
-        _ => { return 1; },
+}
+
+verb buffer_has_one_byte(abs storage: Buffer) -> Int {
+    erg measured = buffer_length(buffer: abs storage);
+    return case dat measured {
+        Result.Ok(length) => case length {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
     };
-    return case cleared {
-        1 => 0,
-        _ => 1,
+}
+
+verb clear_one_byte(ins storage: Buffer) -> Int {
+    erg cleared = buffer_clear(buffer: ins storage);
+    return case dat cleared {
+        Result.Ok(count) => case count {
+            1 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
     };
+}
+
+verb append_and_clear_buffer(ins storage: Buffer, abs source: Buffer) -> Int {
+    erg appended = append_one_byte(storage: ins storage, source: abs source);
+    case appended { 0 => { }, _ => { return 1; }, };
+    erg valid_length = buffer_has_one_byte(storage: abs storage);
+    case valid_length { 0 => { }, _ => { return 1; }, };
+    return clear_one_byte(storage: ins storage);
 }
 
 meta test

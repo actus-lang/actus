@@ -1,10 +1,10 @@
-use std::fs;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::ast::{Block, Param, Program, Stmt, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::{SourceSpan, Token, TokenKind, scan};
-use crate::modules::{ModuleResolver, exports_module};
+use crate::modules::ModuleResolver;
 use crate::parser::parse;
 
 use super::position::{LineIndex, LspPosition, LspRange};
@@ -19,6 +19,7 @@ pub fn find_definition(
     uri: &str,
     source: &str,
     position: &LspPosition,
+    overlays: &HashMap<PathBuf, String>,
 ) -> Option<DefinitionLocation> {
     let tokens = scan(source).0;
     let offset = LineIndex::new(source).byte_offset(source, position)?;
@@ -28,7 +29,7 @@ pub fn find_definition(
     if let Some(span) = local_definition(source, &program, &name, offset) {
         return Some(location(uri, source, span));
     }
-    imported_definition(&current_path, &program, &name)
+    imported_definition(&current_path, &program, &name, overlays)
 }
 
 fn local_definition(
@@ -126,6 +127,7 @@ fn imported_definition(
     current_path: &Path,
     program: &Program,
     name: &str,
+    overlays: &HashMap<PathBuf, String>,
 ) -> Option<DefinitionLocation> {
     let configuration = CompilerConfiguration::from_input_path_read_only(current_path).ok()?;
     let resolver = ModuleResolver::with_dependencies(
@@ -135,12 +137,13 @@ fn imported_definition(
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
         let resolved = resolver.resolve(&import.path).ok()?;
-        let exports = exports_module(&resolver, &import.path).ok()?;
+        let exports =
+            crate::modules::exports_module_with_overlays(&resolver, &import.path, overlays).ok()?;
         if !exports.symbols.iter().any(|symbol| symbol.name == name) {
             continue;
         }
         for path in resolved.source_files() {
-            let module_source = fs::read_to_string(path).ok()?;
+            let module_source = super::module_scope::source_for_path(path, overlays)?;
             let module_program = parse(scan(&module_source).0).ok()?;
             if !exports.symbols.iter().any(|symbol| symbol.name == name && symbol.source == path) {
                 continue;

@@ -62,9 +62,30 @@ pub fn analyze_with_imports_for_target(
     analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
+pub fn analyze_with_imports_with_overlays_for_target(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<PathBuf, String>,
+    target: &crate::target::TargetSpec,
+) -> Result<SemanticModel, ModuleError> {
+    let expanded = resolve_imports_with_overlays(program, resolver, overlays)?;
+    let filtered = filter_program_for_target(&expanded, target);
+    analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
+}
+
 pub fn resolve_imports(
     program: &Program,
     resolver: &ModuleResolver,
 ) -> Result<Program, ModuleError> {
     Ok(build_compilation_plan(program, resolver)?.caller().clone())
+}
+
+fn resolve_imports_with_overlays(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<Program, ModuleError> {
+    Ok(super::plan::build_compilation_plan_with_overlays(program, resolver, overlays)?
+        .caller()
+        .clone())
 }

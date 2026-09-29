@@ -10,14 +10,14 @@ Remove the regular file named by `path`.
 `path` is borrowed read-only and is not retained. The bridge returns zero on
 success, `-1` on a host failure, and never exposes a raw status to callers.
 """
-open unsafe extern "C" verb actus_file_remove_path(abs path: Path) -> Int;
+unsafe extern "C" verb actus_file_remove_path(abs path: Path) -> Int;
 """
 Rename `from` to `to` without copying file contents.
 
 Both path arguments are non-owning `abs` views valid for this call only.
 The bridge returns zero on success or `-1` on failure.
 """
-open unsafe extern "C" verb actus_file_rename_path(abs from: Path, abs to: Path) -> Int;
+unsafe extern "C" verb actus_file_rename_path(abs from: Path, abs to: Path) -> Int;
 """
 Copy the file named by `from` to `to` and return its byte count.
 
@@ -25,7 +25,7 @@ The two path views are borrowed and never retained. A non-negative return is
 the number of copied bytes; the C ABI returns `-1` for failure, translated to
 `IoError.Failed`.
 """
-open unsafe extern "C" verb actus_file_copy_path(abs from: Path, abs to: Path) -> Int;
+unsafe extern "C" verb actus_file_copy_path(abs from: Path, abs to: Path) -> Int;
 """
 Create the directory named by `path`.
 
@@ -33,21 +33,21 @@ The path is an `abs` view. The bridge returns zero on success or `-1` when
 the host rejects the operation. It does not retain the path or allocate a
 converted string; the facade maps `-1` to `IoError.Failed`.
 """
-open unsafe extern "C" verb actus_file_create_dir_path(abs path: Path) -> Int;
+unsafe extern "C" verb actus_file_create_dir_path(abs path: Path) -> Int;
 """
 Remove the empty directory named by `path`.
 
 The path is borrowed for the call. The bridge returns zero on success or
 `-1` when the directory is missing, non-empty, or otherwise inaccessible.
 """
-open unsafe extern "C" verb actus_file_remove_dir_path(abs path: Path) -> Int;
+unsafe extern "C" verb actus_file_remove_dir_path(abs path: Path) -> Int;
 """
 Read all bytes from `handle` into the caller-owned `ins buffer`.
 
 The runtime appends into the existing allocation and retains no pointer.
 The return value is the byte count, `-1` for failure, or `-2` for EOF.
 """
-open unsafe extern "C" verb actus_file_read_all_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_file_read_all_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
 """
 Validate the bytes in `buffer` as UTF-8 without taking ownership.
 
@@ -55,7 +55,7 @@ The buffer is an `abs` view and remains owned by its caller. Zero means
 valid UTF-8; the C ABI returns non-zero for invalid data, mapped to
 `InvalidData`.
 """
-open unsafe extern "C" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;
 
 """Translate a private runtime status into the public I/O result contract."""
 open verb fs_status(erg status: Int) -> Result[Int, IoError] {

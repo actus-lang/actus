@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,9 +7,7 @@ use crate::lexer::scan;
 use crate::parser::parse;
 
 use super::super::resolver::ModuleResolver;
-use super::exports::exports_module;
 use super::identity::ModuleNamespace;
-use super::parsing::parse_module;
 use super::signature_visibility::validate_exported_signatures;
 use super::types::{ModuleError, ModuleExports};
 
@@ -95,10 +94,19 @@ pub fn load_module_unit(
     resolver: &ModuleResolver,
     module_path: &str,
 ) -> Result<ModuleUnit, ModuleError> {
+    load_module_unit_with_overlays(resolver, module_path, &HashMap::new())
+}
+
+pub fn load_module_unit_with_overlays(
+    resolver: &ModuleResolver,
+    module_path: &str,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<ModuleUnit, ModuleError> {
     let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
-    let implementation = parse_module(resolver, module_path)?;
-    let exports = exports_module(resolver, module_path)?;
-    let sources = load_sources(resolved.facade(), resolved.siblings())?;
+    let implementation =
+        super::parsing::parse_module_with_overlays(resolver, module_path, overlays)?;
+    let exports = super::exports::exports_module_with_overlays(resolver, module_path, overlays)?;
+    let sources = load_sources(resolved.facade(), resolved.siblings(), overlays)?;
     let source_key =
         sources.iter().map(|source| normalize(source.path())).collect::<Vec<_>>().join("|");
     let namespace =
@@ -114,19 +122,35 @@ pub fn load_module_unit(
     Ok(unit)
 }
 
-fn load_sources(facade: &Path, siblings: &[PathBuf]) -> Result<Vec<ModuleSource>, ModuleError> {
+fn load_sources(
+    facade: &Path,
+    siblings: &[PathBuf],
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<Vec<ModuleSource>, ModuleError> {
     let mut sources = Vec::with_capacity(siblings.len() + 1);
-    sources.push(load_source(facade, ModuleSourceKind::Facade)?);
+    sources.push(load_source(facade, ModuleSourceKind::Facade, overlays)?);
     for sibling in siblings {
         let name = sibling.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
-        sources.push(load_source(sibling, ModuleSourceKind::Sibling { name: name.to_owned() })?);
+        sources.push(load_source(
+            sibling,
+            ModuleSourceKind::Sibling { name: name.to_owned() },
+            overlays,
+        )?);
     }
     Ok(sources)
 }
 
-fn load_source(path: &Path, kind: ModuleSourceKind) -> Result<ModuleSource, ModuleError> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| ModuleError::Read { path: path.to_owned(), message: error.to_string() })?;
+fn load_source(
+    path: &Path,
+    kind: ModuleSourceKind,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<ModuleSource, ModuleError> {
+    let source = overlays.get(path).cloned().map(Ok).unwrap_or_else(|| {
+        fs::read_to_string(path).map_err(|error| ModuleError::Read {
+            path: path.to_owned(),
+            message: error.to_string(),
+        })
+    })?;
     let (tokens, errors) = scan(&source);
     if !errors.is_empty() {
         return Err(ModuleError::Lex { path: path.to_owned(), errors });

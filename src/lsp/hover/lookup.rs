@@ -1,9 +1,10 @@
-use std::fs;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use crate::ast::{Program, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::{SourceSpan, Token};
-use crate::modules::{ModuleResolver, exports_module};
+use crate::modules::ModuleResolver;
 use crate::parser::parse;
 
 use super::super::position::{LineIndex, LspPosition};
@@ -18,6 +19,7 @@ pub(crate) fn find_hover(
     uri: &str,
     source: &str,
     position: &LspPosition,
+    overlays: &HashMap<PathBuf, String>,
 ) -> Option<super::HoverInfo> {
     let tokens = crate::lexer::scan(source).0;
     let offset = LineIndex::new(source).byte_offset(source, position)?;
@@ -45,7 +47,7 @@ pub(crate) fn find_hover(
     }
     let info = intrinsic_info(&name)
         .or_else(|| local_info(source, &program, &name, offset))
-        .or_else(|| imported_info(uri, &program, &name))?;
+        .or_else(|| imported_info(uri, &program, &name, overlays))?;
     Some(super::HoverInfo {
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
@@ -176,7 +178,12 @@ fn declaration_info(source: &str, declaration: &TopLevelDecl, name: &str) -> Opt
     })
 }
 
-fn imported_info(uri: &str, program: &Program, name: &str) -> Option<SymbolInfo> {
+fn imported_info(
+    uri: &str,
+    program: &Program,
+    name: &str,
+    overlays: &HashMap<PathBuf, String>,
+) -> Option<SymbolInfo> {
     let current_path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&current_path).ok()?;
     let resolver = ModuleResolver::with_dependencies(
@@ -186,19 +193,21 @@ fn imported_info(uri: &str, program: &Program, name: &str) -> Option<SymbolInfo>
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
         let resolved = resolver.resolve(&import.path).ok()?;
-        let exports = exports_module(&resolver, &import.path).ok()?;
-        if let Some(path) = resolved.source_files().next() {
-            let _symbol = exports
-                .symbols
-                .iter()
-                .find(|symbol| symbol.name == name && symbol.source == path)?;
-            let module_source = fs::read_to_string(path).ok()?;
+        let exports =
+            crate::modules::exports_module_with_overlays(&resolver, &import.path, overlays).ok()?;
+        for path in resolved.source_files() {
+            if !exports.symbols.iter().any(|symbol| symbol.name == name && symbol.source == path) {
+                continue;
+            }
+            let module_source = super::super::module_scope::source_for_path(path, overlays)?;
             let module_program = parse(crate::lexer::scan(&module_source).0).ok()?;
-            let declaration = module_program
+            if let Some(declaration) = module_program
                 .declarations
                 .iter()
-                .find(|declaration| declaration_name(declaration) == Some(name))?;
-            return declaration_info(&module_source, declaration, name);
+                .find(|declaration| declaration_name(declaration) == Some(name))
+            {
+                return declaration_info(&module_source, declaration, name);
+            }
         }
     }
     None

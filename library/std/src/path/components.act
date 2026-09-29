@@ -32,34 +32,34 @@ open struct PathComponents {
 }
 
 """Return the final parent component through the C ABI as a non-owning `abs` view, if present."""
-open unsafe extern "C" verb actus_path_parent(abs self: Path) -> Option[abs PathComponent];
+unsafe extern "C" verb actus_path_parent(abs self: Path) -> Option[abs PathComponent];
 
 """Return the final file-name component through the C ABI as a non-owning `abs` view, if present."""
-open unsafe extern "C" verb actus_path_file_name(abs self: Path) -> Option[abs PathComponent];
+unsafe extern "C" verb actus_path_file_name(abs self: Path) -> Option[abs PathComponent];
 
 """
 Return the file stem through the C ABI as an `abs` component, excluding its
 final extension. The view aliases source storage and performs no allocation.
 `None` is returned when the path has no file name.
 """
-open unsafe extern "C" verb actus_path_file_stem(abs self: Path) -> Option[abs PathComponent];
+unsafe extern "C" verb actus_path_file_stem(abs self: Path) -> Option[abs PathComponent];
 
 """
 Return the final extension through the C ABI as an `abs` component without
 allocating or transcoding source units. `None` means the final name has no
 extension according to the selected platform's raw separator rules.
 """
-open unsafe extern "C" verb actus_path_extension(abs self: Path) -> Option[abs PathComponent];
+unsafe extern "C" verb actus_path_extension(abs self: Path) -> Option[abs PathComponent];
 
 """Create zero-allocation iterator state through the C ABI, rooted in the borrowed source path."""
-open unsafe extern "C" verb actus_path_components(abs self: Path) -> PathComponents;
+unsafe extern "C" verb actus_path_components(abs self: Path) -> PathComponents;
 
 """
 Advance the borrowed iterator through the C ABI. `iter` is an `ins` loan whose
 cursor is restored to its caller; the returned `Option` is an `abs`
 source-origin view and no component allocation occurs.
 """
-open unsafe extern "C" verb actus_path_next_component(ins iter: PathComponents) -> Option[abs PathComponent];
+unsafe extern "C" verb actus_path_next_component(ins iter: PathComponents) -> Option[abs PathComponent];
 
 """Return the final parent component as a non-owning `abs` view, if present."""
 open verb parent(abs self: Path) -> Option[abs PathComponent] {

@@ -6,9 +6,9 @@ exclusive loan for the duration of the call. The runtime writes into the
 caller's buffer and returns the byte count; it does not allocate a new
 Actus buffer or retain the handle.
 """
-open unsafe extern "C" verb actus_read_stdin_line(ins buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_read_stdin_line(ins buffer: Buffer) -> Int;
 """C ABI bridge that returns one input byte, or a standard negative status."""
-open unsafe extern "C" verb actus_read_byte() -> Int;
+unsafe extern "C" verb actus_read_byte() -> Int;
 
 """
 Read one line into the caller-provided buffer.

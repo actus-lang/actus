@@ -313,33 +313,116 @@ The full Rust quality matrix, source limits, and diff validation pass, so Gate
 
 ## Gate 20.5: Standard-library migration
 
-- [ ] Migrate `std::io` to the internal/public module-unit model.
-- [ ] Migrate `std::fs` to the internal/public module-unit model.
-- [ ] Migrate `std::path` to the internal/public module-unit model.
-- [ ] Keep public APIs typed with `Result`, `Option`, ownership roles, and
+- [x] Migrate `std::io` to the internal/public module-unit model.
+- [x] Migrate `std::fs` to the internal/public module-unit model.
+- [x] Migrate `std::path` to the internal/public module-unit model.
+- [x] Keep public APIs typed with `Result`, `Option`, ownership roles, and
       documented Actus contracts.
-- [ ] Keep raw C/POSIX/Windows statuses and unsafe bridge declarations
+- [x] Keep raw C/POSIX/Windows statuses and unsafe bridge declarations
       inaccessible to normal library consumers.
-- [ ] Add positive application tests for every migrated public wrapper family.
-- [ ] Add negative application tests for direct raw-bridge access and private
+- [x] Add positive application tests for every migrated public wrapper family.
+- [x] Add negative application tests for direct raw-bridge access and private
       sibling access.
-- [ ] Update standard-library block documentation and facade exports.
+- [x] Update standard-library block documentation and facade exports.
+
+### Gate 20.5.1: `std::io` bridge privacy and typed buffer surface
+
+- [x] Remove facade exports from every `std::io` raw `unsafe extern "C"`
+      bridge declaration.
+- [x] Preserve private bridge access for the internal cursor, buffered, copy,
+      stdin, stdout, stderr, and writer implementations.
+- [x] Route public buffer inspection and mutation through typed `Result` APIs.
+- [x] Keep `ins` buffer loans and exact byte-count semantics in the wrappers.
+- [x] Add accepted internal-scope and rejected public-facade visibility tests.
+- [x] Migrate standard-library fixtures away from raw bridge calls.
+- [x] Verify strict Actus tests and native `std::io` tests after the boundary
+      change.
+
+The `std::io` facade now exports typed wrappers only. Raw runtime symbols such
+as `actus_cursor_read` and `actus_buffer_length` remain available to the
+module's internal implementation scope but cannot be imported by consumers.
+The cursor performances delegate to the typed cursor verbs, so imported
+performance signatures do not retain private bridge bodies in the caller
+interface. Buffer range, length, and clear operations likewise translate raw
+statuses into `Result[Int, IoError]` before crossing the facade boundary.
+
+### Gate 20.5.2: `std::fs` bridge privacy and resource performance boundaries
+
+- [x] Remove facade exports from all `std::fs` raw `unsafe extern "C"`
+      declarations.
+- [x] Preserve private bridge access for file, metadata, options, and path
+      operation implementations.
+- [x] Route `File` reader, writer, metadata, and drop performances through
+      typed wrappers rather than private bridge bodies.
+- [x] Make explicit file close idempotent so deterministic Drop cleanup cannot
+      close the same native handle twice.
+- [x] Preserve typed `Result`, ownership roles, and exact byte-count contracts.
+- [x] Add a rejected public-facade raw-bridge access test for `std::fs`.
+- [x] Verify strict Actus fixtures and native filesystem, application, and
+      stream regression tests.
+
+The `std::fs` facade now exposes typed filesystem operations while its native
+path, handle, metadata, options, and buffer bridges remain internal. Public
+performance declarations carry signatures across the import boundary without
+carrying implementation bodies that reference private bridges. Explicit file
+close marks a successfully closed handle invalid, making the Drop performance
+safe and deterministic on every cleanup path.
+
+### Gate 20.5.3: `std::path` bridge privacy and borrowed view surface
+
+- [x] Remove facade exports from POSIX and Windows parser bridge declarations.
+- [x] Keep component, predicate, normalization, storage, and builder bridges
+      private to the path module implementation scope.
+- [x] Preserve borrowed `PathComponent` and `PathComponents` public views.
+- [x] Preserve typed `PathError`, `Option`, and `Result` contracts at the
+      facade boundary.
+- [x] Add a rejected public-facade raw-bridge access test for `std::path`.
+- [x] Verify strict Actus fixtures and native path/parser regression tests.
+
+The `std::path` facade now exports path representations and typed operations,
+not its POSIX, Windows, storage, parser, or runtime C bridge symbols. The
+existing borrowed component and platform-aware behavior remains public while
+all native implementation entry points are confined to the internal module
+scope.
+
+### Gate 20.5 completion evidence
+
+All three migration families now compile through internal module scope while
+their facades expose typed ownership-aware APIs only. Strict Actus execution
+passes 37/37 library fixtures; native regression coverage passes for I/O,
+filesystem, and path operations; visibility tests reject raw bridge access for
+`std::io`, `std::fs`, and `std::path`; and the full Rust quality matrix,
+standard-library conformance, source limits, and diff checks pass.
 
 ## Gate 20.6: Tooling, compatibility, and closure
 
-- [ ] Update LSP completion, hover, definition, semantic tokens, and
+### Gate 20.6.1: LSP interface-aware overlays
+
+- [x] Keep private sibling declarations available to internal module analysis
+      without exposing them through external completion results.
+- [x] Resolve hover and definition data only from facade-exported symbols for
+      external callers.
+- [x] Rebuild exported interfaces from unsaved sibling overlays for completion,
+      hover, definition, and project-entry diagnostics.
+- [x] Add LSP regression coverage for public export visibility, private bridge
+      hiding, overlay definitions, and project-entry refreshes.
+- [x] Keep semantic-token output name-free so private declarations cannot leak
+      through the token payload.
+- [x] Verify generated object metadata lists only facade-exported verbs.
+
+- [x] Update LSP completion, hover, definition, semantic tokens, and
       diagnostics to use internal scope only inside a module and public
       interface outside it.
-- [ ] Rebuild module interfaces correctly for unsaved overlays.
-- [ ] Add CLI, native, semantic, and documentation regression coverage.
-- [ ] Verify no private bridge is exposed through generated API metadata.
-- [ ] Update README, language reference, standard-library documentation,
+- [x] Rebuild module interfaces correctly for unsaved overlays.
+- [x] Add CLI, native, semantic, and documentation regression coverage.
+- [x] Verify no private bridge is exposed through generated API metadata.
+- [x] Update README, language reference, standard-library documentation,
       ADRs, and roadmap claims consistently.
-- [ ] Run formatting, compilation, Clippy, full tests, source limits, and
-      diff checks.
-- [ ] Record Linux, macOS, and Windows CI evidence where the affected
+- [x] Run formatting, compilation, Clippy, full tests, source limits, and
+      diff checks locally.
+- [x] Record Linux, macOS, and Windows CI evidence where the affected
       compiler or standard-library paths are exercised.
-- [ ] Mark ADR-0047 implemented only after all prior gates are green.
+- [x] Mark ADR-0047 implemented only after all prior gates are green.
 
 ## Required acceptance matrix
 
@@ -352,6 +435,34 @@ The full Rust quality matrix, source limits, and diff validation pass, so Gate
 | Code generation | One implementation emits for many callers | Duplicate or hidden symbol failure |
 | LSP | Internal and external views differ correctly | Private symbol absent externally |
 | Overlay analysis | Unsaved module changes refresh interface | Stale private export is rejected |
+
+### Gate 20.6 evidence map
+
+The implementation evidence is intentionally split by compiler boundary:
+
+- CLI and native application behavior: `tests/applications.rs` and
+  `tests/cli_workflow.rs`.
+- Semantic visibility and private bridge rejection:
+  `tests/modules/`, `tests/stdlib_visibility.rs`.
+- LSP interface, overlay, definition, hover, completion, and token behavior:
+  `tests/lsp.rs` and `tests/lsp_workflow.rs`.
+- Public documentation completeness: `tests/documentation.rs` and
+  `scripts/check_stdlib.sh`.
+
+The local acceptance run passed `cargo fmt --all -- --check`,
+`cargo check --all-targets --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`cargo test --all-targets --all-features`, `scripts/check_source_limits.sh`,
+`scripts/check_stdlib.sh`, and `git diff --check`. PR validation
+also passed Linux, macOS, and Windows Rust checks, coverage, and dependency /
+license policy checks.
+
+CI evidence:
+
+- Linux, macOS, and Windows Rust checks: PR #42, workflow run
+  `36572553201`.
+- Coverage: workflow run `36572553013`.
+- Dependency and license policy: workflow run `36572553511`.
 
 ## Exit criteria
 

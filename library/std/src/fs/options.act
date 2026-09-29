@@ -129,7 +129,7 @@ handle becomes an owned `File`; the raw failure code is translated to
 `IoError.Failed` and is never exposed by the public API. No path bytes are
 copied or allocated at this ABI boundary.
 """
-open unsafe extern "C" verb actus_file_open_options_path(
+unsafe extern "C" verb actus_file_open_options_path(
     abs path: Path,
     abs read: Int,
     abs write: Int,

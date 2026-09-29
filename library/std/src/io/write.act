@@ -5,7 +5,7 @@ The `abs` parameter is a read-only, non-owning view. Writing consumes the
 bytes presented by the view, not the buffer's ownership, so the caller can
 continue using its `erg` buffer after the call.
 """
-open unsafe extern "C" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int;
 
 """
 Write the complete available buffer to stdout when the runtime accepts it.

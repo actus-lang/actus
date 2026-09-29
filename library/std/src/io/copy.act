@@ -8,7 +8,7 @@ The copy-specific C bridge reserves that storage without retaining the buffer.
 Only `EndOfStream` terminates the transfer successfully; all other errors
 are returned to the caller unchanged.
 """
-open unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
+unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
 
 """
 Translate a writer failure into the public copy result contract.

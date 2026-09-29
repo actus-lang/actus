@@ -22,29 +22,29 @@ not retained or copied. The bridge performs no path allocation. The result is
 a new owned `File`, or `-1` on native failure; the facade maps failure to
 `IoError.Failed`.
 """
-open unsafe extern "C" verb actus_file_open_path(abs path: Path, abs mode: Int) -> Int;
+unsafe extern "C" verb actus_file_open_path(abs path: Path, abs mode: Int) -> Int;
 
 """
 Read into the existing `ins` buffer. Non-negative values are byte counts;
 `-1` is `Failed` and `-2` is `EndOfStream`. The runtime retains no buffer.
 """
-open unsafe extern "C" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
 
 """
 Write the logical bytes of an `abs` buffer. Non-negative values are byte
 counts; `-1` is `Failed` and `-2` is `EndOfStream`.
 """
 """The C ABI returns a byte count, `-1` for failure, or `-2` for EOF."""
-open unsafe extern "C" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;
 
 """Flush an owned handle through the C ABI; zero is success and `-1` is `Failed`."""
-open unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
+unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
 
 """Close an owned handle exactly once through the C ABI; zero is success and `-1` is failure."""
-open unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
+unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
 """Move a file cursor through the C ABI and return its resulting absolute byte position or failure."""
-open unsafe extern "C" verb actus_file_seek_buffer(
+unsafe extern "C" verb actus_file_seek_buffer(
     abs handle: Int,
     abs offset: Int,
     abs whence: Int
@@ -86,16 +86,60 @@ open verb file_create(abs path: Path) -> Result[File, IoError] {
     };
 }
 
+"""
+Read bytes from an exclusively loaned open file into an exclusively loaned
+buffer. `Ok` is the exact byte count; `Err` maps failure and end-of-stream
+statuses. The file remains owned by the caller after the loan ends.
+"""
+open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
+    return case status {
+        -1 => Err(IoError.Failed),
+        -2 => Err(IoError.EndOfStream),
+        _ => Ok(status),
+    };
+}
+
+"""
+Write an immutable buffer through an exclusively loaned file. `Ok` reports
+the exact byte count; `Err` reports a typed runtime failure.
+"""
+open verb file_write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
+    erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
+    return case status {
+        -1 => Err(IoError.Failed),
+        -2 => Err(IoError.EndOfStream),
+        _ => Ok(status),
+    };
+}
+
+"""Flush a file loan and return zero on success or a typed I/O failure."""
+open verb file_flush(ins self: File) -> Result[Int, IoError] {
+    erg status = actus_file_flush_buffer(handle: abs self.handle);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Close an exclusively loaned file exactly once. A successful close marks the
+handle invalid so the Drop performance remains idempotent; a failed close
+leaves it live for deterministic cleanup retry.
+"""
+open verb file_close(ins self: File) -> Result[Int, IoError] {
+    erg status = actus_file_close_buffer(handle: abs self.handle);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => { self.handle = -1; return Ok(status); },
+    };
+}
+
 """Read file bytes into caller-provided storage without allocating per call."""
 open perform Reader for File {
     """Read through ins loans, mutate caller storage, and return count or typed error."""
     verb read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
-        erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
-        return case status {
-            -1 => Err(IoError.Failed),
-            -2 => Err(IoError.EndOfStream),
-            _ => Ok(status),
-        };
+        return file_read(self: ins self, buffer: ins buffer);
     }
 }
 
@@ -107,21 +151,12 @@ open perform Writer for File {
     `Err` reports the typed I/O failure.
     """
     verb write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
-        erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
-        return case status {
-            -1 => Err(IoError.Failed),
-            -2 => Err(IoError.EndOfStream),
-            _ => Ok(status),
-        };
+        return file_write(self: ins self, buffer: abs buffer);
     }
 
     """Flush through an ins file loan and return zero or typed failure."""
     verb flush(ins self: File) -> Result[Int, IoError] {
-        erg status = actus_file_flush_buffer(handle: abs self.handle);
-        return case status {
-            -1 => Err(IoError.Failed),
-            _ => Ok(status),
-        };
+        return file_flush(self: ins self);
     }
 }
 
@@ -200,15 +235,7 @@ open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, IoError
 open perform MetadataProvider for File {
     """Inspect metadata through an ins file loan and return scalar facts or failure."""
     verb metadata(ins self: File) -> Result[Metadata, IoError] {
-        erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
-        erg status = actus_file_metadata_handle_buffer(
-            handle: abs self.handle,
-            output: ins output
-        );
-        return case status {
-            -1 => file_metadata_failed(output: dat output),
-            _ => Result[Metadata, IoError].Ok(output),
-        };
+        return file_metadata(self: ins self);
     }
 }
 
@@ -216,6 +243,6 @@ open perform MetadataProvider for File {
 open perform Drop for File {
     """Close the owned File resource through an ins loan during deterministic cleanup."""
     verb drop(ins self: File) {
-        actus_file_close_buffer(handle: abs self.handle);
+        file_close(self: ins self);
     }
 }

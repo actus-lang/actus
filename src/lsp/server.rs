@@ -75,7 +75,8 @@ fn completion(
     let uri =
         params.get("textDocument").and_then(|document| document.get("uri")).and_then(Value::as_str);
     let source = uri.and_then(|value| store.get(value)).map(|document| document.text.as_str());
-    respond(output, id, items(source))
+    let overlays = store.source_overlays();
+    respond(output, id, items(uri.unwrap_or_default(), source, &overlays))
 }
 
 fn semantic_tokens_full(
@@ -103,7 +104,12 @@ fn definition(
     let result = store
         .get(&params.text_document.uri)
         .and_then(|document| {
-            find_definition(&params.text_document.uri, &document.text, &params.position)
+            find_definition(
+                &params.text_document.uri,
+                &document.text,
+                &params.position,
+                &store.source_overlays(),
+            )
         })
         .map(|location| json!({ "uri": location.uri, "range": location.range }))
         .unwrap_or(Value::Null);
@@ -120,7 +126,12 @@ fn hover(
     let result = store
         .get(&params.text_document.uri)
         .and_then(|document| {
-            find_hover(&params.text_document.uri, &document.text, &params.position)
+            find_hover(
+                &params.text_document.uri,
+                &document.text,
+                &params.position,
+                &store.source_overlays(),
+            )
         })
         .map(|info| json!({ "contents": { "kind": "markdown", "value": info.contents }, "range": info.range }))
         .unwrap_or(Value::Null);

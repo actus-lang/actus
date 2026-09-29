@@ -1,19 +1,19 @@
 """Runtime-backed path predicates and component-aware comparisons."""
 
 """Inspect absolute-root state without consuming or allocating the path."""
-open unsafe extern "C" verb actus_path_is_absolute(abs self: Path) -> Bool;
+unsafe extern "C" verb actus_path_is_absolute(abs self: Path) -> Bool;
 
 """Inspect relative-root state through the C ABI and return a Boolean without consuming or allocating the path."""
-open unsafe extern "C" verb actus_path_is_relative(abs self: Path) -> Bool;
+unsafe extern "C" verb actus_path_is_relative(abs self: Path) -> Bool;
 
 """Inspect through the C ABI whether the path has any platform root and return a Boolean without allocation."""
-open unsafe extern "C" verb actus_path_has_root(abs self: Path) -> Bool;
+unsafe extern "C" verb actus_path_has_root(abs self: Path) -> Bool;
 
 """Compare complete borrowed path components at the Rust ABI boundary."""
-open unsafe extern "C" verb actus_path_starts_with(abs self: Path, abs prefix: Path) -> Bool;
+unsafe extern "C" verb actus_path_starts_with(abs self: Path, abs prefix: Path) -> Bool;
 
 """Compare complete trailing borrowed components at the Rust ABI boundary."""
-open unsafe extern "C" verb actus_path_ends_with(abs self: Path, abs suffix: Path) -> Bool;
+unsafe extern "C" verb actus_path_ends_with(abs self: Path, abs suffix: Path) -> Bool;
 
 """
 Return `true` when borrowed `abs self` has an absolute platform root.

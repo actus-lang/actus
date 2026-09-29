@@ -30,6 +30,10 @@ The language specification and compiler architecture are under active developmen
 
 Language style, module visibility, import conventions, and formatting rules are documented in [Actus Language Style and Conventions](docs/language/style-and-conventions.md).
 
+Module implementation scope and facade-bounded public APIs are specified by
+[ADR-0047](docs/decisions/ADR-0047-module-internal-scope-and-facade-visibility.md)
+and tracked in the [Phase 20 roadmap](docs/roadmap/phase-20-module-visibility-and-facade-boundaries.md).
+
 The verified Alpha package, ownership, standard-library, and CLI workflow is
 documented in the [Alpha User Guide](docs/language/alpha-user-guide.md).
 

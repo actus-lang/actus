@@ -88,11 +88,14 @@ verb prepare_file(abs path: Path) -> Int {
 }
 
 verb verify_owned_buffer(dat output: Buffer) -> Int {
-    erg length = actus_buffer_length(buffer: abs output);
+    erg measured = buffer_length(buffer: abs output);
     drop(output);
-    return case length {
-        2 => 0,
-        _ => 1,
+    return case dat measured {
+        Result.Ok(length) => case length {
+            2 => 0,
+            _ => 1,
+        },
+        Result.Err(_) => 1,
     };
 }
 
