@@ -95,7 +95,7 @@ Code extension, and Tree-sitter.
       tokenization, completion, hover, formatting, and diagnostics.
 - [ ] Update the VS Code extension grammar, highlighting, completion, hover,
       diagnostics, and formatter integration.
-- [ ] Update Tree-sitter grammar, precedence, generated parser artifacts, and
+- [x] Update Tree-sitter grammar, precedence, generated parser artifacts, and
       corpus fixtures for the combined operator surface.
 - [ ] Run cross-repository synchronization checks and reject drift between
       compiler, LSP, VS Code, and Tree-sitter definitions.
