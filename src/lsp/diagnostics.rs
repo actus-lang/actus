@@ -8,7 +8,8 @@ use crate::diagnostics::{
 use crate::lexer::scan;
 use crate::modules::{ModuleError, ModuleResolver};
 use crate::parser::parse;
-use crate::semantic::analyze;
+use crate::semantic::{analyze, filter_program_for_target};
+use crate::target::TargetSpec;
 
 use super::position::{LineIndex, LspRange};
 use super::protocol::LspDiagnostic;
@@ -24,7 +25,17 @@ pub fn analyze_document(
     source: &str,
     overlays: &std::collections::HashMap<PathBuf, String>,
 ) -> Vec<LspDiagnostic> {
-    let diagnostics = collect_diagnostics(uri, source, overlays);
+    let target = TargetSpec::host().expect("host target must be supported");
+    analyze_document_for_target(uri, source, overlays, &target)
+}
+
+pub fn analyze_document_for_target(
+    uri: &str,
+    source: &str,
+    overlays: &std::collections::HashMap<PathBuf, String>,
+    target: &TargetSpec,
+) -> Vec<LspDiagnostic> {
+    let diagnostics = collect_diagnostics(uri, source, overlays, target);
     let index = LineIndex::new(source);
     diagnostics
         .into_iter()
@@ -36,6 +47,7 @@ fn collect_diagnostics(
     uri: &str,
     source: &str,
     overlays: &std::collections::HashMap<PathBuf, String>,
+    target: &TargetSpec,
 ) -> Vec<Diagnostic> {
     let (tokens, lex_errors) = scan(source);
     if !lex_errors.is_empty() {
@@ -49,16 +61,17 @@ fn collect_diagnostics(
             return vec![parse_diagnostic(&error)];
         }
     };
-    if let Some(result) = analyze_package_module(uri, &program, overlays) {
+    if let Some(result) = analyze_package_module(uri, &program, overlays, target) {
         let mut diagnostics = package_diagnostics(result);
         sort_diagnostics(&mut diagnostics);
         return diagnostics;
     }
-    if let Some(result) = analyze_test_fixture(uri, &program) {
+    if let Some(result) = analyze_test_fixture(uri, &program, target) {
         let mut diagnostics = package_diagnostics(result);
         sort_diagnostics(&mut diagnostics);
         return diagnostics;
     }
+    let program = filter_program_for_target(&program, target);
     if let Err(error) = analyze(&program) {
         return vec![semantic_diagnostic(&error)];
     }
@@ -68,6 +81,7 @@ fn collect_diagnostics(
 fn analyze_test_fixture(
     uri: &str,
     program: &crate::ast::Program,
+    target: &TargetSpec,
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
@@ -79,13 +93,14 @@ fn analyze_test_fixture(
         configuration.source_root(),
         configuration.dependency_roots(),
     );
-    Some(crate::modules::analyze_with_imports(program, &resolver).map(|_| ()))
+    Some(crate::modules::analyze_with_imports_for_target(program, &resolver, target).map(|_| ()))
 }
 
 fn analyze_package_module(
     uri: &str,
     program: &crate::ast::Program,
     overlays: &std::collections::HashMap<PathBuf, String>,
+    target: &TargetSpec,
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
@@ -94,14 +109,17 @@ fn analyze_package_module(
         configuration.dependency_roots(),
     );
     let result = match module_path_for_file(configuration.source_root(), &path) {
-        Some(module_path) => {
-            crate::modules::analyze_module_with_overlays(&resolver, &module_path, overlays)
-        }
+        Some(module_path) => crate::modules::analyze_module_with_overlays_for_target(
+            &resolver,
+            &module_path,
+            overlays,
+            target,
+        ),
         None if path.parent() == Some(configuration.source_root()) => {
-            crate::modules::analyze_with_imports(program, &resolver)
+            crate::modules::analyze_with_imports_for_target(program, &resolver, target)
         }
         None if is_project_entry_with_imports(&path, program, configuration.project_root()) => {
-            crate::modules::analyze_with_imports(program, &resolver)
+            crate::modules::analyze_with_imports_for_target(program, &resolver, target)
         }
         None => return None,
     };

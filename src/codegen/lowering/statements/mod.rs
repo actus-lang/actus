@@ -239,6 +239,11 @@ fn lower_assignment<'source>(
         string_data,
         layouts,
     )?;
+    if locals.contains_key(name) {
+        super::super::structs::emit_binding_drop(
+            function, name, locals, types, functions, layouts,
+        )?;
+    }
     if let Some(destination) = locals.get(name)
         && types
             .get(name)

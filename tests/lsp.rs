@@ -53,6 +53,37 @@ fn lsp_covers_current_ownership_surface_and_diagnostics() {
     assert_lsp_ownership_diagnostics();
 }
 
+#[test]
+fn lsp_filters_target_declarations_and_marks_inactive_code() {
+    let uri = "file:///tmp/actus-lsp-targets.act";
+    let source = "meta target(\"unix\") verb platform_value() -> Int { return 41; } meta target(\"windows\") verb platform_value() -> Int { return 99; } verb main() -> Int { return platform_value(); }";
+    let messages = [
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{"initializationOptions":{"target":"x86_64-pc-windows-msvc"}}
+        }),
+        json!({
+            "jsonrpc":"2.0",
+            "method":"textDocument/didOpen",
+            "params":{"textDocument":{"uri":uri,"version":1,"text":source}}
+        }),
+        json!({
+            "jsonrpc":"2.0",
+            "id":2,
+            "method":"textDocument/semanticTokens/full",
+            "params":{"textDocument":{"uri":uri}}
+        }),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(stdout.contains("\"tokenModifiers\":[\"inactive-target\"]"), "stdout: {stdout}");
+    assert!(stdout.contains(",1,"), "stdout: {stdout}");
+}
+
 fn assert_lsp_surface_support() {
     let uri = "file:///tmp/actus-lsp-surface.act";
     let source = "/// Mutates a buffer.\nverb mutate(ins buffer: Buffer) { }\nverb slice(abs input: Buffer) -> abs Buffer { return input; }\nunsafe extern \"C\" verb host(erg code: Int) -> Int;\nverb main(abs ready: Bool) -> Int { erg buffer = Buffer[4]; erg code = 0; mutate(buffer: ins buffer); abs view = ref slice(input: abs buffer); return case abs ready { true if ready => host(code: erg code), _ => 1, }; }\n";

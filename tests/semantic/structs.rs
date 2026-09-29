@@ -28,6 +28,29 @@ fn validates_mutable_struct_field_assignment() {
 }
 
 #[test]
+fn rejects_mutation_through_abs_struct_fields() {
+    let direct = analyze_source(
+        "struct Inner { value: Int, } struct Holder { abs view: Inner, } verb main() { erg holder = Holder { view: Inner { value: 1, }, }; holder.view = Inner { value: 2, }; }",
+    )
+    .expect_err("an abs field itself must remain read-only");
+    assert!(matches!(
+        direct.kind,
+        SemanticErrorKind::FrozenStructField { struct_name, field }
+            if struct_name == "Holder" && field == "view"
+    ));
+
+    let nested = analyze_source(
+        "struct Inner { value: Int, } struct Holder { abs view: Inner, } verb main() { erg holder = Holder { view: Inner { value: 1, }, }; holder.view.value = 2; }",
+    )
+    .expect_err("nested mutation through an abs field must remain read-only");
+    assert!(matches!(
+        nested.kind,
+        SemanticErrorKind::FrozenStructField { struct_name, field }
+            if struct_name == "Holder" && field == "view"
+    ));
+}
+
+#[test]
 fn rejects_assignment_between_inferred_struct_types() {
     let error = analyze_source(
         "struct Left { value: Int, } struct Right { value: Int, } verb main() { erg left = Left { value: 1, }; erg right = Right { value: 2, }; left = right; }",
@@ -37,6 +60,30 @@ fn rejects_assignment_between_inferred_struct_types() {
         error.kind,
         SemanticErrorKind::BindingTypeMismatch { expected, found, .. }
             if expected == "Left" && found == "Right"
+    ));
+}
+
+#[test]
+fn transfers_ownership_for_compatible_whole_struct_assignment() {
+    let model = analyze_source(
+        "struct Point { value: Int, } verb main() { erg destination = Point { value: 0, }; erg source = Point { value: 7, }; destination = source; inspect(source.value); }",
+    )
+    .expect_err("the source aggregate must be moved by whole-struct assignment");
+    assert!(matches!(
+        model.kind,
+        SemanticErrorKind::UseAfterMove { name } if name == "source"
+    ));
+}
+
+#[test]
+fn rejects_aggregate_self_assignment() {
+    let error = analyze_source(
+        "struct Point { value: Int, } verb main() { erg point = Point { value: 1, }; point = point; }",
+    )
+    .expect_err("self-assignment would invalidate and overwrite the same owner");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::SelfAssignment { name } if name == "point"
     ));
 }
 
@@ -65,6 +112,17 @@ fn rejects_duplicate_struct_names_and_fields() {
         duplicate_field.kind,
         SemanticErrorKind::DuplicateStructField { struct_name, field }
             if struct_name == "Point" && field == "x"
+    ));
+}
+
+#[test]
+fn rejects_persistent_instrumental_struct_fields() {
+    let error = analyze_source("struct Session { ins scratch: Buffer, }")
+        .expect_err("ins fields cannot outlive their call scope");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidStructFieldRole { struct_name, field, role }
+            if struct_name == "Session" && field == "scratch" && role == "ins"
     ));
 }
 

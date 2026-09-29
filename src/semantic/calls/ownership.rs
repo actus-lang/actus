@@ -6,7 +6,7 @@ use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::super::state::OwnershipState;
 
 impl Analyzer {
-    pub(super) fn move_dat_argument(
+    pub(crate) fn move_dat_argument(
         &mut self,
         expression: &Expr,
         span: SourceSpan,

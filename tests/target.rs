@@ -33,6 +33,29 @@ fn filters_non_matching_target_declarations_before_semantic_analysis() {
     analyze(&filtered).expect("filtered target program should analyze");
 }
 
+#[test]
+fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
+    let linux = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("Linux target should parse");
+    let macos = TargetSpec::parse("x86_64-apple-darwin").expect("macOS target should parse");
+    let windows_msvc =
+        TargetSpec::parse("x86_64-pc-windows-msvc").expect("MSVC target should parse");
+    let windows_gnu =
+        TargetSpec::parse("x86_64-pc-windows-gnu").expect("GNU Windows target should parse");
+    let freestanding =
+        TargetSpec::parse("x86_64-unknown-none").expect("freestanding target should parse");
+
+    assert_eq!(linux.linker_flavor(), actus::target::LinkerFlavor::Gnu);
+    assert_eq!(macos.linker_flavor(), actus::target::LinkerFlavor::Apple);
+    assert_eq!(windows_msvc.linker_flavor(), actus::target::LinkerFlavor::Msvc);
+    assert_eq!(windows_gnu.linker_flavor(), actus::target::LinkerFlavor::Gnu);
+    assert_eq!(freestanding.entry_contract(), actus::target::EntryContract::Freestanding);
+    assert!(linux.matches_platform("unix"));
+    assert!(macos.matches_platform("posix"));
+    assert!(windows_msvc.matches_platform("windows"));
+    assert!(windows_gnu.matches_platform("windows"));
+    assert!(!freestanding.matches_platform("unix"));
+}
+
 #[cfg(unix)]
 #[test]
 fn native_build_ignores_non_matching_target_symbols() {

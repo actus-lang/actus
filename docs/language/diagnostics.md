@@ -12,6 +12,7 @@ edition.
 | `E1001`–`E1028` | Bindings, ownership, calls, types, and returns |
 | `E1029`–`E1033` | Struct declarations and initialization |
 | `E1034`–`E1035` | Struct mutation and field borrow conflicts |
+| `E1094`–`E1096` | Struct field-role, frozen-field, and self-assignment rules |
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enum patterns, roles, generics, packs, and arenas |
 | `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |

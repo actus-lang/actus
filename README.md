@@ -30,6 +30,9 @@ The language specification and compiler architecture are under active developmen
 
 Language style, module visibility, import conventions, and formatting rules are documented in [Actus Language Style and Conventions](docs/language/style-and-conventions.md).
 
+The verified Alpha package, ownership, standard-library, and CLI workflow is
+documented in the [Alpha User Guide](docs/language/alpha-user-guide.md).
+
 The implemented operator, checked-cast, and bounded-indexing contracts are
 listed in the [operator reference](docs/language/operators.md).
 

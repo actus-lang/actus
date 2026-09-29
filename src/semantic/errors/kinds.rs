@@ -171,6 +171,18 @@ pub enum SemanticErrorKind {
         expected: String,
         found: String,
     },
+    InvalidStructFieldRole {
+        struct_name: String,
+        field: String,
+        role: String,
+    },
+    FrozenStructField {
+        struct_name: String,
+        field: String,
+    },
+    SelfAssignment {
+        name: String,
+    },
     TypeMismatch {
         callee: String,
         parameter: String,

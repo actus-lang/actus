@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::ast::{Program, TopLevelDecl};
-use crate::semantic::{SemanticModel, analyze};
+use crate::semantic::{SemanticModel, analyze, filter_program_for_target};
 
 use super::super::resolver::ModuleResolver;
 use super::exports::exports_module;
@@ -26,12 +26,34 @@ pub fn analyze_module_with_overlays(
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
+pub fn analyze_module_with_overlays_for_target(
+    resolver: &ModuleResolver,
+    module_path: &str,
+    overlays: &HashMap<PathBuf, String>,
+    target: &crate::target::TargetSpec,
+) -> Result<SemanticModel, ModuleError> {
+    let program = parse_module_with_overlays(resolver, module_path, overlays)?;
+    let program = resolve_imports(&program, resolver)?;
+    let program = filter_program_for_target(&program, target);
+    analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
+}
+
 pub fn analyze_with_imports(
     program: &Program,
     resolver: &ModuleResolver,
 ) -> Result<SemanticModel, ModuleError> {
     let expanded = resolve_imports(program, resolver)?;
     analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))
+}
+
+pub fn analyze_with_imports_for_target(
+    program: &Program,
+    resolver: &ModuleResolver,
+    target: &crate::target::TargetSpec,
+) -> Result<SemanticModel, ModuleError> {
+    let expanded = resolve_imports(program, resolver)?;
+    let filtered = filter_program_for_target(&expanded, target);
+    analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 pub fn resolve_imports(

@@ -193,6 +193,13 @@ Actus uses four explicit roles for ownership and borrowing:
 an `abs` return is allowed only under the single-origin rule and remains tied
 to the caller owner through a caller-scope borrow record.
 
+Struct aggregates preserve these roles in their fields. Unmarked fields are
+value fields, `erg` fields are owned mutable subresources, and `abs` fields are
+read-only views. Persistent `ins` fields and `dat` fields are not permitted:
+`ins` is a call-scope loan and `dat` is an operation-level transfer. Structs
+are not implicitly copied; compatible whole-struct assignment transfers the
+source owner and cleans the destination's previous owned value.
+
 `perform Role for Type` is compile-time static dispatch. `abs dynamic Role` is
 explicit runtime dispatch and uses a borrowed two-word fat pointer in the
 order `data_ptr`, then `vtable_ptr`. Its cross-unit metadata and compatibility

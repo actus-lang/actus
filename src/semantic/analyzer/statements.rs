@@ -48,10 +48,49 @@ impl Analyzer {
             self.validate_expected_literal(value, expected)?;
         }
         self.visit_expression(value)?;
+        self.move_aggregate_assignment_source(name, value, span)?;
         self.validate_arena_provenance_target(index, name, value, span)?;
         self.record_binding_arena_provenance(index, value);
         self.plan_try_unwind(value);
         Ok(())
+    }
+
+    fn move_aggregate_assignment_source(
+        &mut self,
+        destination: &str,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), super::super::errors::SemanticError> {
+        if !self.is_move_only_aggregate(value) {
+            return Ok(());
+        }
+        if let Expr::Identifier { name, .. } = value
+            && name == destination
+        {
+            return Err(super::super::errors::SemanticError {
+                kind: super::super::errors::SemanticErrorKind::SelfAssignment {
+                    name: name.clone(),
+                },
+                span,
+            });
+        }
+        if matches!(value, Expr::Identifier { .. } | Expr::FieldAccess { .. }) {
+            self.move_dat_argument(value, span)?;
+        }
+        Ok(())
+    }
+
+    fn is_move_only_aggregate(&self, expression: &Expr) -> bool {
+        if let Expr::FieldAccess { object, .. } = expression
+            && self.enum_receiver_name(object).is_some()
+        {
+            return false;
+        }
+        let Some(type_name) = self.expression_type_name(expression) else { return false };
+        type_name == "Buffer"
+            || type_name == "Array"
+            || self.struct_types.contains_key(&type_name)
+            || self.enum_types.contains_key(&type_name)
     }
 
     fn visit_index_assignment(

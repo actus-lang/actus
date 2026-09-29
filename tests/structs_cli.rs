@@ -203,3 +203,30 @@ fn avoids_double_drop_after_moving_owned_field() {
         42,
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn replaces_a_struct_assignment_after_cleaning_the_previous_owner() {
+    let root = std::env::temp_dir().join(format!("actus-struct-replace-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { print(self.value); } } verb main() -> Int { erg destination = Counter { value: 1, }; erg source = Counter { value: 2, }; destination = source; return 0; }";
+    fs::write(&input, source).expect("write source");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let execution = std::process::Command::new(&output).output().expect("run executable");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&execution.stdout), "1\n2\n");
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
