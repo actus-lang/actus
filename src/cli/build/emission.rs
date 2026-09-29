@@ -6,7 +6,7 @@ use crate::configuration::{CompilerConfiguration, EntryContract};
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::artifacts::{default_output, write_artifact};
-use super::loading::{load_build_program, validate_strict_program};
+use super::loading::{load_build_program, validate_strict_plan};
 use super::options::EmitKind;
 
 pub(crate) fn build_file(
@@ -45,17 +45,17 @@ fn build_file_with_report(
     report_output: bool,
     mode: ConformanceMode,
 ) -> i32 {
-    let Some((source, program)) = load_build_program(input, configuration) else {
+    let Some((source, plan)) = load_build_program(input, configuration) else {
         return 1;
     };
     if !validate_source_limits(Path::new(input), &source, mode) {
         return 1;
     }
-    let program = crate::semantic::filter_program_for_target(&program, configuration.target());
-    if mode.is_strict() && !validate_strict_program(input, &source, &program) {
+    let caller = crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
+    if mode.is_strict() && !validate_strict_plan(input, &source, &plan) {
         return 1;
     }
-    let Some(fallback_symbol) = first_defined_verb(&program) else {
+    let Some(fallback_symbol) = first_defined_verb(&caller) else {
         eprintln!("error: `{input}` contains no verb declarations");
         return 1;
     };
@@ -65,7 +65,7 @@ fn build_file_with_report(
         .unwrap_or(fallback_symbol)
         .to_owned();
     let report_mode = report_output.then_some(mode);
-    emit_and_write(input, output, emit, configuration, &program, &symbol, report_mode)
+    emit_and_write(input, output, emit, configuration, &plan, &symbol, report_mode)
 }
 
 fn emit_and_write(
@@ -73,11 +73,12 @@ fn emit_and_write(
     output: Option<&Path>,
     emit: EmitKind,
     configuration: &CompilerConfiguration,
-    program: &crate::ast::Program,
+    plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     report_mode: Option<ConformanceMode>,
 ) -> i32 {
-    if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
+    if let Err(error) = validate_entry(plan.caller(), symbol, emit, configuration.entry_contract())
+    {
         eprintln!("error: {error}");
         return 1;
     }
@@ -87,7 +88,8 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match emit_object(program, symbol, configuration) {
+    let implementation = plan.implementation();
+    let bytes = match emit_object(&implementation, symbol, configuration) {
         Ok(bytes) => bytes,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");

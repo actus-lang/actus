@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{lex_diagnostic, module_diagnostic, parse_diagnostic, render_diagnostic};
 use crate::lexer::scan;
-use crate::modules::{ModuleResolver, resolve_imports};
+use crate::modules::{ModuleCompilationPlan, ModuleResolver, build_compilation_plan};
 use crate::parser::parse;
 
 use super::super::diagnostics::{report_diagnostic, report_diagnostics};
@@ -12,7 +12,7 @@ use super::super::diagnostics::{report_diagnostic, report_diagnostics};
 pub(super) fn load_build_program(
     input: &str,
     configuration: &CompilerConfiguration,
-) -> Option<(String, crate::ast::Program)> {
+) -> Option<(String, ModuleCompilationPlan)> {
     let source = read_build_source(input)?;
     let program = parse_build_source(input, &source)?;
     let program = resolve_build_program(input, &source, program, configuration)?;
@@ -54,13 +54,13 @@ fn resolve_build_program(
     source: &str,
     program: crate::ast::Program,
     configuration: &CompilerConfiguration,
-) -> Option<crate::ast::Program> {
+) -> Option<ModuleCompilationPlan> {
     let resolver = ModuleResolver::with_dependencies(
         configuration.source_root(),
         configuration.dependency_roots(),
     );
-    match resolve_imports(&program, &resolver) {
-        Ok(program) => Some(program),
+    match build_compilation_plan(&program, &resolver) {
+        Ok(plan) => Some(plan),
         Err(error) => {
             let diagnostic = module_diagnostic(&error);
             eprintln!("{input}: {}", render_diagnostic(source, &diagnostic));
@@ -85,4 +85,23 @@ pub(super) fn validate_strict_program(
             false
         }
     }
+}
+
+pub(super) fn validate_strict_plan(
+    input: &str,
+    source: &str,
+    plan: &ModuleCompilationPlan,
+) -> bool {
+    if !validate_strict_program(input, source, plan.caller()) {
+        return false;
+    }
+    if let Err(error) = crate::semantic::analyze(&plan.implementation()) {
+        report_diagnostic(
+            Path::new(input),
+            source,
+            crate::diagnostics::semantic_diagnostic(&error),
+        );
+        return false;
+    }
+    true
 }

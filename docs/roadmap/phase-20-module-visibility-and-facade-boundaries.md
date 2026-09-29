@@ -161,7 +161,7 @@ reported later as an importer-side unknown type.
       separate from each imported module's internal implementation unit.
 - [x] Add a linker boundary that accepts one deterministic object input per
       compiled module unit while preserving the existing single-object API.
-- [ ] Generate public wrappers from their validated module implementation
+- [x] Generate public wrappers from their validated module implementation
       unit, including required private dependencies.
 - [ ] Emit each module implementation once when multiple callers import it.
 - [ ] Preserve C ABI declarations and typed status translation at the runtime
@@ -177,14 +177,15 @@ reported later as an importer-side unknown type.
 
 `ModuleCompilationPlan` now separates the public caller program from the
 internal `ModuleUnit` list used for implementation emission. Repeated imports
-are deduplicated by module path, while each retained unit still contains all
-private declarations required by its public wrappers. The existing
-`resolve_imports` API delegates to the plan's public caller view, preserving
-the importer namespace while making the internal units available to the next
-code-generation slice. Object emission and multi-object linking remain open.
-The linker now accepts an ordered object list and rejects an empty link input;
-the CLI has not yet been switched to emit those module objects, so full
-implementation emission remains open.
+are deduplicated by module path, transitive module imports are collected, and
+each retained unit still contains all private declarations required by its
+public wrappers. The build pipeline validates the public caller scope and
+compiles a separate implementation program assembled from caller-local
+declarations plus the internal units. Native application tests prove that
+`std::fs` wrappers execute with their private dependencies while those
+declarations remain absent from caller lookup. The linker also accepts an
+ordered object list and rejects an empty link input; per-module object emission
+and deterministic symbol namespacing remain open.
 
 ## Gate 20.5: Standard-library migration
 
