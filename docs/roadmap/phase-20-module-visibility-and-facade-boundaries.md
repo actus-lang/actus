@@ -420,9 +420,9 @@ standard-library conformance, source limits, and diff checks pass.
       ADRs, and roadmap claims consistently.
 - [x] Run formatting, compilation, Clippy, full tests, source limits, and
       diff checks locally.
-- [ ] Record Linux, macOS, and Windows CI evidence where the affected
+- [x] Record Linux, macOS, and Windows CI evidence where the affected
       compiler or standard-library paths are exercised.
-- [ ] Mark ADR-0047 implemented only after all prior gates are green.
+- [x] Mark ADR-0047 implemented only after all prior gates are green.
 
 ## Required acceptance matrix
 
@@ -453,8 +453,16 @@ The local acceptance run passed `cargo fmt --all -- --check`,
 `cargo check --all-targets --all-features`,
 `cargo clippy --all-targets --all-features -- -D warnings`,
 `cargo test --all-targets --all-features`, `scripts/check_source_limits.sh`,
-`scripts/check_stdlib.sh`, and `git diff --check`. Cross-platform CI remains
-the required evidence for the remaining platform checkbox.
+`scripts/check_stdlib.sh`, and `git diff --check`. PR validation
+also passed Linux, macOS, and Windows Rust checks, coverage, and dependency /
+license policy checks.
+
+CI evidence:
+
+- Linux, macOS, and Windows Rust checks: PR #42, workflow run
+  `36572553201`.
+- Coverage: workflow run `36572553013`.
+- Dependency and license policy: workflow run `36572553511`.
 
 ## Exit criteria
 

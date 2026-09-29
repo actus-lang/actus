@@ -1,6 +1,6 @@
 # ADR-0047: Module-Internal Scope and Facade-Bounded Visibility
 
-- Status: Proposed
+- Status: Implemented
 - Date: 2026-09-29
 - Scope: Actus module aggregation, semantic visibility, code generation, and
   standard-library implementation boundaries
