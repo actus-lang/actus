@@ -154,3 +154,13 @@ quality command set passed: `cargo fmt --all -- --check`, `cargo check --all-tar
 --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
 `cargo test --all-targets --all-features --no-fail-fast`,
 `scripts/check_source_limits.sh`, and `git diff --check`.
+
+## Gate 6 Evidence
+
+The language documentation now has one operator reference covering precedence,
+operand families, short-circuit behavior, checked casts, bounded indexing, and
+pack-field access. The lexical map, Alpha guarantees, style conventions,
+README, manifesto, and introductory manuscript link to or reflect the same
+implemented contract. Accepted and rejected operator examples are kept in
+documentation; executable behavior remains covered by the compiler's native
+and semantic test suites.

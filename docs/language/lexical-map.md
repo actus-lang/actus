@@ -28,8 +28,9 @@ assigns them meaning:
 `case` is the Actus pattern-matching construct. A general conditional statement
 is not part of the language; `if` is valid only as a boolean pattern guard in
 the form `Pattern if condition => body`. The current lexer also recognizes the
-implemented punctuation and operators, including `->`, `=>`, comparisons,
-equality, `!`, arithmetic operators, and field access with `.`.
+implemented punctuation and operators, including `->`, `=>`, relational and
+equality operators, arithmetic, logical, bitwise, shift, cast (`as`),
+indexing, and field access with `.`.
 
 Relational operators are `<`, `<=`, `>`, and `>=`. They bind below arithmetic
 operators and produce `Bool`. The operands must belong to the same numeric
@@ -40,6 +41,11 @@ not implicitly converted for comparison.
 `print(abs text: Buffer)` is length-aware: it writes exactly the Buffer's live
 length, including embedded zero bytes, and does not require a trailing null
 terminator. String output retains its separate text ABI.
+
+The complete implemented operator contract is documented in the
+[operator reference](operators.md). `expr as Type` is an explicit checked
+integer cast; it is not an implicit conversion. `Array[T, N]` and `Buffer`
+indexing accept `Int`, `Usize`, and unsigned primitive integer indices.
 
 `for` is reserved by the lexer but has no parser construct. `else`, `while`,
 and `in` are not active language constructs. `self` remains an identifier; a
@@ -117,13 +123,14 @@ The following types are part of the accepted language design but are not all
 registered in the current compiler:
 
 ```text
-I8  I16  I32  I64
-U8  U16  U32  U64  Usize
-F32  F64
 Char  Unit
 Option[T]
 Result[T, E]
 ```
+
+Primitive integer names use lowercase widths such as `u8`, `i32`, and `u128`;
+`Usize` is the unsigned target-sized index type. Floating primitives are
+`f32` and `f64`.
 
 `Option[T]` and `Result[T, E]` depend on the generic type phase and exhaustive
 pattern semantics. They must not be documented as fully built-in until their

@@ -77,13 +77,13 @@ Code extension, and Tree-sitter.
 
 ## Gate 6: Documentation and language-surface conformance
 
-- [ ] Update the lexical map, language conventions, Alpha guarantees, and
+- [x] Update the lexical map, language conventions, Alpha guarantees, and
       operator reference with the final implemented rules.
-- [ ] Document short-circuit evaluation, numeric family restrictions, shift
+- [x] Document short-circuit evaluation, numeric family restrictions, shift
       count behavior, and zero-divisor behavior.
-- [ ] Add examples and accepted/rejected fixtures without embedding tests in
+- [x] Add examples and accepted/rejected fixtures without embedding tests in
       implementation files.
-- [ ] Verify the README, manifesto, roadmap, ADRs, and implementation agree.
+- [x] Verify the README, manifesto, roadmap, ADRs, and implementation agree.
 
 ## Gate 7: LSP, VS Code, and Tree-sitter synchronization (final gate)
 

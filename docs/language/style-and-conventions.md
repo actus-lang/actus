@@ -231,7 +231,23 @@ erg result = configure_dma(
 );
 ```
 
-## 8. Foreign Function Interface
+## 8. Operators and bounded access
+
+Use explicit parentheses when a mixed expression would be difficult to read.
+The canonical precedence table and operand contracts are maintained in the
+[operator reference](operators.md). Do not rely on implicit numeric
+conversion, truthiness of integers, or unchecked array access.
+
+```act
+verb valid(abs bytes: Buffer, erg index: u32) -> u8 {
+    return bytes[index];
+}
+```
+
+`expr as Type` must be used when an integer value changes primitive width.
+The cast is checked; it is not a formatting hint or an unchecked reinterpret.
+
+## 9. Foreign Function Interface
 
 Foreign declarations use an explicit ABI tag:
 
@@ -251,7 +267,7 @@ The current alpha backend supports the C ABI only. The low-level primitives
 described by ADR-0012 are accepted design commitments and are not all
 implemented in the current compiler.
 
-## 9. Compatibility Rule
+## 10. Compatibility Rule
 
 When the implementation and this document disagree, the discrepancy must be
 resolved explicitly. A syntax or semantic change requires an update to this

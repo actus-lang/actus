@@ -30,6 +30,9 @@ The language specification and compiler architecture are under active developmen
 
 Language style, module visibility, import conventions, and formatting rules are documented in [Actus Language Style and Conventions](docs/language/style-and-conventions.md).
 
+The implemented operator, checked-cast, and bounded-indexing contracts are
+listed in the [operator reference](docs/language/operators.md).
+
 Actus is designed to provide C-level control through raw pointers, MMIO,
 precise layouts, and inline assembly behind explicit `unsafe` boundaries,
 while keeping ownership and borrowing checks active in safe code. See

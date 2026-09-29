@@ -70,6 +70,13 @@ verb process() {
 
 Verbs coordinate actants instead of attaching behavior exclusively to one object. Parameters are declared with semantic roles, and arguments may be positional or explicitly named. Ambiguous positional calls must use names.
 
+Primitive operators are explicit and statically checked. Equality and
+relational expressions return `Bool`; logical expressions short-circuit;
+bitwise and shift expressions require integer families; and `expr as Type` is
+the checked spelling for primitive integer conversion. Bounded `Array[T, N]`
+and `Buffer` indexing performs deterministic bounds checks. See the
+[operator reference](docs/language/operators.md) for the complete contract.
+
 ## 5. Structured Concurrency
 
 Actus uses structured concurrency by default. Concurrent execution is an
