@@ -85,6 +85,10 @@ impl DocumentStore {
         self.documents.get(uri)
     }
 
+    pub(super) fn documents_snapshot(&self) -> Vec<(String, Document)> {
+        self.documents.iter().map(|(uri, document)| (uri.clone(), document.clone())).collect()
+    }
+
     pub fn set_target(&mut self, target: &TargetSpec) {
         self.workspace.set_target(&target.triple().to_string());
     }

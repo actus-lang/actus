@@ -38,6 +38,15 @@ fn is_query_method(method: &str) -> bool {
             | "textDocument/completion"
             | "textDocument/semanticTokens/full"
             | "textDocument/formatting"
+            | "textDocument/declaration"
+            | "textDocument/typeDefinition"
+            | "textDocument/implementation"
+            | "textDocument/references"
+            | "textDocument/documentSymbol"
+            | "workspace/symbol"
+            | "textDocument/prepareCallHierarchy"
+            | "callHierarchy/incomingCalls"
+            | "callHierarchy/outgoingCalls"
     )
 }
 
@@ -172,6 +181,23 @@ fn query_request<W: Write>(
     context: &mut QueryContext<'_, W>,
 ) -> io::Result<()> {
     match method {
+        "textDocument/declaration"
+        | "textDocument/typeDefinition"
+        | "textDocument/implementation"
+        | "textDocument/references"
+        | "textDocument/documentSymbol"
+        | "workspace/symbol"
+        | "textDocument/prepareCallHierarchy"
+        | "callHierarchy/incomingCalls"
+        | "callHierarchy/outgoingCalls" => super::navigation::dispatch(
+            method,
+            id,
+            params,
+            context.store,
+            context.output,
+            context.metadata.clone(),
+            context.cancellation,
+        ),
         "textDocument/definition" => definition(id, params, context),
         "textDocument/hover" => hover(id, params, context),
         "textDocument/completion" => completion(id, params, context),

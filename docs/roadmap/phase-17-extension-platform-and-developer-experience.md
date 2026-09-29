@@ -81,15 +81,15 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.3: Navigation and symbol intelligence
 
-- [ ] Implement definition, declaration, type definition, implementation,
+- [x] Implement definition, declaration, type definition, implementation,
       references, document symbols, workspace symbols, and call hierarchy.
-- [ ] Resolve local symbols, imported facade exports, private sibling symbols,
+- [x] Resolve local symbols, imported facade exports, private sibling symbols,
       generic instantiations, pack fields, and runtime-backed declarations.
-- [ ] Preserve exact source spans and normalized cross-platform URIs for every
+- [x] Preserve exact source spans and normalized cross-platform URIs for every
       navigation result.
-- [ ] Index symbols incrementally and return deterministic ordering with
+- [x] Index symbols incrementally and return deterministic ordering with
       bounded result sets.
-- [ ] Add accepted and rejected tests for private visibility, stale overlays,
+- [x] Add accepted and rejected tests for private visibility, stale overlays,
       duplicate symbols, ambiguous imports, and missing definitions.
 
 ### Gate 17.0.4: Code intelligence and type information

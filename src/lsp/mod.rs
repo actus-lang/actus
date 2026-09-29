@@ -6,6 +6,7 @@ mod documents;
 mod formatting;
 mod hover;
 mod module_scope;
+mod navigation;
 mod position;
 mod progress;
 mod protocol;

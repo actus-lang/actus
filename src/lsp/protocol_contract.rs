@@ -22,6 +22,13 @@ pub(super) fn initialize_result(target: &TargetSpec, params: &Value) -> Value {
         "capabilities": {
             "textDocumentSync": 1,
             "definitionProvider": true,
+            "declarationProvider": true,
+            "typeDefinitionProvider": true,
+            "implementationProvider": true,
+            "referencesProvider": true,
+            "documentSymbolProvider": true,
+            "workspaceSymbolProvider": true,
+            "callHierarchyProvider": true,
             "hoverProvider": true,
             "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
             "semanticTokensProvider": {
