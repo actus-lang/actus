@@ -159,6 +159,8 @@ reported later as an importer-side unknown type.
 
 - [x] Introduce a compilation plan that keeps the caller's public program
       separate from each imported module's internal implementation unit.
+- [x] Add a linker boundary that accepts one deterministic object input per
+      compiled module unit while preserving the existing single-object API.
 - [ ] Generate public wrappers from their validated module implementation
       unit, including required private dependencies.
 - [ ] Emit each module implementation once when multiple callers import it.
@@ -180,6 +182,9 @@ private declarations required by its public wrappers. The existing
 `resolve_imports` API delegates to the plan's public caller view, preserving
 the importer namespace while making the internal units available to the next
 code-generation slice. Object emission and multi-object linking remain open.
+The linker now accepts an ordered object list and rejects an empty link input;
+the CLI has not yet been switched to emit those module objects, so full
+implementation emission remains open.
 
 ## Gate 20.5: Standard-library migration
 

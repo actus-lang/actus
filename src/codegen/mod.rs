@@ -28,7 +28,7 @@ mod types;
 mod vtable;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
-pub use linker::{NativeLinkError, link_object};
+pub use linker::{NativeLinkError, link_object, link_objects};
 pub use model::{
     NativeCleanupPlan, NativeInstruction, NativeLoopUnwindPlan, NativeUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
