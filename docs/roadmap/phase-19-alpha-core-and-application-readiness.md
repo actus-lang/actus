@@ -169,7 +169,7 @@ contracts that the future platform is allowed to consume.
       bridges.
 - [x] Verify C-ABI status contracts use documented explicit values.
 - [x] Verify no hidden allocation is introduced in zero-allocation contracts.
-- [ ] Verify ownership restoration across runtime failures and early returns.
+- [x] Verify ownership restoration across runtime failures and early returns.
 
 ### Cleanup and control flow
 
@@ -213,6 +213,11 @@ The public fallible standard-library surface is audited by
 performance method returns `Result` or `Option`, while explicitly infallible
 constructors, predicates, configuration helpers, and drop operations remain
 value- or unit-returning by contract.
+
+Native ownership restoration after a typed failure is covered by
+`tests/buffer_cli.rs::restores_an_ins_buffer_after_a_typed_failure_return`.
+The callee mutates an `ins Buffer`, returns `Err`, and the caller successfully
+reuses the restored owner afterward.
 
 Cleanup evidence is distributed across `tests/semantic/`, `tests/codegen/`,
 `tests/buffer_cli.rs`, `tests/fs.rs`, `tests/std_io/`, and `tests/cli.rs`;

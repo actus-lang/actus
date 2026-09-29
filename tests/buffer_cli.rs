@@ -66,6 +66,13 @@ fn executes_exclusive_buffer_mutation_and_reuses_the_caller_owner() {
 
 #[cfg(unix)]
 #[test]
+fn restores_an_ins_buffer_after_a_typed_failure_return() {
+    let source = "enum IoError { Failed, } verb fail_after_mutation(ins buffer: Buffer) -> Result[Int, IoError] { append(buffer, 7); return Result[Int, IoError].Err(IoError.Failed); } verb main() -> Int { erg buffer: Buffer = Buffer[4]; erg result = fail_after_mutation(buffer: ins buffer); append(buffer, 35); return case dat result { Result.Err(_) => 42, Result.Ok(_) => 1, }; }\n";
+    assert_eq!(build_and_run(source, "buffer-ins-failure"), 42);
+}
+
+#[cfg(unix)]
+#[test]
 fn returns_and_reuses_a_zero_copy_abs_buffer_view() {
     let source = "verb identity(abs input: Buffer) -> abs Buffer { return input; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; { abs view = ref identity(input: abs buffer); } append(buffer, 41); return 42; }\n";
     assert_eq!(build_and_run(source, "buffer-abs-view"), 42);
