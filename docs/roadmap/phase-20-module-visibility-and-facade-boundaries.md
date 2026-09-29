@@ -245,14 +245,14 @@ while another family still uses an unqualified name.
 
 #### 20.4.6: Reproducibility and ownership evidence
 
-- [ ] Generate a deterministic symbol manifest for every object build.
-- [ ] Compare repeated builds byte-for-byte or document the permitted object
+- [x] Generate a deterministic symbol manifest for every object build.
+- [x] Compare repeated builds byte-for-byte or document the permitted object
       metadata variance with a stable normalized comparison.
-- [ ] Verify deterministic object ordering, namespace identities, and linker
+- [x] Verify deterministic object ordering, namespace identities, and linker
       inputs across repeated and transitive-import builds.
-- [ ] Verify that one module imported by multiple callers is emitted once.
-- [ ] Add regression coverage for same-named declarations in separate modules.
-- [ ] Mark Gate 20.4 complete only after all preceding sub-gates and the full
+- [x] Verify that one module imported by multiple callers is emitted once.
+- [x] Add regression coverage for same-named declarations in separate modules.
+- [x] Mark Gate 20.4 complete only after all preceding sub-gates and the full
       quality matrix pass.
 
 ### Gate 20.4 progress evidence
@@ -302,6 +302,14 @@ manifest. Executable builds write and link the ordered object list, while
 object builds retain the root object and deterministic module sidecars. Native
 application tests cover standard-library modules, private helpers, external
 bridges, transitive imports, and explicit root/module object output.
+
+Gate 20.4.6 is now implemented: every successful object or executable build
+also emits a deterministic `.symbols` manifest containing ordered object owners
+and resolved declaration symbols. Repeated multi-object builds are compared
+byte-for-byte together with their manifests, and a transitive fixture verifies
+canonical alpha-before-zeta object ordering plus duplicate-import elimination.
+The full Rust quality matrix, source limits, and diff validation pass, so Gate
+20.4 is complete.
 
 ## Gate 20.5: Standard-library migration
 

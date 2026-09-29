@@ -25,7 +25,7 @@ impl NativeSymbolBindings {
         Self { external: bindings.into_iter().collect() }
     }
 
-    pub(super) fn external_symbol<'a>(&'a self, source_name: &'a str) -> &'a str {
+    pub(crate) fn external_symbol<'a>(&'a self, source_name: &'a str) -> &'a str {
         self.external.get(source_name).map(String::as_str).unwrap_or(source_name)
     }
 }

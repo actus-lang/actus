@@ -112,6 +112,7 @@ fn emit_and_write(
 pub(super) struct EmittedObject {
     pub(super) name: String,
     pub(super) bytes: Vec<u8>,
+    pub(super) symbols: std::collections::BTreeSet<String>,
 }
 
 fn emit_objects(
@@ -135,7 +136,32 @@ fn emit_objects(
         configuration.target(),
         &bindings,
     )?;
-    let mut objects = vec![EmittedObject { name: "root".to_owned(), bytes: root_bytes }];
+    let mut objects = vec![EmittedObject {
+        name: "root".to_owned(),
+        bytes: root_bytes,
+        symbols: declared_symbols(
+            root.program(),
+            root.namespace().symbol_prefix(),
+            symbol,
+            &bindings,
+        )?,
+    }];
+    objects.extend(emit_module_objects(
+        &object_plan,
+        configuration,
+        &bindings,
+        &generic_instances,
+    )?);
+    Ok(objects)
+}
+
+fn emit_module_objects(
+    object_plan: &crate::modules::ModuleObjectPlan,
+    configuration: &CompilerConfiguration,
+    bindings: &crate::codegen::NativeSymbolBindings,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<Vec<EmittedObject>, NativeEmitError> {
+    let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
         let bytes =
             crate::codegen::emit_module_object_for_target_in_namespace_with_bindings_and_instances(
@@ -143,8 +169,8 @@ fn emit_objects(
                 unit.namespace().symbol_prefix(),
                 configuration.native_backend(),
                 configuration.target(),
-                &bindings,
-                &generic_instances,
+                bindings,
+                generic_instances,
             )
             .map_err(|error| {
                 NativeEmitError(format!(
@@ -152,9 +178,51 @@ fn emit_objects(
                     unit.namespace().module_path()
                 ))
             })?;
-        objects.push(EmittedObject { name: unit.namespace().symbol_prefix().to_owned(), bytes });
+        objects.push(EmittedObject {
+            name: unit.namespace().symbol_prefix().to_owned(),
+            bytes,
+            symbols: declared_symbols(
+                unit.program(),
+                unit.namespace().symbol_prefix(),
+                "",
+                bindings,
+            )?,
+        });
     }
     Ok(objects)
+}
+
+fn declared_symbols(
+    program: &crate::ast::Program,
+    namespace: &str,
+    entry_symbol: &str,
+    bindings: &crate::codegen::NativeSymbolBindings,
+) -> Result<std::collections::BTreeSet<String>, NativeEmitError> {
+    let mut names = Vec::new();
+    for declaration in &program.declarations {
+        match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) => {
+                let symbol = if verb.name == entry_symbol {
+                    verb.name.clone()
+                } else {
+                    crate::codegen::SymbolIdentity::new(
+                        namespace,
+                        crate::codegen::SymbolKind::Verb,
+                        &verb.name,
+                    )
+                    .map_err(|error| NativeEmitError(error.to_string()))?
+                    .as_str()
+                    .to_owned()
+                };
+                names.push(symbol);
+            }
+            crate::ast::TopLevelDecl::ExternalVerb(verb) => {
+                names.push(bindings.external_symbol(&verb.name).to_owned());
+            }
+            _ => {}
+        }
+    }
+    Ok(names.into_iter().collect())
 }
 
 fn module_bindings(

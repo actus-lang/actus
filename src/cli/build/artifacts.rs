@@ -25,11 +25,19 @@ pub(super) fn write_artifact(
                 let _ = fs::remove_file(path);
             }
         }
-        result
-            .and_then(|()| write_metadata(output, configuration).map_err(|error| error.to_string()))
+        result.and_then(|()| write_success_metadata(output, &objects, configuration))
     } else {
-        write_metadata(output, configuration).map_err(|error| error.to_string())
+        write_success_metadata(output, &objects, configuration)
     }
+}
+
+fn write_success_metadata(
+    output: &Path,
+    objects: &[super::emission::EmittedObject],
+    configuration: &CompilerConfiguration,
+) -> Result<(), String> {
+    super::object_manifest::write(&super::object_manifest::path_for(output), objects)?;
+    write_metadata(output, configuration).map_err(|error| error.to_string())
 }
 
 fn object_paths(

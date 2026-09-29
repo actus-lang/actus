@@ -12,5 +12,7 @@ mod identity;
 mod imports;
 #[path = "modules/plan.rs"]
 mod plan;
+#[path = "modules/reproducibility.rs"]
+mod reproducibility;
 #[path = "modules/resolver.rs"]
 mod resolver;

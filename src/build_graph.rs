@@ -104,11 +104,12 @@ pub fn invalidate_stale_artifact(
     Ok(())
 }
 
-fn generated_paths(artifact: &Path) -> [PathBuf; 4] {
+fn generated_paths(artifact: &Path) -> [PathBuf; 5] {
     [
         artifact.to_owned(),
         artifact.with_extension("obj"),
         artifact.with_extension("bin"),
+        artifact.with_extension("symbols"),
         metadata_path(artifact),
     ]
 }
