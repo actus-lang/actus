@@ -315,15 +315,15 @@ The full Rust quality matrix, source limits, and diff validation pass, so Gate
 
 - [x] Migrate `std::io` to the internal/public module-unit model.
 - [x] Migrate `std::fs` to the internal/public module-unit model.
-- [ ] Migrate `std::path` to the internal/public module-unit model.
-- [ ] Keep public APIs typed with `Result`, `Option`, ownership roles, and
+- [x] Migrate `std::path` to the internal/public module-unit model.
+- [x] Keep public APIs typed with `Result`, `Option`, ownership roles, and
       documented Actus contracts.
-- [ ] Keep raw C/POSIX/Windows statuses and unsafe bridge declarations
+- [x] Keep raw C/POSIX/Windows statuses and unsafe bridge declarations
       inaccessible to normal library consumers.
-- [ ] Add positive application tests for every migrated public wrapper family.
-- [ ] Add negative application tests for direct raw-bridge access and private
+- [x] Add positive application tests for every migrated public wrapper family.
+- [x] Add negative application tests for direct raw-bridge access and private
       sibling access.
-- [ ] Update standard-library block documentation and facade exports.
+- [x] Update standard-library block documentation and facade exports.
 
 ### Gate 20.5.1: `std::io` bridge privacy and typed buffer surface
 
@@ -367,6 +367,32 @@ performance declarations carry signatures across the import boundary without
 carrying implementation bodies that reference private bridges. Explicit file
 close marks a successfully closed handle invalid, making the Drop performance
 safe and deterministic on every cleanup path.
+
+### Gate 20.5.3: `std::path` bridge privacy and borrowed view surface
+
+- [x] Remove facade exports from POSIX and Windows parser bridge declarations.
+- [x] Keep component, predicate, normalization, storage, and builder bridges
+      private to the path module implementation scope.
+- [x] Preserve borrowed `PathComponent` and `PathComponents` public views.
+- [x] Preserve typed `PathError`, `Option`, and `Result` contracts at the
+      facade boundary.
+- [x] Add a rejected public-facade raw-bridge access test for `std::path`.
+- [x] Verify strict Actus fixtures and native path/parser regression tests.
+
+The `std::path` facade now exports path representations and typed operations,
+not its POSIX, Windows, storage, parser, or runtime C bridge symbols. The
+existing borrowed component and platform-aware behavior remains public while
+all native implementation entry points are confined to the internal module
+scope.
+
+### Gate 20.5 completion evidence
+
+All three migration families now compile through internal module scope while
+their facades expose typed ownership-aware APIs only. Strict Actus execution
+passes 37/37 library fixtures; native regression coverage passes for I/O,
+filesystem, and path operations; visibility tests reject raw bridge access for
+`std::io`, `std::fs`, and `std::path`; and the full Rust quality matrix,
+standard-library conformance, source limits, and diff checks pass.
 
 ## Gate 20.6: Tooling, compatibility, and closure
 

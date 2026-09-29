@@ -13,7 +13,7 @@ Ensure `self` has storage for at least `capacity` raw units.
 `self` is an exclusive `ins` loan. The C ABI returns zero on success or a
 typed-negative builder status for validation, platform, or capacity failure.
 """
-open unsafe extern "C" verb actus_path_reserve(ins self: Path, erg capacity: Int) -> Int;
+unsafe extern "C" verb actus_path_reserve(ins self: Path, erg capacity: Int) -> Int;
 
 """
 Join `other` into the caller-owned `self` storage without string conversion.
@@ -21,7 +21,7 @@ Join `other` into the caller-owned `self` storage without string conversion.
 `self` is an `ins` loan and `other` is an `abs` view. The bridge returns zero
 or a typed-negative `PathError` status and retains neither borrowed contract.
 """
-open unsafe extern "C" verb actus_path_join(ins self: Path, abs other: Path) -> Int;
+unsafe extern "C" verb actus_path_join(ins self: Path, abs other: Path) -> Int;
 
 """
 Append `other` to the caller-owned `self` storage in place.
@@ -29,7 +29,7 @@ Append `other` to the caller-owned `self` storage in place.
 `self` is an `ins` loan and `other` is an `abs` view. The return status is
 translated by the facade into `Result[Int, PathError]`.
 """
-open unsafe extern "C" verb actus_path_push(ins self: Path, abs other: Path) -> Int;
+unsafe extern "C" verb actus_path_push(ins self: Path, abs other: Path) -> Int;
 
 """
 Replace the final file-name extension using raw platform code units.
@@ -37,7 +37,7 @@ Replace the final file-name extension using raw platform code units.
 `self` is an `ins` loan and `extension` is an `abs` view. The bridge returns
 zero or a typed-negative status; it never retains the borrowed extension.
 """
-open unsafe extern "C" verb actus_path_set_extension(
+unsafe extern "C" verb actus_path_set_extension(
     ins self: Path,
     abs extension: Path
 ) -> Int;
@@ -48,7 +48,7 @@ Replace the final file-name component using raw platform code units.
 or a typed-negative status, performs no implicit UTF-8 transcoding, and uses
 the existing capacity without allocation. `name` is never retained.
 """
-open unsafe extern "C" verb actus_path_set_file_name(
+unsafe extern "C" verb actus_path_set_file_name(
     ins self: Path,
     abs name: Path
 ) -> Int;

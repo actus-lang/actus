@@ -26,7 +26,7 @@ not inspect or mutate a buffer and returns integer `1` only for ASCII byte
 `byte` is an `erg` scalar copied into the runtime call. The result is `1`
 for ASCII `/` (47), otherwise `0`. No path storage is borrowed or allocated.
 """
-open unsafe extern "C" verb actus_posix_is_separator(erg byte: Int) -> Int;
+unsafe extern "C" verb actus_posix_is_separator(erg byte: Int) -> Int;
 
 """Return `1` for the erg byte representing raw POSIX `/` and `0` for every other byte."""
 open verb posix_is_separator(erg byte: Int) -> Int {
@@ -45,7 +45,7 @@ bridge never converts the raw bytes to UTF-8.
 `path` is an `abs` view and is not retained. The status is `0` for relative,
 `1` for absolute, `-1` for embedded null, and `-2` for invalid metadata.
 """
-open unsafe extern "C" verb actus_posix_root_kind(abs path: Path) -> Int;
+unsafe extern "C" verb actus_posix_root_kind(abs path: Path) -> Int;
 
 """Translate a POSIX parser status into the public root result."""
 open verb posix_root_result(erg status: Int) -> Result[PosixRoot, PathError] {

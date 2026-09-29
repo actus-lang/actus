@@ -29,7 +29,7 @@ Return whether one raw Windows separator byte is accepted.
 `byte` is an `erg` scalar. The result is `1` for `/` (47) or `\\` (92),
 otherwise `0`; no UTF-8 conversion or allocation occurs.
 """
-open unsafe extern "C" verb actus_windows_is_separator(erg byte: Int) -> Int;
+unsafe extern "C" verb actus_windows_is_separator(erg byte: Int) -> Int;
 
 """Return `1` for the erg byte representing raw Windows `/` or `\\` and `0` otherwise."""
 open verb windows_is_separator(erg byte: Int) -> Int {
@@ -49,7 +49,7 @@ drive or UNC prefix. The bridge receives raw UTF-16 storage only.
 `2` drive-absolute, `3` UNC, `-1` embedded null, `-2` invalid UTF-16, and
 `-3` invalid path metadata.
 """
-open unsafe extern "C" verb actus_windows_root_kind(abs path: Path) -> Int;
+unsafe extern "C" verb actus_windows_root_kind(abs path: Path) -> Int;
 
 """Translate a Windows parser status into the public root result."""
 open verb windows_root_result(erg status: Int) -> Result[WindowsRoot, PathError] {

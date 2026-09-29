@@ -45,3 +45,16 @@ fn std_fs_raw_bridge_is_not_importable_through_the_public_facade() {
     );
     assert_eq!(module_diagnostic(&error).code(), "E1109");
 }
+
+#[test]
+fn std_path_raw_bridge_is_not_importable_through_the_public_facade() {
+    let source = parse_source(
+        "import path; verb main() -> Int { return actus_path_is_absolute(path: missing); }",
+    );
+    let error = analyze_with_imports(&source, &std_resolver())
+        .expect_err("raw std::path bridges must remain private to the module");
+    assert!(
+        matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "actus_path_is_absolute")
+    );
+    assert_eq!(module_diagnostic(&error).code(), "E1109");
+}

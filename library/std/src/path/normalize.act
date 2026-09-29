@@ -6,7 +6,7 @@
 rewrite the existing owned buffer without allocation. The public `normalize`
 verb retains the `dat` ownership contract and returns `Result[Path, PathError]`.
 """
-open unsafe extern "C" verb actus_path_normalize(ins self: Path) -> Int;
+unsafe extern "C" verb actus_path_normalize(ins self: Path) -> Int;
 
 """Remove lexical dot components and repeated separators from an owned path.
 
