@@ -117,6 +117,16 @@ pub enum BinaryOp {
     Subtract,
     Multiply,
     Divide,
+    LessThan,
+    LessEquals,
+    GreaterThan,
+    GreaterEquals,
+}
+
+impl BinaryOp {
+    pub const fn is_relational(self) -> bool {
+        matches!(self, Self::LessThan | Self::LessEquals | Self::GreaterThan | Self::GreaterEquals)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

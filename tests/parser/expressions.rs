@@ -81,15 +81,12 @@ fn parses_pattern_guards_without_general_if_statements() {
 }
 
 #[test]
-fn rejects_case_fallthrough_and_standalone_break() {
-    for source in [
-        include_str!("../fixtures/parser/invalid/case_fallthrough.act"),
-        include_str!("../fixtures/parser/invalid/case_break.act"),
-    ] {
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        parse(tokens).expect_err("case fallthrough and standalone break must be rejected");
-    }
+fn rejects_case_fallthrough_but_accepts_loop_control_in_case() {
+    let (tokens, errors) = scan(include_str!("../fixtures/parser/invalid/case_fallthrough.act"));
+    assert!(errors.is_empty());
+    parse(tokens).expect_err("case fallthrough must be rejected");
+
+    parse_source(include_str!("../fixtures/parser/invalid/case_break.act"));
 }
 
 #[test]
@@ -240,6 +237,23 @@ fn parses_integer_expression_precedence() {
         panic!("expected binary return expression");
     };
     assert!(matches!(right.as_ref(), Expr::Binary { .. }));
+}
+
+#[test]
+fn parses_relational_operators_below_arithmetic_precedence() {
+    let program = parse_source("verb main() -> Bool { return 1 + 2 < 4 * 2; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::Binary { operator, left, right, .. }), .. } =
+        &verb.body.statements[0]
+    else {
+        panic!("expected relational return expression");
+    };
+    assert_eq!(*operator, actus::ast::BinaryOp::LessThan);
+    assert!(matches!(left.as_ref(), Expr::Binary { operator: actus::ast::BinaryOp::Add, .. }));
+    assert!(matches!(
+        right.as_ref(),
+        Expr::Binary { operator: actus::ast::BinaryOp::Multiply, .. }
+    ));
 }
 
 #[test]

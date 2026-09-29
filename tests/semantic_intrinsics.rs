@@ -37,6 +37,22 @@ fn validates_print_arguments() {
 }
 
 #[test]
+fn validates_relational_operand_families() {
+    analyze_source("verb main() -> Bool { return 1 < 2; }")
+        .expect("matching Int operands should compare");
+    analyze_source(
+        "verb main() -> Bool { erg left: u8 = 1; erg right: u8 = 2; return left <= right; }",
+    )
+    .expect("matching unsigned operands should compare");
+    analyze_source(
+        "verb main() -> Bool { erg left: u8 = 1; erg right: i8 = 2; return left < right; }",
+    )
+    .expect_err("signed and unsigned operands must not mix");
+    analyze_source("verb main() -> Bool { return 1 < 2.0; }")
+        .expect_err("integer and float operands must not mix");
+}
+
+#[test]
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
     assert_eq!(lookup_builtin_type("String"), Some(BuiltinType::String));

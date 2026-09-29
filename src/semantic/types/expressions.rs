@@ -19,6 +19,7 @@ impl Analyzer {
                 .enum_type_application(expression)
                 .and_then(|type_name| type_name.arguments.first().cloned())
                 .and_then(|type_name| lookup_builtin_type(&type_name.name)),
+            Expr::Binary { operator, .. } if operator.is_relational() => Some(BuiltinType::Bool),
             Expr::Binary { .. } => Some(BuiltinType::Int),
             Expr::Identifier { name, span } => {
                 self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
