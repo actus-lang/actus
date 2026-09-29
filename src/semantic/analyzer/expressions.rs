@@ -33,8 +33,10 @@ impl Analyzer {
             Expr::Binary { left, operator, right, .. } => {
                 self.visit_binary_expression(left, operator, right)
             }
-            Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-                self.visit_expression(expression)
+            Expr::Grouping { expression, .. } => self.visit_expression(expression),
+            Expr::Unary { operator, expression, .. } => {
+                self.visit_expression(expression)?;
+                self.validate_unary_operator(*operator, expression)
             }
             Expr::Cast { expression, target, span } => {
                 self.visit_expression(expression)?;
@@ -169,26 +171,66 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         self.visit_expression(left)?;
         self.visit_expression(right)?;
-        if operator.is_relational() {
-            self.validate_relational_operands(left, right)?;
-        }
-        Ok(())
+        self.validate_binary_operator(*operator, left, right)
     }
 
-    fn validate_relational_operands(&self, left: &Expr, right: &Expr) -> Result<(), SemanticError> {
+    fn validate_binary_operator(
+        &self,
+        operator: BinaryOp,
+        left: &Expr,
+        right: &Expr,
+    ) -> Result<(), SemanticError> {
         let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
-        if relational_types_match(&left_type, &right_type) {
+        let valid = if operator.is_relational() {
+            relational_types_match(&left_type, &right_type)
+        } else if matches!(operator, BinaryOp::Equals | BinaryOp::NotEquals) {
+            equality_types_match(&left_type, &right_type)
+        } else if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
+            left_type == "Bool" && right_type == "Bool"
+        } else if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
+            is_integer_type_name(&left_type) && is_unsigned_integer_type_name(&right_type)
+        } else {
+            is_integer_type_name(&left_type) && is_integer_type_name(&right_type)
+        };
+        if valid {
+            self.validate_constant_operator(operator, right, &left_type)?;
             return Ok(());
         }
         Err(SemanticError {
             kind: SemanticErrorKind::TypeMismatch {
-                callee: "relational operator".to_owned(),
+                callee: binary_operator_name(operator).to_owned(),
                 parameter: "operands".to_owned(),
                 expected: left_type,
                 found: right_type,
             },
             span: expression_span(right),
+        })
+    }
+
+    fn validate_unary_operator(
+        &self,
+        operator: UnaryOp,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        let operand_type =
+            self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
+        let valid = match operator {
+            UnaryOp::Negate => true,
+            UnaryOp::LogicalNot => operand_type == "Bool",
+            UnaryOp::BitwiseNot => is_integer_type_name(&operand_type),
+        };
+        if valid {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::TypeMismatch {
+                callee: unary_operator_name(operator).to_owned(),
+                parameter: "operand".to_owned(),
+                expected: expected_unary_type(operator).to_owned(),
+                found: operand_type,
+            },
+            span: expression_span(expression),
         })
     }
 
@@ -332,6 +374,54 @@ fn relational_types_match(left: &str, right: &str) -> bool {
     }
 }
 
+fn equality_types_match(left: &str, right: &str) -> bool {
+    (left == "Bool" && right == "Bool") || relational_types_match(left, right)
+}
+
+fn is_integer_type_name(name: &str) -> bool {
+    name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
+}
+
+fn is_unsigned_integer_type_name(name: &str) -> bool {
+    if name == "Usize" {
+        return true;
+    }
+    primitive_type(name)
+        .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { signed: false, .. }))
+}
+
+fn binary_operator_name(operator: BinaryOp) -> &'static str {
+    match operator {
+        BinaryOp::Equals => "equality operator",
+        BinaryOp::NotEquals => "inequality operator",
+        BinaryOp::Remainder => "remainder operator",
+        BinaryOp::LogicalAnd => "logical and operator",
+        BinaryOp::LogicalOr => "logical or operator",
+        BinaryOp::BitwiseAnd => "bitwise and operator",
+        BinaryOp::BitwiseOr => "bitwise or operator",
+        BinaryOp::BitwiseXor => "bitwise xor operator",
+        BinaryOp::ShiftLeft => "left shift operator",
+        BinaryOp::ShiftRight => "right shift operator",
+        _ => "relational operator",
+    }
+}
+
+fn unary_operator_name(operator: UnaryOp) -> &'static str {
+    match operator {
+        UnaryOp::LogicalNot => "logical not operator",
+        UnaryOp::BitwiseNot => "bitwise not operator",
+        UnaryOp::Negate => "negation operator",
+    }
+}
+
+fn expected_unary_type(operator: UnaryOp) -> &'static str {
+    match operator {
+        UnaryOp::LogicalNot => "Bool",
+        UnaryOp::BitwiseNot => "integer",
+        UnaryOp::Negate => "numeric",
+    }
+}
+
 fn is_cast_integer_type(name: &str) -> bool {
     name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
 }
@@ -367,6 +457,7 @@ fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
             let (value, _) = integer_literal(expression)?;
             Some((value, true))
         }
+        Expr::Cast { expression, .. } => integer_literal(expression),
         _ => None,
     }
 }

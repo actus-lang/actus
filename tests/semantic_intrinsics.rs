@@ -53,6 +53,56 @@ fn validates_relational_operand_families() {
 }
 
 #[test]
+fn validates_adr44_operator_operand_families() {
+    analyze_source("verb main() -> Bool { return 1 == 1; }")
+        .expect("integer equality should be valid");
+    analyze_source("verb main() -> Bool { return (1 < 2) != (2 < 3); }")
+        .expect("Bool equality should be valid");
+    analyze_source("verb main() -> Int { return 7 % 3; }")
+        .expect("integer remainder should be valid");
+    analyze_source("verb main() -> Bool { return !(1 < 2) || (2 == 3); }")
+        .expect("Bool logical operators should be valid");
+    analyze_source(
+        "verb main() -> u8 { erg left: u8 = 7; erg right: u8 = 3; return left & right; }",
+    )
+    .expect("integer bitwise operators should be valid");
+    analyze_source(
+        "verb main() -> u8 { erg left: u8 = 7; erg count: u8 = 1; return left << count; }",
+    )
+    .expect("unsigned shift counts should be valid");
+}
+
+#[test]
+fn rejects_adr44_invalid_operator_operands() {
+    for source in [
+        "verb main() -> Bool { erg left: u8 = 1; erg right: i8 = 1; return left == right; }",
+        "verb main() -> Int { return 1.5 % 1.0; }",
+        "verb main() -> Bool { return 1 && (2 < 3); }",
+        "verb main() -> Int { return 1.5 & 2.5; }",
+        "verb main() -> u8 { erg left: u8 = 1; erg count: i8 = 1; return left << count; }",
+        "verb main() -> Bool { return !1; }",
+    ] {
+        analyze_source(source).expect_err("invalid ADR-0044 operands must be rejected");
+    }
+}
+
+#[test]
+fn rejects_statically_provable_invalid_integer_operations() {
+    let remainder = analyze_source("verb main() -> Int { return 7 % 0; }")
+        .expect_err("constant zero remainder must be rejected");
+    assert!(matches!(remainder.kind, SemanticErrorKind::ConstantRemainderByZero));
+
+    let shift =
+        analyze_source("verb main() -> u8 { erg input: u8 = 1; return input << (8 as u8); }")
+            .expect_err("constant shift count equal to width must be rejected");
+    assert!(matches!(
+        shift.kind,
+        SemanticErrorKind::ConstantShiftCountOutOfRange { count, width }
+            if count == "8" && width == 8
+    ));
+}
+
+#[test]
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
     assert_eq!(lookup_builtin_type("String"), Some(BuiltinType::String));

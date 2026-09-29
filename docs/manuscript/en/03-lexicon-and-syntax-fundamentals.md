@@ -178,7 +178,17 @@ verb message() -> String {
 
 The quotes delimit the value. Escaped quotes do not terminate it. A newline
 before the closing quote produces an unterminated-string diagnostic.
-Standalone byte literals are not currently implemented.
+Standalone byte literals are not currently implemented. Hexadecimal integer
+literals are accepted where the semantic context permits them.
+
+### Operators
+
+Actus keeps operator meaning explicit. Relational and equality expressions
+return `Bool`; logical operators require `Bool` and short-circuit; bitwise and
+shift operators require integer families. `%` is integer-only, and `expr as
+Type` is an explicit checked integer cast. Array and Buffer indexing is bounded
+and accepts `Int`, `Usize`, or unsigned primitive indices. The complete
+precedence and failure contract is in the [operator reference](../../language/operators.md).
 
 ## 4. Bindings and Mutability
 

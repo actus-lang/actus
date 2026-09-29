@@ -49,3 +49,18 @@ mixed numeric families instead of inserting an implicit conversion.
 When `print` receives an `abs Buffer`, the runtime writes exactly the Buffer's
 current length. The operation is binary-safe and does not read beyond the live
 range or require a null terminator.
+
+## Operators, casts, and bounded storage
+
+Equality, remainder, logical, bitwise, shift, and relational operators are
+validated according to their operand families. `&&` and `||` are genuine
+short-circuit control flow: the right operand is not evaluated when its value
+cannot affect the result. Division and remainder by zero, invalid shift
+counts, and out-of-bounds indexing have deterministic native failure paths.
+
+`expr as Type` is the only supported primitive integer conversion syntax.
+Constant casts are range-checked during semantic analysis; dynamic casts use
+native overflow checks. `Array[T, N]` storage is contiguous and bounded, while
+`Buffer` indexing is checked against its live length. `ins` loans mutate the
+caller-owned storage in place and restore the caller's ownership state after
+the call.

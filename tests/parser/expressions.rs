@@ -257,6 +257,36 @@ fn parses_relational_operators_below_arithmetic_precedence() {
 }
 
 #[test]
+fn parses_operator_precedence_across_new_binary_families() {
+    let program = parse_source("verb main() -> Bool { return 1 + 2 << 1 & 7 == 5 || 1 < 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::Binary { operator, left, .. }), .. } =
+        &verb.body.statements[0]
+    else {
+        panic!("expected logical expression");
+    };
+    assert_eq!(*operator, actus::ast::BinaryOp::LogicalOr);
+    assert!(matches!(left.as_ref(), Expr::Binary { operator: actus::ast::BinaryOp::Equals, .. }));
+}
+
+#[test]
+fn parses_logical_and_bitwise_unary_operators() {
+    let program = parse_source("verb main() -> Bool { return !(1 < 2) && ~(1 ^ 2) != 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::Binary { operator, left, right, .. }), .. } =
+        &verb.body.statements[0]
+    else {
+        panic!("expected logical expression");
+    };
+    assert_eq!(*operator, actus::ast::BinaryOp::LogicalAnd);
+    assert!(matches!(left.as_ref(), Expr::Unary { operator: actus::ast::UnaryOp::LogicalNot, .. }));
+    assert!(matches!(
+        right.as_ref(),
+        Expr::Binary { operator: actus::ast::BinaryOp::NotEquals, .. }
+    ));
+}
+
+#[test]
 fn parses_bounded_array_types_and_indexed_assignments() {
     let program = parse_source(
         "struct Table { cells: Array[Int, 4], } verb main() { erg table = table(); table[1] = 2; inspect(table[1][0]); }",

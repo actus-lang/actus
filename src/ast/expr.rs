@@ -117,10 +117,20 @@ pub enum BinaryOp {
     Subtract,
     Multiply,
     Divide,
+    Remainder,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    ShiftLeft,
+    ShiftRight,
     LessThan,
     LessEquals,
     GreaterThan,
     GreaterEquals,
+    Equals,
+    NotEquals,
+    LogicalAnd,
+    LogicalOr,
 }
 
 impl BinaryOp {
@@ -132,6 +142,8 @@ impl BinaryOp {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnaryOp {
     Negate,
+    LogicalNot,
+    BitwiseNot,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

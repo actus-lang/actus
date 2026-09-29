@@ -137,7 +137,7 @@ fn scans_struct_fields_and_dot_access() {
 
 #[test]
 fn scans_comparison_and_logical_operators() {
-    let (tokens, errors) = scan("< <= > >= == != ! => -> =");
+    let (tokens, errors) = scan("< <= > >= == != ! && || % & | ^ ~ << >> => -> =");
 
     assert!(errors.is_empty());
     assert_eq!(
@@ -150,6 +150,15 @@ fn scans_comparison_and_logical_operators() {
             &TokenKind::DoubleEquals,
             &TokenKind::BangEquals,
             &TokenKind::Bang,
+            &TokenKind::AndAnd,
+            &TokenKind::OrOr,
+            &TokenKind::Percent,
+            &TokenKind::Ampersand,
+            &TokenKind::Pipe,
+            &TokenKind::Caret,
+            &TokenKind::Tilde,
+            &TokenKind::ShiftLeft,
+            &TokenKind::ShiftRight,
             &TokenKind::FatArrow,
             &TokenKind::Arrow,
             &TokenKind::Equals,

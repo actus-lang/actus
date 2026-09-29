@@ -25,7 +25,9 @@ impl Parser {
     fn parse_primary_expression(&mut self) -> Result<Expr, ParseError> {
         let token = self.advance_required("expression")?;
         let expression = match token.kind {
-            TokenKind::Minus => self.parse_unary_prefix(token.span),
+            TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde => {
+                self.parse_unary_prefix(token.span, unary_operator(&token.kind))
+            }
             TokenKind::LeftParen => self.parse_grouped_prefix(token.span),
             TokenKind::Identifier(name) => self.parse_identifier_expression(name, token.span),
             TokenKind::Integer(value) => Ok(Expr::Integer { value, span: token.span }),
@@ -42,10 +44,14 @@ impl Parser {
         self.parse_field_access(expression)
     }
 
-    fn parse_unary_prefix(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
+    fn parse_unary_prefix(
+        &mut self,
+        start: SourceSpan,
+        operator: UnaryOp,
+    ) -> Result<Expr, ParseError> {
         let expression = self.parse_primary_expression()?;
         let span = SourceSpan::new(start.start, expression_span(&expression).end);
-        Ok(Expr::Unary { operator: UnaryOp::Negate, expression: Box::new(expression), span })
+        Ok(Expr::Unary { operator, expression: Box::new(expression), span })
     }
 
     fn parse_grouped_prefix(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
@@ -239,19 +245,36 @@ impl Parser {
             TokenKind::Minus => BinaryOp::Subtract,
             TokenKind::Star => BinaryOp::Multiply,
             TokenKind::Slash => BinaryOp::Divide,
+            TokenKind::Percent => BinaryOp::Remainder,
+            TokenKind::ShiftLeft => BinaryOp::ShiftLeft,
+            TokenKind::ShiftRight => BinaryOp::ShiftRight,
+            TokenKind::Ampersand => BinaryOp::BitwiseAnd,
+            TokenKind::Caret => BinaryOp::BitwiseXor,
+            TokenKind::Pipe => BinaryOp::BitwiseOr,
             TokenKind::LessThan => BinaryOp::LessThan,
             TokenKind::LessEquals => BinaryOp::LessEquals,
             TokenKind::GreaterThan => BinaryOp::GreaterThan,
             TokenKind::GreaterEquals => BinaryOp::GreaterEquals,
+            TokenKind::DoubleEquals => BinaryOp::Equals,
+            TokenKind::BangEquals => BinaryOp::NotEquals,
+            TokenKind::AndAnd => BinaryOp::LogicalAnd,
+            TokenKind::OrOr => BinaryOp::LogicalOr,
             _ => return None,
         };
         let precedence = match operator {
-            BinaryOp::Add | BinaryOp::Subtract => 1,
-            BinaryOp::Multiply | BinaryOp::Divide => 2,
+            BinaryOp::LogicalOr => 0,
+            BinaryOp::LogicalAnd => 1,
+            BinaryOp::Equals | BinaryOp::NotEquals => 2,
             BinaryOp::LessThan
             | BinaryOp::LessEquals
             | BinaryOp::GreaterThan
-            | BinaryOp::GreaterEquals => 0,
+            | BinaryOp::GreaterEquals => 3,
+            BinaryOp::BitwiseOr => 4,
+            BinaryOp::BitwiseXor => 5,
+            BinaryOp::BitwiseAnd => 6,
+            BinaryOp::ShiftLeft | BinaryOp::ShiftRight => 7,
+            BinaryOp::Add | BinaryOp::Subtract => 8,
+            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Remainder => 9,
         };
         Some((operator, precedence))
     }
@@ -291,6 +314,15 @@ impl Parser {
         let span = token.span;
         self.advance_required("argument role")?;
         Ok((Some(role), Some(span)))
+    }
+}
+
+fn unary_operator(kind: &TokenKind) -> UnaryOp {
+    match kind {
+        TokenKind::Bang => UnaryOp::LogicalNot,
+        TokenKind::Tilde => UnaryOp::BitwiseNot,
+        TokenKind::Minus => UnaryOp::Negate,
+        _ => unreachable!("unary_operator called for a non-unary token"),
     }
 }
 

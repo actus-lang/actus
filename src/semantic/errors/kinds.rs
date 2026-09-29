@@ -201,6 +201,11 @@ pub enum SemanticErrorKind {
         target: String,
         literal: String,
     },
+    ConstantRemainderByZero,
+    ConstantShiftCountOutOfRange {
+        count: String,
+        width: u16,
+    },
     InvalidArenaCapacity {
         capacity: String,
     },
