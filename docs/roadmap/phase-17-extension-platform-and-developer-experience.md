@@ -239,6 +239,24 @@ suite on Linux, macOS, and Windows.
 - [ ] Reject stale actions when the document version changed after resolution.
 - [ ] Add cancellation and bounded-result behavior for large workspaces.
 
+### Actus command surface
+
+- [ ] Define typed extension commands for `actus new`, `check`, `build`,
+      `run`, `test`, `fmt`, `watch`, and `lock` without duplicating CLI logic.
+- [ ] Resolve workspace root, manifest, compiler path, target, profile, and
+      feature flags from the active workspace configuration.
+- [ ] Expose commands through the Command Palette and an Activity Bar command
+      view with stable labels, keyboard navigation, and disabled states.
+- [ ] Stream command progress and diagnostics into Output, Problems, and the
+      status view while preserving the exact process exit status.
+- [ ] Support cancellation, concurrent-command exclusion, and deterministic
+      cleanup when a workspace closes or trust is revoked.
+- [ ] Reject command execution in untrusted workspaces and report missing
+      compiler, invalid manifests, spawn failures, and non-zero exits as
+      structured user-facing states.
+- [ ] Test command construction, target/profile propagation, trust gating,
+      cancellation, failure rendering, and multi-root workspace selection.
+
 ## Gate 17.1: Memory and Ownership Graph
 
 See [ADR-0032](../decisions/extension/ADR-0032-memory-ownership-graph.md).

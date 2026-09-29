@@ -45,6 +45,7 @@ fn is_query_method(method: &str) -> bool {
             | "actus/run"
             | "textDocument/semanticTokens/full"
             | "actus/semanticModel"
+            | "actus/memoryGraph"
             | "textDocument/formatting"
             | "textDocument/rangeFormatting"
             | "textDocument/declaration"
@@ -216,51 +217,101 @@ fn language_query<W: Write>(
         "textDocument/definition" => definition(id, params, context),
         "textDocument/hover" => hover(id, params, context),
         "textDocument/completion" => completion(id, params, context),
-        "completionItem/resolve" => super::query_handlers::resolve_completion(
-            id,
-            params,
-            context.store,
-            context.target,
-            context.output,
-            context.metadata.clone(),
-            context.cancellation,
-        ),
+        "completionItem/resolve" => resolve_completion(id, params, context),
         "textDocument/signatureHelp" => signature_help(id, params, context),
         "textDocument/codeAction" | "textDocument/codeLens" | "actus/run" => {
-            super::source_queries::dispatch(
-                method,
-                id,
-                params,
-                super::source_queries::Context {
-                    store: context.store,
-                    target: context.target,
-                    output: context.output,
-                    metadata: context.metadata.clone(),
-                    cancellation: context.cancellation,
-                },
-            )
+            source_query(method, id, params, context)
         }
         "textDocument/semanticTokens/full" => semantic_tokens_full(id, params, context),
-        "actus/semanticModel" => super::semantic_query::dispatch(
-            id,
-            params,
-            context.store,
-            context.target,
-            context.output,
-            context.metadata.clone(),
-            context.cancellation,
-        ),
+        "actus/semanticModel" => semantic_model_query(id, params, context),
+        "actus/memoryGraph" => memory_graph_query(id, params, context),
         "textDocument/formatting" => formatting(id, params, context),
-        "textDocument/rangeFormatting" => super::query_handlers::range_formatting(
-            id,
-            params,
-            context.store,
-            context.output,
-            context.metadata.clone(),
-            context.cancellation,
-        ),
+        "textDocument/rangeFormatting" => range_formatting_query(id, params, context),
         _ => Ok(()),
     }
+}
+
+fn resolve_completion<W: Write>(
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::query_handlers::resolve_completion(
+        id,
+        params,
+        context.store,
+        context.target,
+        context.output,
+        context.metadata.clone(),
+        context.cancellation,
+    )
+}
+
+fn source_query<W: Write>(
+    method: &str,
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::source_queries::dispatch(
+        method,
+        id,
+        params,
+        super::source_queries::Context {
+            store: context.store,
+            target: context.target,
+            output: context.output,
+            metadata: context.metadata.clone(),
+            cancellation: context.cancellation,
+        },
+    )
+}
+
+fn semantic_model_query<W: Write>(
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::semantic_query::dispatch(
+        id,
+        params,
+        context.store,
+        context.target,
+        context.output,
+        context.metadata.clone(),
+        context.cancellation,
+    )
+}
+
+fn memory_graph_query<W: Write>(
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::memory_graph::dispatch(
+        id,
+        params,
+        context.store,
+        context.target,
+        context.output,
+        context.metadata.clone(),
+        context.cancellation,
+    )
+}
+
+fn range_formatting_query<W: Write>(
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::query_handlers::range_formatting(
+        id,
+        params,
+        context.store,
+        context.output,
+        context.metadata.clone(),
+        context.cancellation,
+    )
 }
 
 fn is_navigation_method(method: &str) -> bool {

@@ -3,6 +3,8 @@ mod lsp_support;
 
 #[path = "lsp/diagnostics.rs"]
 mod lsp_diagnostics;
+#[path = "lsp/memory_graph.rs"]
+mod lsp_memory_graph;
 #[path = "lsp/navigation.rs"]
 mod lsp_navigation;
 #[path = "lsp/performance.rs"]
