@@ -81,6 +81,11 @@ impl Analyzer {
     }
 
     fn is_move_only_aggregate(&self, expression: &Expr) -> bool {
+        if let Expr::FieldAccess { object, .. } = expression
+            && self.enum_receiver_name(object).is_some()
+        {
+            return false;
+        }
         let Some(type_name) = self.expression_type_name(expression) else { return false };
         type_name == "Buffer"
             || type_name == "Array"
