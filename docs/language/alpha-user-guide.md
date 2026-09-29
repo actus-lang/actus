@@ -8,6 +8,22 @@ planned syntax or extension-platform features.
 An Alpha package has one `Actus.toml` manifest. The language edition is
 explicitly `alpha`, and hosted applications use a `main` entry verb.
 
+To create a new project directory, use:
+
+```sh
+actus new my_program
+```
+
+Use `actus init` when the directory already exists:
+
+```sh
+actus init --no-git
+```
+
+`new` and `init` create the initial manifest and `src/main.act`; they do not
+compile or publish the project. Git initialization is optional and is never
+performed inside an existing parent repository.
+
 ```toml
 [package]
 name = "my_program"
@@ -104,15 +120,17 @@ declarations, and direct facade bypasses produce deterministic diagnostics.
 
 ## 5. Check, build, run, test, format, and watch
 
-From the package root, the verified hosted workflow is:
+After installing an Actus Alpha release, the user-facing workflow is:
 
 ```sh
-cargo run --bin actus -- check examples/hello.act --strict
-cargo run --bin actus -- build examples/hello.act --strict --emit exe -o target/hello
-cargo run --bin actus -- run examples/console_application.act
-cargo run --bin actus -- test --strict
-cargo run --bin actus -- fmt --check
-cargo run --bin actus -- watch --once
+actus new my_program
+cd my_program
+actus check --strict
+actus build --strict --emit exe -o target/hello
+actus run
+actus test --strict
+actus fmt --check
+actus watch --once
 ```
 
 `check` validates without emitting native code. `build` emits an object or
@@ -126,6 +144,20 @@ The real application workflow and exact output/exit-code assertions are in
 `tests/applications.rs` and `docs/language/alpha-application-workflow.md`.
 The CLI command and rejection matrix is in `tests/cli_workflow.rs` and
 `tests/cli_strict.rs`.
+
+### Repository contributor bootstrap
+
+The repository currently bootstraps the compiler from Rust. Contributors who
+are working from a checkout may use the equivalent form below:
+
+```sh
+cargo run --bin actus -- check examples/hello.act --strict
+```
+
+This command is development evidence, not an installation requirement for
+Alpha users. Release installation and platform-specific binary artifacts are
+Gate 19.6 deliverables and are not claimed by this guide until their checks
+pass.
 
 ## 6. Supported Alpha boundary
 
