@@ -11,15 +11,33 @@ impl Analyzer {
             Expr::BufferLiteral { .. } => Some(BuiltinType::Buffer),
             Expr::FloatLiteral { .. } => None,
             Expr::StringLiteral { .. } => Some(BuiltinType::String),
-            Expr::Grouping { expression, .. }
-            | Expr::Borrow { expression, .. }
-            | Expr::Unary { expression, .. } => self.expression_type(expression),
+            Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
+                self.expression_type(expression)
+            }
+            Expr::Unary { operator, expression, .. } => {
+                if matches!(operator, crate::ast::UnaryOp::LogicalNot) {
+                    Some(BuiltinType::Bool)
+                } else {
+                    self.expression_type(expression)
+                }
+            }
             Expr::Cast { target, .. } => lookup_builtin_type(&target.name),
             Expr::Try { expression, .. } => self
                 .enum_type_application(expression)
                 .and_then(|type_name| type_name.arguments.first().cloned())
                 .and_then(|type_name| lookup_builtin_type(&type_name.name)),
-            Expr::Binary { operator, .. } if operator.is_relational() => Some(BuiltinType::Bool),
+            Expr::Binary {
+                operator:
+                    crate::ast::BinaryOp::Equals
+                    | crate::ast::BinaryOp::NotEquals
+                    | crate::ast::BinaryOp::LogicalAnd
+                    | crate::ast::BinaryOp::LogicalOr
+                    | crate::ast::BinaryOp::LessThan
+                    | crate::ast::BinaryOp::LessEquals
+                    | crate::ast::BinaryOp::GreaterThan
+                    | crate::ast::BinaryOp::GreaterEquals,
+                ..
+            } => Some(BuiltinType::Bool),
             Expr::Binary { .. } => Some(BuiltinType::Int),
             Expr::Identifier { name, span } => {
                 self.binding(name, *span).ok().and_then(|index| self.model.bindings[index].ty)
@@ -85,6 +103,35 @@ impl Analyzer {
     pub(crate) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
         if matches!(expression, Expr::FloatLiteral { .. }) {
             return Some("f64".to_owned());
+        }
+        if let Expr::Grouping { expression, .. } = expression {
+            return self.expression_type_name(expression);
+        }
+        if let Expr::Unary { operator, expression, .. } = expression {
+            return if matches!(operator, crate::ast::UnaryOp::LogicalNot) {
+                Some("Bool".to_owned())
+            } else {
+                self.expression_type_name(expression).or_else(|| {
+                    self.expression_type(expression).map(|ty| ty.spec().name.to_owned())
+                })
+            };
+        }
+        if let Expr::Binary { operator, left, .. } = expression
+            && !matches!(
+                operator,
+                crate::ast::BinaryOp::Equals
+                    | crate::ast::BinaryOp::NotEquals
+                    | crate::ast::BinaryOp::LogicalAnd
+                    | crate::ast::BinaryOp::LogicalOr
+                    | crate::ast::BinaryOp::LessThan
+                    | crate::ast::BinaryOp::LessEquals
+                    | crate::ast::BinaryOp::GreaterThan
+                    | crate::ast::BinaryOp::GreaterEquals
+            )
+        {
+            if let Some(type_name) = self.expression_type_name(left) {
+                return Some(type_name);
+            }
         }
         if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
             && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))

@@ -31,14 +31,14 @@ Code extension, and Tree-sitter.
 
 ## Gate 2: Semantic typing and invalid-program rejection
 
-- [ ] Validate `==` and `!=` for compatible values without implicit casts.
-- [ ] Validate `%` for supported signed and unsigned integer families.
-- [ ] Require `Bool` operands for `&&`, `||`, and `!`.
-- [ ] Validate integer-only bitwise operators and preserve width and signedness.
+- [x] Validate `==` and `!=` for compatible values without implicit casts.
+- [x] Validate `%` for supported signed and unsigned integer families.
+- [x] Require `Bool` operands for `&&`, `||`, and `!`.
+- [x] Validate integer-only bitwise operators and preserve width and signedness.
 - [ ] Validate unsigned shift counts and define out-of-range count behavior.
-- [ ] Reject float bitwise operations, numeric truthiness, mixed equality
+- [x] Reject float bitwise operations, numeric truthiness, mixed equality
       families, and incompatible operand widths where required.
-- [ ] Add deterministic positive and negative semantic tests for every family.
+- [x] Add deterministic positive and negative semantic tests for every family.
 
 ## Gate 3: Native arithmetic, bitwise, and equality lowering
 
