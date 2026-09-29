@@ -208,7 +208,7 @@ fn freestanding_multi_object_build_keeps_configured_entry_and_module_symbols() {
     let (root, input, output) = project("freestanding-objects", source);
     fs::write(
         root.join("Actus.toml"),
-        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\nentry = \"boot\"\n\n[build]\ntarget = \"x86_64-unknown-uefi\"\n",
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\nentry = \"boot\"\n\n[build]\ntarget = \"x86_64-unknown-linux-gnu\"\nentry_contract = \"freestanding\"\n",
     )
     .expect("write freestanding manifest");
     fs::create_dir_all(root.join("src/math")).expect("create math module directory");
