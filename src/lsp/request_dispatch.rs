@@ -47,7 +47,7 @@ fn is_lifecycle_method(method: &str) -> bool {
 
 fn lifecycle_request(
     request: Request,
-    store: &DocumentStore,
+    store: &mut DocumentStore,
     target: &mut TargetSpec,
     state: &mut SessionState,
     output: &mut impl Write,
@@ -68,7 +68,7 @@ fn initialize_request(
     target: &mut TargetSpec,
     state: &mut SessionState,
     output: &mut impl Write,
-    store: &DocumentStore,
+    store: &mut DocumentStore,
     cancellation: Option<&CancellationToken>,
 ) -> io::Result<bool> {
     if *state != SessionState::Created {
@@ -80,7 +80,7 @@ fn initialize_request(
         );
     }
     validate_initialize_contract(&request.params)?;
-    super::server::configure_target(&request.params, target);
+    super::server::configure_target(&request.params, target, store);
     *state = SessionState::Running;
     super::server::respond(
         output,

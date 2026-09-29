@@ -16,6 +16,7 @@ mod request_dispatch;
 mod semantic_tokens;
 mod server;
 mod transport;
+mod workspace;
 
 pub use diagnostics::analyze_document;
 pub use server::run_stdio;

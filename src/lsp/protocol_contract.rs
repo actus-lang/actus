@@ -113,6 +113,7 @@ pub(super) fn response_metadata(
         compiler_version: env!("CARGO_PKG_VERSION"),
         target: target.triple().to_string(),
         result_state: "available",
+        workspace_version: store.workspace_generation(),
         document,
     }
 }

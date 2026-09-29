@@ -64,19 +64,19 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.2: Incremental workspace and semantic model
 
-- [ ] Build a versioned workspace model for open documents, package manifests,
+- [x] Build a versioned workspace model for open documents, package manifests,
       module facades, siblings, imports, and target configuration.
 - [x] Preserve full, incremental, and close overlay updates with strict
       document-version validation.
-- [ ] Recompute only affected modules and dependents after an overlay change;
+- [x] Recompute only affected modules and dependents after an overlay change;
       unrelated documents must retain valid cached results.
-- [ ] Add deterministic module and symbol indexes for package-local and
+- [x] Add deterministic module and symbol indexes for package-local and
       workspace-wide queries.
-- [ ] Make every compiler-backed query cancelable and invalidate results when
+- [x] Make every compiler-backed query cancelable and invalidate results when
       a newer document version supersedes the request.
-- [ ] Bound overlay size, workspace traversal, result count, and cache memory;
+- [x] Bound overlay size, workspace traversal, result count, and cache memory;
       report bounded or partial results explicitly.
-- [ ] Test unsaved edits, deleted files, renamed modules, facade changes,
+- [x] Test unsaved edits, deleted files, renamed modules, facade changes,
       dependency changes, and concurrent document updates.
 
 ### Gate 17.0.3: Navigation and symbol intelligence

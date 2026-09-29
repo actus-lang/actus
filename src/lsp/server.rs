@@ -108,11 +108,14 @@ pub(super) fn open_document(
     output: &mut impl Write,
 ) -> io::Result<()> {
     let params = serde_json::from_value::<DidOpenParams>(params).map_err(invalid_params)?;
-    store.open(
+    if let Err(error) = store.open(
         params.text_document.uri.clone(),
         params.text_document.version,
         params.text_document.text,
-    );
+    ) {
+        eprintln!("actus lsp: {error}");
+        return Ok(());
+    }
     publish(output, &params.text_document.uri, store, target)
 }
 
@@ -177,7 +180,7 @@ fn publish(
     )
 }
 
-pub(super) fn configure_target(params: &Value, target: &mut TargetSpec) {
+pub(super) fn configure_target(params: &Value, target: &mut TargetSpec, store: &mut DocumentStore) {
     let requested = params
         .get("initializationOptions")
         .and_then(|options| options.get("target"))
@@ -186,6 +189,7 @@ pub(super) fn configure_target(params: &Value, target: &mut TargetSpec) {
     let Some(requested) = requested else { return };
     if let Ok(parsed) = TargetSpec::parse(requested) {
         *target = parsed;
+        store.set_target(target);
     }
 }
 

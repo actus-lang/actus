@@ -107,6 +107,8 @@ pub struct ResponseMetadata {
     pub target: String,
     #[serde(rename = "resultState")]
     pub result_state: &'static str,
+    #[serde(rename = "workspaceVersion")]
+    pub workspace_version: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub document: Option<DocumentMetadata>,
 }
