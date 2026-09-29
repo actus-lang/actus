@@ -54,13 +54,33 @@ pub(crate) fn find_hover(
             range: range(source, name_span),
         });
     }
-    let info = intrinsic_info(&name)
+    let mut info = intrinsic_info(&name)
         .or_else(|| local_info(source, &program, &name, offset))
         .or_else(|| imported_info(uri, &program, &name, overlays, target))?;
+    append_target_details(&mut info, target);
     Some(super::HoverInfo {
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
     })
+}
+
+fn append_target_details(info: &mut SymbolInfo, target: &TargetSpec) {
+    if info.signature.starts_with("pack ") {
+        let details = format!(
+            "Target data model: `{}`; pointer width `{:?}`; endianness `{:?}`; entry contract `{}`.",
+            target.triple(),
+            target.pointer_width,
+            target.endianness,
+            match target.entry_contract() {
+                crate::target::EntryContract::Hosted => "hosted",
+                crate::target::EntryContract::Freestanding => "freestanding",
+            },
+        );
+        info.documentation = Some(match info.documentation.take() {
+            Some(documentation) => format!("{documentation}\n\n{details}"),
+            None => details,
+        });
+    }
 }
 
 fn semantic_binding_info(
@@ -83,6 +103,7 @@ fn semantic_binding_info(
         .or_else(|| binding.ty.map(|ty| ty.spec().name.to_owned()))?;
     let identifier =
         super::tokens::identifier_span(source, binding.span, name).unwrap_or(binding.span);
+    let documentation = indexed_type_documentation(&type_name);
     Some(SymbolInfo {
         signature: format!(
             "{} {name}: {type_name} [ownership: {}; access: {}]",
@@ -91,10 +112,22 @@ fn semantic_binding_info(
             access_name(&binding.access),
         ),
         span: identifier,
-        documentation: Some(
-            "Semantic information is derived from the compiler binding model.".to_owned(),
-        ),
+        documentation,
     })
+}
+
+fn indexed_type_documentation(type_name: &str) -> Option<String> {
+    if type_name == "Buffer" {
+        return Some(
+            "Compiler facts: element type `u8`; valid dynamic indexes satisfy `0 <= index < length`; out-of-bounds access uses the deterministic runtime trap.".to_owned(),
+        );
+    }
+    let arguments =
+        type_name.strip_prefix("Array[")?.strip_suffix(']')?.split(", ").collect::<Vec<_>>();
+    (arguments.len() == 2).then(|| format!(
+        "Compiler facts: element type `{}`; capacity `{}`; valid dynamic indexes satisfy `0 <= index < {}`; out-of-bounds access uses the deterministic runtime trap.",
+        arguments[0], arguments[1], arguments[1]
+    ))
 }
 
 fn format_type_name(type_name: &crate::ast::TypeName) -> String {

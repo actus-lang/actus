@@ -16,6 +16,8 @@ mod query_bounds;
 mod query_handlers;
 mod rename;
 mod request_dispatch;
+mod semantic_model;
+mod semantic_query;
 mod semantic_tokens;
 mod server;
 mod signature_help;

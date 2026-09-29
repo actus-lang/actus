@@ -44,6 +44,7 @@ fn is_query_method(method: &str) -> bool {
             | "textDocument/codeLens"
             | "actus/run"
             | "textDocument/semanticTokens/full"
+            | "actus/semanticModel"
             | "textDocument/formatting"
             | "textDocument/rangeFormatting"
             | "textDocument/declaration"
@@ -202,6 +203,15 @@ fn query_request<W: Write>(
             method == "textDocument/prepareRename",
         );
     }
+    language_query(method, id, params, context)
+}
+
+fn language_query<W: Write>(
+    method: &str,
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
     match method {
         "textDocument/definition" => definition(id, params, context),
         "textDocument/hover" => hover(id, params, context),
@@ -231,25 +241,26 @@ fn query_request<W: Write>(
             )
         }
         "textDocument/semanticTokens/full" => semantic_tokens_full(id, params, context),
+        "actus/semanticModel" => super::semantic_query::dispatch(
+            id,
+            params,
+            context.store,
+            context.target,
+            context.output,
+            context.metadata.clone(),
+            context.cancellation,
+        ),
         "textDocument/formatting" => formatting(id, params, context),
-        "textDocument/rangeFormatting" => range_formatting(id, params, context),
+        "textDocument/rangeFormatting" => super::query_handlers::range_formatting(
+            id,
+            params,
+            context.store,
+            context.output,
+            context.metadata.clone(),
+            context.cancellation,
+        ),
         _ => Ok(()),
     }
-}
-
-fn range_formatting<W: Write>(
-    id: Option<Value>,
-    params: Value,
-    context: &mut QueryContext<'_, W>,
-) -> io::Result<()> {
-    super::query_handlers::range_formatting(
-        id,
-        params,
-        context.store,
-        context.output,
-        context.metadata.clone(),
-        context.cancellation,
-    )
 }
 
 fn is_navigation_method(method: &str) -> bool {

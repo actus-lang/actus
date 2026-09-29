@@ -141,19 +141,19 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.7: Actus semantic intelligence
 
-- [ ] Expose `erg`, `abs`, `dat`, and `ins` roles without changing ownership
+- [x] Expose `erg`, `abs`, `dat`, and `ins` roles without changing ownership
       semantics or inventing editor-only states.
-- [ ] Render active, frozen, suspended, moved, and dropped transitions from
+- [x] Render active, frozen, suspended, moved, and dropped transitions from
       compiler ownership records, including cleanup and reborrow edges.
-- [ ] Explain `Array` and `Buffer` element types, dynamic-index bounds,
+- [x] Explain `Array` and `Buffer` element types, dynamic-index bounds,
       checked casts, and deterministic trap behavior.
-- [ ] Expose `pack` backing types, field offsets, widths, masks, ranges,
+- [x] Expose `pack` backing types, field offsets, widths, masks, ranges,
       reserved fields, and target data-model information.
-- [ ] Show target-filtered declarations and explain unavailable host,
+- [x] Show target-filtered declarations and explain unavailable host,
       freestanding, board, and runtime capabilities.
-- [ ] Keep all displayed facts traceable to compiler source spans and semantic
+- [x] Keep all displayed facts traceable to compiler source spans and semantic
       snapshots; the extension must not infer or repair compiler behavior.
-- [ ] Add fixtures for ownership moves, loans, cleanup, arenas, packs, arrays,
+- [x] Add fixtures for ownership moves, loans, cleanup, arenas, packs, arrays,
       buffers, generics, target declarations, and error propagation.
 
 ### Gate 17.0.8: Performance, cancellation, and bounded behavior
