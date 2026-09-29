@@ -15,10 +15,44 @@ pub enum DiagnosticPhase {
     Parser,
     /// A module discovery or import-resolution failure.
     Module,
+    /// A target-selection or target-capability validation failure.
+    Target,
     /// A semantic validation failure.
     Semantic,
+    /// A backend or generated-code validation failure.
+    Codegen,
     /// A diagnostic whose producer has not assigned a phase yet.
     Unclassified,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+/// A secondary source location that explains a compiler diagnostic.
+pub struct DiagnosticRelatedLocation {
+    source_path: Option<String>,
+    span: SourceSpan,
+    message: String,
+}
+
+impl DiagnosticRelatedLocation {
+    /// Creates a related location with an optional source path and explanation.
+    pub fn new(source_path: Option<String>, span: SourceSpan, message: impl Into<String>) -> Self {
+        Self { source_path, span, message: message.into() }
+    }
+
+    /// Returns the related source path, when the location belongs to a file.
+    pub fn source_path(&self) -> Option<&str> {
+        self.source_path.as_deref()
+    }
+
+    /// Returns the related half-open byte span.
+    pub const fn span(&self) -> SourceSpan {
+        self.span
+    }
+
+    /// Returns the related-location explanation.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -93,6 +127,7 @@ pub struct Diagnostic {
     message: String,
     explanation: Option<String>,
     suggestion: Option<String>,
+    related: Vec<DiagnosticRelatedLocation>,
 }
 
 impl Diagnostic {
@@ -128,6 +163,18 @@ impl Diagnostic {
     /// Attaches an actionable correction without changing the diagnostic code.
     pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
         self.suggestion = Some(suggestion.into());
+        self
+    }
+
+    /// Replaces the primary span after a recovery pass has bounded it.
+    pub const fn with_span(mut self, span: SourceSpan) -> Self {
+        self.span = span;
+        self
+    }
+
+    /// Attaches a deterministic secondary source location.
+    pub fn with_related_location(mut self, location: DiagnosticRelatedLocation) -> Self {
+        self.related.push(location);
         self
     }
 
@@ -171,6 +218,11 @@ impl Diagnostic {
         self.suggestion.as_deref()
     }
 
+    /// Returns secondary source locations in stable insertion order.
+    pub fn related_locations(&self) -> &[DiagnosticRelatedLocation] {
+        &self.related
+    }
+
     fn new(
         code: impl Into<String>,
         severity: DiagnosticSeverity,
@@ -186,6 +238,7 @@ impl Diagnostic {
             message: message.into(),
             explanation: None,
             suggestion: None,
+            related: Vec::new(),
         }
     }
 }

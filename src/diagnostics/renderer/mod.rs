@@ -20,8 +20,22 @@ pub fn lex_diagnostic(error: &LexError) -> Diagnostic {
 
 /// Converts a parser failure into the stable diagnostic model.
 pub fn parse_diagnostic(error: &ParseError) -> Diagnostic {
-    Diagnostic::error(parse_code(error.code), error.span, parse_message(error))
-        .with_phase(DiagnosticPhase::Parser)
+    let code = match error.kind {
+        ParseErrorKind::UnexpectedToken { found: crate::lexer::TokenKind::Eof, .. }
+        | ParseErrorKind::UnexpectedEndOfInput { .. } => "E0004",
+        _ => parse_code(error.code),
+    };
+    let diagnostic = Diagnostic::error(code, error.span, parse_message(error))
+        .with_phase(DiagnosticPhase::Parser);
+    match &error.kind {
+        ParseErrorKind::UnexpectedEndOfInput { expected }
+        | ParseErrorKind::UnexpectedToken { expected, found: crate::lexer::TokenKind::Eof } => {
+            diagnostic
+                .with_explanation("the source ends before the parser can complete this construct")
+                .with_suggestion(format!("complete the declaration with {expected}"))
+        }
+        _ => diagnostic,
+    }
 }
 
 /// Converts a semantic failure into the stable diagnostic model.
@@ -47,7 +61,15 @@ pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
 pub fn render_diagnostic(source: &str, diagnostic: &Diagnostic) -> String {
     let (line, column) = line_column(source, diagnostic.span().start);
     let severity = severity_name(diagnostic.severity());
-    format!("{severity}[{}] at {line}:{column}: {}", diagnostic.code(), diagnostic.message())
+    let mut rendered =
+        format!("{severity}[{}] at {line}:{column}: {}", diagnostic.code(), diagnostic.message());
+    if let Some(explanation) = diagnostic.explanation() {
+        rendered.push_str(&format!("; note: {explanation}"));
+    }
+    if let Some(suggestion) = diagnostic.suggestion() {
+        rendered.push_str(&format!("; help: {suggestion}"));
+    }
+    rendered
 }
 
 /// Renders one diagnostic with optional ANSI severity coloring.

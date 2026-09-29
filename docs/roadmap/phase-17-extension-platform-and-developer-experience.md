@@ -126,17 +126,17 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.6: Diagnostics and recovery
 
-- [ ] Unify lexer, parser, semantic, ownership, target, and code-generation
+- [x] Unify lexer, parser, semantic, ownership, target, and code-generation
       diagnostics behind stable codes, ranges, severity, and related data.
-- [ ] Add deterministic recovery for incomplete source so editor queries remain
+- [x] Add deterministic recovery for incomplete source so editor queries remain
       useful without hiding real compiler errors.
-- [ ] Publish diagnostics only for the current document version and clear them
+- [x] Publish diagnostics only for the current document version and clear them
       deterministically on close or successful replacement.
-- [ ] Include actionable related locations, notes, ownership transitions, and
+- [x] Include actionable related locations, notes, ownership transitions, and
       suggested fixes where the compiler provides them.
-- [ ] Never let the semantic analyzer or code generator write directly to the
+- [x] Never let the semantic analyzer or code generator write directly to the
       terminal; LSP rendering remains an independent adapter concern.
-- [ ] Test malformed tokens, incomplete declarations, invalid imports, type
+- [x] Test malformed tokens, incomplete declarations, invalid imports, type
       errors, ownership failures, target filtering, and recovery boundaries.
 
 ### Gate 17.0.7: Actus semantic intelligence

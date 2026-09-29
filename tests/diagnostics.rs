@@ -1,10 +1,11 @@
 use std::process::{Command, Output};
 
 use actus::diagnostics::{
-    Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase, DiagnosticSeverity,
-    StrictDiagnosticCategory, lex_diagnostic, render_colored_diagnostic, render_diagnostic,
-    render_json_diagnostics, render_lex_error, render_parse_error, render_semantic_error,
-    semantic_diagnostic, sort_diagnostics, strict_code_category, validate_diagnostic_catalog,
+    Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase,
+    DiagnosticRelatedLocation, DiagnosticSeverity, StrictDiagnosticCategory, lex_diagnostic,
+    render_colored_diagnostic, render_diagnostic, render_json_diagnostics, render_lex_error,
+    render_parse_error, render_semantic_error, semantic_diagnostic, sort_diagnostics,
+    strict_code_category, validate_diagnostic_catalog,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::modules::{ModuleError, ModuleResolutionError};
@@ -161,7 +162,10 @@ fn diagnostic_model_is_independent_from_terminal_rendering() {
     assert_eq!(diagnostic.message(), "strict warning");
     assert_eq!(diagnostic.explanation(), Some("strict mode rejects unresolved warnings"));
     assert_eq!(diagnostic.suggestion(), Some("resolve the warning before building"));
-    assert_eq!(render_diagnostic(source, &diagnostic), "warning[E1800] at 2:1: strict warning");
+    assert_eq!(
+        render_diagnostic(source, &diagnostic),
+        "warning[E1800] at 2:1: strict warning; note: strict mode rejects unresolved warnings; help: resolve the warning before building"
+    );
 }
 
 #[test]
@@ -192,7 +196,12 @@ fn json_renderer_preserves_shared_diagnostic_metadata() {
             .with_phase(DiagnosticPhase::Configuration)
             .with_source_path("Actus.toml")
             .with_explanation("strict mode rejects unresolved warnings")
-            .with_suggestion("resolve the warning before building"),
+            .with_suggestion("resolve the warning before building")
+            .with_related_location(DiagnosticRelatedLocation::new(
+                Some("src/origin.act".to_owned()),
+                SourceSpan::new(9, 14),
+                "origin of the warning",
+            )),
         Diagnostic::error("E0001", SourceSpan::new(0, 1), "unexpected character")
             .with_phase(DiagnosticPhase::Lexical)
             .with_source_path("src/main.act"),
@@ -207,6 +216,7 @@ fn json_renderer_preserves_shared_diagnostic_metadata() {
     assert_eq!(entries[0]["sourcePath"], "Actus.toml");
     assert_eq!(entries[0]["span"]["start"], 3);
     assert_eq!(entries[0]["explanation"], "strict mode rejects unresolved warnings");
+    assert_eq!(entries[0]["relatedInformation"][0]["message"], "origin of the warning");
     assert_eq!(entries[1]["code"], "E0001");
     assert_eq!(entries[1]["phase"], "lexical");
     assert_eq!(diagnostics[0].code(), "E1800");

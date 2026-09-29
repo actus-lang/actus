@@ -25,6 +25,19 @@ fn json_diagnostic(diagnostic: &Diagnostic) -> Value {
         "sourcePath": diagnostic.source_path(),
         "span": json_span(diagnostic.span()),
         "suggestion": diagnostic.suggestion(),
+        "relatedInformation": diagnostic
+            .related_locations()
+            .iter()
+            .map(json_related_location)
+            .collect::<Vec<_>>(),
+    })
+}
+
+fn json_related_location(location: &super::super::DiagnosticRelatedLocation) -> Value {
+    json!({
+        "message": location.message(),
+        "sourcePath": location.source_path(),
+        "span": json_span(location.span()),
     })
 }
 
@@ -39,7 +52,9 @@ fn phase_name(phase: DiagnosticPhase) -> &'static str {
         DiagnosticPhase::Lexical => "lexical",
         DiagnosticPhase::Parser => "parser",
         DiagnosticPhase::Module => "module",
+        DiagnosticPhase::Target => "target",
         DiagnosticPhase::Semantic => "semantic",
+        DiagnosticPhase::Codegen => "codegen",
         DiagnosticPhase::Unclassified => "unclassified",
     }
 }

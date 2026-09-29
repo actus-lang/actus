@@ -1,6 +1,8 @@
 #[path = "lsp/support.rs"]
 mod lsp_support;
 
+#[path = "lsp/diagnostics.rs"]
+mod lsp_diagnostics;
 #[path = "lsp/navigation.rs"]
 mod lsp_navigation;
 #[path = "lsp/protocol.rs"]

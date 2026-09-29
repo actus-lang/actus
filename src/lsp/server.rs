@@ -150,7 +150,11 @@ pub(super) fn close_document(
             &serde_json::to_value(Notification {
                 jsonrpc: "2.0",
                 method: "textDocument/publishDiagnostics",
-                params: PublishDiagnosticsParams { uri: uri.to_owned(), diagnostics: Vec::new() },
+                params: PublishDiagnosticsParams {
+                    uri: uri.to_owned(),
+                    version: None,
+                    diagnostics: Vec::new(),
+                },
             })
             .map_err(invalid_params)?,
         );
@@ -165,16 +169,20 @@ fn publish(
     target: &TargetSpec,
 ) -> io::Result<()> {
     let overlays = store.source_overlays();
-    let diagnostics = store
-        .get(uri)
-        .map(|document| analyze_document_for_target(uri, &document.text, &overlays, target))
-        .unwrap_or_default();
+    let Some(document) = store.get(uri) else {
+        return Ok(());
+    };
+    let diagnostics = analyze_document_for_target(uri, &document.text, &overlays, target);
     write_message(
         output,
         &serde_json::to_value(Notification {
             jsonrpc: "2.0",
             method: "textDocument/publishDiagnostics",
-            params: PublishDiagnosticsParams { uri: uri.to_owned(), diagnostics },
+            params: PublishDiagnosticsParams {
+                uri: uri.to_owned(),
+                version: Some(document.version),
+                diagnostics,
+            },
         })
         .map_err(invalid_params)?,
     )

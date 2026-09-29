@@ -150,6 +150,8 @@ pub struct Notification {
 #[derive(Clone, Debug, Serialize)]
 pub struct PublishDiagnosticsParams {
     pub uri: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<i64>,
     pub diagnostics: Vec<LspDiagnostic>,
 }
 
@@ -160,4 +162,18 @@ pub struct LspDiagnostic {
     pub code: Option<String>,
     pub source: Option<String>,
     pub message: String,
+    #[serde(rename = "relatedInformation", skip_serializing_if = "Vec::is_empty")]
+    pub related_information: Vec<LspRelatedInformation>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct LspRelatedInformation {
+    pub location: LspLocation,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct LspLocation {
+    pub uri: String,
+    pub range: LspRange,
 }
