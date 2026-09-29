@@ -35,21 +35,21 @@ Code extension, and Tree-sitter.
 - [x] Validate `%` for supported signed and unsigned integer families.
 - [x] Require `Bool` operands for `&&`, `||`, and `!`.
 - [x] Validate integer-only bitwise operators and preserve width and signedness.
-- [ ] Validate unsigned shift counts and define out-of-range count behavior.
+- [x] Validate unsigned shift counts and define out-of-range count behavior.
 - [x] Reject float bitwise operations, numeric truthiness, mixed equality
       families, and incompatible operand widths where required.
 - [x] Add deterministic positive and negative semantic tests for every family.
 
 ## Gate 3: Native arithmetic, bitwise, and equality lowering
 
-- [ ] Lower integer equality and inequality with type-correct comparisons.
-- [ ] Lower signed and unsigned remainder with explicit zero-divisor handling.
-- [ ] Lower `&`, `|`, `^`, and `~` using native integer operations.
-- [ ] Lower `<<` and `>>` with signedness-aware shift instructions and the
+- [x] Lower integer equality and inequality with type-correct comparisons.
+- [x] Lower signed and unsigned remainder with explicit zero-divisor handling.
+- [x] Lower `&`, `|`, `^`, and `~` using native integer operations.
+- [x] Lower `<<` and `>>` with signedness-aware shift instructions and the
       approved shift-count contract.
-- [ ] Preserve packed-field and indexed-array behavior when operator results
+- [x] Preserve packed-field and indexed-array behavior when operator results
       are read from or written to those values.
-- [ ] Add native execution and deterministic trap tests for arithmetic and
+- [x] Add native execution and deterministic trap tests for arithmetic and
       bitwise operations.
 
 ## Gate 4: Short-circuit CFG and ownership correctness

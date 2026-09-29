@@ -128,10 +128,9 @@ impl Analyzer {
                     | crate::ast::BinaryOp::GreaterThan
                     | crate::ast::BinaryOp::GreaterEquals
             )
+            && let Some(type_name) = self.expression_type_name(left)
         {
-            if let Some(type_name) = self.expression_type_name(left) {
-                return Some(type_name);
-            }
+            return Some(type_name);
         }
         if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
             && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))

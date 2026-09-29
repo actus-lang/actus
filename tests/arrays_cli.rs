@@ -26,6 +26,48 @@ fn reads_first_and_last_buffer_bytes_with_dynamic_indexing() {
 
 #[cfg(unix)]
 #[test]
+fn lowers_adr44_integer_comparisons_remainder_bitwise_and_shifts() {
+    let status = run_array_fixture(
+        "adr44-integer-operators",
+        "verb main() -> Int { erg left: u8 = 13; erg right: u8 = 5; erg count: u8 = 3; erg remainder = left % right; erg bits = (left & right) ^ left; erg shifted = right << count; return case left == left { true => (remainder as Int) + (bits as Int) + (shifted as Int) - 9, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn lowers_bitwise_not_and_signed_right_shift() {
+    let status = run_array_fixture(
+        "adr44-unary-and-signed-shift",
+        "verb main() -> Int { erg value: i8 = -8; erg count: u8 = 2; erg shifted = value >> count; erg mask: u8 = 0; erg inverted = ~mask; erg expected: u8 = 255; return case inverted == expected { true => shifted as Int + 44, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn traps_on_integer_remainder_by_zero() {
+    let status = run_array_fixture(
+        "adr44-remainder-zero",
+        "verb main() -> Int { erg value = 42; erg divisor = 0; return value % divisor; }",
+    );
+    assert!(!status.success());
+    assert!(status.code().is_none(), "remainder by zero should trap: {status:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn traps_on_shift_count_out_of_range() {
+    let status = run_array_fixture(
+        "adr44-shift-range",
+        "verb main() -> Int { erg value: u8 = 1; erg count: u8 = 8; return value << count; }",
+    );
+    assert!(!status.success());
+    assert!(status.code().is_none(), "shift count overflow should trap: {status:?}");
+}
+
+#[cfg(unix)]
+#[test]
 fn accepts_u8_and_u32_dynamic_indices() {
     let status = run_array_fixture(
         "unsigned-indices",
