@@ -100,9 +100,25 @@ fn analyze_package_module(
         None if path.parent() == Some(configuration.source_root()) => {
             crate::modules::analyze_with_imports(program, &resolver)
         }
+        None if is_project_entry_with_imports(&path, program, configuration.project_root()) => {
+            crate::modules::analyze_with_imports(program, &resolver)
+        }
         None => return None,
     };
     Some(result.map(|_| ()))
+}
+
+fn is_project_entry_with_imports(
+    path: &Path,
+    program: &crate::ast::Program,
+    project_root: &Path,
+) -> bool {
+    path.starts_with(project_root)
+        && !path.starts_with(project_root.join("tests"))
+        && program
+            .declarations
+            .iter()
+            .any(|declaration| matches!(declaration, crate::ast::TopLevelDecl::Import(_)))
 }
 
 fn package_diagnostics(result: Result<(), ModuleError>) -> Vec<Diagnostic> {
