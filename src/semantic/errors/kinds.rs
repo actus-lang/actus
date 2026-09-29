@@ -196,6 +196,23 @@ pub enum SemanticErrorKind {
     InvalidArenaCapacity {
         capacity: String,
     },
+    InvalidArrayCapacity {
+        capacity: String,
+    },
+    InvalidIndexType {
+        found: String,
+    },
+    IndexOutOfBounds {
+        index: String,
+        capacity: String,
+    },
+    NonIndexableTarget {
+        found: String,
+    },
+    IndexedElementTypeMismatch {
+        expected: String,
+        found: String,
+    },
     ArenaReferenceEscape {
         name: String,
     },

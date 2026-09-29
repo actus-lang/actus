@@ -37,6 +37,9 @@ impl Analyzer {
             Expr::FieldAccess { object, field, .. } => self
                 .resolved_type_name(object)
                 .and_then(|type_name| self.specialized_field_type(&type_name, field)),
+            Expr::Index { target, .. } => {
+                self.resolved_type_name(target).and_then(|type_name| array_element_type(&type_name))
+            }
             _ => None,
         }
     }
@@ -83,4 +86,9 @@ impl Analyzer {
         .ok()
         .map(|substitution| substitution.apply(&field.ty))
     }
+}
+
+fn array_element_type(type_name: &TypeName) -> Option<TypeName> {
+    (type_name.name == "Array" && type_name.arguments.len() == 2)
+        .then(|| type_name.arguments[0].clone())
 }

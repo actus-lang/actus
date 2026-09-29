@@ -33,13 +33,13 @@ complete.
 
 ## Gate 2: Semantic validation and bounds checking
 
-- [ ] Validate array element types and compile-time capacities.
-- [ ] Validate index expressions as supported integer types.
-- [ ] Reject statically provable out-of-bounds constant indices.
-- [ ] Define runtime bounds-check insertion for dynamic indices.
-- [ ] Reject unsupported indexing targets and invalid assignment types.
-- [ ] Add stable diagnostics for capacity, index, and element-type failures.
-- [ ] Add positive and negative semantic fixtures for reads and writes.
+- [x] Validate array element types and compile-time capacities.
+- [x] Validate index expressions as supported integer types.
+- [x] Reject statically provable out-of-bounds constant indices.
+- [x] Define runtime bounds-check insertion for dynamic indices.
+- [x] Reject unsupported indexing targets and invalid assignment types.
+- [x] Add stable diagnostics for capacity, index, and element-type failures.
+- [x] Add positive and negative semantic fixtures for reads and writes.
 
 ## Gate 3: Ownership and slot loans
 

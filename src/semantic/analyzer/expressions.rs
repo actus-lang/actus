@@ -1,9 +1,9 @@
-use crate::ast::Expr;
+use crate::ast::{Expr, PrimitiveType, TypeName, UnaryOp, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
-use super::{canonical_type_name, try_type_mismatch};
+use super::{canonical_type_name, expression_span, try_type_mismatch};
 
 impl Analyzer {
     pub(crate) fn visit_expression_with_expected(
@@ -48,13 +48,89 @@ impl Analyzer {
             }
             Expr::Index { target, index, .. } => {
                 self.visit_expression(target)?;
-                self.visit_expression(index)
+                self.visit_expression(index)?;
+                self.validate_index_access(target, index).map(|_| ())
             }
             Expr::Case { mode, subject, branches, span } => {
                 self.visit_case_expression(*mode, subject, branches, *span)
             }
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    pub(crate) fn validate_index_access(
+        &self,
+        target: &Expr,
+        index: &Expr,
+    ) -> Result<TypeName, SemanticError> {
+        let target_type = self.resolved_type_name(target).ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::NonIndexableTarget { found: "unknown".to_owned() },
+            span: expression_span(target),
+        })?;
+        if target_type.name != "Array" || target_type.arguments.len() != 2 {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::NonIndexableTarget {
+                    found: canonical_type_name(&target_type),
+                },
+                span: expression_span(target),
+            });
+        }
+        self.validate_integer_index(index)?;
+        self.validate_constant_index(index, &target_type.arguments[1])?;
+        Ok(target_type.arguments[0].clone())
+    }
+
+    pub(crate) fn validate_index_value(
+        &self,
+        target: &Expr,
+        index: &Expr,
+        value: &Expr,
+    ) -> Result<(), SemanticError> {
+        let element = self.validate_index_access(target, index)?;
+        let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
+        let expected = canonical_type_name(&element);
+        if type_names_match(&expected, &found)
+            || (primitive_type(&element.name)
+                .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { .. }))
+                && integer_literal(value).is_some())
+        {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::IndexedElementTypeMismatch { expected, found },
+            span: expression_span(value),
+        })
+    }
+
+    fn validate_integer_index(&self, index: &Expr) -> Result<(), SemanticError> {
+        let found = self.expression_type_name(index).unwrap_or_else(|| "unknown".to_owned());
+        if found == "Int" || primitive_type(&found).is_some_and(is_integer_primitive) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::InvalidIndexType { found },
+            span: expression_span(index),
+        })
+    }
+
+    fn validate_constant_index(
+        &self,
+        index: &Expr,
+        capacity: &TypeName,
+    ) -> Result<(), SemanticError> {
+        let Some((literal, negative)) = integer_literal(index) else { return Ok(()) };
+        let Some(capacity) = capacity.name.parse::<u128>().ok() else { return Ok(()) };
+        let magnitude = parse_integer_magnitude(&literal).unwrap_or(u128::MAX);
+        if negative || magnitude >= capacity {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::IndexOutOfBounds {
+                    index: if negative { format!("-{literal}") } else { literal },
+                    capacity: capacity.to_string(),
+                },
+                span: expression_span(index),
+            });
+        }
+        Ok(())
     }
 
     fn visit_buffer_literal(&mut self, length: &Expr) -> Result<(), SemanticError> {
@@ -149,4 +225,40 @@ impl Analyzer {
         }
         Ok(())
     }
+}
+
+fn is_integer_primitive(primitive: PrimitiveType) -> bool {
+    matches!(primitive, PrimitiveType::Integer { .. })
+}
+
+fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
+    match expression {
+        Expr::Integer { value, .. } => Some((value.clone(), false)),
+        Expr::Grouping { expression, .. } => integer_literal(expression),
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            let (value, _) = integer_literal(expression)?;
+            Some((value, true))
+        }
+        _ => None,
+    }
+}
+
+fn parse_integer_magnitude(literal: &str) -> Option<u128> {
+    literal
+        .strip_prefix("0x")
+        .or_else(|| literal.strip_prefix("0X"))
+        .map_or_else(|| literal.parse().ok(), |digits| u128::from_str_radix(digits, 16).ok())
+}
+
+fn type_names_match(expected: &str, found: &str) -> bool {
+    strip_reference_role(expected) == strip_reference_role(found)
+}
+
+fn strip_reference_role(type_name: &str) -> &str {
+    type_name
+        .strip_prefix("abs ")
+        .or_else(|| type_name.strip_prefix("ins "))
+        .or_else(|| type_name.strip_prefix("erg "))
+        .or_else(|| type_name.strip_prefix("dat "))
+        .unwrap_or(type_name)
 }

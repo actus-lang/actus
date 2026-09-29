@@ -8,6 +8,7 @@ pub(super) fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<Stri
         .or_else(|| struct_semantic_message(kind))
         .or_else(|| pack_codes::message(kind))
         .or_else(|| arena_semantic_message(kind))
+        .or_else(|| array_semantic_message(kind))
         .or_else(|| type_semantic_message(kind))
 }
 
@@ -24,6 +25,28 @@ fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::ArenaReferenceLive { arena, reference } => {
             format!("cannot move or drop arena `{arena}` while reference `{reference}` is live")
+        }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn array_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::InvalidArrayCapacity { capacity } => {
+            format!("array capacity `{capacity}` must be a positive compile-time integer")
+        }
+        SemanticErrorKind::InvalidIndexType { found } => {
+            format!("array index must be an integer, found `{found}`")
+        }
+        SemanticErrorKind::IndexOutOfBounds { index, capacity } => {
+            format!("array index `{index}` is outside capacity `{capacity}`")
+        }
+        SemanticErrorKind::NonIndexableTarget { found } => {
+            format!("cannot index value of type `{found}`")
+        }
+        SemanticErrorKind::IndexedElementTypeMismatch { expected, found } => {
+            format!("indexed element type mismatch: expected `{expected}`, found `{found}`")
         }
         _ => return None,
     };

@@ -1,5 +1,7 @@
 #[path = "semantic/arenas.rs"]
 mod arenas;
+#[path = "semantic/arrays.rs"]
+mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
 #[path = "semantic/drop.rs"]
