@@ -7,24 +7,11 @@ import fs;
 
 verb utility_path() -> Result[Path, PathError] {
     erg raw = Buffer[0];
-    append(raw, 46);
-    append(raw, 47);
-    append(raw, 97);
-    append(raw, 99);
-    append(raw, 116);
-    append(raw, 117);
-    append(raw, 115);
-    append(raw, 95);
-    append(raw, 112);
-    append(raw, 49);
-    append(raw, 57);
-    append(raw, 50);
-    append(raw, 46);
-    append(raw, 98);
-    append(raw, 105);
-    append(raw, 110);
-    append(raw, 0);
-    erg parsed = path_from_posix(storage: dat raw);
+    append(raw, 46); append(raw, 47); append(raw, 97); append(raw, 99);
+    append(raw, 116); append(raw, 117); append(raw, 115); append(raw, 95);
+    append(raw, 112); append(raw, 49); append(raw, 57); append(raw, 50);
+    append(raw, 46); append(raw, 98); append(raw, 105); append(raw, 110); append(raw, 0);
+    erg parsed = path_from_ascii(storage: dat raw);
     return case dat parsed {
         Result.Err(error) => Result[Path, PathError].Err(error),
         Result.Ok(path) => normalize(dat path),
