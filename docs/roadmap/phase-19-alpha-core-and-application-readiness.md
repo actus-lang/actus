@@ -160,6 +160,55 @@ contracts that the future platform is allowed to consume.
 - [x] Repeated builds produce the documented deterministic result.
 - [x] Missing-facade diagnostics are stable across repeated isolated checks.
 
+### Runtime profiles and standard-library resolution
+
+The project manifest must select the runtime environment explicitly. The
+runtime profile is a build configuration, not an ordinary user dependency:
+
+```toml
+[build]
+runtime = "std"
+```
+
+- [ ] Define the manifest schema for `runtime = "core" | "std" |
+      "freestanding"`, including the default profile and edition-aware
+      compatibility rules.
+- [ ] Keep `core` implicit and dependency-free; it must not require users to
+      spell out a path to compiler-owned runtime sources.
+- [ ] Make `std` opt in through the manifest and resolve the compiler-owned
+      standard-library package from a versioned builtin/sysroot location.
+- [ ] Define canonical standard-library imports and facades so a project can
+      use `std::io`, `std::fs`, and `std::path` without copying the library
+      into its own `src/` tree or configuring absolute host paths.
+- [ ] Preserve explicit local dependency resolution for third-party and
+      workspace packages, while rejecting ambiguous aliases or declarations
+      that conflict with the selected runtime profile.
+- [ ] Build only standard-library modules reachable from the project's import
+      graph; unused `std` modules must not be compiled or linked implicitly.
+- [ ] Include runtime profile, standard-library version, target, and profile
+      in lockfile validation and artifact identity so builds remain
+      reproducible across machines.
+- [ ] Define diagnostics for missing runtime metadata, unsupported runtime
+      values, incompatible imports, and attempts to use `std` from a
+      freestanding build.
+- [ ] Add `actus init` templates that declare the intended runtime profile and
+      produce a valid first build without manual standard-library wiring.
+- [ ] Add accepted and rejected manifest tests for `core`, `std`, and
+      `freestanding`, including lockfile mismatch and conflicting dependency
+      cases.
+- [ ] Add native integration tests proving that `std` applications compile
+      and run, while `core` and `freestanding` builds do not acquire a host
+      runtime implicitly.
+- [ ] Document the runtime selection and standard-library resolution contract
+      in the user-facing project and package documentation.
+
+The implementation should be split into a future architecture decision for
+runtime selection and builtin package resolution, followed by configuration
+loading, module resolution, reachability-based compilation, lockfile identity,
+CLI templates, and end-to-end verification. This gate must not be marked
+complete while a project still depends on manually copied `library/std`
+paths.
+
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
 
 ### Runtime boundaries

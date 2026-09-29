@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{render_lex_error, render_parse_error};
-use crate::formatter::format_program;
+use crate::formatter::{SourceComment, format_program_with_comments};
 use crate::lexer::scan;
 use crate::parser::parse;
 
@@ -69,8 +69,25 @@ fn format_file(path: &Path, check_only: bool) -> i32 {
         eprintln!("{display}: {}", render_lex_error(&source, error));
         return 1;
     }
+    let comments = source_comments(&source, &tokens);
     let Some(program) = parse_format_source(path, &source, tokens) else { return 1 };
-    format_program_source(path, &source, &program, check_only)
+    format_program_source(path, &source, &program, &comments, check_only)
+}
+
+fn source_comments(source: &str, tokens: &[crate::lexer::Token]) -> Vec<SourceComment> {
+    tokens
+        .iter()
+        .filter(|token| {
+            matches!(
+                token.kind,
+                crate::lexer::TokenKind::Comment | crate::lexer::TokenKind::DocString(_)
+            )
+        })
+        .map(|token| SourceComment {
+            span: token.span,
+            text: source[token.span.start..token.span.end].to_owned(),
+        })
+        .collect()
 }
 
 fn read_format_source(path: &Path) -> Option<String> {
@@ -101,10 +118,11 @@ fn format_program_source(
     path: &Path,
     source: &str,
     program: &crate::ast::Program,
+    comments: &[SourceComment],
     check_only: bool,
 ) -> i32 {
     let display = path.display();
-    let formatted = format_program(program);
+    let formatted = format_program_with_comments(program, comments);
     if check_only {
         if formatted == source {
             println!("{display} is formatted");

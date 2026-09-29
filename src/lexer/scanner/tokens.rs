@@ -68,18 +68,12 @@ impl<'source> Scanner<'source> {
         true
     }
 
-    pub(super) fn skip_whitespace_and_comments(&mut self) {
-        loop {
-            while self.peek().is_some_and(char::is_whitespace) {
-                self.advance();
-            }
-            if self.peek() != Some('/') || self.peek_next() != Some('/') {
-                return;
-            }
-            while self.peek().is_some_and(|character| character != '\n') {
-                self.advance();
-            }
+    pub(super) fn scan_comment(&mut self) {
+        let start = self.cursor;
+        while self.peek().is_some_and(|character| character != '\n') {
+            self.advance();
         }
+        self.push_simple(TokenKind::Comment, start);
     }
 
     fn push_simple(&mut self, kind: TokenKind, start: usize) {

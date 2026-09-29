@@ -40,14 +40,24 @@ impl<'source> Scanner<'source> {
 
     pub fn scan(mut self) -> (Vec<Token>, Vec<LexError>) {
         while !self.is_at_end() {
-            self.skip_whitespace_and_comments();
+            self.skip_whitespace();
             if self.is_at_end() {
                 break;
+            }
+            if self.peek() == Some('/') && self.peek_next() == Some('/') {
+                self.scan_comment();
+                continue;
             }
             self.scan_token();
         }
         let end = self.cursor;
         self.tokens.push(Token::new(TokenKind::Eof, SourceSpan::new(end, end)));
         (self.tokens, self.errors)
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.peek().is_some_and(char::is_whitespace) {
+            self.advance();
+        }
     }
 }

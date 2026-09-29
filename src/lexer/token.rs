@@ -62,6 +62,7 @@ pub enum TokenKind {
     FloatLiteral(String),
     StringLiteral(String),
     DocString(String),
+    Comment,
     LeftBrace,
     RightBrace,
     LeftParen,

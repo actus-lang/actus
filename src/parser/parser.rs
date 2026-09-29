@@ -61,6 +61,8 @@ struct VerbSignature {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
+        let tokens =
+            tokens.into_iter().filter(|token| !matches!(token.kind, TokenKind::Comment)).collect();
         Self { tokens, cursor: 0, enum_names: HashSet::new(), case_subject: false }
     }
 

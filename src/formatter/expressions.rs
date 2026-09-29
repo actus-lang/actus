@@ -2,7 +2,7 @@ use crate::ast::{Argument, Expr};
 
 use super::{Formatter, role_name};
 
-impl Formatter {
+impl Formatter<'_> {
     pub(super) fn expression(&mut self, expression: &Expr) {
         match expression {
             Expr::Identifier { name, .. } => self.output.push_str(name),
@@ -32,7 +32,9 @@ impl Formatter {
             Expr::MethodCall { receiver, method, arguments, .. } => {
                 self.method_call(receiver, method, arguments)
             }
-            Expr::StructLit { name, fields, .. } => self.struct_literal(name, fields),
+            Expr::StructLit { name, type_arguments, fields, .. } => {
+                self.struct_literal(name, type_arguments, fields)
+            }
             Expr::FieldAccess { object, field, .. } => self.field_access(object, field),
             Expr::Index { target, index, .. } => {
                 self.expression(target);
@@ -99,6 +101,10 @@ impl Formatter {
 
     fn call(&mut self, callee: &str, arguments: &[Argument]) {
         self.output.push_str(callee);
+        if arguments.len() > 2 || self.current_line_width() > 90 {
+            self.multiline_call(arguments);
+            return;
+        }
         self.output.push('(');
         for (index, argument) in arguments.iter().enumerate() {
             if index > 0 {
@@ -109,8 +115,39 @@ impl Formatter {
         self.output.push(')');
     }
 
-    fn struct_literal(&mut self, name: &str, fields: &[crate::ast::StructFieldInit]) {
+    fn multiline_call(&mut self, arguments: &[Argument]) {
+        self.output.push_str("(\n");
+        self.indent += 1;
+        for (index, argument) in arguments.iter().enumerate() {
+            self.line_indent();
+            self.argument(argument);
+            if index + 1 < arguments.len() {
+                self.output.push(',');
+            }
+            self.output.push('\n');
+        }
+        self.indent -= 1;
+        self.line_indent();
+        self.output.push(')');
+    }
+
+    fn struct_literal(
+        &mut self,
+        name: &str,
+        type_arguments: &[crate::ast::TypeName],
+        fields: &[crate::ast::StructFieldInit],
+    ) {
         self.output.push_str(name);
+        if !type_arguments.is_empty() {
+            self.output.push('[');
+            for (index, argument) in type_arguments.iter().enumerate() {
+                if index > 0 {
+                    self.output.push_str(", ");
+                }
+                self.type_name(argument);
+            }
+            self.output.push(']');
+        }
         self.output.push_str(" {");
         for (index, field) in fields.iter().enumerate() {
             if index > 0 {
@@ -152,9 +189,10 @@ impl Formatter {
             self.output.push(' ');
         }
         self.expression(subject);
-        self.output.push_str(" {");
+        self.output.push_str(" {\n");
+        self.indent += 1;
         for branch in branches {
-            self.output.push(' ');
+            self.line_indent();
             self.pattern(&branch.pattern);
             if let Some(guard) = &branch.guard {
                 self.output.push_str(" if ");
@@ -165,9 +203,11 @@ impl Formatter {
                 crate::ast::CaseBody::Expression(expression) => self.expression(expression),
                 crate::ast::CaseBody::Block(block) => self.block(block),
             }
-            self.output.push(',');
+            self.output.push_str(",\n");
         }
-        self.output.push_str(" }");
+        self.indent -= 1;
+        self.line_indent();
+        self.output.push('}');
     }
 
     fn pattern(&mut self, pattern: &crate::ast::Pattern) {

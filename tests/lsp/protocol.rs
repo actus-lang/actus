@@ -45,6 +45,23 @@ fn lsp_hover_and_formatting_return_compiler_information() {
 }
 
 #[test]
+fn lsp_formatting_preserves_comments_and_imports() {
+    let uri = "file:///tmp/actus-lsp-format-comments.act";
+    let source = "// keep this comment\nimport io;\n\n// keep this body note\nverb main() -> Int { return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("keep this comment"), "stdout: {stdout}");
+    assert!(stdout.contains("keep this body note"), "stdout: {stdout}");
+    assert!(stdout.contains("import io;"), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_signature_help_exposes_roles_types_and_active_parameter() {
     let uri = "file:///tmp/actus-lsp-signature-help.act";
     let source = "verb combine(abs left: Int, ins right: Buffer) -> Int { return left; }\nverb caller() -> Int { return combine(left: 1, right: Buffer[0]); }\n";
