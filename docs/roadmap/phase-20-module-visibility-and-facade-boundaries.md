@@ -24,17 +24,53 @@ standard library, and language tooling.
 
 ## Gate 20.0: Baseline and module contract inventory
 
-- [ ] Record the current facade, sibling discovery, export, and import flow.
-- [ ] Map the current flattened `Program` representation and its limitations.
-- [ ] Inventory all modules whose public declarations depend on private
+- [x] Record the current facade, sibling discovery, export, and import flow.
+- [x] Map the current flattened `Program` representation and its limitations.
+- [x] Inventory all modules whose public declarations depend on private
       helpers, raw bridges, or private types.
-- [ ] Record the existing module diagnostic range and reserve a stable
+- [x] Record the existing module diagnostic range and reserve a stable
       visibility diagnostic without renderer-specific behavior.
-- [ ] Add baseline positive and negative fixtures for public and private
+- [x] Add baseline positive and negative fixtures for public and private
       declarations.
-- [ ] Define module identity, source provenance, cache keys, and repeated
+- [x] Define module identity, source provenance, cache keys, and repeated
       import behavior.
-- [ ] Document the baseline in this roadmap and ADR-0047 before implementation.
+- [x] Document the baseline in this roadmap and ADR-0047 before implementation.
+
+### Gate 20.0 baseline evidence
+
+The current resolver identifies a directory module through its canonical
+facade and deterministically orders the facade followed by its sibling source
+files. `parse_module` lexes and parses every selected source, validates
+duplicate declaration identities, and returns one flattened `Program`. That
+program is the current internal analysis scope, so a public wrapper can call a
+private helper from an opened sibling.
+
+The baseline inventory covers the currently boundary-sensitive standard
+library modules: `std::io` has private stdout, stderr, stdin, cursor, buffered,
+copy, and raw runtime bridge declarations; `std::fs` has private file,
+metadata, options, and filesystem-operation bridges; and `std::path` has
+private storage, parser, component, predicate, normalization, builder, and
+POSIX/Windows bridge declarations. These modules are the required migration
+set for Gate 20.5. Their public facade wrappers are already typed, while the
+raw `unsafe extern "C"` declarations are currently present in opened sibling
+sources and therefore depend on the missing internal/public scope split.
+
+`exports_module` separately scans the facade's `open` sibling declarations and
+collects only declarations explicitly marked `open` from those siblings.
+`resolve_imports` uses that export table to filter declarations copied into an
+importer's flattened `Program`. Repeated imports are deduplicated by module
+path, but the module implementation and importer interface are not yet
+represented as separate compiler objects.
+
+The baseline fixtures in `tests/modules/baseline.rs` prove all three current
+boundaries: the internal flattened program retains private declarations, a
+public wrapper resolves a private helper internally, and an external caller
+cannot resolve that helper through the facade. The existing `E1100`-`E1108`
+module diagnostic range is reserved for the visibility diagnostic that Gate
+20.3 will make explicit. Module source paths and spans are currently retained
+for duplicate and parse diagnostics; cache-key and module-identity behavior
+is currently the resolver's canonical module path plus deterministic source
+ordering.
 
 ## Gate 20.1: Module compilation-unit representation
 

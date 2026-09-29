@@ -42,6 +42,29 @@ internal compilation unit and its public import interface.
 
 ## Decision
 
+### Baseline recorded before implementation
+
+Before the new module-unit boundary is implemented, the compiler has two
+partial views of a module. The resolver discovers a canonical facade and its
+siblings in deterministic order. `parse_module` parses the selected sources,
+checks duplicate declaration identities, and flattens all declarations into a
+single `Program`; this is the scope currently used for internal semantic
+analysis. Consequently, an exported wrapper can resolve a private helper or
+runtime bridge from an opened sibling.
+
+`exports_module` independently computes the facade-facing export list by
+requiring an opened sibling and an `open` declaration. `resolve_imports` then
+copies only those exported declarations into the importing `Program`,
+deduplicating repeated module paths. This protects current external lookup
+from ordinary closed declarations, but it does not preserve a first-class
+module implementation alongside its public interface. The missing distinction
+is the architectural gap addressed by the following decision.
+
+Gate 20.0 records this behavior with positive and negative fixtures in
+`tests/modules/baseline.rs`. No compiler implementation is considered
+complete until the later gates replace this flattened dual use with an
+explicit internal compilation unit and importer-facing interface.
+
 ### 1. Introduce a module compilation unit boundary
 
 Module aggregation shall produce a logical module unit with at least these
