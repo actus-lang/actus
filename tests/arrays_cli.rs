@@ -16,6 +16,58 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn reads_first_and_last_buffer_bytes_with_dynamic_indexing() {
+    let status = run_array_fixture(
+        "buffer-index",
+        "verb main() -> Int { erg bytes: Buffer = Buffer[0]; append(bytes, 20); append(bytes, 22); erg first = bytes[0]; erg last = bytes[1]; return first + last; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn traps_deterministically_on_buffer_bounds_failure() {
+    let status = run_array_fixture(
+        "buffer-index-bounds",
+        "verb main() -> Int { erg bytes: Buffer = Buffer[0]; append(bytes, 42); return bytes[1]; }",
+    );
+    assert!(!status.success());
+    assert!(status.code().is_none(), "buffer bounds failure should be a native trap: {status:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn passes_an_array_as_an_exclusive_in_place_parameter() {
+    let status = run_array_fixture(
+        "array-ins-parameter",
+        "verb mutate(ins values: Array[Int, 2]) { values[1] = 41; } verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); mutate(values: ins values); return values[1] + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn checks_dynamic_values_before_writing_u8_pack_fields() {
+    let status = run_array_fixture(
+        "pack-u8-range",
+        "pack Byte { erg storage: u8; layout little; fields { erg payload: u8 at 0; } } verb main() -> Int { erg byte = Byte { storage: 0, }; erg input = 41; byte.payload = input; return byte.payload; }",
+    );
+    assert_eq!(status.code(), Some(41));
+}
+
+#[cfg(unix)]
+#[test]
+fn traps_when_a_dynamic_value_exceeds_u8_range() {
+    let status = run_array_fixture(
+        "pack-u8-overflow",
+        "pack Byte { erg storage: u8; layout little; fields { erg payload: u8 at 0; } } verb main() -> Int { erg byte = Byte { storage: 0, }; erg input = 256; byte.payload = input; return byte.payload; }",
+    );
+    assert!(!status.success());
+    assert!(status.code().is_none(), "u8 overflow should be a native trap: {status:?}");
+}
+
+#[cfg(unix)]
+#[test]
 fn traps_deterministically_on_dynamic_array_bounds_failure() {
     let status = run_array_fixture(
         "array-bounds",

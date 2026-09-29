@@ -22,6 +22,20 @@ fn accepts_array_reads_and_in_place_writes() {
 }
 
 #[test]
+fn accepts_dynamic_buffer_reads_as_u8() {
+    analyze_source("verb read(abs bytes: Buffer, abs index: Int) -> u8 { return bytes[index]; }")
+        .expect("buffer indexing should produce a u8 view");
+}
+
+#[test]
+fn rejects_non_integer_buffer_indices() {
+    let error =
+        analyze_source("verb main(abs bytes: Buffer, abs flag: Bool) { print(bytes[flag]); }")
+            .expect_err("boolean buffer indices must be rejected");
+    assert!(matches!(error.kind, SemanticErrorKind::InvalidIndexType { found } if found == "Bool"));
+}
+
+#[test]
 fn rejects_invalid_array_capacity() {
     let error = analyze_source("verb main(abs values: Array[Int, 0]) { }")
         .expect_err("zero-sized arrays must be rejected");

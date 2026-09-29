@@ -30,7 +30,10 @@ impl Analyzer {
             Expr::MethodCall { method, span, .. } => self.method_expression_type(method, *span),
             Expr::StructLit { .. } => None,
             Expr::FieldAccess { object, field, .. } => self.field_expression_type(object, field),
-            Expr::Index { .. } => None,
+            Expr::Index { target, index, .. } => self
+                .validate_index_access(target, index)
+                .ok()
+                .and_then(|type_name| lookup_builtin_type(&type_name.name)),
             Expr::Case { branches, .. } => self.case_expression_type(branches),
         }
     }
@@ -86,9 +89,9 @@ impl Analyzer {
         {
             return Some(super::super::analyzer::canonical_type_name(type_name));
         }
-        self.expression_type(expression)
-            .map(|ty| ty.spec().name.to_owned())
-            .or_else(|| self.binding_type_name(expression))
+        self.binding_type_name(expression)
+            .or_else(|| self.index_type_name(expression))
+            .or_else(|| self.expression_type(expression).map(|ty| ty.spec().name.to_owned()))
             .or_else(|| self.expression_struct_type(expression))
             .or_else(|| self.expression_pack_type(expression))
             .or_else(|| {
@@ -98,6 +101,13 @@ impl Analyzer {
             .or_else(|| self.expression_enum_type_application(expression))
             .or_else(|| self.expression_case_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))
+    }
+
+    fn index_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Index { target, index, .. } = expression else { return None };
+        self.validate_index_access(target, index)
+            .ok()
+            .map(|type_name| super::super::analyzer::canonical_type_name(&type_name))
     }
 
     fn binding_type_name(&self, expression: &Expr) -> Option<String> {

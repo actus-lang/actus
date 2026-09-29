@@ -72,17 +72,34 @@ fn lower_expression_with_context(
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             lower_expression_with_context(function, expression, context)
         }
-        Expr::Index { target, index, .. } => super::arrays::lower_array_index(
-            function,
+        Expr::Index { target, index, .. } => match super::structs::expression_native_type(
             target,
-            index,
-            context.locals,
             context.local_types,
-            context.functions,
-            context.cleanup_schedule,
-            context.string_data,
             context.layouts,
-        ),
+        ) {
+            Some(NativeType::Buffer) => super::buffer_index::lower_buffer_index(
+                function,
+                target,
+                index,
+                context.locals,
+                context.local_types,
+                context.functions,
+                context.cleanup_schedule,
+                context.string_data,
+                context.layouts,
+            ),
+            _ => super::arrays::lower_array_index(
+                function,
+                target,
+                index,
+                context.locals,
+                context.local_types,
+                context.functions,
+                context.cleanup_schedule,
+                context.string_data,
+                context.layouts,
+            ),
+        },
         _ => lower_complex_expression(function, expression, context),
     }
 }

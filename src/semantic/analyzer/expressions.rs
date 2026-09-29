@@ -67,6 +67,15 @@ impl Analyzer {
             kind: SemanticErrorKind::NonIndexableTarget { found: "unknown".to_owned() },
             span: expression_span(target),
         })?;
+        if target_type.name == "Buffer" && target_type.arguments.is_empty() {
+            self.validate_integer_index(index)?;
+            return Ok(TypeName {
+                name: "u8".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span: expression_span(index),
+            });
+        }
         if target_type.name != "Array" || target_type.arguments.len() != 2 {
             return Err(SemanticError {
                 kind: SemanticErrorKind::NonIndexableTarget {
