@@ -14,7 +14,7 @@ fn semantic_model_exposes_compiler_owned_resource_and_target_facts() {
         "verb main() -> Int { erg bytes = Buffer[4]; erg values: Array[u8, 2] = Array[u8, 2](); return 0; }\n",
     );
     let messages = [
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"initializationOptions":{"target":"x86_64-unknown-linux-gnu"}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":2,"text":source}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":2}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
