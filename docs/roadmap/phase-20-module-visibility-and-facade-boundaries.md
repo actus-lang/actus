@@ -314,7 +314,7 @@ The full Rust quality matrix, source limits, and diff validation pass, so Gate
 ## Gate 20.5: Standard-library migration
 
 - [x] Migrate `std::io` to the internal/public module-unit model.
-- [ ] Migrate `std::fs` to the internal/public module-unit model.
+- [x] Migrate `std::fs` to the internal/public module-unit model.
 - [ ] Migrate `std::path` to the internal/public module-unit model.
 - [ ] Keep public APIs typed with `Result`, `Option`, ownership roles, and
       documented Actus contracts.
@@ -345,6 +345,28 @@ The cursor performances delegate to the typed cursor verbs, so imported
 performance signatures do not retain private bridge bodies in the caller
 interface. Buffer range, length, and clear operations likewise translate raw
 statuses into `Result[Int, IoError]` before crossing the facade boundary.
+
+### Gate 20.5.2: `std::fs` bridge privacy and resource performance boundaries
+
+- [x] Remove facade exports from all `std::fs` raw `unsafe extern "C"`
+      declarations.
+- [x] Preserve private bridge access for file, metadata, options, and path
+      operation implementations.
+- [x] Route `File` reader, writer, metadata, and drop performances through
+      typed wrappers rather than private bridge bodies.
+- [x] Make explicit file close idempotent so deterministic Drop cleanup cannot
+      close the same native handle twice.
+- [x] Preserve typed `Result`, ownership roles, and exact byte-count contracts.
+- [x] Add a rejected public-facade raw-bridge access test for `std::fs`.
+- [x] Verify strict Actus fixtures and native filesystem, application, and
+      stream regression tests.
+
+The `std::fs` facade now exposes typed filesystem operations while its native
+path, handle, metadata, options, and buffer bridges remain internal. Public
+performance declarations carry signatures across the import boundary without
+carrying implementation bodies that reference private bridges. Explicit file
+close marks a successfully closed handle invalid, making the Drop performance
+safe and deterministic on every cleanup path.
 
 ## Gate 20.6: Tooling, compatibility, and closure
 

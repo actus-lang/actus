@@ -32,3 +32,16 @@ fn std_io_raw_bridge_is_not_importable_through_the_public_facade() {
     );
     assert_eq!(module_diagnostic(&error).code(), "E1109");
 }
+
+#[test]
+fn std_fs_raw_bridge_is_not_importable_through_the_public_facade() {
+    let source = parse_source(
+        "import fs; verb main() -> Int { return actus_file_remove_path(path: missing); }",
+    );
+    let error = analyze_with_imports(&source, &std_resolver())
+        .expect_err("raw std::fs bridges must remain private to the module");
+    assert!(
+        matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "actus_file_remove_path")
+    );
+    assert_eq!(module_diagnostic(&error).code(), "E1109");
+}
