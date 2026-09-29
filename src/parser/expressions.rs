@@ -197,6 +197,12 @@ impl Parser {
                 expression = Expr::Try { expression: Box::new(expression), span };
                 continue;
             }
+            if self.match_simple(TokenKind::As) {
+                let target = self.parse_type_name()?;
+                let span = SourceSpan::new(expression_span(&expression).start, target.span.end);
+                expression = Expr::Cast { expression: Box::new(expression), target, span };
+                continue;
+            }
             if !self.match_simple(TokenKind::Dot) {
                 break;
             }

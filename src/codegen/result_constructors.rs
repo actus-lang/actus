@@ -144,6 +144,7 @@ fn normalize_expression(
             normalize_method_call(receiver, arguments, signatures, locals)
         }
         Expr::Grouping { expression, .. }
+        | Expr::Cast { expression, .. }
         | Expr::Borrow { expression, .. }
         | Expr::Unary { expression, .. }
         | Expr::Try { expression, .. } => {
@@ -342,6 +343,7 @@ fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
         | Expr::Integer { span, .. }
         | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
-        | Expr::StringLiteral { span, .. } => *span,
+        | Expr::StringLiteral { span, .. }
+        | Expr::Cast { span, .. } => *span,
     }
 }

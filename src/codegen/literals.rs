@@ -79,6 +79,7 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
             values.insert(value.clone());
         }
         Expr::Grouping { expression, .. }
+        | Expr::Cast { expression, .. }
         | Expr::Unary { expression, .. }
         | Expr::Borrow { expression, .. }
         | Expr::Try { expression, .. } => collect_expression(expression, values),

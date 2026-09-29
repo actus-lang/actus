@@ -50,7 +50,8 @@ impl Analyzer {
             Expr::Grouping { expression, .. }
             | Expr::Borrow { expression, .. }
             | Expr::Try { expression, .. }
-            | Expr::Unary { expression, .. } => self.validate_guard_access(expression),
+            | Expr::Unary { expression, .. }
+            | Expr::Cast { expression, .. } => self.validate_guard_access(expression),
             Expr::Binary { left, right, .. } => self.validate_binary_guard_access(left, right),
             Expr::Call { callee, span, .. } | Expr::MethodCall { method: callee, span, .. } => {
                 Err(self.invalid_guard_access(callee, *span))

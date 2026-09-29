@@ -4,6 +4,8 @@ mod arenas;
 mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/casts.rs"]
+mod casts;
 #[path = "semantic/drop.rs"]
 mod drop;
 #[path = "semantic/dynamic.rs"]

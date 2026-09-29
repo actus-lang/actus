@@ -17,6 +17,11 @@ impl Formatter {
             Expr::StringLiteral { value, .. } => self.string_literal(value),
             Expr::Grouping { expression, .. } => self.grouping(expression),
             Expr::Unary { expression, .. } => self.unary(expression),
+            Expr::Cast { expression, target, .. } => {
+                self.expression(expression);
+                self.output.push_str(" as ");
+                self.output.push_str(&target.name);
+            }
             Expr::Binary { left, operator, right, .. } => self.binary(left, operator, right),
             Expr::Borrow { expression, .. } => self.borrow(expression),
             Expr::Try { expression, .. } => {

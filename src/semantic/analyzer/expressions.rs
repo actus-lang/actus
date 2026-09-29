@@ -34,6 +34,10 @@ impl Analyzer {
             Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
                 self.visit_expression(expression)
             }
+            Expr::Cast { expression, target, span } => {
+                self.visit_expression(expression)?;
+                self.validate_primitive_cast(expression, target, *span)
+            }
             Expr::Borrow { expression, .. } => self.visit_expression(expression),
             Expr::Try { expression, span } => self.visit_try_expression(expression, *span),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
@@ -113,7 +117,10 @@ impl Analyzer {
 
     fn validate_integer_index(&self, index: &Expr) -> Result<(), SemanticError> {
         let found = self.expression_type_name(index).unwrap_or_else(|| "unknown".to_owned());
-        if found == "Int" || primitive_type(&found).is_some_and(is_integer_primitive) {
+        if found == "Int"
+            || matches!(found.as_str(), "Usize")
+            || primitive_type(&found).is_some_and(is_integer_primitive)
+        {
             return Ok(());
         }
         Err(SemanticError {
@@ -234,10 +241,67 @@ impl Analyzer {
         }
         Ok(())
     }
+
+    fn validate_primitive_cast(
+        &self,
+        expression: &Expr,
+        target: &TypeName,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let source = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
+        if !is_cast_integer_type(&source) || !is_cast_integer_type(&target.name) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidPrimitiveCast {
+                    source,
+                    target: target.name.clone(),
+                },
+                span,
+            });
+        }
+        if let Some((literal, negative)) = integer_literal(expression)
+            && !cast_literal_fits(&literal, negative, &target.name)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::PrimitiveCastOutOfRange {
+                    target: target.name.clone(),
+                    literal: if negative { format!("-{literal}") } else { literal },
+                },
+                span,
+            });
+        }
+        Ok(())
+    }
 }
 
 fn is_integer_primitive(primitive: PrimitiveType) -> bool {
     matches!(primitive, PrimitiveType::Integer { .. })
+}
+
+fn is_cast_integer_type(name: &str) -> bool {
+    name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
+}
+
+fn cast_literal_fits(literal: &str, negative: bool, target: &str) -> bool {
+    let Some(magnitude) = parse_integer_magnitude(literal) else { return false };
+    if target == "Int" {
+        let positive_limit = (1u128 << 31) - 1;
+        let negative_limit = 1u128 << 31;
+        return (!negative && magnitude <= positive_limit)
+            || (negative && magnitude <= negative_limit);
+    }
+    if target == "Usize" {
+        return !negative && magnitude <= u64::MAX as u128;
+    }
+    let Some(PrimitiveType::Integer { signed, width }) = primitive_type(target) else {
+        return true;
+    };
+    if signed {
+        let positive_limit = (1u128 << (width - 1)) - 1;
+        let negative_limit = 1u128 << (width - 1);
+        (!negative && magnitude <= positive_limit) || (negative && magnitude <= negative_limit)
+    } else {
+        !negative && (width == 128 || magnitude < (1u128 << width))
+    }
 }
 
 fn integer_literal(expression: &Expr) -> Option<(String, bool)> {

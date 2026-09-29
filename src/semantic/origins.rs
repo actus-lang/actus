@@ -46,7 +46,9 @@ impl Analyzer {
             Expr::Binary { left, right, .. } => {
                 combine([self.origin_of(left), self.origin_of(right)])
             }
-            Expr::Unary { expression, .. } => self.origin_of(expression),
+            Expr::Unary { expression, .. } | Expr::Cast { expression, .. } => {
+                self.origin_of(expression)
+            }
             Expr::Case { .. } => Origin::Unknown,
             Expr::BufferLiteral { .. }
             | Expr::Integer { .. }
@@ -189,6 +191,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
-        | Expr::Case { span, .. } => *span,
+        | Expr::Case { span, .. }
+        | Expr::Cast { span, .. } => *span,
     }
 }

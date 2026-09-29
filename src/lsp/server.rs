@@ -213,7 +213,7 @@ fn initialize_result() -> Value {
             "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
             "semanticTokensProvider": {
                 "full": true,
-                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field"], "tokenModifiers": []}
+                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": []}
             },
             "documentFormattingProvider": true
         },

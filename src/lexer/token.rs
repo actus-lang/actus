@@ -49,6 +49,7 @@ pub enum TokenKind {
     Import,
     For,
     Case,
+    As,
     If,
     True,
     False,

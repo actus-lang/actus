@@ -257,6 +257,23 @@ write-back for scalar locals after arbitrary nested calls remains a separate
 ABI/storage milestone; indexed slots already mutate their source storage
 directly and therefore provide the required caller-visible behavior.
 
+## Checked Primitive Casts and Index Type Orthogonality
+
+Primitive conversion is explicit and checked. The source spelling is
+`expression as Type`; conversions are represented in the AST and validated by
+semantic analysis before code generation. Implicit conversion between integer,
+buffer, pointer-like, and unrelated primitive types is forbidden.
+
+Array and buffer indexing accepts the signed language integer `Int` and the
+unsigned index types `u8`, `u32`, and `Usize`. The index is converted to the
+target machine index width only after its type has been validated, and the
+ordinary capacity or buffer-length check remains mandatory.
+
+Constant casts are range-checked during semantic analysis. Non-constant integer
+casts emit a native runtime range check and trap deterministically on overflow
+or underflow. A cast never changes ownership, creates an allocation, or hides
+an ABI boundary.
+
 ## Non-goals
 
 - This ADR does not define an unbounded dynamic array or general allocator.

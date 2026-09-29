@@ -24,6 +24,9 @@ pub(crate) fn expression_native_type(
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             expression_native_type(expression, local_types, layouts)
         }
+        Expr::Cast { target, .. } => {
+            NativeType::from_type_name_with_layout(Some(target), layouts).ok()
+        }
         Expr::FieldAccess { object, field, .. } => {
             expression_native_type(object, local_types, layouts)
                 .and_then(|ty| field_type(ty, field, layouts))

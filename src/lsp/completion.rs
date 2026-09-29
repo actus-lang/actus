@@ -15,6 +15,18 @@ pub(super) fn items(source: Option<&str>) -> serde_json::Value {
         "f32".to_owned(),
         "f64".to_owned(),
         "Void".to_owned(),
+        "Int".to_owned(),
+        "Bool".to_owned(),
+        "Char".to_owned(),
+        "String".to_owned(),
+        "Buffer".to_owned(),
+        "Array".to_owned(),
+        "Arena".to_owned(),
+        "Option".to_owned(),
+        "Result".to_owned(),
+        "Map".to_owned(),
+        "Usize".to_owned(),
+        "as".to_owned(),
     ];
     labels.extend((1..=128).map(|width| format!("u{width}")));
     labels.extend((1..=128).map(|width| format!("i{width}")));

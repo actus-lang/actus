@@ -392,6 +392,19 @@ fn parses_try_operator_as_a_postfix_expression() {
 }
 
 #[test]
+fn parses_checked_casts_as_postfix_expressions() {
+    let program = parse_source("verb main() -> u32 { erg value = 7; return value as u32; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::Cast { expression, target, .. }), .. } =
+        &verb.body.statements[1]
+    else {
+        panic!("expected cast return")
+    };
+    assert!(matches!(expression.as_ref(), Expr::Identifier { name, .. } if name == "value"));
+    assert_eq!(target.name, "u32");
+}
+
+#[test]
 fn parses_short_result_constructors_and_typed_result_bindings() {
     let program = parse_source(
         "verb main() -> Result[Int, IoError] { erg result: Result[Int, IoError] = Ok(1); return result; }",

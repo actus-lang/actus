@@ -100,3 +100,16 @@ complete.
       aggregate `ins` mutation, and checked `u8` assignment.
 - [x] Run the complete quality matrix and record terminal evidence before
       advancing to the Twin-E learning example.
+
+## Gate 8: Checked Primitive Casts and Unsigned Indexing
+
+- [x] Add the `as` keyword and AST representation for explicit primitive casts.
+- [x] Validate integer cast source and target types; reject buffer and
+      unrelated primitive conversions.
+- [x] Reject compile-time cast constants outside the target range with a
+      stable diagnostic.
+- [x] Lower runtime integer casts with explicit overflow and underflow traps.
+- [x] Recognize `u8`, `u32`, and `Usize` as valid array and buffer indices.
+- [x] Preserve the existing dynamic bounds checks after index widening.
+- [x] Add parser, semantic, native success, and native trap regression tests.
+- [x] Run the complete quality matrix and record terminal evidence.

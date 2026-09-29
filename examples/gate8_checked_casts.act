@@ -1,0 +1,22 @@
+"""
+Gate 8 example: explicit checked integer casts and unsigned indexing.
+
+The array is read through u32 and Usize indices, while the buffer is read
+through a u8 index. Every value conversion is explicit and checked with `as`.
+"""
+verb main() -> Int {
+    erg values: Array[u8, 4] = Array[u8, 4]();
+    values[0] = 20;
+    values[1] = 20;
+
+    erg array_index: u32 = 0;
+    erg usize_index: Usize = 1;
+    erg buffer: Buffer = Buffer[0];
+    append(buffer, 2);
+    erg buffer_index: u8 = 0;
+
+    erg first = values[array_index] as Int;
+    erg second = values[usize_index] as Int;
+    erg byte = buffer[buffer_index] as Int;
+    return first + second + byte;
+}
