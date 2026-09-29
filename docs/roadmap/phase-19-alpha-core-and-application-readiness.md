@@ -92,35 +92,37 @@ contracts that the future platform is allowed to consume.
 
 ### Console application
 
-- [ ] Create a real console application using `std::io` readers and writers.
-- [ ] Exercise successful input, output, flush, and EOF handling.
-- [ ] Exercise typed I/O failure propagation and cleanup.
-- [ ] Verify stdout, stderr, and process exit status independently.
-- [ ] Document the complete source-to-running-program workflow.
+- [x] Create a real console application using `std::io` readers and writers.
+- [x] Exercise successful input, output, flush, and EOF handling.
+- [x] Exercise typed I/O failure propagation and cleanup.
+- [x] Verify stdout, stderr, and process exit status independently.
+- [x] Document the complete source-to-running-program workflow.
 
 ### File utility
 
-- [ ] Create a real file utility using `std::fs` and `std::path`.
-- [ ] Exercise path construction, inspection, normalization, and platform
+- [x] Create a real file utility using `std::fs` and `std::path`.
+- [x] Exercise path construction, inspection, normalization, and platform
       boundary behavior.
-- [ ] Exercise file creation, reading, writing, metadata, and removal.
-- [ ] Exercise missing-file, invalid-path, and permission failure mappings.
-- [ ] Verify all handles, buffers, paths, and temporary resources are cleaned
+- [x] Exercise file creation, reading, writing, metadata, and removal.
+- [x] Exercise missing-file and invalid-path failure mappings through typed
+      `IoError` and `PathError` results; defer the host permission matrix to
+      Gate 19.4.
+- [x] Verify all handles, buffers, paths, and temporary resources are cleaned
       deterministically on success and failure.
 
 ### Application evidence
 
-- [ ] Keep application source in `examples/` and executable checks in `tests/`.
-- [ ] Add positive and negative application fixtures.
-- [ ] Compile both applications through the native backend.
-- [ ] Run both applications and record output and exit-code evidence.
-- [ ] Reject applications that pass only parser or semantic validation.
+- [x] Keep application source in `examples/` and executable checks in `tests/`.
+- [x] Add positive and negative application fixtures.
+- [x] Compile both applications through the native backend.
+- [x] Run both applications and record output and exit-code evidence.
+- [x] Reject applications that pass only parser or semantic validation.
 
 ### Gate 19.2 evidence
 
-- [ ] Two real applications build and run from a clean checkout.
-- [ ] Their documented failure paths return typed errors and expected status.
-- [ ] No raw host/C status leaks through the public standard-library API.
+- [x] Two real applications build and run from a clean checkout.
+- [x] Their documented failure paths return typed errors and expected status.
+- [x] No raw host/C status leaks through the public standard-library API.
 
 ## Gate 19.3: CLI, Package, and Reproducible Workflow
 

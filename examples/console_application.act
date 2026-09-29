@@ -1,0 +1,29 @@
+// Phase 19.2 console application.
+// It reads one line through std::io, echoes successful input to stdout,
+// reports EOF to stderr, and returns an application-level status.
+import io;
+
+verb main() -> Int {
+    erg input = Buffer[0];
+    erg result = read_line(buffer: ins input);
+    return case dat result {
+        Result.Ok(_) => {
+            println(text: abs input);
+            eprintln(text: abs input);
+            flush();
+            return 0;
+        },
+        Result.Err(error) => case dat error {
+            IoError.EndOfStream => {
+                erg message = Buffer[0];
+                append(message, 69);
+                append(message, 79);
+                eprintln(text: abs message);
+                return 2;
+            },
+            IoError.Failed => { return 3; },
+            IoError.InvalidInput => { return 4; },
+            IoError.InvalidData => { return 5; },
+        },
+    };
+}

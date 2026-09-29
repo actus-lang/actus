@@ -1,0 +1,107 @@
+// Phase 19.2 file utility.
+// It constructs a raw POSIX path, writes and reads a file, inspects metadata,
+// removes the file, and validates the typed missing-file failure afterward.
+import io;
+import path;
+import fs;
+
+verb utility_path() -> Result[Path, PathError] {
+    erg raw = Buffer[0];
+    append(raw, 46);
+    append(raw, 47);
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 112);
+    append(raw, 49);
+    append(raw, 57);
+    append(raw, 50);
+    append(raw, 46);
+    append(raw, 98);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 0);
+    erg parsed = path_from_posix(storage: dat raw);
+    return case dat parsed {
+        Result.Err(error) => Result[Path, PathError].Err(error),
+        Result.Ok(path) => normalize(dat path),
+    };
+}
+
+verb validate_path(abs path: Path) -> Int {
+    case is_relative(self: abs path) {
+        true => { },
+        _ => { return 20; },
+    };
+    erg name = file_name(self: abs path);
+    return case dat name {
+        Option.Some(_) => 0,
+        Option.None => 22,
+    };
+}
+
+verb process_file(abs path: Path, abs payload: Buffer) -> Int {
+    erg written = write_file(path: abs path, contents: abs payload);
+    case dat written {
+        Result.Err(_) => { return 11; },
+        Result.Ok(_) => { },
+    };
+    erg loaded = read_to_bytes(path: abs path);
+    case dat loaded {
+        Result.Err(_) => { return 12; },
+        Result.Ok(value) => {
+            print(text: abs value);
+            flush();
+            drop(value);
+            return inspect_and_remove(path: abs path);
+        },
+    };
+    return 12;
+}
+
+verb inspect_and_remove(abs path: Path) -> Int {
+    erg information = metadata(path: abs path);
+    case dat information {
+        Result.Err(_) => { return 13; },
+        Result.Ok(_) => { },
+    };
+    erg removed = remove_file(path: abs path);
+    case dat removed {
+        Result.Err(_) => { return 14; },
+        Result.Ok(_) => { },
+    };
+    erg missing = read_to_bytes(path: abs path);
+    return case dat missing {
+        Result.Err(error) => case dat error {
+            IoError.Failed => 0,
+            IoError.EndOfStream => 15,
+            IoError.InvalidInput => 16,
+            IoError.InvalidData => 17,
+        },
+        Result.Ok(value) => {
+            drop(value);
+            return 18;
+        },
+    };
+}
+
+verb main() -> Int {
+    erg path_result = utility_path();
+    erg payload = Buffer[0];
+    append(payload, 65);
+    append(payload, 67);
+    append(payload, 84);
+    return case dat path_result {
+        Result.Err(_) => 10,
+        Result.Ok(path) => {
+            erg valid = validate_path(path: abs path);
+            return case valid {
+                0 => process_file(path: abs path, payload: abs payload),
+                _ => valid,
+            };
+        },
+    };
+}

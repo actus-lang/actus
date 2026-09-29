@@ -1,0 +1,43 @@
+// Negative application fixture: a missing file must become IoError.Failed.
+import path;
+import fs;
+import io;
+
+verb missing_path() -> Result[Path, PathError] {
+    erg raw = Buffer[0];
+    append(raw, 109);
+    append(raw, 105);
+    append(raw, 115);
+    append(raw, 115);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 103);
+    append(raw, 95);
+    append(raw, 49);
+    append(raw, 57);
+    append(raw, 50);
+    append(raw, 0);
+    return path_from_posix(storage: dat raw);
+}
+
+verb main() -> Int {
+    erg parsed = missing_path();
+    return case dat parsed {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg result = read_to_bytes(path: abs path);
+            return case dat result {
+                Result.Err(error) => case dat error {
+                    IoError.Failed => 0,
+                    IoError.EndOfStream => 2,
+                    IoError.InvalidInput => 3,
+                    IoError.InvalidData => 4,
+                },
+                Result.Ok(bytes) => {
+                    drop(bytes);
+                    return 5;
+                },
+            };
+        },
+    };
+}
