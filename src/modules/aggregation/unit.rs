@@ -8,6 +8,7 @@ use crate::parser::parse;
 use super::super::resolver::ModuleResolver;
 use super::exports::exports_module;
 use super::parsing::parse_module;
+use super::signature_visibility::validate_exported_signatures;
 use super::types::{ModuleError, ModuleExports};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -94,13 +95,15 @@ pub fn load_module_unit(
     let sources = load_sources(resolved.facade(), resolved.siblings())?;
     let source_key =
         sources.iter().map(|source| normalize(source.path())).collect::<Vec<_>>().join("|");
-    Ok(ModuleUnit {
+    let unit = ModuleUnit {
         identity: ModuleIdentity { module_path: module_path.to_owned(), source_key },
         facade: resolved.facade().to_owned(),
         sources,
         implementation,
         exports,
-    })
+    };
+    validate_exported_signatures(&unit)?;
+    Ok(unit)
 }
 
 fn load_sources(facade: &Path, siblings: &[PathBuf]) -> Result<Vec<ModuleSource>, ModuleError> {

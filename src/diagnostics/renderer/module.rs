@@ -5,7 +5,8 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 
 /// Converts a module, import, or facade failure into the shared diagnostic model.
 ///
-/// Resolution failures use the stable `E1100`–`E1108` module range. Nested
+/// Resolution failures use the stable `E1100`–`E1108` module range. Visibility
+/// failures use `E1109`. Nested
 /// lexical, parser, and semantic failures retain their subsystem code while
 /// gaining the module source path when one is available.
 pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {

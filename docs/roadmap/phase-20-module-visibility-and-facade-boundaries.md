@@ -66,8 +66,8 @@ The baseline fixtures in `tests/modules/baseline.rs` prove all three current
 boundaries: the internal flattened program retains private declarations, a
 public wrapper resolves a private helper internally, and an external caller
 cannot resolve that helper through the facade. The existing `E1100`-`E1108`
-module diagnostic range is reserved for the visibility diagnostic that Gate
-20.3 will make explicit. Module source paths and spans are currently retained
+module diagnostic range covers resolver and source-boundary failures; `E1109`
+is the stable visibility diagnostic added by Gate 20.3. Module source paths and spans are currently retained
 for duplicate and parse diagnostics; cache-key and module-identity behavior
 is currently the resolver's canonical module path plus deterministic source
 ordering.
@@ -134,9 +134,9 @@ tracked for Gate 20.3 rather than being hidden inside internal scope logic.
 - [x] Keep raw `unsafe extern "C"` bridges private unless a future ADR
       explicitly defines a public interop contract.
 - [x] Reject direct external calls to private helpers and raw bridges.
-- [deferred] Reject private types, constants, and implementation details leaking into
-      public signatures; this requires exported-signature validation and is the
-      remaining Gate 20.3 implementation slice.
+- [x] Reject private types, roles, generic bounds, and implementation details
+      leaking into public signatures; constants are not a declaration category
+      in the current Actus AST.
 - [x] Add a stable visibility diagnostic containing symbol, module, and
       facade guidance.
 - [x] Verify caller-side type, ownership, generic, and error contracts use the
@@ -149,9 +149,11 @@ table before semantic analysis. Direct calls to closed helpers and raw
 `unsafe extern "C"` bridges, as well as construction of closed struct types,
 produce `E1109` with the symbol, module, and canonical facade in the diagnostic
 message. Public wrappers continue to be analyzed from the module's complete
-internal implementation unit. Exported-signature leakage remains open until
-the interface validator checks every exported type, role, generic, and result
-position; it must not be hidden behind generic unknown-type diagnostics.
+internal implementation unit. The compilation-unit loader also validates every
+exported verb, external verb, struct, pack, enum, role, and performance
+signature, including nested result types and generic role bounds. A private
+signature dependency therefore fails at the module boundary rather than being
+reported later as an importer-side unknown type.
 
 ## Gate 20.4: Code generation and implementation emission
 

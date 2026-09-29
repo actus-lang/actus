@@ -1,6 +1,7 @@
 mod analysis;
 mod exports;
 mod parsing;
+mod signature_visibility;
 mod types;
 mod unit;
 mod validation;

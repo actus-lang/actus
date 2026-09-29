@@ -84,10 +84,11 @@ code generation. Cyclic importer graphs remain an interface-resolution
 concern for the next gate and are not treated as sibling-scope declarations.
 
 Gate 20.3 adds importer-side visibility validation before semantic analysis.
-Calls to closed helpers or raw runtime bridges and construction of closed
-struct types are rejected with stable `E1109` diagnostics that identify the
-module and canonical facade. Exported-signature validation remains a required
-follow-up in this gate so private types cannot leak through public contracts.
+Calls to closed helpers or raw runtime bridges, construction of closed struct
+types, and exported signatures that mention private types or role bounds are
+rejected with stable `E1109` diagnostics that identify the module and canonical
+facade. The compilation-unit loader validates nested generic and result
+positions before exposing the public interface.
 
 ### 1. Introduce a module compilation unit boundary
 
@@ -174,9 +175,8 @@ before code generation. The diagnostic must identify:
 - the fact that the symbol is not exported by the canonical facade;
 - the public facade or exported replacement when one exists.
 
-The implementation shall allocate a stable module-visibility diagnostic in
-the existing module diagnostic range (`E1100`–`E1108`) or extend that range in
-the normal diagnostic registry if all existing codes are occupied. The code
+The implementation allocates the stable module-visibility diagnostic `E1109`
+immediately after the resolver/source range (`E1100`–`E1108`). The code
 must be represented in the diagnostic model independently from terminal
 rendering and must be deterministic across CLI and LSP consumers.
 
