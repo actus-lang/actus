@@ -65,6 +65,17 @@ Gate 20.0 records this behavior with positive and negative fixtures in
 complete until the later gates replace this flattened dual use with an
 explicit internal compilation unit and importer-facing interface.
 
+### Gate 20.1 representation
+
+The first implementation step introduces `ModuleUnit` as a responsibility-
+specific aggregation object. It contains a resolver-derived `ModuleIdentity`,
+ordered `ModuleSource` records for the canonical facade and opened siblings,
+the complete internal `Program`, and a separate `ModuleExports` table. Each
+source record retains its path, facade/sibling identity, and parsed program;
+the identity also contains a normalized source-path key for deterministic
+repeated loads. Existing parsing and import behavior remains unchanged while
+later gates migrate semantic analysis and code generation to this boundary.
+
 ### 1. Introduce a module compilation unit boundary
 
 Module aggregation shall produce a logical module unit with at least these

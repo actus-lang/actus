@@ -2,6 +2,7 @@ mod analysis;
 mod exports;
 mod parsing;
 mod types;
+mod unit;
 mod validation;
 
 pub use analysis::{
@@ -11,3 +12,4 @@ pub use analysis::{
 pub use exports::exports_module;
 pub use parsing::parse_module;
 pub use types::{DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation};
+pub use unit::{ModuleIdentity, ModuleSource, ModuleSourceKind, ModuleUnit, load_module_unit};

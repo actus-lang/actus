@@ -74,15 +74,31 @@ ordering.
 
 ## Gate 20.1: Module compilation-unit representation
 
-- [ ] Add an explicit module-unit abstraction for facade and opened siblings.
-- [ ] Preserve all internal declarations required for module analysis.
-- [ ] Preserve declaration source paths, spans, sibling identity, and facade
+- [x] Add an explicit module-unit abstraction for facade and opened siblings.
+- [x] Preserve all internal declarations required for module analysis.
+- [x] Preserve declaration source paths, spans, sibling identity, and facade
       provenance.
-- [ ] Store a separate public export table instead of using one flattened
+- [x] Store a separate public export table instead of using one flattened
       program as both implementation and interface.
-- [ ] Reject duplicate declarations deterministically within one module unit.
-- [ ] Add unit tests for module-unit construction, ordering, provenance, and
+- [x] Reject duplicate declarations deterministically within one module unit.
+- [x] Add unit tests for module-unit construction, ordering, provenance, and
       repeated imports.
+
+### Gate 20.1 evidence
+
+`ModuleUnit` now groups a canonical module identity, ordered facade and sibling
+source records, the complete internal implementation `Program`, and an
+independent `ModuleExports` interface. `ModuleSource` retains each source path,
+facade/sibling identity, and parsed declaration program, while the existing
+aggregation path continues to enforce duplicate declaration rejection before
+the unit is constructed. The identity source key is derived from the
+normalized, resolver-ordered source paths, so repeated loads are stable.
+
+The implementation is exposed through `load_module_unit` without changing the
+existing importer behavior. `tests/modules/compilation_unit.rs` verifies
+internal declarations versus public exports, deterministic source ordering and
+provenance, and repeated-load identity/export stability. Gate 20.2 will make
+this unit the semantic scope boundary.
 
 ## Gate 20.2: Internal semantic scope
 
