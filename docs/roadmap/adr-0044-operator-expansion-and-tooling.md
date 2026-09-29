@@ -58,10 +58,10 @@ Code extension, and Tree-sitter.
 - [x] Lower `!` as a Bool-preserving operation.
 - [x] Preserve expression values at CFG joins with deterministic block
       parameters or equivalent SSA construction.
-- [ ] Preserve `erg`, `abs`, `dat`, and `ins` ownership transitions across
+- [x] Preserve `erg`, `abs`, `dat`, and `ins` ownership transitions across
       skipped and evaluated right-hand operands.
-- [ ] Preserve nested `case`, `break`, `continue`, return, and cleanup paths.
-- [ ] Add side-effect, cleanup, loop, case, and native short-circuit tests.
+- [x] Preserve nested `case`, `break`, `continue`, return, and cleanup paths.
+- [x] Add side-effect, cleanup, loop, case, and native short-circuit tests.
 
 ## Gate 5: Runtime, diagnostics, and end-to-end quality
 

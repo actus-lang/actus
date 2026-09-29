@@ -98,6 +98,46 @@ fn lowers_logical_not_as_a_bool_value() {
 
 #[cfg(unix)]
 #[test]
+fn restores_an_ins_buffer_when_short_circuit_skips_the_rhs() {
+    let status = run_array_fixture(
+        "adr44-short-circuit-ins-skip",
+        "verb touch(ins bytes: Buffer) -> Bool { append(bytes, 7); return 1 < 2; } verb main() -> Int { erg bytes: Buffer = Buffer[0]; erg skipped = (1 > 2) && touch(bytes: ins bytes); append(bytes, 42); return bytes[0]; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn restores_an_ins_buffer_when_short_circuit_evaluates_the_rhs() {
+    let status = run_array_fixture(
+        "adr44-short-circuit-ins-run",
+        "verb touch(ins bytes: Buffer) -> Bool { append(bytes, 7); return 1 < 2; } verb main() -> Int { erg bytes: Buffer = Buffer[0]; erg evaluated = (1 < 2) && touch(bytes: ins bytes); return bytes[0]; }",
+    );
+    assert_eq!(status.code(), Some(7));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_nested_case_loop_control_after_short_circuit_evaluation() {
+    let status = run_array_fixture(
+        "adr44-short-circuit-case-loop",
+        "verb main() -> Int { erg flag = 1; loop { case flag { 1 => { case (1 < 2) && (2 < 3) { true => { break; }, _ => { continue; }, }; }, _ => { continue; }, }; } return 42; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_drop_cleanup_inside_an_evaluated_short_circuit_rhs() {
+    let status = run_array_fixture(
+        "adr44-short-circuit-cleanup",
+        "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { } } verb make() -> Bool { erg item = Counter { value: 7, }; return 1 < 2; } verb main() -> Int { erg evaluated = (1 < 2) && make(); return 42; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn accepts_u8_and_u32_dynamic_indices() {
     let status = run_array_fixture(
         "unsigned-indices",
