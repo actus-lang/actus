@@ -7,15 +7,15 @@ Code extension, and Tree-sitter.
 
 ## Gate 0: Operator contract and compatibility baseline
 
-- [ ] Confirm ADR-0044 precedence, associativity, operand-family, and result
+- [x] Confirm ADR-0044 precedence, associativity, operand-family, and result
       type rules.
-- [ ] Inventory existing lexer, parser, AST, semantic, codegen, runtime, and
+- [x] Inventory existing lexer, parser, AST, semantic, codegen, runtime, and
       formatter support for all requested operators.
-- [ ] Record compatibility requirements for ADR-0042 array, Buffer, cast,
+- [x] Record compatibility requirements for ADR-0042 array, Buffer, cast,
       pack, and slot-loan behavior.
-- [ ] Define stable diagnostics for invalid operands, shift counts, and
+- [x] Define stable diagnostics for invalid operands, shift counts, and
       remainder-by-zero cases.
-- [ ] Add a baseline regression matrix before implementation changes.
+- [x] Add a baseline regression matrix before implementation changes.
 
 ## Gate 1: Lexer, parser, and AST operator surface
 

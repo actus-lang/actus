@@ -164,3 +164,23 @@ README, manifesto, and introductory manuscript link to or reflect the same
 implemented contract. Accepted and rejected operator examples are kept in
 documentation; executable behavior remains covered by the compiler's native
 and semantic test suites.
+
+## Gate 0 Evidence
+
+The compatibility baseline covers the full compiler path. Lexer and parser
+coverage is provided by the operator token and precedence suites; semantic
+coverage is provided by the positive and negative operator-family tests and
+the stable diagnostic tests; native coverage is provided by the operator,
+short-circuit, trap, ownership, cleanup, and deterministic-object tests in
+`tests/arrays_cli.rs` and the related compiler suites. Formatter and source-span
+behavior remain covered by the existing parser and CLI workflow tests.
+
+ADR-0042 compatibility is preserved for bounded `Array[T, N]` and `Buffer`
+indexing, checked integer casts, native pack-field lowering, and exclusive
+`ins` slot loans. ADR-0043 compatibility is preserved for relational result
+types, nested loop control flow, and length-aware Buffer output.
+
+The stable diagnostic baseline is `E1025` for invalid operator operands,
+`E1092` for a statically provable remainder by zero, and `E1093` for a
+statically provable shift count outside the destination width. Runtime-only
+remainder and shift failures retain deterministic native traps.
