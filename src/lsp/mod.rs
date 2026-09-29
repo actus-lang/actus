@@ -1,3 +1,4 @@
+mod cancellation;
 mod completion;
 mod definition;
 mod diagnostics;
@@ -6,9 +7,15 @@ mod formatting;
 mod hover;
 mod module_scope;
 mod position;
+mod progress;
 mod protocol;
+mod protocol_contract;
+mod query_bounds;
+mod query_handlers;
+mod request_dispatch;
 mod semantic_tokens;
 mod server;
+mod transport;
 
 pub use diagnostics::analyze_document;
 pub use server::run_stdio;

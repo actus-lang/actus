@@ -12,6 +12,9 @@ completion:
 6. `ADR-0037` — Compiler-Backed Zero-Allocation Analysis; and
 7. `ADR-0038` — Deterministic C Header Export.
 
+The shared LSP execution and protocol foundation is defined by
+`ADR-0048` — LSP Execution, Cancellation, Progress, and Bounded Responses.
+
 The VS Code Activity Bar and Sidebar are the shared presentation shell for
 these capabilities, not an independent semantic subsystem. All views consume
 versioned compiler/LSP contracts. The extension must not duplicate parsing,

@@ -1,27 +1,29 @@
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
+use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 
-use super::completion::items;
-use super::definition::find_definition;
+use super::cancellation::{CancellationRegistry, CancellationToken};
 use super::diagnostics::analyze_document_for_target;
 use super::documents::DocumentStore;
-use super::formatting::format_document;
-use super::hover::find_hover;
+use super::progress;
 use super::protocol::{
-    DefinitionParams, DidChangeParams, DidOpenParams, FormattingParams, Notification,
-    PublishDiagnosticsParams, Request, Response, TextEdit,
+    DidChangeParams, DidOpenParams, ErrorResponse, JsonRpcError, Notification,
+    PublishDiagnosticsParams, Request, Response, ResponseMetadata,
 };
-use super::semantic_tokens::full as semantic_tokens;
+use super::protocol_contract::{SessionState, response_metadata};
+use super::request_dispatch::{dispatch_request, is_expensive};
+use super::transport::{spawn_reader, write_message};
 use crate::target::TargetSpec;
 
 pub fn run_stdio() -> io::Result<()> {
-    let stdin = io::stdin();
-    let mut input = stdin.lock();
     let mut output = io::stdout().lock();
+    let cancellations = Arc::new(CancellationRegistry::default());
+    let messages = spawn_reader(Arc::clone(&cancellations));
     let mut store = DocumentStore::default();
     let mut target = TargetSpec::host().expect("host target must be supported");
-    while let Some(message) = read_message(&mut input)? {
+    let mut state = SessionState::default();
+    while let Ok(message) = messages.recv() {
         let request = match serde_json::from_slice::<Request>(&message) {
             Ok(request) => request,
             Err(error) => {
@@ -29,8 +31,26 @@ pub fn run_stdio() -> io::Result<()> {
                 continue;
             }
         };
-        if handle_request(request, &mut store, &mut target, &mut output)? {
-            break;
+        let request_id = request.id.clone();
+        let request_params = request.params.clone();
+        let cancellation = cancellations.token(request_id.as_ref());
+        match handle_request(
+            request,
+            &mut store,
+            &mut target,
+            &mut state,
+            &mut output,
+            cancellation.as_ref(),
+        ) {
+            Ok(true) => break,
+            Ok(false) => {}
+            Err(error) if error.kind() == io::ErrorKind::InvalidData => {
+                if let Some(id) = request_id {
+                    let metadata = response_metadata(&target, &request_params, &store);
+                    write_error(&mut output, id, -32602, error.to_string(), metadata)?;
+                }
+            }
+            Err(error) => return Err(error),
         }
     }
     Ok(())
@@ -40,120 +60,48 @@ fn handle_request(
     request: Request,
     store: &mut DocumentStore,
     target: &mut TargetSpec,
+    state: &mut SessionState,
     output: &mut impl Write,
+    cancellation: Option<&CancellationToken>,
 ) -> io::Result<bool> {
-    match request.method.as_str() {
-        "initialize" => {
-            configure_target(&request.params, target);
-            respond(output, request.id, initialize_result())?
-        }
-        "shutdown" => respond(output, request.id, Value::Null)?,
-        "exit" => return Ok(true),
-        "initialized" | "$/cancelRequest" => {}
-        "textDocument/didOpen" => open_document(request.params, store, target, output)?,
-        "textDocument/didChange" => change_document(request.params, store, target, output)?,
-        "textDocument/didClose" => close_document(request.params, store, output)?,
-        "textDocument/definition" => definition(request.id, request.params, store, output)?,
-        "textDocument/hover" => hover(request.id, request.params, store, output)?,
-        "textDocument/completion" => completion(request.id, request.params, store, output)?,
-        "textDocument/semanticTokens/full" => {
-            semantic_tokens_full(request.id, request.params, store, target, output)?
-        }
-        "textDocument/formatting" => formatting(request.id, request.params, store, output)?,
-        _ if request.id.is_some() => respond(output, request.id, Value::Null)?,
-        _ => {}
+    let metadata = response_metadata(target, &request.params, store);
+    if canceled_request(&request, output, metadata.clone(), cancellation)? {
+        return Ok(false);
     }
-    Ok(false)
+    if *state == SessionState::ShuttingDown && request.method != "exit" {
+        return write_lifecycle_error(output, request.id, "server is shutting down", metadata);
+    }
+    let progress_token = if is_expensive(&request.method) {
+        request.id.as_ref().map(|id| progress::begin(output, id)).transpose()?
+    } else {
+        None
+    };
+    if let Some(token) = progress_token.as_deref() {
+        progress::report(output, token, "compiler-backed query")?;
+    }
+    let result = dispatch_request(request, store, target, state, output, cancellation);
+    if let Some(token) = progress_token {
+        progress::finish(output, &token, cancellation.is_some_and(CancellationToken::is_canceled))?;
+    }
+    result
 }
 
-fn completion(
-    id: Option<Value>,
-    params: Value,
-    store: &DocumentStore,
+fn canceled_request(
+    request: &Request,
     output: &mut impl Write,
-) -> io::Result<()> {
-    let uri =
-        params.get("textDocument").and_then(|document| document.get("uri")).and_then(Value::as_str);
-    let source = uri.and_then(|value| store.get(value)).map(|document| document.text.as_str());
-    let overlays = store.source_overlays();
-    respond(output, id, items(uri.unwrap_or_default(), source, &overlays))
+    metadata: ResponseMetadata,
+    cancellation: Option<&CancellationToken>,
+) -> io::Result<bool> {
+    if !cancellation.is_some_and(CancellationToken::is_canceled) {
+        return Ok(false);
+    }
+    if let Some(id) = request.id.clone() {
+        write_error(output, id, -32800, "request canceled".to_owned(), metadata)?;
+    }
+    Ok(true)
 }
 
-fn semantic_tokens_full(
-    id: Option<Value>,
-    params: Value,
-    store: &DocumentStore,
-    target: &TargetSpec,
-    output: &mut impl Write,
-) -> io::Result<()> {
-    let params = serde_json::from_value::<FormattingParams>(params).map_err(invalid_params)?;
-    let result = store
-        .get(&params.text_document.uri)
-        .map(|document| semantic_tokens(&document.text, target))
-        .unwrap_or_else(|| serde_json::json!({"data": []}));
-    respond(output, id, result)
-}
-
-fn definition(
-    id: Option<Value>,
-    params: Value,
-    store: &DocumentStore,
-    output: &mut impl Write,
-) -> io::Result<()> {
-    let params = serde_json::from_value::<DefinitionParams>(params).map_err(invalid_params)?;
-    let result = store
-        .get(&params.text_document.uri)
-        .and_then(|document| {
-            find_definition(
-                &params.text_document.uri,
-                &document.text,
-                &params.position,
-                &store.source_overlays(),
-            )
-        })
-        .map(|location| json!({ "uri": location.uri, "range": location.range }))
-        .unwrap_or(Value::Null);
-    respond(output, id, result)
-}
-
-fn hover(
-    id: Option<Value>,
-    params: Value,
-    store: &DocumentStore,
-    output: &mut impl Write,
-) -> io::Result<()> {
-    let params = serde_json::from_value::<DefinitionParams>(params).map_err(invalid_params)?;
-    let result = store
-        .get(&params.text_document.uri)
-        .and_then(|document| {
-            find_hover(
-                &params.text_document.uri,
-                &document.text,
-                &params.position,
-                &store.source_overlays(),
-            )
-        })
-        .map(|info| json!({ "contents": { "kind": "markdown", "value": info.contents }, "range": info.range }))
-        .unwrap_or(Value::Null);
-    respond(output, id, result)
-}
-
-fn formatting(
-    id: Option<Value>,
-    params: Value,
-    store: &DocumentStore,
-    output: &mut impl Write,
-) -> io::Result<()> {
-    let params = serde_json::from_value::<FormattingParams>(params).map_err(invalid_params)?;
-    let edits = store
-        .get(&params.text_document.uri)
-        .and_then(|document| format_document(&document.text))
-        .map(|(range, new_text)| vec![TextEdit { range, new_text }])
-        .unwrap_or_default();
-    respond(output, id, serde_json::to_value(edits).map_err(invalid_params)?)
-}
-
-fn open_document(
+pub(super) fn open_document(
     params: Value,
     store: &mut DocumentStore,
     target: &TargetSpec,
@@ -168,7 +116,7 @@ fn open_document(
     publish(output, &params.text_document.uri, store, target)
 }
 
-fn change_document(
+pub(super) fn change_document(
     params: Value,
     store: &mut DocumentStore,
     target: &TargetSpec,
@@ -185,7 +133,7 @@ fn change_document(
     publish(output, &params.text_document.uri, store, target)
 }
 
-fn close_document(
+pub(super) fn close_document(
     params: Value,
     store: &mut DocumentStore,
     output: &mut impl Write,
@@ -229,24 +177,7 @@ fn publish(
     )
 }
 
-fn initialize_result() -> Value {
-    json!({
-        "capabilities": {
-            "textDocumentSync": 1,
-            "definitionProvider": true,
-            "hoverProvider": true,
-            "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
-            "semanticTokensProvider": {
-                "full": true,
-                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": ["inactive-target"]}
-            },
-            "documentFormattingProvider": true
-        },
-        "serverInfo": { "name": "actus-lsp", "version": env!("CARGO_PKG_VERSION") }
-    })
-}
-
-fn configure_target(params: &Value, target: &mut TargetSpec) {
+pub(super) fn configure_target(params: &Value, target: &mut TargetSpec) {
     let requested = params
         .get("initializationOptions")
         .and_then(|options| options.get("target"))
@@ -258,44 +189,54 @@ fn configure_target(params: &Value, target: &mut TargetSpec) {
     }
 }
 
-fn respond(output: &mut impl Write, id: Option<Value>, result: Value) -> io::Result<()> {
+pub(super) fn respond(
+    output: &mut impl Write,
+    id: Option<Value>,
+    result: Value,
+    actus: ResponseMetadata,
+    cancellation: Option<&CancellationToken>,
+) -> io::Result<()> {
     let Some(id) = id else { return Ok(()) };
+    if cancellation.is_some_and(CancellationToken::is_canceled) {
+        return write_error(output, id, -32800, "request canceled".to_owned(), actus);
+    }
     write_message(
         output,
-        &serde_json::to_value(Response { jsonrpc: "2.0", id, result }).map_err(invalid_params)?,
+        &serde_json::to_value(Response { jsonrpc: "2.0", id, result, actus })
+            .map_err(invalid_params)?,
     )
 }
 
-fn read_message(input: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
-    let mut content_length = None;
-    loop {
-        let mut line = String::new();
-        if input.read_line(&mut line)? == 0 {
-            return Ok(None);
-        }
-        if line == "\r\n" || line == "\n" {
-            break;
-        }
-        if let Some(value) = line.strip_prefix("Content-Length:") {
-            content_length = value.trim().parse::<usize>().ok();
-        }
-    }
-    let Some(length) = content_length else {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "missing Content-Length"));
+pub(super) fn write_error(
+    output: &mut impl Write,
+    id: Value,
+    code: i32,
+    message: String,
+    actus: ResponseMetadata,
+) -> io::Result<()> {
+    let result_state = match code {
+        -32601 => "unsupported",
+        -32800 => "partial",
+        _ => "invalid",
     };
-    let mut body = vec![0; length];
-    input.read_exact(&mut body)?;
-    Ok(Some(body))
+    let actus = ResponseMetadata { result_state, ..actus };
+    let response =
+        ErrorResponse { jsonrpc: "2.0", id, error: JsonRpcError { code, message }, actus };
+    write_message(output, &serde_json::to_value(response).map_err(invalid_params)?)
 }
 
-fn write_message(output: &mut impl Write, message: &Value) -> io::Result<()> {
-    let body = serde_json::to_vec(message)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    write!(output, "Content-Length: {}\r\n\r\n", body.len())?;
-    output.write_all(&body)?;
-    output.flush()
+pub(super) fn write_lifecycle_error(
+    output: &mut impl Write,
+    id: Option<Value>,
+    message: &str,
+    actus: ResponseMetadata,
+) -> io::Result<bool> {
+    if let Some(id) = id {
+        write_error(output, id, -32600, message.to_owned(), actus)?;
+    }
+    Ok(false)
 }
 
-fn invalid_params(error: serde_json::Error) -> io::Error {
+pub(super) fn invalid_params(error: serde_json::Error) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, error)
 }

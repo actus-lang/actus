@@ -36,26 +36,37 @@ adapter and query surface over that information.
 
 ### Gate 17.0.1: Protocol lifecycle and versioned contracts
 
-- [ ] Implement complete `initialize`, `initialized`, `shutdown`, and `exit`
+See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bounded-responses.md).
+
+- [x] Establish the initial Actus initialize contract with protocol version,
+      schema version, selected target, and explicit result-state vocabulary.
+- [x] Return a structured JSON-RPC invalid-params error for request payloads
+      that fail the server's typed parameter contract without terminating the
+      LSP process.
+- [x] Implement complete `initialize`, `initialized`, `shutdown`, and `exit`
       lifecycle behavior with deterministic error responses.
-- [ ] Define request identifiers, response correlation, notification handling,
+- [x] Add protocol fixtures for initialize metadata, capability negotiation,
+      invalid params, unknown methods, and lifecycle errors.
+- [x] Attach protocol, schema, compiler, target, and current document
+      URI/version metadata to JSON-RPC responses and structured errors.
+- [x] Define request identifiers, response correlation, notification handling,
       and structured JSON-RPC error contracts.
-- [ ] Add cancellation and progress handling for every potentially expensive
+- [x] Add cancellation and progress handling for every potentially expensive
       request; canceled work must not publish stale results.
-- [ ] Define capability negotiation for compiler, server, client, and target
+- [x] Define capability negotiation for compiler, server, client, and target
       versions, including graceful degradation for older clients.
-- [ ] Add versioned response metadata containing compiler version, protocol
+- [x] Add versioned response metadata containing compiler version, protocol
       schema version, target profile, document URI, and document version.
-- [ ] Define explicit `available`, `stale`, `partial`, `unsupported`, and
+- [x] Define explicit `available`, `stale`, `partial`, `unsupported`, and
       `invalid` result states instead of silently returning empty data.
-- [ ] Add JSON fixtures for successful, degraded, rejected, and canceled
+- [x] Add JSON fixtures for successful, degraded, rejected, and canceled
       protocol exchanges.
 
 ### Gate 17.0.2: Incremental workspace and semantic model
 
 - [ ] Build a versioned workspace model for open documents, package manifests,
       module facades, siblings, imports, and target configuration.
-- [ ] Preserve full, incremental, and close overlay updates with strict
+- [x] Preserve full, incremental, and close overlay updates with strict
       document-version validation.
 - [ ] Recompute only affected modules and dependents after an overlay change;
       unrelated documents must retain valid cached results.

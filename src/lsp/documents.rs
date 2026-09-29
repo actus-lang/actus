@@ -31,6 +31,12 @@ impl DocumentStore {
     ) -> Result<(), String> {
         let document =
             self.documents.get_mut(uri).ok_or_else(|| format!("document `{uri}` is not open"))?;
+        if version <= document.version {
+            return Err(format!(
+                "stale document version for `{uri}`: current {}, received {version}",
+                document.version
+            ));
+        }
         for change in changes {
             if let Some(range) = &change.range {
                 let bytes = byte_range(&document.text, range)
