@@ -1,4 +1,7 @@
-use crate::ast::{Block, Expr, Param, Program, ReturnType, Stmt, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{
+    Block, Expr, ExternalVerbDecl, Param, Program, ReturnType, Stmt, TopLevelDecl, TypeName,
+    VerbDecl,
+};
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
 use super::super::native::NativeEmitError;
@@ -19,10 +22,48 @@ pub(in crate::codegen) fn specialize_program(
                     declarations.push(TopLevelDecl::Verb(specialized));
                 }
             }
+            TopLevelDecl::ExternalVerb(verb) if !verb.generic_parameters.is_empty() => {
+                if let Some(specialized) = specialize_external_verb(verb, instances)? {
+                    declarations.push(TopLevelDecl::ExternalVerb(specialized));
+                }
+            }
             other => declarations.push(other.clone()),
         }
     }
     Ok(Program { declarations })
+}
+
+fn specialize_external_verb(
+    verb: &ExternalVerbDecl,
+    instances: &[GenericInstance],
+) -> Result<Option<ExternalVerbDecl>, NativeEmitError> {
+    let instance = instances.iter().find(|instance| instance_matches_external(instance, verb));
+    let Some(instance) = instance else {
+        return Ok(None);
+    };
+    let substitution = TypeSubstitution::for_type(
+        &verb.name,
+        &verb.generic_parameters,
+        &instance.arguments,
+        verb.span,
+    )
+    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    Ok(Some(ExternalVerbDecl {
+        is_open: verb.is_open,
+        doc: verb.doc.clone(),
+        unsafe_boundary: verb.unsafe_boundary,
+        module_import: verb.module_import,
+        abi: verb.abi,
+        metadata: verb.metadata.clone(),
+        name: verb.name.clone(),
+        generic_parameters: Vec::new(),
+        params: verb.params.iter().map(|param| specialize_param(param, &substitution)).collect(),
+        return_type: verb
+            .return_type
+            .as_ref()
+            .map(|return_type| specialize_return_type(return_type, &substitution)),
+        span: verb.span,
+    }))
 }
 
 fn specialize_verb(
@@ -57,6 +98,14 @@ fn specialize_verb(
 }
 
 fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
+    instance.name == verb.name
+        && instance.arguments.len() == verb.generic_parameters.len()
+        && instance.arguments.iter().all(|argument| {
+            !verb.generic_parameters.iter().any(|parameter| parameter.name == argument.name)
+        })
+}
+
+fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl) -> bool {
     instance.name == verb.name
         && instance.arguments.len() == verb.generic_parameters.len()
         && instance.arguments.iter().all(|argument| {

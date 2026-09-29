@@ -157,7 +157,7 @@ fn dynamic_vtable_value(
         context.functions,
         context.layouts,
     )?;
-    let symbol = super::super::vtable::vtable_symbol_for_native(role, native_type);
+    let symbol = context.string_data.vtable_symbol(role, native_type);
     context
         .string_data
         .get(&symbol)

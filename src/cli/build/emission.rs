@@ -6,7 +6,7 @@ use crate::configuration::{CompilerConfiguration, EntryContract};
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::artifacts::{default_output, write_artifact};
-use super::loading::{load_build_program, validate_strict_program};
+use super::loading::{load_build_program, validate_strict_plan};
 use super::options::EmitKind;
 
 pub(crate) fn build_file(
@@ -45,17 +45,17 @@ fn build_file_with_report(
     report_output: bool,
     mode: ConformanceMode,
 ) -> i32 {
-    let Some((source, program)) = load_build_program(input, configuration) else {
+    let Some((source, plan)) = load_build_program(input, configuration) else {
         return 1;
     };
     if !validate_source_limits(Path::new(input), &source, mode) {
         return 1;
     }
-    let program = crate::semantic::filter_program_for_target(&program, configuration.target());
-    if mode.is_strict() && !validate_strict_program(input, &source, &program) {
+    let caller = crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
+    if mode.is_strict() && !validate_strict_plan(input, &source, &plan) {
         return 1;
     }
-    let Some(fallback_symbol) = first_defined_verb(&program) else {
+    let Some(fallback_symbol) = first_defined_verb(&caller) else {
         eprintln!("error: `{input}` contains no verb declarations");
         return 1;
     };
@@ -65,7 +65,7 @@ fn build_file_with_report(
         .unwrap_or(fallback_symbol)
         .to_owned();
     let report_mode = report_output.then_some(mode);
-    emit_and_write(input, output, emit, configuration, &program, &symbol, report_mode)
+    emit_and_write(input, output, emit, configuration, &plan, &symbol, report_mode)
 }
 
 fn emit_and_write(
@@ -73,11 +73,12 @@ fn emit_and_write(
     output: Option<&Path>,
     emit: EmitKind,
     configuration: &CompilerConfiguration,
-    program: &crate::ast::Program,
+    plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     report_mode: Option<ConformanceMode>,
 ) -> i32 {
-    if let Err(error) = validate_entry(program, symbol, emit, configuration.entry_contract()) {
+    if let Err(error) = validate_entry(plan.caller(), symbol, emit, configuration.entry_contract())
+    {
         eprintln!("error: {error}");
         return 1;
     }
@@ -87,14 +88,14 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    let bytes = match emit_object(program, symbol, configuration) {
-        Ok(bytes) => bytes,
+    let objects = match emit_objects(plan, symbol, configuration) {
+        Ok(objects) => objects,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
             return 1;
         }
     };
-    if let Err(error) = write_artifact(input, &output, bytes, emit, configuration) {
+    if let Err(error) = write_artifact(input, &output, objects, emit, configuration) {
         eprintln!("error: {error}");
         return 1;
     }
@@ -108,17 +109,138 @@ fn emit_and_write(
     0
 }
 
-fn emit_object(
-    program: &crate::ast::Program,
+pub(crate) struct EmittedObject {
+    pub(crate) name: String,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) symbols: std::collections::BTreeSet<String>,
+}
+
+pub(crate) fn emit_objects(
+    plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
-) -> Result<Vec<u8>, NativeEmitError> {
-    crate::codegen::emit_program_object_for_target(
-        program,
+) -> Result<Vec<EmittedObject>, NativeEmitError> {
+    let object_plan = plan.object_plan().map_err(|error| NativeEmitError(error.to_string()))?;
+    let targeted_caller =
+        crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
+    let generic_instances = crate::semantic::analyze(&targeted_caller)
+        .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?
+        .generic_instances;
+    let bindings = module_bindings(&object_plan)?;
+    let root = &object_plan.units()[0];
+    let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(
+        root.program(),
         symbol,
+        root.namespace().symbol_prefix(),
         configuration.native_backend(),
         configuration.target(),
-    )
+        &bindings,
+    )?;
+    let mut objects = vec![EmittedObject {
+        name: "root".to_owned(),
+        bytes: root_bytes,
+        symbols: declared_symbols(
+            root.program(),
+            root.namespace().symbol_prefix(),
+            symbol,
+            &bindings,
+        )?,
+    }];
+    objects.extend(emit_module_objects(
+        &object_plan,
+        configuration,
+        &bindings,
+        &generic_instances,
+    )?);
+    Ok(objects)
+}
+
+fn emit_module_objects(
+    object_plan: &crate::modules::ModuleObjectPlan,
+    configuration: &CompilerConfiguration,
+    bindings: &crate::codegen::NativeSymbolBindings,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<Vec<EmittedObject>, NativeEmitError> {
+    let mut objects = Vec::new();
+    for unit in &object_plan.units()[1..] {
+        let bytes =
+            crate::codegen::emit_module_object_for_target_in_namespace_with_bindings_and_instances(
+                unit.program(),
+                unit.namespace().symbol_prefix(),
+                configuration.native_backend(),
+                configuration.target(),
+                bindings,
+                generic_instances,
+            )
+            .map_err(|error| {
+                NativeEmitError(format!(
+                    "module `{}` emission failed: {error}",
+                    unit.namespace().module_path()
+                ))
+            })?;
+        objects.push(EmittedObject {
+            name: unit.namespace().symbol_prefix().to_owned(),
+            bytes,
+            symbols: declared_symbols(
+                unit.program(),
+                unit.namespace().symbol_prefix(),
+                "",
+                bindings,
+            )?,
+        });
+    }
+    Ok(objects)
+}
+
+fn declared_symbols(
+    program: &crate::ast::Program,
+    namespace: &str,
+    entry_symbol: &str,
+    bindings: &crate::codegen::NativeSymbolBindings,
+) -> Result<std::collections::BTreeSet<String>, NativeEmitError> {
+    let mut names = Vec::new();
+    for declaration in &program.declarations {
+        match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) => {
+                let symbol = if verb.name == entry_symbol {
+                    verb.name.clone()
+                } else {
+                    crate::codegen::SymbolIdentity::new(
+                        namespace,
+                        crate::codegen::SymbolKind::Verb,
+                        &verb.name,
+                    )
+                    .map_err(|error| NativeEmitError(error.to_string()))?
+                    .as_str()
+                    .to_owned()
+                };
+                names.push(symbol);
+            }
+            crate::ast::TopLevelDecl::ExternalVerb(verb) => {
+                names.push(bindings.external_symbol(&verb.name).to_owned());
+            }
+            _ => {}
+        }
+    }
+    Ok(names.into_iter().collect())
+}
+
+fn module_bindings(
+    plan: &crate::modules::ModuleObjectPlan,
+) -> Result<crate::codegen::NativeSymbolBindings, NativeEmitError> {
+    let mut bindings = Vec::new();
+    for unit in &plan.units()[1..] {
+        for name in unit.exported_verbs() {
+            let identity = crate::codegen::SymbolIdentity::new(
+                unit.namespace().symbol_prefix(),
+                crate::codegen::SymbolKind::Verb,
+                name,
+            )
+            .map_err(|error| NativeEmitError(error.to_string()))?;
+            bindings.push((name.clone(), identity.as_str().to_owned()));
+        }
+    }
+    Ok(crate::codegen::NativeSymbolBindings::new(bindings))
 }
 
 fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {

@@ -63,7 +63,7 @@ pub fn validate_external_native_signature(
 }
 
 fn validate_external_contract(verb: &ExternalVerbDecl) -> Result<(), NativeAbiError> {
-    if !verb.unsafe_boundary {
+    if !verb.unsafe_boundary && !verb.module_import {
         return Err(NativeAbiError(format!(
             "external native verb `{}` requires an explicit `unsafe` boundary",
             verb.name

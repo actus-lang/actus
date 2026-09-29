@@ -19,8 +19,19 @@ pub fn link_object(
     executable: &Path,
     configuration: &CompilerConfiguration,
 ) -> Result<(), NativeLinkError> {
+    link_objects(&[object], executable, configuration)
+}
+
+pub fn link_objects(
+    objects: &[&Path],
+    executable: &Path,
+    configuration: &CompilerConfiguration,
+) -> Result<(), NativeLinkError> {
+    if objects.is_empty() {
+        return Err(NativeLinkError("link requires at least one object".to_owned()));
+    }
     let linker = configuration.linker();
-    let mut command = configure_link_command(linker, object, configuration);
+    let mut command = configure_link_command(linker, objects, configuration);
     append_link_inputs(&mut command, configuration);
     let output = run_link_command(&mut command, executable, configuration)?;
     if output.status.success() {
@@ -36,7 +47,7 @@ pub fn link_object(
 
 fn configure_link_command(
     linker: &std::ffi::OsStr,
-    object: &Path,
+    objects: &[&Path],
     configuration: &CompilerConfiguration,
 ) -> Command {
     let mut command = Command::new(linker);
@@ -45,8 +56,14 @@ fn configure_link_command(
     {
         command.args(["-flavor", "link"]);
     }
-    command.arg(object);
+    append_object_inputs(&mut command, objects);
     command
+}
+
+fn append_object_inputs(command: &mut Command, objects: &[&Path]) {
+    for object in objects {
+        command.arg(object);
+    }
 }
 
 fn append_link_inputs(command: &mut Command, configuration: &CompilerConfiguration) {
@@ -145,5 +162,18 @@ mod tests {
         assert!(super::is_rust_lld(OsStr::new("rust-lld.exe")));
         assert!(super::is_rust_lld(OsStr::new("C:\\Rust\\rust-lld.exe")));
         assert!(!super::is_rust_lld(OsStr::new("lld-link.exe")));
+    }
+
+    #[test]
+    fn appends_each_module_object_to_one_link_command() {
+        let mut command = std::process::Command::new("linker");
+        let first = Path::new("/tmp/root.o");
+        let second = Path::new("/tmp/module.o");
+        super::append_object_inputs(&mut command, &[first, second]);
+        let arguments = command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(arguments, ["/tmp/root.o", "/tmp/module.o"]);
     }
 }

@@ -90,10 +90,11 @@ fn emits_a_deterministic_role_vtable_data_object() {
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
 
-    assert!(symbols.iter().any(|symbol| {
-        symbol.strip_prefix('_').is_some_and(|name| name.starts_with("actus_vtable_Writer_struct_"))
-            || symbol.starts_with("actus_vtable_Writer_struct_")
-    }));
+    assert!(
+        symbols
+            .iter()
+            .any(|symbol| symbol_matches(symbol, "actus_root__vtable_Writer__struct_5f0"))
+    );
 }
 
 #[test]
@@ -117,7 +118,7 @@ fn lowers_ins_parameters_without_a_wrapper_or_extra_allocation() {
         .expect("ins parameter should use the ordinary native argument representation");
     let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
-    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "mutate")));
+    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "actus_root__verb_mutate")));
 }
 
 #[test]

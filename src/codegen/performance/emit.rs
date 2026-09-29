@@ -22,6 +22,7 @@ pub(in crate::codegen) fn define_performances(
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
+    namespace_prefix: &str,
 ) -> Result<(), NativeEmitError> {
     for definition in definitions {
         let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
@@ -39,6 +40,7 @@ pub(in crate::codegen) fn define_performances(
             string_data,
             layouts,
             vtable_data,
+            namespace_prefix,
         )?;
     }
     Ok(())

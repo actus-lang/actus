@@ -15,6 +15,7 @@ pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
     pub(super) name: String,
     pub(super) program: Program,
+    pub(super) source_program: Program,
 }
 
 pub(super) struct TestCollection {
@@ -56,14 +57,14 @@ fn collect_file_tests(
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
     validate_source(path, &source, mode)?;
-    let Some(program) = parse_source(path, &source, resolver)? else {
+    let Some((source_program, program)) = parse_source(path, &source, resolver)? else {
         return Ok(CollectedFile { tests: Vec::new(), filtered: 0 });
     };
     let declared = test_count(&program);
     let program = filter_program_for_target(&program, configuration.target());
     let filtered = declared.saturating_sub(test_count(&program));
     validate_semantics(path, &source, &program, mode)?;
-    Ok(CollectedFile { tests: discover_tests(path, program), filtered })
+    Ok(CollectedFile { tests: discover_tests(path, source_program, program), filtered })
 }
 
 fn validate_source(path: &Path, source: &str, mode: ConformanceMode) -> Result<(), String> {
@@ -78,7 +79,7 @@ fn parse_source(
     path: &Path,
     source: &str,
     resolver: &ModuleResolver,
-) -> Result<Option<Program>, String> {
+) -> Result<Option<(Program, Program)>, String> {
     let (tokens, errors) = scan(source);
     if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(None);
@@ -86,12 +87,14 @@ fn parse_source(
     if !errors.is_empty() {
         return Err(format!("cannot lex `{}`", path.display()));
     }
-    let program =
+    let source_program =
         parse(tokens).map_err(|error| format!("cannot parse `{}`: {error:?}", path.display()))?;
-    resolve_imports(&program, resolver).map(Some).map_err(|error| {
-        let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
-        format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
-    })
+    resolve_imports(&source_program, resolver)
+        .map(|program| Some((source_program, program)))
+        .map_err(|error| {
+            let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
+            format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
+        })
 }
 
 fn validate_semantics(
@@ -109,7 +112,7 @@ fn validate_semantics(
     })
 }
 
-fn discover_tests(path: &Path, program: Program) -> Vec<DiscoveredTest> {
+fn discover_tests(path: &Path, source_program: Program, program: Program) -> Vec<DiscoveredTest> {
     program
         .declarations
         .iter()
@@ -119,6 +122,7 @@ fn discover_tests(path: &Path, program: Program) -> Vec<DiscoveredTest> {
                     path: path.to_path_buf(),
                     name: verb.name.clone(),
                     program: program.clone(),
+                    source_program: source_program.clone(),
                 })
             }
             _ => None,

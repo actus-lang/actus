@@ -244,6 +244,7 @@ impl Parser {
             is_open,
             doc,
             unsafe_boundary,
+            module_import: false,
             abi,
             metadata,
             name: signature.name,

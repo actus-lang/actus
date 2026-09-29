@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::lexer::scan;
-use actus::modules::{ModuleError, ModuleResolver, analyze_with_imports};
+use actus::modules::{ModuleError, ModuleResolver, analyze_with_imports, load_module_unit};
 use actus::parser::parse;
 
 struct Fixture {
@@ -64,7 +64,76 @@ fn rejects_private_imported_types() {
 
     let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect_err("closed sibling declarations must not cross the import boundary");
-    assert!(matches!(error, ModuleError::Semantic(_)));
+    assert!(
+        matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "HiddenBank")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
+}
+
+#[test]
+fn rejects_direct_calls_to_private_runtime_bridges() {
+    let fixture = Fixture::new();
+    fixture.write("runtime/runtime.act", "open api;");
+    fixture.write(
+        "runtime/api.act",
+        "open verb read() -> Int { return private_bridge(); } unsafe extern \"C\" verb private_bridge() -> Int;",
+    );
+    let program = parse_source("import runtime; verb main() -> Int { return private_bridge(); }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("raw runtime bridge must remain private");
+    assert!(
+        matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "private_bridge")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
+}
+
+#[test]
+fn rejects_private_types_in_exported_signatures() {
+    let fixture = Fixture::new();
+    fixture.write("api/api.act", "open surface;");
+    fixture.write(
+        "api/surface.act",
+        "struct Hidden { state: Int, } open verb expose(abs value: Hidden) -> Int { return 0; }",
+    );
+
+    let error = load_module_unit(&ModuleResolver::new(&fixture.root), "api")
+        .expect_err("private parameter types must not leak through an exported verb");
+    assert!(matches!(
+        error,
+        ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "Hidden"
+    ));
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
+}
+
+#[test]
+fn rejects_private_roles_in_exported_generic_bounds() {
+    let fixture = Fixture::new();
+    fixture.write("api/api.act", "open surface;");
+    fixture.write(
+        "api/surface.act",
+        "role HiddenRole { verb inspect(abs self: Int); } open verb expose[T: HiddenRole](erg value: T) -> Int { return 0; }",
+    );
+
+    let error = load_module_unit(&ModuleResolver::new(&fixture.root), "api")
+        .expect_err("private generic bounds must not leak through an exported verb");
+    assert!(matches!(
+        error,
+        ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "HiddenRole"
+    ));
+}
+
+#[test]
+fn accepts_public_types_nested_in_exported_result_signatures() {
+    let fixture = Fixture::new();
+    fixture.write("api/api.act", "open surface;");
+    fixture.write(
+        "api/surface.act",
+        "open enum Status { Ready, } open verb expose() -> Result[Status, Status] { return Result[Status, Status].Ok(Status.Ready); }",
+    );
+
+    load_module_unit(&ModuleResolver::new(&fixture.root), "api")
+        .expect("public nested result types should remain visible");
 }
 
 #[test]

@@ -42,6 +42,54 @@ internal compilation unit and its public import interface.
 
 ## Decision
 
+### Baseline recorded before implementation
+
+Before the new module-unit boundary is implemented, the compiler has two
+partial views of a module. The resolver discovers a canonical facade and its
+siblings in deterministic order. `parse_module` parses the selected sources,
+checks duplicate declaration identities, and flattens all declarations into a
+single `Program`; this is the scope currently used for internal semantic
+analysis. Consequently, an exported wrapper can resolve a private helper or
+runtime bridge from an opened sibling.
+
+`exports_module` independently computes the facade-facing export list by
+requiring an opened sibling and an `open` declaration. `resolve_imports` then
+copies only those exported declarations into the importing `Program`,
+deduplicating repeated module paths. This protects current external lookup
+from ordinary closed declarations, but it does not preserve a first-class
+module implementation alongside its public interface. The missing distinction
+is the architectural gap addressed by the following decision.
+
+Gate 20.0 records this behavior with positive and negative fixtures in
+`tests/modules/baseline.rs`. No compiler implementation is considered
+complete until the later gates replace this flattened dual use with an
+explicit internal compilation unit and importer-facing interface.
+
+### Gate 20.1 representation
+
+The first implementation step introduces `ModuleUnit` as a responsibility-
+specific aggregation object. It contains a resolver-derived `ModuleIdentity`,
+ordered `ModuleSource` records for the canonical facade and opened siblings,
+the complete internal `Program`, and a separate `ModuleExports` table. Each
+source record retains its path, facade/sibling identity, and parsed program;
+the identity also contains a normalized source-path key for deterministic
+repeated loads. Existing parsing and import behavior remains unchanged while
+later gates migrate semantic analysis and code generation to this boundary.
+
+Gate 20.2 makes the internal semantic analyzer consume that implementation
+program directly. Private helpers and unsafe runtime bridge declarations are
+therefore resolved within the module unit, while the public export table stays
+out of the internal namespace. Unresolved internal references fail before
+code generation. Cyclic importer graphs remain an interface-resolution
+concern for the next gate and are not treated as sibling-scope declarations.
+
+Gate 20.3 adds importer-side visibility validation before semantic analysis.
+Calls to closed helpers or raw runtime bridges, construction of closed struct
+types, and exported signatures that mention private types or role bounds are
+rejected with stable `E1109` diagnostics that identify the module and canonical
+facade. The compilation-unit loader validates nested generic and result
+positions before exposing the public interface.
+
 ### 1. Introduce a module compilation unit boundary
 
 Module aggregation shall produce a logical module unit with at least these
@@ -127,9 +175,8 @@ before code generation. The diagnostic must identify:
 - the fact that the symbol is not exported by the canonical facade;
 - the public facade or exported replacement when one exists.
 
-The implementation shall allocate a stable module-visibility diagnostic in
-the existing module diagnostic range (`E1100`–`E1108`) or extend that range in
-the normal diagnostic registry if all existing codes are occupied. The code
+The implementation allocates the stable module-visibility diagnostic `E1109`
+immediately after the resolver/source range (`E1100`–`E1108`). The code
 must be represented in the diagnostic model independently from terminal
 rendering and must be deterministic across CLI and LSP consumers.
 
