@@ -102,16 +102,30 @@ this unit the semantic scope boundary.
 
 ## Gate 20.2: Internal semantic scope
 
-- [ ] Analyze facade and opened siblings in one internal module scope.
-- [ ] Resolve private helpers from public wrapper bodies.
-- [ ] Resolve unsafe runtime bridges only inside their declaring module.
-- [ ] Preserve ownership roles, generic contracts, cleanup, and result types
+- [x] Analyze facade and opened siblings in one internal module scope.
+- [x] Resolve private helpers from public wrapper bodies.
+- [x] Resolve unsafe runtime bridges only inside their declaring module.
+- [x] Preserve ownership roles, generic contracts, cleanup, and result types
       across internal references.
-- [ ] Reject unresolved internal declarations before code generation.
-- [ ] Add positive tests for private helper calls and typed wrappers that use
+- [x] Reject unresolved internal declarations before code generation.
+- [x] Add positive tests for private helper calls and typed wrappers that use
       private bridges.
-- [ ] Add negative tests for duplicate, cyclic, or provenance-conflicting
-      internal declarations.
+- [x] Add negative tests for duplicate and provenance-conflicting internal
+      declarations.
+- [deferred] Reject cyclic import graphs as part of importer-facing interface
+      resolution in Gate 20.3; sibling internal scope does not recursively
+      import modules and therefore has no internal sibling cycle to resolve.
+
+### Gate 20.2 evidence
+
+`analyze_module` now loads a `ModuleUnit` and analyzes its complete
+implementation program directly. The public export table is not flattened into
+that internal semantic scope. This makes private helper calls and private
+unsafe C-ABI bridge calls resolvable inside the module while unresolved private
+dependencies fail before code generation. Existing duplicate declaration
+validation remains the provenance-conflict guard, and the module test suite
+covers both accepted and rejected paths. Cyclic importer graphs are explicitly
+tracked for Gate 20.3 rather than being hidden inside internal scope logic.
 
 ## Gate 20.3: Public interface and visibility diagnostics
 

@@ -8,12 +8,18 @@ use super::super::resolver::ModuleResolver;
 use super::exports::exports_module;
 use super::parsing::{parse_module, parse_module_with_overlays};
 use super::types::ModuleError;
+use super::unit::{ModuleUnit, load_module_unit};
 
 pub fn analyze_module(
     resolver: &ModuleResolver,
     module_path: &str,
 ) -> Result<SemanticModel, ModuleError> {
-    analyze_module_with_overlays(resolver, module_path, &HashMap::new())
+    let unit = load_module_unit(resolver, module_path)?;
+    analyze_module_unit(&unit)
+}
+
+pub fn analyze_module_unit(unit: &ModuleUnit) -> Result<SemanticModel, ModuleError> {
+    analyze(unit.implementation()).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 pub fn analyze_module_with_overlays(

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use actus::modules::{ModuleResolver, ModuleSourceKind, load_module_unit};
+use actus::modules::{ModuleResolver, ModuleSourceKind, analyze_module, load_module_unit};
 
 struct Fixture {
     root: PathBuf,
@@ -86,4 +86,28 @@ fn repeated_unit_loads_have_equal_identity_and_export_order() {
     assert_eq!(first.identity(), second.identity());
     assert_eq!(first.sources(), second.sources());
     assert_eq!(first.exports(), second.exports());
+}
+
+#[test]
+fn internal_analysis_resolves_private_helpers_and_bridges() {
+    let fixture = Fixture::new();
+    fixture.write("runtime/runtime.act", "open api;");
+    fixture.write(
+        "runtime/api.act",
+        "open unsafe extern \"C\" verb private_bridge() -> Int; open verb read() -> Int { return private_helper() + private_bridge(); } verb private_helper() -> Int { return 40; }",
+    );
+
+    analyze_module(&ModuleResolver::new(&fixture.root), "runtime")
+        .expect("internal semantic scope should resolve private dependencies");
+}
+
+#[test]
+fn internal_analysis_rejects_an_unresolved_private_dependency() {
+    let fixture = Fixture::new();
+    fixture.write("runtime/runtime.act", "open api;");
+    fixture
+        .write("runtime/api.act", "open verb read() -> Int { return missing_private_helper(); }");
+
+    analyze_module(&ModuleResolver::new(&fixture.root), "runtime")
+        .expect_err("unresolved internal dependencies must fail before codegen");
 }

@@ -76,6 +76,13 @@ the identity also contains a normalized source-path key for deterministic
 repeated loads. Existing parsing and import behavior remains unchanged while
 later gates migrate semantic analysis and code generation to this boundary.
 
+Gate 20.2 makes the internal semantic analyzer consume that implementation
+program directly. Private helpers and unsafe runtime bridge declarations are
+therefore resolved within the module unit, while the public export table stays
+out of the internal namespace. Unresolved internal references fail before
+code generation. Cyclic importer graphs remain an interface-resolution
+concern for the next gate and are not treated as sibling-scope declarations.
+
 ### 1. Introduce a module compilation unit boundary
 
 Module aggregation shall produce a logical module unit with at least these
