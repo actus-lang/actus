@@ -128,36 +128,36 @@ contracts that the future platform is allowed to consume.
 
 ### CLI commands
 
-- [ ] Verify `actus check` validates without emitting native code.
-- [ ] Verify `actus build` emits the documented artifact types and names.
-- [ ] Verify `actus run` builds, executes, forwards output, and reports status.
-- [ ] Complete deterministic `actus test` discovery and reporting.
-- [ ] Complete `actus fmt` and `actus fmt --check` behavior.
-- [ ] Verify `actus watch --once` and continuous watch behavior.
-- [ ] Reject unknown, repeated, misplaced, and conflicting command options.
+- [x] Verify `actus check` validates without emitting native code.
+- [x] Verify `actus build` emits the documented artifact types and names.
+- [x] Verify `actus run` builds, executes, forwards output, and reports status.
+- [x] Complete deterministic `actus test` discovery and reporting.
+- [x] Complete `actus fmt` and `actus fmt --check` behavior.
+- [x] Verify `actus watch --once` and continuous watch behavior.
+- [x] Reject unknown, repeated, misplaced, and conflicting command options.
 
 ### Packages and modules
 
-- [ ] Verify manifest entry resolution from project root and nested paths.
-- [ ] Verify facade imports and sibling declarations from clean workspaces.
-- [ ] Verify local dependency resolution and lockfile content checksums.
-- [ ] Reject missing, stale, conflicting, and unsafe dependency metadata.
+- [x] Verify manifest entry resolution from project root and nested paths.
+- [x] Verify facade imports and sibling declarations from clean workspaces.
+- [x] Verify local dependency resolution and lockfile content checksums.
+- [x] Reject missing, stale, conflicting, and unsafe dependency metadata.
 - [ ] Define deterministic package and module failure diagnostics.
 
 ### Profiles and artifacts
 
-- [ ] Verify debug and release profile selection.
-- [ ] Verify target profile and linker configuration behavior.
-- [ ] Define artifact directory, naming, and failed-build cleanup contracts.
-- [ ] Build identical inputs twice and compare artifacts where determinism is
+- [x] Verify debug and release profile selection.
+- [x] Verify target profile and linker configuration behavior.
+- [x] Define artifact directory, naming, and failed-build cleanup contracts.
+- [x] Build identical inputs twice and compare artifacts where determinism is
       promised by the target contract.
-- [ ] Verify no failed command leaves a misleading executable or object file.
+- [x] Verify no failed command leaves a misleading executable or object file.
 
 ### Gate 19.3 evidence
 
-- [ ] CLI workflow tests cover accepted and rejected command forms.
-- [ ] Package and lockfile tests pass from isolated temporary workspaces.
-- [ ] Repeated builds produce the documented deterministic result.
+- [x] CLI workflow tests cover accepted and rejected command forms.
+- [x] Package and lockfile tests pass from isolated temporary workspaces.
+- [x] Repeated builds produce the documented deterministic result.
 
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
 
