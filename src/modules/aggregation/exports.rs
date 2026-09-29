@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -13,12 +14,22 @@ pub fn exports_module(
     resolver: &ModuleResolver,
     module_path: &str,
 ) -> Result<ModuleExports, ModuleError> {
+    exports_module_with_overlays(resolver, module_path, &HashMap::new())
+}
+
+pub fn exports_module_with_overlays(
+    resolver: &ModuleResolver,
+    module_path: &str,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<ModuleExports, ModuleError> {
     let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
     let mut parsed = Vec::new();
     for source_path in resolved.source_files() {
-        let source = fs::read_to_string(source_path).map_err(|error| ModuleError::Read {
-            path: source_path.to_owned(),
-            message: error.to_string(),
+        let source = overlays.get(source_path).cloned().map(Ok).unwrap_or_else(|| {
+            fs::read_to_string(source_path).map_err(|error| ModuleError::Read {
+                path: source_path.to_owned(),
+                message: error.to_string(),
+            })
         })?;
         let (tokens, errors) = scan(&source);
         if !errors.is_empty() {

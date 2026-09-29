@@ -15,7 +15,7 @@ pub use analysis::{
     analyze_module_with_overlays_for_target, analyze_with_imports, analyze_with_imports_for_target,
     resolve_imports,
 };
-pub use exports::exports_module;
+pub use exports::{exports_module, exports_module_with_overlays};
 pub use identity::ModuleNamespace;
 pub use object_plan::{ModuleObjectOwner, ModuleObjectPlan, ModuleObjectUnit};
 pub use parsing::parse_module;

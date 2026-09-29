@@ -424,6 +424,48 @@ fn lsp_uses_unsaved_sibling_overlay_for_package_diagnostics() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
+    let root = temp_root();
+    let module = root.join("src/math");
+    fs::create_dir_all(&module).expect("create module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-interface\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(module.join("math.act"), "open api;\n").expect("write facade");
+    let main_path = root.join("src/main.act");
+    let api_path = module.join("api.act");
+    let main_uri = file_uri(&main_path);
+    let api_uri = file_uri(&api_path);
+    let main = "import math;\nverb main() -> Int { return visible(); }\n";
+    let api =
+        "open verb visible() -> Int { return 7; }\nverb private_bridge() -> Int { return 9; }\n";
+    fs::write(&main_path, main).expect("write main");
+    fs::write(&api_path, "verb disk_only() -> Int { return 3; }\n").expect("write api");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":main_uri,"version":1,"text":main}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":api_uri,"version":1,"text":api}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":main_uri,"version":2},"contentChanges":[{"text":main}]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":main_uri},"position":{"line":1,"character":30}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":main_uri},"position":position_after(main, "visible")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":main_uri},"position":position_after(main, "visible")}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"label\":\"visible\""), "public completion missing: {stdout}");
+    assert!(
+        !stdout.contains("\"label\":\"private_bridge\""),
+        "private completion leaked: {stdout}"
+    );
+    assert!(stdout.contains("verb visible() -> Int"), "public hover missing: {stdout}");
+    assert!(stdout.contains(&api_uri), "definition did not use the module source: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
 fn position_after(source: &str, marker: &str) -> Value {
     let offset = source.find(marker).expect("marker in source") + marker.len() - 1;
     let line = source[..offset].bytes().filter(|byte| *byte == b'\n').count();
