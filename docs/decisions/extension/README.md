@@ -14,6 +14,8 @@ completion:
 
 The shared LSP execution and protocol foundation is defined by
 `ADR-0048` — LSP Execution, Cancellation, Progress, and Bounded Responses.
+It is accepted and verified by the Gate 17.0.10 response-contract snapshots,
+visibility tests, and Linux/macOS/Windows CI matrix.
 
 The VS Code Activity Bar and Sidebar are the shared presentation shell for
 these capabilities, not an independent semantic subsystem. All views consume

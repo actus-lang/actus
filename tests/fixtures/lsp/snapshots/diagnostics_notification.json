@@ -1,0 +1,1 @@
+{"method":"textDocument/publishDiagnostics","params_keys":["diagnostics","uri","version"],"diagnostic_keys":["code","message","range","severity","source"],"version":7}

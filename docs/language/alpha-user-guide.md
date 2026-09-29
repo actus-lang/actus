@@ -149,6 +149,11 @@ The real application workflow and exact output/exit-code assertions are in
 The CLI command and rejection matrix is in `tests/cli_workflow.rs` and
 `tests/cli_strict.rs`.
 
+The compiler-backed editor contract is documented in
+`docs/language/lsp-protocol.md`. It defines the `actus lsp` lifecycle,
+versioned response metadata, result states, cancellation behavior, and the
+cross-platform URI/source-location rules used by all supported clients.
+
 ### Repository contributor bootstrap
 
 The repository currently bootstraps the compiler from Rust. Contributors who

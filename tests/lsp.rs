@@ -9,6 +9,8 @@ mod lsp_navigation;
 mod lsp_performance;
 #[path = "lsp/platform.rs"]
 mod lsp_platform;
+#[path = "lsp/production.rs"]
+mod lsp_production;
 #[path = "lsp/protocol.rs"]
 mod lsp_protocol;
 #[path = "lsp/semantic.rs"]

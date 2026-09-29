@@ -1,6 +1,6 @@
 # ADR-0048: LSP Execution, Cancellation, Progress, and Bounded Responses
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-29
 - Scope: Actus LSP transport, request execution, cancellation, progress, and
   response resource limits
@@ -130,6 +130,13 @@ paths, or mutates source/artifacts/devices as a side effect of inspection.
   target metadata, and deterministic shutdown on Linux, macOS, and Windows.
 - Tests verify that every response has metadata and that standard LSP result
   payloads remain schema-compatible.
+
+Gate 17.0.10 production verification is recorded by the versioned contract
+snapshots under `tests/fixtures/lsp/snapshots/`, the public-response tests in
+`tests/lsp/production.rs`, the visibility tests in `tests/lsp/semantic.rs`,
+and the three-host matrix in `.github/workflows/ci.yml`. The CI job runs the
+complete workspace suite and the isolated LSP contract suite on Linux, macOS,
+and Windows; the step summary records the platform-specific result.
 
 ## Non-goals
 

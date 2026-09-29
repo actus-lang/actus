@@ -185,17 +185,28 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.10: Production verification
 
-- [ ] Add unit, semantic, native, protocol, and end-to-end tests for every
+- [x] Add unit, semantic, native, protocol, and end-to-end tests for every
       Gate 17.0 contract and its negative cases.
-- [ ] Add deterministic JSON fixtures and snapshot review for all public
+- [x] Add deterministic JSON fixtures and snapshot review for all public
       response schemas.
-- [ ] Verify no private compiler declaration, raw bridge, backend type, or
+- [x] Verify no private compiler declaration, raw bridge, backend type, or
       implementation-only field leaks through public LSP data.
-- [ ] Run formatting, compilation, Clippy, full tests, source limits, diff
+- [x] Run formatting, compilation, Clippy, full tests, source limits, diff
       checks, and standard-library conformance checks.
-- [ ] Record Linux, macOS, and Windows CI evidence for the complete LSP suite.
-- [ ] Update the relevant extension ADRs, language reference, protocol
+- [x] Record Linux, macOS, and Windows CI evidence for the complete LSP suite.
+- [x] Update the relevant extension ADRs, language reference, protocol
       documentation, and compatibility policy only after tests are green.
+
+Gate 17.0.10 evidence is split by responsibility: `src/lsp/position.rs` and
+`src/lsp/uri.rs` provide unit-level source-location and URI coverage;
+`tests/lsp/semantic.rs`, `tests/lsp/semantic_states.rs`, and
+`tests/lsp/platform.rs` cover compiler-backed semantic and cross-platform
+behavior; `tests/lsp/production.rs` locks public response families and
+diagnostics notifications to reviewed JSON contract snapshots;
+`tests/lsp/protocol.rs` covers compatibility and lifecycle failures; and
+`tests/lsp_workflow.rs` covers process-level stdio execution and navigation.
+The CI matrix runs the isolated 64-test LSP suite and the complete workspace
+suite on Linux, macOS, and Windows.
 
 ### Workspace and package integration
 
