@@ -38,6 +38,26 @@ already-dropped bindings are excluded from cleanup.
 These guarantees are enforced before native code generation. They do not
 depend on the native backend or on a garbage collector.
 
+## Struct aggregates
+
+- `open` controls whether a struct declaration crosses a module facade; fields
+  do not have a separate visibility modifier.
+- Unmarked fields are value fields. `erg` fields are owned mutable subresources
+  and are included in the containing owner's cleanup plan.
+- `abs` fields are read-only, non-owning views. Mutation of the field or any
+  nested path through it is rejected.
+- `ins` fields are rejected because an exclusive loan is call-scoped and cannot
+  become persistent aggregate state. `dat` is an operation-level transfer and
+  is not a field declaration role.
+- Structs are not implicitly copyable. Compatible whole-struct assignment
+  transfers the source owner, cleans the destination's previous owned value,
+  and reports use-after-move on later source access.
+- Partial field moves are tracked by field path and cleanup skips moved fields
+  exactly once. Self-assignment and overlapping moves are rejected.
+- Ordinary struct layout is deterministic by declaration order and target
+  alignment. Packed and public C-ABI representations require their explicit
+  contracts; unsupported aggregate ABI exposure is rejected or deferred.
+
 ## Numeric Comparisons and Output
 
 The relational operators `<`, `<=`, `>`, and `>=` return `Bool`. Signed integer

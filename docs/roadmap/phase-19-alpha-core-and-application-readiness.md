@@ -84,9 +84,9 @@ contracts that the future platform is allowed to consume.
 
 ### Gate 19.1 evidence
 
-- [ ] Struct visibility and ownership behavior has stable diagnostics.
-- [ ] Accepted and rejected struct programs pass semantic and native tests.
-- [ ] Struct documentation and the language reference match implementation.
+- [x] Struct visibility and ownership behavior has stable diagnostics.
+- [x] Accepted and rejected struct programs pass semantic and native tests.
+- [x] Struct documentation and the language reference match implementation.
 
 ## Gate 19.2: Standard Library and Real Applications
 
