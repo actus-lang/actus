@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use super::completion::items;
 use super::definition::find_definition;
-use super::diagnostics::analyze_document;
+use super::diagnostics::analyze_document_for_target;
 use super::documents::DocumentStore;
 use super::formatting::format_document;
 use super::hover::find_hover;
@@ -13,12 +13,14 @@ use super::protocol::{
     PublishDiagnosticsParams, Request, Response, TextEdit,
 };
 use super::semantic_tokens::full as semantic_tokens;
+use crate::target::TargetSpec;
 
 pub fn run_stdio() -> io::Result<()> {
     let stdin = io::stdin();
     let mut input = stdin.lock();
     let mut output = io::stdout().lock();
     let mut store = DocumentStore::default();
+    let mut target = TargetSpec::host().expect("host target must be supported");
     while let Some(message) = read_message(&mut input)? {
         let request = match serde_json::from_slice::<Request>(&message) {
             Ok(request) => request,
@@ -27,7 +29,7 @@ pub fn run_stdio() -> io::Result<()> {
                 continue;
             }
         };
-        if handle_request(request, &mut store, &mut output)? {
+        if handle_request(request, &mut store, &mut target, &mut output)? {
             break;
         }
     }
@@ -37,21 +39,25 @@ pub fn run_stdio() -> io::Result<()> {
 fn handle_request(
     request: Request,
     store: &mut DocumentStore,
+    target: &mut TargetSpec,
     output: &mut impl Write,
 ) -> io::Result<bool> {
     match request.method.as_str() {
-        "initialize" => respond(output, request.id, initialize_result())?,
+        "initialize" => {
+            configure_target(&request.params, target);
+            respond(output, request.id, initialize_result())?
+        }
         "shutdown" => respond(output, request.id, Value::Null)?,
         "exit" => return Ok(true),
         "initialized" | "$/cancelRequest" => {}
-        "textDocument/didOpen" => open_document(request.params, store, output)?,
-        "textDocument/didChange" => change_document(request.params, store, output)?,
+        "textDocument/didOpen" => open_document(request.params, store, target, output)?,
+        "textDocument/didChange" => change_document(request.params, store, target, output)?,
         "textDocument/didClose" => close_document(request.params, store, output)?,
         "textDocument/definition" => definition(request.id, request.params, store, output)?,
         "textDocument/hover" => hover(request.id, request.params, store, output)?,
         "textDocument/completion" => completion(request.id, request.params, store, output)?,
         "textDocument/semanticTokens/full" => {
-            semantic_tokens_full(request.id, request.params, store, output)?
+            semantic_tokens_full(request.id, request.params, store, target, output)?
         }
         "textDocument/formatting" => formatting(request.id, request.params, store, output)?,
         _ if request.id.is_some() => respond(output, request.id, Value::Null)?,
@@ -76,12 +82,13 @@ fn semantic_tokens_full(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
+    target: &TargetSpec,
     output: &mut impl Write,
 ) -> io::Result<()> {
     let params = serde_json::from_value::<FormattingParams>(params).map_err(invalid_params)?;
     let result = store
         .get(&params.text_document.uri)
-        .map(|document| semantic_tokens(&document.text))
+        .map(|document| semantic_tokens(&document.text, target))
         .unwrap_or_else(|| serde_json::json!({"data": []}));
     respond(output, id, result)
 }
@@ -138,6 +145,7 @@ fn formatting(
 fn open_document(
     params: Value,
     store: &mut DocumentStore,
+    target: &TargetSpec,
     output: &mut impl Write,
 ) -> io::Result<()> {
     let params = serde_json::from_value::<DidOpenParams>(params).map_err(invalid_params)?;
@@ -146,12 +154,13 @@ fn open_document(
         params.text_document.version,
         params.text_document.text,
     );
-    publish(output, &params.text_document.uri, store)
+    publish(output, &params.text_document.uri, store, target)
 }
 
 fn change_document(
     params: Value,
     store: &mut DocumentStore,
+    target: &TargetSpec,
     output: &mut impl Write,
 ) -> io::Result<()> {
     let params = serde_json::from_value::<DidChangeParams>(params).map_err(invalid_params)?;
@@ -162,7 +171,7 @@ fn change_document(
         eprintln!("actus lsp: {error}");
         return Ok(());
     }
-    publish(output, &params.text_document.uri, store)
+    publish(output, &params.text_document.uri, store, target)
 }
 
 fn close_document(
@@ -187,11 +196,16 @@ fn close_document(
     Ok(())
 }
 
-fn publish(output: &mut impl Write, uri: &str, store: &DocumentStore) -> io::Result<()> {
+fn publish(
+    output: &mut impl Write,
+    uri: &str,
+    store: &DocumentStore,
+    target: &TargetSpec,
+) -> io::Result<()> {
     let overlays = store.source_overlays();
     let diagnostics = store
         .get(uri)
-        .map(|document| analyze_document(uri, &document.text, &overlays))
+        .map(|document| analyze_document_for_target(uri, &document.text, &overlays, target))
         .unwrap_or_default();
     write_message(
         output,
@@ -213,12 +227,24 @@ fn initialize_result() -> Value {
             "completionProvider": {"triggerCharacters": ["u", "i", "f"]},
             "semanticTokensProvider": {
                 "full": true,
-                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": []}
+                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": ["inactive-target"]}
             },
             "documentFormattingProvider": true
         },
         "serverInfo": { "name": "actus-lsp", "version": env!("CARGO_PKG_VERSION") }
     })
+}
+
+fn configure_target(params: &Value, target: &mut TargetSpec) {
+    let requested = params
+        .get("initializationOptions")
+        .and_then(|options| options.get("target"))
+        .and_then(Value::as_str)
+        .or_else(|| params.get("target").and_then(Value::as_str));
+    let Some(requested) = requested else { return };
+    if let Ok(parsed) = TargetSpec::parse(requested) {
+        *target = parsed;
+    }
 }
 
 fn respond(output: &mut impl Write, id: Option<Value>, result: Value) -> io::Result<()> {

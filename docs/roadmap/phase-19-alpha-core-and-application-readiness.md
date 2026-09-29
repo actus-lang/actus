@@ -184,9 +184,9 @@ contracts that the future platform is allowed to consume.
 ### Supported hosts
 
 - [x] Run the compiler and native application matrix on Linux.
-- [ ] Run the compiler and native application matrix on macOS.
-- [ ] Run the compiler and native application matrix on Windows.
-- [ ] Verify host-native path separators, encoding boundaries, line endings,
+- [x] Run the compiler and native application matrix on macOS.
+- [x] Run the compiler and native application matrix on Windows.
+- [x] Verify host-native path separators, encoding boundaries, line endings,
       executable names, and linker selection.
 - [ ] Record bare-metal substitutions and unavailable host services explicitly.
 
@@ -202,8 +202,9 @@ failure matrix in `tests/runtime_failure_matrix.rs`. The Linux host slice was
 verified with `./scripts/check_stdlib.sh` and
 `cargo test --all-targets --all-features -- --test-threads=1`; both completed
 successfully, including native application, runtime, filesystem, path, and
-standard-library suites. macOS and Windows remain open until their native CI
-runs provide evidence.
+standard-library suites. GitHub Actions then passed the corresponding macOS
+and Windows native matrices on PR #40, including the file utility's
+host-native path construction.
 
 Borrowed path inspection is covered by `tests/runtime_zero_alloc.rs`, which
 counts allocations around predicates, component views, iteration, and C-view
@@ -276,7 +277,7 @@ and native resource cleanup.
 - [x] Re-run all Rust quality checks from a clean checkout.
 - [x] Re-run all Actus strict, semantic, native, and application tests.
 - [x] Re-run standard-library, package, and lockfile checks.
-- [ ] Re-run Linux, macOS, and Windows CI checks.
+- [x] Re-run Linux, macOS, and Windows CI checks.
 - [x] Re-run coverage checks.
 - [x] Re-run dependency and license policy checks.
 - [x] Verify source and function size limits and `git diff --check`.
@@ -313,8 +314,14 @@ confirmed canonical lockfile stability.
 - [x] Rebuild release artifacts twice under the same target contract.
 - [x] Record compiler version, target, profile, source revision, and artifact
       checksums in the acceptance report.
-- [ ] Ensure the acceptance report contains real command output or linked CI
+- [x] Ensure the acceptance report contains real command output or linked CI
       evidence rather than unverified claims.
+
+PR #40 records the remote acceptance evidence: Linux, macOS, and Windows
+Rust checks, coverage, and dependency/license policy all passed. The Windows
+application matrix initially exposed a POSIX path construction defect; the
+follow-up fix switched the example to `path_from_ascii`, after which the
+application suite passed on all supported hosted targets.
 
 ### Handoff
 
@@ -341,6 +348,6 @@ confirmed canonical lockfile stability.
 - [ ] Phase 16 Gate 6 is complete or all deferrals are explicitly accepted.
 - [ ] Remaining Phase 11 struct items are complete or explicitly deferred.
 - [x] At least two real Actus applications pass native execution checks.
-- [ ] Supported host quality evidence is recorded.
-- [ ] Alpha compatibility and diagnostic policies are published.
+- [x] Supported host quality evidence is recorded.
+- [x] Alpha compatibility and diagnostic policies are published.
 - [ ] A clean checkout reproduces the documented acceptance report.

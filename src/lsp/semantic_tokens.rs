@@ -1,7 +1,9 @@
 use crate::lexer::{TokenKind, scan};
+use crate::target::TargetSpec;
 
-pub(super) fn full(source: &str) -> serde_json::Value {
+pub(super) fn full(source: &str, target: &TargetSpec) -> serde_json::Value {
     let tokens = scan(source).0;
+    let inactive = inactive_spans(source, target);
     let index = crate::lsp::position::LineIndex::new(source);
     let mut previous_line = 0;
     let mut previous_start = 0;
@@ -13,11 +15,47 @@ pub(super) fn full(source: &str) -> serde_json::Value {
         let delta_line = start.line - previous_line;
         let delta_start =
             if delta_line == 0 { start.character - previous_start } else { start.character };
-        data.extend([delta_line, delta_start, end.character - start.character, token_type, 0]);
+        let modifier = u32::from(
+            inactive
+                .iter()
+                .any(|span| span.start <= token.span.start && token.span.end <= span.end),
+        );
+        data.extend([
+            delta_line,
+            delta_start,
+            end.character - start.character,
+            token_type,
+            modifier,
+        ]);
         previous_line = start.line;
         previous_start = start.character;
     }
     serde_json::json!({"data": data})
+}
+
+fn inactive_spans(source: &str, target: &TargetSpec) -> Vec<crate::lexer::SourceSpan> {
+    let tokens = scan(source).0;
+    let Ok(program) = crate::parser::parse(tokens) else { return Vec::new() };
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let metadata = match declaration {
+                crate::ast::TopLevelDecl::Verb(verb) => &verb.metadata,
+                crate::ast::TopLevelDecl::ExternalVerb(verb) => &verb.metadata,
+                _ => return None,
+            };
+            let inactive = metadata.iter().any(|attribute| {
+                matches!(attribute, crate::ast::MetaAttribute::Target(selector)
+                    if !target.matches_platform(selector))
+            });
+            inactive.then_some(match declaration {
+                crate::ast::TopLevelDecl::Verb(verb) => verb.span,
+                crate::ast::TopLevelDecl::ExternalVerb(verb) => verb.span,
+                _ => unreachable!(),
+            })
+        })
+        .collect()
 }
 
 fn token_type(tokens: &[crate::lexer::Token], index: usize) -> Option<u32> {
