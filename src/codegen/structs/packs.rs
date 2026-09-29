@@ -230,11 +230,20 @@ pub(crate) fn lower_pack_field(
         let offset = function.ins().iconst(storage_type, i64::from(bit_offset));
         function.ins().ushr(storage, offset)
     };
-    let mask_value = function.ins().iconst(storage_type, bit_mask(field_layout.width));
+    let storage_bits = packed_storage_bits(pack.storage, layouts)?;
+    let mask_value = field_mask(function, field_layout.width, storage_bits, storage_type);
     let masked = function.ins().band(shifted, mask_value);
-    Ok(super::super::expressions::coerce_to_ir_type(
+    let extracted = sign_extend_field(
         function,
         masked,
+        field_layout.ty,
+        field_layout.width,
+        storage_bits,
+        storage_type,
+    );
+    Ok(super::super::expressions::coerce_to_ir_type(
+        function,
+        extracted,
         layouts.ir_type(field_layout.ty)?,
     ))
 }
@@ -249,7 +258,8 @@ fn lower_pack_field_write(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let storage_type = layouts.ir_type(storage_native_type)?;
-    let mask_value = function.ins().iconst(storage_type, bit_mask(field.width));
+    let storage_bits = packed_storage_bits(storage_native_type, layouts)?;
+    let mask_value = field_mask(function, field.width, storage_bits, storage_type);
     let bit_offset = mapped_bit_offset_for_storage(
         field,
         endianness,
@@ -290,8 +300,53 @@ fn packed_field<'a>(
         .ok_or_else(|| NativeEmitError(format!("unknown packed field `{field}`")))
 }
 
-fn bit_mask(width: u8) -> i64 {
-    if width >= 64 { -1 } else { (1_i64 << width) - 1 }
+fn field_mask(
+    function: &mut FunctionBuilder<'_>,
+    width: u8,
+    storage_bits: u16,
+    storage_type: cranelift_codegen::ir::Type,
+) -> cranelift_codegen::ir::Value {
+    if u16::from(width) >= storage_bits {
+        return function.ins().iconst(storage_type, -1);
+    }
+    let one = function.ins().iconst(storage_type, 1);
+    let shift = function.ins().iconst(storage_type, i64::from(width));
+    let shifted = function.ins().ishl(one, shift);
+    let one_again = function.ins().iconst(storage_type, 1);
+    function.ins().isub(shifted, one_again)
+}
+
+fn sign_extend_field(
+    function: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    field_type: NativeType,
+    width: u8,
+    storage_bits: u16,
+    storage_type: cranelift_codegen::ir::Type,
+) -> cranelift_codegen::ir::Value {
+    let NativeType::Integer { signed: true, .. } = field_type else { return value };
+    if u16::from(width) >= storage_bits {
+        return value;
+    }
+    let shift_amount = storage_bits - u16::from(width);
+    let shift = function.ins().iconst(storage_type, i64::from(shift_amount));
+    let shifted = function.ins().ishl(value, shift);
+    function.ins().sshr(shifted, shift)
+}
+
+fn packed_storage_bits(
+    storage: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<u16, NativeEmitError> {
+    let bytes = layouts
+        .type_size(storage)
+        .ok_or_else(|| NativeEmitError("missing packed storage size".to_owned()))?;
+    u16::try_from(
+        bytes
+            .checked_mul(8)
+            .ok_or_else(|| NativeEmitError("packed storage bit width overflow".to_owned()))?,
+    )
+    .map_err(|_| NativeEmitError("packed storage bit width exceeds u16".to_owned()))
 }
 
 fn mapped_bit_offset(

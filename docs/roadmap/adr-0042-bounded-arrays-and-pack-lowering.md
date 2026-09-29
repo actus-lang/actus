@@ -52,12 +52,12 @@ complete.
 
 ## Gate 4: Cranelift native pack lowering
 
-- [ ] Lower packed-field reads using target-aware shift and mask operations.
-- [ ] Lower packed-field writes using clear-mask and insert operations.
-- [ ] Preserve unrelated backing bits during every write.
-- [ ] Implement signed extraction and sign extension by declared field type.
-- [ ] Validate field range before native insertion.
-- [ ] Add native tests for endianness, widths, overflow, and overlapping layout
+- [x] Lower packed-field reads using target-aware shift and mask operations.
+- [x] Lower packed-field writes using clear-mask and insert operations.
+- [x] Preserve unrelated backing bits during every write.
+- [x] Implement signed extraction and sign extension by declared field type.
+- [x] Validate field range before native insertion.
+- [x] Add native tests for endianness, widths, overflow, and overlapping layout
       rejection.
 
 ## Gate 5: Cranelift native array lowering and bounds failures
