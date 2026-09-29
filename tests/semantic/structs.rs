@@ -69,6 +69,17 @@ fn rejects_duplicate_struct_names_and_fields() {
 }
 
 #[test]
+fn rejects_persistent_instrumental_struct_fields() {
+    let error = analyze_source("struct Session { ins scratch: Buffer, }")
+        .expect_err("ins fields cannot outlive their call scope");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidStructFieldRole { struct_name, field, role }
+            if struct_name == "Session" && field == "scratch" && role == "ins"
+    ));
+}
+
+#[test]
 fn validates_struct_field_types_and_known_field_types() {
     let unknown_type =
         analyze_source("struct Point { x: Missing, }").expect_err("unknown field types must fail");

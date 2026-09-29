@@ -171,6 +171,11 @@ pub enum SemanticErrorKind {
         expected: String,
         found: String,
     },
+    InvalidStructFieldRole {
+        struct_name: String,
+        field: String,
+        role: String,
+    },
     TypeMismatch {
         callee: String,
         parameter: String,

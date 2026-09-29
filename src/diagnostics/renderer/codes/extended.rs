@@ -196,6 +196,11 @@ fn struct_field_message(kind: &SemanticErrorKind) -> Option<String> {
                 "type mismatch for field `{field}` in `{struct_name}`: expected `{expected}`, found `{found}`"
             )
         }
+        SemanticErrorKind::InvalidStructFieldRole { struct_name, field, role } => {
+            format!(
+                "struct field `{field}` in `{struct_name}` cannot persist the `{role}` ownership role"
+            )
+        }
         SemanticErrorKind::InvalidFieldAssignmentTarget { field } => {
             format!("field `{field}` can only be assigned through an erg owner")
         }

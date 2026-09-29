@@ -56,7 +56,8 @@ contracts that the future platform is allowed to consume.
 - [ ] Define `erg` field ownership and mutation rules.
 - [ ] Define `abs` field access and frozen-view propagation.
 - [ ] Define `dat` field moves and the containing-owner state afterward.
-- [ ] Define whether `ins` may loan a field or indexed field slot.
+- [x] Define whether `ins` may loan a field or indexed field slot: persistent
+      `ins` fields are rejected; loans remain call-scope operations.
 - [ ] Reject mutation through frozen or moved field paths.
 
 ### Copy, move, and assignment

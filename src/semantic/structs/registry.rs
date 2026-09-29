@@ -37,6 +37,7 @@ impl Analyzer {
                         span: field.span,
                     });
                 }
+                super::roles::validate_field_role(&definition.name, field)?;
                 analyzer.validate_type_reference(&field.ty)?;
             }
             Ok(())
