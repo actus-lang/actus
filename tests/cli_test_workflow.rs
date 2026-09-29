@@ -75,6 +75,27 @@ fn test_reports_target_filtered_counts_deterministically() {
 
 #[cfg(unix)]
 #[test]
+fn test_links_imported_module_objects_for_meta_tests() {
+    let root = create_test_project(
+        "runner-module",
+        "module.act",
+        "import math; meta test\nverb smoke() -> Int { return add(); }\n",
+    );
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(root.join("src/math/api.act"), "open verb add() -> Int { return 0; }\n")
+        .expect("write module implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("smoke ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_propagates_non_zero_meta_test_exit_status() {
     let root = create_test_project(
         "runner-failure",

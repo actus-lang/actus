@@ -1,10 +1,11 @@
 use std::fs;
 use std::time::Instant;
 
-use crate::ast::{Block, Expr, Program, Stmt, TopLevelDecl, TypeName, VerbDecl};
-use crate::codegen::{emit_program_object_for_target, link_object};
+use crate::ast::{Block, Expr, Stmt, TopLevelDecl, TypeName, VerbDecl};
+use crate::codegen::link_objects;
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::SourceSpan;
+use crate::modules::{ModuleResolver, build_compilation_plan};
 
 use super::super::conformance::ConformanceMode;
 use super::collection::{DiscoveredTest, TestCollection};
@@ -84,19 +85,16 @@ fn run_test(
 ) -> Result<TestProcessResult, String> {
     let verb = test_verb(test)?;
     validate_test_verb(verb)?;
-    let program = test_program(test)?;
-    let object = emit_program_object_for_target(
-        &program,
-        "main",
-        configuration.native_backend(),
-        configuration.target(),
-    )
-    .map_err(|error| error.to_string())?;
-    let paths = TestArtifactPaths::new(index);
-    let result = fs::write(&paths.object, object)
-        .map_err(|error| format!("cannot write test object: {error}"))
+    let plan = test_compilation_plan(test, configuration)?;
+    let objects = crate::cli::build::emit_objects(&plan, "main", configuration)
+        .map_err(|error| error.to_string())?;
+    let mut paths = TestArtifactPaths::new(index);
+    let result = paths
+        .write_objects(&objects)
         .and_then(|()| {
-            link_object(&paths.object, &paths.executable, configuration)
+            let references =
+                paths.objects.iter().map(std::path::PathBuf::as_path).collect::<Vec<_>>();
+            link_objects(&references, &paths.executable, configuration)
                 .map_err(|error| error.to_string())
         })
         .and_then(|()| run_test_process(&paths.executable));
@@ -126,8 +124,11 @@ fn validate_test_verb(verb: &crate::ast::VerbDecl) -> Result<(), String> {
     Ok(())
 }
 
-fn test_program(test: &DiscoveredTest) -> Result<Program, String> {
-    let mut program = test.program.clone();
+fn test_compilation_plan(
+    test: &DiscoveredTest,
+    configuration: &CompilerConfiguration,
+) -> Result<crate::modules::ModuleCompilationPlan, String> {
+    let mut program = test.source_program.clone();
     if program
         .declarations
         .iter()
@@ -136,22 +137,53 @@ fn test_program(test: &DiscoveredTest) -> Result<Program, String> {
         return Err("meta test program already defines `main`".to_owned());
     }
     program.declarations.push(test_main(&test.name));
-    Ok(program)
+    let resolver = ModuleResolver::with_dependencies(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+    );
+    build_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }
 
 struct TestArtifactPaths {
-    object: std::path::PathBuf,
+    objects: Vec<std::path::PathBuf>,
     executable: std::path::PathBuf,
 }
 
 impl TestArtifactPaths {
     fn new(index: usize) -> Self {
         let root = std::env::temp_dir().join(format!("actus-test-{}-{index}", std::process::id()));
-        Self { object: root.with_extension("o"), executable: root.with_extension("bin") }
+        Self { objects: Vec::new(), executable: root.with_extension("bin") }
+    }
+
+    fn write_objects(
+        &mut self,
+        objects: &[crate::cli::build::EmittedObject],
+    ) -> Result<(), String> {
+        let root = self.executable.with_extension("root.o");
+        for (index, object) in objects.iter().enumerate() {
+            let path = if index == 0 {
+                root.clone()
+            } else {
+                self.executable.with_file_name(format!(
+                    "{}.module.{}.o",
+                    self.executable
+                        .file_stem()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("actus-test"),
+                    object.name.replace([':', '/', '\\'], "_")
+                ))
+            };
+            fs::write(&path, &object.bytes)
+                .map_err(|error| format!("cannot write test object: {error}"))?;
+            self.objects.push(path);
+        }
+        Ok(())
     }
 
     fn cleanup(&self) -> Result<(), String> {
-        remove_artifact(&self.object)?;
+        for object in &self.objects {
+            remove_artifact(object)?;
+        }
         remove_artifact(&self.executable)
     }
 }

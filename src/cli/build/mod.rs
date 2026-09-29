@@ -4,5 +4,5 @@ mod loading;
 mod object_manifest;
 mod options;
 
-pub(super) use emission::{build_file, build_file_quiet};
+pub(crate) use emission::{EmittedObject, build_file, build_file_quiet, emit_objects};
 pub(super) use options::{EmitKind, build_command};

@@ -109,13 +109,13 @@ fn emit_and_write(
     0
 }
 
-pub(super) struct EmittedObject {
-    pub(super) name: String,
-    pub(super) bytes: Vec<u8>,
-    pub(super) symbols: std::collections::BTreeSet<String>,
+pub(crate) struct EmittedObject {
+    pub(crate) name: String,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) symbols: std::collections::BTreeSet<String>,
 }
 
-fn emit_objects(
+pub(crate) fn emit_objects(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
