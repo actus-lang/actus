@@ -2,7 +2,10 @@ use std::fs;
 
 use serde_json::json;
 
-use crate::lsp_support::{file_uri, position_after, response_with_id, run_lsp, temp_root};
+use crate::lsp_support::{file_uri, response_with_id, run_lsp, temp_root};
+
+#[cfg(unix)]
+use crate::lsp_support::position_after;
 
 #[test]
 fn lsp_handles_crlf_and_encoded_unicode_document_paths() {
