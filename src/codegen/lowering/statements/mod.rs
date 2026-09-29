@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, Stmt};
@@ -234,6 +235,16 @@ fn lower_assignment<'source>(
         string_data,
         layouts,
     )?;
+    if let Some(destination) = locals.get(name)
+        && types
+            .get(name)
+            .and_then(|ty| ty.ir_type(layouts.pointer_type).ok())
+            .is_some_and(|ty| ty != layouts.pointer_type)
+        && function.func.dfg.value_type(*destination) == layouts.pointer_type
+    {
+        function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), value, *destination, 0);
+        return Ok(Flow::Fallthrough);
+    }
     locals.insert(name, value);
     Ok(Flow::Fallthrough)
 }

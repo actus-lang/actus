@@ -57,6 +57,16 @@ fn mutates_indexed_pack_fields_in_place() {
 
 #[cfg(unix)]
 #[test]
+fn mutates_an_indexed_ins_slot_and_reuses_the_array_owner() {
+    let status = run_array_fixture(
+        "array-ins-slot",
+        "verb mutate(ins slot: Int) { slot = 42; } verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); mutate(slot: ins values[1]); return values[1]; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn emits_identical_objects_for_repeated_array_builds() {
     let root = std::env::temp_dir().join(format!("actus-array-repeat-{}", std::process::id()));
     let input = root.with_extension("act");

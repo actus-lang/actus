@@ -72,10 +72,10 @@ complete.
 ## Gate 6: Native execution and end-to-end quality verification
 
 - [x] Execute arrays and indexed pack fields through native binaries.
-- [ ] Verify `ins` slot mutation and caller reuse without allocation.
+- [x] Verify indexed `ins` slot mutation and caller reuse without allocation.
 - [x] Verify deterministic artifacts and repeated-run results.
 - [ ] Add hosted and freestanding target evidence where supported.
-- [ ] Run formatter, check, clippy, tests, source limits, and diff checks.
-- [ ] Update ADR-0042 with implementation evidence and approved deviations.
+- [x] Run formatter, check, clippy, tests, source limits, and diff checks.
+- [x] Update ADR-0042 with implementation evidence and approved deviations.
 - [ ] Mark this roadmap complete only after all diagnostics and native tests
       pass.

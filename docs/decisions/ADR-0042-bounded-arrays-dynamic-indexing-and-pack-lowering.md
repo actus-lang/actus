@@ -227,6 +227,36 @@ reviewable. Existing packed declarations remain valid; declarations that lack
 complete native lowering must remain rejected until their lowering contract is
 implemented.
 
+## Implementation Evidence
+
+The first native execution milestone is implemented and verified in the
+compiler and integration test suite:
+
+- bounded arrays use contiguous stack or arena storage with dynamic bounds
+  checks and deterministic out-of-bounds traps;
+- indexed reads and writes lower to direct element addresses, without copying
+  the complete array;
+- packed fields lower to native extraction and insertion operations while
+  preserving unrelated backing bits;
+- an `ins` indexed argument passes the caller-owned slot address directly;
+- a scalar `ins` argument is materialized in a caller-owned stack slot before
+  the call, preserving the existing typed ABI for buffer and wide-integer
+  values;
+- repeated native builds and executions are covered by deterministic artifact
+  and exit-code tests.
+
+## Approved Implementation Boundary
+
+The current native lowering accepts scalar `ins` identifiers and indexed slots
+as addressable call arguments. A scalar identifier is materialized into a
+stable call-scope slot; indexed slots use their existing array address. The
+semantic layer remains authoritative for ownership and lifetime validation.
+The code generator rejects unsupported non-addressable `ins` expressions with
+an explicit error instead of silently copying them. Full SSA-to-storage
+write-back for scalar locals after arbitrary nested calls remains a separate
+ABI/storage milestone; indexed slots already mutate their source storage
+directly and therefore provide the required caller-visible behavior.
+
 ## Non-goals
 
 - This ADR does not define an unbounded dynamic array or general allocator.

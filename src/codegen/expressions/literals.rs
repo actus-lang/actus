@@ -107,12 +107,24 @@ pub(in crate::codegen) fn lower_string(
 }
 
 pub(in crate::codegen) fn lower_identifier(
+    function: &mut FunctionBuilder<'_>,
     name: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, super::super::types::NativeType>,
+    pointer_type: cranelift_codegen::ir::Type,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    locals
+    let (binding, value) = locals
         .iter()
         .find(|(binding, _)| binding.as_str() == name)
-        .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))
+        .map(|(binding, value)| (*binding, *value))
+        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+    let Some(native_type) = local_types.get(binding) else { return Ok(value) };
+    let expected = native_type.ir_type(pointer_type)?;
+    if !native_type.is_wide_integer()
+        && expected != pointer_type
+        && function.func.dfg.value_type(value) == pointer_type
+    {
+        return Ok(function.ins().load(expected, MemFlagsData::new(), value, 0));
+    }
+    Ok(value)
 }

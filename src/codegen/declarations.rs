@@ -92,7 +92,17 @@ fn function_meta(
                 (parameter.dispatch == DispatchMode::Dynamic).then(|| parameter.ty.name.clone())
             })
             .collect(),
+        ins_params: params
+            .iter()
+            .map(|parameter| parameter_uses_indirect_ins(parameter, layouts))
+            .collect(),
     })
+}
+
+fn parameter_uses_indirect_ins(parameter: &crate::ast::Param, layouts: &LayoutRegistry) -> bool {
+    parameter.role == crate::ast::Role::Ins
+        && NativeType::try_from_type_name_with_layout(Some(&parameter.ty), layouts)
+            .is_some_and(NativeType::uses_indirect_ins)
 }
 
 pub(super) fn native_signature_for_definition(
@@ -153,7 +163,11 @@ fn append_parameter(
         NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)?
     };
     let parameter_type =
-        if native_type.is_wide_integer() { pointer_type } else { layouts.ir_type(native_type)? };
+        if parameter_uses_indirect_ins(parameter, layouts) || native_type.is_wide_integer() {
+            pointer_type
+        } else {
+            layouts.ir_type(native_type)?
+        };
     signature.params.push(AbiParam::new(parameter_type));
     if parameter.dispatch == DispatchMode::Dynamic {
         signature.params.push(AbiParam::new(pointer_type));

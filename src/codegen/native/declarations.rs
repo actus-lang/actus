@@ -85,6 +85,7 @@ pub(super) fn function_metadata(
                     return_type: meta.return_type,
                     dynamic_params: meta.dynamic_params.clone(),
                     dynamic_roles: meta.dynamic_roles.clone(),
+                    ins_params: meta.ins_params.clone(),
                 },
             )
         })

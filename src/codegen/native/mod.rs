@@ -20,6 +20,7 @@ pub(super) struct FunctionMeta {
     pub(super) return_type: NativeType,
     pub(super) dynamic_params: Vec<bool>,
     pub(super) dynamic_roles: Vec<Option<String>>,
+    pub(super) ins_params: Vec<bool>,
 }
 
 pub(super) struct FunctionRef {
@@ -28,6 +29,7 @@ pub(super) struct FunctionRef {
     pub(super) return_type: NativeType,
     pub(super) dynamic_params: Vec<bool>,
     pub(super) dynamic_roles: Vec<Option<String>>,
+    pub(super) ins_params: Vec<bool>,
 }
 
 impl std::fmt::Display for NativeEmitError {

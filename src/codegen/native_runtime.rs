@@ -120,6 +120,7 @@ fn named_meta(
         return_type,
         dynamic_params: vec![false; parameters.len()],
         dynamic_roles: vec![None; parameters.len()],
+        ins_params: vec![false; parameters.len()],
     }
 }
 

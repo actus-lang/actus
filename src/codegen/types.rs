@@ -21,6 +21,13 @@ pub(super) enum NativeType {
 }
 
 impl NativeType {
+    pub(super) fn uses_indirect_ins(self) -> bool {
+        matches!(
+            self,
+            Self::Int | Self::Integer { width: 1..=64, .. } | Self::Float { .. } | Self::Pack(_)
+        )
+    }
+
     pub(super) fn uses_sret(self) -> bool {
         matches!(self, Self::Struct(_) | Self::Integer { width: 65..=128, .. })
     }
