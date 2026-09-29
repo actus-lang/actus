@@ -142,7 +142,7 @@ contracts that the future platform is allowed to consume.
 - [x] Verify facade imports and sibling declarations from clean workspaces.
 - [x] Verify local dependency resolution and lockfile content checksums.
 - [x] Reject missing, stale, conflicting, and unsafe dependency metadata.
-- [ ] Define deterministic package and module failure diagnostics.
+- [x] Define deterministic package and module failure diagnostics.
 
 ### Profiles and artifacts
 
@@ -158,6 +158,7 @@ contracts that the future platform is allowed to consume.
 - [x] CLI workflow tests cover accepted and rejected command forms.
 - [x] Package and lockfile tests pass from isolated temporary workspaces.
 - [x] Repeated builds produce the documented deterministic result.
+- [x] Missing-facade diagnostics are stable across repeated isolated checks.
 
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
 
