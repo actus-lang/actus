@@ -234,14 +234,14 @@ while another family still uses an unqualified name.
 
 #### 20.4.5: Linker and ABI integration
 
-- [ ] Link the ordered object manifest without relying on filesystem order.
-- [ ] Preserve runtime C ABI declarations and typed `Result` translation.
-- [ ] Validate that internal namespaced symbols never replace public bridge
+- [x] Link the ordered object manifest without relying on filesystem order.
+- [x] Preserve runtime C ABI declarations and typed `Result` translation.
+- [x] Validate that internal namespaced symbols never replace public bridge
       symbols or the configured executable entry symbol.
-- [ ] Verify hosted and freestanding entry contracts with multi-object builds.
-- [ ] Add native tests for public wrappers, private helpers, external bridges,
+- [x] Verify hosted and freestanding entry contracts with multi-object builds.
+- [x] Add native tests for public wrappers, private helpers, external bridges,
       generic dispatch, and drop/cleanup references across objects.
-- [ ] Add negative tests for private symbol leakage and unresolved references.
+- [x] Add negative tests for private symbol leakage and unresolved references.
 
 #### 20.4.6: Reproducibility and ownership evidence
 
@@ -268,8 +268,9 @@ declarations plus the internal units. Native application tests prove that
 declarations remain absent from caller lookup. The linker also accepts an
 ordered object list and rejects an empty link input. The plan rejects
 cross-module native symbol collisions with `E1110` before codegen. Per-module
-object emission and deterministic symbol namespacing remain open rather than
-allowing ambiguous ABI symbols to reach the linker. Native application tests
+object emission and deterministic symbol namespacing are enforced before
+linker invocation rather than allowing ambiguous ABI symbols to reach the linker.
+Native application tests
 now prove that a public module wrapper can execute a private implementation,
 while a direct private bridge call fails with `E1109` before code generation.
 Imported public verbs are represented in the caller scope by signature-only
