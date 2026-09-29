@@ -313,7 +313,7 @@ The full Rust quality matrix, source limits, and diff validation pass, so Gate
 
 ## Gate 20.5: Standard-library migration
 
-- [ ] Migrate `std::io` to the internal/public module-unit model.
+- [x] Migrate `std::io` to the internal/public module-unit model.
 - [ ] Migrate `std::fs` to the internal/public module-unit model.
 - [ ] Migrate `std::path` to the internal/public module-unit model.
 - [ ] Keep public APIs typed with `Result`, `Option`, ownership roles, and
@@ -324,6 +324,27 @@ The full Rust quality matrix, source limits, and diff validation pass, so Gate
 - [ ] Add negative application tests for direct raw-bridge access and private
       sibling access.
 - [ ] Update standard-library block documentation and facade exports.
+
+### Gate 20.5.1: `std::io` bridge privacy and typed buffer surface
+
+- [x] Remove facade exports from every `std::io` raw `unsafe extern "C"`
+      bridge declaration.
+- [x] Preserve private bridge access for the internal cursor, buffered, copy,
+      stdin, stdout, stderr, and writer implementations.
+- [x] Route public buffer inspection and mutation through typed `Result` APIs.
+- [x] Keep `ins` buffer loans and exact byte-count semantics in the wrappers.
+- [x] Add accepted internal-scope and rejected public-facade visibility tests.
+- [x] Migrate standard-library fixtures away from raw bridge calls.
+- [x] Verify strict Actus tests and native `std::io` tests after the boundary
+      change.
+
+The `std::io` facade now exports typed wrappers only. Raw runtime symbols such
+as `actus_cursor_read` and `actus_buffer_length` remain available to the
+module's internal implementation scope but cannot be imported by consumers.
+The cursor performances delegate to the typed cursor verbs, so imported
+performance signatures do not retain private bridge bodies in the caller
+interface. Buffer range, length, and clear operations likewise translate raw
+statuses into `Result[Int, IoError]` before crossing the facade boundary.
 
 ## Gate 20.6: Tooling, compatibility, and closure
 

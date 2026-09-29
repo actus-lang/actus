@@ -2,13 +2,13 @@
 C ABI scalar output bridge. The `erg` role passes the integer value owned
 by the call; the runtime returns an integer status wrapped by `print_int`.
 """
-open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
+unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
 """C ABI bridge that reads a borrowed buffer, writes it to stdout, and returns a byte status."""
-open unsafe extern "C" verb actus_print_buffer_stdout(abs text: Buffer) -> Int;
+unsafe extern "C" verb actus_print_buffer_stdout(abs text: Buffer) -> Int;
 """C ABI bridge that writes a borrowed buffer followed by a newline and returns a byte status."""
-open unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> Int;
+unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> Int;
 """C ABI bridge that synchronizes stdout and returns zero or failure."""
-open unsafe extern "C" verb actus_flush_stdout() -> Int;
+unsafe extern "C" verb actus_flush_stdout() -> Int;
 
 """Print an integer value to stdout and return its typed I/O result."""
 open verb print_int(erg value: Int) -> Result[Int, IoError] {

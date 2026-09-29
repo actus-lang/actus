@@ -59,23 +59,23 @@ Reserve at least `capacity` bytes for `buffer` without changing its logical
 length. The `ins` buffer remains owned by the caller; zero is returned only
 for invalid input and `-1` reports allocation failure at the native boundary.
 """
-open unsafe extern "C" verb actus_buffer_reserve(
+unsafe extern "C" verb actus_buffer_reserve(
     ins buffer: Buffer,
     erg capacity: Int
 ) -> Int;
 
 """Return reserved capacity through the C ABI, or `-1` for an invalid buffer handle."""
-open unsafe extern "C" verb actus_buffer_capacity(abs buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_buffer_capacity(abs buffer: Buffer) -> Int;
 
 """Return logical byte length through the C ABI, or `-1` for an invalid buffer handle."""
-open unsafe extern "C" verb actus_buffer_length(abs buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_buffer_length(abs buffer: Buffer) -> Int;
 
 """
 Append at most `length` bytes beginning at `offset` from the borrowed source.
 The `ins` target is never reallocated; the return value is the exact appended
 count from the C ABI, zero means full capacity, and `-1` means invalid handles or bounds.
 """
-open unsafe extern "C" verb actus_buffer_append_range(
+unsafe extern "C" verb actus_buffer_append_range(
     ins target: Buffer,
     abs source: Buffer,
     erg offset: Int,
@@ -83,7 +83,58 @@ open unsafe extern "C" verb actus_buffer_append_range(
 ) -> Int;
 
 """Clear an ins buffer's logical length through the C ABI while retaining capacity; return cleared byte count or `-1`."""
-open unsafe extern "C" verb actus_buffer_clear(ins buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_buffer_clear(ins buffer: Buffer) -> Int;
+
+"""
+Return the logical byte length of a borrowed buffer through a typed API.
+
+The `abs buffer` view is read-only and remains owned by the caller. `Ok`
+contains the exact number of initialized bytes; `Err(Failed)` reports an
+invalid runtime handle without exposing the raw C status.
+"""
+open verb buffer_length(abs buffer: Buffer) -> Result[Int, IoError] {
+    erg status = actus_buffer_length(buffer: abs buffer);
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
+}
+
+"""
+Append a borrowed source range into an exclusively loaned target buffer.
+
+The `ins target` buffer is mutated in place and returned to its caller after
+the verb completes. `Ok` is the exact appended byte count; `Err(Failed)`
+reports invalid handles and `Err(InvalidData)` reports an empty or rejected
+range. No raw C status escapes this public wrapper.
+"""
+open verb buffer_append_range(
+    ins target: Buffer, abs source: Buffer, erg offset: Int, erg length: Int
+) -> Result[Int, IoError] {
+    erg status = actus_buffer_append_range(
+        target: ins target, source: abs source, offset: offset, length: length
+    );
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        0 => Result[Int, IoError].Err(IoError.InvalidData),
+        _ => Result[Int, IoError].Ok(status),
+    };
+}
+
+"""
+Clear a buffer's logical length while retaining its allocated capacity.
+
+The `ins buffer` loan permits in-place mutation without replacing the
+backing storage. `Ok` contains the exact number of removed bytes and
+`Err(Failed)` reports an invalid runtime handle.
+"""
+open verb buffer_clear(ins buffer: Buffer) -> Result[Int, IoError] {
+    erg status = actus_buffer_clear(buffer: ins buffer);
+    return case status {
+        -1 => Result[Int, IoError].Err(IoError.Failed),
+        _ => Result[Int, IoError].Ok(status),
+    };
+}
 
 """
 Reserve reusable storage for a buffered writer.

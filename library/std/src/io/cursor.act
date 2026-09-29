@@ -16,14 +16,14 @@ open verb cursor(dat buffer: Buffer) -> Cursor {
 }
 
 """Read bytes through the C ABI from a buffer position into a caller-owned destination, returning count or failure."""
-open unsafe extern "C" verb actus_cursor_read(
+unsafe extern "C" verb actus_cursor_read(
     abs source: Buffer,
     erg position: Int,
     ins target: Buffer
 ) -> Int;
 
 """Write a borrowed source buffer through the C ABI at a buffer position, returning count or failure."""
-open unsafe extern "C" verb actus_cursor_write(
+unsafe extern "C" verb actus_cursor_write(
     ins target: Buffer,
     erg position: Int,
     abs source: Buffer
@@ -36,7 +36,7 @@ Validate `position` against the backing storage in `buffer`.
 the cursor. Zero means the position is valid; `-1` means it is outside the
 buffer and is translated to `IoError.Failed` by the C ABI wrapper.
 """
-open unsafe extern "C" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int;
+unsafe extern "C" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int;
 
 """
 Flush cursor state without an operating-system side effect.
@@ -44,7 +44,7 @@ Flush cursor state without an operating-system side effect.
 `target` is an exclusive loan of the cursor's backing buffer. The bridge
 returns zero for success or `-1` for a rejected operation.
 """
-open unsafe extern "C" verb actus_cursor_flush(ins target: Buffer) -> Int;
+unsafe extern "C" verb actus_cursor_flush(ins target: Buffer) -> Int;
 
 """Read from an in-memory cursor into an exclusive caller buffer and return count or error."""
 open verb cursor_read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
@@ -107,16 +107,7 @@ open perform Reader for Cursor {
     count and `Err` is the typed I/O failure.
     """
     verb read(ins self: Cursor, ins buffer: Buffer) -> Result[Int, IoError] {
-        erg status = actus_cursor_read(source: abs self.buffer, position: self.position, target: ins buffer);
-        case status {
-            -1 => { self.position = self.position; },
-            _ => { self.position = self.position + status; },
-        };
-        return case status {
-            -1 => Err(IoError.Failed),
-            0 => Err(IoError.EndOfStream),
-            _ => Ok(status),
-        };
+        return cursor_read(self: ins self, buffer: ins buffer);
     }
 }
 
@@ -128,23 +119,11 @@ open perform Writer for Cursor {
     after the cursor owner is restored.
     """
     verb write(ins self: Cursor, abs buffer: Buffer) -> Result[Int, IoError] {
-        erg status = actus_cursor_write(target: ins self.buffer, position: self.position, source: abs buffer);
-        case status {
-            -1 => { self.position = self.position; },
-            _ => { self.position = self.position + status; },
-        };
-        return case status {
-            -1 => Err(IoError.Failed),
-            _ => Ok(status),
-        };
+        return cursor_write(self: ins self, buffer: abs buffer);
     }
 
     """Flush through an ins cursor loan and return zero or typed failure."""
     verb flush(ins self: Cursor) -> Result[Int, IoError] {
-        erg status = actus_cursor_flush(target: ins self.buffer);
-        return case status {
-            -1 => Err(IoError.Failed),
-            _ => Ok(status),
-        };
+        return cursor_flush(self: ins self);
     }
 }

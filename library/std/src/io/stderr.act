@@ -1,11 +1,11 @@
 """C ABI scalar output bridge for stderr."""
-open unsafe extern "C" verb actus_print_int_stderr(erg value: Int) -> Int;
+unsafe extern "C" verb actus_print_int_stderr(erg value: Int) -> Int;
 """C ABI bridge that reads a borrowed buffer, writes it to stderr, and returns a byte status."""
-open unsafe extern "C" verb actus_print_buffer_stderr(abs text: Buffer) -> Int;
+unsafe extern "C" verb actus_print_buffer_stderr(abs text: Buffer) -> Int;
 """C ABI bridge that writes a borrowed buffer followed by a newline and returns a byte status."""
-open unsafe extern "C" verb actus_print_line_buffer_stderr(abs text: Buffer) -> Int;
+unsafe extern "C" verb actus_print_line_buffer_stderr(abs text: Buffer) -> Int;
 """Flush stderr through the C ABI; zero means success and any non-zero value means failure."""
-open unsafe extern "C" verb actus_flush_stderr() -> Int;
+unsafe extern "C" verb actus_flush_stderr() -> Int;
 
 """Print an erg integer to stderr and return its typed I/O result."""
 open verb eprint_int(erg value: Int) -> Result[Int, IoError] {
