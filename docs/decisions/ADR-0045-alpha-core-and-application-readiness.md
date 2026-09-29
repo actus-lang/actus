@@ -1,6 +1,6 @@
 # ADR-0045: Actus Alpha Core and Application Readiness
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-29
 - Scope: Language-core completion, standard-library acceptance, real application
   workflows, and Alpha compatibility policy

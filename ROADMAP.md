@@ -48,5 +48,5 @@ gated implementation roadmaps:
 - [ ] [Phase 16: Standard Library, Runtime, and Tooling Stabilization](docs/roadmap/phase-16-standard-library-and-runtime.md)
 - [ ] [Phase 17: Extension Platform and Developer Experience](docs/roadmap/phase-17-extension-platform-and-developer-experience.md)
 - [x] [Phase 18: Strict Actus Conformance and Fail-Closed Compilation](docs/roadmap/phase-18-strict-actus-conformance.md)
-- [ ] [Phase 19: Actus Alpha Core and Application Readiness](docs/roadmap/phase-19-alpha-core-and-application-readiness.md)
+- [x] [Phase 19: Actus Alpha Core and Application Readiness](docs/roadmap/phase-19-alpha-core-and-application-readiness.md)
 - [ ] [Phase 20: Module Visibility and Facade-Bounded Compilation](docs/roadmap/phase-20-module-visibility-and-facade-boundaries.md)

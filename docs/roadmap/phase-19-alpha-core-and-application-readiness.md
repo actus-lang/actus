@@ -188,7 +188,9 @@ contracts that the future platform is allowed to consume.
 - [x] Run the compiler and native application matrix on Windows.
 - [x] Verify host-native path separators, encoding boundaries, line endings,
       executable names, and linker selection.
-- [ ] Record bare-metal substitutions and unavailable host services explicitly.
+- [deferred] Record bare-metal substitutions and unavailable host services
+      explicitly. Deferred to a future embedded/bare-metal phase; Phase 19
+      acceptance is limited to hosted Linux, macOS, and Windows targets.
 
 ### Gate 19.4 evidence
 
@@ -325,29 +327,36 @@ application suite passed on all supported hosted targets.
 
 ### Handoff
 
-- [ ] Record every remaining deferral and its intended future phase.
-- [ ] Freeze the compiler/LSP contracts that Phase 17 may consume.
-- [ ] Reject extension-side semantic reimplementation in the handoff record.
-- [ ] Mark Phase 19 complete only after every Alpha criterion is satisfied.
-- [ ] Update `ROADMAP.md` and all affected phase/ADR references.
+- [x] Record every remaining deferral and its intended future phase.
+- [x] Freeze the compiler/LSP contracts that Phase 17 may consume.
+- [x] Reject extension-side semantic reimplementation in the handoff record.
+- [x] Mark Phase 19 complete only after every Alpha criterion is satisfied.
+- [x] Update `ROADMAP.md` and all affected phase/ADR references.
+
+The Alpha handoff freezes the hosted compiler, CLI, standard-library, runtime,
+LSP, and diagnostic contracts documented by ADR-0045 and the Alpha language
+documents. Phase 17 may consume these contracts but must not implement a
+second semantic analyzer in an extension. Raw runtime bridge privacy remains
+owned by ADR-0047 and Phase 20; bare-metal service substitutions remain owned
+by a future embedded phase.
 
 ## Phase 19 invariant
 
-- [ ] A real Actus application can be checked, built, run, tested, formatted,
+- [x] A real Actus application can be checked, built, run, tested, formatted,
       and reproduced through documented commands.
-- [ ] Struct ownership, layout, cleanup, and ABI rules are explicit.
-- [ ] Public standard-library failures are typed and platform-independent.
-- [ ] No implicit conversion, hidden allocation, or undocumented ownership
+- [x] Struct ownership, layout, cleanup, and ABI rules are explicit.
+- [x] Public standard-library failures are typed and platform-independent.
+- [x] No implicit conversion, hidden allocation, or undocumented ownership
       transition is required by accepted Alpha programs.
-- [ ] Phase 17 can consume versioned compiler contracts without becoming a
+- [x] Phase 17 can consume versioned compiler contracts without becoming a
       second compiler.
 
 ## Completion criteria
 
-- [ ] Gates 19.0 through 19.6 are complete.
-- [ ] Phase 16 Gate 6 is complete or all deferrals are explicitly accepted.
-- [ ] Remaining Phase 11 struct items are complete or explicitly deferred.
+- [x] Gates 19.0 through 19.6 are complete.
+- [x] Phase 16 Gate 6 is complete or all deferrals are explicitly accepted.
+- [x] Remaining Phase 11 struct items are complete or explicitly deferred.
 - [x] At least two real Actus applications pass native execution checks.
 - [x] Supported host quality evidence is recorded.
 - [x] Alpha compatibility and diagnostic policies are published.
-- [ ] A clean checkout reproduces the documented acceptance report.
+- [x] A clean checkout reproduces the documented acceptance report.
