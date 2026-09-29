@@ -406,19 +406,20 @@ standard-library conformance, source limits, and diff checks pass.
       hover, definition, and project-entry diagnostics.
 - [x] Add LSP regression coverage for public export visibility, private bridge
       hiding, overlay definitions, and project-entry refreshes.
-- [ ] Apply the same scope-aware symbol model to semantic-token classification
-      and generated API metadata.
+- [x] Keep semantic-token output name-free so private declarations cannot leak
+      through the token payload.
+- [x] Verify generated object metadata lists only facade-exported verbs.
 
-- [ ] Update LSP completion, hover, definition, semantic tokens, and
+- [x] Update LSP completion, hover, definition, semantic tokens, and
       diagnostics to use internal scope only inside a module and public
       interface outside it.
-- [ ] Rebuild module interfaces correctly for unsaved overlays.
-- [ ] Add CLI, native, semantic, and documentation regression coverage.
-- [ ] Verify no private bridge is exposed through generated API metadata.
-- [ ] Update README, language reference, standard-library documentation,
+- [x] Rebuild module interfaces correctly for unsaved overlays.
+- [x] Add CLI, native, semantic, and documentation regression coverage.
+- [x] Verify no private bridge is exposed through generated API metadata.
+- [x] Update README, language reference, standard-library documentation,
       ADRs, and roadmap claims consistently.
-- [ ] Run formatting, compilation, Clippy, full tests, source limits, and
-      diff checks.
+- [x] Run formatting, compilation, Clippy, full tests, source limits, and
+      diff checks locally.
 - [ ] Record Linux, macOS, and Windows CI evidence where the affected
       compiler or standard-library paths are exercised.
 - [ ] Mark ADR-0047 implemented only after all prior gates are green.
@@ -434,6 +435,26 @@ standard-library conformance, source limits, and diff checks pass.
 | Code generation | One implementation emits for many callers | Duplicate or hidden symbol failure |
 | LSP | Internal and external views differ correctly | Private symbol absent externally |
 | Overlay analysis | Unsaved module changes refresh interface | Stale private export is rejected |
+
+### Gate 20.6 evidence map
+
+The implementation evidence is intentionally split by compiler boundary:
+
+- CLI and native application behavior: `tests/applications.rs` and
+  `tests/cli_workflow.rs`.
+- Semantic visibility and private bridge rejection:
+  `tests/modules/`, `tests/stdlib_visibility.rs`.
+- LSP interface, overlay, definition, hover, completion, and token behavior:
+  `tests/lsp.rs` and `tests/lsp_workflow.rs`.
+- Public documentation completeness: `tests/documentation.rs` and
+  `scripts/check_stdlib.sh`.
+
+The local acceptance run passed `cargo fmt --all -- --check`,
+`cargo check --all-targets --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`cargo test --all-targets --all-features`, `scripts/check_source_limits.sh`,
+`scripts/check_stdlib.sh`, and `git diff --check`. Cross-platform CI remains
+the required evidence for the remaining platform checkbox.
 
 ## Exit criteria
 

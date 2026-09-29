@@ -117,6 +117,10 @@ The facade exposes sibling declarations with extensionless `open` entries.
 External code can use only declarations exposed by that facade; sibling files
 share the internal module scope. Missing facades, unknown siblings, duplicate
 declarations, and direct facade bypasses produce deterministic diagnostics.
+This also applies to the standard library: `std::io`, `std::fs`, and
+`std::path` expose typed Actus wrappers, while their raw `unsafe extern "C"`
+bridges remain private implementation declarations. Applications must call the
+typed facade operation rather than a runtime bridge symbol.
 
 ## 5. Check, build, run, test, format, and watch
 

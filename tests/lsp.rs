@@ -452,7 +452,8 @@ fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":main_uri},"position":{"line":1,"character":30}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":main_uri},"position":position_after(main, "visible")}}),
         json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":main_uri},"position":position_after(main, "visible")}}),
-        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":main_uri}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}),
         json!({"jsonrpc":"2.0","method":"exit","params":null}),
     ];
     let stdout = run_lsp(messages.to_vec());
@@ -463,6 +464,10 @@ fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
     );
     assert!(stdout.contains("verb visible() -> Int"), "public hover missing: {stdout}");
     assert!(stdout.contains(&api_uri), "definition did not use the module source: {stdout}");
+    assert!(
+        !stdout.contains("private_bridge"),
+        "private declaration leaked into LSP output: {stdout}"
+    );
     let _ = fs::remove_dir_all(root);
 }
 
