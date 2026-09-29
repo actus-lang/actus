@@ -133,7 +133,7 @@ pub fn c_abi_signature(verb: &VerbDecl) -> Result<CAbiSignature, CAbiError> {
 pub fn c_abi_external_signature(
     declaration: &ExternalVerbDecl,
 ) -> Result<CAbiSignature, CAbiError> {
-    if !declaration.unsafe_boundary {
+    if !declaration.unsafe_boundary && !declaration.module_import {
         return Err(CAbiError::MissingUnsafeBoundary { verb: declaration.name.clone() });
     }
     match declaration.abi {

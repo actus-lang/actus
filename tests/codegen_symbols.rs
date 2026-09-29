@@ -3,6 +3,7 @@ use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
 use actus::target::TargetSpec;
+use object::{Object, ObjectSymbol};
 
 #[test]
 fn symbol_identity_is_stable_across_declaration_families() {
@@ -87,4 +88,30 @@ fn native_objects_follow_namespace_context_deterministically() {
     .unwrap();
     assert_eq!(first, repeat);
     assert_ne!(first, other);
+}
+
+#[test]
+fn imported_module_objects_emit_without_an_entry_and_preserve_public_wrappers() {
+    let source =
+        "verb hidden() -> Int { return 41; } open verb add() -> Int { return hidden() + 1; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let bytes = actus::codegen::emit_module_object_for_target_in_namespace(
+        &program,
+        "actus_mod_4_math",
+        &NativeBackendConfiguration::default(),
+        &TargetSpec::host().unwrap(),
+    )
+    .unwrap();
+    let file = object::File::parse(bytes.as_slice()).unwrap();
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_add") }));
+    assert!(
+        symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_hidden") })
+    );
+}
+
+fn symbol_matches(actual: &str, expected: &str) -> bool {
+    actual == expected || actual.strip_prefix('_') == Some(expected)
 }

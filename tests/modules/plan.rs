@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::lexer::scan;
-use actus::modules::{ModuleError, ModuleResolver, build_compilation_plan};
+use actus::modules::{ModuleError, ModuleObjectOwner, ModuleResolver, build_compilation_plan};
 use actus::parser::parse;
 
 struct Fixture(PathBuf);
@@ -97,4 +97,47 @@ fn rejects_ambiguous_native_symbols_before_codegen() {
         matches!(error, ModuleError::SymbolCollision { ref symbol, .. } if symbol == "verb `shared`")
     );
     assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1110");
+}
+
+#[test]
+fn object_plan_orders_root_and_imported_units_by_canonical_module_path() {
+    let fixture = Fixture::new();
+    fixture.write("zeta/zeta.act", "open api;");
+    fixture.write("zeta/api.act", "open verb zed() -> Int { return 1; }");
+    fixture.write("alpha/alpha.act", "open api;");
+    fixture.write("alpha/api.act", "open verb aye() -> Int { return 2; }");
+    let (tokens, errors) =
+        scan("import zeta; import alpha; verb main() -> Int { return zed() + aye(); }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    assert!(matches!(objects.units()[0].owner(), ModuleObjectOwner::Root));
+    assert!(matches!(
+        objects.units()[1].owner(),
+        ModuleObjectOwner::Imported { module_path } if module_path == "alpha"
+    ));
+    assert!(matches!(
+        objects.units()[2].owner(),
+        ModuleObjectOwner::Imported { module_path } if module_path == "zeta"
+    ));
+}
+
+#[test]
+fn imported_object_program_excludes_module_directives() {
+    let fixture = Fixture::new();
+    fixture.write("math/math.act", "open ops;");
+    fixture.write("math/ops.act", "open verb add() -> Int { return 1; }");
+    let (tokens, errors) = scan("import math; verb main() -> Int { return add(); }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    let object = objects.units()[1].program();
+    assert!(object.declarations.iter().all(|declaration| {
+        !matches!(declaration, actus::ast::TopLevelDecl::Import(_))
+            && !matches!(declaration, actus::ast::TopLevelDecl::OpenSibling(_))
+    }));
 }

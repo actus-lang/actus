@@ -12,7 +12,7 @@ use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataIds;
 use super::super::model::NativeCleanupSchedule;
 use super::super::native_runtime::declare_runtime_functions;
-use super::{FunctionMeta, NativeEmitError};
+use super::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 
 pub(super) fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
     match declaration {
@@ -29,10 +29,11 @@ pub(super) fn declaration_external_verb(declaration: &TopLevelDecl) -> Option<&E
 }
 
 pub(super) struct DeclarationContext<'a> {
-    pub(super) entry_symbol: &'a str,
+    pub(super) entry_symbol: Option<&'a str>,
     pub(super) namespace_prefix: &'a str,
     pub(super) layouts: &'a LayoutRegistry,
     pub(super) target: &'a TargetSpec,
+    pub(super) bindings: &'a NativeSymbolBindings,
 }
 
 pub(super) fn declare_all_functions(
@@ -49,6 +50,7 @@ pub(super) fn declare_all_functions(
         context.entry_symbol,
         context.namespace_prefix,
         context.layouts,
+        context.bindings,
     )?;
     metadata.extend(super::super::performance::declare_performance_functions(
         module,

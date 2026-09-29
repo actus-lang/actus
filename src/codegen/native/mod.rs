@@ -1,5 +1,6 @@
 use cranelift_codegen::ir::FuncRef;
 use cranelift_module::FuncId;
+use std::collections::BTreeMap;
 
 use crate::ast::Program;
 use crate::configuration::NativeBackendConfiguration;
@@ -12,7 +13,22 @@ mod emission;
 mod object;
 
 #[derive(Debug)]
-pub struct NativeEmitError(pub(super) String);
+pub struct NativeEmitError(pub String);
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NativeSymbolBindings {
+    external: BTreeMap<String, String>,
+}
+
+impl NativeSymbolBindings {
+    pub fn new(bindings: impl IntoIterator<Item = (String, String)>) -> Self {
+        Self { external: bindings.into_iter().collect() }
+    }
+
+    pub(super) fn external_symbol<'a>(&'a self, source_name: &'a str) -> &'a str {
+        self.external.get(source_name).map(String::as_str).unwrap_or(source_name)
+    }
+}
 
 pub(super) struct FunctionMeta {
     pub(super) id: FuncId,
@@ -64,7 +80,15 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    emission::emit_program_object_for_target(program, symbol, "actus_root", configuration, target)
+    emission::emit_program_object_for_target(
+        program,
+        Some(symbol),
+        "actus_root",
+        configuration,
+        target,
+        &NativeSymbolBindings::default(),
+        &[],
+    )
 }
 
 pub fn emit_program_object_for_target_in_namespace(
@@ -74,11 +98,82 @@ pub fn emit_program_object_for_target_in_namespace(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    emission::emit_program_object_for_target(
+    emit_program_object_for_target_in_namespace_with_bindings(
         program,
         symbol,
         namespace_prefix,
         configuration,
         target,
+        &NativeSymbolBindings::default(),
+    )
+}
+
+pub fn emit_program_object_for_target_in_namespace_with_bindings(
+    program: &Program,
+    symbol: &str,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+    bindings: &NativeSymbolBindings,
+) -> Result<Vec<u8>, NativeEmitError> {
+    emission::emit_program_object_for_target(
+        program,
+        Some(symbol),
+        namespace_prefix,
+        configuration,
+        target,
+        bindings,
+        &[],
+    )
+}
+
+pub fn emit_module_object_for_target_in_namespace(
+    program: &Program,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+) -> Result<Vec<u8>, NativeEmitError> {
+    emit_module_object_for_target_in_namespace_with_bindings(
+        program,
+        namespace_prefix,
+        configuration,
+        target,
+        &NativeSymbolBindings::default(),
+    )
+}
+
+pub fn emit_module_object_for_target_in_namespace_with_bindings(
+    program: &Program,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+    bindings: &NativeSymbolBindings,
+) -> Result<Vec<u8>, NativeEmitError> {
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances(
+        program,
+        namespace_prefix,
+        configuration,
+        target,
+        bindings,
+        &[],
+    )
+}
+
+pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances(
+    program: &Program,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+    bindings: &NativeSymbolBindings,
+    generic_instances: &[super::super::semantic::GenericInstance],
+) -> Result<Vec<u8>, NativeEmitError> {
+    emission::emit_program_object_for_target(
+        program,
+        None,
+        namespace_prefix,
+        configuration,
+        target,
+        bindings,
+        generic_instances,
     )
 }

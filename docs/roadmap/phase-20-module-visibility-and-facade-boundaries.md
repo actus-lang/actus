@@ -222,15 +222,15 @@ while another family still uses an unqualified name.
 
 #### 20.4.4: Independent module object emission
 
-- [ ] Emit one object per `ModuleUnit`, in canonical module order.
-- [ ] Emit the root caller object separately with only the public signature
+- [x] Emit one object per `ModuleUnit`, in canonical module order.
+- [x] Emit the root caller object separately with only the public signature
       surface and the selected entry point.
-- [ ] Ensure each imported implementation unit is emitted exactly once even
+- [x] Ensure each imported implementation unit is emitted exactly once even
       when reached through repeated or transitive imports.
-- [ ] Keep private implementation declarations out of caller objects and
+- [x] Keep private implementation declarations out of caller objects and
       caller semantic namespaces.
-- [ ] Record object ownership and symbol manifests before linking.
-- [ ] Reject duplicate object ownership before invoking the linker.
+- [x] Record object ownership and symbol manifests before linking.
+- [x] Reject duplicate object ownership before invoking the linker.
 
 #### 20.4.5: Linker and ABI integration
 
@@ -290,6 +290,17 @@ tests that verify deterministic output and distinct symbol identities for
 distinct namespace contexts. Layout registry numbers are compiler-local
 numeric identities, not linker symbols, and cleanup/drop helpers are runtime
 ABI imports rather than module-owned generated declarations.
+
+Gate 20.4.4 is now implemented: the object plan owns one root unit and one
+unit per deduplicated imported module, sorted by canonical module path. The
+root object contains only caller-local declarations plus imported public
+signatures; private module bodies are emitted in their owning namespaced
+objects. Imported generic signatures are specialized before native emission,
+and module-to-module public calls are rebound through the object plan's symbol
+manifest. Executable builds write and link the ordered object list, while
+object builds retain the root object and deterministic module sidecars. Native
+application tests cover standard-library modules, private helpers, external
+bridges, transitive imports, and explicit root/module object output.
 
 ## Gate 20.5: Standard-library migration
 

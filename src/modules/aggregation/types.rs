@@ -21,6 +21,7 @@ pub enum ModuleError {
     Parse { path: PathBuf, error: ParseError },
     DuplicateDeclaration(Box<DuplicateDeclaration>),
     SymbolCollision { symbol: String, first_module: String, second_module: String },
+    DuplicateObjectOwner { module_path: String },
     PrivateDeclarationAccess { module: String, symbol: String, facade: PathBuf, span: SourceSpan },
     Semantic(Box<crate::semantic::SemanticError>),
 }
@@ -84,6 +85,9 @@ impl Display for ModuleError {
                 formatter,
                 "native symbol `{symbol}` would collide between modules `{first_module}` and `{second_module}`"
             ),
+            Self::DuplicateObjectOwner { module_path } => {
+                write!(formatter, "duplicate object ownership for module `{module_path}`")
+            }
             Self::PrivateDeclarationAccess { module, symbol, facade, .. } => write!(
                 formatter,
                 "private declaration `{symbol}` from module `{module}` is not exported by facade `{}`",

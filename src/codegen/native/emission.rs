@@ -12,21 +12,23 @@ use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::performance::PerformanceRegistry;
 use super::super::performance::define_performances;
 use super::super::result_constructors::normalize_program;
-use super::NativeEmitError;
 use super::declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
     define_verbs, function_metadata, validate_native_program,
 };
 use super::object::create_module;
+use super::{NativeEmitError, NativeSymbolBindings};
 
 pub(super) fn emit_program_object_for_target(
     program: &Program,
-    symbol: &str,
+    symbol: Option<&str>,
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
+    bindings: &NativeSymbolBindings,
+    additional_instances: &[GenericInstance],
 ) -> Result<Vec<u8>, NativeEmitError> {
-    let (program, semantic) = prepare_program(program, target)?;
+    let (program, semantic) = prepare_program(program, target, additional_instances)?;
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
     let performance_registry = PerformanceRegistry::from_program_in_namespace(
         &program,
@@ -48,24 +50,77 @@ pub(super) fn emit_program_object_for_target(
         cleanup_schedule: &cleanup_schedule,
         configuration,
         target,
+        bindings,
     })
 }
 
 fn prepare_program(
     program: &Program,
     target: &TargetSpec,
+    additional_instances: &[GenericInstance],
 ) -> Result<(Program, SemanticModel), NativeEmitError> {
     let targeted_program = filter_program_for_target(program, target);
     let normalized_program = normalize_program(&targeted_program);
     let semantic = analyze(&normalized_program)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
-    let specialized_program = super::super::generic::specialize_program(
-        &normalized_program,
-        &semantic.generic_instances,
-    )?;
+    let local_instances = semantic.generic_instances.clone();
+    let mut generic_instances = local_instances.clone();
+    append_generic_instances(
+        &mut generic_instances,
+        additional_instances,
+        program,
+        &local_instances,
+    );
+    let specialized_program =
+        super::super::generic::specialize_program(&normalized_program, &generic_instances)?;
+    let mut semantic = semantic;
+    semantic.generic_instances = generic_instances;
     validate_cleanup_plans(&semantic)
         .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
     Ok((specialized_program, semantic))
+}
+
+fn append_generic_instances(
+    target: &mut Vec<GenericInstance>,
+    additions: &[GenericInstance],
+    program: &Program,
+    local_instances: &[GenericInstance],
+) {
+    let generic_declarations = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) if !verb.generic_parameters.is_empty() => {
+                Some(verb.name.as_str())
+            }
+            crate::ast::TopLevelDecl::ExternalVerb(verb) if !verb.generic_parameters.is_empty() => {
+                Some(verb.name.as_str())
+            }
+            crate::ast::TopLevelDecl::Struct(definition)
+                if !definition.generic_parameters.is_empty() =>
+            {
+                Some(definition.name.as_str())
+            }
+            crate::ast::TopLevelDecl::Enum(definition)
+                if !definition.generic_parameters.is_empty() =>
+            {
+                Some(definition.name.as_str())
+            }
+            _ => None,
+        })
+        .collect::<std::collections::HashSet<_>>();
+    for addition in additions {
+        let relevant = generic_declarations.contains(addition.name.as_str())
+            || local_instances
+                .iter()
+                .any(|instance| instance.canonical_key == addition.canonical_key);
+        if !relevant {
+            continue;
+        }
+        if !target.iter().any(|instance| instance.canonical_key == addition.canonical_key) {
+            target.push(addition.clone());
+        }
+    }
 }
 
 fn collect_declarations(program: &Program) -> (Vec<&VerbDecl>, Vec<&ExternalVerbDecl>) {
@@ -75,11 +130,13 @@ fn collect_declarations(program: &Program) -> (Vec<&VerbDecl>, Vec<&ExternalVerb
     (verbs, external_verbs)
 }
 
-fn validate_entry_verb(verbs: &[&VerbDecl], symbol: &str) -> Result<(), NativeEmitError> {
+fn validate_entry_verb(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<(), NativeEmitError> {
     if verbs.is_empty() {
         return Err(NativeEmitError("program has no verb declarations".to_owned()));
     }
-    if !verbs.iter().any(|verb| verb.name == symbol) {
+    if let Some(symbol) = symbol
+        && !verbs.iter().any(|verb| verb.name == symbol)
+    {
         return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
     }
     Ok(())
@@ -91,9 +148,10 @@ struct VerbEmission<'items, 'program> {
     external_verbs: &'items [&'program ExternalVerbDecl],
     generic_instances: &'items [GenericInstance],
     performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
-    symbol: &'items str,
+    symbol: Option<&'items str>,
     namespace_prefix: &'items str,
     cleanup_schedule: &'items NativeCleanupSchedule,
+    bindings: &'items NativeSymbolBindings,
     configuration: &'items NativeBackendConfiguration,
     target: &'items TargetSpec,
 }
@@ -140,6 +198,7 @@ fn build_layouts_and_metadata(
         inputs.namespace_prefix,
         &layouts,
         inputs.target,
+        inputs.bindings,
     )?;
     Ok((layouts, metadata))
 }
@@ -166,10 +225,11 @@ fn declare_emission_functions(
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
-    symbol: &str,
+    symbol: Option<&str>,
     namespace_prefix: &str,
     layouts: &LayoutRegistry,
     target: &TargetSpec,
+    bindings: &NativeSymbolBindings,
 ) -> Result<std::collections::HashMap<String, super::FunctionMeta>, NativeEmitError> {
     validate_native_program(verbs, external_verbs, layouts)?;
     declare_all_functions(
@@ -177,7 +237,7 @@ fn declare_emission_functions(
         verbs,
         external_verbs,
         performance_definitions,
-        DeclarationContext { entry_symbol: symbol, namespace_prefix, layouts, target },
+        DeclarationContext { entry_symbol: symbol, namespace_prefix, layouts, target, bindings },
     )
 }
 

@@ -7,7 +7,7 @@ use cranelift_object::ObjectModule;
 use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::layout::LayoutRegistry;
-use super::native::{FunctionMeta, NativeEmitError};
+use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::symbols::{SymbolIdentity, SymbolKind};
 use super::types::NativeType;
 
@@ -15,9 +15,10 @@ pub(super) fn declare_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
-    entry_symbol: &str,
+    entry_symbol: Option<&str>,
     namespace_prefix: &str,
     layouts: &LayoutRegistry,
+    bindings: &NativeSymbolBindings,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
     declare_internal_functions(
@@ -28,14 +29,14 @@ pub(super) fn declare_functions(
         layouts,
         &mut metadata,
     )?;
-    declare_external_functions(module, external_verbs, layouts, &mut metadata)?;
+    declare_external_functions(module, external_verbs, layouts, bindings, &mut metadata)?;
     Ok(metadata)
 }
 
 fn declare_internal_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
-    entry_symbol: &str,
+    entry_symbol: Option<&str>,
     namespace_prefix: &str,
     layouts: &LayoutRegistry,
     metadata: &mut HashMap<String, FunctionMeta>,
@@ -56,12 +57,13 @@ fn declare_external_functions(
     module: &mut ObjectModule,
     verbs: &[&ExternalVerbDecl],
     layouts: &LayoutRegistry,
+    bindings: &NativeSymbolBindings,
     metadata: &mut HashMap<String, FunctionMeta>,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let signature = external_native_signature(module, verb, layouts)?;
         let id = module
-            .declare_function(&verb.name, Linkage::Import, &signature)
+            .declare_function(bindings.external_symbol(&verb.name), Linkage::Import, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
         let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
         metadata.insert(verb.name.clone(), function_meta(id, &verb.params, return_type, layouts)?);
@@ -71,10 +73,10 @@ fn declare_external_functions(
 
 fn internal_symbol(
     name: &str,
-    entry_symbol: &str,
+    entry_symbol: Option<&str>,
     namespace_prefix: &str,
 ) -> Result<String, NativeEmitError> {
-    if name == entry_symbol {
+    if entry_symbol == Some(name) {
         return Ok(name.to_owned());
     }
     SymbolIdentity::new(namespace_prefix, SymbolKind::Verb, name)
@@ -208,7 +210,10 @@ mod tests {
 
     #[test]
     fn keeps_only_the_entry_symbol_public() {
-        assert_eq!(internal_symbol("main", "main", "actus_root").unwrap(), "main");
-        assert_eq!(internal_symbol("read", "main", "actus_root").unwrap(), "actus_root__verb_read");
+        assert_eq!(internal_symbol("main", Some("main"), "actus_root").unwrap(), "main");
+        assert_eq!(
+            internal_symbol("read", Some("main"), "actus_root").unwrap(),
+            "actus_root__verb_read"
+        );
     }
 }

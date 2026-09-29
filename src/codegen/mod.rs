@@ -35,8 +35,11 @@ pub use model::{
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
 pub use native::{
-    NativeEmitError, emit_program_object, emit_program_object_for_target,
-    emit_program_object_for_target_in_namespace, emit_program_object_with_configuration,
-    emit_zero_return_object,
+    NativeEmitError, NativeSymbolBindings, emit_module_object_for_target_in_namespace,
+    emit_module_object_for_target_in_namespace_with_bindings,
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances, emit_program_object,
+    emit_program_object_for_target, emit_program_object_for_target_in_namespace,
+    emit_program_object_for_target_in_namespace_with_bindings,
+    emit_program_object_with_configuration, emit_zero_return_object,
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};

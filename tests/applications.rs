@@ -152,6 +152,30 @@ fn module_application_executes_public_wrapper_with_private_implementation() {
 }
 
 #[test]
+fn object_build_emits_one_root_and_one_imported_module_object() {
+    let source = "import math; verb main() -> Int { return add(); }\n";
+    let (root, input, output) = project("module-objects", source);
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(
+        root.join("src/math/api.act"),
+        "open verb add() -> Int { return hidden(); } verb hidden() -> Int { return 42; }\n",
+    )
+    .expect("write module implementation");
+    let object = output.with_extension("obj");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build module objects");
+    assert!(build.status.success(), "build stderr: {}", String::from_utf8_lossy(&build.stderr));
+    assert!(object.exists());
+    assert!(root.join("application.module.actus_mod_4_math.obj").exists());
+    fs::remove_dir_all(root).expect("remove module object project");
+}
+
+#[test]
 fn module_application_rejects_private_bridge_before_codegen() {
     let source = "import runtime; verb main() -> Int { return private_bridge(); }\n";
     let (root, input, _output) = project("private-bridge", source);

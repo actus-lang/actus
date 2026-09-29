@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 
 use super::super::resolver::ModuleResolver;
+use super::object_plan::{ModuleObjectPlan, build_object_plan};
 use super::types::ModuleError;
 use super::unit::{ModuleUnit, load_module_unit};
 use super::validation::export_identity;
@@ -26,6 +27,10 @@ impl ModuleCompilationPlan {
 
     pub fn units(&self) -> &[ModuleUnit] {
         &self.units
+    }
+
+    pub fn object_plan(&self) -> Result<ModuleObjectPlan, ModuleError> {
+        build_object_plan(self)
     }
 
     pub fn implementation(&self) -> Program {
@@ -166,6 +171,7 @@ fn caller_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
             is_open: verb.is_open,
             doc: verb.doc.clone(),
             unsafe_boundary: false,
+            module_import: true,
             abi: ForeignAbi::C,
             metadata: verb.metadata.clone(),
             name: verb.name.clone(),
