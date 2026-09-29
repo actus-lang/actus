@@ -1,0 +1,66 @@
+"""
+Executable ADR-0042, ADR-0043, and ADR-0044 operator evidence.
+
+The program evaluates every operator family, checked casts, unsigned
+indexing, and native packed-field mutation in one compiler-to-runtime path.
+"""
+pack StatusRegister {
+    erg storage: u32;
+    layout little;
+    fields {
+        erg ready: u1 at 0;
+        erg mode: u3 at 1;
+        abs reserved: u28 at 4 = 0;
+    }
+}
+
+/// Evaluate arithmetic, relational, equality, logical, and bitwise operators.
+verb operator_score() -> Int {
+    erg left: u8 = 13;
+    erg right: u8 = 5;
+    erg count: u8 = 1;
+    erg remainder = left % right;
+    erg bits = (left & right) | (left ^ right);
+    erg inverted: u8 = ~right;
+    erg shifted_left = left << count;
+    erg shifted_right = left >> count;
+    erg equal = left == left;
+    erg distinct = left != right;
+    erg ordered = case (left < right) || (left <= right) {
+        true => 1,
+        _ => 0,
+    };
+    erg reversed = case (left > right) && (left >= right) {
+        true => 1,
+        _ => 0,
+    };
+    erg logical = case (equal && !distinct) || (left > right) {
+        true => 1,
+        _ => 0,
+    };
+    return (remainder as Int) + (bits as Int) + (inverted as Int)
+        + shifted_left + shifted_right + ordered + reversed + logical;
+}
+
+/// Exercise checked casts, Buffer and Array indexing, and pack mutation.
+verb storage_score() -> Int {
+    erg values: Array[u8, 2] = Array[u8, 2]();
+    values[0] = 7;
+    values[1] = 9;
+    erg array_index: u32 = 1;
+    erg bytes: Buffer = Buffer[0];
+    append(bytes, 4);
+    erg buffer_index: u8 = 0;
+    erg register = StatusRegister { storage: 0, };
+    register.ready = 1;
+    register.mode = 5;
+    return (values[array_index] as Int) + (bytes[buffer_index] as Int)
+        + (register.ready as Int) + (register.mode as Int);
+}
+
+/// Run the complete operator surface and return its deterministic checksum.
+verb main() -> Int {
+    erg result = operator_score() + storage_score();
+    print(result);
+    return 0;
+}
