@@ -173,11 +173,11 @@ contracts that the future platform is allowed to consume.
 
 ### Cleanup and control flow
 
-- [ ] Verify LIFO cleanup for normal return, early return, and `?`.
-- [ ] Verify cleanup across `break`, `continue`, and nested `case` branches.
-- [ ] Verify `erg`, `abs`, `dat`, and `ins` state transitions after failed calls.
-- [ ] Verify path, buffer, file, and stream resources are not double-dropped.
-- [ ] Add regression tests for every discovered cleanup or ABI failure.
+- [x] Verify LIFO cleanup for normal return, early return, and `?`.
+- [x] Verify cleanup across `break`, `continue`, and nested `case` branches.
+- [x] Verify `erg`, `abs`, `dat`, and `ins` state transitions after failed calls.
+- [x] Verify path, buffer, file, and stream resources are not double-dropped.
+- [x] Add regression tests for every discovered cleanup or ABI failure.
 
 ### Supported hosts
 
@@ -195,8 +195,13 @@ contracts that the future platform is allowed to consume.
 - [ ] No host-specific workaround is hidden in shared compiler layers.
 
 The initial runtime boundary slice is covered by the explicit null-handle
-failure matrix in `tests/runtime_failure_matrix.rs`. The remaining runtime,
-cleanup, and host-matrix items require separate evidence and remain open.
+failure matrix in `tests/runtime_failure_matrix.rs`. The remaining runtime
+boundary and host-matrix items require separate evidence and remain open.
+
+Cleanup evidence is distributed across `tests/semantic/`, `tests/codegen/`,
+`tests/buffer_cli.rs`, `tests/fs.rs`, `tests/std_io/`, and `tests/cli.rs`;
+these tests cover ownership restoration, LIFO unwinding, nested control flow,
+and native resource cleanup.
 
 ## Gate 19.5: Alpha Compatibility and Documentation
 
