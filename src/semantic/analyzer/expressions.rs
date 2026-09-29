@@ -194,6 +194,7 @@ impl Analyzer {
             is_integer_type_name(&left_type) && is_integer_type_name(&right_type)
         };
         if valid {
+            self.validate_constant_operator(operator, right, &left_type)?;
             return Ok(());
         }
         Err(SemanticError {
@@ -456,6 +457,7 @@ fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
             let (value, _) = integer_literal(expression)?;
             Some((value, true))
         }
+        Expr::Cast { expression, .. } => integer_literal(expression),
         _ => None,
     }
 }

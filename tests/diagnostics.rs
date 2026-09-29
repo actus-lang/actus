@@ -29,6 +29,29 @@ fn renders_stable_semantic_error_codes_and_locations() {
 }
 
 #[test]
+fn renders_static_operator_diagnostics_independently_of_renderer() {
+    let source = "verb main() -> Int { return 7 % 0; }\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = analyze(&program).expect_err("constant zero remainder must fail");
+    let diagnostic = semantic_diagnostic(&error);
+
+    assert_eq!(diagnostic.code(), "E1092");
+    assert_eq!(diagnostic.phase(), DiagnosticPhase::Semantic);
+    assert_eq!(
+        render_diagnostic(source, &diagnostic),
+        "error[E1092] at 1:33: constant remainder divisor is zero"
+    );
+    assert!(render_colored_diagnostic(source, &diagnostic, true).contains("E1092"));
+    let json: serde_json::Value = serde_json::from_str(
+        &render_json_diagnostics(std::slice::from_ref(&diagnostic)).expect("valid JSON"),
+    )
+    .expect("JSON diagnostics should parse");
+    assert_eq!(json[0]["code"], "E1092");
+}
+
+#[test]
 fn renders_unknown_verb_diagnostics_with_a_stable_code() {
     let source = "verb main() { missing_verb(1); }\n";
     let (tokens, errors) = scan(source);

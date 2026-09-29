@@ -87,6 +87,22 @@ fn rejects_adr44_invalid_operator_operands() {
 }
 
 #[test]
+fn rejects_statically_provable_invalid_integer_operations() {
+    let remainder = analyze_source("verb main() -> Int { return 7 % 0; }")
+        .expect_err("constant zero remainder must be rejected");
+    assert!(matches!(remainder.kind, SemanticErrorKind::ConstantRemainderByZero));
+
+    let shift =
+        analyze_source("verb main() -> u8 { erg input: u8 = 1; return input << (8 as u8); }")
+            .expect_err("constant shift count equal to width must be rejected");
+    assert!(matches!(
+        shift.kind,
+        SemanticErrorKind::ConstantShiftCountOutOfRange { count, width }
+            if count == "8" && width == 8
+    ));
+}
+
+#[test]
 fn builtin_type_registry_defines_supported_types() {
     assert_eq!(lookup_builtin_type("Int"), Some(BuiltinType::Int));
     assert_eq!(lookup_builtin_type("String"), Some(BuiltinType::String));

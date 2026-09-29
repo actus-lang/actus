@@ -65,15 +65,15 @@ Code extension, and Tree-sitter.
 
 ## Gate 5: Runtime, diagnostics, and end-to-end quality
 
-- [ ] Finalize runtime behavior for remainder-by-zero and invalid shift counts.
-- [ ] Add stable diagnostics and renderer-independent diagnostic tests.
-- [ ] Add compile-time constant evaluation tests for invalid operations where
+- [x] Finalize runtime behavior for remainder-by-zero and invalid shift counts.
+- [x] Add stable diagnostics and renderer-independent diagnostic tests.
+- [x] Add compile-time constant evaluation tests for invalid operations where
       the failure is statically provable.
-- [ ] Add native tests for all operator families and mixed invalid programs.
-- [ ] Verify deterministic object output and repeated execution results.
-- [ ] Run formatting, compilation, Clippy, full tests, source limits, and diff
+- [x] Add native tests for all operator families and mixed invalid programs.
+- [x] Verify deterministic object output and repeated execution results.
+- [x] Run formatting, compilation, Clippy, full tests, source limits, and diff
       checks.
-- [ ] Update ADR-0044 with command evidence and any approved deviations.
+- [x] Update ADR-0044 with command evidence and any approved deviations.
 
 ## Gate 6: Documentation and language-surface conformance
 

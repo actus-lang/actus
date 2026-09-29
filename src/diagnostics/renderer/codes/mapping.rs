@@ -72,6 +72,8 @@ fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
         SemanticErrorKind::InvalidPrimitiveCast { .. } => "E1090",
         SemanticErrorKind::PrimitiveCastOutOfRange { .. } => "E1091",
+        SemanticErrorKind::ConstantRemainderByZero => "E1092",
+        SemanticErrorKind::ConstantShiftCountOutOfRange { .. } => "E1093",
         SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
         SemanticErrorKind::ArenaReferenceEscape { .. } => "E1077",
         SemanticErrorKind::CrossArenaReference { .. } => "E1078",

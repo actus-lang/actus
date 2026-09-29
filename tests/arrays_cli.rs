@@ -46,6 +46,16 @@ fn lowers_bitwise_not_and_signed_right_shift() {
 
 #[cfg(unix)]
 #[test]
+fn lowers_float_equality_and_inequality() {
+    let status = run_array_fixture(
+        "adr44-float-equality",
+        "verb main() -> Int { erg left: f32 = 1.5; erg same: f32 = 1.5; erg other: f32 = 2.5; return case (left == same) && (left != other) { true => 42, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn traps_on_integer_remainder_by_zero() {
     let status = run_array_fixture(
         "adr44-remainder-zero",

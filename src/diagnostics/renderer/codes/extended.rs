@@ -9,7 +9,21 @@ pub(super) fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<Stri
         .or_else(|| pack_codes::message(kind))
         .or_else(|| arena_semantic_message(kind))
         .or_else(|| array_semantic_message(kind))
+        .or_else(|| operator_semantic_message(kind))
         .or_else(|| type_semantic_message(kind))
+}
+
+fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::ConstantRemainderByZero => {
+            "constant remainder divisor is zero".to_owned()
+        }
+        SemanticErrorKind::ConstantShiftCountOutOfRange { count, width } => {
+            format!("constant shift count `{count}` is outside the valid range `0..{width}`")
+        }
+        _ => return None,
+    };
+    Some(message)
 }
 
 fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {

@@ -136,3 +136,21 @@ tooling repositories must be updated in a coordinated final gate.
 This ADR does not define overloaded operators, user-defined equality contracts,
 arbitrary structured equality, implicit truthiness of integers, floating-point
 bitwise operations, or a new ownership model.
+
+## Gate 5 Evidence
+
+Gate 5 is complete on the implementation branch. Runtime remainder and shift
+failures use deterministic native traps for values that are known only at
+execution time. Statically provable cases are rejected before code generation
+with stable diagnostics `E1092` (constant remainder by zero) and `E1093`
+(constant shift count outside the destination width). The diagnostics model is
+tested through plain, colored, and JSON renderers without coupling semantic
+analysis to terminal output.
+
+The native suite covers integer and floating-point equality, remainder,
+logical short-circuiting, bitwise operations, shifts, runtime traps, ownership
+restoration, cleanup, and deterministic repeated object emission. The complete
+quality command set passed: `cargo fmt --all -- --check`, `cargo check --all-targets
+--all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`cargo test --all-targets --all-features --no-fail-fast`,
+`scripts/check_source_limits.sh`, and `git diff --check`.
