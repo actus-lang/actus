@@ -224,6 +224,64 @@ fn build_command_executes_loop_break_control_flow() {
 
 #[cfg(unix)]
 #[test]
+fn build_command_resolves_break_inside_case_to_the_enclosing_loop() {
+    let root = std::env::temp_dir().join(format!("actus-cli-case-loop-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg flag = 1; loop { case flag { 1 => { break; }, _ => { continue; }, }; } return 42; }\n",
+    )
+    .expect("write source");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run executable");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
+fn build_command_executes_unsigned_relational_comparison() {
+    let root = std::env::temp_dir().join(format!("actus-cli-relational-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg left: u8 = 7; erg right: u8 = 7; return case left >= right { true => 0, _ => 1, }; }\n",
+    )
+    .expect("write source");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run executable");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
 fn build_command_executes_return_from_loop_body() {
     let root = std::env::temp_dir().join(format!("actus-cli-loop-return-{}", std::process::id()));
     let input = root.with_extension("act");
