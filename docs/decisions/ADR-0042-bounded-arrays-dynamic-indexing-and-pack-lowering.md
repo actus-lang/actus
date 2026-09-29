@@ -1,6 +1,6 @@
 # ADR-0042: Bounded Contiguous Arrays, Dynamic Indexing, and Native Pack Mutation
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-29
 - Scope: bounded contiguous storage, dynamic indexing, and native packed-field lowering
 
@@ -39,6 +39,12 @@ The indexed type will provide checked dynamic indexing:
   load or store;
 - constant indices may be rejected at compile time when they are provably
   outside the range `[0, N)`.
+
+The capacity `N` is a non-negative decimal integer in the source grammar, but
+the semantic contract admits only positive capacities. `Array[T, 0]` is
+rejected before layout because it has no indexable slot and would otherwise
+require a target-specific zero-sized representation. Future zero-sized
+storage requires a separate decision rather than inheriting this contract.
 
 Array storage may be owned directly by an `erg` binding, embedded in an arena
 allocation, or exposed through a documented borrowed view. The representation
@@ -79,6 +85,13 @@ The layout of `Array[T, N]` is deterministic:
 - zero-length arrays, if admitted by the language, have an explicit layout and
   indexing rule rather than relying on a null or dangling pointer convention.
 
+For the accepted contract, zero-length arrays are not admitted. Accepted
+arrays have no inter-element padding, use the alignment of `T`, and publish a
+layout only after checking multiplication overflow in `N * sizeof(T)`. Any
+ABI tail padding belongs to the containing aggregate and does not change
+element offsets. Stack, struct, and arena placement use the same layout
+record.
+
 Arena placement preserves the same element order, alignment, capacity, and
 provenance rules. Arena reset or destruction is rejected while an `abs` view or
 `ins` slot loan remains live.
@@ -94,6 +107,21 @@ The failure contract must be stable across debug, release, native, and
 freestanding targets. It must not become an unchecked access because a target
 does not provide a hosted panic or exception runtime. A target may select its
 own failure mechanism only through an explicit target contract.
+
+The first native contract is a deterministic non-returning bounds trap. A
+dynamic out-of-bounds access lowers to Cranelift's `HEAP_OUT_OF_BOUNDS` trap;
+hosted targets surface it as the normal non-zero process failure, while
+freestanding targets retain the trap without requiring a host runtime.
+Constant violations remain semantic errors and never reach code generation.
+
+## Existing pack implementation baseline
+
+The compiler already validates pack storage width, field width and role,
+bit-range coverage, overlaps, reserved regions, and duplicate names during
+semantic analysis. The Cranelift layout registry records backing storage,
+endianness, field offsets, widths, and native field types. This is an
+inventory baseline only: complete native field reads, clear-and-insert writes,
+signed extraction, and array/slot composition remain Gate 4 responsibilities.
 
 ## Native pack lowering
 

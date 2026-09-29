@@ -9,11 +9,11 @@ complete.
 
 - [x] Accept ADR-0042 as the governing systems-primitives decision.
 - [x] Define the canonical source spelling for `Array[T, N]`.
-- [ ] Define element layout, alignment, capacity, and zero-length behavior.
-- [ ] Define the stable bounds-failure contract for hosted and freestanding
+- [x] Define element layout, alignment, capacity, and zero-length behavior.
+- [x] Define the stable bounds-failure contract for hosted and freestanding
       targets.
-- [ ] Inventory existing pack layouts and native field access limitations.
-- [ ] Record the array and pack representation in the language and backend
+- [x] Inventory existing pack layouts and native field access limitations.
+- [x] Record the array and pack representation in the language and backend
       documentation.
 
 ## Gate 1: Lexer, parser, and AST
@@ -24,7 +24,7 @@ complete.
       dedicated capacity argument and source span.
 - [x] Parse `expr[index]` indexing expressions with complete source spans.
 - [x] Add AST representation for indexed reads and indexed assignments.
-- [ ] Preserve ownership-role annotations for indexed expressions where the
+- [x] Preserve ownership-role annotations for indexed expressions where the
       grammar permits `abs` and `ins` access.
 - [x] Reject malformed array capacities and incomplete index expressions with
       stable parser diagnostics.

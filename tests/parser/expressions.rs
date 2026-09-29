@@ -296,6 +296,36 @@ fn rejects_malformed_bounded_array_capacity() {
 }
 
 #[test]
+fn preserves_roles_on_indexed_call_arguments() {
+    let program = parse_source(
+        "verb consume(ins slot: Buffer) { } verb inspect(abs slot: Buffer) { } verb main() { erg values = Buffer[4]; consume(slot: ins values[0]); inspect(slot: abs values[1]); }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[2] else { panic!("expected main verb") };
+    let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =
+        &verb.body.statements[1]
+    else {
+        panic!("expected consuming call")
+    };
+    assert_eq!(arguments[0].role, Some(actus::ast::Role::Ins));
+    assert!(matches!(arguments[0].expression, Expr::Index { .. }));
+
+    let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =
+        &verb.body.statements[2]
+    else {
+        panic!("expected borrowed call")
+    };
+    assert_eq!(arguments[0].role, Some(actus::ast::Role::Abs));
+    assert!(matches!(arguments[0].expression, Expr::Index { .. }));
+}
+
+#[test]
+fn rejects_incomplete_index_expression() {
+    let (tokens, errors) = scan("verb main() { erg values = Buffer[4]; inspect(values[); }");
+    assert!(errors.is_empty());
+    parse(tokens).expect_err("an index must contain a complete expression");
+}
+
+#[test]
 fn parses_unary_and_grouped_integer_expressions() {
     let program = parse_source("verb main() -> Int { return -(2 + 3); }");
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
