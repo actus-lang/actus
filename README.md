@@ -10,6 +10,14 @@ The project is in an early alpha stage. The current architecture is built around
 - `ins` — an exclusive call-scope loan that temporarily suspends the owner and
   returns exclusive mutation access when the call ends.
 
+Strict conformance is the release-validation mode for the compiler and
+standard library. Use `actus check --strict`, `actus build --strict`, and
+`actus test --strict` to require fail-closed source, ownership, architecture,
+documentation, target, lockfile, and execution validation. The non-strict
+workflow remains available for interactive development, but is not release
+evidence. See [ADR-0041](docs/decisions/ADR-0041-strict-actus-conformance.md)
+and the [Phase 18 acceptance report](docs/roadmap/phase-18-acceptance-report.md).
+
 Actus Alpha supports lexical borrows and single-origin `abs` returns. A
 returned view is non-owning and remains tied to one caller owner; it cannot be
 stored in a longer-lived structure. The compiler tracks borrow records,
