@@ -223,13 +223,13 @@ and native resource cleanup.
 
 ### Compatibility policy
 
-- [ ] Define the Alpha edition and supported compiler command line.
-- [ ] Classify changes as compatible, diagnostic-only, edition-gated, or
+- [x] Define the Alpha edition and supported compiler command line.
+- [x] Classify changes as compatible, diagnostic-only, edition-gated, or
       breaking.
-- [ ] Define diagnostic-code stability and rendering compatibility.
-- [ ] Define standard-library API compatibility and deprecation rules.
-- [ ] Define lockfile and artifact compatibility expectations.
-- [ ] Define the policy for experimental and deferred features.
+- [x] Define diagnostic-code stability and rendering compatibility.
+- [x] Define standard-library API compatibility and deprecation rules.
+- [x] Define lockfile and artifact compatibility expectations.
+- [x] Define the policy for experimental and deferred features.
 
 ### Documentation
 
