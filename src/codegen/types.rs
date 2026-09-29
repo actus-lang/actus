@@ -14,6 +14,7 @@ pub(super) enum NativeType {
     Buffer,
     Struct(usize),
     Pack(usize),
+    Array(usize),
     Arena(u32),
     Enum(usize),
     FatPointer,
@@ -105,6 +106,7 @@ impl NativeType {
             | Self::Struct(_)
             | Self::Enum(_)
             | Self::Pack(_)
+            | Self::Array(_)
             | Self::Arena(_)
             | Self::FatPointer => Ok(pointer_type),
         }

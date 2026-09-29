@@ -86,6 +86,15 @@ impl Analyzer {
                 .and_then(|index| self.field_arena_provenance.get(&(index, field.clone())).copied())
                 .into_iter()
                 .collect(),
+            Expr::Index { target, .. }
+                if self.expression_struct_type(expression).is_some()
+                    || self
+                        .resolved_type_name(expression)
+                        .is_some_and(|type_name| type_name.name == "Array") =>
+            {
+                self.arena_provenances(target)
+            }
+            Expr::Index { .. } => HashSet::new(),
             Expr::Case { subject, branches, .. } => self.case_arena_provenances(subject, branches),
             _ => HashSet::new(),
         }

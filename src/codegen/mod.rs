@@ -1,5 +1,6 @@
 mod abi;
 mod arenas;
+mod arrays;
 mod calls;
 mod case;
 mod cleanup;

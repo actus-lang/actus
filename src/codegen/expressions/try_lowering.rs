@@ -153,7 +153,10 @@ fn load_try_payload(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match field_type {
-        NativeType::Struct(_) | NativeType::Enum(_) | NativeType::Arena(_) => Ok(payload_address),
+        NativeType::Struct(_)
+        | NativeType::Enum(_)
+        | NativeType::Array(_)
+        | NativeType::Arena(_) => Ok(payload_address),
         NativeType::Int => Ok(load_payload(function, payload_address, types::I32)),
         NativeType::Integer { width, .. } => {
             let ty = layouts.ir_type(NativeType::Integer { signed: false, width })?;

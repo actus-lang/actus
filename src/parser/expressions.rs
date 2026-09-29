@@ -143,7 +143,7 @@ impl Parser {
         span: SourceSpan,
     ) -> Result<Option<Expr>, ParseError> {
         if self.match_simple(TokenKind::LeftParen) {
-            if !type_arguments.is_empty() && name != "Arena" {
+            if !type_arguments.is_empty() && !matches!(name, "Arena" | "Array") {
                 return Err(self.error_at_current("a struct literal after type arguments"));
             }
             let arguments = self.parse_arguments()?;

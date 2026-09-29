@@ -65,6 +65,7 @@ fn emit_owned_field_drop(
         | NativeType::Void
         | NativeType::String
         | NativeType::Pack(_)
+        | NativeType::Array(_)
         | NativeType::Arena(_)
         | NativeType::FatPointer => Ok(()),
     }

@@ -62,12 +62,12 @@ complete.
 
 ## Gate 5: Cranelift native array lowering and bounds failures
 
-- [ ] Lower contiguous array layout for stack and arena storage.
-- [ ] Lower dynamic reads and writes without whole-array copies.
-- [ ] Emit deterministic target-specific bounds failures.
-- [ ] Lower indexed pack access through the same validated layout contract.
-- [ ] Add native tests for valid access, constant rejection, and dynamic failure.
-- [ ] Verify cleanup and arena provenance across indexed operations.
+- [x] Lower contiguous array layout for stack and arena storage.
+- [x] Lower dynamic reads and writes without whole-array copies.
+- [x] Emit deterministic target-specific bounds failures.
+- [x] Lower indexed pack access through the same validated layout contract.
+- [x] Add native tests for valid access, constant rejection, and dynamic failure.
+- [x] Verify cleanup and arena provenance across indexed operations.
 
 ## Gate 6: Native execution and end-to-end quality verification
 

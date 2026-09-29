@@ -66,3 +66,12 @@ fn rejects_indexed_element_type_mismatch() {
             if expected == "Int" && found == "String"
     ));
 }
+
+#[test]
+fn rejects_returning_an_arena_derived_indexed_element() {
+    let error = analyze_source(
+        "struct Point { x: Int, } verb leak() -> Point { erg arena: Arena[128] = Arena[128](); erg points: Array[Point, 2] = arena.place(value: Array[Point, 2]()); return points[0]; }",
+    )
+    .expect_err("arena-derived indexed values must not escape their arena");
+    assert!(matches!(error.kind, SemanticErrorKind::ArenaReferenceEscape { .. }));
+}

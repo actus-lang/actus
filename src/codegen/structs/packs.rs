@@ -122,6 +122,9 @@ fn lower_pack_field_assignment_inner(
     context: PackAssignmentContext<'_, '_, '_>,
     pack_id: usize,
 ) -> Result<(), NativeEmitError> {
+    if let Expr::Index { target, index, .. } = context.object {
+        return lower_indexed_pack_field_assignment(context, pack_id, target, index);
+    }
     let name = binding_name(context.object)?;
     let pack = context
         .layouts
@@ -150,6 +153,63 @@ fn lower_pack_field_assignment_inner(
         context.layouts,
     )?;
     update_pack_binding(context.locals, name, updated)?;
+    Ok(())
+}
+
+fn lower_indexed_pack_field_assignment(
+    context: PackAssignmentContext<'_, '_, '_>,
+    pack_id: usize,
+    target: &Expr,
+    index: &Expr,
+) -> Result<(), NativeEmitError> {
+    let (address, element) = super::super::arrays::lower_array_address(
+        context.function,
+        target,
+        index,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )?;
+    if element != NativeType::Pack(pack_id) {
+        return Err(NativeEmitError(
+            "indexed pack layout does not match field assignment".to_owned(),
+        ));
+    }
+    let pack = context
+        .layouts
+        .pack(pack_id)
+        .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+    let field_layout = packed_field(pack, context.field)?;
+    ensure_pack_field_is_mutable(field_layout, context.field)?;
+    let storage = context.function.ins().load(
+        context.layouts.ir_type(pack.storage)?,
+        cranelift_codegen::ir::MemFlagsData::new(),
+        address,
+        0,
+    );
+    let new_value = lower_expression(
+        context.function,
+        context.value,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )?;
+    let updated = lower_pack_field_write(
+        context.function,
+        storage,
+        new_value,
+        field_layout,
+        pack.storage,
+        pack.endianness,
+        context.layouts,
+    )?;
+    context.function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), updated, address, 0);
     Ok(())
 }
 

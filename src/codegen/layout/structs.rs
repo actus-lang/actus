@@ -141,6 +141,11 @@ impl LayoutRegistry {
             NativeType::Struct(id) => self.struct_type_layout(id)?,
             NativeType::Enum(id) => self.enum_type_layout(id)?,
             NativeType::Pack(id) => self.pack_type_layout(id)?,
+            NativeType::Array(id) => {
+                self.array(id)
+                    .map(|layout| (layout.size, layout.alignment))
+                    .ok_or_else(|| NativeEmitError("missing array layout".to_owned()))?
+            }
             NativeType::Arena(capacity) => (capacity + self.pointer_size, self.pointer_size),
         })
     }
@@ -198,6 +203,10 @@ impl LayoutRegistry {
                     .ok_or_else(|| NativeEmitError(format!("missing packed alignment `{id}`")))?;
                 self.alignment(pack.storage)?
             }
+            NativeType::Array(id) => self
+                .array(id)
+                .map(|layout| layout.alignment)
+                .ok_or_else(|| NativeEmitError("missing array alignment".to_owned()))?,
         })
     }
 }

@@ -28,6 +28,11 @@ pub(crate) fn expression_native_type(
             expression_native_type(object, local_types, layouts)
                 .and_then(|ty| field_type(ty, field, layouts))
         }
+        Expr::Index { target, .. } => expression_native_type(target, local_types, layouts)
+            .and_then(|ty| match ty {
+                NativeType::Array(id) => layouts.array(id).map(|array| array.element),
+                _ => None,
+            }),
         Expr::MethodCall { .. } => super::super::enums::enum_expression_type(expression, layouts),
         Expr::Integer { .. } => Some(NativeType::Int),
         Expr::FloatLiteral { .. } => Some(NativeType::Float { width: 64 }),

@@ -216,6 +216,7 @@ fn native_type_key(target: NativeType) -> String {
         NativeType::Buffer => "buffer".to_owned(),
         NativeType::FatPointer => "fat_pointer".to_owned(),
         NativeType::Pack(id) => format!("pack_{id}"),
+        NativeType::Array(id) => format!("array_{id}"),
         NativeType::Arena(capacity) => format!("arena_{capacity}"),
     }
 }
