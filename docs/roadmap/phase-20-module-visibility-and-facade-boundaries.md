@@ -175,6 +175,79 @@ reported later as an importer-side unknown type.
 - [ ] Verify deterministic object output and symbol ownership across repeated
       compilation.
 
+### Gate 20.4 implementation sequence
+
+The remaining work is intentionally ordered as one complete ABI migration.
+No individual symbol family or object-emission shortcut may be marked complete
+while another family still uses an unqualified name.
+
+#### 20.4.1: Canonical module identity
+
+- [ ] Define one canonical namespace key from the resolved module identity.
+- [ ] Normalize separators, package roots, and facade paths before naming.
+- [ ] Define the root-program namespace and the reserved runtime namespace.
+- [ ] Reject empty, ambiguous, or unstable namespace components.
+- [ ] Add unit tests for equivalent paths, dependency roots, and nested modules.
+
+#### 20.4.2: Symbol-identity model
+
+- [ ] Add a codegen-only symbol identity type carrying namespace, declaration
+      kind, source name, and generic specialization identity.
+- [ ] Define escaping for identifiers and separators without collisions.
+- [ ] Define stable identities for verbs, external bridges, structs, packs,
+      enums, roles, performances, vtables, layouts, and generated data.
+- [ ] Make symbol construction pure and independent of declaration order.
+- [ ] Replace the current collision-only guard with identity-based validation.
+- [ ] Add accepted and rejected collision tests for every declaration family.
+
+#### 20.4.3: Frontend-to-codegen symbol propagation
+
+- [ ] Attach owning module identity to each internal implementation unit.
+- [ ] Pass symbol context through declaration collection and function maps.
+- [ ] Namespace direct calls, recursive calls, generic monomorphizations, and
+      method/performance dispatch references.
+- [ ] Namespace struct layouts, pack layouts, enum payload helpers, vtables,
+      string/data globals, and cleanup/drop helpers.
+- [ ] Keep public entry symbols and documented C ABI bridge names explicitly
+      unqualified where their ABI contract requires it.
+- [ ] Add codegen assertions that every internal reference resolves through the
+      same symbol identity constructor.
+
+#### 20.4.4: Independent module object emission
+
+- [ ] Emit one object per `ModuleUnit`, in canonical module order.
+- [ ] Emit the root caller object separately with only the public signature
+      surface and the selected entry point.
+- [ ] Ensure each imported implementation unit is emitted exactly once even
+      when reached through repeated or transitive imports.
+- [ ] Keep private implementation declarations out of caller objects and
+      caller semantic namespaces.
+- [ ] Record object ownership and symbol manifests before linking.
+- [ ] Reject duplicate object ownership before invoking the linker.
+
+#### 20.4.5: Linker and ABI integration
+
+- [ ] Link the ordered object manifest without relying on filesystem order.
+- [ ] Preserve runtime C ABI declarations and typed `Result` translation.
+- [ ] Validate that internal namespaced symbols never replace public bridge
+      symbols or the configured executable entry symbol.
+- [ ] Verify hosted and freestanding entry contracts with multi-object builds.
+- [ ] Add native tests for public wrappers, private helpers, external bridges,
+      generic dispatch, and drop/cleanup references across objects.
+- [ ] Add negative tests for private symbol leakage and unresolved references.
+
+#### 20.4.6: Reproducibility and ownership evidence
+
+- [ ] Generate a deterministic symbol manifest for every object build.
+- [ ] Compare repeated builds byte-for-byte or document the permitted object
+      metadata variance with a stable normalized comparison.
+- [ ] Verify deterministic object ordering, namespace identities, and linker
+      inputs across repeated and transitive-import builds.
+- [ ] Verify that one module imported by multiple callers is emitted once.
+- [ ] Add regression coverage for same-named declarations in separate modules.
+- [ ] Mark Gate 20.4 complete only after all preceding sub-gates and the full
+      quality matrix pass.
+
 ### Gate 20.4 progress evidence
 
 `ModuleCompilationPlan` now separates the public caller program from the
