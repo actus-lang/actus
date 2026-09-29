@@ -72,6 +72,11 @@ pub enum Expr {
         field: String,
         span: SourceSpan,
     },
+    Index {
+        target: Box<Expr>,
+        index: Box<Expr>,
+        span: SourceSpan,
+    },
     Case {
         mode: CaseMode,
         subject: Box<Expr>,

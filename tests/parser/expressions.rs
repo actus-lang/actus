@@ -243,6 +243,59 @@ fn parses_integer_expression_precedence() {
 }
 
 #[test]
+fn parses_bounded_array_types_and_indexed_assignments() {
+    let program = parse_source(
+        "struct Table { cells: Array[Int, 4], } verb main() { erg table = table(); table[1] = 2; inspect(table[1][0]); }",
+    );
+    let TopLevelDecl::Struct(definition) = &program.declarations[0] else {
+        panic!("expected array-containing struct");
+    };
+    let array_type = &definition.fields[0].ty;
+    assert_eq!(array_type.name, "Array");
+    assert_eq!(array_type.arguments.len(), 2);
+    assert_eq!(array_type.arguments[0].name, "Int");
+    assert_eq!(array_type.arguments[1].name, "4");
+
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    assert!(matches!(
+        &verb.body.statements[1],
+        Stmt::IndexAssignment {
+            target: Expr::Identifier { name, .. },
+            index: Expr::Integer { value, .. },
+            value: Expr::Integer { value: assigned, .. },
+            ..
+        } if name == "table" && value == "1" && assigned == "2"
+    ));
+    let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =
+        &verb.body.statements[2]
+    else {
+        panic!("expected inspection call")
+    };
+    assert!(matches!(
+        &arguments[0].expression,
+        Expr::Index { target, index, span }
+            if matches!(index.as_ref(), Expr::Integer { value, .. } if value == "0")
+                && matches!(target.as_ref(), Expr::Index { target, index, .. }
+                    if matches!(target.as_ref(), Expr::Identifier { name, .. } if name == "table")
+                        && matches!(index.as_ref(), Expr::Integer { value, .. } if value == "1"))
+                && span.start < span.end
+    ));
+}
+
+#[test]
+fn rejects_malformed_bounded_array_capacity() {
+    for source in [
+        "struct Table { cells: Array[Int], }",
+        "struct Table { cells: Array[Int, 4, 8], }",
+        "struct Table { cells: Array[Int, Size], }",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        parse(tokens).expect_err("malformed bounded array must be rejected");
+    }
+}
+
+#[test]
 fn parses_unary_and_grouped_integer_expressions() {
     let program = parse_source("verb main() -> Int { return -(2 + 3); }");
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };

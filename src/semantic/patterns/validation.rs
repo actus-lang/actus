@@ -60,6 +60,7 @@ impl Analyzer {
             | Expr::FloatLiteral { .. }
             | Expr::StringLiteral { .. } => Ok(()),
             Expr::StructLit { name, span, .. } => Err(self.invalid_guard_access(name, *span)),
+            Expr::Index { span, .. } => Err(self.invalid_guard_access("index", *span)),
             Expr::Case { span, .. } => Err(self.invalid_guard_access("case", *span)),
         }
     }

@@ -86,6 +86,11 @@ fn normalize_statement(
         Stmt::FieldAssignment { value, .. } => {
             normalize_expression(value, None, signatures, locals);
         }
+        Stmt::IndexAssignment { target, index, value, .. } => {
+            normalize_expression(target, None, signatures, locals);
+            normalize_expression(index, None, signatures, locals);
+            normalize_expression(value, None, signatures, locals);
+        }
         Stmt::Expression { expression, .. } => {
             normalize_expression(expression, None, signatures, locals);
         }
@@ -151,6 +156,10 @@ fn normalize_expression(
         Expr::StructLit { fields, .. } => normalize_struct_fields(fields, signatures, locals),
         Expr::FieldAccess { object, .. } => {
             normalize_expression(object, None, signatures, locals);
+        }
+        Expr::Index { target, index, .. } => {
+            normalize_expression(target, None, signatures, locals);
+            normalize_expression(index, None, signatures, locals);
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
@@ -327,6 +336,7 @@ fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
         | Expr::Try { span, .. }
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
         | Expr::Case { span, .. }
         | Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }

@@ -58,6 +58,11 @@ fn collect_block(statements: &[Stmt], values: &mut HashSet<String>) {
                 collect_expression(object, values);
                 collect_expression(value, values);
             }
+            Stmt::IndexAssignment { target, index, value, .. } => {
+                collect_expression(target, values);
+                collect_expression(index, values);
+                collect_expression(value, values);
+            }
             Stmt::Return { value: Some(value), .. } => collect_expression(value, values),
             Stmt::Loop(block) | Stmt::Block(block) => collect_block(&block.statements, values),
             Stmt::Return { value: None, .. }
@@ -88,6 +93,10 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
         }
         Expr::StructLit { fields, .. } => collect_struct_fields(fields, values),
         Expr::FieldAccess { object, .. } => collect_expression(object, values),
+        Expr::Index { target, index, .. } => {
+            collect_expression(target, values);
+            collect_expression(index, values);
+        }
         Expr::Case { subject, branches, .. } => collect_case(subject, branches, values),
         Expr::Identifier { .. }
         | Expr::Integer { .. }

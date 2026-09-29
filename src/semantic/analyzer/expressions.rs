@@ -46,6 +46,10 @@ impl Analyzer {
             Expr::FieldAccess { object, field, span } => {
                 self.visit_field_access(object, field, *span)
             }
+            Expr::Index { target, index, .. } => {
+                self.visit_expression(target)?;
+                self.visit_expression(index)
+            }
             Expr::Case { mode, subject, branches, span } => {
                 self.visit_case_expression(*mode, subject, branches, *span)
             }

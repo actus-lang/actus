@@ -30,6 +30,7 @@ impl Analyzer {
             Expr::MethodCall { method, span, .. } => self.method_expression_type(method, *span),
             Expr::StructLit { .. } => None,
             Expr::FieldAccess { object, field, .. } => self.field_expression_type(object, field),
+            Expr::Index { .. } => None,
             Expr::Case { branches, .. } => self.case_expression_type(branches),
         }
     }

@@ -240,7 +240,7 @@ fn contains_returned_borrow(expression: &Expr) -> bool {
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. } => false,
-        Expr::StructLit { .. } | Expr::FieldAccess { .. } => false,
+        Expr::StructLit { .. } | Expr::FieldAccess { .. } | Expr::Index { .. } => false,
         Expr::Case { .. } => false,
     }
 }
@@ -268,6 +268,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
         | Expr::Case { span, .. } => *span,
     }
 }

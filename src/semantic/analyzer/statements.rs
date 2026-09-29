@@ -22,6 +22,11 @@ impl Analyzer {
             Stmt::FieldAssignment { object, field, value, span } => {
                 self.validate_field_assignment(object, field, value, *span)
             }
+            Stmt::IndexAssignment { target, index, value, .. } => {
+                self.visit_expression(target)?;
+                self.visit_expression(index)?;
+                self.visit_expression(value)
+            }
             Stmt::Expression { expression, span } => self.visit_expr_statement(expression, *span),
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => self.visit_loop(block),

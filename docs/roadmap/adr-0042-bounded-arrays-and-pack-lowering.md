@@ -1,0 +1,81 @@
+# ADR-0042 Implementation Roadmap: Bounded Arrays and Native Pack Lowering
+
+This roadmap implements the general systems primitives accepted by ADR-0042.
+It does not define an application-specific data structure or execution model.
+Each gate requires accepted and rejected tests before it can be marked
+complete.
+
+## Gate 0: Contract and representation baseline
+
+- [x] Accept ADR-0042 as the governing systems-primitives decision.
+- [x] Define the canonical source spelling for `Array[T, N]`.
+- [ ] Define element layout, alignment, capacity, and zero-length behavior.
+- [ ] Define the stable bounds-failure contract for hosted and freestanding
+      targets.
+- [ ] Inventory existing pack layouts and native field access limitations.
+- [ ] Record the array and pack representation in the language and backend
+      documentation.
+
+## Gate 1: Lexer, parser, and AST
+
+- [x] Add deterministic token support for bounded array type syntax.
+- [x] Parse `Array[T, N]` type applications with a compile-time capacity.
+- [x] Represent bounded arrays in the existing generic type AST with a
+      dedicated capacity argument and source span.
+- [x] Parse `expr[index]` indexing expressions with complete source spans.
+- [x] Add AST representation for indexed reads and indexed assignments.
+- [ ] Preserve ownership-role annotations for indexed expressions where the
+      grammar permits `abs` and `ins` access.
+- [x] Reject malformed array capacities and incomplete index expressions with
+      stable parser diagnostics.
+- [x] Add lexer and parser tests for valid, malformed, nested, and ambiguous
+      array/index syntax.
+
+## Gate 2: Semantic validation and bounds checking
+
+- [ ] Validate array element types and compile-time capacities.
+- [ ] Validate index expressions as supported integer types.
+- [ ] Reject statically provable out-of-bounds constant indices.
+- [ ] Define runtime bounds-check insertion for dynamic indices.
+- [ ] Reject unsupported indexing targets and invalid assignment types.
+- [ ] Add stable diagnostics for capacity, index, and element-type failures.
+- [ ] Add positive and negative semantic fixtures for reads and writes.
+
+## Gate 3: Ownership and slot loans
+
+- [ ] Define `abs array[index]` as a read-only, non-escaping slot view.
+- [ ] Define `ins array[index]` as an exclusive call-scope slot loan.
+- [ ] Preserve array provenance through slot views and nested calls.
+- [ ] Reject slot aliasing, escaping views, relocation, and drop while loaned.
+- [ ] Prove that slot loans do not copy the complete array.
+- [ ] Add ownership transition and cleanup tests for success and early exit.
+
+## Gate 4: Cranelift native pack lowering
+
+- [ ] Lower packed-field reads using target-aware shift and mask operations.
+- [ ] Lower packed-field writes using clear-mask and insert operations.
+- [ ] Preserve unrelated backing bits during every write.
+- [ ] Implement signed extraction and sign extension by declared field type.
+- [ ] Validate field range before native insertion.
+- [ ] Add native tests for endianness, widths, overflow, and overlapping layout
+      rejection.
+
+## Gate 5: Cranelift native array lowering and bounds failures
+
+- [ ] Lower contiguous array layout for stack and arena storage.
+- [ ] Lower dynamic reads and writes without whole-array copies.
+- [ ] Emit deterministic target-specific bounds failures.
+- [ ] Lower indexed pack access through the same validated layout contract.
+- [ ] Add native tests for valid access, constant rejection, and dynamic failure.
+- [ ] Verify cleanup and arena provenance across indexed operations.
+
+## Gate 6: Native execution and end-to-end quality verification
+
+- [ ] Execute arrays and indexed pack fields through native binaries.
+- [ ] Verify `ins` slot mutation and caller reuse without allocation.
+- [ ] Verify deterministic artifacts and repeated-run results.
+- [ ] Add hosted and freestanding target evidence where supported.
+- [ ] Run formatter, check, clippy, tests, source limits, and diff checks.
+- [ ] Update ADR-0042 with implementation evidence and approved deviations.
+- [ ] Mark this roadmap complete only after all diagnostics and native tests
+      pass.

@@ -214,6 +214,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::MethodCall { span, .. }
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
         | Expr::Case { span, .. } => *span,
     }
 }

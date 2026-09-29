@@ -69,12 +69,44 @@ impl Parser {
             Vec::new()
         };
         let end = self.previous().span.end;
+        self.validate_bounded_array(name.as_str(), &arguments)?;
         Ok(TypeName {
             name,
             arguments,
             reference_role,
             span: SourceSpan::new(token.span.start, end),
         })
+    }
+
+    fn validate_bounded_array(&self, name: &str, arguments: &[TypeName]) -> Result<(), ParseError> {
+        if name != "Array" || arguments.is_empty() {
+            return Ok(());
+        }
+        if arguments.len() != 2 {
+            return Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
+                kind: ParseErrorKind::UnexpectedToken {
+                    expected: "Array element type and capacity".to_owned(),
+                    found: TokenKind::Eof,
+                },
+                span: self.previous().span,
+            });
+        }
+        let capacity = &arguments[1];
+        if !capacity.arguments.is_empty()
+            || capacity.reference_role.is_some()
+            || !capacity.name.chars().all(|character| character.is_ascii_digit())
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
+                kind: ParseErrorKind::UnexpectedToken {
+                    expected: "a non-negative integer array capacity".to_owned(),
+                    found: TokenKind::Identifier(capacity.name.clone()),
+                },
+                span: capacity.span,
+            });
+        }
+        Ok(())
     }
 
     fn parse_type_reference_role(&mut self) -> Result<Option<crate::ast::Role>, ParseError> {

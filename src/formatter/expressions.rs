@@ -29,6 +29,12 @@ impl Formatter {
             }
             Expr::StructLit { name, fields, .. } => self.struct_literal(name, fields),
             Expr::FieldAccess { object, field, .. } => self.field_access(object, field),
+            Expr::Index { target, index, .. } => {
+                self.expression(target);
+                self.output.push('[');
+                self.expression(index);
+                self.output.push(']');
+            }
             Expr::Case { mode, subject, branches, .. } => {
                 self.case_expression(*mode, subject, branches)
             }
