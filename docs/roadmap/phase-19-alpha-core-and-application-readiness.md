@@ -181,7 +181,7 @@ contracts that the future platform is allowed to consume.
 
 ### Supported hosts
 
-- [ ] Run the compiler and native application matrix on Linux.
+- [x] Run the compiler and native application matrix on Linux.
 - [ ] Run the compiler and native application matrix on macOS.
 - [ ] Run the compiler and native application matrix on Windows.
 - [ ] Verify host-native path separators, encoding boundaries, line endings,
@@ -190,13 +190,18 @@ contracts that the future platform is allowed to consume.
 
 ### Gate 19.4 evidence
 
-- [ ] Platform-specific claims have command output or native execution evidence.
-- [ ] Failure behavior is deterministic and diagnostically actionable.
+- [x] Platform-specific claims have command output or native execution evidence
+      for the verified Linux host slice.
+- [x] Failure behavior is deterministic and diagnostically actionable.
 - [ ] No host-specific workaround is hidden in shared compiler layers.
 
 The initial runtime boundary slice is covered by the explicit null-handle
-failure matrix in `tests/runtime_failure_matrix.rs`. The remaining runtime
-boundary and host-matrix items require separate evidence and remain open.
+failure matrix in `tests/runtime_failure_matrix.rs`. The Linux host slice was
+verified with `./scripts/check_stdlib.sh` and
+`cargo test --all-targets --all-features -- --test-threads=1`; both completed
+successfully, including native application, runtime, filesystem, path, and
+standard-library suites. macOS and Windows remain open until their native CI
+runs provide evidence.
 
 Cleanup evidence is distributed across `tests/semantic/`, `tests/codegen/`,
 `tests/buffer_cli.rs`, `tests/fs.rs`, `tests/std_io/`, and `tests/cli.rs`;
