@@ -63,6 +63,13 @@ pub struct FormattingParams {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct RangeFormattingParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+    pub range: LspRange,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct TextDocumentIdentifier {
     pub uri: String,
     #[serde(default)]

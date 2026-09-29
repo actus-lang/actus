@@ -1,4 +1,5 @@
 mod cancellation;
+mod code_lens;
 mod completion;
 mod definition;
 mod diagnostics;
@@ -13,11 +14,14 @@ mod protocol;
 mod protocol_contract;
 mod query_bounds;
 mod query_handlers;
+mod rename;
 mod request_dispatch;
 mod semantic_tokens;
 mod server;
 mod signature_help;
+mod source_queries;
 mod transport;
+mod workflow;
 mod workspace;
 
 pub use diagnostics::analyze_document;

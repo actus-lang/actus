@@ -7,8 +7,11 @@ use super::completion::items;
 use super::definition::find_definition;
 use super::documents::DocumentStore;
 use super::formatting::format_document;
+use super::formatting::format_range;
 use super::hover::find_hover;
-use super::protocol::{DefinitionParams, FormattingParams, ResponseMetadata, TextEdit};
+use super::protocol::{
+    DefinitionParams, FormattingParams, RangeFormattingParams, ResponseMetadata, TextEdit,
+};
 use super::query_bounds::{
     MAX_COMPLETION_ITEMS, MAX_HOVER_BYTES, MAX_SEMANTIC_TOKEN_VALUES, truncate_array,
     truncate_array_preserving_edges, truncate_text,
@@ -70,6 +73,21 @@ pub(super) fn completion(
 }
 
 pub(super) fn resolve_completion(
+    id: Option<Value>,
+    mut params: Value,
+    store: &DocumentStore,
+    target: &TargetSpec,
+    output: &mut impl Write,
+    mut metadata: ResponseMetadata,
+    cancellation: Option<&CancellationToken>,
+) -> io::Result<()> {
+    if resolve_completion_item(&mut params, store, target) {
+        metadata.result_state = "stale";
+    }
+    super::server::respond(output, id, params, metadata, cancellation)
+}
+
+pub(super) fn resolve_completion_item(
     item: &mut Value,
     store: &DocumentStore,
     target: &TargetSpec,
@@ -203,9 +221,47 @@ pub(super) fn formatting(
         metadata.result_state = "stale";
         return super::server::respond(output, id, serde_json::json!([]), metadata, cancellation);
     }
+    let source_is_valid = parse(scan(&document.text).0).is_ok();
     let edits = format_document(&document.text)
         .map(|(range, new_text)| vec![TextEdit { range, new_text }])
         .unwrap_or_default();
+    if !source_is_valid {
+        metadata.result_state = "invalid";
+    }
+    super::server::respond(
+        output,
+        id,
+        serde_json::to_value(edits).map_err(super::server::invalid_params)?,
+        metadata,
+        cancellation,
+    )
+}
+
+pub(super) fn range_formatting(
+    id: Option<Value>,
+    params: Value,
+    store: &DocumentStore,
+    output: &mut impl Write,
+    mut metadata: ResponseMetadata,
+    cancellation: Option<&CancellationToken>,
+) -> io::Result<()> {
+    let params = serde_json::from_value::<RangeFormattingParams>(params)
+        .map_err(super::server::invalid_params)?;
+    let Some(document) = store.get(&params.text_document.uri) else {
+        metadata.result_state = "unsupported";
+        return super::server::respond(output, id, json!([]), metadata, cancellation);
+    };
+    if stale_version(document.version, params.text_document.version) {
+        metadata.result_state = "stale";
+        return super::server::respond(output, id, json!([]), metadata, cancellation);
+    }
+    let source_is_valid = parse(scan(&document.text).0).is_ok();
+    let edits = format_range(&document.text, &params.range)
+        .map(|(range, new_text)| vec![TextEdit { range, new_text }])
+        .unwrap_or_default();
+    if !source_is_valid {
+        metadata.result_state = "invalid";
+    }
     super::server::respond(
         output,
         id,
@@ -219,6 +275,6 @@ fn requested_version(params: &Value) -> Option<i64> {
     params.get("textDocument").and_then(|document| document.get("version")).and_then(Value::as_i64)
 }
 
-fn stale_version(current: i64, requested: Option<i64>) -> bool {
+pub(super) fn stale_version(current: i64, requested: Option<i64>) -> bool {
     requested.is_some_and(|version| version != current)
 }

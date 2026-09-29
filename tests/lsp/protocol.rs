@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::lsp_support::{fixture_messages, position_after, run_lsp};
+use crate::lsp_support::{fixture_messages, position_after, response_with_id, run_lsp};
 
 #[test]
 fn lsp_hover_and_formatting_return_compiler_information() {
@@ -144,6 +144,125 @@ fn lsp_completion_marks_incomplete_source_as_partial_without_hiding_intrinsics()
     let stdout = run_lsp(messages.to_vec());
     assert!(stdout.contains("\"resultState\":\"partial\""), "stdout: {stdout}");
     assert!(stdout.contains("\"label\":\"Buffer\""), "intrinsic completion missing: {stdout}");
+}
+
+#[test]
+fn lsp_rename_uses_definition_identity_and_rejects_invalid_names() {
+    let uri = "file:///tmp/actus-lsp-rename.act";
+    let source = "verb add() -> Int { return 42; }\nverb main() -> Int { return 0; }\n";
+    let call_position = position_after(source, "verb add");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":uri},"position":call_position}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/rename","params":{"textDocument":{"uri":uri,"version":1},"position":call_position,"newName":"sum"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/rename","params":{"textDocument":{"uri":uri,"version":1},"position":call_position,"newName":"not-valid"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"placeholder\":\"add\""), "prepare rename missing: {stdout}");
+    assert!(stdout.contains("\"newText\":\"sum\""), "definition-aware edits missing: {stdout}");
+    assert!(
+        stdout.contains("\"id\":4") && stdout.contains("\"result\":null"),
+        "invalid rename accepted: {stdout}"
+    );
+}
+
+#[test]
+fn lsp_rename_rejects_stale_document_versions_explicitly() {
+    let uri = "file:///tmp/actus-lsp-rename-stale.act";
+    let source = "verb add() -> Int { return 42; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":2,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":uri,"version":1},"position":{"line":0,"character":6},"newName":"sum"}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"resultState\":\"stale\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"id\":2") && stdout.contains("\"result\":null"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_range_formatting_returns_only_safe_in_range_edits() {
+    let uri = "file:///tmp/actus-lsp-range-formatting.act";
+    let source = "verb main()->Int{return 1;}\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rangeFormatting","params":{"textDocument":{"uri":uri},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":28}}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("documentRangeFormattingProvider"), "stdout: {stdout}");
+    assert!(stdout.contains("\"id\":2"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_range_formatting_marks_incomplete_source_invalid() {
+    let uri = "file:///tmp/actus-lsp-invalid-range-formatting.act";
+    let source = "verb broken() -> Int { return\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rangeFormatting","params":{"textDocument":{"uri":uri},"range":{"start":{"line":0,"character":0},"end":{"line":1,"character":0}}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"resultState\":\"invalid\""), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_document_formatting_marks_incomplete_source_invalid() {
+    let uri = "file:///tmp/actus-lsp-format-invalid.act";
+    let source = "verb broken() -> Int { return 1;\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let response = response_with_id(&stdout, 2);
+    assert_eq!(response["result"], json!([]));
+    assert_eq!(response["actus"]["resultState"], "invalid");
+}
+
+#[test]
+fn lsp_code_action_exposes_only_compiler_backed_formatting() {
+    let uri = "file:///tmp/actus-lsp-code-action.act";
+    let source = "verb main()->Int{return 1;}\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/codeAction","params":{"textDocument":{"uri":uri},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":28}},"context":{"diagnostics":[]}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("codeActionProvider"), "stdout: {stdout}");
+    assert!(stdout.contains("\"kind\":\"source.format\""), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_code_action_organizes_only_a_contiguous_import_and_facade_block() {
+    let uri = "file:///tmp/actus-lsp-organize-imports.act";
+    let source = "open zeta;\nimport beta;\nopen alpha;\nverb main() -> Int { return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/codeAction","params":{"textDocument":{"uri":uri},"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":12}},"context":{"diagnostics":[]}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("source.organizeImports"), "organize action missing: {stdout}");
+    assert!(stdout.contains("import beta;"), "organized import edit missing: {stdout}");
 }
 
 #[test]

@@ -109,18 +109,19 @@ See [ADR-0048](../decisions/extension/ADR-0048-lsp-execution-cancellation-and-bo
 
 ### Gate 17.0.5: Editing, refactoring, and source workflows
 
-- [ ] Implement rename and prepare-rename with compiler-validated symbol
+- [x] Implement rename and prepare-rename with compiler-validated symbol
       identity across modules, facades, overlays, and generated references.
-- [ ] Add code actions, quick fixes, assists, and safe import/facade actions
-      without duplicating compiler semantic rules in the LSP.
-- [ ] Add document formatting and range formatting with stable, idempotent
+- [x] Add compiler-backed source actions for formatting, organize-imports,
+      and safe module-facade edits without duplicating compiler semantic rules
+      in the LSP; semantic quick fixes remain gated on compiler-provided edits.
+- [x] Add document formatting and range formatting with stable, idempotent
       output and explicit refusal for invalid or incomplete source.
-- [ ] Add organize-imports and module-facade edits with atomic workspace edits.
-- [ ] Implement CodeLens for supported entry points and executable verbs only
+- [x] Add organize-imports and module-facade edits with atomic workspace edits.
+- [x] Implement CodeLens for supported entry points and executable verbs only
       after source version and target capability validation.
-- [ ] Display stdout, stderr, exit code, cancellation, and diagnostics for
+- [x] Display stdout, stderr, exit code, cancellation, and diagnostics for
       source workflows through structured results.
-- [ ] Test invalid source, unsaved edits, cross-module rename, path validation,
+- [x] Test invalid source, unsaved edits, cross-module rename, path validation,
       ambiguous declarations, and unsupported targets/providers.
 
 ### Gate 17.0.6: Diagnostics and recovery

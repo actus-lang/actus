@@ -38,8 +38,14 @@ fn is_query_method(method: &str) -> bool {
             | "textDocument/completion"
             | "completionItem/resolve"
             | "textDocument/signatureHelp"
+            | "textDocument/prepareRename"
+            | "textDocument/rename"
+            | "textDocument/codeAction"
+            | "textDocument/codeLens"
+            | "actus/run"
             | "textDocument/semanticTokens/full"
             | "textDocument/formatting"
+            | "textDocument/rangeFormatting"
             | "textDocument/declaration"
             | "textDocument/typeDefinition"
             | "textDocument/implementation"
@@ -182,33 +188,100 @@ fn query_request<W: Write>(
     params: Value,
     context: &mut QueryContext<'_, W>,
 ) -> io::Result<()> {
-    match method {
-        "textDocument/declaration"
-        | "textDocument/typeDefinition"
-        | "textDocument/implementation"
-        | "textDocument/references"
-        | "textDocument/documentSymbol"
-        | "workspace/symbol"
-        | "textDocument/prepareCallHierarchy"
-        | "callHierarchy/incomingCalls"
-        | "callHierarchy/outgoingCalls" => super::navigation::dispatch(
-            method,
+    if is_navigation_method(method) {
+        return navigation_query(method, id, params, context);
+    }
+    if matches!(method, "textDocument/prepareRename" | "textDocument/rename") {
+        return super::source_queries::rename(
             id,
             params,
             context.store,
             context.output,
             context.metadata.clone(),
             context.cancellation,
-        ),
+            method == "textDocument/prepareRename",
+        );
+    }
+    match method {
         "textDocument/definition" => definition(id, params, context),
         "textDocument/hover" => hover(id, params, context),
         "textDocument/completion" => completion(id, params, context),
-        "completionItem/resolve" => resolve_completion(id, params, context),
+        "completionItem/resolve" => super::query_handlers::resolve_completion(
+            id,
+            params,
+            context.store,
+            context.target,
+            context.output,
+            context.metadata.clone(),
+            context.cancellation,
+        ),
         "textDocument/signatureHelp" => signature_help(id, params, context),
+        "textDocument/codeAction" | "textDocument/codeLens" | "actus/run" => {
+            super::source_queries::dispatch(
+                method,
+                id,
+                params,
+                super::source_queries::Context {
+                    store: context.store,
+                    target: context.target,
+                    output: context.output,
+                    metadata: context.metadata.clone(),
+                    cancellation: context.cancellation,
+                },
+            )
+        }
         "textDocument/semanticTokens/full" => semantic_tokens_full(id, params, context),
         "textDocument/formatting" => formatting(id, params, context),
+        "textDocument/rangeFormatting" => range_formatting(id, params, context),
         _ => Ok(()),
     }
+}
+
+fn range_formatting<W: Write>(
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::query_handlers::range_formatting(
+        id,
+        params,
+        context.store,
+        context.output,
+        context.metadata.clone(),
+        context.cancellation,
+    )
+}
+
+fn is_navigation_method(method: &str) -> bool {
+    matches!(
+        method,
+        "textDocument/declaration"
+            | "textDocument/typeDefinition"
+            | "textDocument/implementation"
+            | "textDocument/references"
+            | "textDocument/documentSymbol"
+            | "workspace/symbol"
+            | "textDocument/prepareCallHierarchy"
+            | "callHierarchy/incomingCalls"
+            | "callHierarchy/outgoingCalls"
+    )
+}
+
+fn navigation_query<W: Write>(
+    method: &str,
+    id: Option<Value>,
+    params: Value,
+    context: &mut QueryContext<'_, W>,
+) -> io::Result<()> {
+    super::navigation::dispatch(
+        method,
+        id,
+        params,
+        context.store,
+        context.output,
+        context.metadata.clone(),
+        context.cancellation,
+    )
 }
 
 fn definition<W: Write>(
@@ -272,20 +345,6 @@ fn signature_help<W: Write>(
         context.metadata.clone(),
         context.cancellation,
     )
-}
-
-fn resolve_completion<W: Write>(
-    id: Option<Value>,
-    mut params: Value,
-    context: &mut QueryContext<'_, W>,
-) -> io::Result<()> {
-    let stale =
-        super::query_handlers::resolve_completion(&mut params, context.store, context.target);
-    let mut metadata = context.metadata.clone();
-    if stale {
-        metadata.result_state = "stale";
-    }
-    super::server::respond(context.output, id, params, metadata, context.cancellation)
 }
 
 fn semantic_tokens_full<W: Write>(

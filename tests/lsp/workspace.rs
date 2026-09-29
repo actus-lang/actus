@@ -128,6 +128,118 @@ fn lsp_reindexes_facade_dependency_and_renamed_sibling_changes() {
 }
 
 #[test]
+fn lsp_rename_updates_open_facade_export_and_imported_reference() {
+    let root = temp_root();
+    let module = root.join("src/math");
+    fs::create_dir_all(&module).expect("create module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-rename\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let facade_path = module.join("math.act");
+    let api_path = module.join("api.act");
+    let main_path = root.join("src/main.act");
+    let facade = "open api;\n";
+    let api = "open verb add(erg left: Int, erg right: Int) -> Int { return left + right; }\n";
+    let main = "import math;\nverb main() -> Int { return add(left: 40, right: 2); }\n";
+    fs::write(&facade_path, facade).expect("write facade");
+    fs::write(&api_path, api).expect("write api");
+    fs::write(&main_path, main).expect("write main");
+    let facade_uri = file_uri(&facade_path);
+    let api_uri = file_uri(&api_path);
+    let main_uri = file_uri(&main_path);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":main_uri,"version":1,"text":main}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":facade_uri,"version":1,"text":facade}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":api_uri,"version":1,"text":api}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":main_uri,"version":1},"position":{"line":1,"character":30}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/rename","params":{"textDocument":{"uri":main_uri,"version":1},"position":{"line":1,"character":30},"newName":"sum"}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"placeholder\":\"add\""), "prepare rename missing: {stdout}");
+    assert!(stdout.contains("\"newText\":\"sum\""), "cross-module rename missing: {stdout}");
+    assert!(stdout.contains(&api_uri), "declaration edit missing: {stdout}");
+    assert!(stdout.contains(&main_uri), "reference edit missing: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn lsp_code_lens_exposes_only_the_configured_entry_for_current_target() {
+    let root = temp_root();
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-lens\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"boot\"\n",
+    )
+    .expect("write manifest");
+    let path = root.join("src/main.act");
+    let uri = file_uri(&path);
+    let source = "verb helper() -> Int { return 1; }\nverb boot() -> Int { return helper(); }\n";
+    fs::write(&path, source).expect("write source");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":7,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/codeLens","params":{"textDocument":{"uri":uri,"version":7}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/codeLens","params":{"textDocument":{"uri":uri,"version":6}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let lens = crate::lsp_support::response_with_id(&stdout, 2);
+    assert_eq!(lens["result"].as_array().map(Vec::len), Some(1));
+    assert_eq!(lens["result"][0]["command"]["command"], "actus.run");
+    assert_eq!(lens["result"][0]["command"]["arguments"][0]["version"], 7);
+    let stale = crate::lsp_support::response_with_id(&stdout, 3);
+    assert_eq!(stale["result"], json!([]));
+    assert_eq!(stale["actus"]["resultState"], "stale");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn lsp_source_workflow_returns_structured_execution_and_rejects_stale_or_unsaved_input() {
+    let root = temp_root();
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-workflow\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let path = root.join("src/main.act");
+    let uri = file_uri(&path);
+    let source = "verb main() -> Int { return 0; }\n";
+    fs::write(&path, source).expect("write source");
+    let unsaved = "verb main() -> Int { return 1; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":4,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/run","params":{"textDocument":{"uri":uri,"version":4}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"actus/run","params":{"textDocument":{"uri":uri,"version":3}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":5},"contentChanges":[{"text":unsaved}]}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"actus/run","params":{"textDocument":{"uri":uri,"version":5}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let completed = crate::lsp_support::response_with_id(&stdout, 2);
+    assert_eq!(completed["result"]["status"], "completed");
+    assert_eq!(completed["result"]["exitCode"], 0);
+    assert!(completed["result"].get("stdout").is_some());
+    assert!(completed["result"].get("stderr").is_some());
+    assert_eq!(completed["result"]["diagnostics"], json!([]));
+    let stale = crate::lsp_support::response_with_id(&stdout, 3);
+    assert_eq!(stale["result"]["status"], "stale");
+    assert_eq!(stale["actus"]["resultState"], "stale");
+    let unsaved = crate::lsp_support::response_with_id(&stdout, 4);
+    assert_eq!(unsaved["result"]["status"], "unsupported");
+    assert!(unsaved["result"]["stderr"].as_str().unwrap().contains("saved"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn lsp_rejects_oversized_document_overlays() {
     let uri = "file:///tmp/actus-lsp-oversized.act";
     let source = "x".repeat(1024 * 1024 + 1);

@@ -32,11 +32,15 @@ pub(super) fn initialize_result(target: &TargetSpec, params: &Value) -> Value {
             "hoverProvider": true,
             "completionProvider": {"triggerCharacters": ["u", "i", "f"], "resolveProvider": true},
             "signatureHelpProvider": {"triggerCharacters": ["(", ","]},
+            "renameProvider": {"prepareProvider": true},
+            "codeActionProvider": {"codeActionKinds": ["source.format", "source.organizeImports"]},
+            "codeLensProvider": {"resolveProvider": false},
             "semanticTokensProvider": {
                 "full": true,
                 "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": ["inactive-target"]}
             },
-            "documentFormattingProvider": true
+            "documentFormattingProvider": true,
+            "documentRangeFormattingProvider": true
         },
         "serverInfo": { "name": "actus-lsp", "version": env!("CARGO_PKG_VERSION") },
         "actus": {
@@ -45,6 +49,7 @@ pub(super) fn initialize_result(target: &TargetSpec, params: &Value) -> Value {
             "target": target.triple().to_string(),
             "negotiatedCapabilities": negotiated,
             "compatibility": compatibility(params),
+            "sourceWorkflowProvider": {"methods": ["actus/run"], "requiresDocumentVersion": true},
             "states": ["available", "stale", "partial", "unsupported", "invalid"]
         }
     })
@@ -68,6 +73,10 @@ pub(super) fn negotiated_capabilities(params: &Value) -> Vec<&'static str> {
         "documentSync",
         "completion",
         "signatureHelp",
+        "rename",
+        "codeAction",
+        "codeLens",
+        "sourceWorkflow",
         "definition",
         "hover",
         "semanticTokens",
