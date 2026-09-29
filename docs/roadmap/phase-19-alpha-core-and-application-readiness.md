@@ -167,7 +167,7 @@ contracts that the future platform is allowed to consume.
 - [ ] Verify every public fallible I/O operation returns a typed Actus result.
 - [ ] Verify raw POSIX, Windows, and linker statuses remain private to runtime
       bridges.
-- [ ] Verify C-ABI status contracts use documented explicit values.
+- [x] Verify C-ABI status contracts use documented explicit values.
 - [ ] Verify no hidden allocation is introduced in zero-allocation contracts.
 - [ ] Verify ownership restoration across runtime failures and early returns.
 
@@ -193,6 +193,10 @@ contracts that the future platform is allowed to consume.
 - [ ] Platform-specific claims have command output or native execution evidence.
 - [ ] Failure behavior is deterministic and diagnostically actionable.
 - [ ] No host-specific workaround is hidden in shared compiler layers.
+
+The initial runtime boundary slice is covered by the explicit null-handle
+failure matrix in `tests/runtime_failure_matrix.rs`. The remaining runtime,
+cleanup, and host-matrix items require separate evidence and remain open.
 
 ## Gate 19.5: Alpha Compatibility and Documentation
 
