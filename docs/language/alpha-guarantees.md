@@ -37,3 +37,15 @@ already-dropped bindings are excluded from cleanup.
 
 These guarantees are enforced before native code generation. They do not
 depend on the native backend or on a garbage collector.
+
+## Numeric Comparisons and Output
+
+The relational operators `<`, `<=`, `>`, and `>=` return `Bool`. Signed integer
+operands use signed comparison semantics; unsigned integer operands, including
+`Usize`, use unsigned comparison semantics; and `f32` and `f64` use their
+corresponding floating-point comparison semantics. The semantic analyzer rejects
+mixed numeric families instead of inserting an implicit conversion.
+
+When `print` receives an `abs Buffer`, the runtime writes exactly the Buffer's
+current length. The operation is binary-safe and does not read beyond the live
+range or require a null terminator.

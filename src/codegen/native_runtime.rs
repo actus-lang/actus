@@ -7,7 +7,7 @@ use cranelift_object::ObjectModule;
 use crate::ast::IntrinsicKind;
 use crate::runtime::{
     BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
-    ENUM_DROP_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
+    ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
@@ -27,6 +27,7 @@ pub(super) fn declare_runtime_functions(
         enum_allocate: declare_enum_allocate(module, pointer_type)?,
         enum_drop: declare_enum_drop(module, pointer_type)?,
     };
+    declare_print_buffer(module, pointer_type)?;
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
     let mut functions = runtime_metadata(&ids, &append_spec, &print_spec);
@@ -180,5 +181,17 @@ fn declare_print_string(
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(PRINT_STRING_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_print_buffer(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function(PRINT_BUFFER_STDOUT_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }

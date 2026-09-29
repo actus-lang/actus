@@ -1,4 +1,4 @@
-use crate::ast::{Expr, PrimitiveType, TypeName, UnaryOp, primitive_type};
+use crate::ast::{BinaryOp, Expr, PrimitiveType, TypeName, UnaryOp, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
@@ -30,7 +30,9 @@ impl Analyzer {
         match expression {
             Expr::BufferLiteral { length, .. } => self.visit_buffer_literal(length),
             Expr::Identifier { name, span } => self.visit_identifier(name, *span),
-            Expr::Binary { left, right, .. } => self.visit_binary_expression(left, right),
+            Expr::Binary { left, operator, right, .. } => {
+                self.visit_binary_expression(left, operator, right)
+            }
             Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
                 self.visit_expression(expression)
             }
@@ -159,9 +161,35 @@ impl Analyzer {
         self.ensure_readable(index, name, span)
     }
 
-    fn visit_binary_expression(&mut self, left: &Expr, right: &Expr) -> Result<(), SemanticError> {
+    fn visit_binary_expression(
+        &mut self,
+        left: &Expr,
+        operator: &BinaryOp,
+        right: &Expr,
+    ) -> Result<(), SemanticError> {
         self.visit_expression(left)?;
-        self.visit_expression(right)
+        self.visit_expression(right)?;
+        if operator.is_relational() {
+            self.validate_relational_operands(left, right)?;
+        }
+        Ok(())
+    }
+
+    fn validate_relational_operands(&self, left: &Expr, right: &Expr) -> Result<(), SemanticError> {
+        let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
+        let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
+        if relational_types_match(&left_type, &right_type) {
+            return Ok(());
+        }
+        Err(SemanticError {
+            kind: SemanticErrorKind::TypeMismatch {
+                callee: "relational operator".to_owned(),
+                parameter: "operands".to_owned(),
+                expected: left_type,
+                found: right_type,
+            },
+            span: expression_span(right),
+        })
     }
 
     fn visit_try_expression(
@@ -275,6 +303,33 @@ impl Analyzer {
 
 fn is_integer_primitive(primitive: PrimitiveType) -> bool {
     matches!(primitive, PrimitiveType::Integer { .. })
+}
+
+fn relational_types_match(left: &str, right: &str) -> bool {
+    if left == "Int" && right == "Int" {
+        return true;
+    }
+    let left_primitive = if left == "Int" {
+        Some(PrimitiveType::Integer { signed: true, width: 32 })
+    } else {
+        primitive_type(left)
+    };
+    let right_primitive = if right == "Int" {
+        Some(PrimitiveType::Integer { signed: true, width: 32 })
+    } else {
+        primitive_type(right)
+    };
+    match (left_primitive, right_primitive) {
+        (
+            Some(PrimitiveType::Integer { signed: left_signed, .. }),
+            Some(PrimitiveType::Integer { signed: right_signed, .. }),
+        ) => left_signed == right_signed,
+        (
+            Some(PrimitiveType::Float { width: left_width }),
+            Some(PrimitiveType::Float { width: right_width }),
+        ) => left_width == right_width,
+        _ => false,
+    }
 }
 
 fn is_cast_integer_type(name: &str) -> bool {

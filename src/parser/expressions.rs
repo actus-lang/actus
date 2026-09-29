@@ -239,11 +239,19 @@ impl Parser {
             TokenKind::Minus => BinaryOp::Subtract,
             TokenKind::Star => BinaryOp::Multiply,
             TokenKind::Slash => BinaryOp::Divide,
+            TokenKind::LessThan => BinaryOp::LessThan,
+            TokenKind::LessEquals => BinaryOp::LessEquals,
+            TokenKind::GreaterThan => BinaryOp::GreaterThan,
+            TokenKind::GreaterEquals => BinaryOp::GreaterEquals,
             _ => return None,
         };
         let precedence = match operator {
             BinaryOp::Add | BinaryOp::Subtract => 1,
             BinaryOp::Multiply | BinaryOp::Divide => 2,
+            BinaryOp::LessThan
+            | BinaryOp::LessEquals
+            | BinaryOp::GreaterThan
+            | BinaryOp::GreaterEquals => 0,
         };
         Some((operator, precedence))
     }

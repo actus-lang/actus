@@ -1,5 +1,5 @@
 use crate::ast::{
-    CaseBody, CaseBranch, CaseMode, LiteralPattern, NamedPattern, Pattern, PatternBinding, Stmt,
+    CaseBody, CaseBranch, CaseMode, LiteralPattern, NamedPattern, Pattern, PatternBinding,
     VariantPayload,
 };
 use crate::lexer::{SourceSpan, TokenKind};
@@ -66,16 +66,6 @@ impl Parser {
                 return Err(self.error_at_current("`}`"));
             }
             let statement = self.parse_statement()?;
-            if let Stmt::Break { span } = statement {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "case branch body without standalone `break`".to_owned(),
-                        found: TokenKind::Break,
-                    },
-                    span,
-                });
-            }
             statements.push(statement);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;

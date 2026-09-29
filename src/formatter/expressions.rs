@@ -70,6 +70,10 @@ impl Formatter {
             crate::ast::BinaryOp::Subtract => " - ",
             crate::ast::BinaryOp::Multiply => " * ",
             crate::ast::BinaryOp::Divide => " / ",
+            crate::ast::BinaryOp::LessThan => " < ",
+            crate::ast::BinaryOp::LessEquals => " <= ",
+            crate::ast::BinaryOp::GreaterThan => " > ",
+            crate::ast::BinaryOp::GreaterEquals => " >= ",
         });
         self.expression(right);
     }

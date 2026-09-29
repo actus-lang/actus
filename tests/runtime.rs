@@ -13,6 +13,15 @@ fn returns_printed_string_length() {
 }
 
 #[test]
+fn prints_exact_buffer_length_without_a_null_terminator() {
+    let mut storage = [b'A', 0, b'Z'];
+    let mut buffer =
+        ActusBuffer { data: storage.as_mut_ptr(), length: storage.len(), capacity: storage.len() };
+    let count = unsafe { actus::runtime::actus_print_buffer_stdout(&mut buffer) };
+    assert_eq!(count, 3);
+}
+
+#[test]
 fn allocates_appends_and_drops_a_buffer() {
     let handle = actus_buffer_allocate(4);
     assert!(!handle.is_null());
