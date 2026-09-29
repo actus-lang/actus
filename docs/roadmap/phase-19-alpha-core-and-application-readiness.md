@@ -168,7 +168,7 @@ contracts that the future platform is allowed to consume.
 - [ ] Verify raw POSIX, Windows, and linker statuses remain private to runtime
       bridges.
 - [x] Verify C-ABI status contracts use documented explicit values.
-- [ ] Verify no hidden allocation is introduced in zero-allocation contracts.
+- [x] Verify no hidden allocation is introduced in zero-allocation contracts.
 - [ ] Verify ownership restoration across runtime failures and early returns.
 
 ### Cleanup and control flow
@@ -202,6 +202,11 @@ verified with `./scripts/check_stdlib.sh` and
 successfully, including native application, runtime, filesystem, path, and
 standard-library suites. macOS and Windows remain open until their native CI
 runs provide evidence.
+
+Borrowed path inspection is covered by `tests/runtime_zero_alloc.rs`, which
+counts allocations around predicates, component views, iteration, and C-view
+construction. Builders are intentionally excluded because their explicit
+capacity-growth contract permits reallocation.
 
 Cleanup evidence is distributed across `tests/semantic/`, `tests/codegen/`,
 `tests/buffer_cli.rs`, `tests/fs.rs`, `tests/std_io/`, and `tests/cli.rs`;
