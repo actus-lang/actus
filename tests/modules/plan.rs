@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::lexer::scan;
-use actus::modules::{ModuleResolver, build_compilation_plan};
+use actus::modules::{ModuleError, ModuleResolver, build_compilation_plan};
 use actus::parser::parse;
 
 struct Fixture(PathBuf);
@@ -70,4 +70,23 @@ fn compilation_plan_deduplicates_repeated_module_imports() {
             .count(),
         1
     );
+}
+
+#[test]
+fn rejects_ambiguous_native_symbols_before_codegen() {
+    let fixture = Fixture::new();
+    fixture.write("left/left.act", "open api;");
+    fixture.write("left/api.act", "open verb shared() -> Int { return 1; }");
+    fixture.write("right/right.act", "open api;");
+    fixture.write("right/api.act", "open verb shared() -> Int { return 2; }");
+    let (tokens, errors) = scan("import left; import right; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let error = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect_err("ambiguous implementation symbols must fail before codegen");
+    assert!(
+        matches!(error, ModuleError::SymbolCollision { ref symbol, .. } if symbol == "verb `shared`")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1110");
 }

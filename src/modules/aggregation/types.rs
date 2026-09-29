@@ -20,6 +20,7 @@ pub enum ModuleError {
     Lex { path: PathBuf, errors: Vec<LexError> },
     Parse { path: PathBuf, error: ParseError },
     DuplicateDeclaration(Box<DuplicateDeclaration>),
+    SymbolCollision { symbol: String, first_module: String, second_module: String },
     PrivateDeclarationAccess { module: String, symbol: String, facade: PathBuf, span: SourceSpan },
     Semantic(Box<crate::semantic::SemanticError>),
 }
@@ -78,6 +79,10 @@ impl Display for ModuleError {
                 diagnostic.name,
                 diagnostic.first.path.display(),
                 diagnostic.second.path.display()
+            ),
+            Self::SymbolCollision { symbol, first_module, second_module } => write!(
+                formatter,
+                "native symbol `{symbol}` would collide between modules `{first_module}` and `{second_module}`"
             ),
             Self::PrivateDeclarationAccess { module, symbol, facade, .. } => write!(
                 formatter,

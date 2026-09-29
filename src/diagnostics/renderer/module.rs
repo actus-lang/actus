@@ -31,6 +31,9 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
             module_error("E1106", error.to_string(), diagnostic.second.span)
                 .with_source_path(diagnostic.second.path.display().to_string())
         }
+        ModuleError::SymbolCollision { .. } => {
+            module_error("E1110", error.to_string(), SourceSpan::new(0, 0))
+        }
         ModuleError::PrivateDeclarationAccess { span, facade, .. } => {
             module_error("E1109", error.to_string(), *span)
                 .with_source_path(facade.display().to_string())

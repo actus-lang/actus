@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::{Program, TopLevelDecl};
 
@@ -74,11 +74,49 @@ pub fn build_compilation_plan(
             &mut caller_declarations,
         )?;
     }
+    validate_symbol_collisions(&local_declarations, &units)?;
     Ok(ModuleCompilationPlan {
         local: Program { declarations: local_declarations },
         caller: Program { declarations: caller_declarations },
         units,
     })
+}
+
+fn validate_symbol_collisions(
+    local_declarations: &[TopLevelDecl],
+    units: &[ModuleUnit],
+) -> Result<(), ModuleError> {
+    let mut symbols = HashMap::new();
+    record_symbols("<root>", local_declarations, &mut symbols)?;
+    for unit in units {
+        record_symbols(
+            unit.identity().module_path(),
+            &unit.implementation().declarations,
+            &mut symbols,
+        )?;
+    }
+    Ok(())
+}
+
+fn record_symbols(
+    module: &str,
+    declarations: &[TopLevelDecl],
+    symbols: &mut HashMap<(String, String), String>,
+) -> Result<(), ModuleError> {
+    for declaration in declarations {
+        let Some((kind, name)) = export_identity(declaration) else { continue };
+        let key = (kind.to_owned(), name.clone());
+        if let Some(first_module) = symbols.insert(key, module.to_owned())
+            && first_module != module
+        {
+            return Err(ModuleError::SymbolCollision {
+                symbol: format!("{kind} `{name}`"),
+                first_module,
+                second_module: module.to_owned(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn collect_unit(

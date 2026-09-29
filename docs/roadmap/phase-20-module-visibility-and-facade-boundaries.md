@@ -161,6 +161,8 @@ reported later as an importer-side unknown type.
       separate from each imported module's internal implementation unit.
 - [x] Add a linker boundary that accepts one deterministic object input per
       compiled module unit while preserving the existing single-object API.
+- [x] Reject unresolved cross-module native symbol collisions before codegen;
+      deterministic symbol namespacing remains the follow-up implementation.
 - [x] Generate public wrappers from their validated module implementation
       unit, including required private dependencies.
 - [ ] Emit each module implementation once when multiple callers import it.
@@ -184,8 +186,10 @@ compiles a separate implementation program assembled from caller-local
 declarations plus the internal units. Native application tests prove that
 `std::fs` wrappers execute with their private dependencies while those
 declarations remain absent from caller lookup. The linker also accepts an
-ordered object list and rejects an empty link input; per-module object emission
-and deterministic symbol namespacing remain open.
+ordered object list and rejects an empty link input. The plan rejects
+cross-module native symbol collisions with `E1110` before codegen. Per-module
+object emission and deterministic symbol namespacing remain open rather than
+allowing ambiguous ABI symbols to reach the linker.
 
 ## Gate 20.5: Standard-library migration
 
