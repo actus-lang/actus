@@ -24,29 +24,29 @@ contracts that the future platform is allowed to consume.
 
 ### Inventory
 
-- [ ] List every unchecked Phase 16 Gate 6 item and assign it to a later gate.
-- [ ] List every unchecked Phase 11 struct item and assign it to a later gate.
-- [ ] Inventory all public compiler, CLI, runtime, standard-library, and
+- [x] List every unchecked Phase 16 Gate 6 item and assign it to a later gate.
+- [x] List every unchecked Phase 11 struct item and assign it to a later gate.
+- [x] Inventory all public compiler, CLI, runtime, standard-library, and
       package contracts currently used by examples and tests.
-- [ ] Identify duplicated, contradictory, or stale claims in README,
+- [x] Identify duplicated, contradictory, or stale claims in README,
       MANIFESTO, language references, ADRs, and roadmaps.
-- [ ] Record current supported host targets, linkers, and known platform
+- [x] Record current supported host targets, linkers, and known platform
       substitutions.
 
 ### Alpha baseline
 
-- [ ] Define the accepted Alpha language edition and compiler invocation.
-- [ ] Freeze the currently accepted ownership roles and cleanup guarantees.
-- [ ] Freeze the accepted ADR-0042, ADR-0043, and ADR-0044 operator surface.
-- [ ] Freeze the supported `std::io`, `std::fs`, and `std::path` public surface.
-- [ ] Define which existing features remain experimental or deferred.
-- [ ] Add a baseline compatibility report with compiler and repository hashes.
+- [x] Define the accepted Alpha language edition and compiler invocation.
+- [x] Freeze the currently accepted ownership roles and cleanup guarantees.
+- [x] Freeze the accepted ADR-0042, ADR-0043, and ADR-0044 operator surface.
+- [x] Freeze the supported `std::io`, `std::fs`, and `std::path` public surface.
+- [x] Define which existing features remain experimental or deferred.
+- [x] Add a baseline compatibility report with compiler and repository hashes.
 
 ### Gate 19.0 evidence
 
-- [ ] Every remaining item is `implemented`, `scheduled`, or `deferred`.
-- [ ] The baseline report is reproducible from a clean checkout.
-- [ ] Documentation contradictions are either corrected or recorded as work.
+- [x] Every remaining item is `implemented`, `scheduled`, or `deferred`.
+- [x] The baseline report is reproducible from a clean checkout.
+- [x] Documentation contradictions are either corrected or recorded as work.
 
 ## Gate 19.1: Complete Struct Semantics
 
