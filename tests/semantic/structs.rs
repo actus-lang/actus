@@ -64,6 +64,30 @@ fn rejects_assignment_between_inferred_struct_types() {
 }
 
 #[test]
+fn transfers_ownership_for_compatible_whole_struct_assignment() {
+    let model = analyze_source(
+        "struct Point { value: Int, } verb main() { erg destination = Point { value: 0, }; erg source = Point { value: 7, }; destination = source; inspect(source.value); }",
+    )
+    .expect_err("the source aggregate must be moved by whole-struct assignment");
+    assert!(matches!(
+        model.kind,
+        SemanticErrorKind::UseAfterMove { name } if name == "source"
+    ));
+}
+
+#[test]
+fn rejects_aggregate_self_assignment() {
+    let error = analyze_source(
+        "struct Point { value: Int, } verb main() { erg point = Point { value: 1, }; point = point; }",
+    )
+    .expect_err("self-assignment would invalidate and overwrite the same owner");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::SelfAssignment { name } if name == "point"
+    ));
+}
+
+#[test]
 fn registers_structs_and_validates_owned_literals() {
     let model = analyze_source(
         "struct Point { x: Int, y: Int, } verb main() { erg point = Point { x: 1, y: 2, }; point.x; }",

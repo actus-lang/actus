@@ -180,6 +180,9 @@ pub enum SemanticErrorKind {
         struct_name: String,
         field: String,
     },
+    SelfAssignment {
+        name: String,
+    },
     TypeMismatch {
         callee: String,
         parameter: String,

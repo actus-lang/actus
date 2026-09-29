@@ -204,6 +204,9 @@ fn struct_field_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::FrozenStructField { struct_name, field } => {
             format!("cannot mutate read-only `abs` field `{field}` on struct `{struct_name}`")
         }
+        SemanticErrorKind::SelfAssignment { name } => {
+            format!("cannot move aggregate `{name}` onto itself")
+        }
         SemanticErrorKind::InvalidFieldAssignmentTarget { field } => {
             format!("field `{field}` can only be assigned through an erg owner")
         }

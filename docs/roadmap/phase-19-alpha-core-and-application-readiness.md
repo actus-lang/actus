@@ -52,32 +52,35 @@ contracts that the future platform is allowed to consume.
 
 ### Field access and ownership
 
-- [ ] Define module and field visibility rules.
-- [ ] Define `erg` field ownership and mutation rules.
-- [ ] Define `abs` field access and frozen-view propagation.
-- [ ] Define `dat` field moves and the containing-owner state afterward.
+- [x] Define module and field visibility rules: `open` declarations cross
+      facade boundaries; fields have no independent visibility modifier.
+- [x] Define `erg` field ownership and mutation rules.
+- [x] Define `abs` field access and frozen-view propagation.
+- [x] Define `dat` field moves and the containing-owner state afterward.
 - [x] Define whether `ins` may loan a field or indexed field slot: persistent
       `ins` fields are rejected; loans remain call-scope operations.
 - [x] Reject mutation through frozen or moved field paths.
 
 ### Copy, move, and assignment
 
-- [ ] Define whole-struct copy eligibility.
-- [ ] Define whole-struct move behavior and use-after-move diagnostics.
-- [ ] Define field assignment compatibility and replacement cleanup.
-- [ ] Define partial moves and the remaining cleanup plan.
-- [ ] Reject overlapping moves and ambiguous ownership joins.
-- [ ] Add positive and negative semantic fixtures for each transition.
+- [x] Define whole-struct copy eligibility: Alpha structs are not implicitly
+      copyable; explicit aggregate assignment transfers ownership.
+- [x] Define whole-struct move behavior and use-after-move diagnostics.
+- [x] Define field assignment compatibility and replacement cleanup.
+- [x] Define partial moves and the remaining cleanup plan.
+- [x] Reject overlapping moves and ambiguous ownership joins.
+- [x] Add positive and negative semantic fixtures for each transition.
 
 ### References and representation
 
-- [ ] Define which reference-bearing fields are permitted in Alpha.
-- [ ] Reject self-referential and escaping borrow fields without a lifetime
+- [x] Define which reference-bearing fields are permitted in Alpha.
+- [x] Reject self-referential and escaping borrow fields without a lifetime
       contract.
-- [ ] Define packed and externally represented struct policies.
-- [ ] Define native layout, alignment, and padding guarantees.
-- [ ] Define public struct C-ABI exposure or explicitly defer it.
-- [ ] Add layout and cleanup golden tests for accepted representations.
+- [x] Define packed and externally represented struct policies.
+- [x] Define native layout, alignment, and padding guarantees.
+- [x] Define public struct C-ABI exposure or explicitly defer unsupported
+      aggregate layouts.
+- [x] Add layout and cleanup golden tests for accepted representations.
 
 ### Gate 19.1 evidence
 
