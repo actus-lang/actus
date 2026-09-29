@@ -36,6 +36,7 @@ pub use model::{
 };
 pub use native::{
     NativeEmitError, emit_program_object, emit_program_object_for_target,
-    emit_program_object_with_configuration, emit_zero_return_object,
+    emit_program_object_for_target_in_namespace, emit_program_object_with_configuration,
+    emit_zero_return_object,
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};

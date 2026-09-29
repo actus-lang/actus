@@ -28,24 +28,36 @@ pub(super) fn declaration_external_verb(declaration: &TopLevelDecl) -> Option<&E
     }
 }
 
+pub(super) struct DeclarationContext<'a> {
+    pub(super) entry_symbol: &'a str,
+    pub(super) namespace_prefix: &'a str,
+    pub(super) layouts: &'a LayoutRegistry,
+    pub(super) target: &'a TargetSpec,
+}
+
 pub(super) fn declare_all_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
-    symbol: &str,
-    layouts: &LayoutRegistry,
-    target: &TargetSpec,
+    context: DeclarationContext<'_>,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
-    let mut metadata = declare_functions(module, verbs, external_verbs, symbol, layouts)?;
+    let mut metadata = declare_functions(
+        module,
+        verbs,
+        external_verbs,
+        context.entry_symbol,
+        context.namespace_prefix,
+        context.layouts,
+    )?;
     metadata.extend(super::super::performance::declare_performance_functions(
         module,
         performance_definitions,
-        layouts,
+        context.layouts,
     )?);
     let has_print_definition = verbs.iter().any(|verb| verb.name == "print")
         || external_verbs.iter().any(|verb| verb.name == "print");
-    if target_requires_host_runtime(target) {
+    if target_requires_host_runtime(context.target) {
         metadata.extend(declare_runtime_functions(module, has_print_definition)?);
     }
     Ok(metadata)
@@ -102,6 +114,7 @@ pub(super) fn define_verbs(
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &super::super::vtable::VtableDataIds,
+    namespace_prefix: &str,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let meta = functions
@@ -117,6 +130,7 @@ pub(super) fn define_verbs(
             string_data,
             layouts,
             vtable_data,
+            namespace_prefix,
         )?;
     }
     Ok(())

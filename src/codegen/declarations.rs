@@ -8,6 +8,7 @@ use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::layout::LayoutRegistry;
 use super::native::{FunctionMeta, NativeEmitError};
+use super::symbols::{SymbolIdentity, SymbolKind};
 use super::types::NativeType;
 
 pub(super) fn declare_functions(
@@ -15,10 +16,18 @@ pub(super) fn declare_functions(
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     entry_symbol: &str,
+    namespace_prefix: &str,
     layouts: &LayoutRegistry,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
-    declare_internal_functions(module, verbs, entry_symbol, layouts, &mut metadata)?;
+    declare_internal_functions(
+        module,
+        verbs,
+        entry_symbol,
+        namespace_prefix,
+        layouts,
+        &mut metadata,
+    )?;
     declare_external_functions(module, external_verbs, layouts, &mut metadata)?;
     Ok(metadata)
 }
@@ -27,12 +36,13 @@ fn declare_internal_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
     entry_symbol: &str,
+    namespace_prefix: &str,
     layouts: &LayoutRegistry,
     metadata: &mut HashMap<String, FunctionMeta>,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let signature = native_signature_for_definition(module, verb, layouts)?;
-        let symbol = internal_symbol(&verb.name, entry_symbol);
+        let symbol = internal_symbol(&verb.name, entry_symbol, namespace_prefix)?;
         let id = module
             .declare_function(&symbol, Linkage::Export, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
@@ -59,16 +69,17 @@ fn declare_external_functions(
     Ok(())
 }
 
-fn internal_symbol(name: &str, entry_symbol: &str) -> String {
-    if name == entry_symbol || !needs_private_symbol(name) {
-        name.to_owned()
-    } else {
-        format!("__actus_verb_{name}")
+fn internal_symbol(
+    name: &str,
+    entry_symbol: &str,
+    namespace_prefix: &str,
+) -> Result<String, NativeEmitError> {
+    if name == entry_symbol {
+        return Ok(name.to_owned());
     }
-}
-
-fn needs_private_symbol(name: &str) -> bool {
-    matches!(name, "read" | "write" | "open" | "close" | "fsync" | "rename")
+    SymbolIdentity::new(namespace_prefix, SymbolKind::Verb, name)
+        .map(|identity| identity.as_str().to_owned())
+        .map_err(|error| NativeEmitError(error.to_string()))
 }
 
 fn function_meta(
@@ -189,4 +200,15 @@ fn append_return(
         signature.returns.push(AbiParam::new(layouts.ir_type(native_return)?));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::internal_symbol;
+
+    #[test]
+    fn keeps_only_the_entry_symbol_public() {
+        assert_eq!(internal_symbol("main", "main", "actus_root").unwrap(), "main");
+        assert_eq!(internal_symbol("read", "main", "actus_root").unwrap(), "actus_root__verb_read");
+    }
 }

@@ -64,5 +64,21 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    emission::emit_program_object_for_target(program, symbol, configuration, target)
+    emission::emit_program_object_for_target(program, symbol, "actus_root", configuration, target)
+}
+
+pub fn emit_program_object_for_target_in_namespace(
+    program: &Program,
+    symbol: &str,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+) -> Result<Vec<u8>, NativeEmitError> {
+    emission::emit_program_object_for_target(
+        program,
+        symbol,
+        namespace_prefix,
+        configuration,
+        target,
+    )
 }

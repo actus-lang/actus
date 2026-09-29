@@ -203,16 +203,22 @@ while another family still uses an unqualified name.
 
 #### 20.4.3: Frontend-to-codegen symbol propagation
 
-- [ ] Attach owning module identity to each internal implementation unit.
-- [ ] Pass symbol context through declaration collection and function maps.
-- [ ] Namespace direct calls, recursive calls, generic monomorphizations, and
+- [x] Attach the owning namespace context to each native implementation
+      emission unit; the public API retains an explicit root-namespace wrapper
+      for existing callers.
+- [x] Pass symbol context through declaration collection, function maps,
+      string/data globals, and vtable lookup state.
+- [x] Namespace direct calls, recursive calls, generic monomorphizations, and
       method/performance dispatch references.
-- [ ] Namespace struct layouts, pack layouts, enum payload helpers, vtables,
-      string/data globals, and cleanup/drop helpers.
-- [ ] Keep public entry symbols and documented C ABI bridge names explicitly
+- [x] Namespace linker-visible generated vtables, performance implementations,
+      verb implementations, and string/data globals. Struct, pack, and enum
+      layouts remain numeric registry identities rather than linker symbols;
+      cleanup/drop helpers remain explicit runtime C ABI names.
+- [x] Keep public entry symbols and documented C ABI bridge names explicitly
       unqualified where their ABI contract requires it.
-- [ ] Add codegen assertions that every internal reference resolves through the
-      same symbol identity constructor.
+- [x] Add codegen assertions that repeated namespace-aware emission is
+      deterministic and that distinct namespace contexts produce distinct
+      internal symbols.
 
 #### 20.4.4: Independent module object emission
 
@@ -274,8 +280,16 @@ prefix; later codegen stages must use this identity instead of reconstructing
 module names locally. Gate 20.4.2 now provides a codegen-only
 `SymbolIdentity`/`SymbolRegistry` model with declaration-family tags,
 collision-free escaping, generic specialization keys, and declaration-order
-independent duplicate validation. The model is not yet wired into emission;
-that is the explicit scope of Gate 20.4.3.
+independent duplicate validation. Gate 20.4.3 now propagates the namespace
+through native declaration collection, function definition, performance
+dispatch, vtable construction, string/data globals, and internal call
+references. Non-entry Actus verbs are emitted through the namespace identity;
+the configured public entry symbol and runtime C ABI imports remain unqualified
+by contract. Repeated namespace-aware emissions are covered by native object
+tests that verify deterministic output and distinct symbol identities for
+distinct namespace contexts. Layout registry numbers are compiler-local
+numeric identities, not linker symbols, and cleanup/drop helpers are runtime
+ABI imports rather than module-owned generated declarations.
 
 ## Gate 20.5: Standard-library migration
 

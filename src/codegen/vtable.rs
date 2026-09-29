@@ -4,6 +4,8 @@ use cranelift_module::DataId;
 use cranelift_module::{DataDescription, Linkage, Module};
 use cranelift_object::ObjectModule;
 
+use super::symbols::{SymbolIdentity, SymbolKind};
+
 use super::layout::LayoutRegistry;
 use super::native::{FunctionMeta, NativeEmitError};
 use super::performance::{PerformanceDefinition, dispatch_key};
@@ -24,8 +26,9 @@ pub(super) fn define_vtables(
     definitions: &[PerformanceDefinition<'_>],
     functions: &HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
+    namespace_prefix: &str,
 ) -> Result<VtableDataIds, NativeEmitError> {
-    let mut vtables = group_definitions(definitions, layouts)?;
+    let mut vtables = group_definitions(definitions, layouts, namespace_prefix)?;
     vtables.sort_by(|left, right| left.symbol.cmp(&right.symbol));
     let mut data_ids = HashMap::new();
     for vtable in &vtables {
@@ -64,6 +67,7 @@ pub(super) fn declare_vtable_values(
 fn group_definitions(
     definitions: &[PerformanceDefinition<'_>],
     layouts: &LayoutRegistry,
+    namespace_prefix: &str,
 ) -> Result<Vec<VtableDefinition>, NativeEmitError> {
     let mut grouped = HashMap::<(String, String), VtableDefinition>::new();
     for definition in definitions {
@@ -74,7 +78,11 @@ fn group_definitions(
             .or_insert_with(|| VtableDefinition {
                 role_name: definition.role_name.clone(),
                 target_type: definition.target.name.clone(),
-                symbol: vtable_symbol_for_native(&definition.role_name, target),
+                symbol: vtable_symbol_for_native_in_namespace(
+                    namespace_prefix,
+                    &definition.role_name,
+                    target,
+                ),
                 method_symbols: Vec::new(),
             })
             .method_symbols
@@ -83,11 +91,11 @@ fn group_definitions(
     Ok(grouped.into_values().collect())
 }
 
-pub(super) fn vtable_symbol(role: &str, target: &str) -> String {
-    format!("actus_vtable_{}_{}", encode(role), encode(target))
-}
-
-pub(super) fn vtable_symbol_for_native(role: &str, target: NativeType) -> String {
+pub(super) fn vtable_symbol_for_native_in_namespace(
+    namespace_prefix: &str,
+    role: &str,
+    target: NativeType,
+) -> String {
     let target = match target {
         NativeType::Struct(id) => format!("struct_{id}"),
         NativeType::Enum(id) => format!("enum_{id}"),
@@ -104,27 +112,21 @@ pub(super) fn vtable_symbol_for_native(role: &str, target: NativeType) -> String
         NativeType::Array(id) => format!("array_{id}"),
         NativeType::Arena(capacity) => format!("arena_{capacity}"),
     };
-    vtable_symbol(role, &target)
-}
-
-fn encode(value: &str) -> String {
-    value.bytes().fold(String::new(), |mut result, byte| {
-        if byte.is_ascii_alphanumeric() {
-            result.push(byte as char);
-        } else {
-            result.push('_');
-            result.push_str(&format!("{byte:02x}"));
-        }
-        result
-    })
+    SymbolIdentity::specialized(namespace_prefix, SymbolKind::Vtable, role, &[&target])
+        .expect("vtable names are validated by semantic analysis")
+        .as_str()
+        .to_owned()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::vtable_symbol;
+    use super::{NativeType, vtable_symbol_for_native_in_namespace};
 
     #[test]
     fn names_vtables_deterministically() {
-        assert_eq!(vtable_symbol("Writer", "File"), "actus_vtable_Writer_File");
+        assert_eq!(
+            vtable_symbol_for_native_in_namespace("actus_root", "Writer", NativeType::Struct(7)),
+            "actus_root__vtable_Writer__struct_5f7"
+        );
     }
 }

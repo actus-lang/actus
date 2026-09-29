@@ -32,6 +32,7 @@ pub(super) fn define_function(
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
+    namespace_prefix: &str,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
     context.func.signature = native_signature_for_definition(module, verb, layouts)?;
@@ -45,6 +46,7 @@ pub(super) fn define_function(
         string_data,
         layouts,
         vtable_data,
+        namespace_prefix,
     )?;
     module
         .define_function(metadata.id, &mut context)
@@ -64,10 +66,12 @@ fn lower_function_body(
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
+    namespace_prefix: &str,
 ) -> Result<(), NativeEmitError> {
     let references = declare_function_refs(module, &mut context.func, functions)?;
-    let mut string_values = declare_string_values(module, &mut context.func, string_data);
-    string_values.extend(declare_vtable_values(module, &mut context.func, vtable_data));
+    let mut string_values =
+        declare_string_values(module, &mut context.func, string_data, namespace_prefix);
+    string_values.extend_vtables(declare_vtable_values(module, &mut context.func, vtable_data));
     let mut function_context = FunctionBuilderContext::new();
     let mut function = FunctionBuilder::new(&mut context.func, &mut function_context);
     let (return_type, return_slot, flow) = lower_function_flow(

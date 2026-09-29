@@ -6,6 +6,7 @@ use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
 
 use super::layout::LayoutRegistry;
 use super::native::{FunctionMeta, NativeEmitError};
+use super::symbols::{SymbolIdentity, SymbolKind};
 use super::types::NativeType;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
@@ -35,7 +36,10 @@ pub(super) struct PerformanceDefinition<'a> {
 }
 
 impl PerformanceRegistry {
-    pub(super) fn from_reachable(reachable: &[ReachablePerformance]) -> Self {
+    pub(super) fn from_reachable_in_namespace(
+        reachable: &[ReachablePerformance],
+        namespace_prefix: &str,
+    ) -> Self {
         let mut implementations = reachable
             .iter()
             .map(|implementation| PerformanceImplementation {
@@ -43,6 +47,7 @@ impl PerformanceRegistry {
                 target_type: implementation.target_type.clone(),
                 method_name: implementation.method_name.clone(),
                 symbol: performance_symbol(
+                    namespace_prefix,
                     &implementation.role_name,
                     &implementation.target_type,
                     &implementation.method_name,
@@ -53,8 +58,12 @@ impl PerformanceRegistry {
         Self { implementations }
     }
 
-    pub(super) fn from_program(program: &Program, reachable: &[ReachablePerformance]) -> Self {
-        let mut registry = Self::from_reachable(reachable);
+    pub(super) fn from_program_in_namespace(
+        program: &Program,
+        reachable: &[ReachablePerformance],
+        namespace_prefix: &str,
+    ) -> Self {
+        let mut registry = Self::from_reachable_in_namespace(reachable, namespace_prefix);
         for declaration in &program.declarations {
             let TopLevelDecl::Perform(perform) = declaration else { continue };
             let target_type = canonical_type_name(&perform.target);
@@ -63,7 +72,12 @@ impl PerformanceRegistry {
                     role_name: perform.role_name.clone(),
                     target_type: target_type.clone(),
                     method_name: method.name.clone(),
-                    symbol: performance_symbol(&perform.role_name, &target_type, &method.name),
+                    symbol: performance_symbol(
+                        namespace_prefix,
+                        &perform.role_name,
+                        &target_type,
+                        &method.name,
+                    ),
                 });
             }
         }
@@ -199,13 +213,11 @@ fn dynamic_roles(definition: &PerformanceDefinition<'_>) -> Vec<Option<String>> 
         .collect()
 }
 
-fn performance_symbol(role: &str, target: &str, method: &str) -> String {
-    format!(
-        "actus_perf_{}_{}_{}",
-        encode_component(role),
-        encode_component(target),
-        encode_component(method)
-    )
+fn performance_symbol(namespace_prefix: &str, role: &str, target: &str, method: &str) -> String {
+    SymbolIdentity::specialized(namespace_prefix, SymbolKind::Performance, method, &[role, target])
+        .expect("performance names are validated by semantic analysis")
+        .as_str()
+        .to_owned()
 }
 
 pub(super) fn dispatch_key(target: NativeType, method: &str) -> String {
@@ -261,31 +273,40 @@ mod tests {
 
     #[test]
     fn creates_stable_symbols_for_simple_performances() {
-        assert_eq!(performance_symbol("Writer", "File", "write"), "actus_perf_Writer_File_write");
+        assert_eq!(
+            performance_symbol("actus_root", "Writer", "File", "write"),
+            "actus_root__performance_write__Writer_File"
+        );
     }
 
     #[test]
     fn encodes_type_applications_without_symbol_collisions() {
-        let first = performance_symbol("Writer", "Box[Int]", "write");
-        let second = performance_symbol("Writer", "Box_BInt", "write");
+        let first = performance_symbol("actus_root", "Writer", "Box[Int]", "write");
+        let second = performance_symbol("actus_root", "Writer", "Box_BInt", "write");
         assert_ne!(first, second);
     }
 
     #[test]
     fn sorts_reachable_implementations_by_symbol() {
-        let registry = PerformanceRegistry::from_reachable(&[
-            ReachablePerformance {
-                role_name: "Reader".to_owned(),
-                target_type: "File".to_owned(),
-                method_name: "read".to_owned(),
-            },
-            ReachablePerformance {
-                role_name: "Writer".to_owned(),
-                target_type: "File".to_owned(),
-                method_name: "write".to_owned(),
-            },
-        ]);
-        assert_eq!(registry.implementations()[0].symbol, "actus_perf_Reader_File_read");
+        let registry = PerformanceRegistry::from_reachable_in_namespace(
+            &[
+                ReachablePerformance {
+                    role_name: "Reader".to_owned(),
+                    target_type: "File".to_owned(),
+                    method_name: "read".to_owned(),
+                },
+                ReachablePerformance {
+                    role_name: "Writer".to_owned(),
+                    target_type: "File".to_owned(),
+                    method_name: "write".to_owned(),
+                },
+            ],
+            "actus_root",
+        );
+        assert_eq!(
+            registry.implementations()[0].symbol,
+            "actus_root__performance_read__Reader_File"
+        );
         assert!(registry.validate().is_ok());
     }
 }

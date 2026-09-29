@@ -14,21 +14,25 @@ use super::super::performance::define_performances;
 use super::super::result_constructors::normalize_program;
 use super::NativeEmitError;
 use super::declarations::{
-    declaration_external_verb, declaration_verb, declare_all_functions, define_verbs,
-    function_metadata, validate_native_program,
+    DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
+    define_verbs, function_metadata, validate_native_program,
 };
 use super::object::create_module;
 
 pub(super) fn emit_program_object_for_target(
     program: &Program,
     symbol: &str,
+    namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
     let (program, semantic) = prepare_program(program, target)?;
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
-    let performance_registry =
-        PerformanceRegistry::from_program(&program, &semantic.reachable_performances);
+    let performance_registry = PerformanceRegistry::from_program_in_namespace(
+        &program,
+        &semantic.reachable_performances,
+        namespace_prefix,
+    );
     performance_registry.validate().map_err(NativeEmitError)?;
     let performance_definitions = performance_registry.definitions(&program)?;
     let (verbs, external_verbs) = collect_declarations(&program);
@@ -40,6 +44,7 @@ pub(super) fn emit_program_object_for_target(
         generic_instances: &semantic.generic_instances,
         performance_definitions: &performance_definitions,
         symbol,
+        namespace_prefix,
         cleanup_schedule: &cleanup_schedule,
         configuration,
         target,
@@ -87,6 +92,7 @@ struct VerbEmission<'items, 'program> {
     generic_instances: &'items [GenericInstance],
     performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
     symbol: &'items str,
+    namespace_prefix: &'items str,
     cleanup_schedule: &'items NativeCleanupSchedule,
     configuration: &'items NativeBackendConfiguration,
     target: &'items TargetSpec,
@@ -95,10 +101,16 @@ struct VerbEmission<'items, 'program> {
 fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmitError> {
     let mut module = create_module(inputs.configuration, inputs.target)?;
     let (layouts, metadata) = build_layouts_and_metadata(&mut module, &inputs)?;
-    let string_data = define_string_data(&mut module, inputs.verbs).map_err(NativeEmitError)?;
+    let string_data = define_string_data(&mut module, inputs.verbs, inputs.namespace_prefix)
+        .map_err(NativeEmitError)?;
     let functions = function_metadata(&metadata);
-    let vtable_data =
-        define_vtable_data(&mut module, inputs.performance_definitions, &functions, &layouts)?;
+    let vtable_data = define_vtable_data(
+        &mut module,
+        inputs.performance_definitions,
+        &functions,
+        &layouts,
+        inputs.namespace_prefix,
+    )?;
     define_emission_functions(EmissionDefinitions {
         module: &mut module,
         verbs: inputs.verbs,
@@ -108,6 +120,7 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmit
         string_data: &string_data,
         layouts: &layouts,
         vtable_data: &vtable_data,
+        namespace_prefix: inputs.namespace_prefix,
     })?;
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
 }
@@ -124,6 +137,7 @@ fn build_layouts_and_metadata(
         inputs.external_verbs,
         inputs.performance_definitions,
         inputs.symbol,
+        inputs.namespace_prefix,
         &layouts,
         inputs.target,
     )?;
@@ -135,8 +149,15 @@ fn define_vtable_data(
     performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
     functions: &std::collections::HashMap<String, super::FunctionMeta>,
     layouts: &LayoutRegistry,
+    namespace_prefix: &str,
 ) -> Result<super::super::vtable::VtableDataIds, NativeEmitError> {
-    super::super::vtable::define_vtables(module, performance_definitions, functions, layouts)
+    super::super::vtable::define_vtables(
+        module,
+        performance_definitions,
+        functions,
+        layouts,
+        namespace_prefix,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -146,6 +167,7 @@ fn declare_emission_functions(
     external_verbs: &[&ExternalVerbDecl],
     performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
     symbol: &str,
+    namespace_prefix: &str,
     layouts: &LayoutRegistry,
     target: &TargetSpec,
 ) -> Result<std::collections::HashMap<String, super::FunctionMeta>, NativeEmitError> {
@@ -155,9 +177,7 @@ fn declare_emission_functions(
         verbs,
         external_verbs,
         performance_definitions,
-        symbol,
-        layouts,
-        target,
+        DeclarationContext { entry_symbol: symbol, namespace_prefix, layouts, target },
     )
 }
 
@@ -170,6 +190,7 @@ struct EmissionDefinitions<'items, 'program> {
     string_data: &'items super::super::literals::StringDataIds,
     layouts: &'items LayoutRegistry,
     vtable_data: &'items super::super::vtable::VtableDataIds,
+    namespace_prefix: &'items str,
 }
 
 fn define_emission_functions(
@@ -193,6 +214,7 @@ fn define_verb_bodies(
         inputs.string_data,
         inputs.layouts,
         inputs.vtable_data,
+        inputs.namespace_prefix,
     )
 }
 
@@ -209,6 +231,7 @@ fn define_performance_bodies(
         inputs.string_data,
         inputs.layouts,
         inputs.vtable_data,
+        inputs.namespace_prefix,
     )
 }
 

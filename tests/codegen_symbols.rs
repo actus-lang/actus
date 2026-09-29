@@ -1,4 +1,8 @@
 use actus::codegen::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
+use actus::configuration::NativeBackendConfiguration;
+use actus::lexer::scan;
+use actus::parser::parse;
+use actus::target::TargetSpec;
 
 #[test]
 fn symbol_identity_is_stable_across_declaration_families() {
@@ -47,4 +51,40 @@ fn identity_rejects_missing_namespace_and_name() {
         SymbolIdentity::new("actus_root", SymbolKind::Verb, ""),
         Err(SymbolError::EmptyName)
     );
+}
+
+#[test]
+fn native_objects_follow_namespace_context_deterministically() {
+    let source = "verb helper() -> Int { return 1; } verb main() -> Int { return helper(); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let target = TargetSpec::host().unwrap();
+    let configuration = NativeBackendConfiguration::default();
+    let first = actus::codegen::emit_program_object_for_target_in_namespace(
+        &program,
+        "main",
+        "actus_mod_4_left",
+        &configuration,
+        &target,
+    )
+    .unwrap();
+    let repeat = actus::codegen::emit_program_object_for_target_in_namespace(
+        &program,
+        "main",
+        "actus_mod_4_left",
+        &configuration,
+        &target,
+    )
+    .unwrap();
+    let other = actus::codegen::emit_program_object_for_target_in_namespace(
+        &program,
+        "main",
+        "actus_mod_5_right",
+        &configuration,
+        &target,
+    )
+    .unwrap();
+    assert_eq!(first, repeat);
+    assert_ne!(first, other);
 }
