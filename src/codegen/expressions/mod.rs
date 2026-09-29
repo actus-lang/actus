@@ -19,6 +19,7 @@ mod construct;
 mod initializer_types;
 mod literals;
 mod operations;
+mod short_circuit;
 mod try_lowering;
 
 pub(super) use buffer::emit_buffer_drop;

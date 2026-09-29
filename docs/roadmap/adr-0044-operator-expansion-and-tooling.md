@@ -54,9 +54,9 @@ Code extension, and Tree-sitter.
 
 ## Gate 4: Short-circuit CFG and ownership correctness
 
-- [ ] Lower `&&` and `||` as branch-based short-circuit CFG, never eager calls.
-- [ ] Lower `!` as a Bool-preserving operation.
-- [ ] Preserve expression values at CFG joins with deterministic block
+- [x] Lower `&&` and `||` as branch-based short-circuit CFG, never eager calls.
+- [x] Lower `!` as a Bool-preserving operation.
+- [x] Preserve expression values at CFG joins with deterministic block
       parameters or equivalent SSA construction.
 - [ ] Preserve `erg`, `abs`, `dat`, and `ins` ownership transitions across
       skipped and evaluated right-hand operands.

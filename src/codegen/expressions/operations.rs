@@ -1,6 +1,7 @@
 use cranelift_codegen::ir::{
     InstBuilder, TrapCode,
     condcodes::{FloatCC, IntCC},
+    types,
 };
 use cranelift_frontend::FunctionBuilder;
 
@@ -37,7 +38,13 @@ fn lower_unary(
     let value = lower_expression_with_context(function, expression, context)?;
     match operator {
         UnaryOp::Negate => Ok(function.ins().ineg(value)),
-        UnaryOp::LogicalNot | UnaryOp::BitwiseNot => Ok(function.ins().bnot(value)),
+        UnaryOp::LogicalNot => {
+            let value_type = function.func.dfg.value_type(value);
+            let zero = function.ins().iconst(value_type, 0);
+            let inverted = function.ins().icmp(IntCC::Equal, value, zero);
+            Ok(normalize_bool(function, inverted))
+        }
+        UnaryOp::BitwiseNot => Ok(function.ins().bnot(value)),
     }
 }
 
@@ -52,7 +59,7 @@ fn lower_binary(
         return lower_comparison(function, left, operator, right, context);
     }
     if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
-        return Err(NativeEmitError("short-circuit logic requires CFG lowering".to_owned()));
+        return super::short_circuit::lower_short_circuit(function, left, operator, right, context);
     }
     lower_integer_operation(function, left, operator, right, context)
 }
@@ -89,7 +96,18 @@ fn lower_comparison(
         }
         other => return Err(NativeEmitError(format!("cannot compare native type {other:?}"))),
     };
-    Ok(condition)
+    Ok(normalize_bool(function, condition))
+}
+
+fn normalize_bool(
+    function: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    if function.func.dfg.value_type(value) == types::I32 {
+        value
+    } else {
+        function.ins().uextend(types::I32, value)
+    }
 }
 
 fn lower_integer_operation(
@@ -268,7 +286,7 @@ fn float_condition(operator: &BinaryOp) -> Result<FloatCC, NativeEmitError> {
     })
 }
 
-fn lower_expression_with_context(
+pub(super) fn lower_expression_with_context(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,

@@ -68,6 +68,36 @@ fn traps_on_shift_count_out_of_range() {
 
 #[cfg(unix)]
 #[test]
+fn short_circuit_and_skips_an_unreachable_rhs() {
+    let status = run_array_fixture(
+        "adr44-short-circuit-and",
+        "verb fail() -> Bool { erg zero = 0; return 1 / zero == 0; } verb main() -> Int { return case (1 > 2) && fail() { false => 42, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn short_circuit_or_skips_an_unreachable_rhs() {
+    let status = run_array_fixture(
+        "adr44-short-circuit-or",
+        "verb fail() -> Bool { erg zero = 0; return 1 / zero == 0; } verb main() -> Int { return case (1 < 2) || fail() { true => 42, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn lowers_logical_not_as_a_bool_value() {
+    let status = run_array_fixture(
+        "adr44-logical-not",
+        "verb main() -> Int { return case !(1 > 2) { true => 42, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn accepts_u8_and_u32_dynamic_indices() {
     let status = run_array_fixture(
         "unsigned-indices",
