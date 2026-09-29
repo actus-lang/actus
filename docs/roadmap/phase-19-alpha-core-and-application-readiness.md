@@ -273,11 +273,11 @@ and native resource cleanup.
 
 ### Clean-checkout acceptance
 
-- [ ] Re-run all Rust quality checks from a clean checkout.
+- [x] Re-run all Rust quality checks from a clean checkout.
 - [x] Re-run all Actus strict, semantic, native, and application tests.
 - [x] Re-run standard-library, package, and lockfile checks.
 - [ ] Re-run Linux, macOS, and Windows CI checks.
-- [ ] Re-run coverage checks.
+- [x] Re-run coverage checks.
 - [x] Re-run dependency and license policy checks.
 - [x] Verify source and function size limits and `git diff --check`.
 
@@ -291,15 +291,27 @@ tests passed, `actus lock --check` passed, and source-limit and diff checks
 passed. This is working-tree evidence, not yet a fresh-checkout or
 cross-platform release-candidate result.
 
+A detached clean worktree at commit `d8885a0` independently passed formatting,
+compilation, all Rust tests, source limits, diff validation, standard-library
+conformance, strict Actus tests, and lockfile validation. Coverage was run
+with `cargo-llvm-cov 0.9.1` and produced an LCOV report with 41,209 lines.
+The local acceptance environment was Rust `1.98.0` for
+`x86_64-unknown-linux-gnu`; the release object checksum recorded below was
+identical across both builds.
+
 `cargo deny check advisories licenses bans sources` passed using an isolated
 Cargo home; advisory, ban, license, and source policies are green. Two
 `--release --emit obj` builds of `examples/hello.act` produced byte-identical
 objects with SHA-256
 `a1c361bcaf8abc697517675f4036f2669a51fc7fb5ce4a30611c4bba0d63cf5f`.
 
-- [ ] Recreate lockfiles from clean workspaces and compare canonical output.
+In a separate detached clean worktree, `actus lock` regenerated `Actus.lock`,
+`actus lock --check` accepted it, and `git diff --exit-code -- Actus.lock`
+confirmed canonical lockfile stability.
+
+- [x] Recreate lockfiles from clean workspaces and compare canonical output.
 - [x] Rebuild release artifacts twice under the same target contract.
-- [ ] Record compiler version, target, profile, source revision, and artifact
+- [x] Record compiler version, target, profile, source revision, and artifact
       checksums in the acceptance report.
 - [ ] Ensure the acceptance report contains real command output or linked CI
       evidence rather than unverified claims.
