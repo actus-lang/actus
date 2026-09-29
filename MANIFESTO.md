@@ -162,6 +162,10 @@ zero-copy abstractions that preserve the core ownership guarantees.
 
 ## 8. Compiler Roadmap
 
+The verified Alpha application workflow, standard-library contracts, and
+accepted/rejected evidence are collected in the
+[Alpha User Guide](docs/language/alpha-user-guide.md).
+
 The first compiler is bootstrapped in Rust and consists of:
 
 1. a lexer and parser for Actus blocks, verbs, roles, and expressions;

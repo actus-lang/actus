@@ -233,19 +233,19 @@ and native resource cleanup.
 
 ### Documentation
 
-- [ ] Document ownership roles with call-site examples.
-- [ ] Document standard-library error and cleanup contracts.
-- [ ] Document supported targets and target-specific substitutions.
-- [ ] Document package, module facade, build, run, test, and format workflows.
-- [ ] Add beginner-to-running-program tutorials based on verified commands.
-- [ ] Add accepted and rejected examples for the Alpha language surface.
-- [ ] Synchronize README, MANIFESTO, language references, ADRs, and roadmap.
+- [x] Document ownership roles with call-site examples.
+- [x] Document standard-library error and cleanup contracts.
+- [x] Document supported targets and target-specific substitutions.
+- [x] Document package, module facade, build, run, test, and format workflows.
+- [x] Add beginner-to-running-program tutorials based on verified commands.
+- [x] Add accepted and rejected examples for the Alpha language surface.
+- [x] Synchronize README, MANIFESTO, language references, ADRs, and roadmap.
 
 ### Gate 19.5 evidence
 
-- [ ] Public documentation describes only implemented behavior.
-- [ ] Every documented command is reproduced in an automated or recorded test.
-- [ ] Compatibility and diagnostic policies are reviewable without source-code
+- [x] Public documentation describes only implemented behavior.
+- [x] Every documented command is reproduced in an automated or recorded test.
+- [x] Compatibility and diagnostic policies are reviewable without source-code
       archaeology.
 
 ## Gate 19.6: Alpha Release Candidate and Handoff
