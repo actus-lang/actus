@@ -74,8 +74,7 @@ complete.
 - [x] Execute arrays and indexed pack fields through native binaries.
 - [x] Verify indexed `ins` slot mutation and caller reuse without allocation.
 - [x] Verify deterministic artifacts and repeated-run results.
-- [ ] Add hosted and freestanding target evidence where supported.
+- [x] Add hosted and freestanding target evidence where supported.
 - [x] Run formatter, check, clippy, tests, source limits, and diff checks.
 - [x] Update ADR-0042 with implementation evidence and approved deviations.
-- [ ] Mark this roadmap complete only after all diagnostics and native tests
-      pass.
+- [x] Mark this roadmap complete after all diagnostics and native tests pass.
