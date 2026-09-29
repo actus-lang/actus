@@ -28,7 +28,7 @@ pub(crate) fn lower_call(
         &target.ins_params,
         context,
     )?;
-    let target = resolve_call_target(function, callee, target, &values, context.functions)?;
+    let target = resolve_call_target(function, callee, arguments, target, &values, context)?;
     normalize_call_arguments(function, callee, &mut values)?;
     let result_address = allocate_return_address(function, target.return_type, context.layouts)?;
     if let Some(address) = result_address {
@@ -76,18 +76,31 @@ fn finish_call(
 fn resolve_call_target<'a>(
     function: &FunctionBuilder<'_>,
     callee: &str,
+    arguments: &[Argument],
     target: &'a FunctionRef,
     values: &[Value],
-    functions: &'a HashMap<String, FunctionRef>,
+    context: &'a CallLoweringContext<'a, '_>,
 ) -> Result<&'a FunctionRef, NativeEmitError> {
     if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print)
         && target.parameter_names == ["value"]
         && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
     {
-        functions.get("actus_print_string").ok_or_else(|| {
-            NativeEmitError(
-                "native runtime function `actus_print_string` is unavailable".to_owned(),
+        let argument_type = arguments.first().and_then(|argument| {
+            super::super::expressions::initializer_type(
+                &argument.expression,
+                context.local_types,
+                context.functions,
+                context.layouts,
             )
+            .ok()
+        });
+        let symbol = if argument_type == Some(NativeType::Buffer) {
+            "actus_print_buffer_stdout"
+        } else {
+            "actus_print_string"
+        };
+        context.functions.get(symbol).ok_or_else(|| {
+            NativeEmitError(format!("native runtime function `{symbol}` is unavailable"))
         })
     } else {
         Ok(target)

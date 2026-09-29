@@ -31,9 +31,17 @@ pub(super) fn lower_case(
     cleanup_schedule: &super::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
+    loop_targets: Option<super::lowering::LoopTargets>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let context =
-        case_context(locals, local_types, functions, cleanup_schedule, string_data, layouts);
+    let context = case_context(
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        loop_targets,
+    );
     let subject_value = lower_case_subject(function, subject, &context)?;
     let merge = function.create_block();
     let subject_type = initializer_type(subject, local_types, functions, layouts)?;
@@ -64,8 +72,17 @@ fn case_context<'maps, 'keys>(
     cleanup_schedule: &'maps super::model::NativeCleanupSchedule,
     string_data: &'maps StringDataValues,
     layouts: &'maps LayoutRegistry,
+    loop_targets: Option<super::lowering::LoopTargets>,
 ) -> CaseLoweringContext<'maps, 'keys> {
-    CaseLoweringContext::new(locals, local_types, functions, cleanup_schedule, string_data, layouts)
+    CaseLoweringContext::new(
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        loop_targets,
+    )
 }
 
 fn lower_case_subject(

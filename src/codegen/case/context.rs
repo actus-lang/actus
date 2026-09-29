@@ -4,6 +4,7 @@ use cranelift_codegen::ir::Value;
 
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
+use super::super::lowering::LoopTargets;
 use super::super::model::NativeCleanupSchedule;
 use super::super::native::FunctionRef;
 use super::super::types::NativeType;
@@ -15,6 +16,7 @@ pub(super) struct CaseLoweringContext<'maps, 'keys> {
     pub(super) cleanup_schedule: &'maps NativeCleanupSchedule,
     pub(super) string_data: &'maps StringDataValues,
     pub(super) layouts: &'maps LayoutRegistry,
+    pub(super) loop_targets: Option<LoopTargets>,
 }
 
 impl<'maps, 'keys> CaseLoweringContext<'maps, 'keys> {
@@ -25,7 +27,16 @@ impl<'maps, 'keys> CaseLoweringContext<'maps, 'keys> {
         cleanup_schedule: &'maps NativeCleanupSchedule,
         string_data: &'maps StringDataValues,
         layouts: &'maps LayoutRegistry,
+        loop_targets: Option<LoopTargets>,
     ) -> Self {
-        Self { locals, local_types, functions, cleanup_schedule, string_data, layouts }
+        Self {
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+            loop_targets,
+        }
     }
 }

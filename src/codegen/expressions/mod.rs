@@ -42,6 +42,31 @@ pub(super) fn lower_expression(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Value, NativeEmitError> {
+    lower_expression_with_targets(
+        function,
+        expression,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_expression_with_targets(
+    function: &mut FunctionBuilder<'_>,
+    expression: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+    loop_targets: Option<super::lowering::LoopTargets>,
+) -> Result<Value, NativeEmitError> {
     let context = CallLoweringContext::new(
         locals,
         local_types,
@@ -49,7 +74,8 @@ pub(super) fn lower_expression(
         cleanup_schedule,
         string_data,
         layouts,
-    );
+    )
+    .with_loop_targets(loop_targets);
     lower_expression_with_context(function, expression, &context)
 }
 
@@ -178,5 +204,6 @@ fn lower_case_expression(
         context.cleanup_schedule,
         context.string_data,
         context.layouts,
+        context.loop_targets.clone(),
     )
 }

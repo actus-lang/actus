@@ -261,6 +261,7 @@ fn lower_case_block_body<'a>(
         context.cleanup_schedule,
         context.string_data,
         context.layouts,
+        context.loop_targets.clone(),
     )?;
     finish_case_flow(function, flow, result_type)
 }
@@ -285,8 +286,6 @@ fn finish_case_flow(
             function.ins().return_(&[]);
             Ok(None)
         }
-        Flow::Break | Flow::Continue => {
-            Err(NativeEmitError("loop control escaped case block".to_owned()))
-        }
+        Flow::Break | Flow::Continue => Ok(None),
     }
 }

@@ -109,6 +109,7 @@ fn lower_expression_statement(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
@@ -132,6 +133,7 @@ fn lower_expression_statement(
         locals,
         types,
         functions,
+        targets,
         cleanup_schedule,
         string_data,
         layouts,
@@ -145,11 +147,12 @@ fn lower_plain_expression_statement(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
+    targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    lower_expression(
+    super::super::expressions::lower_expression_with_targets(
         function,
         expression,
         locals,
@@ -158,6 +161,7 @@ fn lower_plain_expression_statement(
         cleanup_schedule,
         string_data,
         layouts,
+        targets,
     )?;
     Ok(Flow::Fallthrough)
 }

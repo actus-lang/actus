@@ -53,6 +53,7 @@ pub(crate) fn lower_case_block<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
+    targets: Option<super::LoopTargets>,
 ) -> Result<Flow, NativeEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
@@ -62,7 +63,7 @@ pub(crate) fn lower_case_block<'source>(
         &mut branch_locals,
         &mut branch_types,
         functions,
-        None,
+        targets,
         cleanup_schedule,
         string_data,
         layouts,
