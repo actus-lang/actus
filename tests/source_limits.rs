@@ -66,7 +66,7 @@ fn short_sources_have_no_limit_diagnostics() {
 
 #[test]
 fn source_local_limit_suppression_is_rejected() {
-    let source = "\"\"\"actus: allow(source-limit)\"\"\"\nverb main() { return; }\n";
+    let source = "// actus: allow(source-limit)\nverb main() { return; }\n";
     let diagnostics = source_limit_diagnostics(Path::new("main.act"), source, policy());
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1856"));
 }

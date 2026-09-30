@@ -165,13 +165,7 @@ open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target],
     abs input: Buffer
 ) -> Result[Int, IoError] {
-    erg source_length = actus_buffer_length(buffer: abs input);
-    case source_length {
-        -1 => {
-            return Result[Int, IoError].Err(IoError.Failed);
-        },
-        _ => {},
-    };
+    erg source_length = buffer_length(buffer: abs input)?;
     erg total = 0;
     loop {
         erg remaining = source_length - total;
@@ -181,12 +175,7 @@ open verb buffered_write[Target: Writer](
             },
             _ => {},
         };
-        erg accepted = append_buffered_chunk(
-            target: ins writer.buffer,
-            source: abs input,
-            offset: total,
-            length: remaining
-        )?;
+        erg accepted = append_buffered_chunk(target: ins writer.buffer, source: abs input, offset: total, length: remaining)?;
         total = total + accepted;
         erg full = buffered_storage_is_full(buffer: abs writer.buffer)?;
         case full {
