@@ -77,12 +77,7 @@ fn format_file(path: &Path, check_only: bool) -> i32 {
 fn source_comments(source: &str, tokens: &[crate::lexer::Token]) -> Vec<SourceComment> {
     tokens
         .iter()
-        .filter(|token| {
-            matches!(
-                token.kind,
-                crate::lexer::TokenKind::Comment | crate::lexer::TokenKind::DocString(_)
-            )
-        })
+        .filter(|token| matches!(token.kind, crate::lexer::TokenKind::DocString(_)))
         .map(|token| SourceComment {
             span: token.span,
             text: source[token.span.start..token.span.end].to_owned(),

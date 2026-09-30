@@ -5,7 +5,7 @@ use super::{Formatter, role_name};
 impl Formatter<'_> {
     pub(super) fn expression(&mut self, expression: &Expr) {
         match expression {
-            Expr::Identifier { name, .. } => self.output.push_str(name),
+            Expr::Identifier { name, .. } => self.output.push_str(&normalize_generic_spacing(name)),
             Expr::BufferLiteral { length, .. } => {
                 self.output.push_str("Buffer[");
                 self.expression(length);
@@ -100,7 +100,7 @@ impl Formatter<'_> {
     }
 
     fn call(&mut self, callee: &str, arguments: &[Argument]) {
-        self.output.push_str(callee);
+        self.output.push_str(&normalize_generic_spacing(callee));
         if arguments.len() > 2 || self.current_line_width() > 90 {
             self.multiline_call(arguments);
             return;
@@ -267,4 +267,35 @@ impl Formatter<'_> {
         }
         self.expression(&argument.expression);
     }
+}
+
+fn normalize_generic_spacing(callee: &str) -> String {
+    let mut normalized = String::with_capacity(callee.len() + 4);
+    let mut generic_depth = 0usize;
+    let mut previous_was_space = false;
+    for character in callee.chars() {
+        match character {
+            '[' => {
+                generic_depth += 1;
+                normalized.push(character);
+                previous_was_space = false;
+            }
+            ']' => {
+                generic_depth = generic_depth.saturating_sub(1);
+                normalized.push(character);
+                previous_was_space = false;
+            }
+            ',' if generic_depth > 0 => {
+                normalized.push(',');
+                normalized.push(' ');
+                previous_was_space = true;
+            }
+            ' ' if generic_depth > 0 && previous_was_space => {}
+            _ => {
+                normalized.push(character);
+                previous_was_space = character == ' ';
+            }
+        }
+    }
+    normalized
 }

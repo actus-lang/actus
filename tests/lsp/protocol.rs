@@ -45,9 +45,9 @@ fn lsp_hover_and_formatting_return_compiler_information() {
 }
 
 #[test]
-fn lsp_formatting_preserves_comments_and_imports() {
+fn lsp_formatting_preserves_docstrings_and_imports() {
     let uri = "file:///tmp/actus-lsp-format-comments.act";
-    let source = "// keep this comment\nimport io;\n\n// keep this body note\nverb main() -> Int { return 0; }\n";
+    let source = "\"\"\"Keep this module documentation.\"\"\"\nimport io;\n\n\"\"\"Keep this verb documentation.\"\"\"\nverb main() -> Int { return 0; }\n";
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
@@ -56,8 +56,8 @@ fn lsp_formatting_preserves_comments_and_imports() {
         json!({"jsonrpc":"2.0","method":"exit","params":null}),
     ];
     let stdout = run_lsp(messages.to_vec());
-    assert!(stdout.contains("keep this comment"), "stdout: {stdout}");
-    assert!(stdout.contains("keep this body note"), "stdout: {stdout}");
+    assert!(stdout.contains("Keep this module documentation."), "stdout: {stdout}");
+    assert!(stdout.contains("Keep this verb documentation."), "stdout: {stdout}");
     assert!(stdout.contains("import io;"), "stdout: {stdout}");
 }
 

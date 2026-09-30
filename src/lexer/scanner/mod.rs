@@ -44,10 +44,6 @@ impl<'source> Scanner<'source> {
             if self.is_at_end() {
                 break;
             }
-            if self.peek() == Some('/') && self.peek_next() == Some('/') {
-                self.scan_comment();
-                continue;
-            }
             self.scan_token();
         }
         let end = self.cursor;

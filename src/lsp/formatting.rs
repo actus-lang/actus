@@ -22,7 +22,7 @@ pub fn format_document(source: &str) -> Option<(LspRange, String)> {
 fn source_comments(source: &str, tokens: &[Token]) -> Vec<SourceComment> {
     tokens
         .iter()
-        .filter(|token| matches!(token.kind, TokenKind::Comment | TokenKind::DocString(_)))
+        .filter(|token| matches!(token.kind, TokenKind::DocString(_)))
         .map(|token| SourceComment {
             span: token.span,
             text: source[token.span.start..token.span.end].to_owned(),

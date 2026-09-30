@@ -68,14 +68,6 @@ impl<'source> Scanner<'source> {
         true
     }
 
-    pub(super) fn scan_comment(&mut self) {
-        let start = self.cursor;
-        while self.peek().is_some_and(|character| character != '\n') {
-            self.advance();
-        }
-        self.push_simple(TokenKind::Comment, start);
-    }
-
     fn push_simple(&mut self, kind: TokenKind, start: usize) {
         self.tokens.push(Token::new(kind, SourceSpan::new(start, self.cursor)));
     }
