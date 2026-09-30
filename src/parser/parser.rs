@@ -26,6 +26,7 @@ pub enum ParseErrorKind {
     MetadataTargetNotAllowed,
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope { name: String },
+    DuplicateMetadata { name: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -40,6 +41,7 @@ pub enum ParseErrorCode {
     MetadataTargetNotAllowed,
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope,
+    DuplicateMetadata,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,13 +91,18 @@ impl Parser {
                 if metadata.iter().any(|attribute| {
                     matches!(attribute, MetaAttribute::Limitless(LimitlessScope::File))
                 }) {
-                    if !declarations.is_empty() || doc.is_some() || metadata.len() != 1 {
+                    if !declarations.is_empty()
+                        || !file_metadata.is_empty()
+                        || doc.is_some()
+                        || metadata.len() != 1
+                    {
                         return Err(self.file_metadata_error());
                     }
                     file_metadata.push(LimitlessScope::File);
                     continue;
                 }
                 let doc = doc.or_else(|| self.take_doc_string_group());
+                self.reject_duplicate_metadata(&metadata)?;
                 declarations.push(self.parse_metadata_declaration(metadata, doc)?);
                 continue;
             }
@@ -103,6 +110,26 @@ impl Parser {
         }
 
         Ok(Program { file_metadata, declarations })
+    }
+
+    fn reject_duplicate_metadata(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+        let Some((index, scope)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
+                .then_some((index, "limitless"))
+        }) else {
+            return Ok(());
+        };
+        if metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb)))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata { name: scope.to_owned() },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        Ok(())
     }
 
     fn file_metadata_error(&self) -> ParseError {

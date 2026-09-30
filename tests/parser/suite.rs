@@ -64,6 +64,15 @@ fn rejects_unsupported_limitless_scope() {
 }
 
 #[test]
+fn rejects_duplicate_limitless_directives() {
+    let (tokens, errors) =
+        scan("meta limitless(\"verb\") meta limitless(\"verb\") verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("duplicate limitless metadata should be rejected");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+}
+
+#[test]
 fn rejects_unknown_target_metadata() {
     let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

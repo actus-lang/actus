@@ -147,6 +147,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::UnsupportedLimitlessScope { name } => {
             format!("unsupported limitless scope `{name}`; expected `verb` or `file`")
         }
+        ParseErrorKind::DuplicateMetadata { name } => {
+            format!("duplicate metadata attribute `{name}`")
+        }
     }
 }
 
