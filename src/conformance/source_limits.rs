@@ -21,6 +21,15 @@ pub fn inspect_source(path: &Path, source: &str) -> Vec<Diagnostic> {
     source_limit_diagnostics(path, source, SourceLimitPolicy::default())
 }
 
+/// Inspects one source file when project policy keeps source limits enabled.
+pub fn inspect_source_with_enforcement(
+    path: &Path,
+    source: &str,
+    enforce_limits: bool,
+) -> Vec<Diagnostic> {
+    if enforce_limits { inspect_source(path, source) } else { Vec::new() }
+}
+
 /// Applies a source-limit policy to one Rust or Actus source file.
 pub fn source_limit_diagnostics(
     path: &Path,

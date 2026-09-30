@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use super::BuildProfile;
 use super::types::CompilerConfiguration;
+use super::{BuildProfile, SourceLimitMode};
 use crate::target::{EntryContract, LinkerFlavor, TargetSpec};
 
 impl CompilerConfiguration {
@@ -48,6 +48,10 @@ impl CompilerConfiguration {
 
     pub fn native_backend(&self) -> &super::NativeBackendConfiguration {
         &self.native_backend
+    }
+
+    pub const fn source_limit_mode(&self) -> SourceLimitMode {
+        self.source_limits
     }
 
     pub fn entry_symbol(&self) -> Option<&str> {

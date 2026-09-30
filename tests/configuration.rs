@@ -27,6 +27,56 @@ fn loads_build_settings_from_an_actus_manifest() {
 }
 
 #[test]
+fn source_limits_are_enabled_when_package_policy_is_absent() {
+    let root =
+        std::env::temp_dir().join(format!("actus-config-source-limits-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n")
+        .expect("write manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest_read_only(&path).expect("manifest should load");
+    assert_eq!(configuration.source_limit_mode(), actus::configuration::SourceLimitMode::Enabled);
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn accepts_package_wide_limitless_source_policy() {
+    let root = std::env::temp_dir().join(format!("actus-config-limitless-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\nsource_limits = \"limitless\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest_read_only(&path).expect("manifest should load");
+    assert_eq!(configuration.source_limit_mode(), actus::configuration::SourceLimitMode::Limitless);
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn rejects_unknown_source_limit_policy() {
+    let root =
+        std::env::temp_dir().join(format!("actus-config-invalid-limits-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\nsource_limits = \"off\"\n",
+    )
+    .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest_read_only(&path)
+        .expect_err("unknown source-limit policy must fail");
+    assert!(error.to_string().contains("source_limits"));
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
 fn loads_target_profile_and_hash_for_capsula_artifacts() {
     let root = std::env::temp_dir().join(format!("actus-target-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create project directory");

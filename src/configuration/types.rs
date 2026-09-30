@@ -92,6 +92,7 @@ pub struct CompilerConfiguration {
     pub(super) entry_contract: EntryContract,
     pub(super) run_artifact_prefix: String,
     pub(super) native_backend: NativeBackendConfiguration,
+    pub(super) source_limits: manifest::SourceLimitMode,
     pub(super) entry_symbol: Option<String>,
     pub(super) library_paths: Vec<PathBuf>,
     pub(super) libraries: Vec<LinkLibrary>,

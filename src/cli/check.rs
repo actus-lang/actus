@@ -76,7 +76,7 @@ fn check_source(
 ) -> i32 {
     let input = input_path.to_path_buf();
     let Some(source) = read_check_source(&input) else { return 1 };
-    if !validate_source_limits(&input, &source, mode) {
+    if !validate_source_limits(&input, &source, mode, configuration) {
         return 1;
     }
     let Some(program) = parse_check_source(&input, &source) else { return 1 };

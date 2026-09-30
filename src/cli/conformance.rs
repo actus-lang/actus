@@ -10,11 +10,20 @@ pub(super) enum ConformanceMode {
     Strict,
 }
 
-pub(super) fn validate_source_limits(path: &Path, source: &str, mode: ConformanceMode) -> bool {
+pub(super) fn validate_source_limits(
+    path: &Path,
+    source: &str,
+    mode: ConformanceMode,
+    configuration: &crate::configuration::CompilerConfiguration,
+) -> bool {
     if !mode.is_strict() {
         return true;
     }
-    let diagnostics = crate::conformance::inspect_source(path, source);
+    let diagnostics = crate::conformance::inspect_source_with_enforcement(
+        path,
+        source,
+        configuration.source_limit_mode() == crate::configuration::SourceLimitMode::Enabled,
+    );
     if diagnostics.is_empty() {
         return true;
     }
@@ -50,7 +59,16 @@ pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i3
             return 1;
         }
     }
-    let diagnostics_count = match scan_conformance_paths(&paths) {
+    let configuration = match crate::configuration::CompilerConfiguration::from_current_manifest() {
+        Ok(configuration) => configuration,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 1;
+        }
+    };
+    let enforce_limits =
+        configuration.source_limit_mode() == crate::configuration::SourceLimitMode::Enabled;
+    let diagnostics_count = match scan_conformance_paths(&paths, enforce_limits) {
         Ok(count) => count,
         Err(error) => {
             eprintln!("error: {error}");
@@ -75,12 +93,13 @@ fn conformance_paths() -> Result<Vec<PathBuf>, String> {
         .map_err(|error| format!("cannot scan source roots: {error}"))
 }
 
-fn scan_conformance_paths(paths: &[PathBuf]) -> Result<usize, String> {
+fn scan_conformance_paths(paths: &[PathBuf], enforce_limits: bool) -> Result<usize, String> {
     let mut diagnostics_count = 0;
     for path in paths {
         let source = fs::read_to_string(path)
             .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-        let diagnostics = crate::conformance::inspect_source(path, &source);
+        let diagnostics =
+            crate::conformance::inspect_source_with_enforcement(path, &source, enforce_limits);
         diagnostics_count += diagnostics.len();
         if !diagnostics.is_empty() {
             report_diagnostics(path, &source, diagnostics);

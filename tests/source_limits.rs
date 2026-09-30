@@ -2,8 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use actus::conformance::{
-    SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_tree, source_limit_diagnostics,
-    source_paths, validate_source_exception_manifest,
+    SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_tree,
+    inspect_source_with_enforcement, source_limit_diagnostics, source_paths,
+    validate_source_exception_manifest,
 };
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
 
@@ -33,6 +34,14 @@ fn strict_file_thresholds_escalate_and_stop_at_one_violation() {
     let hard = source_limit_diagnostics(Path::new("src/example.rs"), &lines(501), policy());
     assert_eq!(hard[0].code(), "E1852");
     assert_eq!(hard[0].severity(), DiagnosticSeverity::Error);
+}
+
+#[test]
+fn package_limitless_policy_skips_source_limit_diagnostics() {
+    let source = lines(501);
+    assert!(
+        inspect_source_with_enforcement(Path::new("src/example.act"), &source, false).is_empty()
+    );
 }
 
 #[test]

@@ -56,7 +56,7 @@ fn collect_file_tests(
 ) -> Result<CollectedFile, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-    validate_source(path, &source, mode)?;
+    validate_source(path, &source, mode, configuration)?;
     let Some((source_program, program)) = parse_source(path, &source, resolver)? else {
         return Ok(CollectedFile { tests: Vec::new(), filtered: 0 });
     };
@@ -67,8 +67,13 @@ fn collect_file_tests(
     Ok(CollectedFile { tests: discover_tests(path, source_program, program), filtered })
 }
 
-fn validate_source(path: &Path, source: &str, mode: ConformanceMode) -> Result<(), String> {
-    if validate_source_limits(path, source, mode) {
+fn validate_source(
+    path: &Path,
+    source: &str,
+    mode: ConformanceMode,
+    configuration: &CompilerConfiguration,
+) -> Result<(), String> {
+    if validate_source_limits(path, source, mode, configuration) {
         Ok(())
     } else {
         Err(format!("strict source-limit validation failed for `{}`", path.display()))
