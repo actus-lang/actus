@@ -178,15 +178,6 @@ fn records_half_open_byte_spans() {
 }
 
 #[test]
-fn skips_comments_and_scans_literals() {
-    let (tokens, errors) = scan("// ignored\n42 \"hello\\\"\"");
-
-    assert!(errors.is_empty());
-    assert_eq!(tokens[0].kind, TokenKind::Integer("42".to_owned()));
-    assert_eq!(tokens[1].kind, TokenKind::StringLiteral("hello\\\"".to_owned()));
-}
-
-#[test]
 fn collects_unexpected_character_errors() {
     let (tokens, errors) = scan("erg @ buf");
 

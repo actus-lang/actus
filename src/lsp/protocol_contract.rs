@@ -40,6 +40,7 @@ pub(super) fn initialize_result(target: &TargetSpec, params: &Value) -> Value {
                 "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": ["inactive-target"]}
             },
             "actusSemanticModelProvider": true,
+            "actusMemoryGraphProvider": true,
             "documentFormattingProvider": true,
             "documentRangeFormattingProvider": true
         },
@@ -82,6 +83,7 @@ pub(super) fn negotiated_capabilities(params: &Value) -> Vec<&'static str> {
         "hover",
         "semanticTokens",
         "semanticModel",
+        "memoryGraph",
         "formatting",
     ];
     let Some(requested) = params

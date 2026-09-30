@@ -26,6 +26,22 @@ The architectural decisions for this phase are grouped under
       capabilities and explicit confirmation.
 - [ ] Keep all seven capabilities independently disableable.
 
+## Current phase status
+
+Phase 17 is **paused / deferred** after the compiler-backed LSP core gates.
+Gates 17.0.1 through 17.0.10 are complete and covered by the compiler and
+protocol test suites. The remaining shared-platform work is intentionally
+preserved for a later continuation:
+
+- Workspace and package integration remains open.
+- Versioned contracts, unsaved-source synchronization, and the Actus command
+  surface remain open.
+- Gates 17.1 through 17.8 remain future feature phases.
+
+This status is not a completion claim. The extension remains usable in its
+current tested state, while compiler-core and release-readiness work takes
+priority.
+
 ## Gate 17.0: Shared Extension Platform
 
 Gate 17.0 is the compiler-backed LSP foundation. The server must provide a
@@ -238,6 +254,24 @@ suite on Linux, macOS, and Windows.
 - [ ] Recompute sibling/facade context from the current in-memory package.
 - [ ] Reject stale actions when the document version changed after resolution.
 - [ ] Add cancellation and bounded-result behavior for large workspaces.
+
+### Actus command surface
+
+- [ ] Define typed extension commands for `actus new`, `check`, `build`,
+      `run`, `test`, `fmt`, `watch`, and `lock` without duplicating CLI logic.
+- [ ] Resolve workspace root, manifest, compiler path, target, profile, and
+      feature flags from the active workspace configuration.
+- [ ] Expose commands through the Command Palette and an Activity Bar command
+      view with stable labels, keyboard navigation, and disabled states.
+- [ ] Stream command progress and diagnostics into Output, Problems, and the
+      status view while preserving the exact process exit status.
+- [ ] Support cancellation, concurrent-command exclusion, and deterministic
+      cleanup when a workspace closes or trust is revoked.
+- [ ] Reject command execution in untrusted workspaces and report missing
+      compiler, invalid manifests, spawn failures, and non-zero exits as
+      structured user-facing states.
+- [ ] Test command construction, target/profile propagation, trust gating,
+      cancellation, failure rendering, and multi-root workspace selection.
 
 ## Gate 17.1: Memory and Ownership Graph
 

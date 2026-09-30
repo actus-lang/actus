@@ -1,4 +1,4 @@
-use actus::formatter::format_program;
+use actus::formatter::{SourceComment, format_program, format_program_with_comments};
 use actus::lexer::scan;
 use actus::parser::parse;
 
@@ -63,4 +63,72 @@ fn matches_nested_block_formatter_snapshot() {
     let expected = include_str!("../fixtures/formatter/snapshots/nested_blocks.format.snap");
 
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn preserves_docstrings_and_module_declarations() {
+    let source = "\"\"\"Keep this module documentation.\"\"\"\nimport io;\nopen stdout;\n\"\"\"Keep this verb documentation.\"\"\"\nverb main() -> Int { return 0; }\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let comments = tokens
+        .iter()
+        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
+        .map(|token| SourceComment {
+            span: token.span,
+            text: source[token.span.start..token.span.end].to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let program = parse(tokens).expect("source should parse");
+    let formatted = format_program_with_comments(&program, &comments);
+
+    assert!(formatted.contains("\"\"\"Keep this module documentation.\"\"\""));
+    assert!(formatted.contains("\"\"\"Keep this verb documentation.\"\"\""));
+    assert!(formatted.contains("import io;"));
+    assert!(formatted.contains("open stdout;"));
+}
+
+#[test]
+fn preserves_docstrings_before_declarations() {
+    let source = "\"\"\"Keeps this public documentation.\"\"\"\nopen struct Reader { erg buffer: Buffer, }\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let comments = tokens
+        .iter()
+        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
+        .map(|token| SourceComment {
+            span: token.span,
+            text: source[token.span.start..token.span.end].to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let program = parse(tokens).expect("source should parse");
+    let formatted = format_program_with_comments(&program, &comments);
+
+    assert!(formatted.contains("\"\"\"Keeps this public documentation.\"\"\""));
+    assert!(formatted.contains("open struct Reader"));
+}
+
+#[test]
+fn preserves_roles_in_wrapped_external_parameters() {
+    let source = r#"unsafe extern "C" verb append_range(
+        ins target: Buffer,
+        abs source: Buffer,
+        erg offset: Int,
+        erg length: Int
+    ) -> Int;"#;
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("ins target: Buffer"));
+    assert!(formatted.contains("abs source: Buffer"));
+    assert!(formatted.contains("erg offset: Int"));
+    assert!(formatted.contains("erg length: Int"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn keeps_spaces_in_generic_call_types() {
+    let source = "verb main() -> Result[Int, IoError] { return Result[Int, IoError].Ok(1); }";
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("Result[Int, IoError].Ok(1)"), "formatted: {formatted}");
+    assert_eq!(format_source(&formatted), formatted);
 }

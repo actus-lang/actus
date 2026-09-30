@@ -1,4 +1,4 @@
-// Negative application fixture: a missing file must become IoError.Failed.
+"""Negative application fixture: a missing file must become IoError.Failed."""
 import path;
 import fs;
 import io;

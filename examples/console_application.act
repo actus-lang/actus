@@ -1,6 +1,8 @@
-// Phase 19.2 console application.
-// It reads one line through std::io, echoes successful input to stdout,
-// reports EOF to stderr, and returns an application-level status.
+"""
+Phase 19.2 console application.
+It reads one line through std::io, echoes successful input to stdout,
+reports EOF to stderr, and returns an application-level status.
+"""
 import io;
 
 verb main() -> Int {

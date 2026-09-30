@@ -2,7 +2,7 @@ use crate::ast::{Block, Stmt};
 
 use super::{Formatter, role_name};
 
-impl Formatter {
+impl Formatter<'_> {
     pub(super) fn block(&mut self, block: &Block) {
         self.output.push('{');
         if block.statements.is_empty() {
@@ -13,10 +13,12 @@ impl Formatter {
         self.output.push('\n');
         self.indent += 1;
         for statement in &block.statements {
+            self.emit_comments_before(statement_span(statement).start);
             self.line_indent();
             self.statement(statement);
             self.output.push('\n');
         }
+        self.emit_comments_before(block.span.end);
         self.indent -= 1;
         self.line_indent();
         self.output.push('}');
@@ -106,5 +108,20 @@ impl Formatter {
             self.expression(value);
         }
         self.output.push(';');
+    }
+}
+
+fn statement_span(statement: &Stmt) -> crate::lexer::SourceSpan {
+    match statement {
+        Stmt::OwnerDecl { span, .. }
+        | Stmt::Assignment { span, .. }
+        | Stmt::FieldAssignment { span, .. }
+        | Stmt::IndexAssignment { span, .. }
+        | Stmt::Expression { span, .. }
+        | Stmt::Return { span, .. }
+        | Stmt::Break { span }
+        | Stmt::Continue { span }
+        | Stmt::Drop { span, .. } => *span,
+        Stmt::Loop(block) | Stmt::Block(block) => block.span,
     }
 }

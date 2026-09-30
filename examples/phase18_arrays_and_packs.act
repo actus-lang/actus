@@ -1,6 +1,8 @@
-// Phase 18 systems-primitives demonstration.
-// This program exercises bounded arrays, dynamic indexing, aggregate element
-// assignment, arena placement, native pack mutation, and indexed `ins` loans.
+"""
+Phase 18 systems-primitives demonstration.
+This program exercises bounded arrays, dynamic indexing, aggregate element
+assignment, arena placement, native pack mutation, and indexed `ins` loans.
+"""
 
 struct Point {
     x: Int,

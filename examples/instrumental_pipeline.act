@@ -1,4 +1,4 @@
-// Exclusive call-scope loans keep one Buffer owner while helpers mutate it.
+"""Exclusive call-scope loans keep one Buffer owner while helpers mutate it."""
 
 verb write_marker(ins target: Buffer) -> Int {
     append(target, 7);
@@ -16,7 +16,7 @@ verb main() -> Int {
 
     enrich(target: ins buffer);
 
-    // The caller still owns the same buffer after both loans complete.
+    """The caller still owns the same buffer after both loans complete."""
     append(buffer, 0);
     print(42);
     return 42;

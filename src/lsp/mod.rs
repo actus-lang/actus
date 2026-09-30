@@ -6,6 +6,7 @@ mod diagnostics;
 mod documents;
 mod formatting;
 mod hover;
+mod memory_graph;
 mod module_scope;
 mod navigation;
 mod position;

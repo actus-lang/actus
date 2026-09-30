@@ -1,4 +1,4 @@
-// A compact telemetry frame using Actus's width-qualified primitives.
+"""A compact telemetry frame using Actus's width-qualified primitives."""
 
 enum TelemetryError {
     InvalidMagic,
@@ -9,18 +9,18 @@ verb complete() -> Void {
 }
 
 verb validate_frame(abs frame: Buffer) -> Result[Void, String] {
-    // The caller lends the frame as an abs view; validation allocates nothing.
+    """The caller lends the frame as an abs view; validation allocates nothing."""
     return Result[Void, String].Ok(complete());
 }
 
 verb process_frame(abs frame: Buffer) -> Result[Void, String] {
-    // `?` preserves the Result contract and unwinds the current scope on error.
+    """`?` preserves the Result contract and unwinds the current scope on error."""
     validate_frame(frame: abs frame)?;
     return Result[Void, String].Ok(complete());
 }
 
 verb main() -> Int {
-    // Width-qualified wire fields.
+    """Width-qualified wire fields."""
     erg sequence: u8 = 7;
     erg packet_length: u16 = 128;
     erg device_id: u32 = 0xDEADBEEF;
@@ -28,7 +28,7 @@ verb main() -> Int {
     erg extended_counter: u128 = 255;
     erg signed_delta: i8 = -2;
 
-    // IEEE-754 telemetry values.
+    """IEEE-754 telemetry values."""
     erg temperature: f32 = 21.5;
     erg pressure: f64 = 1013.25;
 

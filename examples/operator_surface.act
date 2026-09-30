@@ -14,7 +14,7 @@ pack StatusRegister {
     }
 }
 
-/// Evaluate arithmetic, relational, equality, logical, and bitwise operators.
+"""Evaluate arithmetic, relational, equality, logical, and bitwise operators."""
 verb operator_score() -> Int {
     erg left: u8 = 13;
     erg right: u8 = 5;
@@ -42,7 +42,7 @@ verb operator_score() -> Int {
         + shifted_left + shifted_right + ordered + reversed + logical;
 }
 
-/// Exercise checked casts, Buffer and Array indexing, and pack mutation.
+"""Exercise checked casts, Buffer and Array indexing, and pack mutation."""
 verb storage_score() -> Int {
     erg values: Array[u8, 2] = Array[u8, 2]();
     values[0] = 7;
@@ -58,7 +58,7 @@ verb storage_score() -> Int {
         + (register.ready as Int) + (register.mode as Int);
 }
 
-/// Run the complete operator surface and return its deterministic checksum.
+"""Run the complete operator surface and return its deterministic checksum."""
 verb main() -> Int {
     erg result = operator_score() + storage_score();
     print(result);
