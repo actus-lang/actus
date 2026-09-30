@@ -26,6 +26,22 @@ The architectural decisions for this phase are grouped under
       capabilities and explicit confirmation.
 - [ ] Keep all seven capabilities independently disableable.
 
+## Current phase status
+
+Phase 17 is **paused / deferred** after the compiler-backed LSP core gates.
+Gates 17.0.1 through 17.0.10 are complete and covered by the compiler and
+protocol test suites. The remaining shared-platform work is intentionally
+preserved for a later continuation:
+
+- Workspace and package integration remains open.
+- Versioned contracts, unsaved-source synchronization, and the Actus command
+  surface remain open.
+- Gates 17.1 through 17.8 remain future feature phases.
+
+This status is not a completion claim. The extension remains usable in its
+current tested state, while compiler-core and release-readiness work takes
+priority.
+
 ## Gate 17.0: Shared Extension Platform
 
 Gate 17.0 is the compiler-backed LSP foundation. The server must provide a
