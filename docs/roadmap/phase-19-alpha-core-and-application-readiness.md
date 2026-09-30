@@ -209,6 +209,72 @@ CLI templates, and end-to-end verification. This gate must not be marked
 complete while a project still depends on manually copied `library/std`
 paths.
 
+## Gate 19.3.1: Explicit Limitless Source Scopes
+
+This sub-gate is governed by
+[ADR-0048](../decisions/ADR-0048-limitless-source-scopes-and-conformance-exceptions.md).
+It makes source-limit exceptions explicit without weakening the default
+architectural policy.
+
+### Metadata syntax and scope
+
+- [ ] Add `meta limitless("verb")` to the Actus metadata grammar and AST.
+- [ ] Apply a verb-scoped directive only to the immediately following verb.
+- [ ] Add `meta limitless("file")` to the file metadata prelude.
+- [ ] Apply a file-scoped directive to file-size and all function-size checks
+      in that file.
+- [ ] Reject unknown scopes, duplicate directives, invalid placement, and
+      directives nested inside verb bodies with stable diagnostics.
+
+### Conformance policy
+
+- [ ] Replace comment-based source-limit suppression detection with the
+      structured metadata model; arbitrary comments must never suppress a
+      limit.
+- [ ] Preserve preferred and hard limits by default for all unannotated
+      sources and declarations.
+- [ ] Define normal and `--strict` policy behavior for source-local metadata.
+- [ ] Record accepted exceptions with canonical path, scope, target, source
+      span, and approval origin.
+- [ ] Keep limitless exceptions separate from ownership, parser, semantic,
+      ABI, runtime, and documentation validation.
+
+### Manifest configuration
+
+- [ ] Add an optional package-level `source_limits = "limitless"` field to
+      the existing `[package]` section in `Actus.toml`; absence keeps limits
+      enabled implicitly.
+- [ ] Make `"limitless"` apply to every source and verb in the configured
+      project source root.
+- [ ] Document that `"limitless"` is not recommended for normal production
+      packages, while preserving the team's explicit freedom to choose it.
+- [ ] Reject unknown values, duplicate package policy declarations, and
+      attempts to use the source-limit switch for unrelated safety policies.
+- [ ] Include the selected source-limit policy in deterministic configuration
+      and artifact identity where conformance policy affects the build.
+
+### Tooling and evidence
+
+- [ ] Preserve metadata through formatting and expose it consistently through
+      CLI and LSP diagnostics.
+- [ ] Add accepted and rejected parser, semantic, project-configuration, and
+      strict-mode tests for both scopes.
+- [ ] Add regression tests proving comments cannot suppress source limits.
+- [ ] Add source-limit tests proving verb scope does not affect sibling verbs
+      and file scope affects both file and function checks.
+- [ ] Document project-wide policy review expectations in the conformance
+      workflow.
+- [ ] Verify `cargo fmt`, `cargo check`, Clippy, the full test suite, source
+      limits, and deterministic diagnostics before closing the sub-gate.
+
+### Gate 19.3.1 evidence
+
+- [ ] The metadata grammar, AST, semantic scope rules, project policy, and
+      conformance scanner agree on one structured exception model.
+- [ ] Strict CI cannot be bypassed by comments or malformed metadata.
+- [ ] Accepted limitless scopes are explicit, reviewable, deterministic, and
+      limited to the intended file or verb.
+
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
 
 ### Runtime boundaries
