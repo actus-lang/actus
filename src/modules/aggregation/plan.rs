@@ -49,7 +49,7 @@ impl ModuleCompilationPlan {
                     .cloned(),
             );
         }
-        Program { declarations }
+        Program { file_metadata: Vec::new(), declarations }
     }
 }
 
@@ -90,8 +90,14 @@ pub fn build_compilation_plan_with_overlays(
     }
     validate_symbol_collisions(&local_declarations, &units)?;
     Ok(ModuleCompilationPlan {
-        local: Program { declarations: local_declarations },
-        caller: Program { declarations: caller_declarations },
+        local: Program {
+            file_metadata: program.file_metadata.clone(),
+            declarations: local_declarations,
+        },
+        caller: Program {
+            file_metadata: program.file_metadata.clone(),
+            declarations: caller_declarations,
+        },
         units,
     })
 }

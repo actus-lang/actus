@@ -45,6 +45,25 @@ fn package_limitless_policy_skips_source_limit_diagnostics() {
 }
 
 #[test]
+fn file_limitless_metadata_skips_file_and_function_diagnostics() {
+    let mut source = String::from("meta limitless(\"file\")\n\"\"\"\n");
+    source.push_str(&lines(301));
+    source.push_str("\"\"\"\nverb large() { return; }\n");
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn verb_limitless_metadata_skips_only_function_diagnostic() {
+    let mut source = String::from("meta limitless(\"verb\") verb large() {\n");
+    for index in 0..60 {
+        source.push_str(&format!("\"\"\"documentation {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\n");
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message().contains("large")));
+}
+
+#[test]
 fn rust_functions_are_measured_without_counting_comment_text() {
     let mut source = String::from("/* fn fake() {\nstill comment } */\nfn real() {\n");
     source.push_str(&lines(40));

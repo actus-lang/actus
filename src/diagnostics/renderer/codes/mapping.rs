@@ -24,6 +24,8 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::UnsupportedTargetPlatform => "E0007",
         ParseErrorCode::ConflictingTargetPlatforms => "E0010",
         ParseErrorCode::MetadataTargetNotAllowed => "E0008",
+        ParseErrorCode::MetadataFileScopeNotAllowed => "E0011",
+        ParseErrorCode::UnsupportedLimitlessScope => "E0012",
     }
 }
 

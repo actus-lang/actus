@@ -30,7 +30,7 @@ pub(in crate::codegen) fn specialize_program(
             other => declarations.push(other.clone()),
         }
     }
-    Ok(Program { declarations })
+    Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
 }
 
 fn specialize_external_verb(

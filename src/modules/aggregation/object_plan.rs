@@ -121,7 +121,7 @@ fn implementation_declarations(
         );
     }
     append_root_generic_support(&mut declarations, module, compilation);
-    Program { declarations }
+    Program { file_metadata: Vec::new(), declarations }
 }
 
 fn append_root_generic_support(

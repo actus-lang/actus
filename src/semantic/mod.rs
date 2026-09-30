@@ -44,6 +44,7 @@ pub fn filter_program_for_target(
     target: &crate::target::TargetSpec,
 ) -> crate::ast::Program {
     crate::ast::Program {
+        file_metadata: program.file_metadata.clone(),
         declarations: program
             .declarations
             .iter()
@@ -65,6 +66,7 @@ fn declaration_matches_target(
     metadata.iter().all(|attribute| match attribute {
         crate::ast::MetaAttribute::Target(selector) => target.matches_platform(selector),
         crate::ast::MetaAttribute::Test => true,
+        crate::ast::MetaAttribute::Limitless(_) => true,
     })
 }
 pub(crate) use type_substitution::TypeSubstitution;

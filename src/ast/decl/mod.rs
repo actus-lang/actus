@@ -5,7 +5,9 @@ mod top_level;
 mod types;
 
 pub use builtins::builtin_enum_definitions;
-pub use callable::{DispatchMode, ExternalVerbDecl, MetaAttribute, Param, VerbDecl};
+pub use callable::{
+    DispatchMode, ExternalVerbDecl, LimitlessScope, MetaAttribute, Param, VerbDecl,
+};
 pub use data::{
     EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField, StructDef,
     StructField, StructFieldRole,

@@ -36,6 +36,13 @@ pub struct VerbDecl {
 pub enum MetaAttribute {
     Test,
     Target(String),
+    Limitless(LimitlessScope),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LimitlessScope {
+    Verb,
+    File,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

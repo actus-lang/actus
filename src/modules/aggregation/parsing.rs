@@ -72,7 +72,7 @@ where
             declarations.push(declaration);
         }
     }
-    Ok(Program { declarations })
+    Ok(Program { file_metadata: Vec::new(), declarations })
 }
 
 fn source_for_path(

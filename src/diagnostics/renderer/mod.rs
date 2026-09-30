@@ -141,6 +141,12 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::MetadataTargetNotAllowed => {
             "metadata can only be attached to verbs or external verbs".to_owned()
         }
+        ParseErrorKind::MetadataFileScopeNotAllowed => {
+            "file-scoped limitless metadata must appear once at the start of the file".to_owned()
+        }
+        ParseErrorKind::UnsupportedLimitlessScope { name } => {
+            format!("unsupported limitless scope `{name}`; expected `verb` or `file`")
+        }
     }
 }
 

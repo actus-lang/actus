@@ -1,6 +1,6 @@
 use actus::ast::{
-    EnumPayload, Expr, LayoutEndianness, MetaAttribute, PrimitiveType, ReturnAccess, Role, Stmt,
-    TopLevelDecl, primitive_type,
+    EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PrimitiveType,
+    ReturnAccess, Role, Stmt, TopLevelDecl, primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -43,6 +43,24 @@ fn parses_target_and_test_metadata_together() {
     assert_eq!(verb.metadata.len(), 2);
     assert!(verb.metadata.contains(&MetaAttribute::Target("windows".to_owned())));
     assert!(verb.metadata.contains(&MetaAttribute::Test));
+}
+
+#[test]
+fn parses_limitless_metadata_at_verb_and_file_scope() {
+    let program = parse_source(
+        "meta limitless(\"file\")\nmeta limitless(\"verb\") verb large() { return 0; }",
+    );
+    assert_eq!(program.file_metadata, vec![LimitlessScope::File]);
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(verb.metadata, vec![MetaAttribute::Limitless(LimitlessScope::Verb)]);
+}
+
+#[test]
+fn rejects_unsupported_limitless_scope() {
+    let (tokens, errors) = scan("meta limitless(\"project\") verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unsupported limitless scope should be rejected");
+    assert_eq!(error.code, ParseErrorCode::UnsupportedLimitlessScope);
 }
 
 #[test]

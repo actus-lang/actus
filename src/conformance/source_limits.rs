@@ -1,9 +1,12 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::ast::{LimitlessScope, MetaAttribute, TopLevelDecl};
 use crate::diagnostics::{Diagnostic, sort_diagnostics};
+use crate::lexer::scan;
+use crate::parser::parse;
 
 #[path = "diagnostics.rs"]
 mod diagnostics;
@@ -36,12 +39,62 @@ pub fn source_limit_diagnostics(
     source: &str,
     policy: SourceLimitPolicy,
 ) -> Vec<Diagnostic> {
-    let mut diagnostics = file_diagnostics(path, source, source.lines().count(), policy);
+    let exemptions = source_limit_exemptions(source);
+    let mut diagnostics = if exemptions.file {
+        Vec::new()
+    } else {
+        file_diagnostics(path, source, source.lines().count(), policy)
+    };
     for function in find_functions(source) {
-        diagnostics.extend(function_diagnostics(path, source, &function, policy));
+        if !exemptions.verbs.contains(&function.name) && !exemptions.file {
+            diagnostics.extend(function_diagnostics(path, source, &function, policy));
+        }
     }
-    diagnostics.extend(suppression_diagnostics(path, source));
+    if !exemptions.file {
+        diagnostics.extend(suppression_diagnostics(path, source));
+    }
     diagnostics
+}
+
+#[derive(Default)]
+struct SourceLimitExemptions {
+    file: bool,
+    verbs: HashSet<String>,
+}
+
+fn source_limit_exemptions(source: &str) -> SourceLimitExemptions {
+    let (tokens, errors) = scan(source);
+    if !errors.is_empty() {
+        return SourceLimitExemptions::default();
+    }
+    let Ok(program) = parse(tokens) else { return SourceLimitExemptions::default() };
+    let mut exemptions = SourceLimitExemptions {
+        file: program.file_metadata.contains(&LimitlessScope::File),
+        ..SourceLimitExemptions::default()
+    };
+    for declaration in program.declarations {
+        let name = match declaration {
+            TopLevelDecl::Verb(verb) => verb
+                .metadata
+                .iter()
+                .any(|attribute| {
+                    matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
+                })
+                .then_some(verb.name),
+            TopLevelDecl::ExternalVerb(verb) => verb
+                .metadata
+                .iter()
+                .any(|attribute| {
+                    matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
+                })
+                .then_some(verb.name),
+            _ => None,
+        };
+        if let Some(name) = name {
+            exemptions.verbs.insert(name);
+        }
+    }
+    exemptions
 }
 
 /// Inspects all Rust and Actus source files below the supplied roots.

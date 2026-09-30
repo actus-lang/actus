@@ -218,6 +218,7 @@ fn declarations(
             let active = metadata.iter().all(|attribute| match attribute {
                 MetaAttribute::Target(selector) => target.matches_platform(selector),
                 MetaAttribute::Test => true,
+                MetaAttribute::Limitless(_) => true,
             });
             Some(json!({"name":name,"active":active,"range":span_range(source,index,span)}))
         })
