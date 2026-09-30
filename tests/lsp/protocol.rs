@@ -115,7 +115,7 @@ fn lsp_signature_help_rejects_stale_document_versions() {
 #[test]
 fn lsp_completion_items_support_context_edits_and_resolution() {
     let uri = "file:///tmp/actus-lsp-completion-resolution.act";
-    let source = "/// Adds a value from the current module.\nverb add(abs value: Int) -> Int { return value; }\nverb main() -> Int { return add(value: 1); }\n";
+    let source = "\"\"\"Adds a value from the current module.\"\"\"\nverb add(abs value: Int) -> Int { return value; }\nverb main() -> Int { return add(value: 1); }\n";
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
@@ -133,7 +133,7 @@ fn lsp_completion_items_support_context_edits_and_resolution() {
 #[test]
 fn lsp_completion_resolution_rejects_a_stale_document_snapshot() {
     let uri = "file:///tmp/actus-lsp-completion-stale.act";
-    let source = "/// Adds a value.\nverb add(abs value: Int) -> Int { return value; }\n";
+    let source = "\"\"\"Adds a value.\"\"\"\nverb add(abs value: Int) -> Int { return value; }\n";
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),

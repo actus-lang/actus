@@ -1,5 +1,7 @@
-// A recursive arena-backed binary tree. Each child is a pointer-sized
-// Option reference: None is null and Some(node) stores the node address.
+"""
+A recursive arena-backed binary tree. Each child is a pointer-sized
+Option reference: None is null and Some(node) stores the node address.
+"""
 struct Node {
     value: Int,
     abs left: Option[abs Node],

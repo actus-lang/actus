@@ -46,7 +46,7 @@ fn lsp_filters_target_declarations_and_marks_inactive_code() {
 
 fn assert_lsp_surface_support() {
     let uri = "file:///tmp/actus-lsp-surface.act";
-    let source = "/// Mutates a buffer.\nverb mutate(ins buffer: Buffer) { }\nverb slice(abs input: Buffer) -> abs Buffer { return input; }\nunsafe extern \"C\" verb host(erg code: Int) -> Int;\nverb main(abs ready: Bool) -> Int { erg buffer = Buffer[4]; erg code = 0; mutate(buffer: ins buffer); abs view = ref slice(input: abs buffer); return case abs ready { true if ready => host(code: erg code), _ => 1, }; }\n";
+    let source = "\"\"\"Mutates a buffer.\"\"\"\nverb mutate(ins buffer: Buffer) { }\nverb slice(abs input: Buffer) -> abs Buffer { return input; }\nunsafe extern \"C\" verb host(erg code: Int) -> Int;\nverb main(abs ready: Bool) -> Int { erg buffer = Buffer[4]; erg code = 0; mutate(buffer: ins buffer); abs view = ref slice(input: abs buffer); return case abs ready { true if ready => host(code: erg code), _ => 1, }; }\n";
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({
@@ -113,7 +113,7 @@ fn assert_lsp_ownership_diagnostics() {
 #[test]
 fn lsp_preserves_utf16_ranges_with_multibyte_source_text() {
     let uri = "file:///tmp/actus-lsp-unicode.act";
-    let source = "/// ქართული 🚀\nverb greet() -> Int { return \"გამარჯობა 🚀\"; }\n";
+    let source = "\"\"\"ქართული 🚀\"\"\"\nverb greet() -> Int { return \"გამარჯობა 🚀\"; }\n";
     let verb_position = position_after(source, "verb greet");
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),

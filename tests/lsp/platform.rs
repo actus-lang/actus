@@ -12,7 +12,7 @@ fn lsp_handles_crlf_and_encoded_unicode_document_paths() {
     let root = temp_root().join("workspace space-ქართული");
     fs::create_dir_all(&root).expect("create unicode workspace");
     let path = root.join("main.act");
-    let source = "/// 🚀\r\nverb greet() -> Int { return 1; }\r\n";
+    let source = "\"\"\"🚀\"\"\"\r\nverb greet() -> Int { return 1; }\r\n";
     fs::write(&path, source).expect("write CRLF source");
     let uri = file_uri(&path);
     assert!(uri.contains("%20") && uri.contains("%E1%83"), "URI was not encoded: {uri}");
@@ -38,7 +38,8 @@ fn lsp_handles_crlf_and_encoded_unicode_document_paths() {
 #[test]
 fn lsp_reports_non_ascii_identifier_boundaries_without_corrupting_diagnostics() {
     let uri = "file:///tmp/actus-lsp-unicode-identifier.act";
-    let source = "// Unicode comments remain valid\nverb café() -> Int { return 1; }\n";
+    let source =
+        "\"\"\"Unicode documentation remains valid\"\"\"\nverb café() -> Int { return 1; }\n";
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),

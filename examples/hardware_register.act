@@ -1,5 +1,7 @@
-// A hardware-style control register with a deterministic 32-bit layout.
-// The storage value can later be mapped to an MMIO address by a target HAL.
+"""
+A hardware-style control register with a deterministic 32-bit layout.
+The storage value can later be mapped to an MMIO address by a target HAL.
+"""
 pack ControlRegister {
     erg storage: u32;
     layout little;
@@ -18,7 +20,7 @@ verb configure_control() -> Int {
     control.prescaler = 5;
     control.mode = 2;
 
-    // `ready` is an abs field: it is observable but cannot be mutated.
+    """`ready` is an abs field: it is observable but cannot be mutated."""
     return control.enabled + control.ready + control.prescaler + control.mode;
 }
 

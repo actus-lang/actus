@@ -1,6 +1,8 @@
-// Phase 19.2 file utility.
-// It constructs a raw POSIX path, writes and reads a file, inspects metadata,
-// removes the file, and validates the typed missing-file failure afterward.
+"""
+Phase 19.2 file utility.
+It constructs a raw POSIX path, writes and reads a file, inspects metadata,
+removes the file, and validates the typed missing-file failure afterward.
+"""
 import io;
 import path;
 import fs;

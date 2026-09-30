@@ -5,7 +5,7 @@ use crate::lsp_support::{response_with_id, run_lsp};
 #[test]
 fn memory_graph_exposes_compiler_owned_states_and_edges() {
     let uri = "file:///tmp/actus-lsp-memory-graph.act";
-    let source = "/// Mutates a buffer.\nverb mutate(ins buffer: Buffer) { }\nverb slice(abs input: Buffer) -> abs Buffer { return input; }\nunsafe extern \"C\" verb host(erg code: Int) -> Int;\nverb main(abs ready: Bool) -> Int { erg buffer = Buffer[4]; erg code = 0; mutate(buffer: ins buffer); abs view = ref slice(input: abs buffer); return case abs ready { true if ready => host(code: erg code), _ => 1, }; }\n";
+    let source = "\"\"\"Mutates a buffer.\"\"\"\nverb mutate(ins buffer: Buffer) { }\nverb slice(abs input: Buffer) -> abs Buffer { return input; }\nunsafe extern \"C\" verb host(erg code: Int) -> Int;\nverb main(abs ready: Bool) -> Int { erg buffer = Buffer[4]; erg code = 0; mutate(buffer: ins buffer); abs view = ref slice(input: abs buffer); return case abs ready { true if ready => host(code: erg code), _ => 1, }; }\n";
     let output = run_lsp(vec![
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"initializationOptions":{"actus":{"capabilities":["memoryGraph"]}}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":4,"text":source}}}),

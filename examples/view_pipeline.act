@@ -1,4 +1,4 @@
-// Caller-scope propagation for a single-origin abs Buffer view.
+"""Caller-scope propagation for a single-origin abs Buffer view."""
 
 verb identity(abs input: Buffer) -> abs Buffer {
     return input;
