@@ -9,11 +9,11 @@ universal communication protocol built on top of it.
 
 - [ ] Confirm the versioned frame constants, byte order, flag policy, maximum
       payload, maximum complete-frame length, and CRC parameters.
-- [ ] Define the public typed error taxonomy for framing, capacity, integrity,
+- [x] Define the public typed error taxonomy for framing, capacity, integrity,
       version, security, authorization, and protocol failures.
-- [ ] Define caller-owned storage and ownership transitions for parser,
+- [x] Define caller-owned storage and ownership transitions for parser,
       serializer, and reassembly operations.
-- [ ] Define the boundary between `std::wire`, `std::ustari`, and transport
+- [x] Define the boundary between `std::wire`, `std::ustari`, and transport
       adapters before implementation begins.
 - [ ] Add the runtime registry entries as `target-neutral` modules.
 
