@@ -183,6 +183,15 @@ runtime = "std"
 
 #### Gate 19.3.4: Builtin standard-library root and canonical imports
 
+Implementation evidence completed so far:
+
+- [x] Resolve the compiler-owned `std/src` root from the packaged toolchain,
+      with a development-tree fallback and no project-authored absolute path.
+- [x] Map `std::io`-style imports to the builtin root without looking for a
+      duplicated `std/` directory.
+- [x] Route CLI and LSP module resolvers through the runtime-aware resolver.
+- [x] Reject a user dependency alias that attempts to shadow builtin `std`.
+
 - [ ] Define the manifest schema for `runtime = "core" | "std" |
       "freestanding"`, including the default profile and edition-aware
       compatibility rules.

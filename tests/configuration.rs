@@ -82,6 +82,29 @@ fn rejects_freestanding_runtime_profile_for_hosted_target() {
 }
 
 #[test]
+fn rejects_dependency_alias_that_shadows_builtin_standard_library() {
+    let root =
+        std::env::temp_dir().join(format!("actus-runtime-alias-conflict-{}", std::process::id()));
+    let dependency = root.join("local_std");
+    fs::create_dir_all(dependency.join("src")).expect("create dependency source root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\n\n[dependencies.std]\npath = \"local_std\"\n",
+    )
+    .expect("write root manifest");
+    fs::write(
+        dependency.join("Actus.toml"),
+        "[package]\nname = \"local_std\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("write dependency manifest");
+
+    let error = CompilerConfiguration::from_manifest_read_only(&root.join("Actus.toml"))
+        .expect_err("builtin std alias must not be shadowed");
+    assert!(error.to_string().contains("conflicts with the builtin standard library"));
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
 fn source_limits_are_enabled_when_package_policy_is_absent() {
     let root =
         std::env::temp_dir().join(format!("actus-config-source-limits-{}", std::process::id()));

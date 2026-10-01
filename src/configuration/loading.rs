@@ -92,6 +92,7 @@ fn build_from_manifest(
         resolve_manifest_target(&manifest, &environment)?;
     let runtime = manifest.build.runtime.unwrap_or_default();
     validate_runtime_profile(runtime, entry_contract)?;
+    validate_runtime_dependency_alias(runtime, &dependency_graph.roots)?;
     let runtime_source_root = super::resolution::runtime_source_root(runtime)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
@@ -117,6 +118,18 @@ fn build_from_manifest(
         libraries,
         ..environment
     })
+}
+
+fn validate_runtime_dependency_alias(
+    runtime: manifest::RuntimeProfile,
+    dependency_roots: &std::collections::BTreeMap<String, PathBuf>,
+) -> Result<(), ConfigurationError> {
+    if runtime == manifest::RuntimeProfile::Std && dependency_roots.contains_key("std") {
+        return Err(ConfigurationError(
+            "dependency alias `std` conflicts with the builtin standard library".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_runtime_profile(
