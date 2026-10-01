@@ -27,6 +27,7 @@ impl CompilerConfiguration {
             linker,
             linker_flavor,
             entry_contract,
+            runtime: super::RuntimeProfile::Core,
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: super::NativeBackendConfiguration::default(),
             source_limits: manifest::SourceLimitMode::default(),
@@ -88,6 +89,8 @@ fn build_from_manifest(
 ) -> Result<CompilerConfiguration, ConfigurationError> {
     let (target, linker_flavor, entry_contract, linker) =
         resolve_manifest_target(&manifest, &environment)?;
+    let runtime = manifest.build.runtime.unwrap_or_default();
+    validate_runtime_profile(runtime, entry_contract)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
     let (profile, native_backend, libraries, library_paths) =
@@ -103,6 +106,7 @@ fn build_from_manifest(
         linker,
         linker_flavor,
         entry_contract,
+        runtime,
         native_backend,
         source_limits: manifest.package.source_limits.unwrap_or_default(),
         entry_symbol: manifest.package.entry,
@@ -110,6 +114,29 @@ fn build_from_manifest(
         libraries,
         ..environment
     })
+}
+
+fn validate_runtime_profile(
+    runtime: manifest::RuntimeProfile,
+    entry_contract: crate::target::EntryContract,
+) -> Result<(), ConfigurationError> {
+    let compatible = match runtime {
+        manifest::RuntimeProfile::Core => true,
+        manifest::RuntimeProfile::Std => true,
+        manifest::RuntimeProfile::Freestanding => {
+            matches!(entry_contract, crate::target::EntryContract::Freestanding)
+        }
+    };
+    if compatible {
+        return Ok(());
+    }
+    let target_kind = match entry_contract {
+        crate::target::EntryContract::Hosted => "hosted",
+        crate::target::EntryContract::Freestanding => "freestanding",
+    };
+    Err(ConfigurationError(format!(
+        "runtime profile `{runtime}` is incompatible with {target_kind} target"
+    )))
 }
 
 fn validated_source_root(

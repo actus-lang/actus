@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -45,6 +46,7 @@ pub enum SourceLimitMode {
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BuildManifest {
+    pub(crate) runtime: Option<RuntimeProfile>,
     pub(crate) target: Option<String>,
     pub(crate) profile: Option<BuildProfile>,
     pub(crate) linker: Option<String>,
@@ -56,6 +58,26 @@ pub(crate) struct BuildManifest {
     pub(crate) library_paths: Vec<String>,
     #[serde(default)]
     pub(crate) libraries: Vec<LibraryManifest>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum RuntimeProfile {
+    #[default]
+    Core,
+    Std,
+    Freestanding,
+}
+
+impl Display for RuntimeProfile {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::Core => "core",
+            Self::Std => "std",
+            Self::Freestanding => "freestanding",
+        };
+        formatter.write_str(name)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]

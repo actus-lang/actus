@@ -162,13 +162,26 @@ contracts that the future platform is allowed to consume.
 
 ### Runtime profiles and standard-library resolution
 
-The project manifest must select the runtime environment explicitly. The
+This gate is governed by
+[ADR-0050](../decisions/ADR-0050-runtime-profiles-and-builtin-standard-library-resolution.md).
+
+The project manifest selects the runtime environment explicitly. The
 runtime profile is a build configuration, not an ordinary user dependency:
 
 ```toml
 [build]
 runtime = "std"
 ```
+
+#### Gate 19.3.3: Runtime profile configuration
+
+- [x] Define typed `core`, `std`, and `freestanding` runtime profiles.
+- [x] Default an omitted runtime to dependency-free `core`.
+- [x] Allow target-aware `std` on hosted and freestanding targets while
+      rejecting `freestanding` on hosted targets during configuration loading.
+- [x] Add accepted and rejected manifest configuration tests.
+
+#### Gate 19.3.4: Builtin standard-library root and canonical imports
 
 - [ ] Define the manifest schema for `runtime = "core" | "std" |
       "freestanding"`, including the default profile and edition-aware
@@ -180,6 +193,10 @@ runtime = "std"
 - [ ] Define canonical standard-library imports and facades so a project can
       use `std::io`, `std::fs`, and `std::path` without copying the library
       into its own `src/` tree or configuring absolute host paths.
+- [ ] Define target capability metadata for builtin modules, distinguishing
+      target-neutral, hosted, and embedded standard-library surfaces.
+- [ ] Allow `runtime = "std"` on freestanding targets while rejecting
+      hosted-only imports such as `std::fs` before code generation.
 - [ ] Preserve explicit local dependency resolution for third-party and
       workspace packages, while rejecting ambiguous aliases or declarations
       that conflict with the selected runtime profile.
@@ -208,6 +225,17 @@ loading, module resolution, reachability-based compilation, lockfile identity,
 CLI templates, and end-to-end verification. This gate must not be marked
 complete while a project still depends on manually copied `library/std`
 paths.
+
+#### Gate 19.3.5: Embedded standard-library capability verification
+
+- [ ] Add target fixtures for hosted and embedded targets, including
+      `thumbv7em-none-eabihf`.
+- [ ] Verify target-neutral and embedded builtin modules resolve from `std`
+      without an operating-system runtime.
+- [ ] Reject hosted-only modules on freestanding targets with deterministic
+      diagnostics.
+- [ ] Add native or target-object tests proving that unused builtin modules
+      are not compiled or linked.
 
 ## Gate 19.3.1: Explicit Limitless Source Scopes
 

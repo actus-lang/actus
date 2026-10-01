@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use super::types::CompilerConfiguration;
-use super::{BuildProfile, SourceLimitMode};
+use super::{BuildProfile, RuntimeProfile, SourceLimitMode};
 use crate::target::{EntryContract, LinkerFlavor, TargetSpec};
 
 impl CompilerConfiguration {
@@ -36,6 +36,10 @@ impl CompilerConfiguration {
 
     pub const fn entry_contract(&self) -> EntryContract {
         self.entry_contract
+    }
+
+    pub const fn runtime_profile(&self) -> RuntimeProfile {
+        self.runtime
     }
 
     pub const fn host_runtime_enabled(&self) -> bool {
