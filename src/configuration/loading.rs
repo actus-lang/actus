@@ -28,6 +28,7 @@ impl CompilerConfiguration {
             linker_flavor,
             entry_contract,
             runtime: super::RuntimeProfile::Core,
+            runtime_source_root: None,
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: super::NativeBackendConfiguration::default(),
             source_limits: manifest::SourceLimitMode::default(),
@@ -91,6 +92,7 @@ fn build_from_manifest(
         resolve_manifest_target(&manifest, &environment)?;
     let runtime = manifest.build.runtime.unwrap_or_default();
     validate_runtime_profile(runtime, entry_contract)?;
+    let runtime_source_root = super::resolution::runtime_source_root(runtime)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
     let (profile, native_backend, libraries, library_paths) =
@@ -107,6 +109,7 @@ fn build_from_manifest(
         linker_flavor,
         entry_contract,
         runtime,
+        runtime_source_root,
         native_backend,
         source_limits: manifest.package.source_limits.unwrap_or_default(),
         entry_symbol: manifest.package.entry,

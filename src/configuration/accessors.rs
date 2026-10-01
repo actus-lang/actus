@@ -42,6 +42,10 @@ impl CompilerConfiguration {
         self.runtime
     }
 
+    pub fn runtime_source_root(&self) -> Option<&Path> {
+        self.runtime_source_root.as_deref()
+    }
+
     pub const fn host_runtime_enabled(&self) -> bool {
         matches!(self.entry_contract, EntryContract::Hosted)
     }

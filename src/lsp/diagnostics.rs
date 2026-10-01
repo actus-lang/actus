@@ -94,9 +94,10 @@ fn analyze_test_fixture(
     if !path.starts_with(tests_root) {
         return None;
     }
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
     );
     Some(crate::modules::analyze_with_imports_for_target(program, &resolver, target).map(|_| ()))
 }
@@ -109,9 +110,10 @@ fn analyze_package_module(
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
     );
     let result = match module_path_for_file(configuration.source_root(), &path) {
         Some(module_path) => crate::modules::analyze_module_with_overlays_for_target(

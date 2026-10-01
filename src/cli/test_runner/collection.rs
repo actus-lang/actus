@@ -33,9 +33,10 @@ pub(super) fn collect_tests(
     configuration: &CompilerConfiguration,
     mode: ConformanceMode,
 ) -> Result<TestCollection, String> {
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
     );
     let mut tests = Vec::new();
     let mut filtered = 0;

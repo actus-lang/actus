@@ -137,9 +137,10 @@ fn test_compilation_plan(
         return Err("meta test program already defines `main`".to_owned());
     }
     program.declarations.push(test_main(&test.name));
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
     );
     build_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }

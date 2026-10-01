@@ -91,6 +91,7 @@ pub struct CompilerConfiguration {
     pub(super) linker_flavor: LinkerFlavor,
     pub(super) entry_contract: EntryContract,
     pub(super) runtime: RuntimeProfile,
+    pub(super) runtime_source_root: Option<PathBuf>,
     pub(super) run_artifact_prefix: String,
     pub(super) native_backend: NativeBackendConfiguration,
     pub(super) source_limits: manifest::SourceLimitMode,

@@ -55,9 +55,10 @@ fn resolve_build_program(
     program: crate::ast::Program,
     configuration: &CompilerConfiguration,
 ) -> Option<ModuleCompilationPlan> {
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
     );
     match build_compilation_plan(&program, &resolver) {
         Ok(plan) => Some(plan),

@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use super::manifest::{
-    ActusManifest, BuildManifest, BuildProfile, OptimizationLevel, ProfilesManifest,
+    ActusManifest, BuildManifest, BuildProfile, OptimizationLevel, ProfilesManifest, RuntimeProfile,
 };
 use super::types::{CompilerConfiguration, LinkLibrary, NativeBackendConfiguration};
 use super::{ConfigurationError, EntryContract, LinkerFlavor};
@@ -65,4 +65,35 @@ pub(super) fn resolve_manifest_target(
 
 pub(super) fn default_linker(target: &TargetSpec) -> OsString {
     OsString::from(target.default_linker())
+}
+
+pub(super) fn runtime_source_root(
+    runtime: RuntimeProfile,
+) -> Result<Option<PathBuf>, ConfigurationError> {
+    if runtime != RuntimeProfile::Std {
+        return Ok(None);
+    }
+    let candidates = builtin_root_candidates();
+    candidates.into_iter().find(|path| path.is_dir()).map(Some).ok_or_else(|| {
+        ConfigurationError(
+            "runtime profile `std` cannot locate the compiler-owned standard library".to_owned(),
+        )
+    })
+}
+
+fn builtin_root_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(sysroot) = std::env::var_os("ACTUS_SYSROOT") {
+        let root = PathBuf::from(sysroot);
+        candidates.push(root.join("std/src"));
+        candidates.push(root.join("library/std/src"));
+    }
+    if let Ok(executable) = std::env::current_exe()
+        && let Some(parent) = executable.parent()
+    {
+        candidates.push(parent.join("../lib/actus/std/src"));
+        candidates.push(parent.join("../share/actus/std/src"));
+    }
+    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std/src"));
+    candidates
 }

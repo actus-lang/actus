@@ -294,9 +294,10 @@ fn imported_info(
 ) -> Option<SymbolInfo> {
     let current_path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&current_path).ok()?;
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
     );
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };

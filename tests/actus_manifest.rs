@@ -112,3 +112,23 @@ fn resolves_legacy_manifest_with_compatibility_fallback() {
 
     assert_import_resolves(&fixture, &fixture.root.join("src"));
 }
+
+#[test]
+fn resolves_builtin_standard_library_from_runtime_profile() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "Actus.toml",
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n\n[build]\nruntime = \"std\"\n",
+    );
+    fixture.write("src/main.act", "import std::io;");
+
+    let configuration = CompilerConfiguration::from_input_path(&fixture.root.join("src/main.act"))
+        .expect("std runtime manifest should load");
+    let program = imported_program("import std::io;");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+    );
+    resolve_imports(&program, &resolver).expect("builtin std facade should resolve");
+}
