@@ -169,6 +169,29 @@ fn conditional_branches_must_join_ownership_state() {
 }
 
 #[test]
+fn conditional_and_compound_syntax_fail_with_stable_parser_diagnostics() {
+    let missing_branch =
+        parse_source("verb main(erg ready: Bool) -> Int { return if ready { 1 } else; }")
+            .expect_err("else must be followed by a block or if expression");
+    assert!(matches!(
+        missing_branch.kind,
+        ParseErrorKind::UnexpectedToken { ref expected, ref found }
+            if expected == "`{`" && matches!(found, actus::lexer::TokenKind::Semicolon)
+    ));
+    assert_eq!(parse_diagnostic(&missing_branch).code(), "E0003");
+
+    let incomplete_assignment =
+        parse_source("verb main() { erg counter: u32 = 0u32; counter +=; }")
+            .expect_err("compound assignment must have a right-hand expression");
+    assert!(matches!(
+        incomplete_assignment.kind,
+        ParseErrorKind::UnexpectedToken { ref expected, ref found }
+            if expected == "expression" && matches!(found, actus::lexer::TokenKind::Semicolon)
+    ));
+    assert_eq!(parse_diagnostic(&incomplete_assignment).code(), "E0003");
+}
+
+#[test]
 fn malformed_generic_keys_and_primitive_rules_have_fixtures() {
     analyze_source("struct Box[T] { item: T, } verb main(erg item: Box[Int]) { }")
         .expect("well-formed generic key should pass");

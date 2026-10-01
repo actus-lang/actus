@@ -296,7 +296,7 @@ matching.
       `&=`, `|=`, `^=`, `<<=`, and `>>=`.
 - [x] Reject malformed integer and floating-point suffixes with stable lexical
       diagnostics.
-- [ ] Reject missing branch delimiters and incomplete compound assignments with
+- [x] Reject missing branch delimiters and incomplete compound assignments with
       stable parser diagnostics.
 - [x] Keep parser implementation split by expression and statement
       responsibility and within the repository file-size limits.
