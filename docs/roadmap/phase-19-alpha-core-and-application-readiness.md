@@ -275,6 +275,95 @@ architectural policy.
 - [ ] Accepted limitless scopes are explicit, reviewable, deterministic, and
       limited to the intended file or verb.
 
+## Gate 19.3.2: Conditional Expressions and Scalar Ergonomics
+
+This sub-gate is governed by
+[ADR-0049](../decisions/ADR-0049-conditional-expressions-and-scalar-ergonomics.md).
+It improves everyday Actus code without weakening explicit typing, ownership,
+checked arithmetic, or the distinction between conditionals and pattern
+matching.
+
+### Gate 19.3.2.1: Lexer, Parser, and AST
+
+- [ ] Add `if`, `else`, and conditional-expression grammar without changing
+      `case` pattern matching semantics.
+- [ ] Add AST nodes for conditional expressions and branch bodies with stable
+      source spans.
+- [ ] Parse typed integer literals such as `1u32`, `0u8`, and `-1i32` with the
+      suffix included in the literal span.
+- [ ] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
+- [ ] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
+      `&=`, `|=`, `^=`, `<<=`, and `>>=`.
+- [ ] Reject malformed suffixes, missing branch delimiters, and incomplete
+      compound assignments with stable parser diagnostics.
+- [ ] Keep parser implementation split by expression and statement
+      responsibility and within the repository file-size limits.
+
+### Gate 19.3.2.2: Semantic Types and Ownership Joins
+
+- [ ] Require every `if` condition to have type `Bool`; do not introduce
+      implicit truthiness.
+- [ ] Validate compatible result types for expression-valued branches.
+- [ ] Validate branch-local moves, borrows, drops, and cleanup joins on both
+      paths.
+- [ ] Ensure the non-selected branch has no runtime side effects.
+- [ ] Permit direct arithmetic on compatible `u32` and `Usize` values,
+      including loop counters and array indices.
+- [ ] Validate compound assignments as one typed place operation and ensure
+      the left-hand place is evaluated exactly once.
+- [ ] Preserve `erg`, `abs`, `dat`, and `ins` mutation and loan contracts for
+      compound assignment targets.
+- [ ] Perform compile-time range checks for typed literals and reject
+      incompatible signedness, widths, and primitive families.
+
+### Gate 19.3.2.3: Native Lowering and Runtime Behavior
+
+- [ ] Lower conditionals to explicit Cranelift branch and merge blocks.
+- [ ] Lower expression-valued conditionals through typed merge values without
+      backend-specific semantic repair.
+- [ ] Lower compound assignments to one load/compute/store sequence while
+      preserving array, buffer, pack, and field bounds checks.
+- [ ] Emit exact-width constants for typed integer and floating literals.
+- [ ] Preserve existing checked behavior for overflow, underflow,
+      division-by-zero, remainder-by-zero, and invalid shift counts.
+- [ ] Add native execution tests for selected and non-selected branches,
+      nested conditionals, counter increments, and typed literal arithmetic.
+
+### Gate 19.3.2.4: Formatter, LSP, and Diagnostics
+
+- [ ] Format nested `if/else` branches deterministically and idempotently.
+- [ ] Preserve typed literal suffixes and compound-assignment operators during
+      formatter round trips.
+- [ ] Add LSP semantic tokens, completion, hover, and diagnostics for the new
+      syntax using compiler-owned information.
+- [ ] Expose condition type, branch result type, and typed literal range facts
+      through the semantic model where those surfaces already exist.
+- [ ] Add stable diagnostics for invalid conditions, incompatible branches,
+      literal overflow, malformed suffixes, and illegal assignment targets.
+
+### Gate 19.3.2.5: Acceptance and Regression Matrix
+
+- [ ] Add accepted and rejected parser fixtures for all new syntax families.
+- [ ] Add semantic tests for branch type joins and ownership cleanup on both
+      paths.
+- [ ] Add positive and negative tests for `u32`/`Usize` arithmetic and every
+      supported compound-assignment family.
+- [ ] Add compile-time range tests for typed integer literals and type-family
+      rejection tests for typed floating literals.
+- [ ] Prove that `case` remains the required construct for enum and `Result`
+      pattern matching.
+- [ ] Run formatter, check, Clippy, the full test suite, source limits, and
+      diff validation before closing the sub-gate.
+
+### Gate 19.3.2 evidence
+
+- [ ] Simple boolean control flow no longer requires synthetic `case` arms.
+- [ ] Scalar loops can increment typed unsigned indices directly.
+- [ ] Typed literals make width and signedness explicit without temporary
+      bindings or implicit conversions.
+- [ ] Native execution, ownership cleanup, formatter output, LSP behavior,
+      and diagnostics agree on one implementation.
+
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
 
 ### Runtime boundaries
