@@ -84,6 +84,16 @@ fn executes_compound_assignments_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_type_directed_unsuffixed_integer_operations_natively() {
+    let status = run_array_fixture(
+        "type-directed-integer-operations",
+        "verb main() -> Int { erg index: u32 = 0; index += 41; return (index + 1) as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_index_compound_assignment_with_one_address_calculation() {
     let status = run_array_fixture(
         "compound-index-assignment",

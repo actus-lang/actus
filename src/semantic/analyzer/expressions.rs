@@ -228,7 +228,22 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
-        let valid = if operator.is_relational() {
+        let unsuffixed_integer_matches = is_unsuffixed_integer_literal(right)
+            && is_integer_type_name(&left_type)
+            && self
+                .validate_expected_literal(
+                    right,
+                    &crate::ast::TypeName {
+                        name: left_type.clone(),
+                        arguments: Vec::new(),
+                        reference_role: None,
+                        span: expression_span(right),
+                    },
+                )
+                .is_ok();
+        let valid = if unsuffixed_integer_matches {
+            true
+        } else if operator.is_relational() {
             relational_types_match(&left_type, &right_type)
         } else if matches!(operator, BinaryOp::Equals | BinaryOp::NotEquals) {
             equality_types_match(&left_type, &right_type)
@@ -386,5 +401,18 @@ impl Analyzer {
             });
         }
         Ok(())
+    }
+}
+
+fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
+    match expression {
+        Expr::Integer { suffix: None, .. } => true,
+        Expr::Grouping { expression, .. } | Expr::Cast { expression, .. } => {
+            is_unsuffixed_integer_literal(expression)
+        }
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            is_unsuffixed_integer_literal(expression)
+        }
+        _ => false,
     }
 }

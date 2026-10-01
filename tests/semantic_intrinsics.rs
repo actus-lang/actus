@@ -91,6 +91,12 @@ fn accepts_statement_if_control_flow_and_diverging_expression_branches() {
 }
 
 #[test]
+fn accepts_unsuffixed_integer_literals_in_known_integer_operations() {
+    analyze_source("verb main() -> u32 { erg index: u32 = 0; index += 1; return index + 1; }")
+        .expect("known integer operands should direct unsuffixed literals");
+}
+
+#[test]
 fn validates_relational_operand_families() {
     analyze_source("verb main() -> Bool { return 1 < 2; }")
         .expect("matching Int operands should compare");

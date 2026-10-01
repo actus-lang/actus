@@ -27,9 +27,12 @@ following prerequisite gates have priority over every wire and Ustari gate:
       loop CFG lowering deterministic.
       Evidence: case-loop native execution, nested case/short-circuit loop
       regression coverage, cleanup-plan tests, and full native test suite.
-- [ ] **Gate P0.4: Type-directed integer ergonomics** — reduce unnecessary
+- [x] **Gate P0.4: Type-directed integer ergonomics** — reduce unnecessary
       temporary bindings for typed literals and same-type arithmetic without
       introducing implicit numeric or ownership conversions.
+      Evidence: unsuffixed literals are directed only by a known integer
+      operand, range-checked against that type, and covered by semantic and
+      native compound-arithmetic tests.
 - [ ] **Gate P0.5: Facade-aware type resolution** — distinguish exported,
       private, missing, and malformed declarations with actionable diagnostics.
 - [ ] **Gate P0.6: Tooling and regression evidence** — update parser,
