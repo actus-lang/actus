@@ -57,7 +57,7 @@ impl Parser {
         if let Some(operator) = self.match_compound_assignment() {
             return self.parse_compound_assignment(expression, operator);
         }
-        if matches!(expression, Expr::If { .. }) && self.check_simple(&TokenKind::RightBrace) {
+        if self.check_simple(&TokenKind::RightBrace) {
             let span = expression_span(&expression);
             return Ok(Stmt::Expression { expression, span });
         }

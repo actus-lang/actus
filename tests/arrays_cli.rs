@@ -24,6 +24,36 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_value_producing_if_branches_natively() {
+    let status = run_array_fixture(
+        "conditional-expression",
+        "verb main() -> Int { erg selected = if 1u32 < 2u32 { 41 } else { 1 }; return selected + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn does_not_evaluate_the_non_selected_if_branch() {
+    let status = run_array_fixture(
+        "conditional-expression-short-branch",
+        "verb main() -> Int { return if 1 < 2 { 42 } else { 1 / 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_nested_value_producing_conditionals() {
+    let status = run_array_fixture(
+        "nested-conditional-expression",
+        "verb main() -> Int { return if 1 < 2 { if 2 < 3 { 42 } else { 0 } } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_compound_assignments_natively() {
     let status = run_array_fixture(
         "compound-assignments",

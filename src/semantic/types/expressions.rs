@@ -4,6 +4,7 @@ use crate::ast::{
 };
 
 use super::super::analyzer::Analyzer;
+use super::super::analyzer::expression_span;
 
 impl Analyzer {
     pub(crate) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
@@ -56,7 +57,9 @@ impl Analyzer {
                 .ok()
                 .and_then(|type_name| lookup_builtin_type(&type_name.name)),
             Expr::Case { branches, .. } => self.case_expression_type(branches),
-            Expr::If { .. } => None,
+            Expr::If { then_branch, else_branch, .. } => {
+                self.if_expression_type(then_branch, else_branch.as_ref())
+            }
         }
     }
 
@@ -100,6 +103,19 @@ impl Analyzer {
             CaseBody::Expression(expression) => self.expression_type(expression),
             CaseBody::Block(_) => None,
         })
+    }
+
+    fn if_expression_type(
+        &self,
+        then_branch: &crate::ast::Block,
+        else_branch: Option<&crate::ast::IfBranch>,
+    ) -> Option<BuiltinType> {
+        let then_type = block_tail_builtin_type(self, then_branch);
+        let else_type = else_branch.as_ref().and_then(|branch| match branch {
+            crate::ast::IfBranch::Block(block) => block_tail_builtin_type(self, block),
+            crate::ast::IfBranch::ElseIf(expression) => self.expression_type(expression),
+        });
+        (then_type == else_type).then_some(then_type).flatten()
     }
 
     pub(crate) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
@@ -158,6 +174,7 @@ impl Analyzer {
             })
             .or_else(|| self.expression_enum_type_application(expression))
             .or_else(|| self.expression_case_type_name(expression))
+            .or_else(|| self.expression_if_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))
     }
 
@@ -186,4 +203,32 @@ impl Analyzer {
             }),
         })
     }
+
+    fn expression_if_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::If { then_branch, else_branch, .. } = expression else { return None };
+        let then_type = block_tail_type_name(self, then_branch);
+        let else_type = else_branch.as_ref().and_then(|branch| match branch {
+            crate::ast::IfBranch::Block(block) => block_tail_type_name(self, block),
+            crate::ast::IfBranch::ElseIf(expression) => self.expression_type_name(expression),
+        });
+        (then_type == else_type).then_some(then_type).flatten()
+    }
+}
+
+fn block_tail_builtin_type(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<BuiltinType> {
+    let crate::ast::Stmt::Expression { expression, span } = block.statements.last()? else {
+        return None;
+    };
+    (span.end == expression_span(expression).end)
+        .then(|| analyzer.expression_type(expression))
+        .flatten()
+}
+
+fn block_tail_type_name(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<String> {
+    let crate::ast::Stmt::Expression { expression, span } = block.statements.last()? else {
+        return None;
+    };
+    (span.end == expression_span(expression).end)
+        .then(|| analyzer.expression_type_name(expression))
+        .flatten()
 }

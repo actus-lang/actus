@@ -144,6 +144,31 @@ fn conditional_guards_require_bool_values() {
 }
 
 #[test]
+fn conditional_expression_branches_have_one_value_type() {
+    analyze_source("verb choose(erg ready: Bool) -> Int { return if ready { 1 } else { 2 }; }")
+        .expect("value-producing branches should unify");
+
+    let mismatch = expect_semantic_error(
+        "verb choose(erg ready: Bool) -> Int { return if ready { 1 } else { 2u8 }; }",
+    );
+    assert!(matches!(
+        mismatch.kind,
+        SemanticErrorKind::TypeMismatch { ref callee, ref parameter, .. }
+            if callee == "if" && parameter == "branches"
+    ));
+}
+
+#[test]
+fn conditional_branches_must_join_ownership_state() {
+    let mismatch = expect_semantic_error(
+        "verb main() { erg bytes = Buffer[1]; if 1 < 2 { drop(bytes); } else { append(bytes, 1); }; }",
+    );
+    assert!(
+        matches!(mismatch.kind, SemanticErrorKind::BranchStateMismatch { ref name, .. } if name == "bytes")
+    );
+}
+
+#[test]
 fn malformed_generic_keys_and_primitive_rules_have_fixtures() {
     analyze_source("struct Box[T] { item: T, } verb main(erg item: Box[Int]) { }")
         .expect("well-formed generic key should pass");

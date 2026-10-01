@@ -56,7 +56,77 @@ fn infer_complex_initializer_type(
         Expr::Case { branches, .. } => {
             super::super::case::infer_case_type(branches, types, functions, layouts)
         }
+        Expr::If { then_branch, else_branch, .. } => {
+            infer_if_type(then_branch, else_branch.as_ref(), types, functions, layouts)
+        }
         _ => Err(NativeEmitError("unsupported native type expression".to_owned())),
+    }
+}
+
+fn infer_if_type(
+    then_branch: &crate::ast::Block,
+    else_branch: Option<&crate::ast::IfBranch>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    let then_type = block_tail_type(then_branch, types, functions, layouts)?;
+    let else_type = match else_branch {
+        Some(crate::ast::IfBranch::Block(block)) => {
+            block_tail_type(block, types, functions, layouts)?
+        }
+        Some(crate::ast::IfBranch::ElseIf(expression)) => {
+            initializer_type(expression, types, functions, layouts)?
+        }
+        None => NativeType::Void,
+    };
+    if then_type == else_type {
+        return Ok(then_type);
+    }
+    if matches!(then_type, NativeType::Void) {
+        return Ok(else_type);
+    }
+    if matches!(else_type, NativeType::Void) {
+        return Ok(then_type);
+    }
+    Err(NativeEmitError("if branches have different native types".to_owned()))
+}
+
+fn block_tail_type(
+    block: &crate::ast::Block,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<NativeType, NativeEmitError> {
+    let Some(crate::ast::Stmt::Expression { expression, span }) = block.statements.last() else {
+        return Ok(NativeType::Void);
+    };
+    if span.end != expression_end(expression) {
+        return Ok(NativeType::Void);
+    }
+    initializer_type(expression, types, functions, layouts)
+}
+
+fn expression_end(expression: &Expr) -> usize {
+    match expression {
+        Expr::Identifier { span, .. }
+        | Expr::Integer { span, .. }
+        | Expr::BufferLiteral { span, .. }
+        | Expr::FloatLiteral { span, .. }
+        | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Cast { span, .. }
+        | Expr::Binary { span, .. }
+        | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
+        | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
+        | Expr::Case { span, .. }
+        | Expr::If { span, .. } => span.end,
     }
 }
 

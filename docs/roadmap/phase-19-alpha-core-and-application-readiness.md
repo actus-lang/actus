@@ -303,11 +303,11 @@ matching.
 
 - [x] Require every `if` condition to have type `Bool`; do not introduce
       implicit truthiness.
-- [ ] Validate compatible result types for expression-valued branches.
-- [ ] Validate branch-local moves, borrows, drops, and cleanup joins on both
+- [x] Validate compatible result types for expression-valued branches.
+- [x] Validate branch-local moves, borrows, drops, and cleanup joins on both
       paths.
-- [ ] Ensure the non-selected branch has no runtime side effects.
-- [ ] Permit direct arithmetic on compatible `u32` and `Usize` values,
+- [x] Ensure the non-selected branch has no runtime side effects.
+- [x] Permit direct arithmetic on compatible `u32` and `Usize` values,
       including loop counters and array indices.
 - [x] Validate compound assignments as one typed place operation and ensure
       the left-hand place is evaluated exactly once.
@@ -320,7 +320,7 @@ matching.
 
 - [x] Lower statement-position conditionals to explicit Cranelift branch and
       merge blocks.
-- [ ] Lower expression-valued conditionals through typed merge values without
+- [x] Lower expression-valued conditionals through typed merge values without
       backend-specific semantic repair.
 - [x] Lower compound assignments to one load/compute/store sequence while
       preserving array, buffer, pack, and field bounds checks.
@@ -328,7 +328,7 @@ matching.
       integer path; typed floating literals remain scheduled separately.
 - [x] Preserve existing checked behavior for overflow, underflow,
       division-by-zero, remainder-by-zero, and invalid shift counts.
-- [ ] Add native execution tests for selected and non-selected branches,
+- [x] Add native execution tests for selected and non-selected branches,
       nested conditionals, counter increments, and typed literal arithmetic.
 
 ### Gate 19.3.2.4: Formatter, LSP, and Diagnostics
@@ -350,7 +350,7 @@ matching.
 
 - [x] Add accepted and rejected parser fixtures for the initial conditional
       syntax slice; retain the remaining syntax families for their own gates.
-- [ ] Add semantic tests for branch type joins and ownership cleanup on both
+- [x] Add semantic tests for branch type joins and ownership cleanup on both
       paths.
 - [x] Add positive native tests for every supported compound-assignment family,
       indexed buffer/array/field/pack places, and negative semantic coverage for
@@ -359,15 +359,15 @@ matching.
       integer literals; type-family tests for typed floating literals remain
       scheduled separately.
       rejection tests for typed floating literals.
-- [ ] Prove that `case` remains the required construct for enum and `Result`
+- [x] Prove that `case` remains the required construct for enum and `Result`
       pattern matching.
-- [ ] Run formatter, check, Clippy, the full test suite, source limits, and
+- [x] Run formatter, check, Clippy, the full test suite, source limits, and
       diff validation before closing the sub-gate.
 
 ### Gate 19.3.2 evidence
 
 - [x] Simple boolean control flow no longer requires synthetic `case` arms.
-- [ ] Scalar loops can increment typed unsigned indices directly.
+- [x] Scalar loops can increment typed unsigned indices directly.
 - [x] Typed integer literals make width and signedness explicit without temporary
       bindings or implicit conversions.
 - [ ] Native execution, ownership cleanup, formatter output, LSP behavior,

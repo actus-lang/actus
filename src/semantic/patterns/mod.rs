@@ -99,7 +99,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn snapshot_binding_states(&self) -> Vec<(OwnershipState, AccessState)> {
+    pub(super) fn snapshot_binding_states(&self) -> Vec<(OwnershipState, AccessState)> {
         self.model
             .bindings
             .iter()
@@ -107,18 +107,21 @@ impl Analyzer {
             .collect()
     }
 
-    fn restore_binding_states(&mut self, snapshot: &[(OwnershipState, AccessState)]) {
+    pub(super) fn restore_binding_states(&mut self, snapshot: &[(OwnershipState, AccessState)]) {
         for (binding, (ownership, access)) in self.model.bindings.iter_mut().zip(snapshot.iter()) {
             binding.ownership = ownership.clone();
             binding.access = access.clone();
         }
     }
 
-    fn snapshot_binding_prefix(&self, count: usize) -> Vec<(OwnershipState, AccessState)> {
+    pub(super) fn snapshot_binding_prefix(
+        &self,
+        count: usize,
+    ) -> Vec<(OwnershipState, AccessState)> {
         self.snapshot_binding_states().into_iter().take(count).collect()
     }
 
-    fn validate_branch_join(
+    pub(super) fn validate_branch_join(
         &self,
         branch_results: &[Vec<(OwnershipState, AccessState)>],
         span: SourceSpan,
