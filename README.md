@@ -37,6 +37,28 @@ and tracked in the [Phase 20 roadmap](docs/roadmap/phase-20-module-visibility-an
 The verified Alpha package, ownership, standard-library, and CLI workflow is
 documented in the [Alpha User Guide](docs/language/alpha-user-guide.md).
 
+New projects use the dependency-free `core` runtime by default. To opt into
+the compiler-owned standard library, select it when creating the project:
+
+```sh
+actus new my_program --runtime std
+cd my_program
+actus check
+actus build --emit exe
+```
+
+The equivalent manifest setting is:
+
+```toml
+[build]
+runtime = "std"
+```
+
+The compiler resolves canonical imports such as `std::io` from the packaged
+standard library. It does not require copying `library/std` into the project
+or adding an absolute host path. Freestanding runtime templates remain
+target-aware work for the embedded capability gate.
+
 The implemented operator, checked-cast, and bounded-indexing contracts are
 listed in the [operator reference](docs/language/operators.md).
 
@@ -93,7 +115,7 @@ entry = "main"
 ACTUS_LINKER=clang cargo run -- build examples/hello.act --emit exe -o examples/hello
 ```
 
-The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. The current manifest supports package identity and native backend settings. Full Actus project commands, dependency resolution, and publishing are planned separately. Language semantics, ownership rules, and borrow safety are not configurable project options.
+The default linker is `cc`. Hosted executables currently require the configured entry verb to be `main`; custom entry symbols will be supported with a future freestanding/linker-target configuration. Language semantics, ownership rules, and borrow safety are not configurable project options.
 
 Native libraries can be supplied through manifest-relative search paths:
 

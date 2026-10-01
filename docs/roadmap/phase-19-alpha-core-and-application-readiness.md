@@ -204,7 +204,7 @@ Implementation evidence completed so far:
 - [x] Define canonical standard-library imports and facades so a project can
       use `std::io`, `std::fs`, and `std::path` without copying the library
       into its own `src/` tree or configuring absolute host paths.
-- [ ] Define target capability metadata for builtin modules, distinguishing
+- [x] Define target capability metadata for builtin modules, distinguishing
       target-neutral, hosted, and embedded standard-library surfaces.
 - [x] Allow `runtime = "std"` on freestanding targets while rejecting
       hosted-only imports such as `std::fs` before code generation.
@@ -221,15 +221,16 @@ Implementation evidence completed so far:
 - [ ] Define diagnostics for missing runtime metadata, unsupported runtime
       values, incompatible imports, and attempts to use `std` from a
       freestanding build.
-- [ ] Add `actus init` templates that declare the intended runtime profile and
+- [x] Add `actus init` and `actus new` templates that declare the intended
+      `core` or `std` runtime profile and
       produce a valid first build without manual standard-library wiring.
 - [x] Add accepted and rejected manifest tests for `core`, `std`, and
       `freestanding`, including lockfile mismatch and conflicting dependency
       cases.
-- [ ] Add native integration tests proving that `std` applications compile
+- [x] Add native integration tests proving that `std` applications compile
       and run, while `core` and `freestanding` builds do not acquire a host
       runtime implicitly.
-- [ ] Document the runtime selection and standard-library resolution contract
+- [x] Document the runtime selection and standard-library resolution contract
       in the user-facing project and package documentation.
 
 The implementation should be split into a future architecture decision for
@@ -248,13 +249,14 @@ Implementation evidence completed so far:
 - [x] Reject a hosted-only builtin import during freestanding module
       resolution before semantic analysis and code generation.
 
-- [ ] Add target fixtures for hosted and embedded targets, including
+- [x] Add target fixtures for hosted and embedded targets, including
       `thumbv7em-none-eabihf`.
-- [ ] Verify target-neutral and embedded builtin modules resolve from `std`
-      without an operating-system runtime.
-- [ ] Reject hosted-only modules on freestanding targets with deterministic
+- [ ] **Deferred:** verify a concrete target-neutral or embedded builtin
+      module resolves from `std` without an operating-system runtime; no such
+      module is shipped yet, so this resumes with the first embedded library.
+- [x] Reject hosted-only modules on freestanding targets with deterministic
       diagnostics.
-- [ ] Add native or target-object tests proving that unused builtin modules
+- [x] Add native or target-object tests proving that unused builtin modules
       are not compiled or linked.
 
 ## Gate 19.3.1: Explicit Limitless Source Scopes

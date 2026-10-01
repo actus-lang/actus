@@ -65,6 +65,25 @@ fn allows_standard_runtime_profile_for_freestanding_target() {
 }
 
 #[test]
+fn allows_standard_runtime_profile_for_embedded_target_fixture() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-embedded-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"embedded\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\ntarget = \"thumbv7em-none-eabihf\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration = CompilerConfiguration::from_manifest_read_only(&path)
+        .expect("embedded std manifest should load");
+    assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
+    assert!(!configuration.host_runtime_enabled());
+    assert!(configuration.runtime_module_roots().is_empty());
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
 fn rejects_freestanding_runtime_profile_for_hosted_target() {
     let root =
         std::env::temp_dir().join(format!("actus-runtime-hosted-mismatch-{}", std::process::id()));

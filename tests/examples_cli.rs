@@ -100,3 +100,29 @@ fn phase18_arrays_and_packs_example_builds_and_executes() {
     assert_eq!(status.code(), Some(92));
     let _ = fs::remove_file(output);
 }
+
+#[cfg(unix)]
+#[test]
+fn runtime_profile_example_builds_and_executes_with_builtin_std() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-profile-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/runtime_profiles/src/main.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--strict".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let execution =
+        std::process::Command::new(&output).output().expect("run runtime profile example");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"text outputtext output\nbytesbytes\n");
+    let _ = fs::remove_file(output);
+}

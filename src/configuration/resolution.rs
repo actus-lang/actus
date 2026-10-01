@@ -117,11 +117,7 @@ pub(super) fn runtime_module_roots(
     };
     let mut roots = std::collections::BTreeMap::new();
     for module in runtime_manifest.modules {
-        let target_class = match entry_contract {
-            EntryContract::Hosted => super::manifest::RuntimeTargetClass::Hosted,
-            EntryContract::Freestanding => super::manifest::RuntimeTargetClass::Freestanding,
-        };
-        if !module.targets.contains(&target_class) {
+        if !module.targets.iter().any(|target| target.applies_to(entry_contract)) {
             continue;
         }
         let module_root = package_root.join(module.path);

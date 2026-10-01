@@ -97,8 +97,21 @@ pub(crate) struct RuntimeModuleManifest {
 #[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum RuntimeTargetClass {
+    TargetNeutral,
     Hosted,
     Freestanding,
+    Embedded,
+}
+
+impl RuntimeTargetClass {
+    pub(crate) fn applies_to(self, entry_contract: crate::target::EntryContract) -> bool {
+        matches!(
+            (self, entry_contract),
+            (Self::TargetNeutral, _)
+                | (Self::Hosted, crate::target::EntryContract::Hosted)
+                | (Self::Freestanding | Self::Embedded, crate::target::EntryContract::Freestanding)
+        )
+    }
 }
 
 impl Display for RuntimeProfile {
@@ -287,4 +300,21 @@ pub(crate) fn warn_if_legacy_manifest(path: &Path) {
 
 pub(crate) fn is_legacy_manifest(path: &Path) -> bool {
     path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RuntimeTargetClass;
+    use crate::target::EntryContract;
+
+    #[test]
+    fn runtime_target_classes_match_hosted_and_embedded_contracts() {
+        assert!(RuntimeTargetClass::TargetNeutral.applies_to(EntryContract::Hosted));
+        assert!(RuntimeTargetClass::TargetNeutral.applies_to(EntryContract::Freestanding));
+        assert!(RuntimeTargetClass::Hosted.applies_to(EntryContract::Hosted));
+        assert!(!RuntimeTargetClass::Hosted.applies_to(EntryContract::Freestanding));
+        assert!(RuntimeTargetClass::Freestanding.applies_to(EntryContract::Freestanding));
+        assert!(RuntimeTargetClass::Embedded.applies_to(EntryContract::Freestanding));
+        assert!(!RuntimeTargetClass::Embedded.applies_to(EntryContract::Hosted));
+    }
 }

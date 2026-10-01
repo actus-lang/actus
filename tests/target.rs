@@ -43,12 +43,15 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
         TargetSpec::parse("x86_64-pc-windows-gnu").expect("GNU Windows target should parse");
     let freestanding =
         TargetSpec::parse("x86_64-unknown-none").expect("freestanding target should parse");
+    let embedded =
+        TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
 
     assert_eq!(linux.linker_flavor(), actus::target::LinkerFlavor::Gnu);
     assert_eq!(macos.linker_flavor(), actus::target::LinkerFlavor::Apple);
     assert_eq!(windows_msvc.linker_flavor(), actus::target::LinkerFlavor::Msvc);
     assert_eq!(windows_gnu.linker_flavor(), actus::target::LinkerFlavor::Gnu);
     assert_eq!(freestanding.entry_contract(), actus::target::EntryContract::Freestanding);
+    assert_eq!(embedded.entry_contract(), actus::target::EntryContract::Freestanding);
     assert!(linux.matches_platform("unix"));
     assert!(macos.matches_platform("posix"));
     assert!(windows_msvc.matches_platform("windows"));

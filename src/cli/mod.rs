@@ -145,11 +145,11 @@ fn usage_text() -> &'static str {
 
 fn command_help_text(command: &str) -> Option<&'static str> {
     match command {
-        "new" => {
-            Some("usage: actus new <name> [--no-git|--vcs none]\n\nCreate a new Actus project.")
-        }
+        "new" => Some(
+            "usage: actus new <name> [--runtime core|std] [--no-git|--vcs none]\n\nCreate a new Actus project.",
+        ),
         "init" => Some(
-            "usage: actus init [--no-git|--vcs none]\n\nInitialize the current directory as an Actus project.",
+            "usage: actus init [--runtime core|std] [--no-git|--vcs none]\n\nInitialize the current directory as an Actus project.",
         ),
         "check" => Some(
             "usage: actus check [file.act] [--strict]\n\nParse, resolve, and validate an Actus project without code generation.",
