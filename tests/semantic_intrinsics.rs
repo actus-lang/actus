@@ -81,6 +81,16 @@ fn rejects_runtime_dependencies_in_constant_initializers() {
 }
 
 #[test]
+fn accepts_statement_if_control_flow_and_diverging_expression_branches() {
+    analyze_source("verb main() -> Int { loop { if 1 == 1 { break; } } return 42; }")
+        .expect("statement if should participate in loop control flow");
+    analyze_source(
+        "verb choose(erg ready: Bool) -> Int { return if ready { return 41; } else { 42 }; }",
+    )
+    .expect("a diverging expression branch should not require a matching value");
+}
+
+#[test]
 fn validates_relational_operand_families() {
     analyze_source("verb main() -> Bool { return 1 < 2; }")
         .expect("matching Int operands should compare");

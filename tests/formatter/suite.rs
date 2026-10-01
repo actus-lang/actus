@@ -38,6 +38,13 @@ fn formats_if_else_without_collapsing_branch_boundaries() {
 }
 
 #[test]
+fn formats_statement_if_without_a_trailing_semicolon() {
+    let formatted = format_source("verb main() { if 1 == 1 { return; } }");
+    assert!(formatted.contains("if 1 == 1 {\n"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_typed_float_literal_suffixes() {
     let formatted = format_source("verb main() { erg value: f32 = 1.5f32; }");
     assert!(formatted.contains("1.5f32"));

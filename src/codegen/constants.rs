@@ -60,6 +60,13 @@ fn inline_block(block: &mut Block, constants: &HashMap<String, Expr>) {
                 inline_expression(value, constants);
             }
             Stmt::Expression { expression, .. } => inline_expression(expression, constants),
+            Stmt::If { condition, then_branch, else_branch, .. } => {
+                inline_expression(condition, constants);
+                inline_block(then_branch, constants);
+                if let Some(IfBranch::Block(block)) = else_branch {
+                    inline_block(block, constants);
+                }
+            }
             Stmt::Return { value: Some(expression), .. } => {
                 inline_expression(expression, constants)
             }

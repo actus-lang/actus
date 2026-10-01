@@ -78,14 +78,22 @@ fn parses_if_else_and_nested_else_if_expressions() {
         "verb choose(erg ready: Bool) { if ready { return 1; } else if ready { return 2; } else { return 3; } }",
     );
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-    let Stmt::Expression { expression, .. } = &verb.body.statements[0] else {
-        panic!("expected conditional expression")
-    };
-    let Expr::If { else_branch: Some(actus::ast::IfBranch::ElseIf(nested)), .. } = expression
+    let Stmt::If { else_branch: Some(actus::ast::IfBranch::ElseIf(nested)), .. } =
+        &verb.body.statements[0]
     else {
-        panic!("expected nested else-if")
+        panic!("expected statement conditional")
     };
     assert!(matches!(nested.as_ref(), Expr::If { .. }));
+}
+
+#[test]
+fn keeps_if_expression_distinct_from_statement_if() {
+    let program =
+        parse_source("verb choose(erg ready: Bool) -> Int { return if ready { 1 } else { 2 }; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::If { .. }), .. } = &verb.body.statements[0] else {
+        panic!("expected value-producing if expression")
+    };
 }
 
 #[test]

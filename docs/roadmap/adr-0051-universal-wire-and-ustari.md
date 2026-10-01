@@ -16,9 +16,12 @@ following prerequisite gates have priority over every wire and Ustari gate:
       validation; lower them without runtime storage or ABI symbols.
       Evidence: parser spans, semantic duplicate/overflow/cycle/runtime checks,
       formatter round-trip, chained native execution, and full repository gates.
-- [ ] **Gate P0.2: Statement conditionals and diverging branches** — separate
+- [x] **Gate P0.2: Statement conditionals and diverging branches** — separate
       statement `if` from expression `if`, classify diverging branches, and
       preserve ownership joins.
+      Evidence: dedicated statement AST, semicolon-free parser path, native
+      loop-break execution, divergent expression typing, formatter round-trip,
+      and LSP nested-binding traversal.
 - [ ] **Gate P0.3: Case and loop control-flow correctness** — support valid
       `return`, `break`, and `continue` paths in case blocks and make nested
       loop CFG lowering deterministic.

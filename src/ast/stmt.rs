@@ -2,6 +2,7 @@ use crate::lexer::SourceSpan;
 
 use super::decl::Role;
 use super::expr::Expr;
+use super::expr::IfBranch;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Block {
@@ -64,6 +65,12 @@ pub enum Stmt {
     },
     Expression {
         expression: Expr,
+        span: SourceSpan,
+    },
+    If {
+        condition: Expr,
+        then_branch: Block,
+        else_branch: Option<IfBranch>,
         span: SourceSpan,
     },
     Return {

@@ -345,7 +345,7 @@ fn build_command_executes_statement_if_break_inside_a_loop() {
     let root = std::env::temp_dir().join(format!("actus-cli-if-break-{}", std::process::id()));
     let input = root.with_extension("act");
     let output = root.with_extension("bin");
-    fs::write(&input, "verb main() -> Int { loop { if 1 == 1 { break; }; } return 42; }\n")
+    fs::write(&input, "verb main() -> Int { loop { if 1 == 1 { break; } } return 42; }\n")
         .expect("write source");
 
     let result = run_with_args(

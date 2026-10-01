@@ -1,17 +1,11 @@
-use crate::ast::{Expr, IfBranch};
+use crate::ast::{Expr, IfBranch, Stmt};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, Parser, expression_span};
 
 impl Parser {
     pub(super) fn parse_if_expression(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
-        let condition = self.parse_expression()?;
-        let then_branch = self.parse_block()?;
-        let else_branch = self.parse_else_branch()?;
-        let end = else_branch.as_ref().map_or(then_branch.span.end, |branch| match branch {
-            IfBranch::Block(block) => block.span.end,
-            IfBranch::ElseIf(expression) => expression_span(expression).end,
-        });
+        let (condition, then_branch, else_branch, end) = self.parse_if_parts(false)?;
         Ok(Expr::If {
             condition: Box::new(condition),
             then_branch,
@@ -20,7 +14,35 @@ impl Parser {
         })
     }
 
-    fn parse_else_branch(&mut self) -> Result<Option<IfBranch>, ParseError> {
+    pub(super) fn parse_if_statement(&mut self, start: SourceSpan) -> Result<Stmt, ParseError> {
+        let (condition, then_branch, else_branch, end) = self.parse_if_parts(true)?;
+        Ok(Stmt::If {
+            condition,
+            then_branch,
+            else_branch,
+            span: SourceSpan::new(start.start, end),
+        })
+    }
+
+    fn parse_if_parts(
+        &mut self,
+        allow_statement_conditionals: bool,
+    ) -> Result<(Expr, crate::ast::Block, Option<IfBranch>, usize), ParseError> {
+        let condition = self.parse_expression()?;
+        let then_branch =
+            self.parse_block_with_statement_conditionals(allow_statement_conditionals)?;
+        let else_branch = self.parse_else_branch(allow_statement_conditionals)?;
+        let end = else_branch.as_ref().map_or(then_branch.span.end, |branch| match branch {
+            IfBranch::Block(block) => block.span.end,
+            IfBranch::ElseIf(expression) => expression_span(expression).end,
+        });
+        Ok((condition, then_branch, else_branch, end))
+    }
+
+    fn parse_else_branch(
+        &mut self,
+        allow_statement_conditionals: bool,
+    ) -> Result<Option<IfBranch>, ParseError> {
         if !self.match_simple(TokenKind::Else) {
             return Ok(None);
         }
@@ -29,6 +51,8 @@ impl Parser {
                 self.parse_if_expression(self.previous().span)?,
             ))));
         }
-        Ok(Some(IfBranch::Block(self.parse_block()?)))
+        Ok(Some(IfBranch::Block(
+            self.parse_block_with_statement_conditionals(allow_statement_conditionals)?,
+        )))
     }
 }

@@ -75,6 +75,15 @@ fn statement_guarantees_return(statement: &Stmt) -> bool {
         Stmt::Return { .. } => true,
         Stmt::Loop(block) => loop_guarantees_return(block),
         Stmt::Block(block) => block_guarantees_return(block),
+        Stmt::If { then_branch, else_branch, .. } => {
+            block_guarantees_return(then_branch)
+                && else_branch.as_ref().is_some_and(|branch| match branch {
+                    crate::ast::IfBranch::Block(block) => block_guarantees_return(block),
+                    crate::ast::IfBranch::ElseIf(expression) => {
+                        matches!(expression.as_ref(), crate::ast::Expr::If { .. })
+                    }
+                })
+        }
         _ => false,
     }
 }
@@ -87,6 +96,13 @@ fn contains_loop_exit(block: &Block) -> bool {
     block.statements.iter().any(|statement| match statement {
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::Block(nested) => contains_loop_exit(nested),
+        Stmt::If { then_branch, else_branch, .. } => {
+            contains_loop_exit(then_branch)
+                || else_branch.as_ref().is_some_and(|branch| match branch {
+                    crate::ast::IfBranch::Block(block) => contains_loop_exit(block),
+                    crate::ast::IfBranch::ElseIf(_) => false,
+                })
+        }
         Stmt::Loop(_) => false,
         _ => false,
     })

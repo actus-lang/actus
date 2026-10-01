@@ -222,7 +222,7 @@ impl Formatter<'_> {
         self.output.push('}');
     }
 
-    fn if_expression(
+    pub(super) fn if_expression(
         &mut self,
         condition: &Expr,
         then_branch: &crate::ast::Block,

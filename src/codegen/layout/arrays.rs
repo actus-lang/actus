@@ -91,6 +91,13 @@ fn collect_block_arrays(block: &crate::ast::Block, definitions: &mut Vec<TypeNam
                 collect_expression_arrays(value, definitions);
             }
             Stmt::Loop(nested) | Stmt::Block(nested) => collect_block_arrays(nested, definitions),
+            Stmt::If { condition, then_branch, else_branch, .. } => {
+                collect_expression_arrays(condition, definitions);
+                collect_block_arrays(then_branch, definitions);
+                if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
+                    collect_block_arrays(block, definitions);
+                }
+            }
             Stmt::Return { value: None, .. }
             | Stmt::Break { .. }
             | Stmt::Continue { .. }

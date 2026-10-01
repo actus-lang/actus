@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{Role, Stmt};
+use crate::ast::{Expr, Role, Stmt};
 
 use super::super::super::layout::LayoutRegistry;
 use super::super::super::literals::StringDataValues;
@@ -170,17 +170,19 @@ fn lower_other_value_statement<'source>(
                 layouts,
             )?))
         }
-        Stmt::Expression { .. } | Stmt::Drop { .. } => Ok(Some(lower_expression_or_drop(
-            function,
-            statement,
-            locals,
-            types,
-            functions,
-            targets,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )?)),
+        Stmt::Expression { .. } | Stmt::If { .. } | Stmt::Drop { .. } => {
+            Ok(Some(lower_expression_or_drop(
+                function,
+                statement,
+                locals,
+                types,
+                functions,
+                targets,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )?))
+        }
         _ => Ok(None),
     }
 }
@@ -331,6 +333,26 @@ fn lower_expression_or_drop<'source>(
             string_data,
             layouts,
         ),
+        Stmt::If { condition, then_branch, else_branch, span } => {
+            let expression = Expr::If {
+                condition: Box::new(condition.clone()),
+                then_branch: then_branch.clone(),
+                else_branch: else_branch.clone(),
+                span: *span,
+            };
+            super::lower_expression_statement(
+                function,
+                &expression,
+                *span,
+                locals,
+                types,
+                functions,
+                targets,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+        }
         Stmt::Drop { name, .. } => {
             super::lower_drop(function, name, locals, types, functions, layouts)
         }

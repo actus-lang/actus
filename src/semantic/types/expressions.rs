@@ -115,7 +115,18 @@ impl Analyzer {
             crate::ast::IfBranch::Block(block) => block_tail_builtin_type(self, block),
             crate::ast::IfBranch::ElseIf(expression) => self.expression_type(expression),
         });
-        (then_type == else_type).then_some(then_type).flatten()
+        if then_type == else_type {
+            return then_type;
+        }
+        if then_type.is_none() && block_diverges(then_branch) {
+            return else_type;
+        }
+        if else_type.is_none()
+            && else_branch.as_ref().is_some_and(|branch| self.if_branch_diverges(branch))
+        {
+            return then_type;
+        }
+        None
     }
 
     pub(crate) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
@@ -235,8 +246,40 @@ impl Analyzer {
             crate::ast::IfBranch::Block(block) => block_tail_type_name(self, block),
             crate::ast::IfBranch::ElseIf(expression) => self.expression_type_name(expression),
         });
-        (then_type == else_type).then_some(then_type).flatten()
+        if then_type == else_type {
+            return then_type;
+        }
+        if then_type.is_none() && block_diverges(then_branch) {
+            return else_type;
+        }
+        if else_type.is_none()
+            && else_branch.as_ref().is_some_and(|branch| self.if_branch_diverges(branch))
+        {
+            return then_type;
+        }
+        None
     }
+
+    fn if_branch_diverges(&self, branch: &crate::ast::IfBranch) -> bool {
+        match branch {
+            crate::ast::IfBranch::Block(block) => block_diverges(block),
+            crate::ast::IfBranch::ElseIf(expression) => {
+                matches!(expression.as_ref(), Expr::If { .. })
+                    && self.expression_type_name(expression).is_none()
+            }
+        }
+    }
+}
+
+fn block_diverges(block: &crate::ast::Block) -> bool {
+    matches!(
+        block.statements.last(),
+        Some(
+            crate::ast::Stmt::Return { .. }
+                | crate::ast::Stmt::Break { .. }
+                | crate::ast::Stmt::Continue { .. }
+        )
+    )
 }
 
 fn block_tail_builtin_type(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<BuiltinType> {
