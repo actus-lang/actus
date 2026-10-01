@@ -91,6 +91,8 @@ pub struct CompilerConfiguration {
     pub(super) linker_flavor: LinkerFlavor,
     pub(super) entry_contract: EntryContract,
     pub(super) runtime: RuntimeProfile,
+    pub(super) runtime_version: Option<String>,
+    pub(super) runtime_checksum: Option<String>,
     pub(super) runtime_source_root: Option<PathBuf>,
     pub(super) runtime_module_roots: BTreeMap<String, PathBuf>,
     pub(super) run_artifact_prefix: String,

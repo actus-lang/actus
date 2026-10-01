@@ -20,6 +20,10 @@ pub struct LockedPackage {
 pub struct ActusLock {
     pub lockfile_version: u32,
     pub runtime: super::manifest::RuntimeProfile,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_checksum: Option<String>,
     #[serde(rename = "package")]
     pub packages: Vec<LockedPackage>,
 }
@@ -48,6 +52,8 @@ impl ActusLock {
         Self {
             lockfile_version: LOCKFILE_VERSION,
             runtime: super::manifest::RuntimeProfile::Core,
+            runtime_version: None,
+            runtime_checksum: None,
             packages,
         }
     }
@@ -81,12 +87,23 @@ impl ActusLock {
             .collect();
         let mut lockfile = Self::from_packages(packages);
         lockfile.runtime = manifest.build.runtime.unwrap_or_default();
+        if lockfile.runtime == super::manifest::RuntimeProfile::Std {
+            let source_root = super::resolution::runtime_source_root(lockfile.runtime)
+                .map_err(|error| LockfileError(error.to_string()))?;
+            (lockfile.runtime_version, lockfile.runtime_checksum) =
+                super::resolution::runtime_identity(lockfile.runtime, source_root.as_deref())
+                    .map_err(|error| LockfileError(error.to_string()))?;
+        }
         Ok(lockfile)
     }
 
     pub fn validate_against_manifest(&self, path: &Path) -> Result<(), LockfileError> {
         let expected = Self::generate_from_manifest(path)?;
-        if self.runtime != expected.runtime || self.packages != expected.packages {
+        if self.runtime != expected.runtime
+            || self.runtime_version != expected.runtime_version
+            || self.runtime_checksum != expected.runtime_checksum
+            || self.packages != expected.packages
+        {
             return Err(LockfileError(
                 "LockfileOutOfDate: Actus.lock does not match Actus.toml dependencies".to_owned(),
             ));

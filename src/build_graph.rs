@@ -29,6 +29,10 @@ pub struct UnitMetadata {
     pub target_spec_hash: String,
     pub profile: String,
     pub runtime: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_checksum: Option<String>,
 }
 
 impl UnitMetadata {
@@ -45,6 +49,8 @@ impl UnitMetadata {
             target_spec_hash: configuration.target_spec_hash().to_owned(),
             profile: configuration.profile().directory_name().to_owned(),
             runtime: configuration.runtime_profile().to_string(),
+            runtime_version: configuration.runtime_version().map(str::to_owned),
+            runtime_checksum: configuration.runtime_checksum().map(str::to_owned),
         }
     }
 
@@ -56,6 +62,8 @@ impl UnitMetadata {
             && self.target_spec_hash == configuration.target_spec_hash()
             && self.profile == configuration.profile().directory_name()
             && self.runtime == configuration.runtime_profile().to_string()
+            && self.runtime_version.as_deref() == configuration.runtime_version()
+            && self.runtime_checksum.as_deref() == configuration.runtime_checksum()
     }
 
     fn read(path: &Path) -> Result<Self, BuildGraphError> {
@@ -141,6 +149,8 @@ mod tests {
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
         assert_eq!(metadata.target_triple, configuration.target().triple().to_string());
         assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
+        assert_eq!(metadata.runtime_version.as_deref(), configuration.runtime_version());
+        assert_eq!(metadata.runtime_checksum.as_deref(), configuration.runtime_checksum());
     }
 
     #[test]
@@ -157,6 +167,8 @@ mod tests {
         assert_eq!(metadata.unit, format!("metadata-{}", std::process::id()));
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
         assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
+        assert_eq!(metadata.runtime_version.as_deref(), configuration.runtime_version());
+        assert_eq!(metadata.runtime_checksum.as_deref(), configuration.runtime_checksum());
         let _ = fs::remove_file(&artifact);
         let _ = fs::remove_file(metadata_path(&artifact));
     }

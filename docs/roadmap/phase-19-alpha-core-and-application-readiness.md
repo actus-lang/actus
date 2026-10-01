@@ -215,7 +215,7 @@ Implementation evidence completed so far:
       graph; unused `std` modules must not be compiled or linked implicitly.
 - [x] Include the selected runtime profile, target, and build profile in
       lockfile validation and persistent artifact identity.
-- [ ] Include the compiler-owned standard-library version/checksum in lockfile
+- [x] Include the compiler-owned standard-library version/checksum in lockfile
       validation and artifact identity so runtime source changes remain
       reproducible across machines.
 - [ ] Define diagnostics for missing runtime metadata, unsupported runtime

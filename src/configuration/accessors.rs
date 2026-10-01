@@ -42,6 +42,14 @@ impl CompilerConfiguration {
         self.runtime
     }
 
+    pub fn runtime_version(&self) -> Option<&str> {
+        self.runtime_version.as_deref()
+    }
+
+    pub fn runtime_checksum(&self) -> Option<&str> {
+        self.runtime_checksum.as_deref()
+    }
+
     pub fn runtime_source_root(&self) -> Option<&Path> {
         self.runtime_source_root.as_deref()
     }

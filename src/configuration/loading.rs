@@ -28,6 +28,8 @@ impl CompilerConfiguration {
             linker_flavor,
             entry_contract,
             runtime: super::RuntimeProfile::Core,
+            runtime_version: None,
+            runtime_checksum: None,
             runtime_source_root: None,
             runtime_module_roots: std::collections::BTreeMap::new(),
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
@@ -95,6 +97,8 @@ fn build_from_manifest(
     validate_runtime_profile(runtime, entry_contract)?;
     validate_runtime_dependency_alias(runtime, &dependency_graph.roots)?;
     let runtime_source_root = super::resolution::runtime_source_root(runtime)?;
+    let (runtime_version, runtime_checksum) =
+        super::resolution::runtime_identity(runtime, runtime_source_root.as_deref())?;
     let runtime_module_roots = super::resolution::runtime_module_roots(runtime, entry_contract)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
@@ -112,6 +116,8 @@ fn build_from_manifest(
         linker_flavor,
         entry_contract,
         runtime,
+        runtime_version,
+        runtime_checksum,
         runtime_source_root,
         runtime_module_roots,
         native_backend,

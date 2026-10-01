@@ -81,6 +81,24 @@ pub(super) fn runtime_source_root(
     })
 }
 
+pub(super) fn runtime_identity(
+    runtime: RuntimeProfile,
+    source_root: Option<&Path>,
+) -> Result<(Option<String>, Option<String>), ConfigurationError> {
+    let Some(source_root) = source_root else {
+        return Ok((None, None));
+    };
+    let package_root = source_root.parent().ok_or_else(|| {
+        ConfigurationError("builtin standard-library root has no package parent".to_owned())
+    })?;
+    let manifest = super::manifest::read(&package_root.join("Actus.toml"))?;
+    let checksum = super::checksum::content_checksum(package_root)?;
+    if runtime != RuntimeProfile::Std {
+        return Ok((None, None));
+    }
+    Ok((Some(manifest.package.version), Some(checksum)))
+}
+
 pub(super) fn runtime_module_roots(
     runtime: RuntimeProfile,
     entry_contract: EntryContract,
