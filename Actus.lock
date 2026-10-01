@@ -1,4 +1,4 @@
-lockfile_version = 2
+lockfile_version = 3
 runtime = "core"
 
 [[package]]

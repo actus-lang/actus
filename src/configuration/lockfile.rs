@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-const LOCKFILE_VERSION: u32 = 2;
+const LOCKFILE_VERSION: u32 = 3;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LockedPackage {
@@ -20,6 +20,8 @@ pub struct LockedPackage {
 pub struct ActusLock {
     pub lockfile_version: u32,
     pub runtime: super::manifest::RuntimeProfile,
+    #[serde(default, skip_serializing_if = "source_limits_are_enabled")]
+    pub source_limits: super::manifest::SourceLimitMode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runtime_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,6 +32,10 @@ pub struct ActusLock {
 
 #[derive(Debug)]
 pub struct LockfileError(pub String);
+
+fn source_limits_are_enabled(mode: &super::manifest::SourceLimitMode) -> bool {
+    *mode == super::manifest::SourceLimitMode::Enabled
+}
 
 impl std::fmt::Display for LockfileError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -52,6 +58,7 @@ impl ActusLock {
         Self {
             lockfile_version: LOCKFILE_VERSION,
             runtime: super::manifest::RuntimeProfile::Core,
+            source_limits: super::manifest::SourceLimitMode::Enabled,
             runtime_version: None,
             runtime_checksum: None,
             packages,
@@ -87,6 +94,7 @@ impl ActusLock {
             .collect();
         let mut lockfile = Self::from_packages(packages);
         lockfile.runtime = manifest.build.runtime.unwrap_or_default();
+        lockfile.source_limits = manifest.package.source_limits.unwrap_or_default();
         if lockfile.runtime == super::manifest::RuntimeProfile::Std {
             let source_root = super::resolution::runtime_source_root(lockfile.runtime)
                 .map_err(|error| LockfileError(error.to_string()))?;
@@ -100,6 +108,7 @@ impl ActusLock {
     pub fn validate_against_manifest(&self, path: &Path) -> Result<(), LockfileError> {
         let expected = Self::generate_from_manifest(path)?;
         if self.runtime != expected.runtime
+            || self.source_limits != expected.source_limits
             || self.runtime_version != expected.runtime_version
             || self.runtime_checksum != expected.runtime_checksum
             || self.packages != expected.packages

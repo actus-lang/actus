@@ -64,6 +64,22 @@ fn verb_limitless_metadata_skips_only_function_diagnostic() {
 }
 
 #[test]
+fn verb_limitless_metadata_does_not_exempt_a_sibling_verb() {
+    let mut source = String::from("meta limitless(\"verb\") verb exempt() {\n");
+    for index in 0..60 {
+        source.push_str(&format!("\"\"\"exempt {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\nverb sibling() {\n");
+    for index in 0..60 {
+        source.push_str(&format!("\"\"\"sibling {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\n");
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message().contains("exempt")));
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.message().contains("sibling")));
+}
+
+#[test]
 fn rust_functions_are_measured_without_counting_comment_text() {
     let mut source = String::from("/* fn fake() {\nstill comment } */\nfn real() {\n");
     source.push_str(&lines(40));

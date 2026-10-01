@@ -37,7 +37,7 @@ pub(crate) struct PackageManifest {
     pub(crate) dependencies: std::collections::BTreeMap<String, String>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SourceLimitMode {
     #[default]

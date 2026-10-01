@@ -53,6 +53,21 @@ fn active_declaration(model: &Value, name: &str) -> bool {
 }
 
 #[test]
+fn semantic_model_exposes_limitless_scope_for_declarations() {
+    let uri = "file:///tmp/actus-lsp-limitless.act";
+    let source = concat!("meta limitless(\"verb\")\n", "verb verb_scope() -> Int { return 2; }\n",);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let model = response_with_id(&run_lsp(messages.to_vec()), 2);
+    assert_eq!(model["result"]["declarations"][0]["limitless"], "verb");
+}
+
+#[test]
 fn hover_explains_index_bounds_and_pack_data_model() {
     let uri = "file:///tmp/actus-lsp-semantic-hover.act";
     let source = "pack Register { erg storage: u8; layout little; fields { erg low: u4 at 0; abs high: u4 at 4; } }\nverb main() -> Int { erg bytes = Buffer[4]; return 0; }\n";

@@ -54,9 +54,11 @@ fn serializes_packages_in_deterministic_order() {
         },
     ]);
     assert_eq!(lock.runtime, actus::configuration::RuntimeProfile::Core);
+    assert_eq!(lock.source_limits, actus::configuration::SourceLimitMode::Enabled);
     assert!(lock.runtime_version.is_none());
     assert!(lock.runtime_checksum.is_none());
     let serialized = lock.serialize().expect("lockfile should serialize");
+    assert!(!serialized.contains("source_limits = \"enabled\""));
     assert!(
         serialized.find("name = \"alpha\"").unwrap() < serialized.find("name = \"zeta\"").unwrap()
     );
@@ -81,16 +83,18 @@ fn lockfile_records_runtime_profile() {
     let manifest = fixture.root.join("Actus.toml");
     fs::write(
         &manifest,
-        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n\n[build]\nruntime = \"std\"\n",
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nsource_limits = \"limitless\"\n\n[build]\nruntime = \"std\"\n",
     )
     .expect("write manifest");
 
     let lock = ActusLock::generate_from_manifest(&manifest).expect("lockfile should generate");
     assert_eq!(lock.runtime, actus::configuration::RuntimeProfile::Std);
+    assert_eq!(lock.source_limits, actus::configuration::SourceLimitMode::Limitless);
     assert!(lock.runtime_version.is_some());
     assert!(lock.runtime_checksum.is_some());
     let serialized = lock.serialize().expect("lockfile should serialize");
     assert!(serialized.contains("runtime = \"std\""));
+    assert!(serialized.contains("source_limits = \"limitless\""));
     assert!(serialized.contains("runtime_version = \"0.1.0\""));
 }
 

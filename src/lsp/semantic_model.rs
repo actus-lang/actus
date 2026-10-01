@@ -256,7 +256,16 @@ fn declarations(
                 MetaAttribute::Test => true,
                 MetaAttribute::Limitless(_) => true,
             });
-            Some(json!({"name":name,"active":active,"range":span_range(source,index,span)}))
+            let limitless = if program.file_metadata.contains(&crate::ast::LimitlessScope::File) {
+                Some("file")
+            } else if metadata.iter().any(|attribute| {
+                matches!(attribute, MetaAttribute::Limitless(crate::ast::LimitlessScope::Verb))
+            }) {
+                Some("verb")
+            } else {
+                None
+            };
+            Some(json!({"name":name,"active":active,"limitless":limitless,"range":span_range(source,index,span)}))
         })
         .collect()
 }
