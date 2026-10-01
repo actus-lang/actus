@@ -15,6 +15,11 @@ Phase 20 tracks the compiler-level module visibility and facade boundary work
 defined by ADR-0047. It may proceed alongside the remaining Alpha handoff only
 when its module and standard-library dependencies are explicit and tested.
 
+Phase 21 tracks production-language capability and Wire readiness. It is a
+prerequisite evidence phase, not a claim that Wire or Ustari is implemented.
+Phase 22 tracks enterprise compiler-platform work that is important for a
+world-class product but is independently gated from the Wire prerequisite.
+
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
 
 ## Ownership Model Extensions
@@ -50,3 +55,5 @@ gated implementation roadmaps:
 - [x] [Phase 18: Strict Actus Conformance and Fail-Closed Compilation](docs/roadmap/phase-18-strict-actus-conformance.md)
 - [x] [Phase 19: Actus Alpha Core and Application Readiness](docs/roadmap/phase-19-alpha-core-and-application-readiness.md)
 - [ ] [Phase 20: Module Visibility and Facade-Bounded Compilation](docs/roadmap/phase-20-module-visibility-and-facade-boundaries.md)
+- [ ] [Phase 21: Production Language Capability and Wire Readiness](docs/roadmap/phase-21-production-language-capability-and-wire-readiness.md)
+- [ ] [Phase 22: Enterprise Compiler Platform](docs/roadmap/phase-22-enterprise-compiler-platform.md)
