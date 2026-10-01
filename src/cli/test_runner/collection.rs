@@ -37,6 +37,7 @@ pub(super) fn collect_tests(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     let mut tests = Vec::new();
     let mut filtered = 0;

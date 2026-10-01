@@ -191,6 +191,8 @@ Implementation evidence completed so far:
       duplicated `std/` directory.
 - [x] Route CLI and LSP module resolvers through the runtime-aware resolver.
 - [x] Reject a user dependency alias that attempts to shadow builtin `std`.
+- [x] Consume builtin module roots from `library/std/Actus.toml` instead of
+      relying only on directory-name conventions.
 
 - [ ] Define the manifest schema for `runtime = "core" | "std" |
       "freestanding"`, including the default profile and edition-aware

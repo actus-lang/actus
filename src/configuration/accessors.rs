@@ -46,6 +46,10 @@ impl CompilerConfiguration {
         self.runtime_source_root.as_deref()
     }
 
+    pub fn runtime_module_roots(&self) -> &std::collections::BTreeMap<String, PathBuf> {
+        &self.runtime_module_roots
+    }
+
     pub const fn host_runtime_enabled(&self) -> bool {
         matches!(self.entry_contract, EntryContract::Hosted)
     }

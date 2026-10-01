@@ -141,6 +141,7 @@ fn test_compilation_plan(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     build_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }

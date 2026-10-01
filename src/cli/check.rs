@@ -121,6 +121,7 @@ fn resolve_check_program(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     match resolve_imports(&program, &resolver) {
         Ok(program) => Some(program),
@@ -166,6 +167,7 @@ fn check_module(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     let program = match parse_module(&resolver, module_path) {
         Ok(program) => program,

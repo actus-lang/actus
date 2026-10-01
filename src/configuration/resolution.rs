@@ -81,6 +81,36 @@ pub(super) fn runtime_source_root(
     })
 }
 
+pub(super) fn runtime_module_roots(
+    runtime: RuntimeProfile,
+) -> Result<std::collections::BTreeMap<String, PathBuf>, ConfigurationError> {
+    let Some(source_root) = runtime_source_root(runtime)? else {
+        return Ok(std::collections::BTreeMap::new());
+    };
+    let package_root = source_root.parent().ok_or_else(|| {
+        ConfigurationError("builtin standard-library root has no package parent".to_owned())
+    })?;
+    let manifest = super::manifest::read(&package_root.join("Actus.toml"))?;
+    let Some(runtime_manifest) = manifest.runtime else {
+        return Err(ConfigurationError(
+            "builtin standard library is missing its runtime registry".to_owned(),
+        ));
+    };
+    let mut roots = std::collections::BTreeMap::new();
+    for module in runtime_manifest.modules {
+        let module_root = package_root.join(module.path);
+        if !module_root.is_dir() {
+            return Err(ConfigurationError(format!(
+                "builtin standard-library module `{}` path does not exist: {}",
+                module.name,
+                module_root.display()
+            )));
+        }
+        roots.insert(module.name, module_root);
+    }
+    Ok(roots)
+}
+
 fn builtin_root_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Some(sysroot) = std::env::var_os("ACTUS_SYSROOT") {

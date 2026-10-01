@@ -129,6 +129,7 @@ fn resolves_builtin_standard_library_from_runtime_profile() {
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     resolve_imports(&program, &resolver).expect("builtin std facade should resolve");
 }

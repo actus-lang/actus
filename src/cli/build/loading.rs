@@ -59,6 +59,7 @@ fn resolve_build_program(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     match build_compilation_plan(&program, &resolver) {
         Ok(plan) => Some(plan),

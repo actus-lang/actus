@@ -71,6 +71,7 @@ pub struct ModuleResolver {
     source_root: PathBuf,
     dependency_roots: BTreeMap<String, PathBuf>,
     runtime_source_root: Option<PathBuf>,
+    runtime_module_roots: BTreeMap<String, PathBuf>,
 }
 
 impl ModuleResolver {
@@ -79,6 +80,7 @@ impl ModuleResolver {
             source_root: source_root.into(),
             dependency_roots: BTreeMap::new(),
             runtime_source_root: None,
+            runtime_module_roots: BTreeMap::new(),
         }
     }
 
@@ -90,6 +92,7 @@ impl ModuleResolver {
             source_root: source_root.into(),
             dependency_roots: dependency_roots.clone(),
             runtime_source_root: None,
+            runtime_module_roots: BTreeMap::new(),
         }
     }
 
@@ -97,16 +100,27 @@ impl ModuleResolver {
         source_root: impl Into<PathBuf>,
         dependency_roots: &BTreeMap<String, PathBuf>,
         runtime_source_root: Option<&Path>,
+        runtime_module_roots: &BTreeMap<String, PathBuf>,
     ) -> Self {
         Self {
             source_root: source_root.into(),
             dependency_roots: dependency_roots.clone(),
             runtime_source_root: runtime_source_root.map(Path::to_owned),
+            runtime_module_roots: runtime_module_roots.clone(),
         }
     }
 
     pub fn resolve(&self, module_path: &str) -> Result<ResolvedModule, ModuleResolutionError> {
         let segments = parse_segments(module_path)?;
+        if let Some(module_name) = segments.get(1)
+            && segments.first() == Some(&"std")
+            && let Some(root) = self.runtime_module_roots.get(*module_name)
+        {
+            if segments.len() != 2 {
+                return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
+            }
+            return resolve_directory(module_path, root, module_name);
+        }
         let (root, module_segments) = self.root_and_segments(&segments);
         if module_segments.is_empty() {
             return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));

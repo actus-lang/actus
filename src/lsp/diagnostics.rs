@@ -98,6 +98,7 @@ fn analyze_test_fixture(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     Some(crate::modules::analyze_with_imports_for_target(program, &resolver, target).map(|_| ()))
 }
@@ -114,6 +115,7 @@ fn analyze_package_module(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     let result = match module_path_for_file(configuration.source_root(), &path) {
         Some(module_path) => crate::modules::analyze_module_with_overlays_for_target(
