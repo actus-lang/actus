@@ -12,6 +12,7 @@ pub struct Program {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TopLevelDecl {
+    Constant(ConstantDecl),
     Verb(VerbDecl),
     ExternalVerb(ExternalVerbDecl),
     Struct(StructDef),
@@ -21,6 +22,16 @@ pub enum TopLevelDecl {
     Perform(PerformDecl),
     OpenSibling(OpenSiblingDecl),
     Import(ImportDecl),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConstantDecl {
+    pub is_open: bool,
+    pub doc: Option<String>,
+    pub name: String,
+    pub ty: TypeName,
+    pub initializer: crate::ast::Expr,
+    pub span: SourceSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

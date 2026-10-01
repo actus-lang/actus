@@ -24,6 +24,26 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn inlines_typed_named_constants_natively() {
+    let status = run_array_fixture(
+        "typed-named-constant",
+        "const ANSWER: u32 = 41u32; verb main() -> Int { return ANSWER as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn inlines_chained_named_constants_natively() {
+    let status = run_array_fixture(
+        "chained-typed-named-constants",
+        "const OFFSET: Int = 41; const ANSWER: Int = OFFSET + 1; verb main() -> Int { return ANSWER; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_value_producing_if_branches_natively() {
     let status = run_array_fixture(
         "conditional-expression",

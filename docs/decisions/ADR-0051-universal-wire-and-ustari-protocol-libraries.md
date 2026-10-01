@@ -51,6 +51,29 @@ a 2-byte CRC trailer. The exact constants are named in the implementation and
 are part of the protocol version. Multi-byte values have one explicit wire
 byte order; host endianness must never affect serialized bytes.
 
+#### Version 1 frame constants
+
+The first wire version fixes the following values. They are protocol
+constants, not host configuration:
+
+- magic bytes: `0x41, 0x57` (`AW`), in that order;
+- version: `1`;
+- header length: `12` bytes;
+- trailer length: `2` bytes;
+- maximum payload: `1024` bytes;
+- maximum complete frame: `1038` bytes (`12 + 1024 + 2`);
+- multi-byte fields: little-endian;
+- header layout: magic `[2]`, version `u8`, flags `u8`, message `u8`,
+  channel `u8`, sequence `u32`, payload length `u16`;
+- version 1 permits no flag bits; every flag bit is reserved and non-zero
+  flags are rejected;
+- integrity: CRC16-CCITT-FALSE with polynomial `0x1021`, initial value
+  `0xffff`, non-reflected input and output, and final XOR `0x0000`.
+
+The complete-frame bound includes the fixed header, the maximum payload, and
+the CRC trailer. A later protocol version must publish a new versioned
+constant set rather than changing these values in place.
+
 The codec must validate the header and payload length before reading payload
 bytes. It must reject unknown versions, reserved flags, impossible lengths,
 invalid CRC values, truncated frames, and insufficient output capacity with

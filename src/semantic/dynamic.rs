@@ -77,6 +77,7 @@ impl Analyzer {
         let mut role_names = Vec::new();
         for declaration in &program.declarations {
             match declaration {
+                TopLevelDecl::Constant(_) => {}
                 TopLevelDecl::Verb(verb) => {
                     self.collect_dynamic_parameters(&mut role_names, &verb.params)
                 }

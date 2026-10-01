@@ -19,6 +19,7 @@ pub(super) fn normalize_program(program: &Program) -> Program {
             _ => {}
         }
     }
+    super::constants::inline_constants(&mut normalized);
     normalized
 }
 

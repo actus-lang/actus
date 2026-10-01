@@ -341,6 +341,33 @@ fn build_command_executes_if_else_control_flow() {
 
 #[cfg(unix)]
 #[test]
+fn build_command_executes_statement_if_break_inside_a_loop() {
+    let root = std::env::temp_dir().join(format!("actus-cli-if-break-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(&input, "verb main() -> Int { loop { if 1 == 1 { break; }; } return 42; }\n")
+        .expect("write source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run executable");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
 fn build_command_executes_signed_relational_comparison() {
     let root =
         std::env::temp_dir().join(format!("actus-cli-signed-relational-{}", std::process::id()));

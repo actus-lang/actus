@@ -21,6 +21,9 @@ fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ConstantShiftCountOutOfRange { count, width } => {
             format!("constant shift count `{count}` is outside the valid range `0..{width}`")
         }
+        SemanticErrorKind::ConstantRuntimeDependency { name } => {
+            format!("constant `{name}` must use a compile-time expression")
+        }
         _ => return None,
     };
     Some(message)

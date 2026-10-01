@@ -45,6 +45,15 @@ fn preserves_typed_float_literal_suffixes() {
 }
 
 #[test]
+fn formats_typed_constants_and_keeps_their_documentation() {
+    let formatted = format_source(
+        "\"\"\"Frame size.\"\"\" open const FRAME_SIZE: u16 = 32u16; verb main() { return; }",
+    );
+    assert!(formatted.contains("\"\"\"Frame size.\"\"\"\nopen const FRAME_SIZE: u16 = 32u16;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formatter_idempotence_holds_for_the_source_corpus() {
     let sources = [
         "verb main() -> Int { return 42; }",

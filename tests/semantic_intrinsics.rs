@@ -37,6 +37,50 @@ fn validates_print_arguments() {
 }
 
 #[test]
+fn validates_typed_constants_and_resolves_constant_references() {
+    analyze_source("const FRAME_HEADER: u16 = 12u16; verb main() -> u16 { return FRAME_HEADER; }")
+        .expect("typed constant reference should be valid");
+}
+
+#[test]
+fn rejects_duplicate_and_overflowing_constants() {
+    let duplicate =
+        analyze_source("const LIMIT: u8 = 4u8; const LIMIT: u8 = 8u8; verb main() { return; }")
+            .expect_err("duplicate constants must be rejected");
+    assert!(
+        matches!(duplicate.kind, SemanticErrorKind::DuplicateConstantName { name } if name == "LIMIT")
+    );
+
+    analyze_source("const LIMIT: u8 = 256u16; verb main() { return; }")
+        .expect_err("constant overflow must be rejected");
+
+    let cycle = analyze_source(
+        "const FIRST: u8 = SECOND; const SECOND: u8 = FIRST; verb main() { return; }",
+    )
+    .expect_err("constant cycles must be rejected");
+    assert!(matches!(cycle.kind, SemanticErrorKind::ConstantCycle { .. }));
+}
+
+#[test]
+fn accepts_forward_referenced_constant_expressions() {
+    analyze_source(
+        "const ANSWER: Int = OFFSET + 1; const OFFSET: Int = 41; verb main() -> Int { return ANSWER; }",
+    )
+    .expect("constant expressions may reference later constants");
+}
+
+#[test]
+fn rejects_runtime_dependencies_in_constant_initializers() {
+    let error = analyze_source(
+        "verb runtime_value() -> Int { return 41; } const ANSWER: Int = runtime_value(); verb main() { return; }",
+    )
+    .expect_err("constants must not depend on runtime calls");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ConstantRuntimeDependency { name } if name == "ANSWER")
+    );
+}
+
+#[test]
 fn validates_relational_operand_families() {
     analyze_source("verb main() -> Bool { return 1 < 2; }")
         .expect("matching Int operands should compare");

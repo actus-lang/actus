@@ -5,9 +5,39 @@ This roadmap implements
 The work is intentionally split between a reusable binary codec and the
 universal communication protocol built on top of it.
 
+## Priority prerequisite: ADR-0052 language ergonomics and core correctness
+
+Wire implementation is intentionally deferred until the compiler can express
+bounded codec algorithms directly and lower them deterministically. The
+following prerequisite gates have priority over every wire and Ustari gate:
+
+- [x] **Gate P0.1: Named compile-time constants** — add typed, immutable,
+      compile-time constants with cycle, overflow, and runtime-dependency
+      validation; lower them without runtime storage or ABI symbols.
+      Evidence: parser spans, semantic duplicate/overflow/cycle/runtime checks,
+      formatter round-trip, chained native execution, and full repository gates.
+- [ ] **Gate P0.2: Statement conditionals and diverging branches** — separate
+      statement `if` from expression `if`, classify diverging branches, and
+      preserve ownership joins.
+- [ ] **Gate P0.3: Case and loop control-flow correctness** — support valid
+      `return`, `break`, and `continue` paths in case blocks and make nested
+      loop CFG lowering deterministic.
+- [ ] **Gate P0.4: Type-directed integer ergonomics** — reduce unnecessary
+      temporary bindings for typed literals and same-type arithmetic without
+      introducing implicit numeric or ownership conversions.
+- [ ] **Gate P0.5: Facade-aware type resolution** — distinguish exported,
+      private, missing, and malformed declarations with actionable diagnostics.
+- [ ] **Gate P0.6: Tooling and regression evidence** — update parser,
+      semantic, codegen, formatter, LSP, and native tests for each preceding
+      gate and pass the repository quality checks.
+
+No `std::wire` or `std::ustari` implementation gate may be closed while a
+priority prerequisite is open. The detailed architecture is recorded in
+[ADR-0052](../decisions/ADR-0052-core-control-flow-constants-and-type-directed-ergonomics.md).
+
 ## Gate 0: Contract and module boundary
 
-- [ ] Confirm the versioned frame constants, byte order, flag policy, maximum
+- [x] Confirm the versioned frame constants, byte order, flag policy, maximum
       payload, maximum complete-frame length, and CRC parameters.
 - [x] Define the public typed error taxonomy for framing, capacity, integrity,
       version, security, authorization, and protocol failures.
@@ -15,9 +45,12 @@ universal communication protocol built on top of it.
       serializer, and reassembly operations.
 - [x] Define the boundary between `std::wire`, `std::ustari`, and transport
       adapters before implementation begins.
-- [ ] Add the runtime registry entries as `target-neutral` modules.
+- [x] Add the runtime registry entry for `std::wire` as a `target-neutral`
+      module.
+- [ ] Add the `std::ustari` runtime registry entry after the wire foundation
+      is complete.
 
-## Gate 1: `std::wire` frame model and deterministic codec
+## Gate 1: `std::wire` frame model and deterministic codec (after ADR-0052)
 
 - [ ] Add the canonical `wire` facade and responsibility-specific siblings.
 - [ ] Implement fixed-width little-endian field encoding and decoding.
@@ -98,6 +131,10 @@ universal communication protocol built on top of it.
       diff validation before closing the roadmap.
 
 ## Explicit deferrals
+
+- The complete wire and Ustari implementation is deferred until all ADR-0052
+  priority prerequisite gates are closed. This is an intentional dependency,
+  not an abandoned feature.
 
 - Physical transport implementations are deferred until the core codec and
   protocol contracts are complete.

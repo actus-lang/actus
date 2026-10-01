@@ -9,10 +9,10 @@ mod types;
 
 pub use abi::ForeignAbi;
 pub use decl::{
-    DispatchMode, EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl, GenericParam,
-    ImportDecl, LayoutEndianness, LimitlessScope, MetaAttribute, OpenSiblingDecl, PackDecl,
-    PackField, Param, PerformDecl, Program, ReturnAccess, ReturnType, Role, RoleDecl, RoleMethod,
-    StructDef, StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl,
+    ConstantDecl, DispatchMode, EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl,
+    GenericParam, ImportDecl, LayoutEndianness, LimitlessScope, MetaAttribute, OpenSiblingDecl,
+    PackDecl, PackField, Param, PerformDecl, Program, ReturnAccess, ReturnType, Role, RoleDecl,
+    RoleMethod, StructDef, StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl,
     builtin_enum_definitions,
 };
 pub use expr::{

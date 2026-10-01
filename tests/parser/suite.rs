@@ -28,6 +28,23 @@ fn parses_a_verb_with_roles_and_return_type() {
 }
 
 #[test]
+fn parses_typed_named_constants_with_source_spans() {
+    let program = parse_source(
+        "\"\"\"CRC polynomial.\"\"\" const CRC16_POLYNOMIAL: u16 = 4129u16; verb main() { return 0; }",
+    );
+    let TopLevelDecl::Constant(constant) = &program.declarations[0] else {
+        panic!("expected constant")
+    };
+    assert_eq!(constant.name, "CRC16_POLYNOMIAL");
+    assert_eq!(constant.ty.name, "u16");
+    assert_eq!(constant.doc.as_deref(), Some("CRC polynomial."));
+    assert!(
+        matches!(constant.initializer, Expr::Integer { ref value, ref suffix, .. } if value == "4129" && suffix.as_deref() == Some("u16"))
+    );
+    assert!(constant.span.start < constant.span.end);
+}
+
+#[test]
 fn parses_target_metadata_into_the_verb_ast() {
     let program = parse_source("meta target(\"unix\") verb platform_action() { return 0; }");
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };

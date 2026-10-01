@@ -5,6 +5,7 @@ mod buffer_index;
 mod calls;
 mod case;
 mod cleanup;
+mod constants;
 mod control_flow;
 mod declarations;
 mod dynamic_call;

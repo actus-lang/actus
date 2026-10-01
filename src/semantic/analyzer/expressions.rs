@@ -202,6 +202,9 @@ impl Analyzer {
     }
 
     fn visit_identifier(&self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
+        if self.constants.contains_key(name) {
+            return Ok(());
+        }
         let index = self.binding(name, span)?;
         self.ensure_readable(index, name, span)
     }

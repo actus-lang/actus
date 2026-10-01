@@ -12,7 +12,9 @@ fn parse_verb(source: &str) -> actus::ast::VerbDecl {
     let program = parse(tokens).expect("source should parse");
     match program.declarations.into_iter().next().expect("verb should exist") {
         actus::ast::TopLevelDecl::Verb(verb) => verb,
-        actus::ast::TopLevelDecl::ExternalVerb(_) => panic!("expected regular verb"),
+        actus::ast::TopLevelDecl::ExternalVerb(_) | actus::ast::TopLevelDecl::Constant(_) => {
+            panic!("expected regular verb")
+        }
         actus::ast::TopLevelDecl::Struct(_)
         | actus::ast::TopLevelDecl::Pack(_)
         | actus::ast::TopLevelDecl::Enum(_)

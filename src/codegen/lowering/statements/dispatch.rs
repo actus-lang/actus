@@ -207,21 +207,18 @@ fn lower_field_or_return<'source>(
             string_data,
             layouts,
         ),
-        Stmt::IndexAssignment { target, index, value, .. } => {
-            super::super::super::arrays::lower_array_assignment(
-                function,
-                target,
-                index,
-                value,
-                locals,
-                types,
-                functions,
-                cleanup_schedule,
-                string_data,
-                layouts,
-            )
-            .map(|()| Flow::Fallthrough)
-        }
+        Stmt::IndexAssignment { target, index, value, .. } => lower_index_assignment_statement(
+            function,
+            target,
+            index,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
         Stmt::Return { value, span } => super::lower_return_statement(
             function,
             value.as_ref(),
@@ -235,6 +232,51 @@ fn lower_field_or_return<'source>(
         ),
         _ => unreachable!(),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_index_assignment_statement(
+    function: &mut FunctionBuilder<'_>,
+    target: &crate::ast::Expr,
+    index: &crate::ast::Expr,
+    value: &crate::ast::Expr,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
+    let result = if super::super::super::structs::expression_native_type(target, types, layouts)
+        == Some(NativeType::Buffer)
+    {
+        super::super::super::buffer_index::lower_buffer_assignment(
+            function,
+            target,
+            index,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )
+    } else {
+        super::super::super::arrays::lower_array_assignment(
+            function,
+            target,
+            index,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )
+    };
+    result.map(|()| Flow::Fallthrough)
 }
 
 #[allow(clippy::too_many_arguments)]
