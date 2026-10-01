@@ -20,6 +20,8 @@ pub(crate) struct ActusManifest {
     pub(crate) build: BuildManifest,
     #[serde(default)]
     pub(crate) profile: ProfilesManifest,
+    #[serde(default)]
+    pub(crate) runtime: Option<RuntimeManifest>,
 }
 
 #[derive(Deserialize)]
@@ -66,6 +68,36 @@ pub enum RuntimeProfile {
     #[default]
     Core,
     Std,
+    Freestanding,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RuntimeManifest {
+    pub(crate) kind: RuntimePackageKind,
+    #[serde(default)]
+    pub(crate) modules: Vec<RuntimeModuleManifest>,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum RuntimePackageKind {
+    Builtin,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RuntimeModuleManifest {
+    pub(crate) name: String,
+    pub(crate) path: String,
+    #[serde(default)]
+    pub(crate) targets: Vec<RuntimeTargetClass>,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum RuntimeTargetClass {
+    Hosted,
     Freestanding,
 }
 
@@ -146,7 +178,8 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
 pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     validate_package(manifest)?;
     validate_build(manifest)?;
-    validate_libraries(manifest)
+    validate_libraries(manifest)?;
+    validate_runtime_manifest(manifest)
 }
 
 fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
@@ -197,6 +230,34 @@ fn validate_libraries(manifest: &ActusManifest) -> Result<(), ConfigurationError
             "Actus.toml library name `{}` must be non-empty and must not start with `-`",
             library.name
         )));
+    }
+    Ok(())
+}
+
+fn validate_runtime_manifest(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
+    let Some(runtime) = &manifest.runtime else { return Ok(()) };
+    match runtime.kind {
+        RuntimePackageKind::Builtin => {}
+    }
+    let mut names = std::collections::BTreeSet::new();
+    for module in &runtime.modules {
+        if module.name.trim().is_empty() || module.path.trim().is_empty() {
+            return Err(ConfigurationError(
+                "Actus.toml runtime modules require non-empty name and path".to_owned(),
+            ));
+        }
+        if !names.insert(&module.name) {
+            return Err(ConfigurationError(format!(
+                "Actus.toml runtime module `{}` is declared more than once",
+                module.name
+            )));
+        }
+        if module.targets.is_empty() {
+            return Err(ConfigurationError(format!(
+                "Actus.toml runtime module `{}` must declare at least one target class",
+                module.name
+            )));
+        }
     }
     Ok(())
 }
