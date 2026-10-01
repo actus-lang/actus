@@ -22,9 +22,11 @@ following prerequisite gates have priority over every wire and Ustari gate:
       Evidence: dedicated statement AST, semicolon-free parser path, native
       loop-break execution, divergent expression typing, formatter round-trip,
       and LSP nested-binding traversal.
-- [ ] **Gate P0.3: Case and loop control-flow correctness** — support valid
+- [x] **Gate P0.3: Case and loop control-flow correctness** — support valid
       `return`, `break`, and `continue` paths in case blocks and make nested
       loop CFG lowering deterministic.
+      Evidence: case-loop native execution, nested case/short-circuit loop
+      regression coverage, cleanup-plan tests, and full native test suite.
 - [ ] **Gate P0.4: Type-directed integer ergonomics** — reduce unnecessary
       temporary bindings for typed literals and same-type arithmetic without
       introducing implicit numeric or ownership conversions.
