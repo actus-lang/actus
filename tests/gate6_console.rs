@@ -56,7 +56,7 @@ fn write_console_project(root: &Path) {
     .expect("write project manifest");
     fs::write(
         root.join("src/main.act"),
-        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 79); append(text, 75); println(text: abs text); eprintln(text: abs text); return 9; }\n",
+        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 79); append(text, 75); printlnb(text: abs text); eprintln(text: abs text); return 9; }\n",
     )
     .expect("write console application");
 }

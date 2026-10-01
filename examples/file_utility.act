@@ -42,7 +42,7 @@ verb process_file(abs path: Path, abs payload: Buffer) -> Int {
     case dat loaded {
         Result.Err(_) => { return 12; },
         Result.Ok(value) => {
-            print(text: abs value);
+            printb(text: abs value);
             flush();
             drop(value);
             return inspect_and_remove(path: abs path);

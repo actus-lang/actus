@@ -173,9 +173,10 @@ fn signature_parts(
 fn map_type(name: &str) -> Result<CAbiType, CAbiError> {
     match lookup_builtin_type(name) {
         Some(BuiltinType::Int) => Ok(CAbiType::Int32),
-        Some(BuiltinType::Buffer) => Ok(CAbiType::OpaquePointer),
-        Some(BuiltinType::Bool | BuiltinType::String | BuiltinType::Array | BuiltinType::Map)
-        | None => Err(CAbiError::UnsupportedType { name: name.to_owned() }),
+        Some(BuiltinType::Buffer | BuiltinType::String) => Ok(CAbiType::OpaquePointer),
+        Some(BuiltinType::Bool | BuiltinType::Array | BuiltinType::Map) | None => {
+            Err(CAbiError::UnsupportedType { name: name.to_owned() })
+        }
     }
 }
 

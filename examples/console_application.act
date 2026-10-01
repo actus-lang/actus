@@ -10,7 +10,7 @@ verb main() -> Int {
     erg result = read_line(buffer: ins input);
     return case dat result {
         Result.Ok(_) => {
-            println(text: abs input);
+            printlnb(text: abs input);
             eprintln(text: abs input);
             flush();
             return 0;
