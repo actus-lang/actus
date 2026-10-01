@@ -62,7 +62,7 @@ pub(crate) struct BuildManifest {
     pub(crate) libraries: Vec<LibraryManifest>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RuntimeProfile {
     #[default]

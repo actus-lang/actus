@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-const LOCKFILE_VERSION: u32 = 1;
+const LOCKFILE_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LockedPackage {
@@ -19,6 +19,7 @@ pub struct LockedPackage {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ActusLock {
     pub lockfile_version: u32,
+    pub runtime: super::manifest::RuntimeProfile,
     #[serde(rename = "package")]
     pub packages: Vec<LockedPackage>,
 }
@@ -44,7 +45,11 @@ impl ActusLock {
                 &right.path,
             ))
         });
-        Self { lockfile_version: LOCKFILE_VERSION, packages }
+        Self {
+            lockfile_version: LOCKFILE_VERSION,
+            runtime: super::manifest::RuntimeProfile::Core,
+            packages,
+        }
     }
 
     pub fn serialize(&self) -> Result<String, LockfileError> {
@@ -59,6 +64,8 @@ impl ActusLock {
     }
 
     pub fn generate_from_manifest(path: &Path) -> Result<Self, LockfileError> {
+        let manifest =
+            super::manifest::read(path).map_err(|error| LockfileError(error.to_string()))?;
         let graph = super::dependencies::resolve(path, false)
             .map_err(|error| LockfileError(error.to_string()))?;
         let packages = graph
@@ -72,12 +79,14 @@ impl ActusLock {
                 checksum: package.checksum,
             })
             .collect();
-        Ok(Self::from_packages(packages))
+        let mut lockfile = Self::from_packages(packages);
+        lockfile.runtime = manifest.build.runtime.unwrap_or_default();
+        Ok(lockfile)
     }
 
     pub fn validate_against_manifest(&self, path: &Path) -> Result<(), LockfileError> {
         let expected = Self::generate_from_manifest(path)?;
-        if self.packages != expected.packages {
+        if self.runtime != expected.runtime || self.packages != expected.packages {
             return Err(LockfileError(
                 "LockfileOutOfDate: Actus.lock does not match Actus.toml dependencies".to_owned(),
             ));

@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::configuration::CompilerConfiguration;
 use actus::lexer::scan;
-use actus::modules::{ModuleResolver, resolve_imports};
+use actus::modules::{ModuleResolver, build_compilation_plan, resolve_imports};
 use actus::parser::parse;
 
 struct Fixture {
@@ -131,7 +131,31 @@ fn resolves_builtin_standard_library_from_runtime_profile() {
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     );
-    resolve_imports(&program, &resolver).expect("builtin std facade should resolve");
+    build_compilation_plan(&program, &resolver).expect("builtin std facade should resolve");
+}
+
+#[test]
+fn builtin_runtime_plan_contains_only_imported_modules() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "Actus.toml",
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n\n[build]\nruntime = \"std\"\n",
+    );
+    fixture.write("src/main.act", "import std::io;");
+
+    let configuration = CompilerConfiguration::from_input_path(&fixture.root.join("src/main.act"))
+        .expect("std runtime manifest should load");
+    let program = imported_program("import std::io;");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+    let plan = build_compilation_plan(&program, &resolver).expect("runtime plan should build");
+    let module_paths =
+        plan.units().iter().map(|unit| unit.identity().module_path()).collect::<Vec<_>>();
+    assert_eq!(module_paths, vec!["std::io"]);
 }
 
 #[test]

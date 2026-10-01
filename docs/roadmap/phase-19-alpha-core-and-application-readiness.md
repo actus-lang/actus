@@ -194,34 +194,36 @@ Implementation evidence completed so far:
 - [x] Consume builtin module roots from `library/std/Actus.toml` instead of
       relying only on directory-name conventions.
 
-- [ ] Define the manifest schema for `runtime = "core" | "std" |
+- [x] Define the manifest schema for `runtime = "core" | "std" |
       "freestanding"`, including the default profile and edition-aware
       compatibility rules.
-- [ ] Keep `core` implicit and dependency-free; it must not require users to
+- [x] Keep `core` implicit and dependency-free; it must not require users to
       spell out a path to compiler-owned runtime sources.
-- [ ] Make `std` opt in through the manifest and resolve the compiler-owned
+- [x] Make `std` opt in through the manifest and resolve the compiler-owned
       standard-library package from a versioned builtin/sysroot location.
-- [ ] Define canonical standard-library imports and facades so a project can
+- [x] Define canonical standard-library imports and facades so a project can
       use `std::io`, `std::fs`, and `std::path` without copying the library
       into its own `src/` tree or configuring absolute host paths.
 - [ ] Define target capability metadata for builtin modules, distinguishing
       target-neutral, hosted, and embedded standard-library surfaces.
-- [ ] Allow `runtime = "std"` on freestanding targets while rejecting
+- [x] Allow `runtime = "std"` on freestanding targets while rejecting
       hosted-only imports such as `std::fs` before code generation.
-- [ ] Preserve explicit local dependency resolution for third-party and
+- [x] Preserve explicit local dependency resolution for third-party and
       workspace packages, while rejecting ambiguous aliases or declarations
       that conflict with the selected runtime profile.
-- [ ] Build only standard-library modules reachable from the project's import
+- [x] Build only standard-library modules reachable from the project's import
       graph; unused `std` modules must not be compiled or linked implicitly.
-- [ ] Include runtime profile, standard-library version, target, and profile
-      in lockfile validation and artifact identity so builds remain
+- [x] Include the selected runtime profile, target, and build profile in
+      lockfile validation and persistent artifact identity.
+- [ ] Include the compiler-owned standard-library version/checksum in lockfile
+      validation and artifact identity so runtime source changes remain
       reproducible across machines.
 - [ ] Define diagnostics for missing runtime metadata, unsupported runtime
       values, incompatible imports, and attempts to use `std` from a
       freestanding build.
 - [ ] Add `actus init` templates that declare the intended runtime profile and
       produce a valid first build without manual standard-library wiring.
-- [ ] Add accepted and rejected manifest tests for `core`, `std`, and
+- [x] Add accepted and rejected manifest tests for `core`, `std`, and
       `freestanding`, including lockfile mismatch and conflicting dependency
       cases.
 - [ ] Add native integration tests proving that `std` applications compile
