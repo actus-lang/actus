@@ -239,6 +239,12 @@ fn lower_assignment<'source>(
         string_data,
         layouts,
     )?;
+    let value = types
+        .get(name)
+        .and_then(|ty| ty.ir_type(layouts.pointer_type).ok())
+        .map_or(value, |target| {
+            crate::codegen::expressions::coerce_to_ir_type(function, value, target)
+        });
     if locals.contains_key(name) {
         super::super::structs::emit_binding_drop(
             function, name, locals, types, functions, layouts,

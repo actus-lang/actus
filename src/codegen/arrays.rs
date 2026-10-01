@@ -7,7 +7,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::expressions::lower_expression;
+use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
@@ -84,6 +84,7 @@ pub(super) fn lower_array_assignment(
             .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
         copy_bytes(function, value, address, size);
     } else {
+        let value = coerce_to_ir_type(function, value, layouts.ir_type(element)?);
         function.ins().store(MemFlagsData::new(), value, address, 0);
     }
     Ok(())

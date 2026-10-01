@@ -314,8 +314,7 @@ matching.
 - [ ] Preserve `erg`, `abs`, `dat`, and `ins` mutation and loan contracts for
       compound assignment targets.
 - [x] Perform compile-time range checks for typed integer literals and reject
-      signedness, width, and declared-type mismatches.
-      incompatible signedness, widths, and primitive families.
+      incompatible signedness, widths, and declared primitive types.
 
 ### Gate 19.3.2.3: Native Lowering and Runtime Behavior
 
@@ -366,7 +365,7 @@ matching.
 
 - [x] Simple boolean control flow no longer requires synthetic `case` arms.
 - [ ] Scalar loops can increment typed unsigned indices directly.
-- [ ] Typed literals make width and signedness explicit without temporary
+- [x] Typed integer literals make width and signedness explicit without temporary
       bindings or implicit conversions.
 - [ ] Native execution, ownership cleanup, formatter output, LSP behavior,
       and diagnostics agree on one implementation.

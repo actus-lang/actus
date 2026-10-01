@@ -19,7 +19,9 @@ pub(crate) fn initializer_type(
         Expr::Identifier { name, .. } => types.get(name).copied().ok_or_else(|| {
             NativeEmitError(format!("native type for binding `{name}` is unavailable"))
         }),
-        Expr::Integer { .. } => Ok(NativeType::Int),
+        Expr::Integer { suffix, .. } => {
+            Ok(suffix.as_deref().and_then(NativeType::from_name).unwrap_or(NativeType::Int))
+        }
         Expr::BufferLiteral { .. } => Ok(NativeType::Buffer),
         Expr::FloatLiteral { .. } => Ok(NativeType::Float { width: 64 }),
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {

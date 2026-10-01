@@ -87,7 +87,9 @@ fn lower_expression_with_context(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     match expression {
-        Expr::Integer { value, .. } => lower_integer(function, value),
+        Expr::Integer { value, suffix, .. } => {
+            lower_integer_expression(function, value, suffix.as_deref(), context)
+        }
         Expr::BufferLiteral { length, .. } => lower_buffer_literal(function, length, context),
         Expr::FloatLiteral { value, .. } => lower_float(function, value),
         Expr::StringLiteral { value, .. } => lower_string(function, value, context.string_data),
@@ -134,6 +136,18 @@ fn lower_expression_with_context(
         },
         _ => lower_complex_expression(function, expression, context),
     }
+}
+
+fn lower_integer_expression(
+    function: &mut FunctionBuilder<'_>,
+    value: &str,
+    suffix: Option<&str>,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, NativeEmitError> {
+    let value = lower_integer(function, value)?;
+    let Some(suffix) = suffix else { return Ok(value) };
+    let Some(native_type) = NativeType::from_name(suffix) else { return Ok(value) };
+    Ok(coerce_to_ir_type(function, value, native_type.ir_type(context.layouts.pointer_type)?))
 }
 
 fn lower_buffer_literal(
