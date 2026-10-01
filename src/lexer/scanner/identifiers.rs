@@ -58,6 +58,7 @@ fn keyword_or_identifier(text: &str) -> TokenKind {
         "case" => TokenKind::Case,
         "as" => TokenKind::As,
         "if" => TokenKind::If,
+        "else" => TokenKind::Else,
         "true" => TokenKind::True,
         "false" => TokenKind::False,
         "_" => TokenKind::Underscore,

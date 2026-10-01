@@ -54,6 +54,10 @@ impl Parser {
         if self.match_simple(TokenKind::Equals) {
             return self.parse_assignment(expression);
         }
+        if matches!(expression, Expr::If { .. }) && self.check_simple(&TokenKind::RightBrace) {
+            let span = expression_span(&expression);
+            return Ok(Stmt::Expression { expression, span });
+        }
         let start = expression_span(&expression).start;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })

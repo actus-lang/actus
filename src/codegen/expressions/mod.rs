@@ -16,6 +16,7 @@ use super::types::NativeType;
 mod buffer;
 mod cast;
 mod construct;
+mod if_lowering;
 mod initializer_types;
 mod literals;
 mod operations;
@@ -167,6 +168,7 @@ fn lower_complex_expression(
         Expr::Try { expression, span } => {
             lower_try_expression(function, expression, *span, context)
         }
+        Expr::If { .. } => if_lowering::lower_if(function, expression, context),
         Expr::Unary { .. } | Expr::Binary { .. } => lower_operation(function, expression, context),
         _ => lower_construct_or_case(function, expression, context),
     }

@@ -20,7 +20,7 @@ mod owners;
 mod try_lowering;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_statements<'source>(
+pub(crate) fn lower_statements<'source>(
     function: &mut FunctionBuilder<'_>,
     statements: &'source [Stmt],
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,

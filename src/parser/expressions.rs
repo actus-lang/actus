@@ -35,6 +35,7 @@ impl Parser {
             TokenKind::StringLiteral(value) => Ok(Expr::StringLiteral { value, span: token.span }),
             TokenKind::Ref => self.parse_borrow_prefix(token.span),
             TokenKind::Case => self.parse_case_expression(),
+            TokenKind::If => self.parse_if_expression(token.span),
             found => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken { expected: "expression".to_owned(), found },
@@ -178,7 +179,11 @@ impl Parser {
             let qualified_name = format_type_application(&name, &type_arguments);
             return Ok(Expr::Identifier { name: qualified_name, span });
         }
-        if !self.case_subject && self.match_simple(TokenKind::LeftBrace) {
+        let is_type_name = name.chars().next().is_some_and(char::is_uppercase);
+        if !self.case_subject
+            && (is_type_name || !type_arguments.is_empty())
+            && self.match_simple(TokenKind::LeftBrace)
+        {
             return self.parse_struct_literal(name, type_arguments, span.start);
         }
         if !type_arguments.is_empty() {

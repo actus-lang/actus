@@ -154,6 +154,7 @@ fn normalize_expression(
             normalize_binary(left, right, signatures, locals);
         }
         Expr::Case { .. } => normalize_case(expression, expected, signatures, locals),
+        Expr::If { .. } => {}
         Expr::StructLit { fields, .. } => normalize_struct_fields(fields, signatures, locals),
         Expr::FieldAccess { object, .. } => {
             normalize_expression(object, None, signatures, locals);
@@ -339,6 +340,7 @@ fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
         | Expr::Case { span, .. }
+        | Expr::If { span, .. }
         | Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
         | Expr::BufferLiteral { span, .. }

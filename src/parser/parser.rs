@@ -3,6 +3,7 @@ use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
 mod case;
+mod conditional;
 mod cursor;
 mod declarations;
 mod enums;

@@ -130,6 +130,20 @@ fn return_and_generic_rules_have_positive_and_negative_fixtures() {
 }
 
 #[test]
+fn conditional_guards_require_bool_values() {
+    analyze_source("verb choose(erg ready: Bool) { if ready { print(1); } else { print(0); }; }")
+        .expect("Bool conditional guard should pass");
+
+    let invalid =
+        expect_semantic_error("verb main() -> Int { if 1 { return 1; } else { return 0; } }");
+    assert!(matches!(
+        invalid.kind,
+        SemanticErrorKind::GuardTypeMismatch { ref found } if found == "Int"
+    ));
+    assert_eq!(semantic_diagnostic(&invalid).code(), "E1063");
+}
+
+#[test]
 fn malformed_generic_keys_and_primitive_rules_have_fixtures() {
     analyze_source("struct Box[T] { item: T, } verb main(erg item: Box[Int]) { }")
         .expect("well-formed generic key should pass");

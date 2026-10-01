@@ -45,6 +45,9 @@ impl Formatter<'_> {
             Expr::Case { mode, subject, branches, .. } => {
                 self.case_expression(*mode, subject, branches)
             }
+            Expr::If { condition, then_branch, else_branch, .. } => {
+                self.if_expression(condition, then_branch, else_branch.as_ref())
+            }
         }
     }
 
@@ -208,6 +211,25 @@ impl Formatter<'_> {
         self.indent -= 1;
         self.line_indent();
         self.output.push('}');
+    }
+
+    fn if_expression(
+        &mut self,
+        condition: &Expr,
+        then_branch: &crate::ast::Block,
+        else_branch: Option<&crate::ast::IfBranch>,
+    ) {
+        self.output.push_str("if ");
+        self.expression(condition);
+        self.output.push(' ');
+        self.block(then_branch);
+        if let Some(else_branch) = else_branch {
+            self.output.push_str(" else ");
+            match else_branch {
+                crate::ast::IfBranch::Block(block) => self.block(block),
+                crate::ast::IfBranch::ElseIf(expression) => self.expression(expression),
+            }
+        }
     }
 
     fn pattern(&mut self, pattern: &crate::ast::Pattern) {

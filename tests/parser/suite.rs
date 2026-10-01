@@ -56,6 +56,22 @@ fn parses_limitless_metadata_at_verb_and_file_scope() {
 }
 
 #[test]
+fn parses_if_else_and_nested_else_if_expressions() {
+    let program = parse_source(
+        "verb choose(erg ready: Bool) { if ready { return 1; } else if ready { return 2; } else { return 3; } }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Expression { expression, .. } = &verb.body.statements[0] else {
+        panic!("expected conditional expression")
+    };
+    let Expr::If { else_branch: Some(actus::ast::IfBranch::ElseIf(nested)), .. } = expression
+    else {
+        panic!("expected nested else-if")
+    };
+    assert!(matches!(nested.as_ref(), Expr::If { .. }));
+}
+
+#[test]
 fn rejects_unsupported_limitless_scope() {
     let (tokens, errors) = scan("meta limitless(\"project\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

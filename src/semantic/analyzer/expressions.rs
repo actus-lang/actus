@@ -62,6 +62,7 @@ impl Analyzer {
             Expr::Case { mode, subject, branches, span } => {
                 self.visit_case_expression(*mode, subject, branches, *span)
             }
+            Expr::If { .. } => self.visit_if_expression(expression),
             Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
     }

@@ -171,6 +171,7 @@ pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
         | Expr::Case { span, .. }
-        | Expr::Cast { span, .. } => *span,
+        | Expr::Cast { span, .. }
+        | Expr::If { span, .. } => *span,
     }
 }

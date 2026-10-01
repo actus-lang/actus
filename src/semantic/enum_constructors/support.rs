@@ -80,6 +80,7 @@ pub(super) fn argument_span(argument: &Argument) -> SourceSpan {
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
         | Expr::Case { span, .. }
+        | Expr::If { span, .. }
         | Expr::Cast { span, .. } => *span,
     }
 }

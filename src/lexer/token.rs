@@ -51,6 +51,7 @@ pub enum TokenKind {
     Case,
     As,
     If,
+    Else,
     True,
     False,
     Underscore,

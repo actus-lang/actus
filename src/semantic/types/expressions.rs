@@ -55,6 +55,7 @@ impl Analyzer {
                 .ok()
                 .and_then(|type_name| lookup_builtin_type(&type_name.name)),
             Expr::Case { branches, .. } => self.case_expression_type(branches),
+            Expr::If { .. } => None,
         }
     }
 

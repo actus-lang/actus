@@ -63,6 +63,7 @@ impl Analyzer {
             Expr::StructLit { name, span, .. } => Err(self.invalid_guard_access(name, *span)),
             Expr::Index { span, .. } => Err(self.invalid_guard_access("index", *span)),
             Expr::Case { span, .. } => Err(self.invalid_guard_access("case", *span)),
+            Expr::If { span, .. } => Err(self.invalid_guard_access("if", *span)),
         }
     }
 

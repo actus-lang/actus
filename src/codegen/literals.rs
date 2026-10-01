@@ -132,6 +132,13 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
             collect_expression(index, values);
         }
         Expr::Case { subject, branches, .. } => collect_case(subject, branches, values),
+        Expr::If { condition, then_branch, else_branch, .. } => {
+            collect_expression(condition, values);
+            collect_block(&then_branch.statements, values);
+            if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
+                collect_block(&block.statements, values);
+            }
+        }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
         | Expr::BufferLiteral { .. }
