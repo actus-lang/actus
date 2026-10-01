@@ -33,11 +33,16 @@ following prerequisite gates have priority over every wire and Ustari gate:
       Evidence: unsuffixed literals are directed only by a known integer
       operand, range-checked against that type, and covered by semantic and
       native compound-arithmetic tests.
-- [ ] **Gate P0.5: Facade-aware type resolution** — distinguish exported,
+- [x] **Gate P0.5: Facade-aware type resolution** — distinguish exported,
       private, missing, and malformed declarations with actionable diagnostics.
-- [ ] **Gate P0.6: Tooling and regression evidence** — update parser,
+      Evidence: facade resolver, private-import, missing-facade, exported
+      signature, and module-diagnostic regression suites.
+- [x] **Gate P0.6: Tooling and regression evidence** — update parser,
       semantic, codegen, formatter, LSP, and native tests for each preceding
       gate and pass the repository quality checks.
+      Evidence: parser/semantic/codegen/formatter/LSP/native coverage and the
+      complete formatting, compilation, Clippy, test, source-limit, and diff
+      gates passing after P0.1-P0.4.
 
 No `std::wire` or `std::ustari` implementation gate may be closed while a
 priority prerequisite is open. The detailed architecture is recorded in
