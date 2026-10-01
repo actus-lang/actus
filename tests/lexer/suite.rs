@@ -188,6 +188,29 @@ fn scans_comparison_and_logical_operators() {
 }
 
 #[test]
+fn scans_compound_assignment_operators_as_single_tokens() {
+    let (tokens, errors) = scan("+= -= *= /= %= &= |= ^= <<= >>=");
+
+    assert!(errors.is_empty());
+    assert_eq!(
+        tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+        vec![
+            &TokenKind::PlusEquals,
+            &TokenKind::MinusEquals,
+            &TokenKind::StarEquals,
+            &TokenKind::SlashEquals,
+            &TokenKind::PercentEquals,
+            &TokenKind::AmpersandEquals,
+            &TokenKind::PipeEquals,
+            &TokenKind::CaretEquals,
+            &TokenKind::ShiftLeftEquals,
+            &TokenKind::ShiftRightEquals,
+            &TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
 fn records_half_open_byte_spans() {
     let (tokens, errors) = scan("erg buf");
 

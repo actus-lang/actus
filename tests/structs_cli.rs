@@ -50,6 +50,26 @@ fn executes_struct_field_assignment() {
 
 #[cfg(unix)]
 #[test]
+fn executes_struct_field_compound_assignment() {
+    build_and_run(
+        "struct Point { x: Int, y: Int, } verb main() -> Int { erg point = Point { x: 5, y: 0, }; point.x += 37; return point.x; }\n",
+        "struct-compound-assignment",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_pack_field_compound_assignment() {
+    build_and_run(
+        "pack Register { erg storage: u8; layout little; fields { erg value: u8 at 0; } } verb main() -> Int { erg register = Register { storage: 5u8, }; register.value += 37u8; return register.value as Int; }\n",
+        "pack-compound-assignment",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_nested_struct_access_and_owned_drop() {
     build_and_run(
         "struct Inner { x: Int, y: Int, } struct Holder { inner: Inner, erg payload: Buffer, } verb main() -> Int { erg holder = Holder { inner: Inner { x: 40, y: 2, }, payload: Buffer[4], }; return holder.inner.x + holder.inner.y; }\n",

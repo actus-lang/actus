@@ -15,9 +15,12 @@ use super::super::structs::emit_binding_drop;
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
+mod compound;
 mod dispatch;
 mod owners;
 mod try_lowering;
+
+pub(crate) use compound::lower_compound_assignment;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_statements<'source>(

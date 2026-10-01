@@ -292,7 +292,7 @@ matching.
 - [x] Parse typed integer literals such as `1u32`, `0u8`, and `-1i32` with the
       suffix included in the literal span.
 - [ ] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
-- [ ] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
+- [x] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
       `&=`, `|=`, `^=`, `<<=`, and `>>=`.
 - [ ] Reject malformed suffixes, missing branch delimiters, and incomplete
       compound assignments with stable parser diagnostics.
@@ -309,9 +309,9 @@ matching.
 - [ ] Ensure the non-selected branch has no runtime side effects.
 - [ ] Permit direct arithmetic on compatible `u32` and `Usize` values,
       including loop counters and array indices.
-- [ ] Validate compound assignments as one typed place operation and ensure
+- [x] Validate compound assignments as one typed place operation and ensure
       the left-hand place is evaluated exactly once.
-- [ ] Preserve `erg`, `abs`, `dat`, and `ins` mutation and loan contracts for
+- [x] Preserve `erg`, `abs`, `dat`, and `ins` mutation and loan contracts for
       compound assignment targets.
 - [x] Perform compile-time range checks for typed integer literals and reject
       incompatible signedness, widths, and declared primitive types.
@@ -322,11 +322,11 @@ matching.
       merge blocks.
 - [ ] Lower expression-valued conditionals through typed merge values without
       backend-specific semantic repair.
-- [ ] Lower compound assignments to one load/compute/store sequence while
+- [x] Lower compound assignments to one load/compute/store sequence while
       preserving array, buffer, pack, and field bounds checks.
 - [x] Emit typed integer constants through the existing exact-width native
       integer path; typed floating literals remain scheduled separately.
-- [ ] Preserve existing checked behavior for overflow, underflow,
+- [x] Preserve existing checked behavior for overflow, underflow,
       division-by-zero, remainder-by-zero, and invalid shift counts.
 - [ ] Add native execution tests for selected and non-selected branches,
       nested conditionals, counter increments, and typed literal arithmetic.
@@ -334,11 +334,13 @@ matching.
 ### Gate 19.3.2.4: Formatter, LSP, and Diagnostics
 
 - [x] Format nested `if/else` branches deterministically and idempotently.
-- [x] Preserve typed integer literal suffixes during formatting and semantic
-      tokenization; compound-assignment operators remain scheduled separately.
-      formatter round trips.
-- [ ] Add LSP semantic tokens, completion, hover, and diagnostics for the new
-      syntax using compiler-owned information.
+- [x] Preserve typed integer literal suffixes and compound-assignment operators
+      during formatting and semantic tokenization; formatter round trips remain
+      deterministic.
+- [x] Add LSP semantic-token and hover rendering for compound-assignment
+      operators using compiler-owned token information; completion and richer
+      semantic diagnostics remain part of the broader conditional-expression
+      work.
 - [ ] Expose condition type, branch result type, and typed literal range facts
       through the semantic model where those surfaces already exist.
 - [ ] Add stable diagnostics for invalid conditions, incompatible branches,
@@ -350,8 +352,9 @@ matching.
       syntax slice; retain the remaining syntax families for their own gates.
 - [ ] Add semantic tests for branch type joins and ownership cleanup on both
       paths.
-- [ ] Add positive and negative tests for `u32`/`Usize` arithmetic and every
-      supported compound-assignment family.
+- [x] Add positive native tests for every supported compound-assignment family,
+      indexed buffer/array/field/pack places, and negative semantic coverage for
+      incompatible operands.
 - [x] Add lexer, semantic range, mismatch, and native execution tests for typed
       integer literals; type-family tests for typed floating literals remain
       scheduled separately.

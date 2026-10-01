@@ -5,7 +5,7 @@ use cranelift_codegen::ir::{
 };
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::Expr;
+use crate::ast::{BinaryOp, Expr};
 
 use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::layout::LayoutRegistry;
@@ -87,6 +87,55 @@ pub(super) fn lower_array_assignment(
         let value = coerce_to_ir_type(function, value, layouts.ir_type(element)?);
         function.ins().store(MemFlagsData::new(), value, address, 0);
     }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_array_compound_assignment(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    operator: BinaryOp,
+    value: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let (address, element) = lower_array_address(
+        function,
+        target,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    if matches!(element, NativeType::Struct(_) | NativeType::Array(_)) {
+        return Err(NativeEmitError(
+            "compound assignment requires a scalar array element".to_owned(),
+        ));
+    }
+    let current = function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0);
+    let right = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let right = coerce_to_ir_type(function, right, layouts.ir_type(element)?);
+    let updated = super::expressions::lower_compound_integer_operation(
+        function, current, operator, right, element,
+    )?;
+    function.ins().store(MemFlagsData::new(), updated, address, 0);
     Ok(())
 }
 

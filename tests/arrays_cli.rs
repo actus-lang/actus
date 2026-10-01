@@ -24,6 +24,36 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_compound_assignments_natively() {
+    let status = run_array_fixture(
+        "compound-assignments",
+        "verb main() -> Int { erg value: u8 = 5u8; value += 7u8; value -= 2u8; value *= 3u8; value /= 5u8; value %= 4u8; value &= 3u8; value |= 4u8; value ^= 1u8; value <<= 1u8; value >>= 1u8; return value as Int; }",
+    );
+    assert_eq!(status.code(), Some(7));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_index_compound_assignment_with_one_address_calculation() {
+    let status = run_array_fixture(
+        "compound-index-assignment",
+        "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0u8] = 5u8; values[0u8] += 37u8; return values[0u8] as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_buffer_index_compound_assignment() {
+    let status = run_array_fixture(
+        "compound-buffer-assignment",
+        "verb main() -> Int { erg bytes: Buffer = Buffer[0]; append(bytes, 5u8); bytes[0u8] += 37u8; return bytes[0u8] as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn reads_first_and_last_buffer_bytes_with_dynamic_indexing() {
     let status = run_array_fixture(
         "buffer-index",

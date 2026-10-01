@@ -215,7 +215,7 @@ fn lower_indexed_pack_field_assignment(
     Ok(())
 }
 
-fn seal_checked_pack_block(
+pub(super) fn seal_checked_pack_block(
     function: &mut cranelift_frontend::FunctionBuilder<'_>,
     field_type: NativeType,
     block_name: &str,
@@ -226,7 +226,7 @@ fn seal_checked_pack_block(
     }
 }
 
-fn update_pack_binding(
+pub(super) fn update_pack_binding(
     locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
     name: &str,
     updated: cranelift_codegen::ir::Value,
@@ -240,7 +240,7 @@ fn update_pack_binding(
     Ok(())
 }
 
-fn ensure_pack_field_is_mutable(
+pub(super) fn ensure_pack_field_is_mutable(
     field_layout: &PackFieldLayout,
     field: &str,
 ) -> Result<(), NativeEmitError> {
@@ -321,7 +321,7 @@ pub(crate) fn lower_pack_field(
     ))
 }
 
-fn lower_pack_field_write(
+pub(super) fn lower_pack_field_write(
     function: &mut FunctionBuilder<'_>,
     storage: cranelift_codegen::ir::Value,
     new_value: cranelift_codegen::ir::Value,
@@ -388,7 +388,7 @@ fn shift_value(
     }
 }
 
-fn packed_field<'a>(
+pub(super) fn packed_field<'a>(
     pack: &'a super::super::layout::PackLayout,
     field: &str,
 ) -> Result<&'a PackFieldLayout, NativeEmitError> {
@@ -475,7 +475,7 @@ fn mapped_bit_offset_for_storage(
     }
 }
 
-fn binding_name(expression: &Expr) -> Result<&String, NativeEmitError> {
+pub(super) fn binding_name(expression: &Expr) -> Result<&String, NativeEmitError> {
     match expression {
         Expr::Identifier { name, .. } => Ok(name),
         _ => Err(NativeEmitError("packed assignment requires a direct binding".to_owned())),

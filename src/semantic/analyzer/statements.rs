@@ -1,4 +1,4 @@
-use crate::ast::{Block, Expr, Role, Stmt};
+use crate::ast::{BinaryOp, Block, CompoundAssignmentTarget, Expr, Role, Stmt};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::SemanticError;
@@ -25,6 +25,9 @@ impl Analyzer {
             Stmt::IndexAssignment { target, index, value, .. } => {
                 self.visit_index_assignment(target, index, value)
             }
+            Stmt::CompoundAssignment { target, operator, value, span } => {
+                self.visit_compound_assignment(target, *operator, value, *span)
+            }
             Stmt::Expression { expression, span } => self.visit_expr_statement(expression, *span),
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => self.visit_loop(block),
@@ -32,6 +35,54 @@ impl Analyzer {
             Stmt::Continue { span } => self.visit_loop_control(false, *span),
             Stmt::Drop { name, span } => self.drop_binding(name, *span),
             Stmt::Block(block) => self.visit_nested_block(block),
+        }
+    }
+
+    fn visit_compound_assignment(
+        &mut self,
+        target: &CompoundAssignmentTarget,
+        operator: crate::ast::CompoundAssignmentOp,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let binary_operator = match operator {
+            crate::ast::CompoundAssignmentOp::Add => BinaryOp::Add,
+            crate::ast::CompoundAssignmentOp::Subtract => BinaryOp::Subtract,
+            crate::ast::CompoundAssignmentOp::Multiply => BinaryOp::Multiply,
+            crate::ast::CompoundAssignmentOp::Divide => BinaryOp::Divide,
+            crate::ast::CompoundAssignmentOp::Remainder => BinaryOp::Remainder,
+            crate::ast::CompoundAssignmentOp::BitwiseAnd => BinaryOp::BitwiseAnd,
+            crate::ast::CompoundAssignmentOp::BitwiseOr => BinaryOp::BitwiseOr,
+            crate::ast::CompoundAssignmentOp::BitwiseXor => BinaryOp::BitwiseXor,
+            crate::ast::CompoundAssignmentOp::ShiftLeft => BinaryOp::ShiftLeft,
+            crate::ast::CompoundAssignmentOp::ShiftRight => BinaryOp::ShiftRight,
+        };
+        match target {
+            CompoundAssignmentTarget::Identifier(name) => {
+                let binding = self.binding(name, span)?;
+                self.ensure_mutable(binding, name, span)?;
+                let left = Expr::Identifier { name: name.clone(), span };
+                self.visit_expression(value)?;
+                self.validate_binary_operator(binary_operator, &left, value)
+            }
+            CompoundAssignmentTarget::Field { object, field } => {
+                let left = Expr::FieldAccess {
+                    object: Box::new(object.clone()),
+                    field: field.clone(),
+                    span,
+                };
+                self.validate_field_assignment(object, field, value, span)?;
+                self.validate_binary_operator(binary_operator, &left, value)
+            }
+            CompoundAssignmentTarget::Index { target, index } => {
+                let left = Expr::Index {
+                    target: Box::new(target.clone()),
+                    index: Box::new(index.clone()),
+                    span,
+                };
+                self.visit_index_assignment(target, index, value)?;
+                self.validate_binary_operator(binary_operator, &left, value)
+            }
         }
     }
 

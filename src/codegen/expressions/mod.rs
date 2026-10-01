@@ -30,6 +30,7 @@ pub(super) use literals::{
     coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
     lower_wide_integer,
 };
+pub(super) use operations::lower_compound_integer_operation;
 pub(super) use operations::lower_operation;
 pub(super) use try_lowering::lower_try_expression;
 

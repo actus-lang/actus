@@ -157,6 +157,35 @@ fn lower_integer_operation(
     })
 }
 
+pub(in crate::codegen) fn lower_compound_integer_operation(
+    function: &mut FunctionBuilder<'_>,
+    left: cranelift_codegen::ir::Value,
+    operator: BinaryOp,
+    right: cranelift_codegen::ir::Value,
+    left_type: NativeType,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if matches!(operator, BinaryOp::Divide | BinaryOp::Remainder) {
+        trap_if_zero(function, right);
+    }
+    if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
+        trap_if_shift_count_exceeds_width(function, right, left);
+    }
+    Ok(match operator {
+        BinaryOp::Add => function.ins().iadd(left, right),
+        BinaryOp::Subtract => function.ins().isub(left, right),
+        BinaryOp::Multiply => function.ins().imul(left, right),
+        BinaryOp::Divide => integer_divide(function, left, right, left_type),
+        BinaryOp::Remainder => integer_remainder(function, left, right, left_type),
+        BinaryOp::BitwiseAnd => function.ins().band(left, right),
+        BinaryOp::BitwiseOr => function.ins().bor(left, right),
+        BinaryOp::BitwiseXor => function.ins().bxor(left, right),
+        BinaryOp::ShiftLeft => function.ins().ishl(left, right),
+        BinaryOp::ShiftRight if is_signed(left_type) => function.ins().sshr(left, right),
+        BinaryOp::ShiftRight => function.ins().ushr(left, right),
+        _ => return Err(NativeEmitError("unsupported compound operator".to_owned())),
+    })
+}
+
 fn integer_divide(
     function: &mut FunctionBuilder<'_>,
     left: cranelift_codegen::ir::Value,

@@ -21,5 +21,5 @@ pub use expr::{
 pub use intrinsic::{IntrinsicKind, IntrinsicSpec, lookup_call_intrinsic, lookup_intrinsic};
 pub use pattern::{LiteralPattern, NamedPattern, Pattern, PatternBinding, VariantPayload};
 pub use registry::RegistryStatus;
-pub use stmt::{Block, Stmt};
+pub use stmt::{Block, CompoundAssignmentOp, CompoundAssignmentTarget, Stmt};
 pub use types::{BuiltinType, BuiltinTypeSpec, PrimitiveType, lookup_builtin_type, primitive_type};

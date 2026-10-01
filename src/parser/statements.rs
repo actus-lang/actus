@@ -1,4 +1,4 @@
-use crate::ast::{Block, Expr, Role, Stmt};
+use crate::ast::{Block, CompoundAssignmentOp, CompoundAssignmentTarget, Expr, Role, Stmt};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
@@ -54,6 +54,9 @@ impl Parser {
         if self.match_simple(TokenKind::Equals) {
             return self.parse_assignment(expression);
         }
+        if let Some(operator) = self.match_compound_assignment() {
+            return self.parse_compound_assignment(expression, operator);
+        }
         if matches!(expression, Expr::If { .. }) && self.check_simple(&TokenKind::RightBrace) {
             let span = expression_span(&expression);
             return Ok(Stmt::Expression { expression, span });
@@ -61,6 +64,57 @@ impl Parser {
         let start = expression_span(&expression).start;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })
+    }
+
+    fn match_compound_assignment(&mut self) -> Option<CompoundAssignmentOp> {
+        let operator = match self.peek()?.kind {
+            TokenKind::PlusEquals => CompoundAssignmentOp::Add,
+            TokenKind::MinusEquals => CompoundAssignmentOp::Subtract,
+            TokenKind::StarEquals => CompoundAssignmentOp::Multiply,
+            TokenKind::SlashEquals => CompoundAssignmentOp::Divide,
+            TokenKind::PercentEquals => CompoundAssignmentOp::Remainder,
+            TokenKind::AmpersandEquals => CompoundAssignmentOp::BitwiseAnd,
+            TokenKind::PipeEquals => CompoundAssignmentOp::BitwiseOr,
+            TokenKind::CaretEquals => CompoundAssignmentOp::BitwiseXor,
+            TokenKind::ShiftLeftEquals => CompoundAssignmentOp::ShiftLeft,
+            TokenKind::ShiftRightEquals => CompoundAssignmentOp::ShiftRight,
+            _ => return None,
+        };
+        self.advance_required("compound assignment operator").ok()?;
+        Some(operator)
+    }
+
+    fn parse_compound_assignment(
+        &mut self,
+        expression: Expr,
+        operator: CompoundAssignmentOp,
+    ) -> Result<Stmt, ParseError> {
+        let value = self.parse_expression()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        let span = SourceSpan::new(expression_span(&expression).start, end);
+        let target = match expression {
+            Expr::Identifier { name, .. } => CompoundAssignmentTarget::Identifier(name),
+            Expr::FieldAccess { object, field, .. } => {
+                CompoundAssignmentTarget::Field { object: *object, field }
+            }
+            Expr::Index { target, index, .. } => {
+                CompoundAssignmentTarget::Index { target: *target, index: *index }
+            }
+            _ => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "assignable binding, field, or index".to_owned(),
+                        found: self
+                            .peek()
+                            .map(|token| token.kind.clone())
+                            .unwrap_or(TokenKind::Eof),
+                    },
+                    span,
+                });
+            }
+        };
+        Ok(Stmt::CompoundAssignment { target, operator, value, span })
     }
 
     fn parse_assignment(&mut self, expression: Expr) -> Result<Stmt, ParseError> {

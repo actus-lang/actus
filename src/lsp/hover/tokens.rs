@@ -52,6 +52,16 @@ pub(super) fn operator_at(tokens: &[Token], offset: usize) -> Option<(&'static s
             TokenKind::Minus => "-",
             TokenKind::Star => "*",
             TokenKind::Slash => "/",
+            TokenKind::PlusEquals => "+=",
+            TokenKind::MinusEquals => "-=",
+            TokenKind::StarEquals => "*=",
+            TokenKind::SlashEquals => "/=",
+            TokenKind::PercentEquals => "%=",
+            TokenKind::AmpersandEquals => "&=",
+            TokenKind::PipeEquals => "|=",
+            TokenKind::CaretEquals => "^=",
+            TokenKind::ShiftLeftEquals => "<<=",
+            TokenKind::ShiftRightEquals => ">>=",
             _ => return None,
         };
         Some((operator, token.span))

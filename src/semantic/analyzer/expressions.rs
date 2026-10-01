@@ -184,7 +184,7 @@ impl Analyzer {
         self.validate_binary_operator(*operator, left, right)
     }
 
-    fn validate_binary_operator(
+    pub(super) fn validate_binary_operator(
         &self,
         operator: BinaryOp,
         left: &Expr,

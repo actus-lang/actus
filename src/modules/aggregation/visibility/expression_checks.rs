@@ -53,6 +53,19 @@ fn check_block_with_context(
                 check_expr_with_context(index, context)?;
                 check_expr_with_context(value, context)?;
             }
+            Stmt::CompoundAssignment { target, value, .. } => {
+                match target {
+                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
+                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
+                        check_expr_with_context(object, context)?;
+                    }
+                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
+                        check_expr_with_context(target, context)?;
+                        check_expr_with_context(index, context)?;
+                    }
+                }
+                check_expr_with_context(value, context)?;
+            }
             Stmt::Return { value: None, .. } | Stmt::Break { .. } | Stmt::Continue { .. } => {}
             Stmt::Loop(nested) | Stmt::Block(nested) => {
                 check_block_with_context(nested, context)?;

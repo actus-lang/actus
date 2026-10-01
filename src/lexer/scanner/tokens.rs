@@ -9,30 +9,10 @@ impl<'source> Scanner<'source> {
         if self.scan_simple_token(character, start) {
             return;
         }
+        if self.scan_operator(character, start) {
+            return;
+        }
         match character {
-            '<' if self.match_character('<') => self.push_simple(TokenKind::ShiftLeft, start),
-            '<' if self.match_character('=') => self.push_simple(TokenKind::LessEquals, start),
-            '<' => self.push_simple(TokenKind::LessThan, start),
-            '=' if self.match_character('>') => self.push_simple(TokenKind::FatArrow, start),
-            '=' if self.match_character('=') => self.push_simple(TokenKind::DoubleEquals, start),
-            '=' => self.push_simple(TokenKind::Equals, start),
-            '>' if self.match_character('>') => self.push_simple(TokenKind::ShiftRight, start),
-            '>' if self.match_character('=') => self.push_simple(TokenKind::GreaterEquals, start),
-            '>' => self.push_simple(TokenKind::GreaterThan, start),
-            '!' if self.match_character('=') => self.push_simple(TokenKind::BangEquals, start),
-            '!' => self.push_simple(TokenKind::Bang, start),
-            '%' => self.push_simple(TokenKind::Percent, start),
-            '&' if self.match_character('&') => self.push_simple(TokenKind::AndAnd, start),
-            '&' => self.push_simple(TokenKind::Ampersand, start),
-            '|' if self.match_character('|') => self.push_simple(TokenKind::OrOr, start),
-            '|' => self.push_simple(TokenKind::Pipe, start),
-            '^' => self.push_simple(TokenKind::Caret, start),
-            '~' => self.push_simple(TokenKind::Tilde, start),
-            '+' => self.push_simple(TokenKind::Plus, start),
-            '-' if self.match_character('>') => self.push_simple(TokenKind::Arrow, start),
-            '-' => self.push_simple(TokenKind::Minus, start),
-            '*' => self.push_simple(TokenKind::Star, start),
-            '/' => self.push_simple(TokenKind::Slash, start),
             '.' => self.push_simple(TokenKind::Dot, start),
             '?' => self.push_simple(TokenKind::Question, start),
             '0' if matches!(self.peek(), Some('x' | 'X')) => self.scan_hex_integer(start),
@@ -49,6 +29,59 @@ impl<'source> Scanner<'source> {
                 SourceSpan::new(start, self.cursor),
             )),
         }
+    }
+
+    fn scan_operator(&mut self, character: char, start: usize) -> bool {
+        let kind = match character {
+            '<' if self.peek() == Some('<') => {
+                self.advance();
+                if self.match_character('=') {
+                    TokenKind::ShiftLeftEquals
+                } else {
+                    TokenKind::ShiftLeft
+                }
+            }
+            '<' if self.match_character('=') => TokenKind::LessEquals,
+            '<' => TokenKind::LessThan,
+            '=' if self.match_character('>') => TokenKind::FatArrow,
+            '=' if self.match_character('=') => TokenKind::DoubleEquals,
+            '=' => TokenKind::Equals,
+            '>' if self.peek() == Some('>') => {
+                self.advance();
+                if self.match_character('=') {
+                    TokenKind::ShiftRightEquals
+                } else {
+                    TokenKind::ShiftRight
+                }
+            }
+            '>' if self.match_character('=') => TokenKind::GreaterEquals,
+            '>' => TokenKind::GreaterThan,
+            '!' if self.match_character('=') => TokenKind::BangEquals,
+            '!' => TokenKind::Bang,
+            '%' if self.match_character('=') => TokenKind::PercentEquals,
+            '%' => TokenKind::Percent,
+            '&' if self.match_character('&') => TokenKind::AndAnd,
+            '&' if self.match_character('=') => TokenKind::AmpersandEquals,
+            '&' => TokenKind::Ampersand,
+            '|' if self.match_character('|') => TokenKind::OrOr,
+            '|' if self.match_character('=') => TokenKind::PipeEquals,
+            '|' => TokenKind::Pipe,
+            '^' if self.match_character('=') => TokenKind::CaretEquals,
+            '^' => TokenKind::Caret,
+            '~' => TokenKind::Tilde,
+            '+' if self.match_character('=') => TokenKind::PlusEquals,
+            '+' => TokenKind::Plus,
+            '-' if self.match_character('>') => TokenKind::Arrow,
+            '-' if self.match_character('=') => TokenKind::MinusEquals,
+            '-' => TokenKind::Minus,
+            '*' if self.match_character('=') => TokenKind::StarEquals,
+            '*' => TokenKind::Star,
+            '/' if self.match_character('=') => TokenKind::SlashEquals,
+            '/' => TokenKind::Slash,
+            _ => return false,
+        };
+        self.push_simple(kind, start);
+        true
     }
 
     fn scan_simple_token(&mut self, character: char, start: usize) -> bool {

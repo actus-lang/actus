@@ -91,6 +91,19 @@ fn normalize_statement(
             normalize_expression(index, None, signatures, locals);
             normalize_expression(value, None, signatures, locals);
         }
+        Stmt::CompoundAssignment { target, value, .. } => {
+            match target {
+                crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
+                crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
+                    normalize_expression(object, None, signatures, locals)
+                }
+                crate::ast::CompoundAssignmentTarget::Index { target, index } => {
+                    normalize_expression(target, None, signatures, locals);
+                    normalize_expression(index, None, signatures, locals);
+                }
+            }
+            normalize_expression(value, None, signatures, locals);
+        }
         Stmt::Expression { expression, .. } => {
             normalize_expression(expression, None, signatures, locals);
         }

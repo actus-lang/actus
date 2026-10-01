@@ -129,6 +129,16 @@ fn operator_token_type(kind: &TokenKind) -> Option<u32> {
             | TokenKind::Minus
             | TokenKind::Star
             | TokenKind::Slash
+            | TokenKind::PlusEquals
+            | TokenKind::MinusEquals
+            | TokenKind::StarEquals
+            | TokenKind::SlashEquals
+            | TokenKind::PercentEquals
+            | TokenKind::AmpersandEquals
+            | TokenKind::PipeEquals
+            | TokenKind::CaretEquals
+            | TokenKind::ShiftLeftEquals
+            | TokenKind::ShiftRightEquals
     )
     .then_some(9)
 }
