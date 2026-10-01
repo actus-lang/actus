@@ -1,4 +1,6 @@
 use std::fs;
+#[cfg(unix)]
+use std::process::Command;
 
 use actus::cli::run_with_args;
 
@@ -40,6 +42,33 @@ fn run_command_builds_and_executes_source() {
 
     assert_eq!(result, 42);
     let _ = fs::remove_file(input);
+}
+
+#[cfg(unix)]
+#[test]
+fn build_command_returns_zero_for_a_void_hosted_entry() {
+    let root = std::env::temp_dir().join(format!("actus-cli-void-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(&input, "verb main() -> Void { return; }\n").expect("write source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = Command::new(&output).status().expect("run Void executable");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
 }
 
 #[cfg(unix)]

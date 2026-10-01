@@ -6,7 +6,7 @@ use crate::ast::{ExternalVerbDecl, TopLevelDecl, VerbDecl};
 use crate::target::TargetSpec;
 
 use super::super::abi::{validate_external_native_signature, validate_native_signature};
-use super::super::declarations::declare_functions;
+use super::super::declarations::{FunctionDeclarationContext, declare_functions};
 use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataIds;
@@ -43,14 +43,25 @@ pub(super) fn declare_all_functions(
     performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
     context: DeclarationContext<'_>,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let force_entry_return = target_requires_host_runtime(context.target)
+        && verbs.iter().any(|verb| {
+            context.entry_symbol == Some(verb.name.as_str())
+                && verb
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|return_type| return_type.ty.name == "Void")
+        });
     let mut metadata = declare_functions(
         module,
         verbs,
         external_verbs,
-        context.entry_symbol,
-        context.namespace_prefix,
-        context.layouts,
-        context.bindings,
+        FunctionDeclarationContext {
+            entry_symbol: context.entry_symbol,
+            namespace_prefix: context.namespace_prefix,
+            layouts: context.layouts,
+            bindings: context.bindings,
+            force_entry_return,
+        },
     )?;
     metadata.extend(super::super::performance::declare_performance_functions(
         module,
@@ -117,11 +128,16 @@ pub(super) fn define_verbs(
     layouts: &LayoutRegistry,
     vtable_data: &super::super::vtable::VtableDataIds,
     namespace_prefix: &str,
+    entry_symbol: Option<&str>,
+    target: &TargetSpec,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let meta = functions
             .get(&verb.name)
             .ok_or_else(|| NativeEmitError(format!("missing native function `{}`", verb.name)))?;
+        let force_entry_return = entry_symbol == Some(verb.name.as_str())
+            && matches!(target.entry_contract(), crate::target::EntryContract::Hosted)
+            && verb.return_type.as_ref().is_some_and(|return_type| return_type.ty.name == "Void");
         define_function(
             module,
             frontend_config,
@@ -133,6 +149,7 @@ pub(super) fn define_verbs(
             layouts,
             vtable_data,
             namespace_prefix,
+            force_entry_return,
         )?;
     }
     Ok(())

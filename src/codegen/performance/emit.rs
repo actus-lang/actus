@@ -41,6 +41,7 @@ pub(in crate::codegen) fn define_performances(
             layouts,
             vtable_data,
             namespace_prefix,
+            false,
         )?;
     }
     Ok(())

@@ -179,6 +179,8 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmit
         layouts: &layouts,
         vtable_data: &vtable_data,
         namespace_prefix: inputs.namespace_prefix,
+        entry_symbol: inputs.symbol,
+        target: inputs.target,
     })?;
     module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
 }
@@ -251,6 +253,8 @@ struct EmissionDefinitions<'items, 'program> {
     layouts: &'items LayoutRegistry,
     vtable_data: &'items super::super::vtable::VtableDataIds,
     namespace_prefix: &'items str,
+    entry_symbol: Option<&'items str>,
+    target: &'items TargetSpec,
 }
 
 fn define_emission_functions(
@@ -275,6 +279,8 @@ fn define_verb_bodies(
         inputs.layouts,
         inputs.vtable_data,
         inputs.namespace_prefix,
+        inputs.entry_symbol,
+        inputs.target,
     )
 }
 

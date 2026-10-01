@@ -10,7 +10,7 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::VerbDecl;
 
-use super::declarations::native_signature_for_definition;
+use super::declarations::{native_signature_for_definition, native_signature_for_entry};
 use super::layout::LayoutRegistry;
 use super::literals::{StringDataIds, StringDataValues, declare_string_values};
 use super::lowering::lower_body;
@@ -33,9 +33,14 @@ pub(super) fn define_function(
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
+    force_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
-    context.func.signature = native_signature_for_definition(module, verb, layouts)?;
+    context.func.signature = if force_entry_return {
+        native_signature_for_entry(module, verb, layouts, true)?
+    } else {
+        native_signature_for_definition(module, verb, layouts)?
+    };
     lower_function_body(
         module,
         &mut context,
@@ -47,6 +52,7 @@ pub(super) fn define_function(
         layouts,
         vtable_data,
         namespace_prefix,
+        force_entry_return,
     )?;
     module
         .define_function(metadata.id, &mut context)
@@ -67,6 +73,7 @@ fn lower_function_body(
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
+    force_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let mut string_values =
@@ -82,12 +89,14 @@ fn lower_function_body(
         cleanup_schedule,
         &string_values,
         layouts,
+        force_entry_return,
     )?;
-    emit_flow(&mut function, return_type, return_slot, flow, layouts)?;
+    emit_flow(&mut function, return_type, return_slot, flow, layouts, force_entry_return)?;
     function.finalize(frontend_config);
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_function_flow(
     function: &mut FunctionBuilder<'_>,
     module: &mut ObjectModule,
@@ -96,12 +105,13 @@ fn lower_function_flow(
     cleanup_schedule: &NativeCleanupSchedule,
     string_values: &StringDataValues,
     layouts: &LayoutRegistry,
+    force_entry_return: bool,
 ) -> Result<
     (Option<NativeType>, Option<cranelift_codegen::ir::Value>, super::lowering::Flow),
     NativeEmitError,
 > {
     let (return_type, return_slot, (locals, local_types)) =
-        setup_function_entry(function, module, verb, layouts)?;
+        setup_function_entry(function, module, verb, layouts, force_entry_return)?;
     let flow = lower_body(
         function,
         &verb.body.statements,
@@ -120,6 +130,7 @@ fn setup_function_entry<'a>(
     module: &mut ObjectModule,
     verb: &'a VerbDecl,
     layouts: &LayoutRegistry,
+    force_entry_return: bool,
 ) -> Result<
     (Option<NativeType>, Option<cranelift_codegen::ir::Value>, BoundParameters<'a>),
     NativeEmitError,
@@ -128,7 +139,13 @@ fn setup_function_entry<'a>(
     function.switch_to_block(block);
     function.append_block_params_for_function_params(block);
     let parameters = function.block_params(block).to_vec();
-    let return_type = declared_return_type(verb, layouts)?;
+    let return_type = declared_return_type(verb, layouts)?.map(|return_type| {
+        if force_entry_return && matches!(return_type, NativeType::Void) {
+            NativeType::Int
+        } else {
+            return_type
+        }
+    });
     let return_slot = return_type.filter(|ty| layouts.uses_return_slot(*ty)).map(|_| parameters[0]);
     let parameter_offset = usize::from(return_slot.is_some());
     let (locals, local_types) =
