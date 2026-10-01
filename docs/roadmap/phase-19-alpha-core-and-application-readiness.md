@@ -289,7 +289,7 @@ matching.
       `case` pattern matching semantics.
 - [x] Add AST nodes for conditional expressions and branch bodies with stable
       source spans.
-- [ ] Parse typed integer literals such as `1u32`, `0u8`, and `-1i32` with the
+- [x] Parse typed integer literals such as `1u32`, `0u8`, and `-1i32` with the
       suffix included in the literal span.
 - [ ] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
 - [ ] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
@@ -313,7 +313,8 @@ matching.
       the left-hand place is evaluated exactly once.
 - [ ] Preserve `erg`, `abs`, `dat`, and `ins` mutation and loan contracts for
       compound assignment targets.
-- [ ] Perform compile-time range checks for typed literals and reject
+- [x] Perform compile-time range checks for typed integer literals and reject
+      signedness, width, and declared-type mismatches.
       incompatible signedness, widths, and primitive families.
 
 ### Gate 19.3.2.3: Native Lowering and Runtime Behavior
@@ -324,7 +325,8 @@ matching.
       backend-specific semantic repair.
 - [ ] Lower compound assignments to one load/compute/store sequence while
       preserving array, buffer, pack, and field bounds checks.
-- [ ] Emit exact-width constants for typed integer and floating literals.
+- [x] Emit typed integer constants through the existing exact-width native
+      integer path; typed floating literals remain scheduled separately.
 - [ ] Preserve existing checked behavior for overflow, underflow,
       division-by-zero, remainder-by-zero, and invalid shift counts.
 - [ ] Add native execution tests for selected and non-selected branches,
@@ -333,7 +335,8 @@ matching.
 ### Gate 19.3.2.4: Formatter, LSP, and Diagnostics
 
 - [x] Format nested `if/else` branches deterministically and idempotently.
-- [ ] Preserve typed literal suffixes and compound-assignment operators during
+- [x] Preserve typed integer literal suffixes during formatting and semantic
+      tokenization; compound-assignment operators remain scheduled separately.
       formatter round trips.
 - [ ] Add LSP semantic tokens, completion, hover, and diagnostics for the new
       syntax using compiler-owned information.
@@ -350,7 +353,9 @@ matching.
       paths.
 - [ ] Add positive and negative tests for `u32`/`Usize` arithmetic and every
       supported compound-assignment family.
-- [ ] Add compile-time range tests for typed integer literals and type-family
+- [x] Add lexer, semantic range, mismatch, and native execution tests for typed
+      integer literals; type-family tests for typed floating literals remain
+      scheduled separately.
       rejection tests for typed floating literals.
 - [ ] Prove that `case` remains the required construct for enum and `Result`
       pattern matching.

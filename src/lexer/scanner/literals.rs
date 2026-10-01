@@ -22,7 +22,10 @@ impl<'source> Scanner<'source> {
                 SourceSpan::new(start, self.cursor),
             ));
         }
-        self.tokens.push(Token::new(TokenKind::Integer(text), SourceSpan::new(start, self.cursor)));
+        self.tokens.push(Token::new(
+            TokenKind::Integer { value: text, suffix: None },
+            SourceSpan::new(start, self.cursor),
+        ));
     }
 
     pub(super) fn scan_integer(&mut self, start: usize) {
@@ -43,11 +46,31 @@ impl<'source> Scanner<'source> {
             ));
             return;
         }
-        let text = &self.source[start..self.cursor];
+        let value_end = self.cursor;
+        let suffix = self.scan_integer_suffix();
+        let value = self.source[start..value_end].to_owned();
         self.tokens.push(Token::new(
-            TokenKind::Integer(text.to_owned()),
+            TokenKind::Integer { value, suffix },
             SourceSpan::new(start, self.cursor),
         ));
+    }
+
+    fn scan_integer_suffix(&mut self) -> Option<String> {
+        if !self.peek().is_some_and(is_identifier_continue) {
+            return None;
+        }
+        let start = self.cursor;
+        while self.peek().is_some_and(is_identifier_continue) {
+            self.advance();
+        }
+        let suffix = self.source[start..self.cursor].to_owned();
+        if !is_integer_suffix(&suffix) {
+            self.errors.push(LexError::new(
+                LexErrorKind::InvalidIntegerType(suffix.clone()),
+                SourceSpan::new(start, self.cursor),
+            ));
+        }
+        Some(suffix)
     }
 
     pub(super) fn scan_string(&mut self, start: usize) {
@@ -109,6 +132,17 @@ impl<'source> Scanner<'source> {
 
 fn is_identifier_continue(character: char) -> bool {
     character == '_' || character.is_ascii_alphanumeric()
+}
+
+fn is_integer_suffix(text: &str) -> bool {
+    let Some(prefix) = text.as_bytes().first().copied() else { return false };
+    if !matches!(prefix, b'u' | b'i') || text.len() == 1 {
+        return false;
+    }
+    let Some(width) = text.get(1..).and_then(|digits| digits.parse::<u16>().ok()) else {
+        return false;
+    };
+    (1..=128).contains(&width)
 }
 
 fn normalize_doc_string(content: &str) -> String {

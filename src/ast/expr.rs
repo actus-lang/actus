@@ -13,6 +13,7 @@ pub enum Expr {
     },
     Integer {
         value: String,
+        suffix: Option<String>,
         span: SourceSpan,
     },
     BufferLiteral {

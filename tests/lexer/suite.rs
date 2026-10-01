@@ -43,8 +43,28 @@ fn scans_width_qualified_integer_types_and_hex_literals() {
     assert_eq!(tokens[5].kind, TokenKind::FloatType { width: 32 });
     assert_eq!(tokens[6].kind, TokenKind::FloatType { width: 64 });
     assert_eq!(tokens[7].kind, TokenKind::VoidType);
-    assert_eq!(tokens[8].kind, TokenKind::Integer("0xDEADBEEF".to_owned()));
-    assert_eq!(tokens[9].kind, TokenKind::Integer("0x0".to_owned()));
+    assert_eq!(tokens[8].kind, TokenKind::Integer { value: "0xDEADBEEF".to_owned(), suffix: None });
+    assert_eq!(tokens[9].kind, TokenKind::Integer { value: "0x0".to_owned(), suffix: None });
+}
+
+#[test]
+fn scans_typed_integer_literals_as_single_tokens_with_full_spans() {
+    let (tokens, errors) = scan("1u32 0u8 -1i32");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].span, SourceSpan::new(0, 4));
+    assert_eq!(
+        tokens[0].kind,
+        TokenKind::Integer { value: "1".to_owned(), suffix: Some("u32".to_owned()) }
+    );
+    assert_eq!(
+        tokens[1].kind,
+        TokenKind::Integer { value: "0".to_owned(), suffix: Some("u8".to_owned()) }
+    );
+    assert_eq!(
+        tokens[3].kind,
+        TokenKind::Integer { value: "1".to_owned(), suffix: Some("i32".to_owned()) }
+    );
 }
 
 #[test]

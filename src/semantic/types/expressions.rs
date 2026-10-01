@@ -1,5 +1,6 @@
 use crate::ast::{
     BuiltinType, CaseBody, Expr, IntrinsicKind, Stmt, lookup_builtin_type, lookup_call_intrinsic,
+    primitive_type,
 };
 
 use super::super::analyzer::Analyzer;
@@ -102,6 +103,11 @@ impl Analyzer {
     }
 
     pub(crate) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
+        if let Expr::Integer { suffix: Some(suffix), .. } = expression
+            && matches!(primitive_type(suffix), Some(crate::ast::PrimitiveType::Integer { .. }))
+        {
+            return Some(suffix.clone());
+        }
         if matches!(expression, Expr::FloatLiteral { .. }) {
             return Some("f64".to_owned());
         }

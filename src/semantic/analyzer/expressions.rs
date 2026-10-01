@@ -34,9 +34,15 @@ impl Analyzer {
                 self.visit_binary_expression(left, operator, right)
             }
             Expr::Grouping { expression, .. } => self.visit_expression(expression),
-            Expr::Unary { operator, expression, .. } => {
+            Expr::Unary { operator, expression, span } => {
                 self.visit_expression(expression)?;
-                self.validate_unary_operator(*operator, expression)
+                self.validate_unary_operator(*operator, expression)?;
+                let unary = Expr::Unary {
+                    operator: *operator,
+                    expression: expression.clone(),
+                    span: *span,
+                };
+                self.validate_typed_integer_expression(&unary)
             }
             Expr::Cast { expression, target, span } => {
                 self.visit_expression(expression)?;
@@ -63,7 +69,10 @@ impl Analyzer {
                 self.visit_case_expression(*mode, subject, branches, *span)
             }
             Expr::If { .. } => self.visit_if_expression(expression),
-            Expr::Integer { .. } | Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
+            Expr::Integer { value, suffix, span } => {
+                self.validate_typed_integer_literal(value, suffix.as_deref(), *span)
+            }
+            Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
         }
     }
 

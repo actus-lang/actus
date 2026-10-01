@@ -16,6 +16,14 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_typed_integer_literals_natively() {
+    let status =
+        run_array_fixture("typed-integer-literals", "verb main() -> u32 { return 1u32 + 2u32; }");
+    assert_eq!(status.code(), Some(3));
+}
+
+#[cfg(unix)]
+#[test]
 fn reads_first_and_last_buffer_bytes_with_dynamic_indexing() {
     let status = run_array_fixture(
         "buffer-index",

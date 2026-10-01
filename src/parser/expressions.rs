@@ -30,7 +30,9 @@ impl Parser {
             }
             TokenKind::LeftParen => self.parse_grouped_prefix(token.span),
             TokenKind::Identifier(name) => self.parse_identifier_expression(name, token.span),
-            TokenKind::Integer(value) => Ok(Expr::Integer { value, span: token.span }),
+            TokenKind::Integer { value, suffix } => {
+                Ok(Expr::Integer { value, suffix, span: token.span })
+            }
             TokenKind::FloatLiteral(value) => Ok(Expr::FloatLiteral { value, span: token.span }),
             TokenKind::StringLiteral(value) => Ok(Expr::StringLiteral { value, span: token.span }),
             TokenKind::Ref => self.parse_borrow_prefix(token.span),

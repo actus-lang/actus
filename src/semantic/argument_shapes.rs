@@ -21,7 +21,10 @@ pub(super) fn argument_type_matches(expected: &str, found: &str, expression: &Ex
         return true;
     }
     match primitive_type(expected) {
-        Some(PrimitiveType::Integer { .. }) => is_integer_literal(expression),
+        Some(PrimitiveType::Integer { .. }) => {
+            is_integer_literal(expression)
+                && integer_literal_suffix(expression).is_none_or(|suffix| suffix == expected)
+        }
         Some(PrimitiveType::Float { .. }) => matches!(expression, Expr::FloatLiteral { .. }),
         Some(PrimitiveType::Void) => false,
         None => false,
@@ -35,6 +38,16 @@ fn is_integer_literal(expression: &Expr) -> bool {
             is_integer_literal(expression)
         }
         _ => false,
+    }
+}
+
+fn integer_literal_suffix(expression: &Expr) -> Option<&str> {
+    match expression {
+        Expr::Integer { suffix, .. } => suffix.as_deref(),
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            integer_literal_suffix(expression)
+        }
+        _ => None,
     }
 }
 

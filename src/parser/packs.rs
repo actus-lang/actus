@@ -116,7 +116,7 @@ impl Parser {
 }
 
 fn parse_offset(kind: &TokenKind) -> Option<u16> {
-    let TokenKind::Integer(value) = kind else { return None };
+    let TokenKind::Integer { value, suffix: None } = kind else { return None };
     value.parse::<u16>().ok()
 }
 

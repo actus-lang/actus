@@ -188,7 +188,10 @@ impl Analyzer {
         let expected_name = super::super::analyzer::canonical_type_name(expected);
         let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
         let literal_matches = match primitive_type(&expected.name) {
-            Some(PrimitiveType::Integer { .. }) => integer_literal(value).is_some(),
+            Some(PrimitiveType::Integer { .. }) => {
+                integer_literal(value).is_some()
+                    && integer_literal_suffix(value).is_none_or(|suffix| suffix == expected_name)
+            }
             Some(PrimitiveType::Float { .. }) => matches!(value, Expr::FloatLiteral { .. }),
             Some(PrimitiveType::Void) | None => false,
         };
@@ -223,6 +226,16 @@ impl Analyzer {
             },
             span,
         })
+    }
+}
+
+fn integer_literal_suffix(expression: &Expr) -> Option<&str> {
+    match expression {
+        Expr::Integer { suffix, .. } => suffix.as_deref(),
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            integer_literal_suffix(expression)
+        }
+        _ => None,
     }
 }
 

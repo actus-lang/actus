@@ -133,6 +133,28 @@ fn accepts_primitive_integer_boundary_literals() {
 }
 
 #[test]
+fn accepts_typed_integer_literals_and_preserves_their_type() {
+    analyze_source(
+        "verb main() -> Void { erg index = 1u32; erg byte: u8 = 0u8; erg signed: i32 = -1i32; return; }",
+    )
+    .expect("typed integer literals should infer and preserve their primitive types");
+}
+
+#[test]
+fn rejects_typed_integer_literal_mismatches_and_overflow() {
+    for source in [
+        "verb main() { erg byte: u8 = 1u32; }",
+        "verb main() { erg byte = 256u8; }",
+        "verb main() { erg byte = -1u8; }",
+    ] {
+        assert!(
+            analyze_source(source).is_err(),
+            "typed integer literal must match and fit its suffix: {source}"
+        );
+    }
+}
+
+#[test]
 fn rejects_primitive_integer_overflow_and_unsigned_underflow() {
     for source in [
         "verb main() { erg value: u3 = 8; }",
