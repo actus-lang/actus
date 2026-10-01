@@ -2,9 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use actus::conformance::{
-    SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_tree,
-    inspect_source_with_enforcement, source_limit_diagnostics, source_paths,
-    validate_source_exception_manifest,
+    LimitlessApprovalOrigin, SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_report,
+    inspect_source_report_with_enforcement, inspect_source_tree, inspect_source_with_enforcement,
+    source_limit_diagnostics, source_paths, validate_source_exception_manifest,
 };
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
 
@@ -77,6 +77,39 @@ fn verb_limitless_metadata_does_not_exempt_a_sibling_verb() {
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
     assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message().contains("exempt")));
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.message().contains("sibling")));
+}
+
+#[test]
+fn limitless_report_records_canonical_scope_target_span_and_origin() {
+    let source = "meta limitless(\"verb\") verb exempt() { return; }\n";
+    let report = inspect_source_report(
+        Path::new("src/example.act"),
+        source,
+        policy(),
+        LimitlessApprovalOrigin::SourceMetadata,
+    );
+    assert_eq!(report.diagnostics, Vec::new());
+    assert_eq!(report.approvals.len(), 1);
+    let approval = &report.approvals[0];
+    assert_eq!(approval.path, Path::new("src/example.act"));
+    assert_eq!(approval.scope, "verb");
+    assert_eq!(approval.target.as_deref(), Some("exempt"));
+    assert!(approval.span.end > approval.span.start);
+    assert_eq!(approval.origin, LimitlessApprovalOrigin::SourceMetadata);
+}
+
+#[test]
+fn package_limitless_report_records_policy_approval() {
+    let source = "verb main() { return; }\n";
+    let report =
+        inspect_source_report_with_enforcement(Path::new("src/example.act"), source, false);
+    assert!(report.diagnostics.is_empty());
+    assert_eq!(report.approvals.len(), 1);
+    let approval = &report.approvals[0];
+    assert_eq!(approval.scope, "file");
+    assert_eq!(approval.target, None);
+    assert_eq!(approval.span.end, source.len());
+    assert_eq!(approval.origin, LimitlessApprovalOrigin::PackageConfiguration);
 }
 
 #[test]

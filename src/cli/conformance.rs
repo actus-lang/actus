@@ -68,17 +68,19 @@ pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i3
     };
     let enforce_limits =
         configuration.source_limit_mode() == crate::configuration::SourceLimitMode::Enabled;
-    let diagnostics_count = match scan_conformance_paths(&paths, enforce_limits) {
-        Ok(count) => count,
+    let (diagnostics_count, approvals_count) = match scan_conformance_paths(&paths, enforce_limits)
+    {
+        Ok(counts) => counts,
         Err(error) => {
             eprintln!("error: {error}");
             return 1;
         }
     };
     println!(
-        "conformance: scanned {} source files; {} diagnostics{}",
+        "conformance: scanned {} source files; {} diagnostics; {} accepted limitless scopes{}",
         paths.len(),
         diagnostics_count,
+        approvals_count,
         if mode.is_strict() { " (strict)" } else { "" }
     );
     i32::from(mode.is_strict() && diagnostics_count != 0)
@@ -93,16 +95,24 @@ fn conformance_paths() -> Result<Vec<PathBuf>, String> {
         .map_err(|error| format!("cannot scan source roots: {error}"))
 }
 
-fn scan_conformance_paths(paths: &[PathBuf], enforce_limits: bool) -> Result<usize, String> {
+fn scan_conformance_paths(
+    paths: &[PathBuf],
+    enforce_limits: bool,
+) -> Result<(usize, usize), String> {
     let mut diagnostics_count = 0;
+    let mut approvals_count = 0;
     for path in paths {
         let source = fs::read_to_string(path)
             .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-        let diagnostics =
-            crate::conformance::inspect_source_with_enforcement(path, &source, enforce_limits);
-        diagnostics_count += diagnostics.len();
-        if !diagnostics.is_empty() {
-            report_diagnostics(path, &source, diagnostics);
+        let report = crate::conformance::inspect_source_report_with_enforcement(
+            path,
+            &source,
+            enforce_limits,
+        );
+        diagnostics_count += report.diagnostics.len();
+        approvals_count += report.approvals.len();
+        if !report.diagnostics.is_empty() {
+            report_diagnostics(path, &source, report.diagnostics);
         }
     }
     let root =
@@ -115,7 +125,7 @@ fn scan_conformance_paths(paths: &[PathBuf], enforce_limits: bool) -> Result<usi
             diagnostic.source_path().map(str::to_owned).unwrap_or_else(|| "<unknown>".to_owned());
         report_diagnostics(Path::new(&source_path), "", vec![diagnostic]);
     }
-    Ok(diagnostics_count)
+    Ok((diagnostics_count, approvals_count))
 }
 
 fn parse_conformance_mode(

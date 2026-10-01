@@ -284,7 +284,7 @@ architectural policy.
 - [x] Preserve preferred and hard limits by default for all unannotated
       sources and declarations.
 - [x] Define normal and `--strict` policy behavior for source-local metadata.
-- [ ] Record accepted exceptions with canonical path, scope, target, source
+- [x] Record accepted exceptions with canonical path, scope, target, source
       span, and approval origin.
 - [x] Keep limitless exceptions separate from ownership, parser, semantic,
       ABI, runtime, and documentation validation.
@@ -312,8 +312,8 @@ architectural policy.
 - [x] Add regression tests proving comments cannot suppress source limits.
 - [x] Add source-limit tests proving verb scope does not affect sibling verbs
       and file scope affects both file and function checks.
-- [ ] Document project-wide policy review expectations in the conformance
-      workflow.
+- [x] Document project-wide policy review expectations in the conformance
+      workflow under `docs/conformance/limitless-policy.md`.
 - [x] Verify `cargo fmt`, `cargo check`, Clippy, the full test suite, source
       limits, and deterministic diagnostics before closing the sub-gate.
 
@@ -322,7 +322,7 @@ architectural policy.
 - [x] The metadata grammar, AST, semantic scope rules, project policy, and
       conformance scanner agree on one structured exception model.
 - [x] Strict CI cannot be bypassed by comments or malformed metadata.
-- [ ] Accepted limitless scopes are explicit, reviewable, deterministic, and
+- [x] Accepted limitless scopes are explicit, reviewable, deterministic, and
       limited to the intended file or verb.
 
 ## Gate 19.3.2: Conditional Expressions and Scalar Ergonomics
