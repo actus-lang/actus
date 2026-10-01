@@ -110,6 +110,7 @@ pub(crate) fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
-        | Expr::Case { span, .. } => *span,
+        | Expr::Case { span, .. }
+        | Expr::If { span, .. } => *span,
     }
 }

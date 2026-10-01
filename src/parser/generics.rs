@@ -140,7 +140,7 @@ impl Parser {
 fn type_name_text(kind: &TokenKind) -> Option<String> {
     match kind {
         TokenKind::Identifier(name) => Some(name.clone()),
-        TokenKind::Integer(value) => Some(value.clone()),
+        TokenKind::Integer { value, suffix: None } => Some(value.clone()),
         TokenKind::IntType { signed, width } => {
             Some(format!("{}{}", if *signed { 'i' } else { 'u' }, width))
         }

@@ -32,3 +32,24 @@ The test asserts native compilation, exact output bytes, independent process
 statuses, typed EOF and missing-file failures, and removal of the temporary
 file. The fixture source is kept under `tests/fixtures/applications/`; no
 test logic is embedded in the standard-library implementation.
+
+## Runtime profile
+
+New projects default to the dependency-free `core` runtime. A project that
+uses the compiler-owned standard library selects it in `Actus.toml`:
+
+```toml
+[build]
+runtime = "std"
+```
+
+The same profile can be written by the project template command:
+
+```sh
+actus new my_program --runtime std
+```
+
+Canonical imports such as `std::io` resolve from the packaged standard-library
+root. The project does not copy standard-library sources or configure an
+absolute host path. Runtime selection, target capability filtering, and
+lockfile identity are validated before native code generation.

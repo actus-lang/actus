@@ -24,6 +24,7 @@ pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
+pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";

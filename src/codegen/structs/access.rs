@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::Expr;
+use crate::ast::{BinaryOp, Expr};
 
 use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
@@ -159,6 +159,149 @@ pub(crate) fn lower_field_assignment<'source>(
         Some(NativeType::Pack(id)) => lower_pack_field_assignment(context, id),
         _ => lower_struct_field_assignment(context),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_field_compound_assignment<'source>(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    operator: BinaryOp,
+    value: &Expr,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
+        return super::compound::lower_pack_field_compound_assignment(
+            function,
+            object,
+            field,
+            operator,
+            value,
+            id,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        );
+    }
+    lower_struct_field_compound_assignment(FieldCompoundContext {
+        function,
+        object,
+        field,
+        operator,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    })
+}
+
+struct FieldCompoundContext<'input, 'source, 'function> {
+    function: &'input mut FunctionBuilder<'function>,
+    object: &'input Expr,
+    field: &'input str,
+    operator: BinaryOp,
+    value: &'input Expr,
+    locals: &'input mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &'input HashMap<&'source String, NativeType>,
+    functions: &'input HashMap<String, FunctionRef>,
+    cleanup_schedule: &'input NativeCleanupSchedule,
+    string_data: &'input StringDataValues,
+    layouts: &'input LayoutRegistry,
+}
+
+fn lower_struct_field_compound_assignment(
+    context: FieldCompoundContext<'_, '_, '_>,
+) -> Result<(), NativeEmitError> {
+    let FieldCompoundContext {
+        function,
+        object,
+        field,
+        operator,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    } = context;
+    let (address, field_layout) = lower_field_address(
+        function,
+        object,
+        field,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    if field_layout.indirect
+        || matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_))
+    {
+        return Err(NativeEmitError(
+            "compound assignment requires a scalar struct field".to_owned(),
+        ));
+    }
+    let current = load_struct_field(function, address, &field_layout, layouts)?;
+    let updated = lower_struct_compound_value(
+        function,
+        current,
+        operator,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        field_layout.ty,
+    )?;
+    function.ins().store(MemFlagsData::new(), updated, address, field_layout.offset as i32);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_struct_compound_value<'source>(
+    function: &mut FunctionBuilder<'_>,
+    current: cranelift_codegen::ir::Value,
+    operator: BinaryOp,
+    value: &Expr,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+    field_type: NativeType,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let right = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let right =
+        super::super::expressions::coerce_to_ir_type(function, right, layouts.ir_type(field_type)?);
+    let updated = super::super::expressions::lower_compound_integer_operation(
+        function, current, operator, right, field_type,
+    )?;
+    Ok(updated)
 }
 
 struct FieldAssignmentContext<'input, 'source, 'function> {

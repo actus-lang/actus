@@ -131,9 +131,11 @@ fn imported_definition(
     overlays: &HashMap<PathBuf, String>,
 ) -> Option<DefinitionLocation> {
     let configuration = CompilerConfiguration::from_input_path_read_only(current_path).ok()?;
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };

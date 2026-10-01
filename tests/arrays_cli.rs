@@ -16,6 +16,74 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_typed_integer_literals_natively() {
+    let status =
+        run_array_fixture("typed-integer-literals", "verb main() -> u32 { return 1u32 + 2u32; }");
+    assert_eq!(status.code(), Some(3));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_value_producing_if_branches_natively() {
+    let status = run_array_fixture(
+        "conditional-expression",
+        "verb main() -> Int { erg selected = if 1u32 < 2u32 { 41 } else { 1 }; return selected + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn does_not_evaluate_the_non_selected_if_branch() {
+    let status = run_array_fixture(
+        "conditional-expression-short-branch",
+        "verb main() -> Int { return if 1 < 2 { 42 } else { 1 / 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_nested_value_producing_conditionals() {
+    let status = run_array_fixture(
+        "nested-conditional-expression",
+        "verb main() -> Int { return if 1 < 2 { if 2 < 3 { 42 } else { 0 } } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_compound_assignments_natively() {
+    let status = run_array_fixture(
+        "compound-assignments",
+        "verb main() -> Int { erg value: u8 = 5u8; value += 7u8; value -= 2u8; value *= 3u8; value /= 5u8; value %= 4u8; value &= 3u8; value |= 4u8; value ^= 1u8; value <<= 1u8; value >>= 1u8; return value as Int; }",
+    );
+    assert_eq!(status.code(), Some(7));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_index_compound_assignment_with_one_address_calculation() {
+    let status = run_array_fixture(
+        "compound-index-assignment",
+        "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0u8] = 5u8; values[0u8] += 37u8; return values[0u8] as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_buffer_index_compound_assignment() {
+    let status = run_array_fixture(
+        "compound-buffer-assignment",
+        "verb main() -> Int { erg bytes: Buffer = Buffer[0]; append(bytes, 5u8); bytes[0u8] += 37u8; return bytes[0u8] as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn reads_first_and_last_buffer_bytes_with_dynamic_indexing() {
     let status = run_array_fixture(
         "buffer-index",
@@ -50,6 +118,16 @@ fn lowers_float_equality_and_inequality() {
     let status = run_array_fixture(
         "adr44-float-equality",
         "verb main() -> Int { erg left: f32 = 1.5; erg same: f32 = 1.5; erg other: f32 = 2.5; return case (left == same) && (left != other) { true => 42, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn lowers_typed_float_literals_at_the_declared_width() {
+    let status = run_array_fixture(
+        "typed-float-literals",
+        "verb main() -> Int { erg value: f32 = 1.5f32; return case value == 1.5f32 { true => 42, _ => 0, }; }",
     );
     assert_eq!(status.code(), Some(42));
 }

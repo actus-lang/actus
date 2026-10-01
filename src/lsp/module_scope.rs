@@ -20,9 +20,11 @@ pub(super) fn imported_public_symbols(
     let Ok(configuration) = CompilerConfiguration::from_input_path_read_only(&path) else {
         return Vec::new();
     };
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     program
         .declarations

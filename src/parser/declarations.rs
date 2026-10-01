@@ -12,8 +12,10 @@ struct ExternalVerbSignature {
 }
 
 impl Parser {
-    pub(super) fn parse_top_level_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
-        let mut doc = self.take_doc_string_group();
+    pub(super) fn parse_top_level_decl_with_doc(
+        &mut self,
+        mut doc: Option<String>,
+    ) -> Result<TopLevelDecl, ParseError> {
         if self.check_simple(&TokenKind::Meta) {
             let metadata = self.parse_metadata_group()?;
             doc = doc.or_else(|| self.take_doc_string_group());
@@ -27,13 +29,23 @@ impl Parser {
         Ok(TopLevelDecl::Verb(declaration))
     }
 
-    fn parse_metadata_group(&mut self) -> Result<Vec<crate::ast::MetaAttribute>, ParseError> {
+    pub(super) fn parse_metadata_group(
+        &mut self,
+    ) -> Result<Vec<crate::ast::MetaAttribute>, ParseError> {
         let mut metadata = Vec::new();
         while self.check_simple(&TokenKind::Meta) {
             let metadata_start = self.peek().map_or(0, |token| token.span.start);
             let parsed = self.parse_metadata()?;
             self.reject_conflicting_targets(&metadata, &parsed, metadata_start)?;
             metadata.extend(parsed);
+            if metadata.iter().any(|attribute| {
+                matches!(
+                    attribute,
+                    crate::ast::MetaAttribute::Limitless(crate::ast::LimitlessScope::File)
+                )
+            }) {
+                break;
+            }
         }
         Ok(metadata)
     }
@@ -135,7 +147,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_metadata_declaration(
+    pub(super) fn parse_metadata_declaration(
         &mut self,
         metadata: Vec<crate::ast::MetaAttribute>,
         doc: Option<String>,
@@ -300,5 +312,6 @@ fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
     match attribute {
         crate::ast::MetaAttribute::Target(selector) => Some(selector),
         crate::ast::MetaAttribute::Test => None,
+        crate::ast::MetaAttribute::Limitless(_) => None,
     }
 }

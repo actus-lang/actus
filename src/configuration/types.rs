@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
 use super::manifest;
-use super::manifest::{BuildProfile, LibraryKind, OptimizationLevel};
+use super::manifest::{BuildProfile, LibraryKind, OptimizationLevel, RuntimeProfile};
 use crate::target::{EntryContract, LinkerFlavor, TargetSpec};
 
 pub(super) const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
@@ -90,8 +90,14 @@ pub struct CompilerConfiguration {
     pub(super) linker: OsString,
     pub(super) linker_flavor: LinkerFlavor,
     pub(super) entry_contract: EntryContract,
+    pub(super) runtime: RuntimeProfile,
+    pub(super) runtime_version: Option<String>,
+    pub(super) runtime_checksum: Option<String>,
+    pub(super) runtime_source_root: Option<PathBuf>,
+    pub(super) runtime_module_roots: BTreeMap<String, PathBuf>,
     pub(super) run_artifact_prefix: String,
     pub(super) native_backend: NativeBackendConfiguration,
+    pub(super) source_limits: manifest::SourceLimitMode,
     pub(super) entry_symbol: Option<String>,
     pub(super) library_paths: Vec<PathBuf>,
     pub(super) libraries: Vec<LinkLibrary>,

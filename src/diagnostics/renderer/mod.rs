@@ -115,6 +115,9 @@ fn lex_message(error: &LexError) -> String {
         LexErrorKind::InvalidIntegerType(text) => {
             format!("invalid integer type `{text}`; expected `u1..u128` or `i1..i128`")
         }
+        LexErrorKind::InvalidFloatType(text) => {
+            format!("invalid float type `{text}`; expected `f32` or `f64`")
+        }
         LexErrorKind::InvalidHexLiteral(text) => format!("invalid hexadecimal literal `{text}`"),
     }
 }
@@ -140,6 +143,15 @@ fn parse_message(error: &ParseError) -> String {
         }
         ParseErrorKind::MetadataTargetNotAllowed => {
             "metadata can only be attached to verbs or external verbs".to_owned()
+        }
+        ParseErrorKind::MetadataFileScopeNotAllowed => {
+            "file-scoped limitless metadata must appear once at the start of the file".to_owned()
+        }
+        ParseErrorKind::UnsupportedLimitlessScope { name } => {
+            format!("unsupported limitless scope `{name}`; expected `verb` or `file`")
+        }
+        ParseErrorKind::DuplicateMetadata { name } => {
+            format!("duplicate metadata attribute `{name}`")
         }
     }
 }

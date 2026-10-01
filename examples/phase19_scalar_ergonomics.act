@@ -1,0 +1,23 @@
+"""
+Phase 19 scalar ergonomics acceptance example.
+
+This program exercises typed integer literals, explicit signed and unsigned
+values, compatible arithmetic, dynamic array indexing, and statement-position
+if/else control flow without using `case` as a substitute for a Boolean guard.
+"""
+
+verb main() -> Int {
+    erg index: u32 = 1u32;
+    erg values: Array[Int, 4] = Array[Int, 4]();
+    values[index] = 41;
+
+    erg branch: u8 = 2u8;
+    erg bound: u32 = index + 1u32;
+    erg signed_offset: i32 = -1i32;
+    if bound > index {
+        print((values[index] as Int) + (signed_offset as Int) + (branch as Int));
+    } else {
+        print(0);
+    };
+    return 0;
+}

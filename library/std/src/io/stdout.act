@@ -10,6 +10,37 @@ unsafe extern "C" verb actus_print_line_buffer_stdout(abs text: Buffer) -> Int;
 """C ABI bridge that synchronizes stdout and returns zero or failure."""
 unsafe extern "C" verb actus_flush_stdout() -> Int;
 
+"""C ABI bridge that writes a borrowed string without adding a newline."""
+unsafe extern "C" verb actus_write_string_stdout(abs text: String) -> Int;
+"""C ABI bridge that writes a borrowed string followed by a newline."""
+unsafe extern "C" verb actus_print_string(abs text: String) -> Int;
+
+"""Print a borrowed string without adding a newline.
+
+Returns `Result.Ok(count)` with the number of written bytes, or
+`Result.Err(IoError.Failed)` when the runtime write fails.
+"""
+open verb print(abs text: String) -> Result[Int, IoError] {
+    erg status = actus_write_string_stdout(text: abs text);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""Print a borrowed string and append a newline.
+
+Returns `Result.Ok(count)` with the number of written bytes, or
+`Result.Err(IoError.Failed)` when the runtime write fails.
+"""
+open verb println(abs text: String) -> Result[Int, IoError] {
+    erg status = actus_print_string(text: abs text);
+    return case status {
+        -1 => Err(IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
 """Print an integer value to stdout and return its typed I/O result."""
 open verb print_int(erg value: Int) -> Result[Int, IoError] {
     erg status = actus_print_int(value: value);
@@ -19,8 +50,12 @@ open verb print_int(erg value: Int) -> Result[Int, IoError] {
     };
 }
 
-"""Print a borrowed buffer without consuming or modifying it, returning its byte result or error."""
-open verb print(abs text: Buffer) -> Result[Int, IoError] {
+"""Print borrowed bytes without consuming or modifying them.
+
+Returns `Result.Ok(count)` with the number of written bytes, or
+`Result.Err(IoError.Failed)` when the runtime write fails.
+"""
+open verb printb(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_buffer_stdout(text: abs text);
     return case status {
         -1 => Err(IoError.Failed),
@@ -28,11 +63,12 @@ open verb print(abs text: Buffer) -> Result[Int, IoError] {
     };
 }
 
+"""Print borrowed bytes, append a newline, and flush stdout immediately.
+
+Returns `Result.Ok(count)` with the number of written bytes, or
+`Result.Err(IoError.Failed)` when the runtime write or flush fails.
 """
-Print a borrowed buffer, append a newline, and flush stdout immediately.
-The result contains the written byte count or `IoError.Failed`.
-"""
-open verb println(abs text: Buffer) -> Result[Int, IoError] {
+open verb printlnb(abs text: Buffer) -> Result[Int, IoError] {
     erg status = actus_print_line_buffer_stdout(text: abs text);
     erg flushed = actus_flush_stdout();
     return case status {

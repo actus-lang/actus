@@ -162,7 +162,10 @@ contracts that the future platform is allowed to consume.
 
 ### Runtime profiles and standard-library resolution
 
-The project manifest must select the runtime environment explicitly. The
+This gate is governed by
+[ADR-0050](../decisions/ADR-0050-runtime-profiles-and-builtin-standard-library-resolution.md).
+
+The project manifest selects the runtime environment explicitly. The
 runtime profile is a build configuration, not an ordinary user dependency:
 
 ```toml
@@ -170,36 +173,64 @@ runtime profile is a build configuration, not an ordinary user dependency:
 runtime = "std"
 ```
 
-- [ ] Define the manifest schema for `runtime = "core" | "std" |
+#### Gate 19.3.3: Runtime profile configuration
+
+- [x] Define typed `core`, `std`, and `freestanding` runtime profiles.
+- [x] Default an omitted runtime to dependency-free `core`.
+- [x] Allow target-aware `std` on hosted and freestanding targets while
+      rejecting `freestanding` on hosted targets during configuration loading.
+- [x] Add accepted and rejected manifest configuration tests.
+
+#### Gate 19.3.4: Builtin standard-library root and canonical imports
+
+Implementation evidence completed so far:
+
+- [x] Resolve the compiler-owned `std/src` root from the packaged toolchain,
+      with a development-tree fallback and no project-authored absolute path.
+- [x] Map `std::io`-style imports to the builtin root without looking for a
+      duplicated `std/` directory.
+- [x] Route CLI and LSP module resolvers through the runtime-aware resolver.
+- [x] Reject a user dependency alias that attempts to shadow builtin `std`.
+- [x] Consume builtin module roots from `library/std/Actus.toml` instead of
+      relying only on directory-name conventions.
+
+- [x] Define the manifest schema for `runtime = "core" | "std" |
       "freestanding"`, including the default profile and edition-aware
       compatibility rules.
-- [ ] Keep `core` implicit and dependency-free; it must not require users to
+- [x] Keep `core` implicit and dependency-free; it must not require users to
       spell out a path to compiler-owned runtime sources.
-- [ ] Make `std` opt in through the manifest and resolve the compiler-owned
+- [x] Make `std` opt in through the manifest and resolve the compiler-owned
       standard-library package from a versioned builtin/sysroot location.
-- [ ] Define canonical standard-library imports and facades so a project can
+- [x] Define canonical standard-library imports and facades so a project can
       use `std::io`, `std::fs`, and `std::path` without copying the library
       into its own `src/` tree or configuring absolute host paths.
-- [ ] Preserve explicit local dependency resolution for third-party and
+- [x] Define target capability metadata for builtin modules, distinguishing
+      target-neutral, hosted, and embedded standard-library surfaces.
+- [x] Allow `runtime = "std"` on freestanding targets while rejecting
+      hosted-only imports such as `std::fs` before code generation.
+- [x] Preserve explicit local dependency resolution for third-party and
       workspace packages, while rejecting ambiguous aliases or declarations
       that conflict with the selected runtime profile.
-- [ ] Build only standard-library modules reachable from the project's import
+- [x] Build only standard-library modules reachable from the project's import
       graph; unused `std` modules must not be compiled or linked implicitly.
-- [ ] Include runtime profile, standard-library version, target, and profile
-      in lockfile validation and artifact identity so builds remain
+- [x] Include the selected runtime profile, target, and build profile in
+      lockfile validation and persistent artifact identity.
+- [x] Include the compiler-owned standard-library version/checksum in lockfile
+      validation and artifact identity so runtime source changes remain
       reproducible across machines.
-- [ ] Define diagnostics for missing runtime metadata, unsupported runtime
-      values, incompatible imports, and attempts to use `std` from a
-      freestanding build.
-- [ ] Add `actus init` templates that declare the intended runtime profile and
+- [x] Define stable diagnostics for missing runtime metadata, unsupported
+      runtime values, incompatible builtin imports, and runtime/target
+      incompatibility (`E1803`-`E1805` and module code `E1112`).
+- [x] Add `actus init` and `actus new` templates that declare the intended
+      `core` or `std` runtime profile and
       produce a valid first build without manual standard-library wiring.
-- [ ] Add accepted and rejected manifest tests for `core`, `std`, and
+- [x] Add accepted and rejected manifest tests for `core`, `std`, and
       `freestanding`, including lockfile mismatch and conflicting dependency
       cases.
-- [ ] Add native integration tests proving that `std` applications compile
+- [x] Add native integration tests proving that `std` applications compile
       and run, while `core` and `freestanding` builds do not acquire a host
       runtime implicitly.
-- [ ] Document the runtime selection and standard-library resolution contract
+- [x] Document the runtime selection and standard-library resolution contract
       in the user-facing project and package documentation.
 
 The implementation should be split into a future architecture decision for
@@ -208,6 +239,190 @@ loading, module resolution, reachability-based compilation, lockfile identity,
 CLI templates, and end-to-end verification. This gate must not be marked
 complete while a project still depends on manually copied `library/std`
 paths.
+
+#### Gate 19.3.5: Embedded standard-library capability verification
+
+Implementation evidence completed so far:
+
+- [x] Filter builtin modules by `targets = ["hosted", "freestanding"]`
+      while loading the compiler configuration.
+- [x] Reject a hosted-only builtin import during freestanding module
+      resolution before semantic analysis and code generation.
+
+- [x] Add target fixtures for hosted and embedded targets, including
+      `thumbv7em-none-eabihf`.
+- [ ] **Deferred:** verify a concrete target-neutral or embedded builtin
+      module resolves from `std` without an operating-system runtime; no such
+      module is shipped yet, so this resumes with the first embedded library.
+- [x] Reject hosted-only modules on freestanding targets with deterministic
+      diagnostics.
+- [x] Add native or target-object tests proving that unused builtin modules
+      are not compiled or linked.
+
+## Gate 19.3.1: Explicit Limitless Source Scopes
+
+This sub-gate is governed by
+[ADR-0048](../decisions/ADR-0048-limitless-source-scopes-and-conformance-exceptions.md).
+It makes source-limit exceptions explicit without weakening the default
+architectural policy.
+
+### Metadata syntax and scope
+
+- [x] Add `meta limitless("verb")` to the Actus metadata grammar and AST.
+- [x] Apply a verb-scoped directive only to the immediately following verb.
+- [x] Add `meta limitless("file")` to the file metadata prelude.
+- [x] Apply a file-scoped directive to file-size and all function-size checks
+      in that file.
+- [x] Reject unknown scopes, duplicate directives, invalid placement, and
+      directives nested inside verb bodies with stable diagnostics.
+
+### Conformance policy
+
+- [x] Replace comment-based source-limit suppression detection with the
+      structured metadata model; arbitrary comments must never suppress a
+      limit.
+- [x] Preserve preferred and hard limits by default for all unannotated
+      sources and declarations.
+- [x] Define normal and `--strict` policy behavior for source-local metadata.
+- [x] Record accepted exceptions with canonical path, scope, target, source
+      span, and approval origin.
+- [x] Keep limitless exceptions separate from ownership, parser, semantic,
+      ABI, runtime, and documentation validation.
+
+### Manifest configuration
+
+- [x] Add an optional package-level `source_limits = "limitless"` field to
+      the existing `[package]` section in `Actus.toml`; absence keeps limits
+      enabled implicitly.
+- [x] Make `"limitless"` apply to every source and verb in the configured
+      project source root.
+- [x] Document that `"limitless"` is not recommended for normal production
+      packages, while preserving the team's explicit freedom to choose it.
+- [x] Reject unknown values, duplicate package policy declarations, and
+      attempts to use the source-limit switch for unrelated safety policies.
+- [x] Include the selected source-limit policy in deterministic configuration
+      and artifact identity where conformance policy affects the build.
+
+### Tooling and evidence
+
+- [x] Preserve metadata through formatting and expose it consistently through
+      CLI conformance output and the LSP semantic model.
+- [x] Add accepted and rejected parser, semantic, project-configuration, and
+      strict-mode tests for both scopes.
+- [x] Add regression tests proving comments cannot suppress source limits.
+- [x] Add source-limit tests proving verb scope does not affect sibling verbs
+      and file scope affects both file and function checks.
+- [x] Document project-wide policy review expectations in the conformance
+      workflow under `docs/conformance/limitless-policy.md`.
+- [x] Verify `cargo fmt`, `cargo check`, Clippy, the full test suite, source
+      limits, and deterministic diagnostics before closing the sub-gate.
+
+### Gate 19.3.1 evidence
+
+- [x] The metadata grammar, AST, semantic scope rules, project policy, and
+      conformance scanner agree on one structured exception model.
+- [x] Strict CI cannot be bypassed by comments or malformed metadata.
+- [x] Accepted limitless scopes are explicit, reviewable, deterministic, and
+      limited to the intended file or verb.
+
+## Gate 19.3.2: Conditional Expressions and Scalar Ergonomics
+
+This sub-gate is governed by
+[ADR-0049](../decisions/ADR-0049-conditional-expressions-and-scalar-ergonomics.md).
+It improves everyday Actus code without weakening explicit typing, ownership,
+checked arithmetic, or the distinction between conditionals and pattern
+matching.
+
+### Gate 19.3.2.1: Lexer, Parser, and AST
+
+- [x] Add `if`, `else`, and conditional-expression grammar without changing
+      `case` pattern matching semantics.
+- [x] Add AST nodes for conditional expressions and branch bodies with stable
+      source spans.
+- [x] Parse typed integer literals such as `1u32`, `0u8`, and `-1i32` with the
+      suffix included in the literal span.
+- [x] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
+- [x] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
+      `&=`, `|=`, `^=`, `<<=`, and `>>=`.
+- [x] Reject malformed integer and floating-point suffixes with stable lexical
+      diagnostics.
+- [x] Reject missing branch delimiters and incomplete compound assignments with
+      stable parser diagnostics.
+- [x] Keep parser implementation split by expression and statement
+      responsibility and within the repository file-size limits.
+
+### Gate 19.3.2.2: Semantic Types and Ownership Joins
+
+- [x] Require every `if` condition to have type `Bool`; do not introduce
+      implicit truthiness.
+- [x] Validate compatible result types for expression-valued branches.
+- [x] Validate branch-local moves, borrows, drops, and cleanup joins on both
+      paths.
+- [x] Ensure the non-selected branch has no runtime side effects.
+- [x] Permit direct arithmetic on compatible `u32` and `Usize` values,
+      including loop counters and array indices.
+- [x] Validate compound assignments as one typed place operation and ensure
+      the left-hand place is evaluated exactly once.
+- [x] Preserve `erg`, `abs`, `dat`, and `ins` mutation and loan contracts for
+      compound assignment targets.
+- [x] Perform compile-time range checks for typed integer literals and reject
+      incompatible signedness, widths, and declared primitive types.
+
+### Gate 19.3.2.3: Native Lowering and Runtime Behavior
+
+- [x] Lower statement-position conditionals to explicit Cranelift branch and
+      merge blocks.
+- [x] Lower expression-valued conditionals through typed merge values without
+      backend-specific semantic repair.
+- [x] Lower compound assignments to one load/compute/store sequence while
+      preserving array, buffer, pack, and field bounds checks.
+- [x] Emit typed integer and floating constants through the existing
+      exact-width native literal paths.
+- [x] Preserve existing checked behavior for overflow, underflow,
+      division-by-zero, remainder-by-zero, and invalid shift counts.
+- [x] Add native execution tests for selected and non-selected branches,
+      nested conditionals, counter increments, and typed literal arithmetic.
+
+### Gate 19.3.2.4: Formatter, LSP, and Diagnostics
+
+- [x] Format nested `if/else` branches deterministically and idempotently.
+- [x] Preserve typed integer and floating literal suffixes and
+      compound-assignment operators
+      during formatting and semantic tokenization; formatter round trips remain
+      deterministic.
+- [x] Add LSP semantic-token and hover rendering for compound-assignment
+      operators using compiler-owned token information; completion and richer
+      semantic diagnostics remain part of the broader conditional-expression
+      work.
+- [x] Expose condition type, branch result type, and typed literal range facts
+      through the semantic model where those surfaces already exist.
+- [x] Preserve stable diagnostics for invalid conditions, incompatible branches,
+      literal overflow, malformed suffixes, and illegal assignment targets.
+
+### Gate 19.3.2.5: Acceptance and Regression Matrix
+
+- [x] Add accepted and rejected parser fixtures for the initial conditional
+      syntax slice; retain the remaining syntax families for their own gates.
+- [x] Add semantic tests for branch type joins and ownership cleanup on both
+      paths.
+- [x] Add positive native tests for every supported compound-assignment family,
+      indexed buffer/array/field/pack places, and negative semantic coverage for
+      incompatible operands.
+- [x] Add lexer, semantic range, mismatch, and native execution tests for typed
+      integer and floating literals, including malformed suffix rejection.
+- [x] Prove that `case` remains the required construct for enum and `Result`
+      pattern matching.
+- [x] Run formatter, check, Clippy, the full test suite, source limits, and
+      diff validation before closing the sub-gate.
+
+### Gate 19.3.2 evidence
+
+- [x] Simple boolean control flow no longer requires synthetic `case` arms.
+- [x] Scalar loops can increment typed unsigned indices directly.
+- [x] Typed integer literals make width and signedness explicit without temporary
+      bindings or implicit conversions.
+- [x] Native execution, ownership cleanup, formatter output, LSP behavior,
+      and diagnostics agree on one implementation.
 
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
 

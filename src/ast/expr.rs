@@ -13,6 +13,7 @@ pub enum Expr {
     },
     Integer {
         value: String,
+        suffix: Option<String>,
         span: SourceSpan,
     },
     BufferLiteral {
@@ -21,6 +22,7 @@ pub enum Expr {
     },
     FloatLiteral {
         value: String,
+        suffix: Option<String>,
         span: SourceSpan,
     },
     StringLiteral {
@@ -88,6 +90,18 @@ pub enum Expr {
         branches: Vec<CaseBranch>,
         span: SourceSpan,
     },
+    If {
+        condition: Box<Expr>,
+        then_branch: Block,
+        else_branch: Option<IfBranch>,
+        span: SourceSpan,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IfBranch {
+    Block(Block),
+    ElseIf(Box<Expr>),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

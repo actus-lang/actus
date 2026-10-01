@@ -91,6 +91,19 @@ fn normalize_statement(
             normalize_expression(index, None, signatures, locals);
             normalize_expression(value, None, signatures, locals);
         }
+        Stmt::CompoundAssignment { target, value, .. } => {
+            match target {
+                crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
+                crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
+                    normalize_expression(object, None, signatures, locals)
+                }
+                crate::ast::CompoundAssignmentTarget::Index { target, index } => {
+                    normalize_expression(target, None, signatures, locals);
+                    normalize_expression(index, None, signatures, locals);
+                }
+            }
+            normalize_expression(value, None, signatures, locals);
+        }
         Stmt::Expression { expression, .. } => {
             normalize_expression(expression, None, signatures, locals);
         }
@@ -154,6 +167,7 @@ fn normalize_expression(
             normalize_binary(left, right, signatures, locals);
         }
         Expr::Case { .. } => normalize_case(expression, expected, signatures, locals),
+        Expr::If { .. } => {}
         Expr::StructLit { fields, .. } => normalize_struct_fields(fields, signatures, locals),
         Expr::FieldAccess { object, .. } => {
             normalize_expression(object, None, signatures, locals);
@@ -339,6 +353,7 @@ fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
         | Expr::Case { span, .. }
+        | Expr::If { span, .. }
         | Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
         | Expr::BufferLiteral { span, .. }

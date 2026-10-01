@@ -21,8 +21,16 @@ pub(super) fn argument_type_matches(expected: &str, found: &str, expression: &Ex
         return true;
     }
     match primitive_type(expected) {
-        Some(PrimitiveType::Integer { .. }) => is_integer_literal(expression),
-        Some(PrimitiveType::Float { .. }) => matches!(expression, Expr::FloatLiteral { .. }),
+        Some(PrimitiveType::Integer { .. }) => {
+            is_integer_literal(expression)
+                && integer_literal_suffix(expression).is_none_or(|suffix| suffix == expected)
+        }
+        Some(PrimitiveType::Float { .. }) => match expression {
+            Expr::FloatLiteral { suffix, .. } => {
+                suffix.as_deref().is_none_or(|found| found == expected)
+            }
+            _ => false,
+        },
         Some(PrimitiveType::Void) => false,
         None => false,
     }
@@ -35,6 +43,16 @@ fn is_integer_literal(expression: &Expr) -> bool {
             is_integer_literal(expression)
         }
         _ => false,
+    }
+}
+
+fn integer_literal_suffix(expression: &Expr) -> Option<&str> {
+    match expression {
+        Expr::Integer { suffix, .. } => suffix.as_deref(),
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            integer_literal_suffix(expression)
+        }
+        _ => None,
     }
 }
 
@@ -69,6 +87,7 @@ pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::StructLit { span, .. }
         | Expr::FieldAccess { span, .. }
         | Expr::Index { span, .. }
-        | Expr::Case { span, .. } => *span,
+        | Expr::Case { span, .. }
+        | Expr::If { span, .. } => *span,
     }
 }

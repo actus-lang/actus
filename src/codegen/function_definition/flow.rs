@@ -12,16 +12,17 @@ pub(super) fn emit_flow(
     return_slot: Option<cranelift_codegen::ir::Value>,
     flow: super::super::lowering::Flow,
     layouts: &LayoutRegistry,
+    force_void_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
     match flow {
         super::super::lowering::Flow::Return(result) => {
             emit_value_return(function, return_type, return_slot, result, layouts)
         }
         super::super::lowering::Flow::Fallthrough => {
-            emit_fallthrough(function, return_type, return_slot)
+            emit_fallthrough(function, return_type, return_slot, force_void_entry_return)
         }
         super::super::lowering::Flow::VoidReturn => {
-            emit_void_return(function, return_type, return_slot)
+            emit_void_return(function, return_type, return_slot, force_void_entry_return)
         }
         super::super::lowering::Flow::Break | super::super::lowering::Flow::Continue => {
             Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
@@ -88,7 +89,13 @@ fn emit_fallthrough(
     function: &mut FunctionBuilder<'_>,
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,
+    force_void_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
+    if force_void_entry_return {
+        let result = function.ins().iconst(cranelift_codegen::ir::types::I32, 0);
+        function.ins().return_(&[result]);
+        return Ok(());
+    }
     match (return_type, return_slot) {
         (None, None) | (Some(NativeType::Void), None) => {
             function.ins().return_(&[]);
@@ -105,7 +112,13 @@ fn emit_void_return(
     function: &mut FunctionBuilder<'_>,
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,
+    force_void_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
+    if force_void_entry_return {
+        let result = function.ins().iconst(cranelift_codegen::ir::types::I32, 0);
+        function.ins().return_(&[result]);
+        return Ok(());
+    }
     match (return_type, return_slot) {
         (None, None) | (Some(NativeType::Void), None) => {
             function.ins().return_(&[]);

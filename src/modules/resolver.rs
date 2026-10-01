@@ -6,10 +6,29 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub enum ModuleResolutionError {
     InvalidPath(String),
-    MissingFacade { module: String, expected: PathBuf },
-    AmbiguousModule { module: String, directory: PathBuf, file: PathBuf },
-    BypassesFacade { module: String, parent: String, facade: PathBuf },
-    Io { path: PathBuf, message: String },
+    MissingFacade {
+        module: String,
+        expected: PathBuf,
+    },
+    /// A builtin module exists but is unavailable for the configured target.
+    IncompatibleRuntime {
+        module: String,
+        expected: PathBuf,
+    },
+    AmbiguousModule {
+        module: String,
+        directory: PathBuf,
+        file: PathBuf,
+    },
+    BypassesFacade {
+        module: String,
+        parent: String,
+        facade: PathBuf,
+    },
+    Io {
+        path: PathBuf,
+        message: String,
+    },
 }
 
 impl Display for ModuleResolutionError {
@@ -19,6 +38,11 @@ impl Display for ModuleResolutionError {
             Self::MissingFacade { module, expected } => write!(
                 formatter,
                 "module `{module}` is missing its canonical facade `{}`",
+                expected.display()
+            ),
+            Self::IncompatibleRuntime { module, expected } => write!(
+                formatter,
+                "builtin module `{module}` is incompatible with the configured target; facade `{}` is unavailable",
                 expected.display()
             ),
             Self::AmbiguousModule { module, directory, file } => write!(
@@ -70,30 +94,81 @@ impl ResolvedModule {
 pub struct ModuleResolver {
     source_root: PathBuf,
     dependency_roots: BTreeMap<String, PathBuf>,
+    runtime_source_root: Option<PathBuf>,
+    runtime_module_roots: BTreeMap<String, PathBuf>,
 }
 
 impl ModuleResolver {
     pub fn new(source_root: impl Into<PathBuf>) -> Self {
-        Self { source_root: source_root.into(), dependency_roots: BTreeMap::new() }
+        Self {
+            source_root: source_root.into(),
+            dependency_roots: BTreeMap::new(),
+            runtime_source_root: None,
+            runtime_module_roots: BTreeMap::new(),
+        }
     }
 
     pub fn with_dependencies(
         source_root: impl Into<PathBuf>,
         dependency_roots: &BTreeMap<String, PathBuf>,
     ) -> Self {
-        Self { source_root: source_root.into(), dependency_roots: dependency_roots.clone() }
+        Self {
+            source_root: source_root.into(),
+            dependency_roots: dependency_roots.clone(),
+            runtime_source_root: None,
+            runtime_module_roots: BTreeMap::new(),
+        }
+    }
+
+    pub fn with_dependencies_and_runtime(
+        source_root: impl Into<PathBuf>,
+        dependency_roots: &BTreeMap<String, PathBuf>,
+        runtime_source_root: Option<&Path>,
+        runtime_module_roots: &BTreeMap<String, PathBuf>,
+    ) -> Self {
+        Self {
+            source_root: source_root.into(),
+            dependency_roots: dependency_roots.clone(),
+            runtime_source_root: runtime_source_root.map(Path::to_owned),
+            runtime_module_roots: runtime_module_roots.clone(),
+        }
     }
 
     pub fn resolve(&self, module_path: &str) -> Result<ResolvedModule, ModuleResolutionError> {
         let segments = parse_segments(module_path)?;
-        let root = self
-            .dependency_roots
-            .get(segments[0])
-            .cloned()
-            .unwrap_or_else(|| self.source_root.clone());
-        reject_facade_bypass(&root, &segments, module_path)?;
-        let directory = segments.iter().fold(root.clone(), |path, segment| path.join(segment));
-        let file = self.module_file_root(&root, &segments).with_extension("act");
+        if let Some(module_name) = segments.get(1)
+            && segments.first() == Some(&"std")
+        {
+            let Some(root) = self.runtime_module_roots.get(*module_name) else {
+                let root = self
+                    .runtime_source_root
+                    .as_ref()
+                    .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
+                let expected = root.join(module_name).join(format!("{module_name}.act"));
+                if expected.is_file() {
+                    return Err(ModuleResolutionError::IncompatibleRuntime {
+                        module: module_path.to_owned(),
+                        expected,
+                    });
+                }
+                return Err(ModuleResolutionError::MissingFacade {
+                    module: module_path.to_owned(),
+                    expected,
+                });
+            };
+            if segments.len() != 2 {
+                return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
+            }
+            return resolve_directory(module_path, root, module_name);
+        }
+        let (root, module_segments) = self.root_and_segments(&segments);
+        if module_segments.is_empty() {
+            return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
+        }
+        reject_facade_bypass(&root, module_segments, module_path)?;
+        let directory =
+            module_segments.iter().fold(root.clone(), |path, segment| path.join(segment));
+        let file = self.module_file_root(&root, module_segments).with_extension("act");
         if directory.is_dir() && file.is_file() {
             return Err(ModuleResolutionError::AmbiguousModule {
                 module: module_path.to_owned(),
@@ -113,8 +188,22 @@ impl ModuleResolver {
         }
         Err(ModuleResolutionError::MissingFacade {
             module: module_path.to_owned(),
-            expected: directory.join(format!("{}.act", segments.last().expect("path"))),
+            expected: directory.join(format!("{}.act", module_segments.last().expect("path"))),
         })
+    }
+
+    fn root_and_segments<'a>(&'a self, segments: &'a [&str]) -> (PathBuf, &'a [&'a str]) {
+        if segments.first() == Some(&"std")
+            && let Some(root) = &self.runtime_source_root
+        {
+            return (root.clone(), &segments[1..]);
+        }
+        let root = self
+            .dependency_roots
+            .get(segments[0])
+            .cloned()
+            .unwrap_or_else(|| self.source_root.clone());
+        (root, segments)
     }
 
     fn module_file_root(&self, root: &Path, segments: &[&str]) -> PathBuf {

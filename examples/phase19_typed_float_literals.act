@@ -1,0 +1,13 @@
+"""
+Phase 19 typed floating-point literal acceptance example.
+
+The suffix is part of the literal and selects the native floating-point width.
+"""
+
+verb main() -> Int {
+    erg value: f32 = 1.5f32;
+    return case value == 1.5f32 {
+        true => 42,
+        _ => 0,
+    };
+}

@@ -1,4 +1,6 @@
 mod declarations;
+mod expression_conditionals;
+mod expression_rules;
 mod expressions;
 mod lifecycle;
 mod operator_validation;

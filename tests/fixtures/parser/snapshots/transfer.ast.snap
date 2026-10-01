@@ -1,4 +1,5 @@
 Program {
+    file_metadata: [],
     declarations: [
         Verb(
             VerbDecl {

@@ -62,7 +62,9 @@ fn lower_value_statement<'source>(
 ) -> Result<Option<Flow>, NativeEmitError> {
     if !matches!(
         statement,
-        Stmt::OwnerDecl { role: Role::Erg | Role::Abs | Role::Ins, .. } | Stmt::Assignment { .. }
+        Stmt::OwnerDecl { role: Role::Erg | Role::Abs | Role::Ins, .. }
+            | Stmt::Assignment { .. }
+            | Stmt::CompoundAssignment { .. }
     ) {
         return lower_other_value_statement(
             function,
@@ -125,6 +127,20 @@ fn lower_owner_or_assignment<'source>(
             string_data,
             layouts,
         ),
+        Stmt::CompoundAssignment { target, operator, value, .. } => {
+            super::lower_compound_assignment(
+                function,
+                target,
+                *operator,
+                value,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+        }
         _ => unreachable!(),
     }
 }

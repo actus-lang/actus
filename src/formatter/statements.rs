@@ -1,4 +1,4 @@
-use crate::ast::{Block, Stmt};
+use crate::ast::{Block, CompoundAssignmentOp, CompoundAssignmentTarget, Stmt};
 
 use super::{Formatter, role_name};
 
@@ -46,6 +46,9 @@ impl Formatter<'_> {
                 self.expression(value);
                 self.output.push(';');
             }
+            Stmt::CompoundAssignment { target, operator, value, .. } => {
+                self.compound_assignment(target, *operator, value);
+            }
             Stmt::Expression { expression, .. } => {
                 self.expression(expression);
                 self.output.push(';');
@@ -66,6 +69,31 @@ impl Formatter<'_> {
             }
             Stmt::Block(block) => self.block(block),
         }
+    }
+
+    fn compound_assignment(
+        &mut self,
+        target: &CompoundAssignmentTarget,
+        operator: CompoundAssignmentOp,
+        value: &crate::ast::Expr,
+    ) {
+        match target {
+            CompoundAssignmentTarget::Identifier(name) => self.output.push_str(name),
+            CompoundAssignmentTarget::Field { object, field } => {
+                self.expression(object);
+                self.output.push('.');
+                self.output.push_str(field);
+            }
+            CompoundAssignmentTarget::Index { target, index } => {
+                self.expression(target);
+                self.output.push('[');
+                self.expression(index);
+                self.output.push(']');
+            }
+        }
+        self.output.push_str(compound_operator_text(operator));
+        self.expression(value);
+        self.output.push(';');
     }
 
     fn owner_declaration(
@@ -117,11 +145,27 @@ fn statement_span(statement: &Stmt) -> crate::lexer::SourceSpan {
         | Stmt::Assignment { span, .. }
         | Stmt::FieldAssignment { span, .. }
         | Stmt::IndexAssignment { span, .. }
+        | Stmt::CompoundAssignment { span, .. }
         | Stmt::Expression { span, .. }
         | Stmt::Return { span, .. }
         | Stmt::Break { span }
         | Stmt::Continue { span }
         | Stmt::Drop { span, .. } => *span,
         Stmt::Loop(block) | Stmt::Block(block) => block.span,
+    }
+}
+
+fn compound_operator_text(operator: CompoundAssignmentOp) -> &'static str {
+    match operator {
+        CompoundAssignmentOp::Add => " += ",
+        CompoundAssignmentOp::Subtract => " -= ",
+        CompoundAssignmentOp::Multiply => " *= ",
+        CompoundAssignmentOp::Divide => " /= ",
+        CompoundAssignmentOp::Remainder => " %= ",
+        CompoundAssignmentOp::BitwiseAnd => " &= ",
+        CompoundAssignmentOp::BitwiseOr => " |= ",
+        CompoundAssignmentOp::BitwiseXor => " ^= ",
+        CompoundAssignmentOp::ShiftLeft => " <<= ",
+        CompoundAssignmentOp::ShiftRight => " >>= ",
     }
 }

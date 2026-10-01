@@ -16,6 +16,7 @@ use super::types::NativeType;
 mod buffer;
 mod cast;
 mod construct;
+mod if_lowering;
 mod initializer_types;
 mod literals;
 mod operations;
@@ -29,6 +30,7 @@ pub(super) use literals::{
     coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
     lower_wide_integer,
 };
+pub(super) use operations::lower_compound_integer_operation;
 pub(super) use operations::lower_operation;
 pub(super) use try_lowering::lower_try_expression;
 
@@ -86,9 +88,14 @@ fn lower_expression_with_context(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     match expression {
-        Expr::Integer { value, .. } => lower_integer(function, value),
+        Expr::Integer { value, suffix, .. } => {
+            lower_integer_expression(function, value, suffix.as_deref(), context)
+        }
         Expr::BufferLiteral { length, .. } => lower_buffer_literal(function, length, context),
-        Expr::FloatLiteral { value, .. } => lower_float(function, value),
+        Expr::FloatLiteral { value, suffix, .. } => match suffix.as_deref() {
+            Some("f32") => lower_float_as(function, value, cranelift_codegen::ir::types::F32),
+            _ => lower_float(function, value),
+        },
         Expr::StringLiteral { value, .. } => lower_string(function, value, context.string_data),
         Expr::Identifier { name, .. } => lower_identifier(
             function,
@@ -135,6 +142,18 @@ fn lower_expression_with_context(
     }
 }
 
+fn lower_integer_expression(
+    function: &mut FunctionBuilder<'_>,
+    value: &str,
+    suffix: Option<&str>,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, NativeEmitError> {
+    let value = lower_integer(function, value)?;
+    let Some(suffix) = suffix else { return Ok(value) };
+    let Some(native_type) = NativeType::from_name(suffix) else { return Ok(value) };
+    Ok(coerce_to_ir_type(function, value, native_type.ir_type(context.layouts.pointer_type)?))
+}
+
 fn lower_buffer_literal(
     function: &mut FunctionBuilder<'_>,
     length: &Expr,
@@ -167,6 +186,7 @@ fn lower_complex_expression(
         Expr::Try { expression, span } => {
             lower_try_expression(function, expression, *span, context)
         }
+        Expr::If { .. } => if_lowering::lower_if(function, expression, context),
         Expr::Unary { .. } | Expr::Binary { .. } => lower_operation(function, expression, context),
         _ => lower_construct_or_case(function, expression, context),
     }

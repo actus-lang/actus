@@ -48,11 +48,47 @@ pub(super) fn query(
         "borrows": borrows(source, &index, &model),
         "loans": loans(source, &index, &model),
         "cleanup": cleanup(source, &index, &model),
+        "literals": literals(source, &index, &model),
+        "conditionals": conditionals(source, &index, &model),
         "packs": packs(source, &index, &target_program),
         "declarations": declarations(source, &index, &program, target),
     });
     store.cache_semantic(uri, &target_name, version, result.clone());
     result
+}
+
+fn literals(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {
+    model
+        .literal_facts
+        .iter()
+        .map(|fact| {
+            json!({
+                "kind": fact.kind,
+                "value": fact.value,
+                "suffix": fact.suffix,
+                "type": fact.type_name,
+                "range": span_range(source, index, fact.span),
+            })
+        })
+        .collect()
+}
+
+fn conditionals(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {
+    model
+        .conditional_facts
+        .iter()
+        .map(|fact| {
+            json!({
+                "range": span_range(source, index, fact.span),
+                "condition": {
+                    "type": fact.condition_type,
+                    "range": span_range(source, index, fact.condition_span),
+                },
+                "thenType": fact.then_type,
+                "elseType": fact.else_type,
+            })
+        })
+        .collect()
 }
 
 fn bindings(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {
@@ -218,8 +254,18 @@ fn declarations(
             let active = metadata.iter().all(|attribute| match attribute {
                 MetaAttribute::Target(selector) => target.matches_platform(selector),
                 MetaAttribute::Test => true,
+                MetaAttribute::Limitless(_) => true,
             });
-            Some(json!({"name":name,"active":active,"range":span_range(source,index,span)}))
+            let limitless = if program.file_metadata.contains(&crate::ast::LimitlessScope::File) {
+                Some("file")
+            } else if metadata.iter().any(|attribute| {
+                matches!(attribute, MetaAttribute::Limitless(crate::ast::LimitlessScope::Verb))
+            }) {
+                Some("verb")
+            } else {
+                None
+            };
+            Some(json!({"name":name,"active":active,"limitless":limitless,"range":span_range(source,index,span)}))
         })
         .collect()
 }

@@ -5,6 +5,7 @@ mod statements;
 
 pub(super) use super::model::NativeCleanupSchedule;
 pub(super) use body::{lower_body, lower_case_block};
+pub(super) use statements::lower_statements;
 
 #[derive(Clone, Copy)]
 pub(super) enum Flow {

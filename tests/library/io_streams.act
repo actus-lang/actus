@@ -154,8 +154,8 @@ verb stdin_eof_is_typed() -> Int {
 verb emit_standard_output(abs text: Buffer) -> Int {
     erg value = 0;
     erg integer = print_int(value: value);
-    erg printed = print(text: abs text);
-    erg line = println(text: abs text);
+    erg printed = printb(text: abs text);
+    erg line = printlnb(text: abs text);
     case dat integer {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },

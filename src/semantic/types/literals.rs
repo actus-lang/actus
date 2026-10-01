@@ -4,6 +4,59 @@ use super::super::analyzer::Analyzer;
 use super::super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
+    pub(crate) fn validate_typed_float_literal(
+        &self,
+        value: &str,
+        suffix: Option<&str>,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(suffix) = suffix else { return Ok(()) };
+        if !matches!(suffix, "f32" | "f64") || value.parse::<f64>().is_err() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::NumericLiteralOutOfRange {
+                    ty: suffix.to_owned(),
+                    literal: value.to_owned(),
+                },
+                span,
+            });
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_typed_integer_literal(
+        &self,
+        value: &str,
+        suffix: Option<&str>,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(suffix) = suffix else { return Ok(()) };
+        let expected =
+            TypeName { name: suffix.to_owned(), arguments: Vec::new(), reference_role: None, span };
+        let expression =
+            Expr::Integer { value: value.to_owned(), suffix: Some(suffix.to_owned()), span };
+        if primitive_type(suffix).is_none() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::NumericLiteralOutOfRange {
+                    ty: suffix.to_owned(),
+                    literal: value.to_owned(),
+                },
+                span,
+            });
+        }
+        self.validate_expected_literal(&expression, &expected)
+    }
+
+    pub(crate) fn validate_typed_integer_expression(
+        &self,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        let Some(suffix) = integer_literal_suffix(expression) else { return Ok(()) };
+        let span = crate::semantic::analyzer::expression_span(expression);
+        let expected =
+            TypeName { name: suffix.to_owned(), arguments: Vec::new(), reference_role: None, span };
+        self.validate_expected_literal(expression, &expected)
+    }
+
     pub(crate) fn validate_expected_literal(
         &self,
         expression: &Expr,
@@ -35,6 +88,16 @@ impl Analyzer {
             },
             span: expected.span,
         })
+    }
+}
+
+fn integer_literal_suffix(expression: &Expr) -> Option<&str> {
+    match expression {
+        Expr::Integer { suffix, .. } => suffix.as_deref(),
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            integer_literal_suffix(expression)
+        }
+        _ => None,
     }
 }
 

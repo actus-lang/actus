@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -19,6 +20,8 @@ pub(crate) struct ActusManifest {
     pub(crate) build: BuildManifest,
     #[serde(default)]
     pub(crate) profile: ProfilesManifest,
+    #[serde(default)]
+    pub(crate) runtime: Option<RuntimeManifest>,
 }
 
 #[derive(Deserialize)]
@@ -29,13 +32,23 @@ pub(crate) struct PackageManifest {
     pub(crate) edition: Option<String>,
     pub(crate) entry: Option<String>,
     pub(crate) source_root: Option<String>,
+    pub(crate) source_limits: Option<SourceLimitMode>,
     #[serde(default)]
     pub(crate) dependencies: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceLimitMode {
+    #[default]
+    Enabled,
+    Limitless,
 }
 
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BuildManifest {
+    pub(crate) runtime: Option<RuntimeProfile>,
     pub(crate) target: Option<String>,
     pub(crate) profile: Option<BuildProfile>,
     pub(crate) linker: Option<String>,
@@ -47,6 +60,69 @@ pub(crate) struct BuildManifest {
     pub(crate) library_paths: Vec<String>,
     #[serde(default)]
     pub(crate) libraries: Vec<LibraryManifest>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RuntimeProfile {
+    #[default]
+    Core,
+    Std,
+    Freestanding,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RuntimeManifest {
+    pub(crate) kind: RuntimePackageKind,
+    #[serde(default)]
+    pub(crate) modules: Vec<RuntimeModuleManifest>,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum RuntimePackageKind {
+    Builtin,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RuntimeModuleManifest {
+    pub(crate) name: String,
+    pub(crate) path: String,
+    #[serde(default)]
+    pub(crate) targets: Vec<RuntimeTargetClass>,
+}
+
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum RuntimeTargetClass {
+    TargetNeutral,
+    Hosted,
+    Freestanding,
+    Embedded,
+}
+
+impl RuntimeTargetClass {
+    pub(crate) fn applies_to(self, entry_contract: crate::target::EntryContract) -> bool {
+        matches!(
+            (self, entry_contract),
+            (Self::TargetNeutral, _)
+                | (Self::Hosted, crate::target::EntryContract::Hosted)
+                | (Self::Freestanding | Self::Embedded, crate::target::EntryContract::Freestanding)
+        )
+    }
+}
+
+impl Display for RuntimeProfile {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::Core => "core",
+            Self::Std => "std",
+            Self::Freestanding => "freestanding",
+        };
+        formatter.write_str(name)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
@@ -106,7 +182,18 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
         ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
     })?;
     let manifest = toml::from_str::<ActusManifest>(&source).map_err(|error| {
-        ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
+        let message = error.to_string();
+        if message.contains("unknown variant")
+            && message.contains("core")
+            && message.contains("std")
+        {
+            ConfigurationError(format!(
+                "unsupported runtime profile in `{}`: {message}",
+                path.display()
+            ))
+        } else {
+            ConfigurationError(format!("cannot parse `{}`: {message}", path.display()))
+        }
     })?;
     validate(&manifest)?;
     Ok(manifest)
@@ -115,7 +202,8 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
 pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     validate_package(manifest)?;
     validate_build(manifest)?;
-    validate_libraries(manifest)
+    validate_libraries(manifest)?;
+    validate_runtime_manifest(manifest)
 }
 
 fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
@@ -170,6 +258,34 @@ fn validate_libraries(manifest: &ActusManifest) -> Result<(), ConfigurationError
     Ok(())
 }
 
+fn validate_runtime_manifest(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
+    let Some(runtime) = &manifest.runtime else { return Ok(()) };
+    match runtime.kind {
+        RuntimePackageKind::Builtin => {}
+    }
+    let mut names = std::collections::BTreeSet::new();
+    for module in &runtime.modules {
+        if module.name.trim().is_empty() || module.path.trim().is_empty() {
+            return Err(ConfigurationError(
+                "Actus.toml runtime modules require non-empty name and path".to_owned(),
+            ));
+        }
+        if !names.insert(&module.name) {
+            return Err(ConfigurationError(format!(
+                "Actus.toml runtime module `{}` is declared more than once",
+                module.name
+            )));
+        }
+        if module.targets.is_empty() {
+            return Err(ConfigurationError(format!(
+                "Actus.toml runtime module `{}` must declare at least one target class",
+                module.name
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn source_root(manifest: &ActusManifest, directory: &Path) -> PathBuf {
     directory.join(manifest.package.source_root.as_deref().unwrap_or("src"))
 }
@@ -195,4 +311,21 @@ pub(crate) fn warn_if_legacy_manifest(path: &Path) {
 
 pub(crate) fn is_legacy_manifest(path: &Path) -> bool {
     path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RuntimeTargetClass;
+    use crate::target::EntryContract;
+
+    #[test]
+    fn runtime_target_classes_match_hosted_and_embedded_contracts() {
+        assert!(RuntimeTargetClass::TargetNeutral.applies_to(EntryContract::Hosted));
+        assert!(RuntimeTargetClass::TargetNeutral.applies_to(EntryContract::Freestanding));
+        assert!(RuntimeTargetClass::Hosted.applies_to(EntryContract::Hosted));
+        assert!(!RuntimeTargetClass::Hosted.applies_to(EntryContract::Freestanding));
+        assert!(RuntimeTargetClass::Freestanding.applies_to(EntryContract::Freestanding));
+        assert!(RuntimeTargetClass::Embedded.applies_to(EntryContract::Freestanding));
+        assert!(!RuntimeTargetClass::Embedded.applies_to(EntryContract::Hosted));
+    }
 }

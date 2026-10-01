@@ -1,9 +1,13 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::ast::{LimitlessScope, MetaAttribute, TopLevelDecl};
 use crate::diagnostics::{Diagnostic, sort_diagnostics};
+use crate::lexer::SourceSpan;
+use crate::lexer::scan;
+use crate::parser::parse;
 
 #[path = "diagnostics.rs"]
 mod diagnostics;
@@ -16,9 +20,68 @@ use diagnostics::{file_diagnostics, function_diagnostics, suppression_diagnostic
 pub use policy::SourceLimitPolicy;
 use scan::find_functions;
 
+/// Records why a source-limit exception was accepted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LimitlessApprovalOrigin {
+    SourceMetadata,
+    PackageConfiguration,
+}
+
+/// One reviewable source-limit exception accepted for a source file.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LimitlessApproval {
+    pub path: PathBuf,
+    pub scope: &'static str,
+    pub target: Option<String>,
+    pub span: SourceSpan,
+    pub origin: LimitlessApprovalOrigin,
+}
+
+/// Conformance diagnostics together with the accepted exception evidence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceLimitReport {
+    pub diagnostics: Vec<Diagnostic>,
+    pub approvals: Vec<LimitlessApproval>,
+}
+
 /// Inspects one source file and returns every source-limit diagnostic it violates.
 pub fn inspect_source(path: &Path, source: &str) -> Vec<Diagnostic> {
     source_limit_diagnostics(path, source, SourceLimitPolicy::default())
+}
+
+/// Inspects one source file when project policy keeps source limits enabled.
+pub fn inspect_source_with_enforcement(
+    path: &Path,
+    source: &str,
+    enforce_limits: bool,
+) -> Vec<Diagnostic> {
+    if enforce_limits { inspect_source(path, source) } else { Vec::new() }
+}
+
+/// Inspects one source while recording whether acceptance came from source metadata or package policy.
+pub fn inspect_source_report_with_enforcement(
+    path: &Path,
+    source: &str,
+    enforce_limits: bool,
+) -> SourceLimitReport {
+    if enforce_limits {
+        return inspect_source_report(
+            path,
+            source,
+            SourceLimitPolicy::default(),
+            LimitlessApprovalOrigin::SourceMetadata,
+        );
+    }
+    SourceLimitReport {
+        diagnostics: Vec::new(),
+        approvals: vec![LimitlessApproval {
+            path: fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()),
+            scope: "file",
+            target: None,
+            span: SourceSpan::new(0, source.len()),
+            origin: LimitlessApprovalOrigin::PackageConfiguration,
+        }],
+    }
 }
 
 /// Applies a source-limit policy to one Rust or Actus source file.
@@ -27,12 +90,93 @@ pub fn source_limit_diagnostics(
     source: &str,
     policy: SourceLimitPolicy,
 ) -> Vec<Diagnostic> {
-    let mut diagnostics = file_diagnostics(path, source, source.lines().count(), policy);
+    inspect_source_report(path, source, policy, LimitlessApprovalOrigin::SourceMetadata).diagnostics
+}
+
+/// Inspects one source and returns diagnostics plus accepted exception evidence.
+pub fn inspect_source_report(
+    path: &Path,
+    source: &str,
+    policy: SourceLimitPolicy,
+    origin: LimitlessApprovalOrigin,
+) -> SourceLimitReport {
+    let exemptions = source_limit_exemptions(source);
+    let mut diagnostics = if exemptions.file {
+        Vec::new()
+    } else {
+        file_diagnostics(path, source, source.lines().count(), policy)
+    };
     for function in find_functions(source) {
-        diagnostics.extend(function_diagnostics(path, source, &function, policy));
+        if !exemptions.verbs.contains(&function.name) && !exemptions.file {
+            diagnostics.extend(function_diagnostics(path, source, &function, policy));
+        }
     }
-    diagnostics.extend(suppression_diagnostics(path, source));
-    diagnostics
+    if !exemptions.file {
+        diagnostics.extend(suppression_diagnostics(path, source));
+    }
+    let canonical_path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let approvals = exemptions
+        .approvals
+        .into_iter()
+        .map(|(scope, target, span)| LimitlessApproval {
+            path: canonical_path.clone(),
+            scope,
+            target,
+            span,
+            origin,
+        })
+        .collect();
+    SourceLimitReport { diagnostics, approvals }
+}
+
+#[derive(Default)]
+struct SourceLimitExemptions {
+    file: bool,
+    verbs: HashSet<String>,
+    approvals: Vec<(&'static str, Option<String>, SourceSpan)>,
+}
+
+fn source_limit_exemptions(source: &str) -> SourceLimitExemptions {
+    let (tokens, errors) = scan(source);
+    if !errors.is_empty() {
+        return SourceLimitExemptions::default();
+    }
+    let Ok(program) = parse(tokens) else { return SourceLimitExemptions::default() };
+    let mut exemptions = SourceLimitExemptions {
+        file: program.file_metadata.contains(&LimitlessScope::File),
+        ..SourceLimitExemptions::default()
+    };
+    if exemptions.file {
+        exemptions.approvals.push(("file", None, SourceSpan::new(0, source.len())));
+    }
+    for declaration in program.declarations {
+        let (name, span) = match declaration {
+            TopLevelDecl::Verb(verb) => (
+                verb.metadata
+                    .iter()
+                    .any(|attribute| {
+                        matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
+                    })
+                    .then_some(verb.name),
+                verb.span,
+            ),
+            TopLevelDecl::ExternalVerb(verb) => (
+                verb.metadata
+                    .iter()
+                    .any(|attribute| {
+                        matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
+                    })
+                    .then_some(verb.name),
+                verb.span,
+            ),
+            _ => (None, SourceSpan::new(0, 0)),
+        };
+        if let Some(name) = name {
+            exemptions.verbs.insert(name.clone());
+            exemptions.approvals.push(("verb", Some(name), span));
+        }
+    }
+    exemptions
 }
 
 /// Inspects all Rust and Actus source files below the supplied roots.

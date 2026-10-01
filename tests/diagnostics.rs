@@ -53,6 +53,18 @@ fn renders_static_operator_diagnostics_independently_of_renderer() {
 }
 
 #[test]
+fn renders_malformed_float_suffix_with_a_stable_lexical_code() {
+    let (tokens, errors) = scan("verb main() -> Int { return 1.0f16; }\n");
+    assert_eq!(tokens.len(), 12);
+    let error = errors.first().expect("invalid float suffix should be diagnosed");
+    let diagnostic = lex_diagnostic(error);
+
+    assert_eq!(diagnostic.code(), "E0006");
+    assert_eq!(diagnostic.phase(), DiagnosticPhase::Lexical);
+    assert_eq!(diagnostic.span(), SourceSpan::new(31, 34));
+}
+
+#[test]
 fn renders_unknown_verb_diagnostics_with_a_stable_code() {
     let source = "verb main() { missing_verb(1); }\n";
     let (tokens, errors) = scan(source);
@@ -134,6 +146,17 @@ fn renders_missing_facade_with_a_stable_module_code() {
         render_diagnostic("", &diagnostic),
         "error[E1101] at 1:1: module `std::missing` is missing its canonical facade `library/std/src/missing/missing.act`"
     );
+}
+
+#[test]
+fn renders_incompatible_runtime_module_with_a_stable_code() {
+    let error = ModuleError::Resolution(ModuleResolutionError::IncompatibleRuntime {
+        module: "std::fs".to_owned(),
+        expected: std::path::PathBuf::from("library/std/src/fs/fs.act"),
+    });
+    let diagnostic = actus::diagnostics::module_diagnostic(&error);
+    assert_eq!(diagnostic.code(), "E1112");
+    assert!(diagnostic.message().contains("incompatible with the configured target"));
 }
 
 #[test]

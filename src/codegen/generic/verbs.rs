@@ -30,7 +30,7 @@ pub(in crate::codegen) fn specialize_program(
             other => declarations.push(other.clone()),
         }
     }
-    Ok(Program { declarations })
+    Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
 }
 
 fn specialize_external_verb(
@@ -146,6 +146,12 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
             value: specialize_expression(value, substitution),
             span: *span,
         },
+        Stmt::CompoundAssignment { target, operator, value, span } => Stmt::CompoundAssignment {
+            target: specialize_compound_target(target, substitution),
+            operator: *operator,
+            value: specialize_expression(value, substitution),
+            span: *span,
+        },
         Stmt::Expression { expression, span } => Stmt::Expression {
             expression: specialize_expression(expression, substitution),
             span: *span,
@@ -156,6 +162,29 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
         Stmt::Loop(block) => Stmt::Loop(specialize_block(block, substitution)),
         Stmt::Block(block) => Stmt::Block(specialize_block(block, substitution)),
         _ => statement.clone(),
+    }
+}
+
+fn specialize_compound_target(
+    target: &crate::ast::CompoundAssignmentTarget,
+    substitution: &TypeSubstitution,
+) -> crate::ast::CompoundAssignmentTarget {
+    match target {
+        crate::ast::CompoundAssignmentTarget::Identifier(name) => {
+            crate::ast::CompoundAssignmentTarget::Identifier(name.clone())
+        }
+        crate::ast::CompoundAssignmentTarget::Field { object, field } => {
+            crate::ast::CompoundAssignmentTarget::Field {
+                object: specialize_expression(object, substitution),
+                field: field.clone(),
+            }
+        }
+        crate::ast::CompoundAssignmentTarget::Index { target, index } => {
+            crate::ast::CompoundAssignmentTarget::Index {
+                target: specialize_expression(target, substitution),
+                index: specialize_expression(index, substitution),
+            }
+        }
     }
 }
 

@@ -38,7 +38,7 @@ pub(super) fn lower_owner_declaration<'source>(
     }
     let value = lower_owner_value(
         function,
-        declared_native,
+        Some(native_type),
         initializer,
         locals,
         types,

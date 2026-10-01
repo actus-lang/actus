@@ -11,6 +11,7 @@ pub(crate) fn lex_code(error: &LexError) -> u8 {
         LexErrorKind::UnterminatedDocString => 3,
         LexErrorKind::InvalidIntegerType(_) => 4,
         LexErrorKind::InvalidHexLiteral(_) => 5,
+        LexErrorKind::InvalidFloatType(_) => 6,
     }
 }
 
@@ -24,6 +25,9 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::UnsupportedTargetPlatform => "E0007",
         ParseErrorCode::ConflictingTargetPlatforms => "E0010",
         ParseErrorCode::MetadataTargetNotAllowed => "E0008",
+        ParseErrorCode::MetadataFileScopeNotAllowed => "E0011",
+        ParseErrorCode::UnsupportedLimitlessScope => "E0012",
+        ParseErrorCode::DuplicateMetadata => "E0013",
     }
 }
 

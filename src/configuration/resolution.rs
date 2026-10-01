@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use super::manifest::{
-    ActusManifest, BuildManifest, BuildProfile, OptimizationLevel, ProfilesManifest,
+    ActusManifest, BuildManifest, BuildProfile, OptimizationLevel, ProfilesManifest, RuntimeProfile,
 };
 use super::types::{CompilerConfiguration, LinkLibrary, NativeBackendConfiguration};
 use super::{ConfigurationError, EntryContract, LinkerFlavor};
@@ -65,4 +65,87 @@ pub(super) fn resolve_manifest_target(
 
 pub(super) fn default_linker(target: &TargetSpec) -> OsString {
     OsString::from(target.default_linker())
+}
+
+pub(super) fn runtime_source_root(
+    runtime: RuntimeProfile,
+) -> Result<Option<PathBuf>, ConfigurationError> {
+    if runtime != RuntimeProfile::Std {
+        return Ok(None);
+    }
+    let candidates = builtin_root_candidates();
+    candidates.into_iter().find(|path| path.is_dir()).map(Some).ok_or_else(|| {
+        ConfigurationError(
+            "runtime profile `std` cannot locate the compiler-owned standard library".to_owned(),
+        )
+    })
+}
+
+pub(super) fn runtime_identity(
+    runtime: RuntimeProfile,
+    source_root: Option<&Path>,
+) -> Result<(Option<String>, Option<String>), ConfigurationError> {
+    let Some(source_root) = source_root else {
+        return Ok((None, None));
+    };
+    let package_root = source_root.parent().ok_or_else(|| {
+        ConfigurationError("builtin standard-library root has no package parent".to_owned())
+    })?;
+    let manifest = super::manifest::read(&package_root.join("Actus.toml"))?;
+    let checksum = super::checksum::content_checksum(package_root)?;
+    if runtime != RuntimeProfile::Std {
+        return Ok((None, None));
+    }
+    Ok((Some(manifest.package.version), Some(checksum)))
+}
+
+pub(super) fn runtime_module_roots(
+    runtime: RuntimeProfile,
+    entry_contract: EntryContract,
+) -> Result<std::collections::BTreeMap<String, PathBuf>, ConfigurationError> {
+    let Some(source_root) = runtime_source_root(runtime)? else {
+        return Ok(std::collections::BTreeMap::new());
+    };
+    let package_root = source_root.parent().ok_or_else(|| {
+        ConfigurationError("builtin standard-library root has no package parent".to_owned())
+    })?;
+    let manifest = super::manifest::read(&package_root.join("Actus.toml"))?;
+    let Some(runtime_manifest) = manifest.runtime else {
+        return Err(ConfigurationError(
+            "builtin standard library is missing its runtime registry".to_owned(),
+        ));
+    };
+    let mut roots = std::collections::BTreeMap::new();
+    for module in runtime_manifest.modules {
+        if !module.targets.iter().any(|target| target.applies_to(entry_contract)) {
+            continue;
+        }
+        let module_root = package_root.join(module.path);
+        if !module_root.is_dir() {
+            return Err(ConfigurationError(format!(
+                "builtin standard-library module `{}` path does not exist: {}",
+                module.name,
+                module_root.display()
+            )));
+        }
+        roots.insert(module.name, module_root);
+    }
+    Ok(roots)
+}
+
+fn builtin_root_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(sysroot) = std::env::var_os("ACTUS_SYSROOT") {
+        let root = PathBuf::from(sysroot);
+        candidates.push(root.join("std/src"));
+        candidates.push(root.join("library/std/src"));
+    }
+    if let Ok(executable) = std::env::current_exe()
+        && let Some(parent) = executable.parent()
+    {
+        candidates.push(parent.join("../lib/actus/std/src"));
+        candidates.push(parent.join("../share/actus/std/src"));
+    }
+    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std/src"));
+    candidates
 }

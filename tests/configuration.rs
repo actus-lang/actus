@@ -1,7 +1,12 @@
 use std::fs;
 
-use actus::configuration::{BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel};
-use actus::diagnostics::{DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST};
+use actus::configuration::{
+    BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel, RuntimeProfile,
+};
+use actus::diagnostics::{
+    DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST,
+    STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED,
+};
 use actus::target::TargetSpec;
 
 #[test]
@@ -16,6 +21,7 @@ fn loads_build_settings_from_an_actus_manifest() {
     let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
     assert_eq!(configuration.linker().to_string_lossy(), "clang");
     assert_eq!(configuration.entry_symbol(), Some("main"));
+    assert_eq!(configuration.runtime_profile(), RuntimeProfile::Core);
     assert_eq!(configuration.native_backend().module_name(), "sample_native");
     assert!(!configuration.native_backend().position_independent());
     assert_eq!(configuration.libraries()[0].name(), "m");
@@ -24,6 +30,170 @@ fn loads_build_settings_from_an_actus_manifest() {
     let expected_linker = TargetSpec::host().expect("host target should parse").linker_flavor();
     assert_eq!(configuration.linker_flavor(), expected_linker);
     let _ = fs::remove_file(path);
+}
+
+#[test]
+fn loads_explicit_standard_runtime_profile() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-std-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration = CompilerConfiguration::from_manifest_read_only(&path)
+        .expect("standard runtime manifest should load");
+    assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn allows_standard_runtime_profile_for_freestanding_target() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-mismatch-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"bare\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\ntarget = \"x86_64-unknown-none\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration = CompilerConfiguration::from_manifest_read_only(&path)
+        .expect("target-aware std must load for freestanding targets");
+    assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
+    assert!(configuration.runtime_module_roots().is_empty());
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn allows_standard_runtime_profile_for_embedded_target_fixture() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-embedded-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"embedded\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\ntarget = \"thumbv7em-none-eabihf\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration = CompilerConfiguration::from_manifest_read_only(&path)
+        .expect("embedded std manifest should load");
+    assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
+    assert!(!configuration.host_runtime_enabled());
+    assert!(configuration.runtime_module_roots().is_empty());
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn rejects_freestanding_runtime_profile_for_hosted_target() {
+    let root =
+        std::env::temp_dir().join(format!("actus-runtime-hosted-mismatch-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"hosted\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"freestanding\"\n",
+    )
+    .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("freestanding runtime must be rejected for hosted targets");
+    assert_eq!(error.diagnostic().code(), STRICT_RUNTIME_TARGET_INCOMPATIBLE);
+    assert!(error.to_string().contains("incompatible with hosted target"));
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn rejects_unknown_runtime_profile_with_a_stable_diagnostic() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-unknown-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"unknown\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"portable\"\n",
+    )
+    .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("unknown runtime profile must be rejected");
+    assert_eq!(error.diagnostic().code(), STRICT_RUNTIME_UNSUPPORTED);
+    assert!(error.to_string().contains("unsupported runtime profile"));
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn rejects_dependency_alias_that_shadows_builtin_standard_library() {
+    let root =
+        std::env::temp_dir().join(format!("actus-runtime-alias-conflict-{}", std::process::id()));
+    let dependency = root.join("local_std");
+    fs::create_dir_all(dependency.join("src")).expect("create dependency source root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\n\n[dependencies.std]\npath = \"local_std\"\n",
+    )
+    .expect("write root manifest");
+    fs::write(
+        dependency.join("Actus.toml"),
+        "[package]\nname = \"local_std\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("write dependency manifest");
+
+    let error = CompilerConfiguration::from_manifest_read_only(&root.join("Actus.toml"))
+        .expect_err("builtin std alias must not be shadowed");
+    assert!(error.to_string().contains("conflicts with the builtin standard library"));
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn source_limits_are_enabled_when_package_policy_is_absent() {
+    let root =
+        std::env::temp_dir().join(format!("actus-config-source-limits-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n")
+        .expect("write manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest_read_only(&path).expect("manifest should load");
+    assert_eq!(configuration.source_limit_mode(), actus::configuration::SourceLimitMode::Enabled);
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn accepts_package_wide_limitless_source_policy() {
+    let root = std::env::temp_dir().join(format!("actus-config-limitless-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\nsource_limits = \"limitless\"\n",
+    )
+    .expect("write manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest_read_only(&path).expect("manifest should load");
+    assert_eq!(configuration.source_limit_mode(), actus::configuration::SourceLimitMode::Limitless);
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn rejects_unknown_source_limit_policy() {
+    let root =
+        std::env::temp_dir().join(format!("actus-config-invalid-limits-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\nsource_limits = \"off\"\n",
+    )
+    .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest_read_only(&path)
+        .expect_err("unknown source-limit policy must fail");
+    assert!(error.to_string().contains("source_limits"));
+    fs::remove_dir_all(root).expect("remove fixture");
 }
 
 #[test]

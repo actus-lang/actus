@@ -77,6 +77,19 @@ fn collect_block_arrays(block: &crate::ast::Block, definitions: &mut Vec<TypeNam
                 collect_expression_arrays(object, definitions);
                 collect_expression_arrays(value, definitions);
             }
+            Stmt::CompoundAssignment { target, value, .. } => {
+                match target {
+                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
+                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
+                        collect_expression_arrays(object, definitions)
+                    }
+                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
+                        collect_expression_arrays(target, definitions);
+                        collect_expression_arrays(index, definitions);
+                    }
+                }
+                collect_expression_arrays(value, definitions);
+            }
             Stmt::Loop(nested) | Stmt::Block(nested) => collect_block_arrays(nested, definitions),
             Stmt::Return { value: None, .. }
             | Stmt::Break { .. }
@@ -127,6 +140,13 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
                 }
                 crate::ast::CaseBody::Block(block) => collect_block_arrays(block, definitions),
             });
+        }
+        Expr::If { condition, then_branch, else_branch, .. } => {
+            collect_expression_arrays(condition, definitions);
+            collect_block_arrays(then_branch, definitions);
+            if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
+                collect_block_arrays(block, definitions);
+            }
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }

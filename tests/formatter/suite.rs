@@ -27,6 +27,24 @@ fn formatting_is_idempotent() {
 }
 
 #[test]
+fn formats_if_else_without_collapsing_branch_boundaries() {
+    let source = "verb choose(erg ready: Bool) -> Int { if ready { return 1; } else if ready { return 2; } else { return 3; } }";
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("if ready {\n"));
+    assert!(formatted.contains("} else if ready {\n"));
+    assert!(formatted.contains("} else {\n"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_typed_float_literal_suffixes() {
+    let formatted = format_source("verb main() { erg value: f32 = 1.5f32; }");
+    assert!(formatted.contains("1.5f32"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formatter_idempotence_holds_for_the_source_corpus() {
     let sources = [
         "verb main() -> Int { return 42; }",

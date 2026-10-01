@@ -13,7 +13,7 @@ pub use crate::target::{EntryContract, LinkerFlavor};
 pub use loading::package_identity;
 pub use lockfile::{ActusLock, LockedPackage, LockfileError};
 pub use manifest::OptimizationLevel;
-pub use manifest::{BuildProfile, LibraryKind};
+pub use manifest::{BuildProfile, LibraryKind, RuntimeProfile, SourceLimitMode};
 pub use strict::StrictConfigurationError;
 pub use types::{
     CompilerConfiguration, ConfigurationError, LinkLibrary, NativeBackendConfiguration,

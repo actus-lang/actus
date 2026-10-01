@@ -4,3 +4,21 @@ version = "0.1.0"
 edition = "alpha"
 entry = "lib"
 source_root = "src"
+
+[runtime]
+kind = "builtin"
+
+[[runtime.modules]]
+name = "io"
+path = "src/io"
+targets = ["hosted"]
+
+[[runtime.modules]]
+name = "fs"
+path = "src/fs"
+targets = ["hosted"]
+
+[[runtime.modules]]
+name = "path"
+path = "src/path"
+targets = ["hosted"]

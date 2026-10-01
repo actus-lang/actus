@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, Value, condcodes::IntCC};
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::Expr;
+use crate::ast::{BinaryOp, Expr};
 
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
@@ -14,6 +14,84 @@ use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_buffer_index(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
+    let address = lower_buffer_address(
+        function,
+        target,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let byte =
+        function.ins().load(cranelift_codegen::ir::types::I8, MemFlagsData::new(), address, 0);
+    Ok(byte)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_buffer_compound_assignment(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    operator: BinaryOp,
+    value: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let address = lower_buffer_address(
+        function,
+        target,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let current =
+        function.ins().load(cranelift_codegen::ir::types::I8, MemFlagsData::new(), address, 0);
+    let right = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let right =
+        super::expressions::coerce_to_ir_type(function, right, cranelift_codegen::ir::types::I8);
+    let updated = super::expressions::lower_compound_integer_operation(
+        function,
+        current,
+        operator,
+        right,
+        NativeType::Integer { signed: false, width: 8 },
+    )?;
+    function.ins().store(MemFlagsData::new(), updated, address, 0);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_buffer_address(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -61,10 +139,8 @@ pub(super) fn lower_buffer_index(
     function.switch_to_block(ok_block);
     let data = function.ins().load(layouts.pointer_type, MemFlagsData::new(), handle, 0);
     let address = function.ins().iadd(data, index);
-    let byte =
-        function.ins().load(cranelift_codegen::ir::types::I8, MemFlagsData::new(), address, 0);
     function.seal_block(ok_block);
-    Ok(byte)
+    Ok(address)
 }
 
 fn coerce_index(

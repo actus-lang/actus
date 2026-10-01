@@ -6,6 +6,7 @@ use super::types::{ReturnType, TypeName};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program {
+    pub file_metadata: Vec<crate::ast::LimitlessScope>,
     pub declarations: Vec<TopLevelDecl>,
 }
 

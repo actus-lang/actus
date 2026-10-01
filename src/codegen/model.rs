@@ -279,6 +279,8 @@ mod tests {
             drop_types: Vec::new(),
             binding_type_names: std::collections::HashMap::new(),
             arena_provenance: std::collections::HashMap::new(),
+            literal_facts: Vec::new(),
+            conditional_facts: Vec::new(),
         }
     }
 
@@ -321,6 +323,8 @@ mod tests {
             drop_types: Vec::new(),
             binding_type_names: std::collections::HashMap::new(),
             arena_provenance: std::collections::HashMap::new(),
+            literal_facts: Vec::new(),
+            conditional_facts: Vec::new(),
         };
 
         assert!(validate_cleanup_plans(&model).is_err());

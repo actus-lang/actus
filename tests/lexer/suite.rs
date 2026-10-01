@@ -43,8 +43,52 @@ fn scans_width_qualified_integer_types_and_hex_literals() {
     assert_eq!(tokens[5].kind, TokenKind::FloatType { width: 32 });
     assert_eq!(tokens[6].kind, TokenKind::FloatType { width: 64 });
     assert_eq!(tokens[7].kind, TokenKind::VoidType);
-    assert_eq!(tokens[8].kind, TokenKind::Integer("0xDEADBEEF".to_owned()));
-    assert_eq!(tokens[9].kind, TokenKind::Integer("0x0".to_owned()));
+    assert_eq!(tokens[8].kind, TokenKind::Integer { value: "0xDEADBEEF".to_owned(), suffix: None });
+    assert_eq!(tokens[9].kind, TokenKind::Integer { value: "0x0".to_owned(), suffix: None });
+}
+
+#[test]
+fn scans_typed_integer_literals_as_single_tokens_with_full_spans() {
+    let (tokens, errors) = scan("1u32 0u8 -1i32");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].span, SourceSpan::new(0, 4));
+    assert_eq!(
+        tokens[0].kind,
+        TokenKind::Integer { value: "1".to_owned(), suffix: Some("u32".to_owned()) }
+    );
+    assert_eq!(
+        tokens[1].kind,
+        TokenKind::Integer { value: "0".to_owned(), suffix: Some("u8".to_owned()) }
+    );
+    assert_eq!(
+        tokens[3].kind,
+        TokenKind::Integer { value: "1".to_owned(), suffix: Some("i32".to_owned()) }
+    );
+}
+
+#[test]
+fn scans_typed_float_literals_as_single_tokens_with_full_spans() {
+    let (tokens, errors) = scan("1.5f32 2.5f64");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].span, SourceSpan::new(0, 6));
+    assert_eq!(
+        tokens[0].kind,
+        TokenKind::FloatLiteral { value: "1.5".to_owned(), suffix: Some("f32".to_owned()) }
+    );
+    assert_eq!(
+        tokens[1].kind,
+        TokenKind::FloatLiteral { value: "2.5".to_owned(), suffix: Some("f64".to_owned()) }
+    );
+}
+
+#[test]
+fn rejects_unknown_typed_float_suffixes() {
+    let (_, errors) = scan("1.5f16");
+    assert!(
+        matches!(errors.as_slice(), [error] if matches!(error.kind, LexErrorKind::InvalidFloatType(ref suffix) if suffix == "f16"))
+    );
 }
 
 #[test]
@@ -162,6 +206,29 @@ fn scans_comparison_and_logical_operators() {
             &TokenKind::FatArrow,
             &TokenKind::Arrow,
             &TokenKind::Equals,
+            &TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn scans_compound_assignment_operators_as_single_tokens() {
+    let (tokens, errors) = scan("+= -= *= /= %= &= |= ^= <<= >>=");
+
+    assert!(errors.is_empty());
+    assert_eq!(
+        tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+        vec![
+            &TokenKind::PlusEquals,
+            &TokenKind::MinusEquals,
+            &TokenKind::StarEquals,
+            &TokenKind::SlashEquals,
+            &TokenKind::PercentEquals,
+            &TokenKind::AmpersandEquals,
+            &TokenKind::PipeEquals,
+            &TokenKind::CaretEquals,
+            &TokenKind::ShiftLeftEquals,
+            &TokenKind::ShiftRightEquals,
             &TokenKind::Eof,
         ]
     );

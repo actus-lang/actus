@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use super::BuildProfile;
 use super::types::CompilerConfiguration;
+use super::{BuildProfile, RuntimeProfile, SourceLimitMode};
 use crate::target::{EntryContract, LinkerFlavor, TargetSpec};
 
 impl CompilerConfiguration {
@@ -38,6 +38,26 @@ impl CompilerConfiguration {
         self.entry_contract
     }
 
+    pub const fn runtime_profile(&self) -> RuntimeProfile {
+        self.runtime
+    }
+
+    pub fn runtime_version(&self) -> Option<&str> {
+        self.runtime_version.as_deref()
+    }
+
+    pub fn runtime_checksum(&self) -> Option<&str> {
+        self.runtime_checksum.as_deref()
+    }
+
+    pub fn runtime_source_root(&self) -> Option<&Path> {
+        self.runtime_source_root.as_deref()
+    }
+
+    pub fn runtime_module_roots(&self) -> &std::collections::BTreeMap<String, PathBuf> {
+        &self.runtime_module_roots
+    }
+
     pub const fn host_runtime_enabled(&self) -> bool {
         matches!(self.entry_contract, EntryContract::Hosted)
     }
@@ -48,6 +68,10 @@ impl CompilerConfiguration {
 
     pub fn native_backend(&self) -> &super::NativeBackendConfiguration {
         &self.native_backend
+    }
+
+    pub const fn source_limit_mode(&self) -> SourceLimitMode {
+        self.source_limits
     }
 
     pub fn entry_symbol(&self) -> Option<&str> {

@@ -96,6 +96,19 @@ fn collect_block(statements: &[Stmt], values: &mut HashSet<String>) {
                 collect_expression(index, values);
                 collect_expression(value, values);
             }
+            Stmt::CompoundAssignment { target, value, .. } => {
+                match target {
+                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
+                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
+                        collect_expression(object, values)
+                    }
+                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
+                        collect_expression(target, values);
+                        collect_expression(index, values);
+                    }
+                }
+                collect_expression(value, values);
+            }
             Stmt::Return { value: Some(value), .. } => collect_expression(value, values),
             Stmt::Loop(block) | Stmt::Block(block) => collect_block(&block.statements, values),
             Stmt::Return { value: None, .. }
@@ -132,6 +145,13 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
             collect_expression(index, values);
         }
         Expr::Case { subject, branches, .. } => collect_case(subject, branches, values),
+        Expr::If { condition, then_branch, else_branch, .. } => {
+            collect_expression(condition, values);
+            collect_block(&then_branch.statements, values);
+            if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
+                collect_block(&block.statements, values);
+            }
+        }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
         | Expr::BufferLiteral { .. }

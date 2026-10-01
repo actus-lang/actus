@@ -11,44 +11,54 @@ use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::symbols::{SymbolIdentity, SymbolKind};
 use super::types::NativeType;
 
+pub(super) struct FunctionDeclarationContext<'a> {
+    pub(super) entry_symbol: Option<&'a str>,
+    pub(super) namespace_prefix: &'a str,
+    pub(super) layouts: &'a LayoutRegistry,
+    pub(super) bindings: &'a NativeSymbolBindings,
+    pub(super) force_entry_return: bool,
+}
+
 pub(super) fn declare_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
-    entry_symbol: Option<&str>,
-    namespace_prefix: &str,
-    layouts: &LayoutRegistry,
-    bindings: &NativeSymbolBindings,
+    context: FunctionDeclarationContext<'_>,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let mut metadata = HashMap::new();
-    declare_internal_functions(
+    declare_internal_functions(module, verbs, &context, &mut metadata)?;
+    declare_external_functions(
         module,
-        verbs,
-        entry_symbol,
-        namespace_prefix,
-        layouts,
+        external_verbs,
+        context.layouts,
+        context.bindings,
         &mut metadata,
     )?;
-    declare_external_functions(module, external_verbs, layouts, bindings, &mut metadata)?;
     Ok(metadata)
 }
 
 fn declare_internal_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
-    entry_symbol: Option<&str>,
-    namespace_prefix: &str,
-    layouts: &LayoutRegistry,
+    context: &FunctionDeclarationContext<'_>,
     metadata: &mut HashMap<String, FunctionMeta>,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
-        let signature = native_signature_for_definition(module, verb, layouts)?;
-        let symbol = internal_symbol(&verb.name, entry_symbol, namespace_prefix)?;
+        let signature = native_signature_for_entry(
+            module,
+            verb,
+            context.layouts,
+            context.force_entry_return && context.entry_symbol == Some(verb.name.as_str()),
+        )?;
+        let symbol = internal_symbol(&verb.name, context.entry_symbol, context.namespace_prefix)?;
         let id = module
             .declare_function(&symbol, Linkage::Export, &signature)
             .map_err(|error| NativeEmitError(error.to_string()))?;
         let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
-        metadata.insert(verb.name.clone(), function_meta(id, &verb.params, return_type, layouts)?);
+        metadata.insert(
+            verb.name.clone(),
+            function_meta(id, &verb.params, return_type, context.layouts)?,
+        );
     }
     Ok(())
 }
@@ -128,6 +138,22 @@ pub(super) fn native_signature_for_definition(
         &verb.params,
         verb.return_type.as_ref().map(|return_type| &return_type.ty),
         layouts,
+        false,
+    )
+}
+
+pub(super) fn native_signature_for_entry(
+    module: &mut ObjectModule,
+    verb: &VerbDecl,
+    layouts: &LayoutRegistry,
+    force_return: bool,
+) -> Result<cranelift_codegen::ir::Signature, NativeEmitError> {
+    signature_for(
+        module,
+        &verb.params,
+        verb.return_type.as_ref().map(|return_type| &return_type.ty),
+        layouts,
+        force_return,
     )
 }
 
@@ -141,6 +167,7 @@ fn external_native_signature(
         &verb.params,
         verb.return_type.as_ref().map(|return_type| &return_type.ty),
         layouts,
+        false,
     )
 }
 
@@ -149,6 +176,7 @@ fn signature_for(
     params: &[crate::ast::Param],
     return_type: Option<&crate::ast::TypeName>,
     layouts: &LayoutRegistry,
+    force_return: bool,
 ) -> Result<cranelift_codegen::ir::Signature, NativeEmitError> {
     let mut signature = module.make_signature();
     let pointer_type = module.isa().pointer_type();
@@ -160,7 +188,14 @@ fn signature_for(
     for parameter in params {
         append_parameter(&mut signature, parameter, pointer_type, layouts)?;
     }
-    append_return(&mut signature, return_type, native_return, uses_return_slot, layouts)?;
+    append_return(
+        &mut signature,
+        return_type,
+        native_return,
+        uses_return_slot,
+        layouts,
+        force_return,
+    )?;
     Ok(signature)
 }
 
@@ -194,12 +229,14 @@ fn append_return(
     native_return: NativeType,
     uses_return_slot: bool,
     layouts: &LayoutRegistry,
+    force_return: bool,
 ) -> Result<(), NativeEmitError> {
     let returns_value = return_type.is_some()
         && (!uses_return_slot || layouts.returns_borrowed_view(native_return))
-        && !matches!(native_return, NativeType::Void);
+        && (!matches!(native_return, NativeType::Void) || force_return);
     if returns_value {
-        signature.returns.push(AbiParam::new(layouts.ir_type(native_return)?));
+        let return_type = if force_return { NativeType::Int } else { native_return };
+        signature.returns.push(AbiParam::new(layouts.ir_type(return_type)?));
     }
     Ok(())
 }

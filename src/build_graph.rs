@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::configuration::CompilerConfiguration;
 
-const ACTMETA_FORMAT_VERSION: u32 = 1;
+const ACTMETA_FORMAT_VERSION: u32 = 3;
 
 #[derive(Debug)]
 pub struct BuildGraphError(String);
@@ -28,6 +28,12 @@ pub struct UnitMetadata {
     pub target_triple: String,
     pub target_spec_hash: String,
     pub profile: String,
+    pub runtime: String,
+    pub source_limits: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_checksum: Option<String>,
 }
 
 impl UnitMetadata {
@@ -43,6 +49,10 @@ impl UnitMetadata {
             target_triple: configuration.target().triple().to_string(),
             target_spec_hash: configuration.target_spec_hash().to_owned(),
             profile: configuration.profile().directory_name().to_owned(),
+            runtime: configuration.runtime_profile().to_string(),
+            source_limits: source_limit_name(configuration.source_limit_mode()).to_owned(),
+            runtime_version: configuration.runtime_version().map(str::to_owned),
+            runtime_checksum: configuration.runtime_checksum().map(str::to_owned),
         }
     }
 
@@ -53,6 +63,10 @@ impl UnitMetadata {
             && self.target_triple == configuration.target().triple().to_string()
             && self.target_spec_hash == configuration.target_spec_hash()
             && self.profile == configuration.profile().directory_name()
+            && self.runtime == configuration.runtime_profile().to_string()
+            && self.source_limits == source_limit_name(configuration.source_limit_mode())
+            && self.runtime_version.as_deref() == configuration.runtime_version()
+            && self.runtime_checksum.as_deref() == configuration.runtime_checksum()
     }
 
     fn read(path: &Path) -> Result<Self, BuildGraphError> {
@@ -61,6 +75,13 @@ impl UnitMetadata {
         })?;
         toml::from_str(&source)
             .map_err(|error| BuildGraphError(format!("cannot parse `{}`: {error}", path.display())))
+    }
+}
+
+fn source_limit_name(mode: crate::configuration::SourceLimitMode) -> &'static str {
+    match mode {
+        crate::configuration::SourceLimitMode::Enabled => "enabled",
+        crate::configuration::SourceLimitMode::Limitless => "limitless",
     }
 }
 
@@ -137,6 +158,10 @@ mod tests {
         let metadata = UnitMetadata::for_configuration("sample", &configuration);
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
         assert_eq!(metadata.target_triple, configuration.target().triple().to_string());
+        assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
+        assert_eq!(metadata.source_limits, "enabled");
+        assert_eq!(metadata.runtime_version.as_deref(), configuration.runtime_version());
+        assert_eq!(metadata.runtime_checksum.as_deref(), configuration.runtime_checksum());
     }
 
     #[test]
@@ -152,6 +177,10 @@ mod tests {
         let metadata = UnitMetadata::read(&metadata_path(&artifact)).expect("read metadata");
         assert_eq!(metadata.unit, format!("metadata-{}", std::process::id()));
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
+        assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
+        assert_eq!(metadata.source_limits, "enabled");
+        assert_eq!(metadata.runtime_version.as_deref(), configuration.runtime_version());
+        assert_eq!(metadata.runtime_checksum.as_deref(), configuration.runtime_checksum());
         let _ = fs::remove_file(&artifact);
         let _ = fs::remove_file(metadata_path(&artifact));
     }

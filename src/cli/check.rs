@@ -76,7 +76,7 @@ fn check_source(
 ) -> i32 {
     let input = input_path.to_path_buf();
     let Some(source) = read_check_source(&input) else { return 1 };
-    if !validate_source_limits(&input, &source, mode) {
+    if !validate_source_limits(&input, &source, mode, configuration) {
         return 1;
     }
     let Some(program) = parse_check_source(&input, &source) else { return 1 };
@@ -117,9 +117,11 @@ fn resolve_check_program(
     source: &str,
     program: crate::ast::Program,
 ) -> Option<crate::ast::Program> {
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     match resolve_imports(&program, &resolver) {
         Ok(program) => Some(program),
@@ -161,9 +163,11 @@ fn check_module(
     module_path: &str,
     mode: ConformanceMode,
 ) -> i32 {
-    let resolver = ModuleResolver::with_dependencies(
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
     );
     let program = match parse_module(&resolver, module_path) {
         Ok(program) => program,

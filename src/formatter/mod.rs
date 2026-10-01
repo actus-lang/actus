@@ -41,8 +41,13 @@ struct Formatter<'comments> {
 
 impl Formatter<'_> {
     fn program(&mut self, program: &Program) {
+        for scope in &program.file_metadata {
+            if matches!(scope, crate::ast::LimitlessScope::File) {
+                self.output.push_str("meta limitless(\"file\")\n");
+            }
+        }
         for (index, declaration) in program.declarations.iter().enumerate() {
-            if index > 0 {
+            if index > 0 || !program.file_metadata.is_empty() {
                 self.output.push('\n');
                 self.output.push('\n');
             }
@@ -180,6 +185,13 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
     match metadata {
         crate::ast::MetaAttribute::Test => "test".to_owned(),
         crate::ast::MetaAttribute::Target(selector) => format!("target(\"{selector}\")"),
+        crate::ast::MetaAttribute::Limitless(scope) => {
+            let scope = match scope {
+                crate::ast::LimitlessScope::Verb => "verb",
+                crate::ast::LimitlessScope::File => "file",
+            };
+            format!("limitless(\"{scope}\")")
+        }
     }
 }
 

@@ -13,6 +13,27 @@ fn parse_source(source: &str) -> actus::ast::Program {
 }
 
 #[test]
+fn parses_compound_assignment_targets_and_operators() {
+    let program = parse_source(
+        "verb main() { erg index: u32 = 0u32; index += 1u32; values[0u32] <<= 1u32; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(matches!(
+        &verb.body.statements[1],
+        Stmt::CompoundAssignment { operator: actus::ast::CompoundAssignmentOp::Add, target: actus::ast::CompoundAssignmentTarget::Identifier(name), .. }
+            if name == "index"
+    ));
+    assert!(matches!(
+        &verb.body.statements[2],
+        Stmt::CompoundAssignment {
+            operator: actus::ast::CompoundAssignmentOp::ShiftLeft,
+            target: actus::ast::CompoundAssignmentTarget::Index { .. },
+            ..
+        }
+    ));
+}
+
+#[test]
 fn parses_case_variants_literals_and_wildcard_with_spans() {
     let program = parse_source(
         "enum Color { Red, } verb main() -> Int { return case value { Color.Red => 1, true => 2, _ => 0, }; }",

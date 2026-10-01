@@ -15,12 +15,15 @@ use super::super::structs::emit_binding_drop;
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
+mod compound;
 mod dispatch;
 mod owners;
 mod try_lowering;
 
+pub(crate) use compound::lower_compound_assignment;
+
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_statements<'source>(
+pub(crate) fn lower_statements<'source>(
     function: &mut FunctionBuilder<'_>,
     statements: &'source [Stmt],
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
@@ -239,6 +242,12 @@ fn lower_assignment<'source>(
         string_data,
         layouts,
     )?;
+    let value = types
+        .get(name)
+        .and_then(|ty| ty.ir_type(layouts.pointer_type).ok())
+        .map_or(value, |target| {
+            crate::codegen::expressions::coerce_to_ir_type(function, value, target)
+        });
     if locals.contains_key(name) {
         super::super::structs::emit_binding_drop(
             function, name, locals, types, functions, layouts,

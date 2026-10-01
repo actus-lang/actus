@@ -27,8 +27,14 @@ impl CompilerConfiguration {
             linker,
             linker_flavor,
             entry_contract,
+            runtime: super::RuntimeProfile::Core,
+            runtime_version: None,
+            runtime_checksum: None,
+            runtime_source_root: None,
+            runtime_module_roots: std::collections::BTreeMap::new(),
             run_artifact_prefix: DEFAULT_RUN_ARTIFACT_PREFIX.to_owned(),
             native_backend: super::NativeBackendConfiguration::default(),
+            source_limits: manifest::SourceLimitMode::default(),
             entry_symbol: None,
             library_paths: Vec::new(),
             libraries: Vec::new(),
@@ -87,6 +93,13 @@ fn build_from_manifest(
 ) -> Result<CompilerConfiguration, ConfigurationError> {
     let (target, linker_flavor, entry_contract, linker) =
         resolve_manifest_target(&manifest, &environment)?;
+    let runtime = manifest.build.runtime.unwrap_or_default();
+    validate_runtime_profile(runtime, entry_contract)?;
+    validate_runtime_dependency_alias(runtime, &dependency_graph.roots)?;
+    let runtime_source_root = super::resolution::runtime_source_root(runtime)?;
+    let (runtime_version, runtime_checksum) =
+        super::resolution::runtime_identity(runtime, runtime_source_root.as_deref())?;
+    let runtime_module_roots = super::resolution::runtime_module_roots(runtime, entry_contract)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
     let (profile, native_backend, libraries, library_paths) =
@@ -102,12 +115,53 @@ fn build_from_manifest(
         linker,
         linker_flavor,
         entry_contract,
+        runtime,
+        runtime_version,
+        runtime_checksum,
+        runtime_source_root,
+        runtime_module_roots,
         native_backend,
+        source_limits: manifest.package.source_limits.unwrap_or_default(),
         entry_symbol: manifest.package.entry,
         library_paths,
         libraries,
         ..environment
     })
+}
+
+fn validate_runtime_dependency_alias(
+    runtime: manifest::RuntimeProfile,
+    dependency_roots: &std::collections::BTreeMap<String, PathBuf>,
+) -> Result<(), ConfigurationError> {
+    if runtime == manifest::RuntimeProfile::Std && dependency_roots.contains_key("std") {
+        return Err(ConfigurationError(
+            "dependency alias `std` conflicts with the builtin standard library".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_runtime_profile(
+    runtime: manifest::RuntimeProfile,
+    entry_contract: crate::target::EntryContract,
+) -> Result<(), ConfigurationError> {
+    let compatible = match runtime {
+        manifest::RuntimeProfile::Core => true,
+        manifest::RuntimeProfile::Std => true,
+        manifest::RuntimeProfile::Freestanding => {
+            matches!(entry_contract, crate::target::EntryContract::Freestanding)
+        }
+    };
+    if compatible {
+        return Ok(());
+    }
+    let target_kind = match entry_contract {
+        crate::target::EntryContract::Hosted => "hosted",
+        crate::target::EntryContract::Freestanding => "freestanding",
+    };
+    Err(ConfigurationError(format!(
+        "runtime profile `{runtime}` is incompatible with {target_kind} target"
+    )))
 }
 
 fn validated_source_root(

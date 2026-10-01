@@ -1,8 +1,9 @@
-use crate::ast::{DispatchMode, MetaAttribute, Param, Program, Role, VerbDecl};
+use crate::ast::{DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, VerbDecl};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
 mod case;
+mod conditional;
 mod cursor;
 mod declarations;
 mod enums;
@@ -24,6 +25,9 @@ pub enum ParseErrorKind {
     UnsupportedTargetPlatform { name: String },
     ConflictingTargetPlatforms { first: String, second: String },
     MetadataTargetNotAllowed,
+    MetadataFileScopeNotAllowed,
+    UnsupportedLimitlessScope { name: String },
+    DuplicateMetadata { name: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -36,6 +40,9 @@ pub enum ParseErrorCode {
     UnsupportedTargetPlatform,
     ConflictingTargetPlatforms,
     MetadataTargetNotAllowed,
+    MetadataFileScopeNotAllowed,
+    UnsupportedLimitlessScope,
+    DuplicateMetadata,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,13 +82,63 @@ impl Parser {
         Ok(VerbSignature { name, generic_parameters, params, return_type })
     }
     pub fn parse(mut self) -> Result<Program, ParseError> {
+        let mut file_metadata = Vec::new();
         let mut declarations = Vec::new();
 
         while !self.at_end() {
-            declarations.push(self.parse_top_level_decl()?);
+            let doc = self.take_doc_string_group();
+            if self.check_simple(&TokenKind::Meta) {
+                let metadata = self.parse_metadata_group()?;
+                if metadata.iter().any(|attribute| {
+                    matches!(attribute, MetaAttribute::Limitless(LimitlessScope::File))
+                }) {
+                    if !declarations.is_empty()
+                        || !file_metadata.is_empty()
+                        || doc.is_some()
+                        || metadata.len() != 1
+                    {
+                        return Err(self.file_metadata_error());
+                    }
+                    file_metadata.push(LimitlessScope::File);
+                    continue;
+                }
+                let doc = doc.or_else(|| self.take_doc_string_group());
+                self.reject_duplicate_metadata(&metadata)?;
+                declarations.push(self.parse_metadata_declaration(metadata, doc)?);
+                continue;
+            }
+            declarations.push(self.parse_top_level_decl_with_doc(doc)?);
         }
 
-        Ok(Program { declarations })
+        Ok(Program { file_metadata, declarations })
+    }
+
+    fn reject_duplicate_metadata(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+        let Some((index, scope)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
+                .then_some((index, "limitless"))
+        }) else {
+            return Ok(());
+        };
+        if metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb)))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata { name: scope.to_owned() },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        Ok(())
+    }
+
+    fn file_metadata_error(&self) -> ParseError {
+        ParseError {
+            code: ParseErrorCode::MetadataFileScopeNotAllowed,
+            kind: ParseErrorKind::MetadataFileScopeNotAllowed,
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        }
     }
 
     fn take_doc_string(&mut self) -> Option<String> {
@@ -154,12 +211,44 @@ impl Parser {
                 Ok(vec![MetaAttribute::Test])
             }
             "target" => self.parse_target_metadata(),
+            "limitless" => self.parse_limitless_metadata(),
             name => Err(ParseError {
                 code: ParseErrorCode::UnknownMetadata,
                 kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },
                 span: attribute.span,
             }),
         }
+    }
+
+    fn parse_limitless_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
+        self.expect_simple(TokenKind::LeftParen, "`(` after `limitless`")?;
+        let scope_token = self.advance_required("limitless scope string")?;
+        let scope = match scope_token.kind {
+            TokenKind::StringLiteral(scope) => match scope.as_str() {
+                "verb" => LimitlessScope::Verb,
+                "file" => LimitlessScope::File,
+                _ => {
+                    return Err(ParseError {
+                        code: ParseErrorCode::UnsupportedLimitlessScope,
+                        kind: ParseErrorKind::UnsupportedLimitlessScope { name: scope },
+                        span: scope_token.span,
+                    });
+                }
+            },
+            found => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "`verb` or `file` scope string".to_owned(),
+                        found,
+                    },
+                    span: scope_token.span,
+                });
+            }
+        };
+        self.expect_simple(TokenKind::RightParen, "`)` after limitless scope")?;
+        let _ = self.match_simple(TokenKind::Semicolon);
+        Ok(vec![MetaAttribute::Limitless(scope)])
     }
 
     fn parse_target_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {

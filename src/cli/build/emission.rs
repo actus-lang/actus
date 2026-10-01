@@ -48,7 +48,7 @@ fn build_file_with_report(
     let Some((source, plan)) = load_build_program(input, configuration) else {
         return 1;
     };
-    if !validate_source_limits(Path::new(input), &source, mode) {
+    if !validate_source_limits(Path::new(input), &source, mode, configuration) {
         return 1;
     }
     let caller = crate::semantic::filter_program_for_target(plan.caller(), configuration.target());

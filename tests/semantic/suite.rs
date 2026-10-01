@@ -38,6 +38,15 @@ fn rejects_undeclared_identifiers() {
 }
 
 #[test]
+fn validates_compound_assignments_as_typed_place_operations() {
+    analyze_source("verb update(erg index: u32) { index += 1u32; index <<= 1u32; }")
+        .expect("matching integer compound assignments should pass");
+    let error = analyze_source("verb broken(erg ready: Bool) { ready += 1; }")
+        .expect_err("compound assignments must reject non-numeric operands");
+    assert!(matches!(error.kind, SemanticErrorKind::TypeMismatch { .. }));
+}
+
+#[test]
 fn rejects_duplicate_bindings_and_shadowing() {
     let duplicate = analyze_source("verb broken() { erg value = 1; erg value = 2; }")
         .expect_err("duplicate binding must fail");

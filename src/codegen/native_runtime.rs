@@ -8,6 +8,7 @@ use crate::ast::IntrinsicKind;
 use crate::runtime::{
     BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
     ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
+    WRITE_STRING_STDOUT_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
@@ -24,6 +25,7 @@ pub(super) fn declare_runtime_functions(
         append: declare_append(module, pointer_type)?,
         print_int: declare_print_int(module)?,
         print_string: declare_print_string(module, pointer_type)?,
+        write_string: declare_write_string(module, pointer_type)?,
         enum_allocate: declare_enum_allocate(module, pointer_type)?,
         enum_drop: declare_enum_drop(module, pointer_type)?,
     };
@@ -43,6 +45,7 @@ struct RuntimeFunctionIds {
     append: cranelift_module::FuncId,
     print_int: cranelift_module::FuncId,
     print_string: cranelift_module::FuncId,
+    write_string: cranelift_module::FuncId,
     enum_allocate: cranelift_module::FuncId,
     enum_drop: cranelift_module::FuncId,
 }
@@ -74,7 +77,11 @@ fn runtime_metadata(
             print_spec.name.to_owned(),
             intrinsic_meta(ids.print_int, print_spec.parameters, NativeType::Int),
         ),
-        (PRINT_STRING_SYMBOL.to_owned(), named_meta(ids.print_string, &["value"], NativeType::Int)),
+        (PRINT_STRING_SYMBOL.to_owned(), named_meta(ids.print_string, &["text"], NativeType::Int)),
+        (
+            WRITE_STRING_STDOUT_SYMBOL.to_owned(),
+            named_meta(ids.write_string, &["text"], NativeType::Int),
+        ),
     ])
 }
 
@@ -193,5 +200,17 @@ fn declare_print_buffer(
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(PRINT_BUFFER_STDOUT_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_write_string(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function(WRITE_STRING_STDOUT_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }

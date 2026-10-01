@@ -2,8 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use actus::conformance::{
-    SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_tree, source_limit_diagnostics,
-    source_paths, validate_source_exception_manifest,
+    LimitlessApprovalOrigin, SourceLimitPolicy, fixture_tree_diagnostics, inspect_source_report,
+    inspect_source_report_with_enforcement, inspect_source_tree, inspect_source_with_enforcement,
+    source_limit_diagnostics, source_paths, validate_source_exception_manifest,
 };
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
 
@@ -33,6 +34,82 @@ fn strict_file_thresholds_escalate_and_stop_at_one_violation() {
     let hard = source_limit_diagnostics(Path::new("src/example.rs"), &lines(501), policy());
     assert_eq!(hard[0].code(), "E1852");
     assert_eq!(hard[0].severity(), DiagnosticSeverity::Error);
+}
+
+#[test]
+fn package_limitless_policy_skips_source_limit_diagnostics() {
+    let source = lines(501);
+    assert!(
+        inspect_source_with_enforcement(Path::new("src/example.act"), &source, false).is_empty()
+    );
+}
+
+#[test]
+fn file_limitless_metadata_skips_file_and_function_diagnostics() {
+    let mut source = String::from("meta limitless(\"file\")\n\"\"\"\n");
+    source.push_str(&lines(301));
+    source.push_str("\"\"\"\nverb large() { return; }\n");
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn verb_limitless_metadata_skips_only_function_diagnostic() {
+    let mut source = String::from("meta limitless(\"verb\") verb large() {\n");
+    for index in 0..60 {
+        source.push_str(&format!("\"\"\"documentation {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\n");
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message().contains("large")));
+}
+
+#[test]
+fn verb_limitless_metadata_does_not_exempt_a_sibling_verb() {
+    let mut source = String::from("meta limitless(\"verb\") verb exempt() {\n");
+    for index in 0..60 {
+        source.push_str(&format!("\"\"\"exempt {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\nverb sibling() {\n");
+    for index in 0..60 {
+        source.push_str(&format!("\"\"\"sibling {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\n");
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message().contains("exempt")));
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.message().contains("sibling")));
+}
+
+#[test]
+fn limitless_report_records_canonical_scope_target_span_and_origin() {
+    let source = "meta limitless(\"verb\") verb exempt() { return; }\n";
+    let report = inspect_source_report(
+        Path::new("src/example.act"),
+        source,
+        policy(),
+        LimitlessApprovalOrigin::SourceMetadata,
+    );
+    assert_eq!(report.diagnostics, Vec::new());
+    assert_eq!(report.approvals.len(), 1);
+    let approval = &report.approvals[0];
+    assert_eq!(approval.path, Path::new("src/example.act"));
+    assert_eq!(approval.scope, "verb");
+    assert_eq!(approval.target.as_deref(), Some("exempt"));
+    assert!(approval.span.end > approval.span.start);
+    assert_eq!(approval.origin, LimitlessApprovalOrigin::SourceMetadata);
+}
+
+#[test]
+fn package_limitless_report_records_policy_approval() {
+    let source = "verb main() { return; }\n";
+    let report =
+        inspect_source_report_with_enforcement(Path::new("src/example.act"), source, false);
+    assert!(report.diagnostics.is_empty());
+    assert_eq!(report.approvals.len(), 1);
+    let approval = &report.approvals[0];
+    assert_eq!(approval.scope, "file");
+    assert_eq!(approval.target, None);
+    assert_eq!(approval.span.end, source.len());
+    assert_eq!(approval.origin, LimitlessApprovalOrigin::PackageConfiguration);
 }
 
 #[test]

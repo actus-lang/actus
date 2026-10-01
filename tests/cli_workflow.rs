@@ -45,6 +45,45 @@ fn new_initializes_main_and_prints_next_steps() {
 }
 
 #[test]
+fn new_can_select_the_builtin_standard_runtime_profile() {
+    let root = std::env::temp_dir().join(format!("actus-new-std-{}", std::process::id()));
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["new", root.to_str().unwrap(), "--runtime", "std", "--no-git"])
+        .output()
+        .expect("run new command");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    let manifest = fs::read_to_string(root.join("Actus.toml")).expect("read manifest");
+    assert!(manifest.contains("runtime = \"std\""));
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .expect("check generated std project");
+    assert!(check.status.success(), "stderr: {}", String::from_utf8_lossy(&check.stderr));
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "obj"])
+        .current_dir(&root)
+        .output()
+        .expect("build generated std project");
+    assert!(build.status.success(), "stderr: {}", String::from_utf8_lossy(&build.stderr));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn project_templates_reject_freestanding_without_a_target() {
+    let root = std::env::temp_dir().join(format!("actus-new-bare-{}", std::process::id()));
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["new", root.to_str().unwrap(), "--runtime", "freestanding", "--no-git"])
+        .output()
+        .expect("run new command");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("requires an explicit target"));
+    assert!(!root.exists());
+}
+
+#[test]
 fn init_prints_next_steps_and_initializes_main() {
     let root = std::env::temp_dir().join(format!("actus-init-main-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create init directory");
