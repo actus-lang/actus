@@ -6,10 +6,29 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub enum ModuleResolutionError {
     InvalidPath(String),
-    MissingFacade { module: String, expected: PathBuf },
-    AmbiguousModule { module: String, directory: PathBuf, file: PathBuf },
-    BypassesFacade { module: String, parent: String, facade: PathBuf },
-    Io { path: PathBuf, message: String },
+    MissingFacade {
+        module: String,
+        expected: PathBuf,
+    },
+    /// A builtin module exists but is unavailable for the configured target.
+    IncompatibleRuntime {
+        module: String,
+        expected: PathBuf,
+    },
+    AmbiguousModule {
+        module: String,
+        directory: PathBuf,
+        file: PathBuf,
+    },
+    BypassesFacade {
+        module: String,
+        parent: String,
+        facade: PathBuf,
+    },
+    Io {
+        path: PathBuf,
+        message: String,
+    },
 }
 
 impl Display for ModuleResolutionError {
@@ -19,6 +38,11 @@ impl Display for ModuleResolutionError {
             Self::MissingFacade { module, expected } => write!(
                 formatter,
                 "module `{module}` is missing its canonical facade `{}`",
+                expected.display()
+            ),
+            Self::IncompatibleRuntime { module, expected } => write!(
+                formatter,
+                "builtin module `{module}` is incompatible with the configured target; facade `{}` is unavailable",
                 expected.display()
             ),
             Self::AmbiguousModule { module, directory, file } => write!(
@@ -120,9 +144,16 @@ impl ModuleResolver {
                     .runtime_source_root
                     .as_ref()
                     .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
+                let expected = root.join(module_name).join(format!("{module_name}.act"));
+                if expected.is_file() {
+                    return Err(ModuleResolutionError::IncompatibleRuntime {
+                        module: module_path.to_owned(),
+                        expected,
+                    });
+                }
                 return Err(ModuleResolutionError::MissingFacade {
                     module: module_path.to_owned(),
-                    expected: root.join(module_name).join(format!("{module_name}.act")),
+                    expected,
                 });
             };
             if segments.len() != 2 {

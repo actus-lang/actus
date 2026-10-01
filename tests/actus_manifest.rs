@@ -177,5 +177,10 @@ fn rejects_hosted_builtin_module_for_freestanding_target() {
     );
     let error = resolve_imports(&program, &resolver)
         .expect_err("hosted-only std module must not resolve for freestanding target");
-    assert!(error.to_string().contains("std::fs"));
+    assert!(matches!(
+        error,
+        actus::modules::ModuleError::Resolution(
+            actus::modules::ModuleResolutionError::IncompatibleRuntime { .. }
+        )
+    ));
 }

@@ -35,6 +35,15 @@ pub const STRICT_LEGACY_MANIFEST: &str = "E1801";
 /// by strict configuration loading.
 pub const STRICT_LEGACY_DEPENDENCY: &str = "E1802";
 
+/// The selected runtime profile requires unavailable compiler-owned metadata.
+pub const STRICT_RUNTIME_METADATA_MISSING: &str = "E1803";
+
+/// The manifest requested a runtime profile that is not supported by this edition.
+pub const STRICT_RUNTIME_UNSUPPORTED: &str = "E1804";
+
+/// A runtime profile is incompatible with the selected target contract.
+pub const STRICT_RUNTIME_TARGET_INCOMPATIBLE: &str = "E1805";
+
 /// Missing or empty public block documentation.
 pub const STRICT_DOCUMENTATION_MISSING: &str = "E1840";
 

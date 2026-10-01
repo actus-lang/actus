@@ -182,7 +182,18 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
         ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
     })?;
     let manifest = toml::from_str::<ActusManifest>(&source).map_err(|error| {
-        ConfigurationError(format!("cannot parse `{}`: {error}", path.display()))
+        let message = error.to_string();
+        if message.contains("unknown variant")
+            && message.contains("core")
+            && message.contains("std")
+        {
+            ConfigurationError(format!(
+                "unsupported runtime profile in `{}`: {message}",
+                path.display()
+            ))
+        } else {
+            ConfigurationError(format!("cannot parse `{}`: {message}", path.display()))
+        }
     })?;
     validate(&manifest)?;
     Ok(manifest)

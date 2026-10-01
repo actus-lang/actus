@@ -3,7 +3,10 @@ use std::fs;
 use actus::configuration::{
     BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel, RuntimeProfile,
 };
-use actus::diagnostics::{DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST};
+use actus::diagnostics::{
+    DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST,
+    STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED,
+};
 use actus::target::TargetSpec;
 
 #[test]
@@ -95,9 +98,28 @@ fn rejects_freestanding_runtime_profile_for_hosted_target() {
     )
     .expect("write manifest");
 
-    let error = CompilerConfiguration::from_manifest_read_only(&path)
+    let error = CompilerConfiguration::from_manifest_strict(&path)
         .expect_err("freestanding runtime must be rejected for hosted targets");
+    assert_eq!(error.diagnostic().code(), STRICT_RUNTIME_TARGET_INCOMPATIBLE);
     assert!(error.to_string().contains("incompatible with hosted target"));
+    fs::remove_dir_all(root).expect("remove fixture");
+}
+
+#[test]
+fn rejects_unknown_runtime_profile_with_a_stable_diagnostic() {
+    let root = std::env::temp_dir().join(format!("actus-runtime-unknown-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    let path = root.join("Actus.toml");
+    fs::write(
+        &path,
+        "[package]\nname = \"unknown\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"portable\"\n",
+    )
+    .expect("write manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("unknown runtime profile must be rejected");
+    assert_eq!(error.diagnostic().code(), STRICT_RUNTIME_UNSUPPORTED);
+    assert!(error.to_string().contains("unsupported runtime profile"));
     fs::remove_dir_all(root).expect("remove fixture");
 }
 

@@ -58,6 +58,9 @@ fn resolution_diagnostic(error: &ModuleResolutionError) -> Diagnostic {
         ModuleResolutionError::MissingFacade { expected, .. } => {
             ("E1101", Some(expected.display().to_string()))
         }
+        ModuleResolutionError::IncompatibleRuntime { expected, .. } => {
+            ("E1112", Some(expected.display().to_string()))
+        }
         ModuleResolutionError::AmbiguousModule { directory, .. } => {
             ("E1102", Some(directory.display().to_string()))
         }

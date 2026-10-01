@@ -87,6 +87,12 @@ the code generator.
    selecting `std`.
 8. Only modules reachable from source imports are compiled.
 9. The profile does not weaken ownership, source-limit, or target contracts.
+10. Runtime configuration failures use stable diagnostics for missing
+    compiler-owned metadata, unsupported profile values, and
+    runtime/target incompatibility. A builtin module that exists in the
+    standard-library source tree but is unavailable for the selected target
+    uses a distinct module diagnostic rather than a generic missing-facade
+    error.
 
 ## Consequences
 

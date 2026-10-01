@@ -149,6 +149,17 @@ fn renders_missing_facade_with_a_stable_module_code() {
 }
 
 #[test]
+fn renders_incompatible_runtime_module_with_a_stable_code() {
+    let error = ModuleError::Resolution(ModuleResolutionError::IncompatibleRuntime {
+        module: "std::fs".to_owned(),
+        expected: std::path::PathBuf::from("library/std/src/fs/fs.act"),
+    });
+    let diagnostic = actus::diagnostics::module_diagnostic(&error);
+    assert_eq!(diagnostic.code(), "E1112");
+    assert!(diagnostic.message().contains("incompatible with the configured target"));
+}
+
+#[test]
 fn renders_unknown_facade_sibling_with_a_stable_module_code() {
     let error = ModuleError::UnknownSiblingModule {
         module: "std::io".to_owned(),

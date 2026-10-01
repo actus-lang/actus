@@ -4,7 +4,8 @@ use std::path::Path;
 use super::{CompilerConfiguration, ConfigurationError, manifest};
 use crate::diagnostics::{
     Diagnostic, DiagnosticPhase, STRICT_CONFIGURATION_FAILURE, STRICT_LEGACY_DEPENDENCY,
-    STRICT_LEGACY_MANIFEST,
+    STRICT_LEGACY_MANIFEST, STRICT_RUNTIME_METADATA_MISSING, STRICT_RUNTIME_TARGET_INCOMPATIBLE,
+    STRICT_RUNTIME_UNSUPPORTED,
 };
 use crate::lexer::SourceSpan;
 
@@ -24,6 +25,15 @@ impl StrictConfigurationError {
         let message = error.to_string();
         let code = if message.contains("deprecated dependency `Arca.toml`") {
             STRICT_LEGACY_DEPENDENCY
+        } else if message.contains("cannot locate the compiler-owned standard library")
+            || message.contains("builtin standard library is missing its runtime registry")
+            || message.contains("builtin standard-library root has no package parent")
+        {
+            STRICT_RUNTIME_METADATA_MISSING
+        } else if message.contains("unsupported runtime profile") {
+            STRICT_RUNTIME_UNSUPPORTED
+        } else if message.contains("runtime profile `freestanding` is incompatible") {
+            STRICT_RUNTIME_TARGET_INCOMPATIBLE
         } else {
             STRICT_CONFIGURATION_FAILURE
         };

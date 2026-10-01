@@ -218,9 +218,9 @@ Implementation evidence completed so far:
 - [x] Include the compiler-owned standard-library version/checksum in lockfile
       validation and artifact identity so runtime source changes remain
       reproducible across machines.
-- [ ] Define diagnostics for missing runtime metadata, unsupported runtime
-      values, incompatible imports, and attempts to use `std` from a
-      freestanding build.
+- [x] Define stable diagnostics for missing runtime metadata, unsupported
+      runtime values, incompatible builtin imports, and runtime/target
+      incompatibility (`E1803`-`E1805` and module code `E1112`).
 - [x] Add `actus init` and `actus new` templates that declare the intended
       `core` or `std` runtime profile and
       produce a valid first build without manual standard-library wiring.
