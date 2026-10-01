@@ -60,6 +60,7 @@ fn allows_standard_runtime_profile_for_freestanding_target() {
     let configuration = CompilerConfiguration::from_manifest_read_only(&path)
         .expect("target-aware std must load for freestanding targets");
     assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
+    assert!(configuration.runtime_module_roots().is_empty());
     fs::remove_dir_all(root).expect("remove fixture");
 }
 

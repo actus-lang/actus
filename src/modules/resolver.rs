@@ -114,8 +114,17 @@ impl ModuleResolver {
         let segments = parse_segments(module_path)?;
         if let Some(module_name) = segments.get(1)
             && segments.first() == Some(&"std")
-            && let Some(root) = self.runtime_module_roots.get(*module_name)
         {
+            let Some(root) = self.runtime_module_roots.get(*module_name) else {
+                let root = self
+                    .runtime_source_root
+                    .as_ref()
+                    .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
+                return Err(ModuleResolutionError::MissingFacade {
+                    module: module_path.to_owned(),
+                    expected: root.join(module_name).join(format!("{module_name}.act")),
+                });
+            };
             if segments.len() != 2 {
                 return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
             }

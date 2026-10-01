@@ -95,7 +95,7 @@ fn build_from_manifest(
     validate_runtime_profile(runtime, entry_contract)?;
     validate_runtime_dependency_alias(runtime, &dependency_graph.roots)?;
     let runtime_source_root = super::resolution::runtime_source_root(runtime)?;
-    let runtime_module_roots = super::resolution::runtime_module_roots(runtime)?;
+    let runtime_module_roots = super::resolution::runtime_module_roots(runtime, entry_contract)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
     let (profile, native_backend, libraries, library_paths) =

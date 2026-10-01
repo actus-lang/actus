@@ -239,6 +239,13 @@ paths.
 
 #### Gate 19.3.5: Embedded standard-library capability verification
 
+Implementation evidence completed so far:
+
+- [x] Filter builtin modules by `targets = ["hosted", "freestanding"]`
+      while loading the compiler configuration.
+- [x] Reject a hosted-only builtin import during freestanding module
+      resolution before semantic analysis and code generation.
+
 - [ ] Add target fixtures for hosted and embedded targets, including
       `thumbv7em-none-eabihf`.
 - [ ] Verify target-neutral and embedded builtin modules resolve from `std`

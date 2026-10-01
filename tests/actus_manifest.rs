@@ -133,3 +133,25 @@ fn resolves_builtin_standard_library_from_runtime_profile() {
     );
     resolve_imports(&program, &resolver).expect("builtin std facade should resolve");
 }
+
+#[test]
+fn rejects_hosted_builtin_module_for_freestanding_target() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "Actus.toml",
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n\n[build]\nruntime = \"std\"\ntarget = \"x86_64-unknown-none\"\n",
+    );
+
+    let configuration = CompilerConfiguration::from_input_path(&fixture.root.join("src/main.act"))
+        .expect("freestanding std manifest should load");
+    let program = imported_program("import std::fs;");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+    let error = resolve_imports(&program, &resolver)
+        .expect_err("hosted-only std module must not resolve for freestanding target");
+    assert!(error.to_string().contains("std::fs"));
+}

@@ -83,6 +83,7 @@ pub(super) fn runtime_source_root(
 
 pub(super) fn runtime_module_roots(
     runtime: RuntimeProfile,
+    entry_contract: EntryContract,
 ) -> Result<std::collections::BTreeMap<String, PathBuf>, ConfigurationError> {
     let Some(source_root) = runtime_source_root(runtime)? else {
         return Ok(std::collections::BTreeMap::new());
@@ -98,6 +99,13 @@ pub(super) fn runtime_module_roots(
     };
     let mut roots = std::collections::BTreeMap::new();
     for module in runtime_manifest.modules {
+        let target_class = match entry_contract {
+            EntryContract::Hosted => super::manifest::RuntimeTargetClass::Hosted,
+            EntryContract::Freestanding => super::manifest::RuntimeTargetClass::Freestanding,
+        };
+        if !module.targets.contains(&target_class) {
+            continue;
+        }
         let module_root = package_root.join(module.path);
         if !module_root.is_dir() {
             return Err(ConfigurationError(format!(
