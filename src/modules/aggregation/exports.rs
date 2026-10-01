@@ -35,8 +35,10 @@ pub fn exports_module_with_overlays(
         if !errors.is_empty() {
             return Err(ModuleError::Lex { path: source_path.to_owned(), errors });
         }
-        let program = parse(tokens)
-            .map_err(|error| ModuleError::Parse { path: source_path.to_owned(), error })?;
+        let program = parse(tokens).map_err(|error| ModuleError::Parse {
+            path: source_path.to_owned(),
+            error: Box::new(error),
+        })?;
         parsed.push((source_path.to_owned(), program));
     }
     validate_open_siblings(module_path, resolved.facade(), resolved.siblings(), &parsed[0].1)?;

@@ -18,7 +18,7 @@ pub enum ModuleError {
     UnknownSiblingModule { module: String, sibling: String, facade: PathBuf },
     Read { path: PathBuf, message: String },
     Lex { path: PathBuf, errors: Vec<LexError> },
-    Parse { path: PathBuf, error: ParseError },
+    Parse { path: PathBuf, error: Box<ParseError> },
     DuplicateDeclaration(Box<DuplicateDeclaration>),
     SymbolCollision { symbol: String, first_module: String, second_module: String },
     DuplicateObjectOwner { module_path: String },

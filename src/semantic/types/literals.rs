@@ -4,6 +4,25 @@ use super::super::analyzer::Analyzer;
 use super::super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
+    pub(crate) fn validate_typed_float_literal(
+        &self,
+        value: &str,
+        suffix: Option<&str>,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some(suffix) = suffix else { return Ok(()) };
+        if !matches!(suffix, "f32" | "f64") || value.parse::<f64>().is_err() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::NumericLiteralOutOfRange {
+                    ty: suffix.to_owned(),
+                    literal: value.to_owned(),
+                },
+                span,
+            });
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_typed_integer_literal(
         &self,
         value: &str,

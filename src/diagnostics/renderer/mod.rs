@@ -115,6 +115,9 @@ fn lex_message(error: &LexError) -> String {
         LexErrorKind::InvalidIntegerType(text) => {
             format!("invalid integer type `{text}`; expected `u1..u128` or `i1..i128`")
         }
+        LexErrorKind::InvalidFloatType(text) => {
+            format!("invalid float type `{text}`; expected `f32` or `f64`")
+        }
         LexErrorKind::InvalidHexLiteral(text) => format!("invalid hexadecimal literal `{text}`"),
     }
 }

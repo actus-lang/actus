@@ -124,6 +124,16 @@ fn lowers_float_equality_and_inequality() {
 
 #[cfg(unix)]
 #[test]
+fn lowers_typed_float_literals_at_the_declared_width() {
+    let status = run_array_fixture(
+        "typed-float-literals",
+        "verb main() -> Int { erg value: f32 = 1.5f32; return case value == 1.5f32 { true => 42, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn traps_on_integer_remainder_by_zero() {
     let status = run_array_fixture(
         "adr44-remainder-zero",

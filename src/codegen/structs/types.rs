@@ -39,7 +39,9 @@ pub(crate) fn expression_native_type(
             }),
         Expr::MethodCall { .. } => super::super::enums::enum_expression_type(expression, layouts),
         Expr::Integer { .. } => Some(NativeType::Int),
-        Expr::FloatLiteral { .. } => Some(NativeType::Float { width: 64 }),
+        Expr::FloatLiteral { suffix, .. } => Some(NativeType::Float {
+            width: if suffix.as_deref() == Some("f32") { 32 } else { 64 },
+        }),
         Expr::StringLiteral { .. } => Some(NativeType::String),
         _ => None,
     }

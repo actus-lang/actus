@@ -62,8 +62,10 @@ where
         if !errors.is_empty() {
             return Err(ModuleError::Lex { path: source_path, errors });
         }
-        let program = parse(tokens)
-            .map_err(|error| ModuleError::Parse { path: source_path.clone(), error })?;
+        let program = parse(tokens).map_err(|error| ModuleError::Parse {
+            path: source_path.clone(),
+            error: Box::new(error),
+        })?;
         if source_index == 0 {
             validate_open_siblings(module_path, facade, siblings, &program)?;
         }

@@ -68,6 +68,30 @@ fn scans_typed_integer_literals_as_single_tokens_with_full_spans() {
 }
 
 #[test]
+fn scans_typed_float_literals_as_single_tokens_with_full_spans() {
+    let (tokens, errors) = scan("1.5f32 2.5f64");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert_eq!(tokens[0].span, SourceSpan::new(0, 6));
+    assert_eq!(
+        tokens[0].kind,
+        TokenKind::FloatLiteral { value: "1.5".to_owned(), suffix: Some("f32".to_owned()) }
+    );
+    assert_eq!(
+        tokens[1].kind,
+        TokenKind::FloatLiteral { value: "2.5".to_owned(), suffix: Some("f64".to_owned()) }
+    );
+}
+
+#[test]
+fn rejects_unknown_typed_float_suffixes() {
+    let (_, errors) = scan("1.5f16");
+    assert!(
+        matches!(errors.as_slice(), [error] if matches!(error.kind, LexErrorKind::InvalidFloatType(ref suffix) if suffix == "f16"))
+    );
+}
+
+#[test]
 fn rejects_invalid_width_types_and_hex_literals() {
     let (_, errors) = scan("u0 i0 u129 i256 0x 0x12G");
 

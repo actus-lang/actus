@@ -33,7 +33,9 @@ impl Parser {
             TokenKind::Integer { value, suffix } => {
                 Ok(Expr::Integer { value, suffix, span: token.span })
             }
-            TokenKind::FloatLiteral(value) => Ok(Expr::FloatLiteral { value, span: token.span }),
+            TokenKind::FloatLiteral { value, suffix } => {
+                Ok(Expr::FloatLiteral { value, suffix, span: token.span })
+            }
             TokenKind::StringLiteral(value) => Ok(Expr::StringLiteral { value, span: token.span }),
             TokenKind::Ref => self.parse_borrow_prefix(token.span),
             TokenKind::Case => self.parse_case_expression(),

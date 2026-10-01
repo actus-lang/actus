@@ -291,7 +291,7 @@ matching.
       source spans.
 - [x] Parse typed integer literals such as `1u32`, `0u8`, and `-1i32` with the
       suffix included in the literal span.
-- [ ] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
+- [x] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
 - [x] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
       `&=`, `|=`, `^=`, `<<=`, and `>>=`.
 - [ ] Reject malformed suffixes, missing branch delimiters, and incomplete
@@ -324,8 +324,8 @@ matching.
       backend-specific semantic repair.
 - [x] Lower compound assignments to one load/compute/store sequence while
       preserving array, buffer, pack, and field bounds checks.
-- [x] Emit typed integer constants through the existing exact-width native
-      integer path; typed floating literals remain scheduled separately.
+- [x] Emit typed integer and floating constants through the existing
+      exact-width native literal paths.
 - [x] Preserve existing checked behavior for overflow, underflow,
       division-by-zero, remainder-by-zero, and invalid shift counts.
 - [x] Add native execution tests for selected and non-selected branches,
@@ -334,7 +334,8 @@ matching.
 ### Gate 19.3.2.4: Formatter, LSP, and Diagnostics
 
 - [x] Format nested `if/else` branches deterministically and idempotently.
-- [x] Preserve typed integer literal suffixes and compound-assignment operators
+- [x] Preserve typed integer and floating literal suffixes and
+      compound-assignment operators
       during formatting and semantic tokenization; formatter round trips remain
       deterministic.
 - [x] Add LSP semantic-token and hover rendering for compound-assignment
@@ -356,9 +357,7 @@ matching.
       indexed buffer/array/field/pack places, and negative semantic coverage for
       incompatible operands.
 - [x] Add lexer, semantic range, mismatch, and native execution tests for typed
-      integer literals; type-family tests for typed floating literals remain
-      scheduled separately.
-      rejection tests for typed floating literals.
+      integer and floating literals, including malformed suffix rejection.
 - [x] Prove that `case` remains the required construct for enum and `Result`
       pattern matching.
 - [x] Run formatter, check, Clippy, the full test suite, source limits, and

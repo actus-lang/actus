@@ -124,8 +124,8 @@ impl Analyzer {
         {
             return Some(suffix.clone());
         }
-        if matches!(expression, Expr::FloatLiteral { .. }) {
-            return Some("f64".to_owned());
+        if let Expr::FloatLiteral { suffix, .. } = expression {
+            return Some(suffix.as_deref().unwrap_or("f64").to_owned());
         }
         if let Expr::Grouping { expression, .. } = expression {
             return self.expression_type_name(expression);

@@ -192,7 +192,12 @@ impl Analyzer {
                 integer_literal(value).is_some()
                     && integer_literal_suffix(value).is_none_or(|suffix| suffix == expected_name)
             }
-            Some(PrimitiveType::Float { .. }) => matches!(value, Expr::FloatLiteral { .. }),
+            Some(PrimitiveType::Float { .. }) => match value {
+                Expr::FloatLiteral { suffix, .. } => {
+                    suffix.as_deref().is_none_or(|found| found == expected.name)
+                }
+                _ => false,
+            },
             Some(PrimitiveType::Void) | None => false,
         };
         if literal_matches || type_names_match(&expected_name, &found) {

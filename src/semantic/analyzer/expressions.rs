@@ -72,7 +72,10 @@ impl Analyzer {
             Expr::Integer { value, suffix, span } => {
                 self.validate_typed_integer_literal(value, suffix.as_deref(), *span)
             }
-            Expr::FloatLiteral { .. } | Expr::StringLiteral { .. } => Ok(()),
+            Expr::FloatLiteral { value, suffix, span } => {
+                self.validate_typed_float_literal(value, suffix.as_deref(), *span)
+            }
+            Expr::StringLiteral { .. } => Ok(()),
         }
     }
 

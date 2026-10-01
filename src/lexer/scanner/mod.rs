@@ -11,6 +11,7 @@ pub enum LexErrorKind {
     UnterminatedString,
     UnterminatedDocString,
     InvalidIntegerType(String),
+    InvalidFloatType(String),
     InvalidHexLiteral(String),
 }
 

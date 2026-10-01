@@ -39,9 +39,11 @@ impl<'source> Scanner<'source> {
             while self.peek().is_some_and(|character| character.is_ascii_digit()) {
                 self.advance();
             }
-            let text = &self.source[start..self.cursor];
+            let value_end = self.cursor;
+            let suffix = self.scan_float_suffix();
+            let text = self.source[start..value_end].to_owned();
             self.tokens.push(Token::new(
-                TokenKind::FloatLiteral(text.to_owned()),
+                TokenKind::FloatLiteral { value: text, suffix },
                 SourceSpan::new(start, self.cursor),
             ));
             return;
@@ -67,6 +69,24 @@ impl<'source> Scanner<'source> {
         if !is_integer_suffix(&suffix) {
             self.errors.push(LexError::new(
                 LexErrorKind::InvalidIntegerType(suffix.clone()),
+                SourceSpan::new(start, self.cursor),
+            ));
+        }
+        Some(suffix)
+    }
+
+    fn scan_float_suffix(&mut self) -> Option<String> {
+        if !self.peek().is_some_and(is_identifier_continue) {
+            return None;
+        }
+        let start = self.cursor;
+        while self.peek().is_some_and(is_identifier_continue) {
+            self.advance();
+        }
+        let suffix = self.source[start..self.cursor].to_owned();
+        if !matches!(suffix.as_str(), "f32" | "f64") {
+            self.errors.push(LexError::new(
+                LexErrorKind::InvalidFloatType(suffix.clone()),
                 SourceSpan::new(start, self.cursor),
             ));
         }

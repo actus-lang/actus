@@ -155,8 +155,8 @@ fn load_source(
     if !errors.is_empty() {
         return Err(ModuleError::Lex { path: path.to_owned(), errors });
     }
-    let program =
-        parse(tokens).map_err(|error| ModuleError::Parse { path: path.to_owned(), error })?;
+    let program = parse(tokens)
+        .map_err(|error| ModuleError::Parse { path: path.to_owned(), error: Box::new(error) })?;
     Ok(ModuleSource { path: path.to_owned(), kind, program })
 }
 

@@ -384,3 +384,12 @@ fn rejects_declarations_that_shadow_intrinsics() {
         matches!(error.kind, SemanticErrorKind::ReservedIntrinsicName { name } if name == "allocate")
     );
 }
+
+#[test]
+fn accepts_typed_float_literals_and_rejects_mismatched_suffixes() {
+    analyze_source("verb main() { erg value: f32 = 1.5f32; erg other: f64 = 2.5; }")
+        .expect("typed float literals should preserve their declared width");
+    let error = analyze_source("verb main() { erg value: f32 = 1.5f64; }")
+        .expect_err("a typed f64 literal must not silently narrow to f32");
+    assert!(matches!(error.kind, SemanticErrorKind::BindingTypeMismatch { .. }));
+}

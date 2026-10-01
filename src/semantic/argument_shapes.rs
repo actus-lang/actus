@@ -25,7 +25,12 @@ pub(super) fn argument_type_matches(expected: &str, found: &str, expression: &Ex
             is_integer_literal(expression)
                 && integer_literal_suffix(expression).is_none_or(|suffix| suffix == expected)
         }
-        Some(PrimitiveType::Float { .. }) => matches!(expression, Expr::FloatLiteral { .. }),
+        Some(PrimitiveType::Float { .. }) => match expression {
+            Expr::FloatLiteral { suffix, .. } => {
+                suffix.as_deref().is_none_or(|found| found == expected)
+            }
+            _ => false,
+        },
         Some(PrimitiveType::Void) => false,
         None => false,
     }

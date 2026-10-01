@@ -17,7 +17,12 @@ impl Formatter<'_> {
                     self.output.push_str(suffix);
                 }
             }
-            Expr::FloatLiteral { value, .. } => self.output.push_str(value),
+            Expr::FloatLiteral { value, suffix, .. } => {
+                self.output.push_str(value);
+                if let Some(suffix) = suffix {
+                    self.output.push_str(suffix);
+                }
+            }
             Expr::StringLiteral { value, .. } => self.string_literal(value),
             Expr::Grouping { expression, .. } => self.grouping(expression),
             Expr::Unary { operator, expression, .. } => self.unary(operator, expression),

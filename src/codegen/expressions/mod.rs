@@ -92,7 +92,10 @@ fn lower_expression_with_context(
             lower_integer_expression(function, value, suffix.as_deref(), context)
         }
         Expr::BufferLiteral { length, .. } => lower_buffer_literal(function, length, context),
-        Expr::FloatLiteral { value, .. } => lower_float(function, value),
+        Expr::FloatLiteral { value, suffix, .. } => match suffix.as_deref() {
+            Some("f32") => lower_float_as(function, value, cranelift_codegen::ir::types::F32),
+            _ => lower_float(function, value),
+        },
         Expr::StringLiteral { value, .. } => lower_string(function, value, context.string_data),
         Expr::Identifier { name, .. } => lower_identifier(
             function,

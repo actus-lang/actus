@@ -96,7 +96,7 @@ fn token_type(tokens: &[crate::lexer::Token], index: usize) -> Option<u32> {
     }
     match kind {
         TokenKind::IntType { .. } | TokenKind::FloatType { .. } | TokenKind::VoidType => Some(0),
-        TokenKind::Integer { .. } | TokenKind::FloatLiteral(_) => Some(1),
+        TokenKind::Integer { .. } | TokenKind::FloatLiteral { .. } => Some(1),
         TokenKind::Erg => Some(2),
         TokenKind::Abs => Some(3),
         TokenKind::Dat => Some(4),

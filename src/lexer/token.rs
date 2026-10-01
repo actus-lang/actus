@@ -60,7 +60,7 @@ pub enum TokenKind {
     VoidType,
     Identifier(String),
     Integer { value: String, suffix: Option<String> },
-    FloatLiteral(String),
+    FloatLiteral { value: String, suffix: Option<String> },
     StringLiteral(String),
     DocString(String),
     LeftBrace,

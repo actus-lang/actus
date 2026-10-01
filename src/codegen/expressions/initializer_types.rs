@@ -23,7 +23,9 @@ pub(crate) fn initializer_type(
             Ok(suffix.as_deref().and_then(NativeType::from_name).unwrap_or(NativeType::Int))
         }
         Expr::BufferLiteral { .. } => Ok(NativeType::Buffer),
-        Expr::FloatLiteral { .. } => Ok(NativeType::Float { width: 64 }),
+        Expr::FloatLiteral { suffix, .. } => {
+            Ok(NativeType::Float { width: if suffix.as_deref() == Some("f32") { 32 } else { 64 } })
+        }
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
             initializer_type(expression, types, functions, layouts)
         }

@@ -22,6 +22,7 @@ pub enum Expr {
     },
     FloatLiteral {
         value: String,
+        suffix: Option<String>,
         span: SourceSpan,
     },
     StringLiteral {

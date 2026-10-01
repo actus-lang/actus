@@ -11,6 +11,7 @@ pub(crate) fn lex_code(error: &LexError) -> u8 {
         LexErrorKind::UnterminatedDocString => 3,
         LexErrorKind::InvalidIntegerType(_) => 4,
         LexErrorKind::InvalidHexLiteral(_) => 5,
+        LexErrorKind::InvalidFloatType(_) => 6,
     }
 }
 
