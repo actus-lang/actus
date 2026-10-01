@@ -266,6 +266,16 @@ fn accepts_u8_and_u32_dynamic_indices() {
 
 #[cfg(unix)]
 #[test]
+fn executes_unsuffixed_integer_comparison_and_indexing_natively() {
+    let status = run_array_fixture(
+        "unsuffixed-comparison-and-index",
+        "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = 41; erg index: u32 = 0; return case index < 1 { true => (values[index] as Int) + 1, _ => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_checked_integer_casts() {
     let status = run_array_fixture(
         "checked-casts",

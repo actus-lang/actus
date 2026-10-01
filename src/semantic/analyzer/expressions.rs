@@ -228,10 +228,9 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
-        let unsuffixed_integer_matches = is_unsuffixed_integer_literal(right)
-            && is_integer_type_name(&left_type)
-            && self
-                .validate_expected_literal(
+        let unsuffixed_integer_matches =
+            if is_unsuffixed_integer_literal(right) && is_integer_type_name(&left_type) {
+                self.validate_expected_literal(
                     right,
                     &crate::ast::TypeName {
                         name: left_type.clone(),
@@ -239,8 +238,11 @@ impl Analyzer {
                         reference_role: None,
                         span: expression_span(right),
                     },
-                )
-                .is_ok();
+                )?;
+                true
+            } else {
+                false
+            };
         let valid = if unsuffixed_integer_matches {
             true
         } else if operator.is_relational() {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{BlockArg, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::Stmt;
+use crate::ast::{CaseBody, IfBranch, Stmt};
 
 use super::native::NativeEmitError;
 
@@ -39,6 +39,23 @@ pub(super) fn assigned_outer_bindings(
             },
             Stmt::Block(block) | Stmt::Loop(block) => {
                 names.extend(assigned_outer_bindings(&block.statements, locals));
+                None
+            }
+            Stmt::If { then_branch, else_branch, .. } => {
+                names.extend(assigned_outer_bindings(&then_branch.statements, locals));
+                if let Some(IfBranch::Block(block)) = else_branch {
+                    names.extend(assigned_outer_bindings(&block.statements, locals));
+                }
+                None
+            }
+            Stmt::Expression { expression, .. } => {
+                if let crate::ast::Expr::Case { branches, .. } = expression {
+                    for branch in branches {
+                        if let CaseBody::Block(block) = &branch.body {
+                            names.extend(assigned_outer_bindings(&block.statements, locals));
+                        }
+                    }
+                }
                 None
             }
             _ => None,

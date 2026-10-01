@@ -35,6 +35,20 @@ fn lsp_keeps_lexical_and_type_diagnostics_stable() {
 }
 
 #[test]
+fn lsp_accepts_statement_conditionals_and_type_directed_integer_indexing() {
+    let uri = "file:///tmp/actus-lsp-ergonomics.act";
+    let source = "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); erg index: u32 = 0; loop { if index >= 1 { break; } values[index] = 41; index += 1; } return values[0] + 1; }";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "valid ergonomics were rejected: {stdout}");
+}
+
+#[test]
 fn lsp_publishes_current_version_and_clears_after_replacement_and_close() {
     let uri = "file:///tmp/actus-lsp-versioned.act";
     let invalid = "verb main() { @ }";

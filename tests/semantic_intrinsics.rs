@@ -97,6 +97,14 @@ fn accepts_unsuffixed_integer_literals_in_known_integer_operations() {
 }
 
 #[test]
+fn rejects_out_of_range_unsuffixed_integer_literals_in_known_integer_operations() {
+    let error =
+        analyze_source("verb main() -> u8 { erg value: u8 = 1; value += 256; return value; }")
+            .expect_err("type-directed literals must retain range checking");
+    assert!(matches!(error.kind, SemanticErrorKind::NumericLiteralOutOfRange { .. }));
+}
+
+#[test]
 fn validates_relational_operand_families() {
     analyze_source("verb main() -> Bool { return 1 < 2; }")
         .expect("matching Int operands should compare");

@@ -25,24 +25,31 @@ following prerequisite gates have priority over every wire and Ustari gate:
 - [x] **Gate P0.3: Case and loop control-flow correctness** — support valid
       `return`, `break`, and `continue` paths in case blocks and make nested
       loop CFG lowering deterministic.
-      Evidence: case-loop native execution, nested case/short-circuit loop
-      regression coverage, cleanup-plan tests, and full native test suite.
+      Evidence: `tests/cli.rs` covers native case-return, case-break, and
+      case-continue execution; `tests/arrays_cli.rs` covers nested case/loop
+      control after short-circuit evaluation; semantic cleanup tests cover
+      nested unwind plans; repeated object tests cover deterministic lowering.
 - [x] **Gate P0.4: Type-directed integer ergonomics** — reduce unnecessary
       temporary bindings for typed literals and same-type arithmetic without
       introducing implicit numeric or ownership conversions.
-      Evidence: unsuffixed literals are directed only by a known integer
-      operand, range-checked against that type, and covered by semantic and
-      native compound-arithmetic tests.
+      Evidence: `tests/arrays_cli.rs` covers native direct arithmetic,
+      compound assignment, comparison, and `u32` indexing; semantic tests
+      cover unsuffixed literal range rejection; parser and lexer suites cover
+      typed literal spans and postfix syntax.
 - [x] **Gate P0.5: Facade-aware type resolution** — distinguish exported,
       private, missing, and malformed declarations with actionable diagnostics.
-      Evidence: facade resolver, private-import, missing-facade, exported
-      signature, and module-diagnostic regression suites.
+      Evidence: `tests/modules/imports.rs` covers public facade exports,
+      private imported types, missing imports, and malformed facade sources;
+      diagnostics assert stable module/parser codes through the boundary.
 - [x] **Gate P0.6: Tooling and regression evidence** — update parser,
       semantic, codegen, formatter, LSP, and native tests for each preceding
       gate and pass the repository quality checks.
-      Evidence: parser/semantic/codegen/formatter/LSP/native coverage and the
-      complete formatting, compilation, Clippy, test, source-limit, and diff
-      gates passing after P0.1-P0.4.
+      Evidence: fresh CLI/native, semantic, module, and LSP tests are green;
+      parser, formatter, codegen, and regression suites remain green. The
+      complete repository checks pass: `cargo fmt --all -- --check`,
+      `cargo check --all-targets --all-features`, `cargo clippy --all-targets
+      --all-features -- -D warnings`, `cargo test --all-targets
+      --all-features`, `scripts/check_source_limits.sh`, and `git diff --check`.
 
 No `std::wire` or `std::ustari` implementation gate may be closed while a
 priority prerequisite is open. The detailed architecture is recorded in
