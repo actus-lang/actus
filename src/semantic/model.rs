@@ -54,6 +54,24 @@ pub struct OriginRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LiteralFact {
+    pub span: SourceSpan,
+    pub kind: &'static str,
+    pub value: String,
+    pub suffix: Option<String>,
+    pub type_name: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConditionalFact {
+    pub span: SourceSpan,
+    pub condition_span: SourceSpan,
+    pub condition_type: String,
+    pub then_type: Option<String>,
+    pub else_type: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenericInstance {
     pub name: String,
     pub arguments: Vec<TypeName>,
@@ -101,4 +119,6 @@ pub struct SemanticModel {
     pub drop_types: Vec<String>,
     pub binding_type_names: std::collections::HashMap<usize, TypeName>,
     pub arena_provenance: std::collections::HashMap<usize, usize>,
+    pub literal_facts: Vec<LiteralFact>,
+    pub conditional_facts: Vec<ConditionalFact>,
 }

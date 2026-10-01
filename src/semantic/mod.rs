@@ -33,8 +33,9 @@ pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{
-    Binding, BorrowRecord, DynamicRoleType, ExclusiveLoan, FatPointerLayout, GenericInstance,
-    Origin, OriginRecord, OriginRoot, ReachablePerformance, SemanticModel,
+    Binding, BorrowRecord, ConditionalFact, DynamicRoleType, ExclusiveLoan, FatPointerLayout,
+    GenericInstance, LiteralFact, Origin, OriginRecord, OriginRoot, ReachablePerformance,
+    SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use types::{SemanticType, TypeRegistry};

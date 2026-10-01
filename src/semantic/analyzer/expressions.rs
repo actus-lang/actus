@@ -3,6 +3,12 @@ use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
+use super::expression_rules::{
+    binary_operator_name, cast_literal_fits, equality_types_match, expected_unary_type,
+    integer_literal, is_cast_integer_type, is_integer_primitive, is_integer_type_name,
+    is_unsigned_integer_type_name, parse_integer_magnitude, relational_types_match,
+    type_names_match, unary_operator_name,
+};
 use super::{canonical_type_name, expression_span, try_type_mismatch};
 
 impl Analyzer {
@@ -70,13 +76,37 @@ impl Analyzer {
             }
             Expr::If { .. } => self.visit_if_expression(expression),
             Expr::Integer { value, suffix, span } => {
-                self.validate_typed_integer_literal(value, suffix.as_deref(), *span)
+                self.validate_typed_integer_literal(value, suffix.as_deref(), *span)?;
+                self.record_literal_fact("integer", value, suffix, *span);
+                Ok(())
             }
             Expr::FloatLiteral { value, suffix, span } => {
-                self.validate_typed_float_literal(value, suffix.as_deref(), *span)
+                self.validate_typed_float_literal(value, suffix.as_deref(), *span)?;
+                self.record_literal_fact("float", value, suffix, *span);
+                Ok(())
             }
             Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    fn record_literal_fact(
+        &mut self,
+        kind: &'static str,
+        value: &str,
+        suffix: &Option<String>,
+        span: SourceSpan,
+    ) {
+        if self.model.literal_facts.iter().any(|fact| fact.span == span) {
+            return;
+        }
+        let type_name = suffix.clone().or_else(|| (kind == "float").then(|| "f64".to_owned()));
+        self.model.literal_facts.push(super::super::model::LiteralFact {
+            span,
+            kind,
+            value: value.to_owned(),
+            suffix: suffix.clone(),
+            type_name,
+        });
     }
 
     pub(crate) fn validate_index_access(
@@ -354,143 +384,4 @@ impl Analyzer {
         }
         Ok(())
     }
-}
-
-fn is_integer_primitive(primitive: PrimitiveType) -> bool {
-    matches!(primitive, PrimitiveType::Integer { .. })
-}
-
-fn relational_types_match(left: &str, right: &str) -> bool {
-    if left == "Int" && right == "Int" {
-        return true;
-    }
-    let left_primitive = if left == "Int" {
-        Some(PrimitiveType::Integer { signed: true, width: 32 })
-    } else {
-        primitive_type(left)
-    };
-    let right_primitive = if right == "Int" {
-        Some(PrimitiveType::Integer { signed: true, width: 32 })
-    } else {
-        primitive_type(right)
-    };
-    match (left_primitive, right_primitive) {
-        (
-            Some(PrimitiveType::Integer { signed: left_signed, .. }),
-            Some(PrimitiveType::Integer { signed: right_signed, .. }),
-        ) => left_signed == right_signed,
-        (
-            Some(PrimitiveType::Float { width: left_width }),
-            Some(PrimitiveType::Float { width: right_width }),
-        ) => left_width == right_width,
-        _ => false,
-    }
-}
-
-fn equality_types_match(left: &str, right: &str) -> bool {
-    (left == "Bool" && right == "Bool") || relational_types_match(left, right)
-}
-
-fn is_integer_type_name(name: &str) -> bool {
-    name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
-}
-
-fn is_unsigned_integer_type_name(name: &str) -> bool {
-    if name == "Usize" {
-        return true;
-    }
-    primitive_type(name)
-        .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { signed: false, .. }))
-}
-
-fn binary_operator_name(operator: BinaryOp) -> &'static str {
-    match operator {
-        BinaryOp::Equals => "equality operator",
-        BinaryOp::NotEquals => "inequality operator",
-        BinaryOp::Remainder => "remainder operator",
-        BinaryOp::LogicalAnd => "logical and operator",
-        BinaryOp::LogicalOr => "logical or operator",
-        BinaryOp::BitwiseAnd => "bitwise and operator",
-        BinaryOp::BitwiseOr => "bitwise or operator",
-        BinaryOp::BitwiseXor => "bitwise xor operator",
-        BinaryOp::ShiftLeft => "left shift operator",
-        BinaryOp::ShiftRight => "right shift operator",
-        _ => "relational operator",
-    }
-}
-
-fn unary_operator_name(operator: UnaryOp) -> &'static str {
-    match operator {
-        UnaryOp::LogicalNot => "logical not operator",
-        UnaryOp::BitwiseNot => "bitwise not operator",
-        UnaryOp::Negate => "negation operator",
-    }
-}
-
-fn expected_unary_type(operator: UnaryOp) -> &'static str {
-    match operator {
-        UnaryOp::LogicalNot => "Bool",
-        UnaryOp::BitwiseNot => "integer",
-        UnaryOp::Negate => "numeric",
-    }
-}
-
-fn is_cast_integer_type(name: &str) -> bool {
-    name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
-}
-
-fn cast_literal_fits(literal: &str, negative: bool, target: &str) -> bool {
-    let Some(magnitude) = parse_integer_magnitude(literal) else { return false };
-    if target == "Int" {
-        let positive_limit = (1u128 << 31) - 1;
-        let negative_limit = 1u128 << 31;
-        return (!negative && magnitude <= positive_limit)
-            || (negative && magnitude <= negative_limit);
-    }
-    if target == "Usize" {
-        return !negative && magnitude <= u64::MAX as u128;
-    }
-    let Some(PrimitiveType::Integer { signed, width }) = primitive_type(target) else {
-        return true;
-    };
-    if signed {
-        let positive_limit = (1u128 << (width - 1)) - 1;
-        let negative_limit = 1u128 << (width - 1);
-        (!negative && magnitude <= positive_limit) || (negative && magnitude <= negative_limit)
-    } else {
-        !negative && (width == 128 || magnitude < (1u128 << width))
-    }
-}
-
-fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
-    match expression {
-        Expr::Integer { value, .. } => Some((value.clone(), false)),
-        Expr::Grouping { expression, .. } => integer_literal(expression),
-        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
-            let (value, _) = integer_literal(expression)?;
-            Some((value, true))
-        }
-        Expr::Cast { expression, .. } => integer_literal(expression),
-        _ => None,
-    }
-}
-
-fn parse_integer_magnitude(literal: &str) -> Option<u128> {
-    literal
-        .strip_prefix("0x")
-        .or_else(|| literal.strip_prefix("0X"))
-        .map_or_else(|| literal.parse().ok(), |digits| u128::from_str_radix(digits, 16).ok())
-}
-
-fn type_names_match(expected: &str, found: &str) -> bool {
-    strip_reference_role(expected) == strip_reference_role(found)
-}
-
-fn strip_reference_role(type_name: &str) -> &str {
-    type_name
-        .strip_prefix("abs ")
-        .or_else(|| type_name.strip_prefix("ins "))
-        .or_else(|| type_name.strip_prefix("erg "))
-        .or_else(|| type_name.strip_prefix("dat "))
-        .unwrap_or(type_name)
 }

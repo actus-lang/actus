@@ -39,6 +39,16 @@ impl Analyzer {
             expression,
         )?;
         self.validate_if_result(then_branch, else_branch.as_ref(), expression)?;
+        self.model.conditional_facts.push(super::super::model::ConditionalFact {
+            span: expression_span(expression),
+            condition_span: expression_span(condition),
+            condition_type,
+            then_type: block_tail_type(self, then_branch),
+            else_type: else_branch.as_ref().and_then(|branch| match branch {
+                IfBranch::Block(block) => block_tail_type(self, block),
+                IfBranch::ElseIf(expression) => self.expression_type_name(expression),
+            }),
+        });
         Ok(())
     }
 

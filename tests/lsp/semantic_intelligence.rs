@@ -11,7 +11,7 @@ fn semantic_model_exposes_compiler_owned_resource_and_target_facts() {
         "meta target(\"windows\")\n",
         "verb windows_only() -> Int { return 2; }\n",
         "pack Register { erg storage: u8; layout little; fields { erg low: u4 at 0; abs high: u4 at 4; } }\n",
-        "verb main() -> Int { erg bytes = Buffer[4]; erg values: Array[u8, 2] = Array[u8, 2](); return 0; }\n",
+        "verb main() -> Int { erg bytes = Buffer[4]; erg values: Array[u8, 2] = Array[u8, 2](); erg value: f32 = 1.5f32; return if value == 1.5f32 { 41 } else { 0 }; }\n",
     );
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"initializationOptions":{"target":"x86_64-unknown-linux-gnu"}}}),
@@ -27,6 +27,17 @@ fn semantic_model_exposes_compiler_owned_resource_and_target_facts() {
     assert_eq!(model["result"]["bindings"][1]["indexed"]["capacity"], "2");
     assert_eq!(model["result"]["packs"][0]["storageBits"], 8);
     assert_eq!(model["result"]["packs"][0]["fields"][0]["offset"], 0);
+    assert_eq!(model["result"]["literals"][0]["kind"], "integer");
+    assert!(model["result"]["literals"].as_array().is_some_and(|facts| {
+        facts.iter().any(|fact| fact["suffix"] == "f32" && fact["type"] == "f32")
+    }));
+    assert!(model["result"]["conditionals"].as_array().is_some_and(|facts| {
+        facts.iter().any(|fact| {
+            fact["condition"]["type"] == "Bool"
+                && fact["thenType"] == "Int"
+                && fact["elseType"] == "Int"
+        })
+    }));
     assert!(model["result"]["target"]["triple"].as_str().is_some());
     assert!(active_declaration(&model, "unix_only"));
     assert!(!active_declaration(&model, "windows_only"));

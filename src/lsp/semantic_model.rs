@@ -48,11 +48,47 @@ pub(super) fn query(
         "borrows": borrows(source, &index, &model),
         "loans": loans(source, &index, &model),
         "cleanup": cleanup(source, &index, &model),
+        "literals": literals(source, &index, &model),
+        "conditionals": conditionals(source, &index, &model),
         "packs": packs(source, &index, &target_program),
         "declarations": declarations(source, &index, &program, target),
     });
     store.cache_semantic(uri, &target_name, version, result.clone());
     result
+}
+
+fn literals(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {
+    model
+        .literal_facts
+        .iter()
+        .map(|fact| {
+            json!({
+                "kind": fact.kind,
+                "value": fact.value,
+                "suffix": fact.suffix,
+                "type": fact.type_name,
+                "range": span_range(source, index, fact.span),
+            })
+        })
+        .collect()
+}
+
+fn conditionals(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {
+    model
+        .conditional_facts
+        .iter()
+        .map(|fact| {
+            json!({
+                "range": span_range(source, index, fact.span),
+                "condition": {
+                    "type": fact.condition_type,
+                    "range": span_range(source, index, fact.condition_span),
+                },
+                "thenType": fact.then_type,
+                "elseType": fact.else_type,
+            })
+        })
+        .collect()
 }
 
 fn bindings(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {

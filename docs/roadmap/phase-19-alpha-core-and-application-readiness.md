@@ -294,8 +294,10 @@ matching.
 - [x] Parse typed floating-point literals such as `1.0f32` and `2.5f64`.
 - [x] Parse compound assignments including `+=`, `-=`, `*=`, `/=`, `%=`,
       `&=`, `|=`, `^=`, `<<=`, and `>>=`.
-- [ ] Reject malformed suffixes, missing branch delimiters, and incomplete
-      compound assignments with stable parser diagnostics.
+- [x] Reject malformed integer and floating-point suffixes with stable lexical
+      diagnostics.
+- [ ] Reject missing branch delimiters and incomplete compound assignments with
+      stable parser diagnostics.
 - [x] Keep parser implementation split by expression and statement
       responsibility and within the repository file-size limits.
 
@@ -342,9 +344,9 @@ matching.
       operators using compiler-owned token information; completion and richer
       semantic diagnostics remain part of the broader conditional-expression
       work.
-- [ ] Expose condition type, branch result type, and typed literal range facts
+- [x] Expose condition type, branch result type, and typed literal range facts
       through the semantic model where those surfaces already exist.
-- [ ] Add stable diagnostics for invalid conditions, incompatible branches,
+- [x] Preserve stable diagnostics for invalid conditions, incompatible branches,
       literal overflow, malformed suffixes, and illegal assignment targets.
 
 ### Gate 19.3.2.5: Acceptance and Regression Matrix
@@ -369,7 +371,7 @@ matching.
 - [x] Scalar loops can increment typed unsigned indices directly.
 - [x] Typed integer literals make width and signedness explicit without temporary
       bindings or implicit conversions.
-- [ ] Native execution, ownership cleanup, formatter output, LSP behavior,
+- [x] Native execution, ownership cleanup, formatter output, LSP behavior,
       and diagnostics agree on one implementation.
 
 ## Gate 19.4: Runtime, Portability, and Failure Matrix
