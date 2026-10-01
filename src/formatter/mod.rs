@@ -58,6 +58,7 @@ impl Formatter<'_> {
 
     fn top_level(&mut self, declaration: &TopLevelDecl) {
         match declaration {
+            TopLevelDecl::Constant(constant) => self.constant(constant),
             TopLevelDecl::Verb(verb) => self.verb(verb),
             TopLevelDecl::ExternalVerb(verb) => self.external_verb(verb),
             TopLevelDecl::Struct(definition) => self.struct_definition(definition),
@@ -68,6 +69,21 @@ impl Formatter<'_> {
             TopLevelDecl::OpenSibling(sibling) => self.open_sibling(sibling),
             TopLevelDecl::Import(import) => self.import(import),
         }
+    }
+
+    fn constant(&mut self, constant: &crate::ast::ConstantDecl) {
+        self.documentation(constant.doc.as_deref());
+        self.line_indent();
+        if constant.is_open {
+            self.output.push_str("open ");
+        }
+        self.output.push_str("const ");
+        self.output.push_str(&constant.name);
+        self.output.push_str(": ");
+        self.type_name(&constant.ty);
+        self.output.push_str(" = ");
+        self.expression(&constant.initializer);
+        self.output.push_str(";\n");
     }
 
     pub(super) fn line_indent(&mut self) {
@@ -169,6 +185,7 @@ impl Formatter<'_> {
 
 fn declaration_span(declaration: &TopLevelDecl) -> SourceSpan {
     match declaration {
+        TopLevelDecl::Constant(value) => value.span,
         TopLevelDecl::Verb(value) => value.span,
         TopLevelDecl::ExternalVerb(value) => value.span,
         TopLevelDecl::Struct(value) => value.span,

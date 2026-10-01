@@ -28,6 +28,23 @@ fn parses_a_verb_with_roles_and_return_type() {
 }
 
 #[test]
+fn parses_typed_named_constants_with_source_spans() {
+    let program = parse_source(
+        "\"\"\"CRC polynomial.\"\"\" const CRC16_POLYNOMIAL: u16 = 4129u16; verb main() { return 0; }",
+    );
+    let TopLevelDecl::Constant(constant) = &program.declarations[0] else {
+        panic!("expected constant")
+    };
+    assert_eq!(constant.name, "CRC16_POLYNOMIAL");
+    assert_eq!(constant.ty.name, "u16");
+    assert_eq!(constant.doc.as_deref(), Some("CRC polynomial."));
+    assert!(
+        matches!(constant.initializer, Expr::Integer { ref value, ref suffix, .. } if value == "4129" && suffix.as_deref() == Some("u16"))
+    );
+    assert!(constant.span.start < constant.span.end);
+}
+
+#[test]
 fn parses_target_metadata_into_the_verb_ast() {
     let program = parse_source("meta target(\"unix\") verb platform_action() { return 0; }");
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
@@ -61,14 +78,22 @@ fn parses_if_else_and_nested_else_if_expressions() {
         "verb choose(erg ready: Bool) { if ready { return 1; } else if ready { return 2; } else { return 3; } }",
     );
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-    let Stmt::Expression { expression, .. } = &verb.body.statements[0] else {
-        panic!("expected conditional expression")
-    };
-    let Expr::If { else_branch: Some(actus::ast::IfBranch::ElseIf(nested)), .. } = expression
+    let Stmt::If { else_branch: Some(actus::ast::IfBranch::ElseIf(nested)), .. } =
+        &verb.body.statements[0]
     else {
-        panic!("expected nested else-if")
+        panic!("expected statement conditional")
     };
     assert!(matches!(nested.as_ref(), Expr::If { .. }));
+}
+
+#[test]
+fn keeps_if_expression_distinct_from_statement_if() {
+    let program =
+        parse_source("verb choose(erg ready: Bool) -> Int { return if ready { 1 } else { 2 }; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::If { .. }), .. } = &verb.body.statements[0] else {
+        panic!("expected value-producing if expression")
+    };
 }
 
 #[test]

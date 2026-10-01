@@ -91,6 +91,46 @@ pub(super) fn lower_buffer_compound_assignment(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub(super) fn lower_buffer_assignment(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    value: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let address = lower_buffer_address(
+        function,
+        target,
+        index,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let value = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    let value =
+        super::expressions::coerce_to_ir_type(function, value, cranelift_codegen::ir::types::I8);
+    function.ins().store(MemFlagsData::new(), value, address, 0);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn lower_buffer_address(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,

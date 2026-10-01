@@ -24,6 +24,26 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn inlines_typed_named_constants_natively() {
+    let status = run_array_fixture(
+        "typed-named-constant",
+        "const ANSWER: u32 = 41u32; verb main() -> Int { return ANSWER as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn inlines_chained_named_constants_natively() {
+    let status = run_array_fixture(
+        "chained-typed-named-constants",
+        "const OFFSET: Int = 41; const ANSWER: Int = OFFSET + 1; verb main() -> Int { return ANSWER; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_value_producing_if_branches_natively() {
     let status = run_array_fixture(
         "conditional-expression",
@@ -60,6 +80,16 @@ fn executes_compound_assignments_natively() {
         "verb main() -> Int { erg value: u8 = 5u8; value += 7u8; value -= 2u8; value *= 3u8; value /= 5u8; value %= 4u8; value &= 3u8; value |= 4u8; value ^= 1u8; value <<= 1u8; value >>= 1u8; return value as Int; }",
     );
     assert_eq!(status.code(), Some(7));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_type_directed_unsuffixed_integer_operations_natively() {
+    let status = run_array_fixture(
+        "type-directed-integer-operations",
+        "verb main() -> Int { erg index: u32 = 0; index += 41; return (index + 1) as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
 }
 
 #[cfg(unix)]
@@ -230,6 +260,16 @@ fn accepts_u8_and_u32_dynamic_indices() {
     let status = run_array_fixture(
         "unsigned-indices",
         "verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[1] = 20; erg array_index: u32 = 1; erg bytes: Buffer = Buffer[0]; append(bytes, 22); erg buffer_index: u8 = 0; return values[array_index] + bytes[buffer_index]; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_unsuffixed_integer_comparison_and_indexing_natively() {
+    let status = run_array_fixture(
+        "unsuffixed-comparison-and-index",
+        "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = 41; erg index: u32 = 0; return case index < 1 { true => (values[index] as Int) + 1, _ => 0, }; }",
     );
     assert_eq!(status.code(), Some(42));
 }

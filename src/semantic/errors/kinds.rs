@@ -141,6 +141,15 @@ pub enum SemanticErrorKind {
     DuplicateVerbName {
         name: String,
     },
+    DuplicateConstantName {
+        name: String,
+    },
+    ConstantCycle {
+        name: String,
+    },
+    ConstantRuntimeDependency {
+        name: String,
+    },
     DuplicateStructName {
         name: String,
     },

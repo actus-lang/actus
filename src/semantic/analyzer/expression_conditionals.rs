@@ -133,10 +133,23 @@ fn block_tail_type(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<Str
 }
 
 fn branch_diverges(block: &crate::ast::Block) -> bool {
-    matches!(
-        block.statements.last(),
-        Some(Stmt::Return { .. } | Stmt::Break { .. } | Stmt::Continue { .. })
-    )
+    block.statements.last().is_some_and(statement_diverges)
+}
+
+fn statement_diverges(statement: &Stmt) -> bool {
+    match statement {
+        Stmt::Return { .. } | Stmt::Break { .. } | Stmt::Continue { .. } => true,
+        Stmt::If { then_branch, else_branch, .. } => {
+            branch_diverges(then_branch)
+                && else_branch.as_ref().is_some_and(|branch| match branch {
+                    IfBranch::Block(block) => branch_diverges(block),
+                    IfBranch::ElseIf(expression) => {
+                        matches!(expression.as_ref(), Expr::If { .. })
+                    }
+                })
+        }
+        _ => false,
+    }
 }
 
 fn else_branch_diverges(analyzer: &Analyzer, branch: &IfBranch) -> bool {

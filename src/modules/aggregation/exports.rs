@@ -74,6 +74,7 @@ fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
 
 fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
     match declaration {
+        TopLevelDecl::Constant(value) => value.is_open,
         TopLevelDecl::Verb(value) => value.is_open,
         TopLevelDecl::ExternalVerb(value) => value.is_open,
         TopLevelDecl::Struct(value) => value.is_open,

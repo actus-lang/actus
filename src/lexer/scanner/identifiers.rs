@@ -50,6 +50,7 @@ fn keyword_or_identifier(text: &str) -> TokenKind {
         "enum" => TokenKind::Enum,
         "role" => TokenKind::Role,
         "perform" => TokenKind::Perform,
+        "const" => TokenKind::Const,
         "dynamic" => TokenKind::Dynamic,
         "meta" => TokenKind::Meta,
         "open" => TokenKind::Open,

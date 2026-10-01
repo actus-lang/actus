@@ -29,6 +29,15 @@ impl Analyzer {
                 self.visit_compound_assignment(target, *operator, value, *span)
             }
             Stmt::Expression { expression, span } => self.visit_expr_statement(expression, *span),
+            Stmt::If { condition, then_branch, else_branch, span } => {
+                let expression = Expr::If {
+                    condition: Box::new(condition.clone()),
+                    then_branch: then_branch.clone(),
+                    else_branch: else_branch.clone(),
+                    span: *span,
+                };
+                self.visit_if_expression(&expression)
+            }
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => self.visit_loop(block),
             Stmt::Break { span } => self.visit_loop_control(true, *span),

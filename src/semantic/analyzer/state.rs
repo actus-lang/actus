@@ -20,6 +20,8 @@ pub(crate) struct Analyzer {
     pub(crate) next_loan_id: usize,
     pub(crate) active_borrow_ids: HashSet<usize>,
     pub(crate) signatures: HashMap<String, super::super::calls::VerbSignature>,
+    pub(crate) constants: HashMap<String, crate::ast::TypeName>,
+    pub(crate) constant_initializers: HashMap<String, crate::ast::Expr>,
     pub(crate) loop_boundaries: Vec<usize>,
     pub(crate) current_return_type: Option<BuiltinType>,
     pub(crate) current_return_type_name: Option<crate::ast::TypeName>,

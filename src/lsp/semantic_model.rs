@@ -241,6 +241,7 @@ fn declarations(
         .iter()
         .filter_map(|declaration| {
             let (name, span, metadata): (&str, SourceSpan, &[MetaAttribute]) = match declaration {
+                TopLevelDecl::Constant(value) => (&value.name, value.span, &[]),
                 TopLevelDecl::Verb(verb) => (&verb.name, verb.span, &verb.metadata),
                 TopLevelDecl::ExternalVerb(verb) => (&verb.name, verb.span, &verb.metadata),
                 TopLevelDecl::Struct(value) => (&value.name, value.span, &[]),

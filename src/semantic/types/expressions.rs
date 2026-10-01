@@ -115,44 +115,28 @@ impl Analyzer {
             crate::ast::IfBranch::Block(block) => block_tail_builtin_type(self, block),
             crate::ast::IfBranch::ElseIf(expression) => self.expression_type(expression),
         });
-        (then_type == else_type).then_some(then_type).flatten()
+        if then_type == else_type {
+            return then_type;
+        }
+        if then_type.is_none() && block_diverges(then_branch) {
+            return else_type;
+        }
+        if else_type.is_none()
+            && else_branch.as_ref().is_some_and(|branch| self.if_branch_diverges(branch))
+        {
+            return then_type;
+        }
+        None
     }
 
     pub(crate) fn expression_type_name(&self, expression: &Expr) -> Option<String> {
-        if let Expr::Integer { suffix: Some(suffix), .. } = expression
-            && matches!(primitive_type(suffix), Some(crate::ast::PrimitiveType::Integer { .. }))
-        {
-            return Some(suffix.clone());
+        if let Some(type_name) = self.literal_type_name(expression) {
+            return Some(type_name);
         }
-        if let Expr::FloatLiteral { suffix, .. } = expression {
-            return Some(suffix.as_deref().unwrap_or("f64").to_owned());
+        if let Some(type_name) = self.unary_type_name(expression) {
+            return Some(type_name);
         }
-        if let Expr::Grouping { expression, .. } = expression {
-            return self.expression_type_name(expression);
-        }
-        if let Expr::Unary { operator, expression, .. } = expression {
-            return if matches!(operator, crate::ast::UnaryOp::LogicalNot) {
-                Some("Bool".to_owned())
-            } else {
-                self.expression_type_name(expression).or_else(|| {
-                    self.expression_type(expression).map(|ty| ty.spec().name.to_owned())
-                })
-            };
-        }
-        if let Expr::Binary { operator, left, .. } = expression
-            && !matches!(
-                operator,
-                crate::ast::BinaryOp::Equals
-                    | crate::ast::BinaryOp::NotEquals
-                    | crate::ast::BinaryOp::LogicalAnd
-                    | crate::ast::BinaryOp::LogicalOr
-                    | crate::ast::BinaryOp::LessThan
-                    | crate::ast::BinaryOp::LessEquals
-                    | crate::ast::BinaryOp::GreaterThan
-                    | crate::ast::BinaryOp::GreaterEquals
-            )
-            && let Some(type_name) = self.expression_type_name(left)
-        {
+        if let Some(type_name) = self.binary_type_name(expression) {
             return Some(type_name);
         }
         if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
@@ -164,6 +148,7 @@ impl Analyzer {
             return Some(super::super::analyzer::canonical_type_name(target));
         }
         self.binding_type_name(expression)
+            .or_else(|| self.constant_type_name(expression))
             .or_else(|| self.index_type_name(expression))
             .or_else(|| self.expression_type(expression).map(|ty| ty.spec().name.to_owned()))
             .or_else(|| self.expression_struct_type(expression))
@@ -178,6 +163,51 @@ impl Analyzer {
             .or_else(|| self.expression_enum_type(expression))
     }
 
+    fn literal_type_name(&self, expression: &Expr) -> Option<String> {
+        match expression {
+            Expr::Integer { suffix: Some(suffix), .. }
+                if matches!(
+                    primitive_type(suffix),
+                    Some(crate::ast::PrimitiveType::Integer { .. })
+                ) =>
+            {
+                Some(suffix.clone())
+            }
+            Expr::FloatLiteral { suffix, .. } => {
+                Some(suffix.as_deref().unwrap_or("f64").to_owned())
+            }
+            Expr::Grouping { expression, .. } => self.expression_type_name(expression),
+            _ => None,
+        }
+    }
+
+    fn unary_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Unary { operator, expression, .. } = expression else { return None };
+        if matches!(operator, crate::ast::UnaryOp::LogicalNot) {
+            Some("Bool".to_owned())
+        } else {
+            self.expression_type_name(expression)
+                .or_else(|| self.expression_type(expression).map(|ty| ty.spec().name.to_owned()))
+        }
+    }
+
+    fn binary_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Binary { operator, left, .. } = expression else { return None };
+        (!matches!(
+            operator,
+            crate::ast::BinaryOp::Equals
+                | crate::ast::BinaryOp::NotEquals
+                | crate::ast::BinaryOp::LogicalAnd
+                | crate::ast::BinaryOp::LogicalOr
+                | crate::ast::BinaryOp::LessThan
+                | crate::ast::BinaryOp::LessEquals
+                | crate::ast::BinaryOp::GreaterThan
+                | crate::ast::BinaryOp::GreaterEquals
+        ))
+        .then(|| self.expression_type_name(left))
+        .flatten()
+    }
+
     fn index_type_name(&self, expression: &Expr) -> Option<String> {
         let Expr::Index { target, index, .. } = expression else { return None };
         self.validate_index_access(target, index)
@@ -189,6 +219,11 @@ impl Analyzer {
         let Expr::Identifier { name, span } = expression else { return None };
         let index = self.binding(name, *span).ok()?;
         self.binding_type_names.get(&index).map(super::super::analyzer::canonical_type_name)
+    }
+
+    fn constant_type_name(&self, expression: &Expr) -> Option<String> {
+        let Expr::Identifier { name, .. } = expression else { return None };
+        self.constants.get(name).map(super::super::analyzer::canonical_type_name)
     }
 
     fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {
@@ -211,8 +246,40 @@ impl Analyzer {
             crate::ast::IfBranch::Block(block) => block_tail_type_name(self, block),
             crate::ast::IfBranch::ElseIf(expression) => self.expression_type_name(expression),
         });
-        (then_type == else_type).then_some(then_type).flatten()
+        if then_type == else_type {
+            return then_type;
+        }
+        if then_type.is_none() && block_diverges(then_branch) {
+            return else_type;
+        }
+        if else_type.is_none()
+            && else_branch.as_ref().is_some_and(|branch| self.if_branch_diverges(branch))
+        {
+            return then_type;
+        }
+        None
     }
+
+    fn if_branch_diverges(&self, branch: &crate::ast::IfBranch) -> bool {
+        match branch {
+            crate::ast::IfBranch::Block(block) => block_diverges(block),
+            crate::ast::IfBranch::ElseIf(expression) => {
+                matches!(expression.as_ref(), Expr::If { .. })
+                    && self.expression_type_name(expression).is_none()
+            }
+        }
+    }
+}
+
+fn block_diverges(block: &crate::ast::Block) -> bool {
+    matches!(
+        block.statements.last(),
+        Some(
+            crate::ast::Stmt::Return { .. }
+                | crate::ast::Stmt::Break { .. }
+                | crate::ast::Stmt::Continue { .. }
+        )
+    )
 }
 
 fn block_tail_builtin_type(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<BuiltinType> {

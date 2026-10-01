@@ -70,6 +70,13 @@ fn check_block_with_context(
             Stmt::Loop(nested) | Stmt::Block(nested) => {
                 check_block_with_context(nested, context)?;
             }
+            Stmt::If { condition, then_branch, else_branch, .. } => {
+                check_expr_with_context(condition, context)?;
+                check_block_with_context(then_branch, context)?;
+                if let Some(IfBranch::Block(block)) = else_branch {
+                    check_block_with_context(block, context)?;
+                }
+            }
             Stmt::Drop { .. } => {}
         }
     }

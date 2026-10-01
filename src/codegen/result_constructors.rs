@@ -19,6 +19,7 @@ pub(super) fn normalize_program(program: &Program) -> Program {
             _ => {}
         }
     }
+    super::constants::inline_constants(&mut normalized);
     normalized
 }
 
@@ -106,6 +107,13 @@ fn normalize_statement(
         }
         Stmt::Expression { expression, .. } => {
             normalize_expression(expression, None, signatures, locals);
+        }
+        Stmt::If { condition, then_branch, else_branch, .. } => {
+            normalize_expression(condition, None, signatures, locals);
+            normalize_block(then_branch, return_type, signatures, locals);
+            if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
+                normalize_block(block, return_type, signatures, locals);
+            }
         }
         Stmt::Return { value: Some(expression), .. } => {
             normalize_expression(expression, return_type, signatures, locals);

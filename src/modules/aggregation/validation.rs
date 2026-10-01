@@ -50,6 +50,7 @@ fn canonical_type_name(type_name: &crate::ast::TypeName) -> String {
 
 fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &String, SourceSpan)> {
     match declaration {
+        TopLevelDecl::Constant(value) => Some(("const", &value.name, value.span)),
         TopLevelDecl::Struct(value) => Some(("struct", &value.name, value.span)),
         TopLevelDecl::Pack(value) => Some(("pack", &value.name, value.span)),
         TopLevelDecl::Enum(value) => Some(("enum", &value.name, value.span)),

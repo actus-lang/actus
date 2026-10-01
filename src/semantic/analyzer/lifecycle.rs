@@ -18,6 +18,7 @@ impl Analyzer {
         self.validate_role_declarations()?;
         self.validate_performances(program)?;
         self.validate_recursive_types()?;
+        self.register_constants(program)?;
         self.register_declarations(program)?;
         self.collect_dynamic_roles(program);
         self.validate_method_declarations(program)?;

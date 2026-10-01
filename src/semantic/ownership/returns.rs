@@ -43,6 +43,9 @@ impl Analyzer {
     }
 
     fn move_returned_binding(&mut self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
+        if self.constants.contains_key(name) {
+            return Ok(());
+        }
         let index = self.binding(name, span)?;
         self.ensure_access_available(index, name, span)?;
         self.reject_ins_return(index, name, span)?;

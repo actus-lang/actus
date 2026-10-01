@@ -110,6 +110,13 @@ fn collect_block(statements: &[Stmt], values: &mut HashSet<String>) {
                 collect_expression(value, values);
             }
             Stmt::Return { value: Some(value), .. } => collect_expression(value, values),
+            Stmt::If { condition, then_branch, else_branch, .. } => {
+                collect_expression(condition, values);
+                collect_block(&then_branch.statements, values);
+                if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
+                    collect_block(&block.statements, values);
+                }
+            }
             Stmt::Loop(block) | Stmt::Block(block) => collect_block(&block.statements, values),
             Stmt::Return { value: None, .. }
             | Stmt::Break { .. }

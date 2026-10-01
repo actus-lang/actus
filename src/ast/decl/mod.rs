@@ -13,6 +13,7 @@ pub use data::{
     StructField, StructFieldRole,
 };
 pub use top_level::{
-    ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod, TopLevelDecl,
+    ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,
+    TopLevelDecl,
 };
 pub use types::{GenericParam, ReturnAccess, ReturnType, Role, TypeName};

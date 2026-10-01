@@ -32,7 +32,7 @@ fn collect_private_names(unit: &ModuleUnit) -> PrivateNames {
         }
         if kind == "role" {
             private.roles.insert(name);
-        } else if matches!(kind, "struct" | "pack" | "enum") {
+        } else if matches!(kind, "const" | "struct" | "pack" | "enum") {
             private.declarations.insert(name);
         }
     }
@@ -50,6 +50,7 @@ fn validate_declaration(
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
     match declaration {
+        TopLevelDecl::Constant(_) => Ok(()),
         TopLevelDecl::Verb(value) => validate_callable(
             &value.generic_parameters,
             &value.params,

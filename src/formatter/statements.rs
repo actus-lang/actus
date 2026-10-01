@@ -53,6 +53,9 @@ impl Formatter<'_> {
                 self.expression(expression);
                 self.output.push(';');
             }
+            Stmt::If { condition, then_branch, else_branch, .. } => {
+                self.if_expression(condition, then_branch, else_branch.as_ref());
+            }
             Stmt::Return { value, .. } => {
                 self.return_statement(value.as_ref());
             }
@@ -147,6 +150,7 @@ fn statement_span(statement: &Stmt) -> crate::lexer::SourceSpan {
         | Stmt::IndexAssignment { span, .. }
         | Stmt::CompoundAssignment { span, .. }
         | Stmt::Expression { span, .. }
+        | Stmt::If { span, .. }
         | Stmt::Return { span, .. }
         | Stmt::Break { span }
         | Stmt::Continue { span }

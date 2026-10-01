@@ -38,9 +38,25 @@ fn formats_if_else_without_collapsing_branch_boundaries() {
 }
 
 #[test]
+fn formats_statement_if_without_a_trailing_semicolon() {
+    let formatted = format_source("verb main() { if 1 == 1 { return; } }");
+    assert!(formatted.contains("if 1 == 1 {\n"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_typed_float_literal_suffixes() {
     let formatted = format_source("verb main() { erg value: f32 = 1.5f32; }");
     assert!(formatted.contains("1.5f32"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_typed_constants_and_keeps_their_documentation() {
+    let formatted = format_source(
+        "\"\"\"Frame size.\"\"\" open const FRAME_SIZE: u16 = 32u16; verb main() { return; }",
+    );
+    assert!(formatted.contains("\"\"\"Frame size.\"\"\"\nopen const FRAME_SIZE: u16 = 32u16;"));
     assert_eq!(format_source(&formatted), formatted);
 }
 

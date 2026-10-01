@@ -37,6 +37,74 @@ fn validates_print_arguments() {
 }
 
 #[test]
+fn validates_typed_constants_and_resolves_constant_references() {
+    analyze_source("const FRAME_HEADER: u16 = 12u16; verb main() -> u16 { return FRAME_HEADER; }")
+        .expect("typed constant reference should be valid");
+}
+
+#[test]
+fn rejects_duplicate_and_overflowing_constants() {
+    let duplicate =
+        analyze_source("const LIMIT: u8 = 4u8; const LIMIT: u8 = 8u8; verb main() { return; }")
+            .expect_err("duplicate constants must be rejected");
+    assert!(
+        matches!(duplicate.kind, SemanticErrorKind::DuplicateConstantName { name } if name == "LIMIT")
+    );
+
+    analyze_source("const LIMIT: u8 = 256u16; verb main() { return; }")
+        .expect_err("constant overflow must be rejected");
+
+    let cycle = analyze_source(
+        "const FIRST: u8 = SECOND; const SECOND: u8 = FIRST; verb main() { return; }",
+    )
+    .expect_err("constant cycles must be rejected");
+    assert!(matches!(cycle.kind, SemanticErrorKind::ConstantCycle { .. }));
+}
+
+#[test]
+fn accepts_forward_referenced_constant_expressions() {
+    analyze_source(
+        "const ANSWER: Int = OFFSET + 1; const OFFSET: Int = 41; verb main() -> Int { return ANSWER; }",
+    )
+    .expect("constant expressions may reference later constants");
+}
+
+#[test]
+fn rejects_runtime_dependencies_in_constant_initializers() {
+    let error = analyze_source(
+        "verb runtime_value() -> Int { return 41; } const ANSWER: Int = runtime_value(); verb main() { return; }",
+    )
+    .expect_err("constants must not depend on runtime calls");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ConstantRuntimeDependency { name } if name == "ANSWER")
+    );
+}
+
+#[test]
+fn accepts_statement_if_control_flow_and_diverging_expression_branches() {
+    analyze_source("verb main() -> Int { loop { if 1 == 1 { break; } } return 42; }")
+        .expect("statement if should participate in loop control flow");
+    analyze_source(
+        "verb choose(erg ready: Bool) -> Int { return if ready { return 41; } else { 42 }; }",
+    )
+    .expect("a diverging expression branch should not require a matching value");
+}
+
+#[test]
+fn accepts_unsuffixed_integer_literals_in_known_integer_operations() {
+    analyze_source("verb main() -> u32 { erg index: u32 = 0; index += 1; return index + 1; }")
+        .expect("known integer operands should direct unsuffixed literals");
+}
+
+#[test]
+fn rejects_out_of_range_unsuffixed_integer_literals_in_known_integer_operations() {
+    let error =
+        analyze_source("verb main() -> u8 { erg value: u8 = 1; value += 256; return value; }")
+            .expect_err("type-directed literals must retain range checking");
+    assert!(matches!(error.kind, SemanticErrorKind::NumericLiteralOutOfRange { .. }));
+}
+
+#[test]
 fn validates_relational_operand_families() {
     analyze_source("verb main() -> Bool { return 1 < 2; }")
         .expect("matching Int operands should compare");

@@ -85,6 +85,9 @@ impl Parser {
         if let Some(declaration) = self.parse_external_keyword(doc.clone())? {
             return Ok(Some(declaration));
         }
+        if self.check_simple(&TokenKind::Const) {
+            return Ok(Some(TopLevelDecl::Constant(self.parse_constant(false, doc)?)));
+        }
         self.parse_type_keyword(doc)
     }
 
@@ -231,6 +234,9 @@ impl Parser {
         if self.check_simple(&TokenKind::Verb) {
             return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(true, Vec::new(), doc)?));
         }
+        if self.check_simple(&TokenKind::Const) {
+            return Ok(TopLevelDecl::Constant(self.parse_constant(true, doc)?));
+        }
         if self.check_simple(&TokenKind::Extern) || self.check_simple(&TokenKind::Unsafe) {
             return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
                 self.check_simple(&TokenKind::Unsafe),
@@ -240,6 +246,28 @@ impl Parser {
             )?));
         }
         Err(self.error_at_current("a declaration after `open`"))
+    }
+
+    fn parse_constant(
+        &mut self,
+        is_open: bool,
+        doc: Option<String>,
+    ) -> Result<crate::ast::ConstantDecl, ParseError> {
+        let start = self.expect_keyword(TokenKind::Const, "`const`")?.span.start;
+        let name = identifier_text(&self.take_identifier("constant name")?.kind);
+        self.expect_simple(TokenKind::Colon, "`:`")?;
+        let ty = self.parse_type_name()?;
+        self.expect_simple(TokenKind::Equals, "`=`")?;
+        let initializer = self.parse_expression()?;
+        let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        Ok(crate::ast::ConstantDecl {
+            is_open,
+            doc,
+            name,
+            ty,
+            initializer,
+            span: SourceSpan::new(start, end),
+        })
     }
 
     fn parse_external_verb(

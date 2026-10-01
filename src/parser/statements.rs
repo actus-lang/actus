@@ -5,6 +5,13 @@ use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span,
 
 impl Parser {
     pub(super) fn parse_block(&mut self) -> Result<Block, ParseError> {
+        self.parse_block_with_statement_conditionals(true)
+    }
+
+    pub(super) fn parse_block_with_statement_conditionals(
+        &mut self,
+        allow_statement_conditionals: bool,
+    ) -> Result<Block, ParseError> {
         let start = self.expect_simple(TokenKind::LeftBrace, "`{`")?.span.start;
         let mut statements = Vec::new();
         while !self.check_simple(&TokenKind::RightBrace) {
@@ -15,18 +22,30 @@ impl Parser {
             if self.check_simple(&TokenKind::RightBrace) {
                 break;
             }
-            statements.push(self.parse_statement()?);
+            statements.push(self.parse_statement_with_conditionals(allow_statement_conditionals)?);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(Block { statements, span: SourceSpan::new(start, end) })
     }
 
     pub(super) fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.parse_statement_with_conditionals(true)
+    }
+
+    fn parse_statement_with_conditionals(
+        &mut self,
+        allow_statement_conditionals: bool,
+    ) -> Result<Stmt, ParseError> {
         if self.check_simple(&TokenKind::LeftBrace) {
             return Ok(Stmt::Block(self.parse_block()?));
         }
         if self.match_simple(TokenKind::Loop) {
             return Ok(Stmt::Loop(self.parse_block()?));
+        }
+        if allow_statement_conditionals && self.match_simple(TokenKind::If) {
+            let statement = self.parse_if_statement(self.previous().span)?;
+            self.match_simple(TokenKind::Semicolon);
+            return Ok(statement);
         }
         if self.check_role(&TokenKind::Erg)
             || self.check_role(&TokenKind::Abs)

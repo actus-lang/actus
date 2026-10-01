@@ -68,6 +68,16 @@ pub(super) fn block_info(source: &str, statements: &[Stmt], name: &str) -> Optio
                     return Some(info);
                 }
             }
+            Stmt::If { then_branch, else_branch, .. } => {
+                if let Some(info) = block_info(source, &then_branch.statements, name) {
+                    return Some(info);
+                }
+                if let Some(crate::ast::IfBranch::Block(block)) = else_branch
+                    && let Some(info) = block_info(source, &block.statements, name)
+                {
+                    return Some(info);
+                }
+            }
             _ => {}
         }
     }

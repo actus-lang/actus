@@ -159,3 +159,15 @@ fn rejects_unknown_import_with_stable_module_diagnostic() {
     let diagnostic = actus::diagnostics::module_diagnostic(&error);
     assert_eq!(diagnostic.code(), "E1101");
 }
+
+#[test]
+fn rejects_malformed_facade_source_before_external_type_resolution() {
+    let fixture = Fixture::new();
+    fixture.write("api/api.act", "open surface;");
+    fixture.write("api/surface.act", "open struct Broken {");
+
+    let error = load_module_unit(&ModuleResolver::new(&fixture.root), "api")
+        .expect_err("malformed facade exports must fail before import analysis");
+    assert!(matches!(error, ModuleError::Parse { .. }));
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E0004");
+}
