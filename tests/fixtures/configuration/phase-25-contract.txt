@@ -1,0 +1,36 @@
+PHASE 25 CONFIGURATION CONTRACT FIXTURES
+
+[accepted]
+src/config/config.act
+  open values;
+src/config/values.act
+  open const DEFAULT_THRESHOLD: u8 = 30u8;
+src/main.act
+  import config;
+  verb main() -> Int { return DEFAULT_THRESHOLD as Int; }
+
+[rejected: configuration-import]
+src/config/config.act
+  import aie;
+  open values;
+
+[rejected: runtime-declaration]
+src/config/values.act
+  verb runtime_state() -> Int { return 1; }
+
+[rejected: direct-child-bypass]
+src/main.act
+  import config::values;
+
+[rejected: private-constant]
+src/config/values.act
+  const PRIVATE_LIMIT: u8 = 1u8;
+src/main.act
+  import config;
+  verb main() -> Int { return PRIVATE_LIMIT as Int; }
+
+[rejected: dependency-cycle]
+src/config/config.act
+  import aie;
+src/aie/aie.act
+  import config;

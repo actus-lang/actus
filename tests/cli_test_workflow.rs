@@ -11,7 +11,7 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
         "smoke.act",
         "meta test\nverb smoke() -> Int { return 0; }\n",
     );
-    let output = run_test_command(&root);
+    let output = run_command(&root, &["test", "--strict"]);
     assert!(output.status.success(), "test command failed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1 passed; 0 failed"));
@@ -90,6 +90,27 @@ fn test_links_imported_module_objects_for_meta_tests() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success(), "stdout: {stdout}");
     assert!(stdout.contains("smoke ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_treats_configuration_as_a_package_module() {
+    let root = create_test_project(
+        "runner-config",
+        "config_test.act",
+        "import config; meta test\nverb reads_config() -> Int { return LIMIT as Int - 30; }\n",
+    );
+    fs::create_dir_all(root.join("src/config")).expect("create config directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n").expect("write config facade");
+    fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
+        .expect("write config values");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("reads_config ... ok"), "stdout: {stdout}");
     assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);
 }

@@ -97,13 +97,22 @@ pub(super) fn validate_strict_plan(
     if !validate_strict_program(input, source, plan.caller()) {
         return false;
     }
-    if let Err(error) = crate::semantic::analyze(&plan.implementation()) {
-        report_diagnostic(
-            Path::new(input),
-            source,
-            crate::diagnostics::semantic_diagnostic(&error),
-        );
-        return false;
+    let object_plan = match plan.object_plan() {
+        Ok(object_plan) => object_plan,
+        Err(error) => {
+            eprintln!("{input}: {}", render_diagnostic(source, &module_diagnostic(&error)));
+            return false;
+        }
+    };
+    for unit in object_plan.units() {
+        if let Err(error) = crate::semantic::analyze(unit.program()) {
+            report_diagnostic(
+                Path::new(input),
+                source,
+                crate::diagnostics::semantic_diagnostic(&error),
+            );
+            return false;
+        }
     }
     true
 }

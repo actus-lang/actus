@@ -1,8 +1,12 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use actus::modules::{ModuleResolver, ModuleSourceKind, analyze_module, load_module_unit};
+use actus::modules::{
+    ModuleResolver, ModuleSourceKind, analyze_module, load_module_unit,
+    load_module_unit_with_overlays,
+};
 
 struct Fixture {
     root: PathBuf,
@@ -108,6 +112,23 @@ fn repeated_unit_loads_have_equal_identity_and_export_order() {
     assert_eq!(first.identity(), second.identity());
     assert_eq!(first.sources(), second.sources());
     assert_eq!(first.exports(), second.exports());
+}
+
+#[test]
+fn configuration_source_changes_invalidate_module_identity() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    let values = fixture.root.join("config/values.act");
+    fixture.write("config/values.act", "open const LIMIT: u8 = 30u8;");
+    let resolver = ModuleResolver::new(&fixture.root);
+    let baseline = load_module_unit(&resolver, "config").expect("config should load");
+
+    let mut overlays = HashMap::new();
+    overlays.insert(values, "open const LIMIT: u8 = 31u8;".to_owned());
+    let changed = load_module_unit_with_overlays(&resolver, "config", &overlays)
+        .expect("overlay config should load");
+
+    assert_ne!(baseline.identity().source_key(), changed.identity().source_key());
 }
 
 #[test]

@@ -94,6 +94,9 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<Option<(usize, String)>, SemanticError> {
         let Expr::Identifier { name, span: identifier_span } = expression else { return Ok(None) };
+        if self.constants.contains_key(name) || self.is_const_generic_parameter(name) {
+            return Ok(None);
+        }
         let index = self.binding(name, *identifier_span)?;
         self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Ins {

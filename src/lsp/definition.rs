@@ -144,6 +144,7 @@ fn collect_top_level_definition(
         TopLevelDecl::Enum(value) => (&value.name, value.span),
         TopLevelDecl::Role(value) => (&value.name, value.span),
         TopLevelDecl::Pack(value) => (&value.name, value.span),
+        TopLevelDecl::Constant(value) => (&value.name, value.span),
         _ => return,
     };
     if declared_name == name
@@ -237,6 +238,7 @@ fn top_level_span(source: &str, program: &Program, name: &str) -> Option<SourceS
             TopLevelDecl::Enum(value) => (&value.name, value.span),
             TopLevelDecl::Role(value) => (&value.name, value.span),
             TopLevelDecl::Pack(value) => (&value.name, value.span),
+            TopLevelDecl::Constant(value) => (&value.name, value.span),
             _ => return None,
         };
         (declared_name == name).then(|| identifier_span(source, span, name)).flatten()
