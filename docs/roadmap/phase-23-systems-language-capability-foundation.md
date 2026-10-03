@@ -720,9 +720,10 @@ The original Phase 23 scope is closed through Gate 23.8: the three baseline
 gaps have direct evidence, the capability fixture passes strict check/test,
 native execution is verified, and formatter/LSP behavior matches the
 compiler. The multi-word packed-storage extension is closed through Gate
-23.15. Gates 23.9–23.15 have direct evidence, including the 64-byte systems
-fixture and the typed `Array[Pack, N]` collection tests, through the same
-strict, native, object, formatter, LSP, source-limit, documentation, and
-repository quality checks. Any remaining language limitation must be recorded
-with an owner, an exact unblock condition, and a dedicated roadmap item in
-this phase.
+23.15, and the package-level zero-float acceptance contract is closed through
+Gate 23.18. Gates 23.9–23.18 have direct evidence, including the 64-byte
+systems fixture, typed `Array[Pack, N]` collection tests, and manifest-driven
+Cranelift IR verification through the same strict, native, object, formatter,
+LSP, source-limit, documentation, and repository quality checks. Any
+remaining language limitation must be recorded with an owner, an exact
+unblock condition, and a dedicated roadmap item in this phase.
