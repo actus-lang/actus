@@ -10,7 +10,8 @@ checkout.
 - Repository: `/home/magradze/Projects/actus_project/actus`
 - Compiler invocation: `cargo run --quiet --bin actus -- check <file> --strict`
 - Target: the current hosted/default compiler target
-- Revision: the Phase 23 roadmap commit plus the uncommitted baseline fixtures
+- Revision: `f8ad56e` (`test(phase23): close systems readiness gate`), with the
+  baseline fixtures and all later Phase 23 acceptance evidence committed
 
 ## Fixtures
 
@@ -85,7 +86,7 @@ Observed result:
 checked `tests/fixtures/phase23/nested_place_call_baseline.act` successfully (strict)
 ```
 
-Status: **not reproduced by the minimal current fixture**.
+Status at Gate 23.0: **not reproduced by the minimal current fixture**.
 
 The current compiler already accepts a nested `if` containing an indexed
 aggregate field assignment and a nested named call in this reduced form. The
@@ -94,9 +95,11 @@ fixture before parser changes are justified. Possible differences include a
 const-generic receiver, a pack field, a more complex place chain, an `ins`
 loan, or a branch expression rather than a statement body.
 
-No nested-place parser gap is marked confirmed from the original report alone.
-This protects the compiler from regressing an already-supported path or adding
-an unnecessary parser rewrite.
+No nested-place parser gap was marked confirmed from the original report alone.
+The later Gate 23.3, 23.4, and 23.5 acceptance suites now cover the expanded
+place, call, and typed-join workload, including nested indexed aggregate
+assignment, nested calls, and value-producing branches. This closes the
+reproduction task without a speculative parser rewrite.
 
 ## Initial ownership of the work
 
@@ -112,12 +115,16 @@ an unnecessary parser rewrite.
 - [x] The two confirmed failures have exact current diagnostics recorded.
 - [x] The minimal nested place/call form was tested instead of being assumed
       broken.
-- [ ] Minimize and reproduce the exact nested-control-flow failure, if it
-      still exists in the real workload.
-- [ ] Add the final evidence index after the confirmed failure set is frozen.
-- [ ] Confirm the implementation plan and module ownership before Gate 23.1.
+- [x] Minimize and reproduce the exact nested-control-flow failure, if it
+      still exists in the real workload. The minimal fixture passed, and the
+      later nested-place, nested-call, and typed-join suites cover the expanded
+      workload without reproducing a remaining parser defect.
+- [x] Add the final evidence index after the confirmed failure set is frozen.
+- [x] Confirm the implementation plan and module ownership before Gate 23.1;
+      the ownership table above is reflected by the implementation and test
+      boundaries recorded in the later gate evidence.
 
-The next implementation gate is therefore Const Generic Parameters, with
-Boolean Literal Expressions implemented in parallel only if the work remains
-small and independently testable. The unconfirmed nested parser report stays
-open as a reproduction task, not as permission for speculative changes.
+Gate 23.0 is closed. The confirmed baseline gaps were implemented through
+Gates 23.1 and 23.2, while the expanded nested-control-flow workload was
+closed through Gates 23.3–23.5. Cross-layer and systems-readiness evidence is
+indexed in [Phase 23 capability evidence index](phase-23-capability-evidence-index.md).

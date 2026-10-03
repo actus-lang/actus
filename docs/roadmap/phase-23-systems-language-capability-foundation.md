@@ -48,17 +48,21 @@ minimization task rather than a confirmed compiler defect.
 
 ## Gate 23.0: Baseline reproduction and architecture contract
 
-- [ ] Add minimal positive and negative fixtures for each reported gap.
-- [ ] Record the current diagnostic, source span, compiler stage, and expected
+- [x] Add minimal positive and negative fixtures for each reported gap.
+- [x] Record the current diagnostic, source span, compiler stage, and expected
       behavior for every fixture.
-- [ ] Identify the responsible lexer, parser, AST, semantic, codegen,
+- [x] Identify the responsible lexer, parser, AST, semantic, codegen,
       formatter, LSP, and test modules before implementation.
-- [ ] Confirm the solution remains target-neutral and does not add an
+- [x] Confirm the solution remains target-neutral and does not add an
       application-specific AIE lowering path.
-- [ ] Confirm all new implementation files remain below the repository hard
+- [x] Confirm all new implementation files remain below the repository hard
       size limit and are split by responsibility.
-- [ ] Add a capability evidence index naming each test and command that closes
+- [x] Add a capability evidence index naming each test and command that closes
       a gate.
+
+Gate 23.0 is closed. The baseline, implementation ownership, and final
+cross-layer evidence are recorded in the [baseline evidence](phase-23-gate-23.0-baseline.md)
+and [capability evidence index](phase-23-capability-evidence-index.md).
 
 ## Gate 23.1: Const generic parameters
 
