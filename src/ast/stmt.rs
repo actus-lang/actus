@@ -25,10 +25,36 @@ pub enum CompoundAssignmentOp {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CompoundAssignmentTarget {
-    Identifier(String),
-    Field { object: Expr, field: String },
-    Index { target: Expr, index: Expr },
+pub enum Place {
+    Binding { name: String, span: SourceSpan },
+    Field { object: Box<Place>, field: String, span: SourceSpan },
+    Index { target: Box<Place>, index: Expr, span: SourceSpan },
+}
+
+impl Place {
+    pub fn span(&self) -> SourceSpan {
+        match self {
+            Self::Binding { span, .. } | Self::Field { span, .. } | Self::Index { span, .. } => {
+                *span
+            }
+        }
+    }
+
+    pub fn to_expr(&self) -> Expr {
+        match self {
+            Self::Binding { name, span } => Expr::Identifier { name: name.clone(), span: *span },
+            Self::Field { object, field, span } => Expr::FieldAccess {
+                object: Box::new(object.to_expr()),
+                field: field.clone(),
+                span: *span,
+            },
+            Self::Index { target, index, span } => Expr::Index {
+                target: Box::new(target.to_expr()),
+                index: Box::new(index.clone()),
+                span: *span,
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,24 +67,12 @@ pub enum Stmt {
         span: SourceSpan,
     },
     Assignment {
-        name: String,
-        value: Expr,
-        span: SourceSpan,
-    },
-    FieldAssignment {
-        object: Expr,
-        field: String,
-        value: Expr,
-        span: SourceSpan,
-    },
-    IndexAssignment {
-        target: Expr,
-        index: Expr,
+        target: Place,
         value: Expr,
         span: SourceSpan,
     },
     CompoundAssignment {
-        target: CompoundAssignmentTarget,
+        target: Place,
         operator: CompoundAssignmentOp,
         value: Expr,
         span: SourceSpan,

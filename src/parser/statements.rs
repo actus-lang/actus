@@ -1,4 +1,4 @@
-use crate::ast::{Block, CompoundAssignmentOp, CompoundAssignmentTarget, Expr, Role, Stmt};
+use crate::ast::{Block, CompoundAssignmentOp, Expr, Place, Role, Stmt};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
@@ -111,28 +111,7 @@ impl Parser {
         let value = self.parse_expression()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         let span = SourceSpan::new(expression_span(&expression).start, end);
-        let target = match expression {
-            Expr::Identifier { name, .. } => CompoundAssignmentTarget::Identifier(name),
-            Expr::FieldAccess { object, field, .. } => {
-                CompoundAssignmentTarget::Field { object: *object, field }
-            }
-            Expr::Index { target, index, .. } => {
-                CompoundAssignmentTarget::Index { target: *target, index: *index }
-            }
-            _ => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "assignable binding, field, or index".to_owned(),
-                        found: self
-                            .peek()
-                            .map(|token| token.kind.clone())
-                            .unwrap_or(TokenKind::Eof),
-                    },
-                    span,
-                });
-            }
-        };
+        let target = self.parse_place(expression, span)?;
         Ok(Stmt::CompoundAssignment { target, operator, value, span })
     }
 
@@ -140,14 +119,21 @@ impl Parser {
         let value = self.parse_expression()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         let span = SourceSpan::new(expression_span(&expression).start, end);
+        let target = self.parse_place(expression, span)?;
+        Ok(Stmt::Assignment { target, value, span })
+    }
+
+    fn parse_place(&self, expression: Expr, span: SourceSpan) -> Result<Place, ParseError> {
         match expression {
-            Expr::Identifier { name, .. } => Ok(Stmt::Assignment { name, value, span }),
-            Expr::FieldAccess { object, field, .. } => {
-                Ok(Stmt::FieldAssignment { object: *object, field, value, span })
+            Expr::Identifier { name, span } => Ok(Place::Binding { name, span }),
+            Expr::FieldAccess { object, field, span } => {
+                Ok(Place::Field { object: Box::new(self.parse_place(*object, span)?), field, span })
             }
-            Expr::Index { target, index, .. } => {
-                Ok(Stmt::IndexAssignment { target: *target, index: *index, value, span })
-            }
+            Expr::Index { target, index, span } => Ok(Place::Index {
+                target: Box::new(self.parse_place(*target, span)?),
+                index: *index,
+                span,
+            }),
             _ => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {

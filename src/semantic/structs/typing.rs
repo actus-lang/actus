@@ -67,7 +67,11 @@ impl Analyzer {
             })
     }
 
-    fn specialized_field_type(&self, type_name: &TypeName, field: &str) -> Option<TypeName> {
+    pub(crate) fn specialized_field_type(
+        &self,
+        type_name: &TypeName,
+        field: &str,
+    ) -> Option<TypeName> {
         if let Some(pack_field) = self.pack_field(&type_name.name, field) {
             return Some(pack_field.ty.clone());
         }

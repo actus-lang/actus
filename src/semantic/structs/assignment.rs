@@ -17,7 +17,7 @@ impl Analyzer {
             return self.validate_pack_field_assignment(&struct_name, field, value, span);
         }
         self.ensure_struct_field_mutable(&struct_name, field, span)?;
-        self.validate_struct_field_assignment(&struct_name, field, value, span)?;
+        self.validate_struct_field_assignment(object, &struct_name, field, value, span)?;
         self.record_field_arena_provenance(object, field, value, span)
     }
 
@@ -105,6 +105,7 @@ impl Analyzer {
 
     fn validate_struct_field_assignment(
         &mut self,
+        object: &Expr,
         struct_name: &str,
         field: &str,
         value: &Expr,
@@ -120,7 +121,11 @@ impl Analyzer {
             });
         };
         self.visit_expression(value)?;
-        self.validate_field_value(struct_name, &struct_field, value, span)
+        let expected = self
+            .resolved_type_name(object)
+            .and_then(|type_name| self.specialized_field_type(&type_name, field))
+            .unwrap_or_else(|| struct_field.ty.clone());
+        self.validate_field_value_type(struct_name, &struct_field, &expected, value, span)
     }
 
     fn validate_pack_field_assignment(

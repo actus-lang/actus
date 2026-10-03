@@ -206,6 +206,32 @@ pub(crate) fn lower_field_compound_assignment<'source>(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_field_address_for_ins<'source>(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let (address, field_layout) = lower_field_address(
+        function,
+        object,
+        field,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)))
+}
+
 struct FieldCompoundContext<'input, 'source, 'function> {
     function: &'input mut FunctionBuilder<'function>,
     object: &'input Expr,

@@ -109,7 +109,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn validate_field_value_type(
+    pub(crate) fn validate_field_value_type(
         &self,
         struct_name: &str,
         field: &StructField,
@@ -139,15 +139,5 @@ impl Analyzer {
             },
             span,
         })
-    }
-
-    pub(crate) fn validate_field_value(
-        &self,
-        struct_name: &str,
-        field: &StructField,
-        value: &Expr,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        self.validate_field_value_type(struct_name, field, &field.ty, value, span)
     }
 }

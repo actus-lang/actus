@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{Expr, Role, Stmt};
+use crate::ast::{Expr, Place, Role, Stmt};
 
 use super::super::super::layout::LayoutRegistry;
 use super::super::super::literals::StringDataValues;
@@ -78,6 +78,20 @@ fn lower_value_statement<'source>(
             layouts,
         );
     }
+    if let Stmt::CompoundAssignment { target, operator, value, .. } = statement {
+        return Ok(Some(super::lower_compound_assignment(
+            function,
+            target,
+            *operator,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?));
+    }
     Ok(Some(lower_owner_or_assignment(
         function,
         statement,
@@ -104,7 +118,7 @@ fn lower_owner_or_assignment<'source>(
     match statement {
         Stmt::OwnerDecl {
             role: Role::Erg | Role::Abs | Role::Ins, name, ty, initializer, ..
-        } => super::owners::lower_owner_declaration(
+        } => lower_owner_declaration(
             function,
             name,
             ty.as_deref(),
@@ -116,22 +130,10 @@ fn lower_owner_or_assignment<'source>(
             string_data,
             layouts,
         ),
-        Stmt::Assignment { name, value, .. } => super::lower_assignment(
-            function,
-            name,
-            value,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-        Stmt::CompoundAssignment { target, operator, value, .. } => {
-            super::lower_compound_assignment(
+        Stmt::Assignment { target: Place::Binding { name, .. }, value, .. } => {
+            lower_binding_assignment(
                 function,
-                target,
-                *operator,
+                name,
                 value,
                 locals,
                 types,
@@ -141,8 +143,71 @@ fn lower_owner_or_assignment<'source>(
                 layouts,
             )
         }
+        Stmt::Assignment { target, value, .. } => lower_place_assignment(
+            function,
+            target,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
         _ => unreachable!(),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_owner_declaration<'source>(
+    function: &mut FunctionBuilder<'_>,
+    name: &'source String,
+    ty: Option<&str>,
+    initializer: &Expr,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
+    super::owners::lower_owner_declaration(
+        function,
+        name,
+        ty,
+        initializer,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_binding_assignment<'source>(
+    function: &mut FunctionBuilder<'_>,
+    name: &'source String,
+    value: &Expr,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, NativeEmitError> {
+    super::lower_assignment(
+        function,
+        name,
+        value,
+        locals,
+        types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -158,18 +223,16 @@ fn lower_other_value_statement<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Option<Flow>, NativeEmitError> {
     match statement {
-        Stmt::FieldAssignment { .. } | Stmt::IndexAssignment { .. } | Stmt::Return { .. } => {
-            Ok(Some(lower_field_or_return(
-                function,
-                statement,
-                locals,
-                types,
-                functions,
-                cleanup_schedule,
-                string_data,
-                layouts,
-            )?))
-        }
+        Stmt::Return { .. } => Ok(Some(lower_field_or_return(
+            function,
+            statement,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?)),
         Stmt::Expression { .. } | Stmt::If { .. } | Stmt::Drop { .. } => {
             Ok(Some(lower_expression_or_drop(
                 function,
@@ -199,28 +262,6 @@ fn lower_field_or_return<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     match statement {
-        Stmt::FieldAssignment { .. } => lower_field_assignment_statement(
-            function,
-            statement,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
-        Stmt::IndexAssignment { target, index, value, .. } => lower_index_assignment_statement(
-            function,
-            target,
-            index,
-            value,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        ),
         Stmt::Return { value, span } => super::lower_return_statement(
             function,
             value.as_ref(),
@@ -282,9 +323,10 @@ fn lower_index_assignment_statement(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_field_assignment_statement<'source>(
+fn lower_place_assignment<'source>(
     function: &mut FunctionBuilder<'_>,
-    statement: &'source Stmt,
+    place: &'source Place,
+    value: &'source Expr,
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
@@ -292,20 +334,34 @@ fn lower_field_assignment_statement<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let Stmt::FieldAssignment { object, field, value, .. } = statement else { unreachable!() };
-    super::super::super::structs::lower_field_assignment(
-        function,
-        object,
-        field,
-        value,
-        locals,
-        types,
-        functions,
-        cleanup_schedule,
-        string_data,
-        layouts,
-    )
-    .map(|()| Flow::Fallthrough)
+    match place {
+        Place::Field { object, field, .. } => super::super::super::structs::lower_field_assignment(
+            function,
+            &object.to_expr(),
+            field,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )
+        .map(|()| Flow::Fallthrough),
+        Place::Index { target, index, .. } => lower_index_assignment_statement(
+            function,
+            &target.to_expr(),
+            index,
+            value,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        ),
+        Place::Binding { .. } => unreachable!(),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

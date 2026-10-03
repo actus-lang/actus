@@ -41,29 +41,14 @@ fn check_block_with_context(
                 }
                 check_expr_with_context(initializer, context)?;
             }
-            Stmt::Assignment { value, .. }
-            | Stmt::Expression { expression: value, .. }
+            Stmt::Assignment { target, value, .. } => {
+                check_expr_with_context(&target.to_expr(), context)?;
+                check_expr_with_context(value, context)?;
+            }
+            Stmt::Expression { expression: value, .. }
             | Stmt::Return { value: Some(value), .. } => check_expr_with_context(value, context)?,
-            Stmt::FieldAssignment { object, value, .. } => {
-                check_expr_with_context(object, context)?;
-                check_expr_with_context(value, context)?;
-            }
-            Stmt::IndexAssignment { target, index, value, .. } => {
-                check_expr_with_context(target, context)?;
-                check_expr_with_context(index, context)?;
-                check_expr_with_context(value, context)?;
-            }
             Stmt::CompoundAssignment { target, value, .. } => {
-                match target {
-                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
-                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
-                        check_expr_with_context(object, context)?;
-                    }
-                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
-                        check_expr_with_context(target, context)?;
-                        check_expr_with_context(index, context)?;
-                    }
-                }
+                check_expr_with_context(&target.to_expr(), context)?;
                 check_expr_with_context(value, context)?;
             }
             Stmt::Return { value: None, .. } | Stmt::Break { .. } | Stmt::Continue { .. } => {}

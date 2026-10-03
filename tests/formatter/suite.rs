@@ -60,6 +60,16 @@ fn formats_boolean_literals_without_rewriting_their_values() {
 }
 
 #[test]
+fn formats_nested_places_without_collapsing_selectors() {
+    let formatted = format_source(
+        "verb main() { erg values: Array[Int, 2] = Array[Int, 2](); values[1].field = 7; values[1].field += 1; }",
+    );
+    assert!(formatted.contains("values[1].field = 7;"));
+    assert!(formatted.contains("values[1].field += 1;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_typed_constants_and_keeps_their_documentation() {
     let formatted = format_source(
         "\"\"\"Frame size.\"\"\" open const FRAME_SIZE: u16 = 32u16; verb main() { return; }",

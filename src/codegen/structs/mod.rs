@@ -7,6 +7,7 @@ mod packs;
 mod types;
 
 pub(super) use access::lower_field_access;
+pub(crate) use access::lower_field_address_for_ins;
 pub(crate) use access::lower_field_assignment;
 pub(crate) use access::lower_field_compound_assignment;
 pub(crate) use cleanup::{emit_binding_drop, emit_partial_binding_drop, emit_struct_drop};

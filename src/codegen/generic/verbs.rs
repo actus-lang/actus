@@ -135,19 +135,13 @@ fn specialize_block(block: &Block, substitution: &TypeSubstitution) -> Block {
 fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> Stmt {
     match statement {
         Stmt::OwnerDecl { .. } => specialize_owner_declaration(statement, substitution),
-        Stmt::Assignment { name, value, span } => Stmt::Assignment {
-            name: name.clone(),
-            value: specialize_expression(value, substitution),
-            span: *span,
-        },
-        Stmt::FieldAssignment { object, field, value, span } => Stmt::FieldAssignment {
-            object: specialize_expression(object, substitution),
-            field: field.clone(),
+        Stmt::Assignment { target, value, span } => Stmt::Assignment {
+            target: specialize_place(target, substitution),
             value: specialize_expression(value, substitution),
             span: *span,
         },
         Stmt::CompoundAssignment { target, operator, value, span } => Stmt::CompoundAssignment {
-            target: specialize_compound_target(target, substitution),
+            target: specialize_place(target, substitution),
             operator: *operator,
             value: specialize_expression(value, substitution),
             span: *span,
@@ -165,26 +159,24 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
     }
 }
 
-fn specialize_compound_target(
-    target: &crate::ast::CompoundAssignmentTarget,
+fn specialize_place(
+    target: &crate::ast::Place,
     substitution: &TypeSubstitution,
-) -> crate::ast::CompoundAssignmentTarget {
+) -> crate::ast::Place {
     match target {
-        crate::ast::CompoundAssignmentTarget::Identifier(name) => {
-            crate::ast::CompoundAssignmentTarget::Identifier(name.clone())
+        crate::ast::Place::Binding { name, span } => {
+            crate::ast::Place::Binding { name: name.clone(), span: *span }
         }
-        crate::ast::CompoundAssignmentTarget::Field { object, field } => {
-            crate::ast::CompoundAssignmentTarget::Field {
-                object: specialize_expression(object, substitution),
-                field: field.clone(),
-            }
-        }
-        crate::ast::CompoundAssignmentTarget::Index { target, index } => {
-            crate::ast::CompoundAssignmentTarget::Index {
-                target: specialize_expression(target, substitution),
-                index: specialize_expression(index, substitution),
-            }
-        }
+        crate::ast::Place::Field { object, field, span } => crate::ast::Place::Field {
+            object: Box::new(specialize_place(object, substitution)),
+            field: field.clone(),
+            span: *span,
+        },
+        crate::ast::Place::Index { target, index, span } => crate::ast::Place::Index {
+            target: Box::new(specialize_place(target, substitution)),
+            index: specialize_expression(index, substitution),
+            span: *span,
+        },
     }
 }
 

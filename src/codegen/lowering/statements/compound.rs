@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::Value;
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{BinaryOp, CompoundAssignmentOp, CompoundAssignmentTarget, Expr};
+use crate::ast::{BinaryOp, CompoundAssignmentOp, Expr, Place};
 
 use super::super::super::arrays::lower_array_compound_assignment;
 use super::super::super::buffer_index::lower_buffer_compound_assignment;
@@ -18,7 +18,7 @@ use super::{Flow, NativeCleanupSchedule};
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_compound_assignment<'source>(
     function: &mut FunctionBuilder<'_>,
-    target: &CompoundAssignmentTarget,
+    target: &Place,
     operator: CompoundAssignmentOp,
     expression: &Expr,
     locals: &mut HashMap<&'source String, Value>,
@@ -30,7 +30,7 @@ pub(crate) fn lower_compound_assignment<'source>(
 ) -> Result<Flow, NativeEmitError> {
     let operator = compound_binary_operator(operator);
     match target {
-        CompoundAssignmentTarget::Identifier(name) => lower_identifier(
+        Place::Binding { name, .. } => lower_identifier(
             function,
             name,
             operator,
@@ -42,9 +42,9 @@ pub(crate) fn lower_compound_assignment<'source>(
             string_data,
             layouts,
         ),
-        CompoundAssignmentTarget::Field { object, field } => lower_field_compound_assignment(
+        Place::Field { object, field, .. } => lower_field_compound_assignment(
             function,
-            object,
+            &object.to_expr(),
             field,
             operator,
             expression,
@@ -56,9 +56,9 @@ pub(crate) fn lower_compound_assignment<'source>(
             layouts,
         )
         .map(|()| Flow::Fallthrough),
-        CompoundAssignmentTarget::Index { target, index } => lower_index(
+        Place::Index { target, index, .. } => lower_index(
             function,
-            target,
+            &target.to_expr(),
             index,
             operator,
             expression,

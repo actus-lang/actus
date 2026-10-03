@@ -391,6 +391,36 @@ fn copies_aggregate_array_elements_without_copying_the_array() {
 
 #[cfg(unix)]
 #[test]
+fn executes_nested_array_struct_place_assignment() {
+    let status = run_array_fixture(
+        "nested-array-struct-place",
+        "struct Point { x: Int, y: Int, } verb main() -> Int { erg points: Array[Point, 2] = Array[Point, 2](); points[1] = Point { x: 19, y: 3, }; points[1].x = 40; points[1].x += 2; return points[1].x + points[1].y; }",
+    );
+    assert_eq!(status.code(), Some(45));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_ins_loan_for_a_nested_array_struct_place() {
+    let status = run_array_fixture(
+        "nested-array-struct-ins",
+        "struct Point { x: Int, } verb mutate(ins slot: Int) { slot = 42; } verb main() -> Int { erg points: Array[Point, 2] = Array[Point, 2](); points[1] = Point { x: 0, }; mutate(slot: ins points[1].x); return points[1].x; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_nested_place_in_a_generic_array_aggregate() {
+    let status = run_array_fixture(
+        "nested-generic-array-place",
+        "struct Box[T] { item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1] = Box[Int] { item: 7, }; boxes[1].item = 35; return boxes[1].item + 7; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn places_contiguous_arrays_in_an_arena_without_reallocation() {
     let status = run_array_fixture(
         "array-arena",

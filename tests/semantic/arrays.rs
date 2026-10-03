@@ -22,6 +22,26 @@ fn accepts_array_reads_and_in_place_writes() {
 }
 
 #[test]
+fn accepts_nested_array_struct_place_assignment() {
+    analyze_source(
+        "struct Point { x: Int, y: Int, } verb write(erg points: Array[Point, 2]) { points[1].x = 7; points[1].x += 1; }",
+    )
+    .expect("nested array struct places should remain writable");
+}
+
+#[test]
+fn rejects_nested_mutation_through_an_abs_array_place() {
+    let error = analyze_source(
+        "struct Point { x: Int, } verb write(abs points: Array[Point, 2]) { points[1].x = 7; }",
+    )
+    .expect_err("nested places must preserve the array owner's read-only role");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidFieldAssignmentTarget { field } if field == "x"
+    ));
+}
+
+#[test]
 fn accepts_dynamic_buffer_reads_as_u8() {
     analyze_source("verb read(abs bytes: Buffer, abs index: Int) -> u8 { return bytes[index]; }")
         .expect("buffer indexing should produce a u8 view");

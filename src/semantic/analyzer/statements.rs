@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Block, CompoundAssignmentTarget, Expr, Role, Stmt};
+use crate::ast::{BinaryOp, Block, Expr, Place, Role, Stmt};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::SemanticError;
@@ -18,12 +18,8 @@ impl Analyzer {
             Stmt::OwnerDecl { role, name, ty, initializer, span } => {
                 self.visit_owner_decl(role, name, ty.as_deref(), initializer, *span)
             }
-            Stmt::Assignment { name, value, span } => self.visit_assignment(name, value, *span),
-            Stmt::FieldAssignment { object, field, value, span } => {
-                self.validate_field_assignment(object, field, value, *span)
-            }
-            Stmt::IndexAssignment { target, index, value, .. } => {
-                self.visit_index_assignment(target, index, value)
+            Stmt::Assignment { target, value, span } => {
+                self.visit_place_assignment(target, value, *span)
             }
             Stmt::CompoundAssignment { target, operator, value, span } => {
                 self.visit_compound_assignment(target, *operator, value, *span)
@@ -49,7 +45,7 @@ impl Analyzer {
 
     fn visit_compound_assignment(
         &mut self,
-        target: &CompoundAssignmentTarget,
+        target: &Place,
         operator: crate::ast::CompoundAssignmentOp,
         value: &Expr,
         span: SourceSpan,
@@ -67,30 +63,51 @@ impl Analyzer {
             crate::ast::CompoundAssignmentOp::ShiftRight => BinaryOp::ShiftRight,
         };
         match target {
-            CompoundAssignmentTarget::Identifier(name) => {
+            Place::Binding { name, .. } => {
                 let binding = self.binding(name, span)?;
                 self.ensure_mutable(binding, name, span)?;
                 let left = Expr::Identifier { name: name.clone(), span };
                 self.visit_expression(value)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
-            CompoundAssignmentTarget::Field { object, field } => {
+            Place::Field { object, field, .. } => {
+                let object_expression = object.to_expr();
                 let left = Expr::FieldAccess {
-                    object: Box::new(object.clone()),
+                    object: Box::new(object_expression.clone()),
                     field: field.clone(),
                     span,
                 };
-                self.validate_field_assignment(object, field, value, span)?;
+                self.validate_field_assignment(&object_expression, field, value, span)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
-            CompoundAssignmentTarget::Index { target, index } => {
+            Place::Index { target, index, .. } => {
+                let target_expression = target.to_expr();
                 let left = Expr::Index {
-                    target: Box::new(target.clone()),
+                    target: Box::new(target_expression.clone()),
                     index: Box::new(index.clone()),
                     span,
                 };
-                self.visit_index_assignment(target, index, value)?;
+                self.visit_index_assignment(&target_expression, index, value)?;
                 self.validate_binary_operator(binary_operator, &left, value)
+            }
+        }
+    }
+
+    fn visit_place_assignment(
+        &mut self,
+        target: &Place,
+        value: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        match target {
+            Place::Binding { name, .. } => self.visit_assignment(name, value, span),
+            Place::Field { object, field, .. } => {
+                let object = object.to_expr();
+                self.validate_field_assignment(&object, field, value, span)
+            }
+            Place::Index { target, index, .. } => {
+                let target = target.to_expr();
+                self.visit_index_assignment(&target, index, value)
             }
         }
     }

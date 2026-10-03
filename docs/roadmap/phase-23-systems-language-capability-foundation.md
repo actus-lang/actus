@@ -142,7 +142,7 @@ literal may appear, subject to normal type checking.
       required, with a stable type diagnostic.
 - [x] Prove short-circuit behavior when a Boolean literal controls `&&` or
       `||`.
-- [ ] Add hosted and freestanding/object-level evidence where applicable.
+- [x] Add hosted and freestanding/object-level evidence where applicable.
       Hosted native evidence is present; freestanding/object parity remains
       part of Gate 23.7.
 
@@ -162,6 +162,10 @@ verb bool_values() -> Bool {
 
 ## Gate 23.3: Nested places and indexed assignment parsing
 
+Status: **closed**. Gate 23.3 replaces the former
+split assignment variants with one typed place representation and re-proves
+semantic ownership and native address evaluation for complete selector chains.
+
 An lvalue/place is a writable location, not merely a simple identifier. The
 parser and AST must represent nested paths without losing evaluation order or
 ownership information.
@@ -178,18 +182,18 @@ object[index].field[index] = value;
 
 Required work:
 
-- [ ] Define one AST place representation shared by simple, field, index, and
+- [x] Define one AST place representation shared by simple, field, index, and
       nested compound-assignment targets.
-- [ ] Parse nested field/index chains in statement position and expression
+- [x] Parse nested field/index chains in statement position and expression
       position where the language permits them.
-- [ ] Preserve source spans for the complete place and each selector.
-- [ ] Ensure the base expression is evaluated exactly once for assignment and
+- [x] Preserve source spans for the complete place and each selector.
+- [x] Ensure the base expression is evaluated exactly once for assignment and
       compound assignment.
-- [ ] Reject indexing a non-indexable value, field access on a non-aggregate,
+- [x] Reject indexing a non-indexable value, field access on a non-aggregate,
       and mutation through `abs` or suspended owners during semantic analysis.
-- [ ] Preserve `ins` loans for aggregate slots without copying the containing
+- [x] Preserve `ins` loans for aggregate slots without copying the containing
       array or buffer.
-- [ ] Add parser and semantic tests for arrays of structs, structs containing
+- [x] Add parser and semantic tests for arrays of structs, structs containing
       arrays, packs, and nested generic aggregates.
 
 The following must be a normal compiler path, not an application exception:
@@ -197,6 +201,10 @@ The following must be a normal compiler path, not an application exception:
 ```act
 fabric.columns[source_idx].axon_0 = slot;
 ```
+
+The implementation and acceptance evidence are recorded in [Gate 23.3
+nested-place evidence](phase-23-gate-23.3-nested-places.md). The full repository
+quality checks pass for this gate.
 
 ## Gate 23.4: Nested call and statement parsing
 

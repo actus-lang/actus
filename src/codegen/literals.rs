@@ -86,27 +86,9 @@ fn collect_block(statements: &[Stmt], values: &mut HashSet<String>) {
             | Stmt::Expression { expression: initializer, .. } => {
                 collect_expression(initializer, values)
             }
-            Stmt::Assignment { value, .. } => collect_expression(value, values),
-            Stmt::FieldAssignment { object, value, .. } => {
-                collect_expression(object, values);
-                collect_expression(value, values);
-            }
-            Stmt::IndexAssignment { target, index, value, .. } => {
-                collect_expression(target, values);
-                collect_expression(index, values);
-                collect_expression(value, values);
-            }
-            Stmt::CompoundAssignment { target, value, .. } => {
-                match target {
-                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
-                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
-                        collect_expression(object, values)
-                    }
-                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
-                        collect_expression(target, values);
-                        collect_expression(index, values);
-                    }
-                }
+            Stmt::Assignment { target, value, .. }
+            | Stmt::CompoundAssignment { target, value, .. } => {
+                collect_expression(&target.to_expr(), values);
                 collect_expression(value, values);
             }
             Stmt::Return { value: Some(value), .. } => collect_expression(value, values),

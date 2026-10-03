@@ -1,5 +1,5 @@
 use actus::ast::{
-    CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Stmt, StructFieldRole, TopLevelDecl,
+    CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Place, Stmt, StructFieldRole, TopLevelDecl,
     VariantPayload,
 };
 use actus::diagnostics::render_parse_error;
@@ -20,14 +20,14 @@ fn parses_compound_assignment_targets_and_operators() {
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     assert!(matches!(
         &verb.body.statements[1],
-        Stmt::CompoundAssignment { operator: actus::ast::CompoundAssignmentOp::Add, target: actus::ast::CompoundAssignmentTarget::Identifier(name), .. }
+        Stmt::CompoundAssignment { operator: actus::ast::CompoundAssignmentOp::Add, target: Place::Binding { name, .. }, .. }
             if name == "index"
     ));
     assert!(matches!(
         &verb.body.statements[2],
         Stmt::CompoundAssignment {
             operator: actus::ast::CompoundAssignmentOp::ShiftLeft,
-            target: actus::ast::CompoundAssignmentTarget::Index { .. },
+            target: Place::Index { .. },
             ..
         }
     ));
@@ -245,8 +245,11 @@ fn parses_field_assignment() {
     let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
     assert!(matches!(
         &verb.body.statements[1],
-        Stmt::FieldAssignment { field, value: Expr::Integer { value, .. }, .. }
-            if field == "x" && value == "2"
+        Stmt::Assignment {
+            target: Place::Field { field, .. },
+            value: Expr::Integer { value, .. },
+            ..
+        } if field == "x" && value == "2"
     ));
 }
 
@@ -338,12 +341,13 @@ fn parses_bounded_array_types_and_indexed_assignments() {
     let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
     assert!(matches!(
         &verb.body.statements[1],
-        Stmt::IndexAssignment {
-            target: Expr::Identifier { name, .. },
-            index: Expr::Integer { value, .. },
+        Stmt::Assignment {
+            target: Place::Index { target, index, .. },
             value: Expr::Integer { value: assigned, .. },
             ..
-        } if name == "table" && value == "1" && assigned == "2"
+        } if matches!(target.as_ref(), Place::Binding { name, .. } if name == "table")
+            && matches!(index, Expr::Integer { value, .. } if value == "1")
+            && assigned == "2"
     ));
     let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =
         &verb.body.statements[2]
@@ -358,6 +362,41 @@ fn parses_bounded_array_types_and_indexed_assignments() {
                     if matches!(target.as_ref(), Expr::Identifier { name, .. } if name == "table")
                         && matches!(index.as_ref(), Expr::Integer { value, .. } if value == "1"))
                 && span.start < span.end
+    ));
+}
+
+#[test]
+fn parses_nested_field_and_index_place_chains() {
+    let program = parse_source(
+        "verb main() { erg fabric = value(); fabric.columns[0].axon_0 = 1; fabric.columns[0].axon_0 += 1; fabric.columns[0][1].axon_0 = 2; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else {
+        panic!("expected verb");
+    };
+
+    assert!(matches!(
+        &verb.body.statements[1],
+        Stmt::Assignment { target: Place::Field { object, field, .. }, .. }
+            if field == "axon_0"
+                && matches!(object.as_ref(), Place::Index { target, .. }
+                    if matches!(target.as_ref(), Place::Field { field, .. } if field == "columns"))
+    ));
+    assert!(matches!(
+        &verb.body.statements[2],
+        Stmt::CompoundAssignment {
+            target: Place::Field { object, field, .. }, ..
+        }
+            if field == "axon_0"
+                && matches!(object.as_ref(), Place::Index { target, .. }
+                    if matches!(target.as_ref(), Place::Field { field, .. } if field == "columns"))
+    ));
+    assert!(matches!(
+        &verb.body.statements[3],
+        Stmt::Assignment { target: Place::Field { object, field, .. }, .. }
+            if field == "axon_0"
+                && matches!(object.as_ref(), Place::Index { target, .. }
+                    if matches!(target.as_ref(), Place::Index { target, .. }
+                        if matches!(target.as_ref(), Place::Field { field, .. } if field == "columns")))
     ));
 }
 
