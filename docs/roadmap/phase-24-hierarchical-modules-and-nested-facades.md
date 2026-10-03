@@ -50,16 +50,22 @@ reachable merely because its directory exists.
 
 ## Gate 24.0: Baseline and module-tree contract
 
-- [ ] Add positive and negative fixtures for a parent facade with child
+- [x] Add positive and negative fixtures for a parent facade with child
       directory modules.
-- [ ] Define the accepted filesystem shape, canonical facade rule, and
+- [x] Define the accepted filesystem shape, canonical facade rule, and
       diagnostics for missing or ambiguous child facades.
-- [ ] Define whether an empty child directory, a child facade without
+- [x] Define whether an empty child directory, a child facade without
       implementation siblings, and a nested child hierarchy are accepted.
-- [ ] Record the resolver, aggregation, visibility, parser, LSP, formatter,
+- [x] Record the resolver, aggregation, visibility, parser, LSP, formatter,
       and test-runner ownership before implementation.
-- [ ] Keep the implementation target-neutral and below repository file-size
+- [x] Keep the implementation target-neutral and below repository file-size
       and function-size limits.
+
+Gate 24.0 is closed as a baseline gate. The resolver tests record that a
+parent facade currently resolves only its direct `.act` siblings and does not
+yet discover child directories. They also preserve the existing `E1108`
+diagnostic for a direct child-module import that bypasses the parent facade.
+The implementation work begins at Gate 24.1.
 
 ## Gate 24.1: Hierarchical resolver
 

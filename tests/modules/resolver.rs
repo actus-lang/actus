@@ -53,6 +53,41 @@ fn resolves_directory_facade_and_sorted_siblings() {
 }
 
 #[test]
+fn records_hierarchical_module_baseline_without_discovering_child_directories() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act");
+    fixture.write("aie/layout/layout.act");
+    fixture.write("aie/runtime/runtime.act");
+    fixture.write("aie/runtime/fabric.act");
+    fixture.write("aie/persistence/persistence.act");
+
+    let module =
+        ModuleResolver::new(&fixture.root).resolve("aie").expect("parent facade should resolve");
+
+    assert_eq!(module.facade(), fixture.root.join("aie/aie.act").as_path());
+    assert!(module.siblings().is_empty());
+    assert_eq!(module.source_files().count(), 1);
+}
+
+#[test]
+fn records_hierarchical_module_baseline_and_rejects_child_facade_bypass() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act");
+    fixture.write("aie/runtime/runtime.act");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("aie::runtime")
+        .expect_err("child modules must be reached through the parent facade");
+
+    assert!(
+        matches!(&error, ModuleResolutionError::BypassesFacade { parent, .. } if parent == "aie")
+    );
+    let diagnostic =
+        actus::diagnostics::module_diagnostic(&actus::modules::ModuleError::Resolution(error));
+    assert_eq!(diagnostic.code(), "E1108");
+}
+
+#[test]
 fn resolves_single_file_module_without_siblings() {
     let fixture = Fixture::new();
     fixture.write("driver/gpio.act");
