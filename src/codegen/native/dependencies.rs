@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::ast::{Block, Expr, ExternalVerbDecl, Place, Stmt, VerbDecl};
+use crate::ast::{Block, Expr, ExternalVerbDecl, Place, Stmt, VerbDecl, lookup_call_intrinsic};
+use crate::lexer::SourceSpan;
 
 use super::NativeEmitError;
 
@@ -28,9 +29,15 @@ pub(super) fn reachable_declarations<'a>(
         if let Some(verb) = local.get(name.as_str()) {
             let mut calls = Vec::new();
             collect_block_calls(&verb.body, &mut calls);
-            queue.extend(calls.into_iter().filter(|call| {
-                local.contains_key(call.as_str()) || external.contains_key(call.as_str())
-            }));
+            for call in calls {
+                if local.contains_key(call.name.as_str())
+                    || external.contains_key(call.name.as_str())
+                {
+                    queue.push_back(call.name);
+                } else if call.requires_resolution && !is_native_builtin(&call.name) {
+                    return Err(NativeEmitError(format_unresolved_call(&name, &call)));
+                }
+            }
         }
     }
     let selected_verbs =
@@ -40,6 +47,27 @@ pub(super) fn reachable_declarations<'a>(
     // unlike Actus verbs, these declarations do not emit function bodies.
     let selected_external = external_verbs.to_vec();
     Ok((selected_verbs, selected_external))
+}
+
+struct NativeCall {
+    name: String,
+    span: SourceSpan,
+    requires_resolution: bool,
+}
+
+fn is_native_builtin(name: &str) -> bool {
+    lookup_call_intrinsic(name).is_some()
+        || matches!(name, "Array" | "Arena" | "Buffer" | "Ok" | "Err" | "Some" | "None" | "place")
+        || name.chars().next().is_some_and(char::is_uppercase)
+        || name.starts_with("Array[")
+        || name.starts_with("Arena[")
+}
+
+fn format_unresolved_call(caller: &str, call: &NativeCall) -> String {
+    format!(
+        "unresolved native dependency `{}` called from `{}` at {}:{}",
+        call.name, caller, call.span.start, call.span.end
+    )
 }
 
 fn root_names(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<Vec<String>, NativeEmitError> {
@@ -57,13 +85,13 @@ fn root_names(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<Vec<String>, 
     Ok(public)
 }
 
-fn collect_block_calls(block: &Block, calls: &mut Vec<String>) {
+fn collect_block_calls(block: &Block, calls: &mut Vec<NativeCall>) {
     for statement in &block.statements {
         collect_statement_calls(statement, calls);
     }
 }
 
-fn collect_statement_calls(statement: &Stmt, calls: &mut Vec<String>) {
+fn collect_statement_calls(statement: &Stmt, calls: &mut Vec<NativeCall>) {
     match statement {
         Stmt::OwnerDecl { initializer, .. } | Stmt::Expression { expression: initializer, .. } => {
             collect_expression_calls(initializer, calls)
@@ -94,7 +122,7 @@ fn collect_statement_calls(statement: &Stmt, calls: &mut Vec<String>) {
     }
 }
 
-fn collect_place_calls(place: &Place, calls: &mut Vec<String>) {
+fn collect_place_calls(place: &Place, calls: &mut Vec<NativeCall>) {
     match place {
         Place::Binding { .. } => {}
         Place::Field { object, .. } => collect_place_calls(object, calls),
@@ -105,22 +133,13 @@ fn collect_place_calls(place: &Place, calls: &mut Vec<String>) {
     }
 }
 
-fn collect_expression_calls(expression: &Expr, calls: &mut Vec<String>) {
+fn collect_expression_calls(expression: &Expr, calls: &mut Vec<NativeCall>) {
     match expression {
-        Expr::Call { callee, arguments, .. } => {
-            calls.push(
-                callee.split_once('[').map_or_else(|| callee.clone(), |(name, _)| name.to_owned()),
-            );
-            for argument in arguments {
-                collect_expression_calls(&argument.expression, calls);
-            }
+        Expr::Call { callee, arguments, span } => {
+            collect_direct_call(callee, arguments, *span, calls)
         }
-        Expr::MethodCall { receiver, method, arguments, .. } => {
-            calls.push(method.clone());
-            collect_expression_calls(receiver, calls);
-            for argument in arguments {
-                collect_expression_calls(&argument.expression, calls);
-            }
+        Expr::MethodCall { receiver, method, arguments, span } => {
+            collect_method_call(receiver, method, arguments, *span, calls)
         }
         Expr::Grouping { expression, .. }
         | Expr::Unary { expression, .. }
@@ -158,10 +177,40 @@ fn collect_expression_calls(expression: &Expr, calls: &mut Vec<String>) {
     }
 }
 
+fn collect_direct_call(
+    callee: &str,
+    arguments: &[crate::ast::Argument],
+    span: SourceSpan,
+    calls: &mut Vec<NativeCall>,
+) {
+    calls.push(NativeCall {
+        name: callee.split_once('[').map_or_else(|| callee.to_owned(), |(name, _)| name.to_owned()),
+        span,
+        requires_resolution: true,
+    });
+    for argument in arguments {
+        collect_expression_calls(&argument.expression, calls);
+    }
+}
+
+fn collect_method_call(
+    receiver: &Expr,
+    method: &str,
+    arguments: &[crate::ast::Argument],
+    span: SourceSpan,
+    calls: &mut Vec<NativeCall>,
+) {
+    calls.push(NativeCall { name: method.to_owned(), span, requires_resolution: false });
+    collect_expression_calls(receiver, calls);
+    for argument in arguments {
+        collect_expression_calls(&argument.expression, calls);
+    }
+}
+
 fn collect_case_calls(
     subject: &Expr,
     branches: &[crate::ast::CaseBranch],
-    calls: &mut Vec<String>,
+    calls: &mut Vec<NativeCall>,
 ) {
     collect_expression_calls(subject, calls);
     for branch in branches {
@@ -205,5 +254,25 @@ mod tests {
             selected.iter().map(|verb| verb.name.as_str()).collect::<Vec<_>>(),
             ["main", "helper", "leaf"]
         );
+    }
+
+    #[test]
+    fn rejects_unresolved_native_dependencies_at_the_call_span() {
+        let source = "verb main() -> Int { return missing(); }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("dependency fixture should parse");
+        let verbs = program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Verb(verb) => Some(verb),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let error = reachable_declarations(&verbs, &[], Some("main"))
+            .expect_err("unresolved dependency should fail closed");
+        assert!(error.0.contains("unresolved native dependency `missing`"));
+        assert!(error.0.contains("called from `main` at 28:37"));
     }
 }

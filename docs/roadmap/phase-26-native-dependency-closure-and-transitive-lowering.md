@@ -147,13 +147,20 @@ module bindings preserve public calls without exporting unused declarations.
 
 - [ ] Make strict check, test runner, object build, executable build, and LSP
       use the same dependency-resolution contract where applicable.
-- [ ] Report unresolved native dependencies with the originating call span and
+- [x] Report unresolved native dependencies with the originating call span and
       actionable module/helper identity.
-- [ ] Keep formatter and source-limit checks independent of native reachability.
-- [ ] Add regression coverage for malformed nested facades, missing helpers,
+- [x] Keep formatter and source-limit checks independent of native reachability.
+- [x] Add regression coverage for malformed nested facades, missing helpers,
       generic mismatch, duplicate symbols, and private-export bypass attempts.
-- [ ] Document the dependency-closure contract in the coding-agent guide and
+- [x] Document the dependency-closure contract in the coding-agent guide and
       compiler architecture documentation after implementation.
+
+Gate 26.5 now fails closed on unresolved native calls during dependency
+traversal, preserving the originating AST span and caller/helper identities.
+The closure contract is documented for coding agents and compiler
+maintainers, while the remaining parity work is to route the same dependency
+resolution and diagnostic representation through check, test, build, and LSP
+surfaces.
 
 ## Gate 26.6: End-to-end acceptance
 
