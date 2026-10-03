@@ -1,0 +1,6 @@
+import control;
+
+meta test
+verb parent_facade_exposes_public_api() -> Int {
+    return control_value() - 24;
+}

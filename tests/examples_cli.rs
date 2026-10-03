@@ -267,7 +267,11 @@ fn hierarchical_module_example_uses_one_public_parent_facade() {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/hierarchical_modules");
     let binary =
         std::env::temp_dir().join(format!("actus-hierarchical-{}.bin", std::process::id()));
-    for arguments in [vec!["check", "--strict"], vec!["fmt", "--check"]] {
+    let first_object =
+        std::env::temp_dir().join(format!("actus-hierarchical-{}-first.o", std::process::id()));
+    let second_object =
+        std::env::temp_dir().join(format!("actus-hierarchical-{}-second.o", std::process::id()));
+    for arguments in [vec!["check", "--strict"], vec!["test", "--strict"], vec!["fmt", "--check"]] {
         let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
             .args(arguments)
             .current_dir(&root)
@@ -285,5 +289,17 @@ fn hierarchical_module_example_uses_one_public_parent_facade() {
     let execution =
         std::process::Command::new(&binary).output().expect("run hierarchical module example");
     assert_eq!(execution.status.code(), Some(24));
+    for output in [&first_object, &second_object] {
+        let object_build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(["build", "--strict", "--emit", "obj", "-o"])
+            .arg(output)
+            .current_dir(&root)
+            .output()
+            .expect("build hierarchical module object");
+        assert!(object_build.status.success(), "object build failed: {:?}", object_build);
+    }
+    assert_eq!(std::fs::read(&first_object).unwrap(), std::fs::read(&second_object).unwrap());
     let _ = std::fs::remove_file(binary);
+    let _ = std::fs::remove_file(first_object);
+    let _ = std::fs::remove_file(second_object);
 }

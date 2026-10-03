@@ -200,15 +200,22 @@ exit code `24`.
 
 ## Gate 24.7: End-to-end acceptance
 
-- [ ] `actus check --strict` accepts the hierarchical module fixture.
-- [ ] `actus test --strict` runs parent and child module tests with complete
+- [x] `actus check --strict` accepts the hierarchical module fixture.
+- [x] `actus test --strict` runs parent and child module tests with complete
       sibling visibility.
-- [ ] Native object and executable builds emit deterministic artifacts with no
+- [x] Native object and executable builds emit deterministic artifacts with no
       duplicate module objects.
-- [ ] Parent-facade public API and child-private API are both tested.
-- [ ] Full Rust formatting, check, clippy, test, source-limit, documentation,
+- [x] Parent-facade public API and child-private API are both tested.
+- [x] Full Rust formatting, check, clippy, test, source-limit, documentation,
       architecture, and diff checks pass.
-- [ ] Repeated builds and repeated diagnostics produce identical results.
+- [x] Repeated builds and repeated diagnostics produce identical results.
+
+Gate 24.7 is closed. The hierarchical example passes strict check, strict
+tests, formatter validation, native executable execution, and repeated object
+build comparison. Existing module acceptance tests cover the public parent
+facade, private child declarations, duplicate object-owner prevention, and
+stable resolver diagnostics. The repository-wide Rust, source-limit,
+documentation, architecture, and diff checks pass.
 
 ## Non-goals
 
