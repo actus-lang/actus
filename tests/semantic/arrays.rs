@@ -30,6 +30,44 @@ fn accepts_nested_array_struct_place_assignment() {
 }
 
 #[test]
+fn preserves_fixed_width_types_through_case_and_if_indexed_writes() {
+    analyze_source(
+        "verb write(erg values: Array[u32, 2], abs selected: u32, abs enabled: Bool) { values[0] = case enabled { true => selected, _ => 0u32, }; values[1] = if enabled { selected } else { 0u32 }; }",
+    )
+    .expect("nested case and if expressions must preserve their fixed-width result type");
+}
+
+#[test]
+fn preserves_nested_array_types_through_call_results() {
+    let source = r#"
+        open verb make() -> Array[u8, 64] {
+            return Array[u8, 64]();
+        }
+
+        open verb main() -> Void {
+            erg values: Array[Array[u8, 64], 2] = Array[Array[u8, 64], 2]();
+            values[0] = make();
+        }
+    "#;
+    analyze_source(source).expect("nested array call result should retain its full type");
+}
+
+#[test]
+fn preserves_pattern_payload_types_through_case_results() {
+    let source = r#"
+        open verb select() -> u32 {
+            erg candidate: Option[u32] = Option[u32].Some(7u32);
+            erg selected: u32 = case dat candidate {
+                Option.Some(value) => value,
+                Option.None => 0u32,
+            };
+            return selected;
+        }
+    "#;
+    analyze_source(source).expect("case payload should retain its declared primitive type");
+}
+
+#[test]
 fn rejects_nested_mutation_through_an_abs_array_place() {
     let error = analyze_source(
         "struct Point { x: Int, } verb write(abs points: Array[Point, 2]) { points[1].x = 7; }",

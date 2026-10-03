@@ -11,6 +11,8 @@ mod statements;
 mod validation;
 mod verb;
 
+pub(crate) use expression_rules::cast_literal_fits;
+pub(crate) use expressions::case_branch_type;
 pub(crate) use state::{Analyzer, ScopeFrame};
 pub(crate) use validation::{
     canonical_type_name, expression_span, is_origin_return_expression, try_type_mismatch,

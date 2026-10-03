@@ -97,6 +97,23 @@ fn keeps_if_expression_distinct_from_statement_if() {
 }
 
 #[test]
+fn preserves_a_semicolon_terminated_final_expression_value() {
+    let program =
+        parse_source("verb choose(erg ready: Bool) -> Int { return if ready { 1; } else { 2; }; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::If { then_branch, .. }), .. } = &verb.body.statements[0]
+    else {
+        panic!("expected value-producing if expression")
+    };
+    let Stmt::Expression { expression: Expr::Integer { span, .. }, span: statement_span } =
+        &then_branch.statements[0]
+    else {
+        panic!("expected final integer expression")
+    };
+    assert_eq!(span, statement_span);
+}
+
+#[test]
 fn rejects_unsupported_limitless_scope() {
     let (tokens, errors) = scan("meta limitless(\"project\") verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

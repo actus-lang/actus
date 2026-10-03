@@ -354,34 +354,7 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         self.visit_expression(subject)?;
-        self.validate_case_patterns(mode, subject, branches, span)?;
-        self.validate_case_result_types(branches, span)
-    }
-
-    fn validate_case_result_types(
-        &self,
-        branches: &[crate::ast::CaseBranch],
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let mut expected: Option<String> = None;
-        for branch in branches {
-            let Some(candidate) = case_branch_type(self, &branch.body) else { continue };
-            if let Some(expected) = &expected
-                && expected != &candidate
-            {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::TypeMismatch {
-                        callee: "case".to_owned(),
-                        parameter: "branches".to_owned(),
-                        expected: expected.clone(),
-                        found: candidate,
-                    },
-                    span,
-                });
-            }
-            expected = Some(candidate);
-        }
-        Ok(())
+        self.validate_case_patterns(mode, subject, branches, span)
     }
 
     fn validate_try_expression(
@@ -459,7 +432,7 @@ fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
     }
 }
 
-fn case_branch_type(analyzer: &Analyzer, body: &CaseBody) -> Option<String> {
+pub(crate) fn case_branch_type(analyzer: &Analyzer, body: &CaseBody) -> Option<String> {
     match body {
         CaseBody::Expression(expression) => analyzer.expression_type_name(expression),
         CaseBody::Block(block) if block_diverges(block) => None,

@@ -140,10 +140,29 @@ impl Analyzer {
         if let Some(type_name) = self.binary_type_name(expression) {
             return Some(type_name);
         }
-        if let Expr::Call { span, .. } | Expr::MethodCall { span, .. } = expression
-            && let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end))
-        {
-            return Some(super::super::analyzer::canonical_type_name(type_name));
+        if let Expr::Call { callee, span, .. } = expression {
+            if let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end)) {
+                return Some(super::super::analyzer::canonical_type_name(type_name));
+            }
+            if let Some(type_name) = self
+                .signatures
+                .get(callee)
+                .and_then(|signature| signature.return_type_name.as_ref())
+            {
+                return Some(super::super::analyzer::canonical_type_name(type_name));
+            }
+        }
+        if let Expr::MethodCall { method, span, .. } = expression {
+            if let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end)) {
+                return Some(super::super::analyzer::canonical_type_name(type_name));
+            }
+            if let Some(type_name) = self
+                .signatures
+                .get(method)
+                .and_then(|signature| signature.return_type_name.as_ref())
+            {
+                return Some(super::super::analyzer::canonical_type_name(type_name));
+            }
         }
         if let Expr::Cast { target, .. } = expression {
             return Some(super::super::analyzer::canonical_type_name(target));
@@ -151,6 +170,8 @@ impl Analyzer {
         self.binding_type_name(expression)
             .or_else(|| self.constant_type_name(expression))
             .or_else(|| self.index_type_name(expression))
+            .or_else(|| self.expression_case_type_name(expression))
+            .or_else(|| self.expression_if_type_name(expression))
             .or_else(|| self.expression_type(expression).map(|ty| ty.spec().name.to_owned()))
             .or_else(|| self.expression_struct_type(expression))
             .or_else(|| self.expression_pack_type(expression))
@@ -159,8 +180,6 @@ impl Analyzer {
                     .map(|name| super::super::analyzer::canonical_type_name(&name))
             })
             .or_else(|| self.expression_enum_type_application(expression))
-            .or_else(|| self.expression_case_type_name(expression))
-            .or_else(|| self.expression_if_type_name(expression))
             .or_else(|| self.expression_enum_type(expression))
     }
 
@@ -229,7 +248,10 @@ impl Analyzer {
     }
 
     fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {
-        let Expr::Case { branches, .. } = expression else { return None };
+        let Expr::Case { branches, span, .. } = expression else { return None };
+        if let Some(type_name) = self.case_result_types.get(&(span.start, span.end)) {
+            return Some(super::super::analyzer::canonical_type_name(type_name));
+        }
         branches.iter().find_map(|branch| match &branch.body {
             CaseBody::Expression(expression) => self.expression_type_name(expression),
             CaseBody::Block(block) => block.statements.iter().rev().find_map(|statement| {

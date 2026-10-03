@@ -96,9 +96,20 @@ impl Parser {
         if let Some(operator) = self.match_compound_assignment() {
             return self.parse_compound_assignment(expression, operator);
         }
-        if allow_implicit_final_expression && self.check_simple(&TokenKind::RightBrace) {
+        if allow_implicit_final_expression {
             let span = expression_span(&expression);
-            return Ok(Stmt::Expression { expression, span });
+            if self.check_simple(&TokenKind::RightBrace) {
+                return Ok(Stmt::Expression { expression, span });
+            }
+            if self.match_simple(TokenKind::Semicolon) {
+                if self.check_simple(&TokenKind::RightBrace) {
+                    return Ok(Stmt::Expression { expression, span });
+                }
+                return Ok(Stmt::Expression {
+                    expression,
+                    span: SourceSpan::new(span.start, self.previous().span.end),
+                });
+            }
         }
         let start = expression_span(&expression).start;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
