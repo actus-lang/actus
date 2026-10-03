@@ -134,24 +134,25 @@ tests for these boundaries.
 
 ## Gate 24.4: Compiler pipeline integration
 
-- [ ] Make parsing, semantic analysis, generic discovery, native object
+- [x] Make parsing, semantic analysis, generic discovery, native object
       planning, and linking consume the same hierarchical module graph.
 - [x] Ensure imported child implementations are emitted exactly once and
       parent facades do not create duplicate object owners.
-- [ ] Preserve transitive generic specialization across child modules,
+- [x] Preserve transitive generic specialization across child modules,
       including const-generic values and nested generic calls.
-- [ ] Keep backend-specific types out of resolver, parser, AST, and semantic
+- [x] Keep backend-specific types out of resolver, parser, AST, and semantic
       module boundaries.
-- [ ] Add native execution tests for a parent facade that re-exports code from
+- [x] Add native execution tests for a parent facade that re-exports code from
       multiple child directories.
 
-Gate 24.4 progress: hierarchical child sources are now part of the owning
+Gate 24.4 is closed: hierarchical child sources are now part of the owning
 `ModuleUnit` source identity and are loaded in deterministic facade/sibling
 order. Object planning keeps the complete child implementation under the
 parent module owner, so a child directory does not create a second object
 owner or duplicate emission. The module suite provides 58 passing tests for
-this boundary. Full graph-wide generic discovery and native linking evidence
-remain open in this gate.
+this boundary. Native acceptance proves a const-generic nested call chain
+through a child facade (`outer[N] -> inner[N]`) with executable exit code `4`,
+and a package with multiple child facades links and runs with exit code `42`.
 
 ## Gate 24.5: Tooling parity
 

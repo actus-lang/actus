@@ -284,6 +284,82 @@ fn native_build_propagates_nested_generic_instances_through_an_imported_module()
 
 #[cfg(unix)]
 #[test]
+fn native_build_propagates_nested_generics_through_a_child_facade() {
+    let root =
+        std::env::temp_dir().join(format!("actus-nested-generic-child-{}", std::process::id()));
+    let child = root.join("src/aie/runtime");
+    fs::create_dir_all(&child).expect("create child module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"nested-generic-child\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "import aie; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n",
+    )
+    .expect("write root source");
+    fs::write(root.join("src/aie/aie.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "open engine;\n").expect("write child facade");
+    fs::write(
+        child.join("engine.act"),
+        "open struct Storage[N: Usize] { erg values: Array[u32, N], } open verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } open verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
+    )
+    .expect("write nested generic source");
+
+    let output = root.join("nested-generic-child");
+    let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "exe", "-o", output.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .expect("build nested generic child module");
+    assert!(result.status.success(), "stderr: {}", String::from_utf8_lossy(&result.stderr));
+    let status = Command::new(&output).status().expect("run nested generic child module");
+    assert_eq!(status.code(), Some(4));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn native_build_links_multiple_child_facades_once() {
+    let root = std::env::temp_dir().join(format!("actus-multiple-children-{}", std::process::id()));
+    let runtime = root.join("src/device/runtime");
+    let layout = root.join("src/device/layout");
+    fs::create_dir_all(&runtime).expect("create runtime directory");
+    fs::create_dir_all(&layout).expect("create layout directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"multiple-children\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "import device; verb main() -> Int { return runtime_value() + layout_value(); }\n",
+    )
+    .expect("write root source");
+    fs::write(root.join("src/device/device.act"), "open runtime; open layout;\n")
+        .expect("write parent facade");
+    fs::write(runtime.join("runtime.act"), "open api;\n").expect("write runtime facade");
+    fs::write(runtime.join("api.act"), "open verb runtime_value() -> Int { return 40; }\n")
+        .expect("write runtime implementation");
+    fs::write(layout.join("layout.act"), "open api;\n").expect("write layout facade");
+    fs::write(layout.join("api.act"), "open verb layout_value() -> Int { return 2; }\n")
+        .expect("write layout implementation");
+
+    let output = root.join("multiple-children");
+    let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "exe", "-o", output.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .expect("build package with multiple child facades");
+    assert!(result.status.success(), "stderr: {}", String::from_utf8_lossy(&result.stderr));
+    let status = Command::new(&output).status().expect("run multiple child executable");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn watch_once_checks_the_project_entry() {
     let root = std::env::temp_dir().join(format!("actus-watch-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source directory");
