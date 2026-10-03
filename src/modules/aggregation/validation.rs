@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::ast::{Program, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
+use super::super::resolver::ResolvedChildModule;
 use super::types::{DuplicateDeclaration, ModuleError, ModuleLocation};
 
 pub(super) fn check_declaration_name(
@@ -75,12 +76,14 @@ pub(super) fn validate_open_siblings(
     module_path: &str,
     facade: &Path,
     siblings: &[PathBuf],
+    children: &[ResolvedChildModule],
     program: &Program,
 ) -> Result<(), ModuleError> {
-    let known = siblings
+    let mut known = siblings
         .iter()
         .filter_map(|path| path.file_stem().and_then(|stem| stem.to_str()))
         .collect::<std::collections::HashSet<_>>();
+    known.extend(children.iter().filter_map(|child| child.module_path().rsplit("::").next()));
     for declaration in &program.declarations {
         if let TopLevelDecl::OpenSibling(sibling) = declaration
             && !known.contains(sibling.name.as_str())

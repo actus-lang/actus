@@ -93,13 +93,23 @@ existing package-root and facade-bypass regressions.
 
 ## Gate 24.2: Parent-to-child facade aggregation
 
-- [ ] Add explicit parent-facade aggregation for child modules.
-- [ ] Ensure declarations exposed by a child facade are visible through the
+- [x] Add explicit parent-facade aggregation for child modules.
+- [x] Ensure declarations exposed by a child facade are visible through the
       parent only when the parent explicitly opens that child.
-- [ ] Preserve child internal scope across all implementation siblings.
-- [ ] Reject unknown child names, duplicate child exports, and collisions
+- [x] Preserve child internal scope across all implementation siblings.
+- [x] Reject unknown child names, duplicate child exports, and collisions
       between parent and child declarations before code generation.
-- [ ] Keep private child declarations inaccessible to external consumers.
+- [x] Keep private child declarations inaccessible to external consumers.
+
+Gate 24.2 is closed: parent parsing and export aggregation now follows explicit
+child-facade openings recursively. A child facade's public declarations are
+available through the parent facade, while declarations kept private in child
+implementation siblings remain available only to the aggregated internal
+scope. External resolution still uses the parent boundary, so opening a child
+internally does not make the child facade directly importable. The module test
+suite provides 51 passing tests for this behavior, including deterministic
+rejection of duplicate child exports and parent-child export collisions before
+code generation.
 
 ## Gate 24.3: Namespace and visibility boundaries
 

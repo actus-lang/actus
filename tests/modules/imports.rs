@@ -54,6 +54,18 @@ fn resolves_only_facade_exports_into_the_importing_unit() {
 }
 
 #[test]
+fn resolves_public_child_declarations_through_the_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime;");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 7; }");
+    let program = parse_source("import aie; verb main() -> Int { return start(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("child exports should be visible through the parent facade");
+}
+
+#[test]
 fn rejects_private_imported_types() {
     let fixture = Fixture::new();
     fixture.write("driver/gpio/gpio.act", "open registers;");

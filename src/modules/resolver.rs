@@ -170,27 +170,7 @@ impl ModuleResolver {
         if let Some(module_name) = segments.get(1)
             && segments.first() == Some(&"std")
         {
-            let Some(root) = self.runtime_module_roots.get(*module_name) else {
-                let root = self
-                    .runtime_source_root
-                    .as_ref()
-                    .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
-                let expected = root.join(module_name).join(format!("{module_name}.act"));
-                if expected.is_file() {
-                    return Err(ModuleResolutionError::IncompatibleRuntime {
-                        module: module_path.to_owned(),
-                        expected,
-                    });
-                }
-                return Err(ModuleResolutionError::MissingFacade {
-                    module: module_path.to_owned(),
-                    expected,
-                });
-            };
-            if segments.len() != 2 {
-                return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
-            }
-            return resolve_directory(module_path, root, module_name);
+            return self.resolve_runtime_module(module_path, &segments, module_name);
         }
         let (root, module_segments) = self.root_and_segments(&segments);
         if module_segments.is_empty() {
@@ -222,6 +202,69 @@ impl ModuleResolver {
             module: module_path.to_owned(),
             expected: directory.join(format!("{}.act", module_segments.last().expect("path"))),
         })
+    }
+
+    fn resolve_runtime_module(
+        &self,
+        module_path: &str,
+        segments: &[&str],
+        module_name: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        let Some(root) = self.runtime_module_roots.get(module_name) else {
+            let root = self
+                .runtime_source_root
+                .as_ref()
+                .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
+            let expected = root.join(module_name).join(format!("{module_name}.act"));
+            return if expected.is_file() {
+                Err(ModuleResolutionError::IncompatibleRuntime {
+                    module: module_path.to_owned(),
+                    expected,
+                })
+            } else {
+                Err(ModuleResolutionError::MissingFacade {
+                    module: module_path.to_owned(),
+                    expected,
+                })
+            };
+        };
+        if segments.len() != 2 {
+            return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
+        }
+        resolve_directory(module_path, root, module_name)
+    }
+
+    /// Resolves a child through an already-resolved parent facade.
+    ///
+    /// This is the internal aggregation path. External imports must continue
+    /// to use [`Self::resolve`] so direct child-facade bypasses remain rejected.
+    pub fn resolve_child(
+        &self,
+        parent_module_path: &str,
+        child_name: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        if !valid_segment(child_name) {
+            return Err(ModuleResolutionError::InvalidPath(format!(
+                "{parent_module_path}::{child_name}"
+            )));
+        }
+        let parent = self.resolve(parent_module_path)?;
+        let Some(child) = parent
+            .children()
+            .iter()
+            .find(|child| child.module_path().rsplit("::").next() == Some(child_name))
+        else {
+            return Err(ModuleResolutionError::MissingFacade {
+                module: format!("{parent_module_path}::{child_name}"),
+                expected: parent
+                    .facade()
+                    .parent()
+                    .unwrap_or_else(|| Path::new(""))
+                    .join(child_name)
+                    .join(format!("{child_name}.act")),
+            });
+        };
+        resolve_directory(child.module_path(), child.directory(), child_name)
     }
 
     fn root_and_segments<'a>(&'a self, segments: &'a [&str]) -> (PathBuf, &'a [&'a str]) {
