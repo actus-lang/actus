@@ -43,16 +43,26 @@ public exports -> native dependency closure -> object emission -> linker
 
 ## Gate 26.0: Dependency-closure contract
 
-- [ ] Define the native dependency graph nodes and edges for verbs, generic
+- [x] Define the native dependency graph nodes and edges for verbs, generic
       instances, aggregate types, performances, and external bridges.
-- [ ] Define the root set for hosted entry verbs, configured freestanding
+- [x] Define the root set for hosted entry verbs, configured freestanding
       entries, object emission, and test-runner entry points.
-- [ ] Define deterministic identity and ordering for reachable dependencies.
-- [ ] Define cycle handling and diagnostics for recursive or invalid native
+- [x] Define deterministic identity and ordering for reachable dependencies.
+- [x] Define cycle handling and diagnostics for recursive or invalid native
       dependency paths.
-- [ ] Record that native reachability never changes facade visibility.
-- [ ] Add architecture fixtures for a public verb, private helper, nested
+- [x] Record that native reachability never changes facade visibility.
+- [x] Add architecture fixtures for a public verb, private helper, nested
       facade, and cross-module helper chain.
+
+Gate 26.0 is closed as the dependency-closure contract gate. The contract
+defines public/native roots, reachable declaration categories, canonical
+identity and ordering, cycle/duplicate handling, and the rule that native
+reachability never widens facade visibility. The fixtures in
+`tests/fixtures/native_dependency_closure/phase-26-contract.txt` cover a
+public-to-private transitive chain, repeated-helper deduplication, private
+facade bypass, unresolved reachable helpers, and duplicate native identity.
+Gates 26.1-26.6 remain open until the compiler implements and executes this
+contract with native evidence.
 
 ## Gate 26.1: Reachable call-graph discovery
 
