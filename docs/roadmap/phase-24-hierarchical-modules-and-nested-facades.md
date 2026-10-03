@@ -156,16 +156,25 @@ and a package with multiple child facades links and runs with exit code `42`.
 
 ## Gate 24.5: Tooling parity
 
-- [ ] Teach the formatter to preserve and format parent-child facade
+- [x] Teach the formatter to preserve and format parent-child facade
       declarations deterministically.
-- [ ] Make LSP diagnostics, definitions, references, hover, semantic tokens,
+- [x] Make LSP diagnostics, definitions, references, hover, semantic tokens,
       and document symbols resolve declarations through the parent facade.
-- [ ] Ensure malformed or partially edited child modules do not terminate the
+- [x] Ensure malformed or partially edited child modules do not terminate the
       language server.
-- [ ] Make the test runner discover complete module trees rather than treating
+- [x] Make the test runner discover complete module trees rather than treating
       child implementation files as independent test roots.
-- [ ] Add formatter idempotence and LSP integration fixtures for nested
+- [x] Add formatter idempotence and LSP integration fixtures for nested
       facades.
+
+Gate 24.5 is closed. LSP definition, hover, references, and rename lookups
+consume the complete hierarchical `ModuleUnit` source list, so declarations
+opened through nested child facades resolve to their actual implementation
+files. The tooling fixtures cover parent imports, child-facade navigation,
+formatter idempotence, and malformed child overlays; the language server keeps
+serving diagnostics and requests while an edited child is temporarily invalid.
+The test runner maps nested tests to their highest canonical parent facade and
+executes them with the complete child sibling scope.
 
 ## Gate 24.6: Documentation and developer workflow
 

@@ -122,19 +122,17 @@ fn parse_source(
 }
 
 fn module_source(path: &Path, source_root: &Path) -> Option<String> {
-    let directory = path.parent()?;
-    let relative = directory.strip_prefix(source_root).ok()?;
-    if relative.as_os_str().is_empty() {
-        return None;
+    let mut directory = path.parent()?.to_owned();
+    let mut segments = Vec::new();
+    while directory.starts_with(source_root) && directory != source_root {
+        let module_name = directory.file_name()?.to_str()?.to_owned();
+        if !directory.join(format!("{module_name}.act")).is_file() {
+            break;
+        }
+        segments.push(module_name);
+        directory = directory.parent()?.to_owned();
     }
-    let module_name = directory.file_name()?.to_str()?;
-    directory.join(format!("{module_name}.act")).is_file().then(|| {
-        relative
-            .components()
-            .map(|component| component.as_os_str().to_str().unwrap_or_default())
-            .collect::<Vec<_>>()
-            .join("::")
-    })
+    segments.last().cloned()
 }
 
 fn validate_semantics(

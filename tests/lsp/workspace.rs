@@ -1,7 +1,7 @@
 use serde_json::json;
 use std::fs;
 
-use crate::lsp_support::{file_uri, run_lsp, temp_root};
+use crate::lsp_support::{file_uri, position_after, run_lsp, temp_root};
 
 #[test]
 fn lsp_reports_monotonic_workspace_versions_for_overlay_updates() {
@@ -68,6 +68,50 @@ fn lsp_keeps_malformed_nested_overlay_live_and_reports_a_precise_diagnostic() {
         stdout.contains("\"id\":3"),
         "completion response missing after malformed edit: {stdout}"
     );
+}
+
+#[test]
+fn lsp_keeps_a_malformed_nested_child_overlay_live() {
+    let root = temp_root();
+    let child = root.join("src/device/runtime");
+    fs::create_dir_all(&child).expect("create nested child module");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-malformed-child\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let main_path = root.join("src/main.act");
+    let child_path = child.join("api.act");
+    let main_uri = file_uri(&main_path);
+    let child_uri = file_uri(&child_path);
+    let main = "import device;\nverb main() -> Int { return visible(); }\n";
+    let valid_child = "open verb visible() -> Int { return 42; }\n";
+    let malformed_child = "open verb visible() -> Int { return\n";
+    fs::write(&main_path, main).expect("write main");
+    fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "open api;\n").expect("write child facade");
+    fs::write(&child_path, valid_child).expect("write child implementation");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":main_uri,"version":1,"text":main}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":child_uri,"version":1,"text":valid_child}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":child_uri,"version":2},"contentChanges":[{"text":malformed_child}]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"visible")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"visible")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("diagnostics"), "missing nested child diagnostics: {stdout}");
+    assert!(
+        stdout.contains("\"id\":2"),
+        "hover response missing after malformed child edit: {stdout}"
+    );
+    assert!(
+        stdout.contains("\"id\":3"),
+        "definition response missing after malformed child edit: {stdout}"
+    );
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]

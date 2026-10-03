@@ -205,19 +205,22 @@ fn imported_definition(
     );
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
-        let resolved = resolver.resolve(&import.path).ok()?;
         let exports =
             crate::modules::exports_module_with_overlays(&resolver, &import.path, overlays).ok()?;
         if !exports.symbols.iter().any(|symbol| symbol.name == name) {
             continue;
         }
-        for path in resolved.source_files() {
+        let unit =
+            crate::modules::load_module_unit_with_overlays(&resolver, &import.path, overlays)
+                .ok()?;
+        for source in unit.sources() {
+            let path = source.path();
             let module_source = super::module_scope::source_for_path(path, overlays)?;
-            let module_program = parse(scan(&module_source).0).ok()?;
+            let module_program = source.program();
             if !exports.symbols.iter().any(|symbol| symbol.name == name && symbol.source == path) {
                 continue;
             }
-            if let Some(span) = top_level_span(&module_source, &module_program, name) {
+            if let Some(span) = top_level_span(&module_source, module_program, name) {
                 return Some(location(&path_to_file_uri(path), &module_source, span));
             }
         }

@@ -124,6 +124,35 @@ fn test_compiles_meta_tests_against_their_complete_sibling_module() {
 
 #[cfg(unix)]
 #[test]
+fn test_discovers_meta_tests_inside_a_child_facade_tree() {
+    let root = create_test_project(
+        "runner-child-module",
+        "placeholder.act",
+        "meta test\nverb unused() -> Int { return 0; }\n",
+    );
+    fs::remove_file(root.join("tests/placeholder.act")).expect("remove placeholder test");
+    let child = root.join("src/device/runtime");
+    fs::create_dir_all(&child).expect("create nested module directory");
+    fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "open engine; open tests;\n").expect("write child facade");
+    fs::write(child.join("engine.act"), "open verb runtime_value() -> Int { return 42; }\n")
+        .expect("write child sibling");
+    fs::write(
+        child.join("tests.act"),
+        "meta test\nverb sees_parent_scope() -> Int { return runtime_value() - 42; }\n",
+    )
+    .expect("write child test source");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("sees_parent_scope ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_propagates_non_zero_meta_test_exit_status() {
     let root = create_test_project(
         "runner-failure",
@@ -152,6 +181,28 @@ fn fmt_check_reports_drift_then_accepts_canonical_output() {
     fs::write(root.join("src/main.act"), "verb main()->Int{return 0;}\n").expect("write source");
     let before = run_in_project(&root, &["fmt", "--check"]);
     assert!(!before.success());
+    assert!(run_in_project(&root, &["fmt"]).success());
+    assert!(run_in_project(&root, &["fmt", "--check"]).success());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn fmt_is_idempotent_across_nested_facade_sources() {
+    let root = std::env::temp_dir().join(format!("actus-fmt-nested-{}", std::process::id()));
+    let child = root.join("src/device/runtime");
+    fs::create_dir_all(&child).expect("create nested source directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"fmt-nested\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "open api;\n").expect("write child facade");
+    fs::write(child.join("api.act"), "verb main()->Int{return 42;}\n")
+        .expect("write child implementation");
+
+    assert!(!run_in_project(&root, &["fmt", "--check"]).success());
     assert!(run_in_project(&root, &["fmt"]).success());
     assert!(run_in_project(&root, &["fmt", "--check"]).success());
     let _ = fs::remove_dir_all(root);

@@ -479,3 +479,42 @@ fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
     );
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn lsp_defines_exports_from_a_nested_child_facade() {
+    let root = temp_root();
+    let child = root.join("src/device/runtime");
+    fs::create_dir_all(&child).expect("create nested child module");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-nested-facade\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let main_path = root.join("src/main.act");
+    let engine_path = child.join("engine.act");
+    let main_uri = file_uri(&main_path);
+    let engine_uri = file_uri(&engine_path);
+    let main = "import device;\nverb main() -> Int { return runtime_value(); }\n";
+    let engine = "open verb runtime_value() -> Int { return 42; }\n";
+    fs::write(&main_path, main).expect("write main");
+    fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "open engine;\n").expect("write child facade");
+    fs::write(&engine_path, "open verb runtime_value() -> Int { return 42; }\n")
+        .expect("write nested export");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":main_uri,"version":1,"text":main}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":engine_uri,"version":1,"text":engine}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"runtime_value")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"runtime_value")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/references","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"runtime_value")}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/rename","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"runtime_value"),"newName":"renamed_runtime_value"}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains(&engine_uri), "nested definition missing: {stdout}");
+    assert!(stdout.contains("verb runtime_value() -> Int"), "nested hover missing: {stdout}");
+    assert!(stdout.contains("renamed_runtime_value"), "nested rename missing: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
