@@ -154,6 +154,16 @@ fn specializes_const_generic_expression_values_from_struct_arguments() {
 
 #[cfg(unix)]
 #[test]
+fn accepts_const_generic_values_in_case_guards() {
+    let status = run_array_fixture(
+        "const-generic-case-guard",
+        "verb choose[N: Usize]() -> u32 { return case true { true if 0u32 < (N as u32) => N as u32, _ => 0u32, }; } verb main() -> Int { return choose[4]() as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
 fn specializes_transitive_const_generic_verb_calls_natively() {
     let status = run_array_fixture(
         "transitive-const-generic-verb",

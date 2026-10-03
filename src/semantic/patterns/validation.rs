@@ -34,6 +34,9 @@ impl Analyzer {
     fn validate_guard_access(&self, expression: &Expr) -> Result<(), SemanticError> {
         match expression {
             Expr::Identifier { name, span } => {
+                if self.is_const_generic_parameter(name) {
+                    return Ok(());
+                }
                 let index = self.binding(name, *span)?;
                 if self.model.bindings[index].ownership.is_live() {
                     Ok(())
