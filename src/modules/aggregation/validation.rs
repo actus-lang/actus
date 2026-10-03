@@ -97,3 +97,24 @@ pub(super) fn validate_open_siblings(
     }
     Ok(())
 }
+
+pub(super) fn validate_configuration_source(
+    module_path: &str,
+    source_path: &Path,
+    program: &crate::ast::Program,
+) -> Result<(), ModuleError> {
+    if module_path != "config" && !module_path.starts_with("config::") {
+        return Ok(());
+    }
+    if let Some(import) = program.declarations.iter().find_map(|declaration| match declaration {
+        TopLevelDecl::Import(import) => Some(import),
+        _ => None,
+    }) {
+        return Err(ModuleError::ConfigurationImport {
+            module: module_path.to_owned(),
+            path: source_path.to_owned(),
+            span: import.span,
+        });
+    }
+    Ok(())
+}

@@ -74,16 +74,26 @@ before compiler implementation begins.
 
 ## Gate 25.1: Parser, resolver, and facade policy
 
-- [ ] Preserve existing `import` and `open` syntax without adding a second
+- [x] Preserve existing `import` and `open` syntax without adding a second
       configuration language.
-- [ ] Resolve `config` through the package source root and canonical facade.
-- [ ] Allow configuration facades to open configuration siblings and nested
+- [x] Resolve `config` through the package source root and canonical facade.
+- [x] Allow configuration facades to open configuration siblings and nested
       configuration facades deterministically.
-- [ ] Reject `import` declarations from the configuration subtree.
-- [ ] Reject direct child imports that bypass `config/config.act`.
-- [ ] Reject ambiguous configuration file/directory shapes and missing
+- [x] Reject `import` declarations from the configuration subtree.
+- [x] Reject direct child imports that bypass `config/config.act`.
+- [x] Reject ambiguous configuration file/directory shapes and missing
       canonical configuration facades.
-- [ ] Add resolver tests for sorted sources, overlays, and malformed trees.
+- [x] Add resolver tests for sorted sources, overlays, and malformed trees.
+
+Gate 25.1 is closed. The existing extensionless `import` and `open` syntax is
+used unchanged. The resolver applies the canonical `config/config.act` facade
+rule, preserves deterministic sibling/child discovery, and rejects missing or
+ambiguous configuration roots. Module aggregation now rejects imports from
+the entire `config` subtree with stable `E1113` diagnostics, while direct
+configuration-child bypasses retain the stable `E1108` diagnostic. Module
+tests cover public sibling resolution, nested configuration rejection, facade
+bypass, canonical-root failures, sorted discovery, overlays, and malformed
+facades.
 
 ## Gate 25.2: Semantic compile-time configuration
 

@@ -185,6 +185,30 @@ fn rejects_direct_imports_that_bypass_a_parent_facade() {
 }
 
 #[test]
+fn applies_canonical_facade_rules_to_the_reserved_configuration_root() {
+    let missing = Fixture::new();
+    missing.write("config/values.act");
+    let missing_error = ModuleResolver::new(&missing.root)
+        .resolve("config")
+        .expect_err("config requires a canonical config.act facade");
+    assert!(matches!(
+        missing_error,
+        ModuleResolutionError::MissingFacade { module, .. } if module == "config"
+    ));
+
+    let ambiguous = Fixture::new();
+    ambiguous.write("config.act");
+    ambiguous.write("config/config.act");
+    let ambiguous_error = ModuleResolver::new(&ambiguous.root)
+        .resolve("config")
+        .expect_err("config file and directory roots must not coexist");
+    assert!(matches!(
+        ambiguous_error,
+        ModuleResolutionError::AmbiguousModule { module, .. } if module == "config"
+    ));
+}
+
+#[test]
 fn rejects_invalid_module_paths() {
     let fixture = Fixture::new();
     let error = ModuleResolver::new(&fixture.root)

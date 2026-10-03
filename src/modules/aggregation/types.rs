@@ -16,6 +16,7 @@ pub struct ModuleLocation {
 pub enum ModuleError {
     Resolution(ModuleResolutionError),
     UnknownSiblingModule { module: String, sibling: String, facade: PathBuf },
+    ConfigurationImport { module: String, path: PathBuf, span: SourceSpan },
     Read { path: PathBuf, message: String },
     Lex { path: PathBuf, errors: Vec<LexError> },
     Parse { path: PathBuf, error: Box<ParseError> },
@@ -60,6 +61,11 @@ impl Display for ModuleError {
                 formatter,
                 "module `{module}` facade `{}` references unknown sibling `{sibling}.act`",
                 facade.display()
+            ),
+            Self::ConfigurationImport { module, path, .. } => write!(
+                formatter,
+                "configuration module `{module}` cannot import `{}`",
+                path.display()
             ),
             Self::Read { path, message } => {
                 write!(formatter, "cannot read module source `{}`: {message}", path.display())

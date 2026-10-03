@@ -8,7 +8,7 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 /// Converts a module, import, or facade failure into the shared diagnostic model.
 ///
 /// Resolution failures use the stable `E1100`–`E1108` module range. Visibility
-/// failures use `E1109`. Nested
+/// failures use `E1109`; configuration policy failures use `E1113`. Nested
 /// lexical, parser, and semantic failures retain their subsystem code while
 /// gaining the module source path when one is available.
 pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
@@ -16,6 +16,10 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         ModuleError::Resolution(error) => resolution_diagnostic(error),
         ModuleError::UnknownSiblingModule { .. } => {
             module_error("E1104", error.to_string(), SourceSpan::new(0, 0))
+        }
+        ModuleError::ConfigurationImport { span, path, .. } => {
+            module_error("E1113", error.to_string(), *span)
+                .with_source_path(path.display().to_string())
         }
         ModuleError::Read { path, .. } => {
             module_error("E1105", error.to_string(), SourceSpan::new(0, 0))

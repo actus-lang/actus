@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::lexer::scan;
-use actus::modules::{ModuleError, ModuleResolver, analyze_with_imports, load_module_unit};
+use actus::modules::{
+    ModuleError, ModuleResolver, analyze_with_imports, load_module_unit, parse_module,
+};
 use actus::parser::parse;
 
 struct Fixture {
@@ -63,6 +65,59 @@ fn resolves_public_child_declarations_through_the_parent_facade() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("child exports should be visible through the parent facade");
+}
+
+#[test]
+fn resolves_a_configuration_facade_with_compile_time_siblings() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write("config/values.act", "open const LIMIT: u8 = 30u8;");
+
+    parse_module(&ModuleResolver::new(&fixture.root), "config")
+        .expect("configuration facade should resolve its sibling constants");
+}
+
+#[test]
+fn rejects_imports_inside_the_configuration_subtree() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "import aie; open values;");
+    fixture.write("config/values.act", "open const LIMIT: u8 = 30u8;");
+    fixture.write("aie/aie.act", "");
+
+    let error = parse_module(&ModuleResolver::new(&fixture.root), "config")
+        .expect_err("configuration sources must not import modules");
+    assert!(
+        matches!(error, ModuleError::ConfigurationImport { ref module, .. } if module == "config")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1113");
+}
+
+#[test]
+fn rejects_imports_inside_nested_configuration_sources() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open policy;");
+    fixture.write("config/policy/policy.act", "import aie;");
+    fixture.write("aie/aie.act", "");
+
+    let error = parse_module(&ModuleResolver::new(&fixture.root), "config")
+        .expect_err("nested configuration sources must not import modules");
+    assert!(
+        matches!(error, ModuleError::ConfigurationImport { ref module, .. } if module == "config::policy")
+    );
+}
+
+#[test]
+fn rejects_direct_configuration_child_bypass() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write("config/values/values.act", "open const LIMIT: u8 = 30u8;");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("config::values")
+        .expect_err("configuration children must be reached through the facade");
+    assert!(
+        matches!(error, actus::modules::ModuleResolutionError::BypassesFacade { ref parent, .. } if parent == "config")
+    );
 }
 
 #[test]
