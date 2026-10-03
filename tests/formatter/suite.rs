@@ -83,6 +83,15 @@ fn formats_array_backed_packs_idempotently_with_layout_metadata() {
 }
 
 #[test]
+fn formats_pack_array_element_types_idempotently() {
+    let source = "pack Cell { erg storage: u8; layout little; fields { erg marker: u8 at 0; } } struct Fabric { cells: Array[Cell, 2], }";
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("cells: Array[Cell, 2]"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn keeps_pack_storage_and_field_documentation_in_place() {
     let source = concat!(
         "\"\"\"Frame layout.\"\"\"\n",

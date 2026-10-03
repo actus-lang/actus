@@ -66,6 +66,21 @@ fn accepts_indexed_pack_storage_reads_writes_and_nested_control_flow() {
 }
 
 #[test]
+fn accepts_pack_types_as_bounded_array_elements() {
+    analyze_source(
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } struct Fabric { erg cells: Array[Cell, 64], }",
+    )
+    .expect("declared packs should be valid array element types");
+}
+
+#[test]
+fn rejects_unknown_pack_types_as_array_elements() {
+    let error = analyze_source("struct Fabric { erg cells: Array[MissingPack, 2], }")
+        .expect_err("unknown array pack elements must be rejected");
+    assert!(matches!(error, SemanticErrorKind::UnknownType { name } if name == "MissingPack"));
+}
+
+#[test]
 fn rejects_a_constant_index_outside_pack_storage_capacity() {
     let error = analyze_source(
         "pack CacheLine { erg storage: Array[u8, 2]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; } } verb read(abs column: CacheLine) -> u8 { return column.storage[2]; }",

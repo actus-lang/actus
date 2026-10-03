@@ -11,6 +11,7 @@ use super::super::literals::StringDataValues;
 use super::super::model::NativeCleanupSchedule;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_pack_literal(
@@ -181,18 +182,21 @@ fn lower_indexed_pack_field_assignment(
             "indexed pack layout does not match field assignment".to_owned(),
         ));
     }
+    write_indexed_pack_field(context, pack_id, address)
+}
+
+fn write_indexed_pack_field(
+    mut context: PackAssignmentContext<'_, '_, '_>,
+    pack_id: usize,
+    address: cranelift_codegen::ir::Value,
+) -> Result<(), NativeEmitError> {
     let pack = context
         .layouts
         .pack(pack_id)
         .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, context.field)?;
     ensure_pack_field_is_mutable(field_layout, context.field)?;
-    let storage = context.function.ins().load(
-        context.layouts.ir_type(pack.storage)?,
-        cranelift_codegen::ir::MemFlagsData::new(),
-        address,
-        0,
-    );
+    let storage = indexed_pack_storage(&mut context, pack.storage, address)?;
     let new_value = lower_expression(
         context.function,
         context.value,
@@ -212,34 +216,32 @@ fn lower_indexed_pack_field_assignment(
         pack.endianness,
         context.layouts,
     )?;
-    context.function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), updated, address, 0);
-    seal_checked_pack_block(context.function, field_layout.ty, "indexed pack write block");
-    Ok(())
-}
-
-pub(super) fn seal_checked_pack_block(
-    function: &mut cranelift_frontend::FunctionBuilder<'_>,
-    field_type: NativeType,
-    block_name: &str,
-) {
-    if field_type == (NativeType::Integer { signed: false, width: 8 }) {
-        let block = function.current_block().expect(block_name);
-        function.seal_block(block);
+    if !matches!(pack.storage, NativeType::Array(_)) {
+        context.function.ins().store(
+            cranelift_codegen::ir::MemFlagsData::new(),
+            updated,
+            address,
+            0,
+        );
+        seal_checked_pack_block(context.function, field_layout.ty, "indexed pack write block");
     }
+    Ok(())
 }
 
-pub(super) fn update_pack_binding(
-    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
-    name: &str,
-    updated: cranelift_codegen::ir::Value,
-) -> Result<(), NativeEmitError> {
-    let binding = locals
-        .keys()
-        .find(|candidate| candidate.as_str() == name)
-        .copied()
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
-    locals.insert(binding, updated);
-    Ok(())
+fn indexed_pack_storage(
+    context: &mut PackAssignmentContext<'_, '_, '_>,
+    storage_type: NativeType,
+    address: cranelift_codegen::ir::Value,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if matches!(storage_type, NativeType::Array(_)) {
+        return Ok(address);
+    }
+    Ok(context.function.ins().load(
+        context.layouts.ir_type(storage_type)?,
+        cranelift_codegen::ir::MemFlagsData::new(),
+        address,
+        0,
+    ))
 }
 
 pub(super) fn ensure_pack_field_is_mutable(

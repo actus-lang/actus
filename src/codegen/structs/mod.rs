@@ -4,6 +4,7 @@ mod compound;
 mod construct;
 mod inline_pack;
 mod memory;
+mod pack_state;
 mod pack_validation;
 mod packs;
 mod types;

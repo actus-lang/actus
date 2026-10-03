@@ -1,4 +1,6 @@
-use crate::ast::{EnumDef, EnumPayload, Expr, Program, Stmt, StructDef, TopLevelDecl, TypeName};
+use crate::ast::{
+    EnumDef, EnumPayload, Expr, PackDecl, Program, Stmt, StructDef, TopLevelDecl, TypeName,
+};
 
 use super::super::generic::canonical_type_name;
 use super::{ArrayLayout, LayoutRegistry};
@@ -53,7 +55,42 @@ pub(crate) fn array_definitions(
             }
         }
     }
+    sort_array_definitions(&mut definitions, program);
     definitions
+}
+
+fn sort_array_definitions(definitions: &mut [TypeName], program: &Program) {
+    let packs = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Pack(pack) => Some((pack.name.as_str(), pack)),
+            _ => None,
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    definitions
+        .sort_by_key(|definition| array_dependency_depth(definition, &packs, &mut Vec::new()));
+}
+
+fn array_dependency_depth(
+    type_name: &TypeName,
+    packs: &std::collections::HashMap<&str, &PackDecl>,
+    visiting: &mut Vec<String>,
+) -> usize {
+    if type_name.name == "Array" {
+        return type_name
+            .arguments
+            .first()
+            .map_or(0, |element| 1 + array_dependency_depth(element, packs, visiting));
+    }
+    let Some(pack) = packs.get(type_name.name.as_str()) else { return 0 };
+    if visiting.iter().any(|name| name == &pack.name) {
+        return 0;
+    }
+    visiting.push(pack.name.clone());
+    let depth = array_dependency_depth(pack.storage.type_name(), packs, visiting);
+    visiting.pop();
+    depth + 1
 }
 
 fn collect_verb_arrays(verb: &crate::ast::VerbDecl, definitions: &mut Vec<TypeName>) {

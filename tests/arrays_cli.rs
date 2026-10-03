@@ -561,6 +561,36 @@ fn mutates_indexed_pack_fields_in_place() {
 
 #[cfg(unix)]
 #[test]
+fn executes_array_of_array_backed_packs_natively() {
+    let status = run_array_fixture(
+        "array-of-array-backed-packs",
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); cells[1] = Cell { storage: Array[u8, 2](), }; cells[1].marker = 41u8; return cells[1].marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_compound_assignment_through_array_of_packs_natively() {
+    let status = run_array_fixture(
+        "array-of-packs-compound",
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); cells[1] = Cell { storage: Array[u8, 2](), }; cells[1].marker = 40u8; cells[1].marker += 1u8; return cells[1].marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_ins_loan_through_an_array_of_packs_natively() {
+    let status = run_array_fixture(
+        "array-of-packs-ins",
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb mutate(ins cell: Cell) { cell.marker = 41u8; } verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); cells[1] = Cell { storage: Array[u8, 2](), }; mutate(cell: ins cells[1]); return cells[1].marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn mutates_an_indexed_ins_slot_and_reuses_the_array_owner() {
     let status = run_array_fixture(
         "array-ins-slot",

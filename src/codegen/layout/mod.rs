@@ -145,11 +145,10 @@ impl LayoutRegistry {
             .iter()
             .map(|pack| self.pack_layout_for(pack))
             .collect::<Result<Vec<_>, _>>()?;
-        self.array_layouts = self
-            .array_definitions
-            .iter()
-            .map(|array| self.array_layout_for(array))
-            .collect::<Result<Vec<_>, _>>()?;
+        self.array_layouts.clear();
+        for array in self.array_definitions.clone() {
+            self.array_layouts.push(self.array_layout_for(&array)?);
+        }
         Ok(())
     }
 

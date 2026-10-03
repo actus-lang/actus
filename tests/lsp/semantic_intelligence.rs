@@ -118,6 +118,26 @@ fn lsp_exposes_array_pack_layout_facts_and_reindexes_overlay_changes() {
 }
 
 #[test]
+fn lsp_accepts_pack_types_as_array_element_types() {
+    let uri = "file:///tmp/actus-lsp-pack-array.act";
+    let source = concat!(
+        "pack Cell { erg storage: u8; layout little; fields { erg marker: u8 at 0; } }\n",
+        "struct Fabric { cells: Array[Cell, 2], }\n",
+        "verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let model = response_with_id(&run_lsp(messages.to_vec()), 2);
+    assert_eq!(model["result"]["state"], "available");
+    assert_eq!(model["result"]["packs"][0]["name"], "Cell");
+}
+
+#[test]
 fn lsp_navigates_and_renames_array_pack_storage() {
     let uri = "file:///tmp/actus-lsp-pack-storage-navigation.act";
     let source = "pack Frame { erg storage: Array[u8, 4]; layout little; fields { erg marker: u8 at 0; abs _reserved: u24 at 8 = 0; } }\nverb main() -> Int { erg frame = Frame { storage: Array[u8, 4](), }; return frame.storage[0] as Int; }\n";

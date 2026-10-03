@@ -527,6 +527,65 @@ No gate in this extension may be closed by changing the AIE source to use a
 different representation. The compiler capability itself must be implemented,
 tested, and documented first.
 
+### Gate 23.15: Pack values as array elements
+
+Status: **closed**. The array-backed storage gates prove that a `pack` can own
+an inline `Array[u8, N]` byte region. They do not yet make a declared `pack`
+type a valid element type for an ordinary array. This is a separate compiler
+capability required for fixed-capacity fabrics and other bounded collections of
+hardware records.
+
+- [x] Register every valid `pack` declaration in the same type namespace used
+      by structs, verbs, and array element resolution.
+- [x] Accept `Array[Pack, N]` in declarations, parameters, returns, aggregate
+      construction, and nested generic types when the pack has a valid bounded
+      layout.
+- [x] Preserve pack identity, field metadata, alignment, size, and element
+      stride when the pack is used as an array element. The stride must be the
+      complete inline pack layout, including any required padding, and must not
+      degrade to a pointer or opaque handle.
+- [x] Lower indexed pack-array access natively: evaluate the array base and
+      index exactly once, calculate the checked element address from the pack
+      stride, and route field reads, writes, and compound assignments through
+      that same place.
+- [x] Define ownership behavior for `Array[Pack, N]`, including copy, move,
+      return, aggregate initialization, `abs` reads, and `ins` mutation. A
+      pack element loan must not create an alias that bypasses the array
+      owner's cleanup or mutation rules.
+- [x] Reject incomplete, recursive, unsupported, or otherwise non-layout pack
+      element types with deterministic diagnostics. Bounds, overflow, and
+      invalid element layout must be checked before native lowering.
+- [x] Add accepted fixtures covering `Array[Minicolumn, 64]`, indexed field
+      reads/writes, nested calls, aggregate initialization, ownership joins,
+      serialization, and native execution.
+- [x] Add rejected fixtures for unknown pack registration, invalid pack
+      layout, out-of-range indexes, illegal aliasing, use-after-move, and
+      stride/layout overflow.
+- [x] Add semantic layout, native codegen, formatter, LSP, and end-to-end
+      tests. The gate requires strict check/test/fmt, native execution,
+      rejected diagnostics, object emission, source-limit checks,
+      documentation checks, and the full repository quality suite.
+
+Gate 23.15 is satisfied by direct evidence rather than syntax acceptance or
+work through a pointer, opaque runtime object, or manually flattened byte
+array. Completion requires direct evidence that `Array[Pack, N]` is an inline,
+typed, ownership-safe collection whose indexing and field access work through
+the normal semantic and native pipelines. Semantic coverage is provided by
+`accepts_pack_types_as_bounded_array_elements` and
+`rejects_unknown_pack_types_as_array_elements` in `tests/semantic/packs.rs`.
+Native coverage is provided by
+`executes_array_of_array_backed_packs_natively`,
+`executes_compound_assignment_through_array_of_packs_natively`, and
+`preserves_ins_loan_through_an_array_of_packs_natively` in
+`tests/arrays_cli.rs`. Formatter and LSP parity are covered by
+`formats_pack_array_element_types_idempotently` and
+`lsp_accepts_pack_types_as_array_element_types`.
+
+The implementation registers pack declarations before struct validation,
+resolves pack elements as typed inline array layouts, orders dependent array
+layouts before their containing pack arrays, and lowers indexed pack places
+with one checked address calculation and the correct inline storage stride.
+
 ## Non-goals
 
 This phase does not:
@@ -544,8 +603,10 @@ This phase does not:
 The original Phase 23 scope is closed through Gate 23.8: the three baseline
 gaps have direct evidence, the capability fixture passes strict check/test,
 native execution is verified, and formatter/LSP behavior matches the
-compiler. The multi-word packed-storage extension closes only when Gates
-23.9–23.14 have direct evidence and the 64-byte systems fixture passes the
-same strict, native, object, formatter, LSP, source-limit, documentation, and
+compiler. The multi-word packed-storage extension is closed through Gate
+23.15. Gates 23.9–23.15 have direct evidence, including the 64-byte systems
+fixture and the typed `Array[Pack, N]` collection tests, through the same
+strict, native, object, formatter, LSP, source-limit, documentation, and
 repository quality checks. Any remaining language limitation must be recorded
-with an owner, an exact unblock condition, and a dedicated roadmap item.
+with an owner, an exact unblock condition, and a dedicated roadmap item in
+this phase.
