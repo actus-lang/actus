@@ -168,15 +168,16 @@ fn clamp_span(span: crate::lexer::SourceSpan, source_length: usize) -> crate::le
 fn module_path_for_file(source_root: &Path, file: &Path) -> Option<String> {
     file.strip_prefix(source_root).ok()?;
     let mut directory = file.parent()?;
+    let mut module_path = None;
     while directory.starts_with(source_root) && directory != source_root {
         let name = directory.file_name()?.to_str()?;
         if directory.join(format!("{name}.act")).is_file() {
             let module = directory.strip_prefix(source_root).ok()?;
-            return Some(path_components(module).join("::"));
+            module_path = Some(path_components(module).join("::"));
         }
         directory = directory.parent()?;
     }
-    None
+    module_path
 }
 
 fn path_components(path: &Path) -> Vec<String> {
