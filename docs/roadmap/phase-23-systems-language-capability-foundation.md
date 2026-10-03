@@ -788,6 +788,31 @@ Gate 23.22 evidence is provided by
 `tests/arrays_cli.rs`, together with the existing semantic rejection fixtures
 for invalid const arguments and the repository-wide compiler checks.
 
+### Gate 23.23: Const generic values in case guards
+
+Status: **closed**. Const generic parameters are recognized as read-only
+compile-time values by guarded `case` patterns, including guards that cast or
+compare the parameter before returning a typed value. This closes the
+semantic gap where guard validation incorrectly required `N` to be a runtime
+binding even though generic expression specialization already materialized
+its concrete value.
+
+- [x] Permit a declared const generic parameter in guard access validation
+      without adding it to runtime ownership or mutable-binding state.
+- [x] Preserve normal runtime binding validation for every non-generic guard
+      identifier.
+- [x] Add native regression coverage for `choose[N: Usize]` using
+      `N as u32` in a guarded branch and verify the concrete `choose[4]`
+      result.
+- [x] Verify the external AIE acceptance package with the installed compiler:
+      strict checking and all ten native tests pass.
+- [x] Run the complete compiler quality checks, including formatting, source
+      limits, documentation, clippy, full tests, and diff validation.
+
+Gate 23.23 evidence is provided by
+`accepts_const_generic_values_in_case_guards` in `tests/arrays_cli.rs` and
+the external AIE strict test run, which completed with `10 passed; 0 failed`.
+
 ## Non-goals
 
 This phase does not:
@@ -814,6 +839,7 @@ including the 64-byte
 systems fixture, typed `Array[Pack, N]` collection tests, and manifest-driven
 Cranelift IR verification, generic-verb native execution, and caller-owned
 array return slots through the same strict, native, object, formatter, LSP,
-source-limit, documentation, and repository quality checks. Any remaining
+source-limit, documentation, and repository quality checks. Gate 23.23 also
+closes const-generic access in case guards with direct native evidence. Any remaining
 language limitation must be recorded with an owner, an exact unblock
 condition, and a dedicated roadmap item in this phase.
