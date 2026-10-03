@@ -128,15 +128,20 @@ the aggregate ABI coverage.
 
 ## Gate 26.4: Object emission and symbol boundaries
 
-- [ ] Emit each reachable private helper exactly once in its owning native
+- [x] Emit each reachable private helper exactly once in its owning native
       object or the defined shared object boundary.
-- [ ] Keep private helper symbols internal or deterministically namespaced.
-- [ ] Preserve public facade symbols and external bindings without exposing
+- [x] Keep private helper symbols internal or deterministically namespaced.
+- [x] Preserve public facade symbols and external bindings without exposing
       private implementation declarations.
-- [ ] Link root and imported objects using the computed closure metadata.
-- [ ] Reject duplicate native identities before linking.
-- [ ] Verify that empty or unreachable modules do not produce spurious runtime
+- [x] Link root and imported objects using the computed closure metadata.
+- [x] Reject duplicate native identities before linking.
+- [x] Verify that empty or unreachable modules do not produce spurious runtime
       symbols.
+
+Gate 26.4 is covered by object-symbol tests and the multi-object CLI suite.
+Reachable private helpers and each concrete generic instance are emitted once,
+specialized symbols are namespace-qualified deterministically, and root-to-
+module bindings preserve public calls without exporting unused declarations.
 
 ## Gate 26.5: Tooling and diagnostics parity
 
