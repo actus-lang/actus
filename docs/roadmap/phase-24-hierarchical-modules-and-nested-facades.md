@@ -113,14 +113,24 @@ code generation.
 
 ## Gate 24.3: Namespace and visibility boundaries
 
-- [ ] Permit external code to import the parent module without importing child
+- [x] Permit external code to import the parent module without importing child
       paths directly.
-- [ ] Reject direct child imports that bypass a parent facade.
-- [ ] Preserve deterministic namespace identity for parent and child modules.
-- [ ] Validate generic types, generic verbs, packs, constants, performances,
+- [x] Reject direct child imports that bypass a parent facade.
+- [x] Preserve deterministic namespace identity for parent and child modules.
+- [x] Validate generic types, generic verbs, packs, constants, performances,
       and nested calls across the parent-child boundary.
-- [ ] Add accepted and rejected ownership, visibility, and duplicate-symbol
+- [x] Add accepted and rejected ownership, visibility, and duplicate-symbol
       tests for hierarchical modules.
+
+Gate 24.3 is closed. External callers resolve the parent facade as the only
+public gateway; direct child paths continue to produce the existing bypass
+diagnostic. Namespace identities and symbol prefixes remain deterministic and
+distinct for parent and child paths. Acceptance coverage includes generic
+types, generic verbs with nested calls, packs, constants, roles, and
+performances. Rejection coverage includes private child packs and constants,
+private types and roles in exported signatures, duplicate exports, parent-child
+collisions, and direct child imports. The module suite provides 56 passing
+tests for these boundaries.
 
 ## Gate 24.4: Compiler pipeline integration
 

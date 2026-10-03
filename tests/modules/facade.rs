@@ -142,6 +142,27 @@ fn facade_controls_performance_exports_as_well() {
 }
 
 #[test]
+fn parent_facade_preserves_generic_pack_constant_and_performance_exports() {
+    let fixture = Fixture::new();
+    fixture.write("device/device.act", "open runtime;");
+    fixture.write("device/runtime/runtime.act", "open api;");
+    fixture.write(
+        "device/runtime/api.act",
+        "open struct Packet[T] { item: T, } open pack Register { erg storage: u8; layout little; fields { erg ready: u1 at 0; } } open const LIMIT: u8 = 8u8; open verb make[T](erg item: T) -> Packet[T] { return Packet[T] { item: item, }; } open role Reader { verb read(abs self: Register) -> u8; } open perform Reader for Register { verb read(abs self: Register) -> u8 { return self.ready; } }",
+    );
+
+    let exports = exports_module(&ModuleResolver::new(&fixture.root), "device")
+        .expect("parent facade should preserve child export categories");
+
+    assert!(exports.contains("struct", "Packet"));
+    assert!(exports.contains("pack", "Register"));
+    assert!(exports.contains("const", "LIMIT"));
+    assert!(exports.contains("verb", "make"));
+    assert!(exports.contains("role", "Reader"));
+    assert!(exports.contains("perform", "Reader for Register"));
+}
+
+#[test]
 fn facade_rejects_unknown_sibling_module() {
     let fixture = Fixture::new();
     fixture.write("driver/gpio/gpio.act", "open missing;");

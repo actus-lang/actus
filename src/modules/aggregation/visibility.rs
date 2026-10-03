@@ -13,8 +13,9 @@ pub(super) fn validate_import_visibility(
     module_path: &str,
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
-    let private_verbs = private_names(unit, "verb");
-    let private_types = private_names(unit, "struct");
+    let private_verbs = private_names(unit, &["verb"]);
+    let private_types = private_names(unit, &["struct", "pack", "enum"]);
+    let private_constants = private_names(unit, &["const"]);
     for declaration in &program.declarations {
         let block = match declaration {
             TopLevelDecl::Verb(verb) => Some(&verb.body),
@@ -26,6 +27,7 @@ pub(super) fn validate_import_visibility(
                 block,
                 &private_verbs,
                 &private_types,
+                &private_constants,
                 module_path,
                 unit,
             )?;
@@ -39,13 +41,13 @@ pub(super) fn validate_import_visibility(
     Ok(())
 }
 
-fn private_names(unit: &ModuleUnit, kind: &str) -> HashSet<String> {
+fn private_names(unit: &ModuleUnit, kinds: &[&str]) -> HashSet<String> {
     unit.implementation()
         .declarations
         .iter()
         .filter_map(|declaration| super::validation::export_identity(declaration))
         .filter(|(declaration_kind, name)| {
-            *declaration_kind == kind && !unit.exports().contains(declaration_kind, name)
+            kinds.contains(declaration_kind) && !unit.exports().contains(declaration_kind, name)
         })
         .map(|(_, name)| name)
         .collect()
