@@ -1,0 +1,11 @@
+struct Cell {
+    erg charge: u8,
+}
+
+struct Fabric[N: Usize] {
+    erg cells: Array[Cell, N],
+}
+
+verb main() -> Int {
+    return 0;
+}

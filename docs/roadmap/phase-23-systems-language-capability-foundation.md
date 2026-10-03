@@ -23,9 +23,10 @@ production-shaped systems code:
 2. Boolean literals exist in the lexical vocabulary but are not accepted as
    ordinary value expressions in every expression/initializer path. For
    example, `erg linked: Bool = false;` must be accepted and lowered.
-3. Nested control-flow parsing does not yet cover every combination of indexed
-   and field places, nested calls, and value-producing branches. Examples that
-   must become valid include:
+3. A nested-control-flow failure was reported for combinations of indexed and
+   field places, nested calls, and value-producing branches. The minimal
+   current fixture must reproduce the exact failure before parser changes are
+   accepted. The reported shape includes:
 
    ```act
    if condition {
@@ -36,6 +37,11 @@ production-shaped systems code:
 
 These statements are the baseline to reproduce with focused fixtures. They
 must not be marked fixed from documentation or from a parser-only change.
+
+The first reproduction results are recorded in
+[Gate 23.0 baseline evidence](phase-23-gate-23.0-baseline.md). The current
+minimal nested place/call fixture passes, so that report remains an open
+minimization task rather than a confirmed compiler defect.
 
 ## Gate 23.0: Baseline reproduction and architecture contract
 
