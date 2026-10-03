@@ -145,8 +145,9 @@ module bindings preserve public calls without exporting unused declarations.
 
 ## Gate 26.5: Tooling and diagnostics parity
 
-- [ ] Make strict check, test runner, object build, executable build, and LSP
-      use the same dependency-resolution contract where applicable.
+- [x] Use the shared module/facade resolution contract in strict check and LSP,
+      and the shared native dependency-closure contract in the test runner,
+      object build, and executable build.
 - [x] Report unresolved native dependencies with the originating call span and
       actionable module/helper identity.
 - [x] Keep formatter and source-limit checks independent of native reachability.
@@ -157,25 +158,32 @@ module bindings preserve public calls without exporting unused declarations.
 
 Gate 26.5 now fails closed on unresolved native calls during dependency
 traversal, preserving the originating AST span and caller/helper identities.
-The closure contract is documented for coding agents and compiler
-maintainers, while the remaining parity work is to route the same dependency
-resolution and diagnostic representation through check, test, build, and LSP
-surfaces.
+Strict check and LSP intentionally stop at the shared module/facade semantic
+contract; they do not invoke native code generation. The test runner, object
+build, and executable build share `emit_objects`, which applies the native
+dependency closure before declaration and linking. The closure contract is
+documented for coding agents and compiler maintainers.
 
 ## Gate 26.6: End-to-end acceptance
 
-- [ ] `actus check --strict` accepts the nested facade dependency fixture.
-- [ ] `actus test --strict` executes tests using private transitive helpers.
-- [ ] `actus build --strict --emit obj` emits all reachable objects and symbols.
-- [ ] `actus build --strict --emit exe` links and executes the fixture.
-- [ ] Nested generic helper chains execute with the expected concrete values.
-- [ ] Aggregate return helpers execute without invalid return-slot or layout
+- [x] `actus check --strict` accepts the nested facade dependency fixture.
+- [x] `actus test --strict` executes tests using private transitive helpers.
+- [x] `actus build --strict --emit obj` emits all reachable objects and symbols.
+- [x] `actus build --strict --emit exe` links and executes the fixture.
+- [x] Nested generic helper chains execute with the expected concrete values.
+- [x] Aggregate return helpers execute without invalid return-slot or layout
       behavior.
-- [ ] Private helpers remain absent from the public facade/API surface.
-- [ ] Repeated builds, object identities, diagnostics, and dependency ordering
+- [x] Private helpers remain absent from the public facade/API surface.
+- [x] Repeated builds, object identities, diagnostics, and dependency ordering
       are deterministic.
-- [ ] Full Rust formatting, check, clippy, test, source-limit, documentation,
+- [x] Full Rust formatting, check, clippy, test, source-limit, documentation,
       architecture, and diff checks pass.
+
+Gate 26.6 is closed by the nested-facade CLI fixtures, transitive generic
+execution tests, aggregate return-slot tests, private-surface visibility tests,
+deterministic object and diagnostic tests, and the complete repository quality
+suite. The acceptance evidence exercises the same semantic and native
+resolution boundaries described in Gate 26.5.
 
 ## Non-goals
 
