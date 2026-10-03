@@ -1304,6 +1304,24 @@ reachable `inner[4]` instance before native declaration and lowering. This
 propagation is deterministic and deduplicated; do not add duplicate helper
 verbs or handwritten concrete wrappers.
 
+Const generic parameters are also valid read-only compile-time values inside
+case guards. They may be used directly or through a cast and are resolved
+before native lowering:
+
+```act
+verb choose[N: Usize]() -> u32 {
+    return case true {
+        true if 0u32 < (N as u32) => N as u32,
+        _ => 0u32,
+    };
+}
+```
+
+The compiler specializes `choose[4]` with the concrete value `4`; `N` is not
+a mutable runtime binding and cannot be assigned, borrowed, or transferred.
+Case-guard access must remain deterministic across direct and transitively
+specialized generic verbs.
+
 #### Array return ABI
 
 Returning `Array[T, N]` uses the same caller-owned return-slot ABI as other
