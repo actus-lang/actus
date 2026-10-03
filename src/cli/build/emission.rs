@@ -105,6 +105,9 @@ fn emit_and_write(
         } else {
             println!("built `{}`", output.display());
         }
+        if configuration.native_backend().verifies_no_float_ir() {
+            println!("verified generated native IR: no floating-point instructions");
+        }
     }
     0
 }

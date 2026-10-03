@@ -71,6 +71,86 @@ fn new_can_select_the_builtin_standard_runtime_profile() {
 }
 
 #[test]
+fn package_zero_float_policy_accepts_integer_builds() {
+    let root = std::env::temp_dir().join(format!("actus-no-float-integer-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"integer_app\"\nversion = \"0.1.0\"\n\n[build]\nverify_no_float_ir = true\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+        .expect("write integer source");
+    fs::create_dir_all(root.join("tests")).expect("create test directory");
+    fs::write(root.join("tests/smoke.act"), "meta test\nverb smoke() -> Int { return 0; }\n")
+        .expect("write integer test");
+
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("run strict integer check");
+    assert!(check.status.success(), "stderr: {}", String::from_utf8_lossy(&check.stderr));
+    let tests = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["test", "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("run strict integer tests");
+    assert!(tests.status.success(), "stderr: {}", String::from_utf8_lossy(&tests.stderr));
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "obj"])
+        .current_dir(&root)
+        .output()
+        .expect("run integer zero-float build");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("no floating-point instructions"));
+    let executable = root.join("integer_app");
+    let executable_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "exe", "-o", executable.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .expect("build integer executable");
+    assert!(
+        executable_build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&executable_build.stderr)
+    );
+    let run = Command::new(&executable).output().expect("run integer executable");
+    assert!(run.status.success());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn package_zero_float_policy_rejects_float_builds_with_function_context() {
+    let root = std::env::temp_dir().join(format!("actus-no-float-float-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"float_app\"\nversion = \"0.1.0\"\n\n[build]\nverify_no_float_ir = true\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "verb main() -> Int { erg value: f32 = 1.0f32; return 0; }\n",
+    )
+    .expect("write float source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "obj"])
+        .current_dir(&root)
+        .output()
+        .expect("run float zero-float build");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("native function `main`"), "stderr: {stderr}");
+    assert!(stderr.contains("floating-point IR instructions"), "stderr: {stderr}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn project_templates_reject_freestanding_without_a_target() {
     let root = std::env::temp_dir().join(format!("actus-new-bare-{}", std::process::id()));
     let output = Command::new(env!("CARGO_BIN_EXE_actus"))

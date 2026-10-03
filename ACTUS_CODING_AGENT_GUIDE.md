@@ -1030,6 +1030,20 @@ The compiler resolves canonical `std::io`, `std::fs`, and `std::path` imports
 from the packaged library. Applications must use public typed facade APIs,
 not the internal C bridge symbols.
 
+For a package that requires an integer-only generated native boundary, enable
+the compiler-owned Cranelift IR audit in `Actus.toml`:
+
+```toml
+[build]
+verify_no_float_ir = true
+```
+
+The setting applies to every Actus-generated native function emitted for the
+package and rejects floating-point IR before object emission. It proves only
+the generated Actus IR boundary. External ABI objects and separately linked
+runtime objects need their own audit and are not silently covered by this
+setting.
+
 ### 20.1 `std::io`
 
 The public I/O facade includes:

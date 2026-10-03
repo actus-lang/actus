@@ -679,24 +679,27 @@ Gate 23.17 evidence:
 
 ### Gate 23.18: Package-level zero-float acceptance contract
 
-Status: **open**. The compiler hook is available, but a package-level
-zero-float claim requires an explicit acceptance workflow that enables the
-hook for the complete generated workload and records its target/runtime
-boundary. This gate must not be closed by an object disassembly or by checking
-only the application entry function.
+Status: **closed**. The package manifest now enables the compiler-owned IR
+audit across the complete generated native workload, with package-level
+positive and negative evidence for the declared target/runtime boundary. This
+gate is based on compiler IR inspection before object emission, not on object
+disassembly.
 
-- [ ] Define the package or test-harness opt-in that applies the verifier to
+- [x] Define the package or test-harness opt-in that applies the verifier to
       every Actus-generated function in the workload, including reachable
       generic and performance specializations.
-- [ ] Add an accepted integer-only systems fixture and run the verifier across
+- [x] Add an accepted integer-only systems fixture and run the verifier across
       its complete native function set before object emission.
-- [ ] Add a rejected fixture containing a reachable floating-point operation
+- [x] Add a rejected fixture containing a reachable floating-point operation
       and prove that the diagnostic identifies the owning native function.
-- [ ] Record the target, runtime profile, external ABI boundary, and whether
-      runtime/library objects are inside or outside the zero-float contract.
-- [ ] Add CLI/test reporting that distinguishes `no generated float IR` from
+- [x] Record the target, runtime profile, external ABI boundary, and whether
+      runtime/library objects are inside or outside the zero-float contract:
+      the package fixture uses the host target and core runtime; the contract
+      covers Actus-generated IR only, while external ABI and separately linked
+      runtime/library objects remain outside its scope.
+- [x] Add CLI/test reporting that distinguishes `no generated float IR` from
       `no float bytes found in an object`; the latter is not sufficient.
-- [ ] Add the complete package-level check, test, native build, object, and
+- [x] Add the complete package-level check, test, native build, object, and
       executable evidence before closing this gate.
 
 ## Non-goals
