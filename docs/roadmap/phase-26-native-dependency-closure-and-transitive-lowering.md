@@ -66,17 +66,23 @@ contract with native evidence.
 
 ## Gate 26.1: Reachable call-graph discovery
 
-- [ ] Traverse direct calls from every selected public/native root.
-- [ ] Recursively discover private helpers in the same module object.
-- [ ] Resolve calls across nested facade-owned module objects through the
+- [x] Traverse direct calls from every selected public/native root.
+- [x] Recursively discover private helpers in the same module object.
+- [x] Resolve calls across nested facade-owned module objects through the
       canonical module identity.
-- [ ] Include method/performance dispatch dependencies required by the native
+- [x] Include method/performance dispatch dependencies required by the native
       implementation.
-- [ ] Include external bridge declarations without treating them as Actus
+- [x] Include external bridge declarations without treating them as Actus
       function bodies.
 - [ ] Reject unresolved reachable calls before object emission with a stable
       diagnostic.
-- [ ] Deduplicate repeated helper calls and preserve deterministic traversal.
+- [x] Deduplicate repeated helper calls and preserve deterministic traversal.
+
+Gate 26.1 implementation is in place for reachable Actus verbs, private
+helpers, method calls, performances, external bridge declarations, and stable
+deduplicated traversal. The unresolved-reachable-call diagnostic remains open
+for Gate 26.5 because it requires source-span propagation and parity across
+check, build, test, and LSP diagnostics.
 
 ## Gate 26.2: Generic and transitive specialization
 

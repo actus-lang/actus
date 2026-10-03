@@ -92,8 +92,7 @@ fn native_objects_follow_namespace_context_deterministically() {
 
 #[test]
 fn imported_module_objects_emit_without_an_entry_and_preserve_public_wrappers() {
-    let source =
-        "verb hidden() -> Int { return 41; } open verb add() -> Int { return hidden() + 1; }";
+    let source = "verb hidden() -> Int { return 41; } verb unused() -> Int { return 99; } open verb add() -> Int { return hidden() + 1; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
@@ -109,6 +108,9 @@ fn imported_module_objects_emit_without_an_entry_and_preserve_public_wrappers() 
     assert!(symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_add") }));
     assert!(
         symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_hidden") })
+    );
+    assert!(
+        !symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_unused") })
     );
 }
 
