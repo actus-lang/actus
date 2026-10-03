@@ -181,6 +181,7 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmit
         namespace_prefix: inputs.namespace_prefix,
         entry_symbol: inputs.symbol,
         target: inputs.target,
+        configuration: inputs.configuration,
     })?;
     module
         .finish()
@@ -258,6 +259,7 @@ struct EmissionDefinitions<'items, 'program> {
     namespace_prefix: &'items str,
     entry_symbol: Option<&'items str>,
     target: &'items TargetSpec,
+    configuration: &'items NativeBackendConfiguration,
 }
 
 fn define_emission_functions(
@@ -284,6 +286,7 @@ fn define_verb_bodies(
         inputs.namespace_prefix,
         inputs.entry_symbol,
         inputs.target,
+        inputs.configuration,
     )
 }
 
@@ -301,6 +304,7 @@ fn define_performance_bodies(
         inputs.layouts,
         inputs.vtable_data,
         inputs.namespace_prefix,
+        inputs.configuration,
     )
 }
 

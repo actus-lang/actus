@@ -55,6 +55,31 @@ fn native_backend_accepts_externalized_build_settings() {
 }
 
 #[test]
+fn test_zero_float_verification_inspects_generated_integer_ir() {
+    let (tokens, errors) =
+        scan("verb main() -> Int { erg value: u32 = 1u32; return value + 1u32; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("integer source should parse");
+    let configuration = NativeBackendConfiguration::default().with_no_float_ir_verification();
+
+    emit_program_object_with_configuration(&program, "main", &configuration)
+        .expect("integer-only generated IR should pass the float audit");
+}
+
+#[test]
+fn zero_float_verification_rejects_generated_float_ir() {
+    let (tokens, errors) = scan("verb main() -> Int { erg value: f32 = 1.0f32; return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("float source should parse");
+    let configuration = NativeBackendConfiguration::default().with_no_float_ir_verification();
+
+    let error = emit_program_object_with_configuration(&program, "main", &configuration)
+        .expect_err("float IR must be rejected by the zero-float contract");
+    assert!(error.to_string().contains("native function `main`"));
+    assert!(error.to_string().contains("floating-point IR instructions"));
+}
+
+#[test]
 fn native_backend_rejects_registered_but_unlowered_collection_types() {
     let (tokens, errors) = scan("verb main(erg items: Array) -> Int { return 0; }");
     assert!(errors.is_empty());

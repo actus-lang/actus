@@ -39,6 +39,7 @@ pub struct NativeBackendConfiguration {
     module_name: String,
     position_independent: bool,
     optimization_level: OptimizationLevel,
+    verify_no_float_ir: bool,
 }
 
 impl Default for NativeBackendConfiguration {
@@ -47,6 +48,7 @@ impl Default for NativeBackendConfiguration {
             module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(),
             position_independent: true,
             optimization_level: OptimizationLevel::None,
+            verify_no_float_ir: false,
         }
     }
 }
@@ -57,6 +59,7 @@ impl NativeBackendConfiguration {
             module_name: module_name.into(),
             position_independent,
             optimization_level: OptimizationLevel::None,
+            verify_no_float_ir: false,
         }
     }
 
@@ -75,6 +78,15 @@ impl NativeBackendConfiguration {
 
     pub const fn optimization_level(&self) -> OptimizationLevel {
         self.optimization_level
+    }
+
+    pub fn with_no_float_ir_verification(mut self) -> Self {
+        self.verify_no_float_ir = true;
+        self
+    }
+
+    pub const fn verifies_no_float_ir(&self) -> bool {
+        self.verify_no_float_ir
     }
 }
 

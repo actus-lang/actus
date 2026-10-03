@@ -11,6 +11,7 @@ use super::super::native::{FunctionMeta, NativeEmitError};
 use super::super::types::NativeType;
 use super::super::vtable::VtableDataIds;
 use super::{PerformanceDefinition, dispatch_key};
+use crate::configuration::NativeBackendConfiguration;
 
 #[allow(clippy::too_many_arguments)]
 pub(in crate::codegen) fn define_performances(
@@ -23,6 +24,7 @@ pub(in crate::codegen) fn define_performances(
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
 ) -> Result<(), NativeEmitError> {
     for definition in definitions {
         let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
@@ -42,6 +44,7 @@ pub(in crate::codegen) fn define_performances(
             vtable_data,
             namespace_prefix,
             false,
+            configuration,
         )?;
     }
     Ok(())

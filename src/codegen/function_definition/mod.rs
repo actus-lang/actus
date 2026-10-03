@@ -9,6 +9,7 @@ use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
 use crate::ast::VerbDecl;
+use crate::configuration::NativeBackendConfiguration;
 
 use super::declarations::{native_signature_for_definition, native_signature_for_entry};
 use super::layout::LayoutRegistry;
@@ -35,6 +36,7 @@ pub(super) fn define_function(
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
     force_entry_return: bool,
+    configuration: &NativeBackendConfiguration,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
     context.func.signature = if force_entry_return {
@@ -58,6 +60,15 @@ pub(super) fn define_function(
     .map_err(|error| {
         NativeEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
     })?;
+    if configuration.verifies_no_float_ir() {
+        let floating = super::native::ir_audit::floating_point_instructions(&context.func);
+        if !floating.is_empty() {
+            return Err(NativeEmitError(format!(
+                "native function `{}` contains floating-point IR instructions: {floating:?}",
+                verb.name
+            )));
+        }
+    }
     module.define_function(metadata.id, &mut context).map_err(|error| {
         NativeEmitError(format!("native function `{}` verification failed: {error:?}", verb.name))
     })?;

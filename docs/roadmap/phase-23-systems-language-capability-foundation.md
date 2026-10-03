@@ -642,6 +642,63 @@ Gate 23.16 evidence:
   `scripts/check_source_limits.sh`, `scripts/check_documentation.sh`, and
   `git diff --check`.
 
+### Gate 23.17: Compiler-owned Cranelift IR verification
+
+Status: **closed**. The compiler now provides an explicit native-backend
+verification hook for workloads that require an integer-only or
+zero-floating-point contract. Verification runs after Actus native lowering
+has produced each Cranelift `Function` and before object emission, so it audits
+the compiler's actual IR rather than disassembling unrelated runtime code.
+
+- [x] Add an opt-in native backend configuration for no-float IR verification
+      without changing the default behavior of programs that intentionally use
+      `f32` or `f64`.
+- [x] Inspect generated Cranelift instruction opcodes, operands, and results
+      for floating-point scalar and vector types, including comparisons whose
+      result is an integer condition.
+- [x] Reject the native function before object emission and include the
+      function name plus the detected floating-point instruction identities in
+      the structured native error.
+- [x] Keep the verifier independent from terminal rendering and object-byte
+      heuristics.
+- [x] Add an integer-only integration fixture that passes and a float-positive
+      integration fixture that is rejected by the same generated-IR hook.
+- [x] Preserve the default native behavior for existing floating-point tests
+      when the verification option is not enabled.
+
+Gate 23.17 evidence:
+
+- `NativeBackendConfiguration::with_no_float_ir_verification` enables the
+  contract without adding a language-specific or target-specific syntax.
+- `test_zero_float_verification_inspects_generated_integer_ir` proves that
+  generated integer IR passes.
+- `zero_float_verification_rejects_generated_float_ir` proves that generated
+  floating-point IR is rejected before object emission.
+- `test_zero_float_verification` and the float-positive IR unit test cover
+  opcode, operand-type, result-type, and vector-lane inspection.
+
+### Gate 23.18: Package-level zero-float acceptance contract
+
+Status: **open**. The compiler hook is available, but a package-level
+zero-float claim requires an explicit acceptance workflow that enables the
+hook for the complete generated workload and records its target/runtime
+boundary. This gate must not be closed by an object disassembly or by checking
+only the application entry function.
+
+- [ ] Define the package or test-harness opt-in that applies the verifier to
+      every Actus-generated function in the workload, including reachable
+      generic and performance specializations.
+- [ ] Add an accepted integer-only systems fixture and run the verifier across
+      its complete native function set before object emission.
+- [ ] Add a rejected fixture containing a reachable floating-point operation
+      and prove that the diagnostic identifies the owning native function.
+- [ ] Record the target, runtime profile, external ABI boundary, and whether
+      runtime/library objects are inside or outside the zero-float contract.
+- [ ] Add CLI/test reporting that distinguishes `no generated float IR` from
+      `no float bytes found in an object`; the latter is not sufficient.
+- [ ] Add the complete package-level check, test, native build, object, and
+      executable evidence before closing this gate.
+
 ## Non-goals
 
 This phase does not:
