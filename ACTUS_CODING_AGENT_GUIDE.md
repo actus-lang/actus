@@ -972,6 +972,50 @@ put mutable runtime state or deployment settings in `src/config`. The compiler,
 formatter, LSP, test runner, and native backend must all resolve this facade
 through the same module boundary.
 
+#### 17.3.1 Configuration constants in native modules
+
+Configuration constants remain compile-time values after they cross the
+facade boundary. Native lowering must resolve them in the same public export
+namespace used by semantic analysis; replacing them with source-level
+literal workarounds is incorrect.
+
+This contract also applies through nested module facades. For example,
+`src/aie/persistence/serialization.act` may import `config` and use a
+constant exported by `src/config/config.act` even when the final native
+object is emitted for the parent `aie` module. The compiler must carry the
+constant into the corresponding module object before native semantic
+analysis and lowering.
+
+Package constants may be used in all supported compile-time expression
+contexts, including:
+
+- scalar initializers and assignments;
+- struct and pack literals;
+- predicates, `case` guards, and conditional expressions;
+- array capacities and generic const arguments where the type contract allows
+  them;
+- indexed expressions and layout-related values.
+
+A constant identifier is not a runtime binding and has no ownership state.
+Using a constant as an `erg` field or aggregate initializer value must not
+attempt to move, borrow, or drop a runtime owner. Constants remain typed and
+range-checked during semantic analysis, then are inlined or otherwise
+materialized before native lowering.
+
+When changing package configuration or module aggregation, verify the full
+boundary rather than only source checking:
+
+```sh
+actus check --strict
+actus build --strict --emit obj
+actus build --strict --emit exe
+actus test --strict
+```
+
+At least one regression test must cover a constant imported through a nested
+facade and used in an aggregate initializer or predicate. The test should
+verify native execution, not only semantic acceptance.
+
 ### 17.4 Visibility
 
 `open` on a declaration or sibling export is the Actus visibility mechanism.
