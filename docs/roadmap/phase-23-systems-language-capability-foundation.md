@@ -239,22 +239,24 @@ quality checks pass for this gate.
 
 ## Gate 23.5: Typed nested control-flow joins
 
-Nested `if`, `case`, and loop branches must produce a consistent semantic and
-native control-flow graph.
+Status: **closed**. Nested conditional and case branches now share typed
+semantic joins and explicit native merge/termination edges. Diverging return
+paths are emitted as native terminators instead of being mistaken for
+fallthrough paths.
 
-- [ ] Support nested `if` statements inside expression branches and nested
+- [x] Support nested `if` statements inside expression branches and nested
       `if` expressions inside statements.
-- [ ] Support `case` branches that return a typed value or diverge.
-- [ ] Unify branch values only when their types are compatible.
-- [ ] Treat `return`, `break`, `continue`, and typed `?` propagation as
+- [x] Support `case` branches that return a typed value or diverge.
+- [x] Unify branch values only when their types are compatible.
+- [x] Treat `return`, `break`, `continue`, and typed `?` propagation as
       diverging/unwinding paths where appropriate.
-- [ ] Preserve branch-local moves and borrows across joins.
-- [ ] Emit deterministic cleanup on every normal and early edge.
-- [ ] Lower merge values through explicit native block parameters or an
+- [x] Preserve branch-local moves and borrows across joins.
+- [x] Emit deterministic cleanup on every normal and early edge.
+- [x] Lower merge values through explicit native block parameters or an
       equivalent backend-owned representation.
-- [ ] Ensure indexed places and nested calls survive branch lowering without
+- [x] Ensure indexed places and nested calls survive branch lowering without
       duplicated evaluation.
-- [ ] Add repeated native execution tests for identical results and cleanup.
+- [x] Add repeated native execution tests for identical results and cleanup.
 
 Representative expression:
 
@@ -265,6 +267,10 @@ erg selected: u32 = if ready {
     return 0;
 };
 ```
+
+The implementation and acceptance evidence are recorded in [Gate 23.5 typed
+control-flow evidence](phase-23-gate-23.5-control-flow-joins.md). The full
+repository quality checks pass for this gate.
 
 ## Gate 23.6: Formatter, LSP, and diagnostics parity
 

@@ -130,6 +130,22 @@ fn validates_nested_call_roles_and_try_propagation() {
 }
 
 #[test]
+fn validates_case_branch_result_types_and_divergence() {
+    analyze_source(
+        "verb choose(erg ready: Bool) -> Int { return case ready { true => { return 41; }, _ => 42, }; }",
+    )
+    .expect("a diverging case branch may coexist with the typed branch");
+
+    let error = analyze_source(
+        "verb choose(erg ready: Bool) { erg selected = case ready { true => 41, _ => 42u8, }; }",
+    )
+    .expect_err("case branches with incompatible inferred types must fail");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::TypeMismatch { callee, .. } if callee == "case")
+    );
+}
+
+#[test]
 fn rejects_invalid_nested_call_contracts() {
     let invalid_role = analyze_source(
         "verb update(ins slot: Int) { } verb main() { erg value = 0; if true { update(slot: abs value); } }",

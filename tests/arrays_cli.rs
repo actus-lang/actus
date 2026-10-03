@@ -94,6 +94,26 @@ fn executes_nested_value_producing_conditionals() {
 
 #[cfg(unix)]
 #[test]
+fn executes_nested_if_expression_with_a_diverging_branch() {
+    let status = run_array_fixture(
+        "nested-if-diverging-branch",
+        "verb choose(erg ready: Bool) -> Int { erg selected = if ready { if true { 41 } else { 42 } } else { return 0; }; return selected + 1; } verb main() -> Int { erg ready = true; return choose(ready: ready); }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_typed_case_branch_with_a_returning_branch() {
+    let status = run_array_fixture(
+        "typed-case-diverging-branch",
+        "verb choose() -> Int { return case true { true => { return 41; }, _ => 0, }; } verb main() -> Int { return choose() + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_calls_across_nested_statement_blocks() {
     let status = run_array_fixture(
         "nested-call-statements",

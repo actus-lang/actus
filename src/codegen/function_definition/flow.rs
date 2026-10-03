@@ -15,7 +15,7 @@ pub(super) fn emit_flow(
     force_void_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
     match flow {
-        super::super::lowering::Flow::Return(result) => {
+        super::super::lowering::Flow::Return(result, _) => {
             emit_value_return(function, return_type, return_slot, result, layouts)
         }
         super::super::lowering::Flow::Fallthrough => {
@@ -30,7 +30,7 @@ pub(super) fn emit_flow(
     }
 }
 
-fn emit_value_return(
+pub(crate) fn emit_value_return(
     function: &mut FunctionBuilder<'_>,
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,

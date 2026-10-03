@@ -98,8 +98,44 @@ fn lower_branch(
         });
         let argument = cranelift_codegen::ir::BlockArg::Value(value);
         function.ins().jump(merge_block, [&argument]);
+    } else {
+        emit_branch_flow(function, flow, result_type, context.layouts)?;
     }
     Ok(())
+}
+
+fn emit_branch_flow(
+    function: &mut FunctionBuilder<'_>,
+    flow: Flow,
+    result_type: NativeType,
+    layouts: &crate::codegen::layout::LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    match flow {
+        Flow::Return(value, value_type) => {
+            let value_type = value_type.unwrap_or(result_type);
+            let return_slot = if layouts.uses_return_slot(value_type) {
+                let entry = function.func.layout.entry_block().ok_or_else(|| {
+                    NativeEmitError("native function has no entry block".to_owned())
+                })?;
+                function.block_params(entry).first().copied()
+            } else {
+                None
+            };
+            crate::codegen::function_definition::emit_value_return(
+                function,
+                Some(value_type),
+                return_slot,
+                value,
+                layouts,
+            )
+        }
+        Flow::VoidReturn => {
+            function.ins().return_(&[]);
+            Ok(())
+        }
+        Flow::Break | Flow::Continue => Ok(()),
+        Flow::Fallthrough => Ok(()),
+    }
 }
 
 fn split_tail_expression(block: &crate::ast::Block) -> (&[crate::ast::Stmt], Option<&Expr>) {

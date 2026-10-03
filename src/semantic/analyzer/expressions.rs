@@ -1,4 +1,6 @@
-use crate::ast::{BinaryOp, Expr, PrimitiveType, TypeName, UnaryOp, primitive_type};
+use crate::ast::{
+    BinaryOp, CaseBody, Expr, IfBranch, PrimitiveType, Stmt, TypeName, UnaryOp, primitive_type,
+};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
@@ -352,7 +354,34 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         self.visit_expression(subject)?;
-        self.validate_case_patterns(mode, subject, branches, span)
+        self.validate_case_patterns(mode, subject, branches, span)?;
+        self.validate_case_result_types(branches, span)
+    }
+
+    fn validate_case_result_types(
+        &self,
+        branches: &[crate::ast::CaseBranch],
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let mut expected: Option<String> = None;
+        for branch in branches {
+            let Some(candidate) = case_branch_type(self, &branch.body) else { continue };
+            if let Some(expected) = &expected
+                && expected != &candidate
+            {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::TypeMismatch {
+                        callee: "case".to_owned(),
+                        parameter: "branches".to_owned(),
+                        expected: expected.clone(),
+                        found: candidate,
+                    },
+                    span,
+                });
+            }
+            expected = Some(candidate);
+        }
+        Ok(())
     }
 
     fn validate_try_expression(
@@ -425,6 +454,42 @@ fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
         }
         Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
             is_unsuffixed_integer_literal(expression)
+        }
+        _ => false,
+    }
+}
+
+fn case_branch_type(analyzer: &Analyzer, body: &CaseBody) -> Option<String> {
+    match body {
+        CaseBody::Expression(expression) => analyzer.expression_type_name(expression),
+        CaseBody::Block(block) if block_diverges(block) => None,
+        CaseBody::Block(block) => block_tail_type(analyzer, block),
+    }
+}
+
+fn block_tail_type(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<String> {
+    let Some(Stmt::Expression { expression, span }) = block.statements.last() else {
+        return None;
+    };
+    (span.end == expression_span(expression).end)
+        .then(|| analyzer.expression_type_name(expression))?
+}
+
+fn block_diverges(block: &crate::ast::Block) -> bool {
+    block.statements.last().is_some_and(statement_diverges)
+}
+
+fn statement_diverges(statement: &Stmt) -> bool {
+    match statement {
+        Stmt::Return { .. } | Stmt::Break { .. } | Stmt::Continue { .. } => true,
+        Stmt::If { then_branch, else_branch, .. } => {
+            block_diverges(then_branch)
+                && else_branch.as_ref().is_some_and(|branch| match branch {
+                    IfBranch::Block(block) => block_diverges(block),
+                    IfBranch::ElseIf(expression) => {
+                        matches!(expression.as_ref(), Expr::If { .. })
+                    }
+                })
         }
         _ => false,
     }

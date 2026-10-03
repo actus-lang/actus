@@ -272,7 +272,7 @@ fn finish_case_flow(
     result_type: NativeType,
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     match flow {
-        Flow::Return(value) => {
+        Flow::Return(value, _) => {
             function.ins().return_(&[value]);
             Ok(None)
         }

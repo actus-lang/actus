@@ -19,6 +19,7 @@ use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 use flow::emit_flow;
+pub(crate) use flow::emit_value_return;
 use parameters::{BoundParameters, bind_parameters, declare_function_refs};
 
 #[allow(clippy::too_many_arguments)]

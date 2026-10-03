@@ -50,7 +50,7 @@ pub(super) fn lower_return(
         layouts,
     )?;
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
-    Ok(Flow::Return(value))
+    Ok(Flow::Return(value, None))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -117,7 +117,7 @@ fn lower_try_return(
     let result = allocate_enum(function, layout.size, functions, layouts)?;
     let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts);
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
-    Ok(Flow::Return(return_value))
+    Ok(Flow::Return(return_value, Some(NativeType::Enum(enum_id))))
 }
 
 fn emit_try_return_branches(
