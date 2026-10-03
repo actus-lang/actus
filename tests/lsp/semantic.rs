@@ -197,6 +197,27 @@ fn lsp_keeps_systems_syntax_parity_for_generics_booleans_and_fields() {
 }
 
 #[test]
+fn lsp_understands_the_phase23_readiness_source_without_overlay_drift() {
+    let root =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_readiness");
+    let path = root.join("src/main.act");
+    let source = std::fs::read_to_string(&path).expect("read Phase 23.8 source");
+    let uri = file_uri(&path);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "readiness diagnostics drifted: {stdout}");
+    assert!(stdout.contains("\"id\":2"), "readiness formatting response missing: {stdout}");
+    assert!(stdout.contains("\"id\":3"), "readiness semantic token response missing: {stdout}");
+}
+
+#[test]
 fn lsp_exposes_gate_7_and_gate_8_indexing_and_casts() {
     let uri = "file:///tmp/actus-lsp-gate8.act";
     let source = "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); erg index: Usize = 0; erg bytes: Buffer = Buffer[0]; append(bytes, 41); erg byte_index: u8 = 0; return (values[index] as Int) + (bytes[byte_index] as Int); }\n";

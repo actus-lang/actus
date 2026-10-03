@@ -308,18 +308,18 @@ the same syntax and semantic model.
 
 ## Gate 23.8: Readiness for advanced systems workloads
 
-- [ ] Demonstrate a bounded, non-application-specific fixture that combines
+- [x] Demonstrate a bounded, non-application-specific fixture that combines
       const generics, fixed-width arithmetic, Boolean state, nested places,
       nested calls, typed errors, and deterministic cleanup.
-- [ ] Demonstrate a fixed-size graph/fabric-like data structure without
+- [x] Demonstrate a fixed-size graph/fabric-like data structure without
       hardcoding its implementation into the compiler.
-- [ ] Demonstrate serialization/snapshot code using ordinary Actus `Array`,
+- [x] Demonstrate serialization/snapshot code using ordinary Actus `Array`,
       `Buffer`, `pack`, and ownership contracts.
-- [ ] Demonstrate bounded decay/threshold logic with typed literals and
+- [x] Demonstrate bounded decay/threshold logic with typed literals and
       compound assignment.
-- [ ] Verify the same source is understood by check, build, test, formatter,
+- [x] Verify the same source is understood by check, build, test, formatter,
       and LSP.
-- [ ] Only after this gate is closed may an advanced systems workload be
+- [x] Only after this gate is closed may an advanced systems workload be
       claimed as compiler-validated rather than source-level experimental code.
 
 ## Non-goals

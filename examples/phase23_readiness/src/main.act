@@ -1,0 +1,67 @@
+"""
+Phase 23.8 systems-readiness fixture.
+
+This is a bounded graph/fabric workload, not an application-specific runtime.
+It combines fixed-size topology, packed snapshot metadata, zero-copy Buffer
+serialization, typed failure, Boolean control flow, and deterministic decay.
+"""
+enum EncodeError {
+    Full,
+    Invalid,
+}
+
+pack SnapshotHeader { erg storage: u32; layout little; fields { erg node_count: u8 at 0; erg threshold: u8 at 8; erg flags: u8 at 16; abs _reserved: u8 at 24 = 0; } }
+
+struct Node {
+    value: u32,
+    threshold: u8,
+    decay: u8,
+    flags: u8,
+    next: u32,
+}
+
+struct Fabric[N: Usize] {
+    nodes: Array[Node, N],
+}
+
+verb decay(ins node: Node) -> Int {
+    node.decay += 1u8;
+    if node.decay >= node.threshold {
+        node.flags |= 1u8;
+    }
+    return 0;
+}
+
+verb encode_node(ins output: Buffer, abs node: Node) -> Result[Int, EncodeError] {
+    append(output, node.value as u8);
+    return Result[Int, EncodeError].Ok(1);
+}
+
+verb validate_node(abs node: Node) -> Result[Int, EncodeError] {
+    return Result[Int, EncodeError].Err(EncodeError.Invalid);
+}
+
+verb snapshot(ins output: Buffer, abs fabric: Fabric[2]) -> Result[Int, EncodeError] {
+    erg first = encode_node(output: ins output, node: abs fabric.nodes[0])?;
+    erg second = encode_node(output: ins output, node: abs fabric.nodes[1])?;
+    return Result[Int, EncodeError].Ok(first + second);
+}
+
+verb main() -> Int {
+    erg fabric: Fabric[2] = Fabric[2] {nodes: Array[Node, 2]()};
+    fabric.nodes[0] = Node {value: 40u32, threshold: 2u8, decay: 0u8, flags: 0u8, next: 1u32};
+    fabric.nodes[1] = Node {value: 0u32, threshold: 2u8, decay: 0u8, flags: 0u8, next: 0u32};
+    erg decay_status = decay(node: ins fabric.nodes[0]);
+    erg snapshot_bytes = Buffer[8];
+    erg encoded = snapshot(output: ins snapshot_bytes, fabric: abs fabric);
+    erg total: Int = case dat encoded {
+        Result.Ok(count) => count,
+        Result.Err(_) => 0,
+    };
+    erg validation = validate_node(node: abs fabric.nodes[1]);
+    erg validation_status: Int = case dat validation {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+    return total + validation_status + decay_status + fabric.nodes[0].decay as Int + fabric.nodes[0].flags as Int + 38;
+}

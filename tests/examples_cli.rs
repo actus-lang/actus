@@ -187,3 +187,41 @@ fn phase23_capability_package_passes_strict_test_native_and_object_acceptance() 
     let _ = std::fs::remove_file(binary);
     let _ = std::fs::remove_file(object);
 }
+
+#[cfg(unix)]
+#[test]
+fn phase23_readiness_package_passes_strict_and_native_acceptance() {
+    let root =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_readiness");
+    let binary =
+        std::env::temp_dir().join(format!("actus-phase23-readiness-{}.bin", std::process::id()));
+    let rejected = root.join("tests/fixtures/rejected_buffer_owner.act");
+
+    for arguments in [vec!["check", "--strict"], vec!["test", "--strict"], vec!["fmt", "--check"]] {
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(arguments)
+            .current_dir(&root)
+            .output()
+            .expect("run strict Phase 23.8 package command");
+        assert!(result.status.success(), "readiness command failed: {:?}", result);
+    }
+
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&binary)
+        .current_dir(&root)
+        .output()
+        .expect("build Phase 23.8 readiness executable");
+    assert!(build.status.success(), "readiness build failed: {:?}", build);
+    let execution =
+        std::process::Command::new(&binary).output().expect("run Phase 23.8 readiness executable");
+    assert_eq!(execution.status.code(), Some(41));
+
+    let rejected_check = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", rejected.to_str().expect("rejected fixture path"), "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("check rejected Phase 23.8 fixture");
+    assert!(!rejected_check.status.success());
+    let _ = std::fs::remove_file(binary);
+}
