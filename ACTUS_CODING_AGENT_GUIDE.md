@@ -1037,6 +1037,20 @@ Formatter and source-limit checks remain independent of native reachability.
 Changes to call collection, generic specialization, module facades, or symbol
 bindings require semantic, native, and multi-object regression evidence.
 
+#### 17.3.3 Shared resolution boundaries
+
+`actus check --strict` and the LSP use the shared module/facade semantic
+resolution contract. They must resolve sibling declarations, nested facades,
+visibility, and public exports consistently, but they intentionally stop before
+native code generation.
+
+`actus test --strict`, object builds, and executable builds use the shared
+native dependency-closure contract described above. They must start from the
+same selected public roots, materialize the same reachable private and generic
+dependencies, and preserve the same symbol and diagnostic identity across
+surfaces. Do not implement a separate dependency scanner for one command or
+force semantic-only commands to invoke code generation.
+
 ### 17.4 Visibility
 
 `open` on a declaration or sibling export is the Actus visibility mechanism.
