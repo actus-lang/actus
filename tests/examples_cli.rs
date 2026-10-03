@@ -7,6 +7,13 @@ use actus::cli::run_with_args;
 use object::{Object, ObjectSymbol};
 
 #[cfg(unix)]
+fn has_main_symbol(object_file: &object::File<'_>) -> bool {
+    object_file
+        .symbols()
+        .any(|symbol| symbol.name().is_ok_and(|name| matches!(name, "main" | "_main")))
+}
+
+#[cfg(unix)]
 #[test]
 fn sensor_telemetry_example_builds_and_executes() {
     let root = std::env::temp_dir().join(format!("actus-sensor-example-{}", std::process::id()));
@@ -175,7 +182,7 @@ fn phase23_capability_package_passes_strict_test_native_and_object_acceptance() 
     let object_bytes = std::fs::read(&object).expect("read Phase 23 object");
     let object_file = object::File::parse(object_bytes.as_slice()).expect("parse Phase 23 object");
     assert!(object_file.section_by_name(".text").is_some());
-    assert!(object_file.symbols().any(|symbol| symbol.name() == Ok("main")));
+    assert!(has_main_symbol(&object_file));
 
     let rejected_check = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["check", rejected.to_str().expect("rejected fixture path"), "--strict"])
@@ -239,7 +246,7 @@ fn phase23_readiness_package_passes_strict_and_native_acceptance() {
     let object_file =
         object::File::parse(object_bytes.as_slice()).expect("parse Phase 23.14 object");
     assert!(object_file.section_by_name(".text").is_some());
-    assert!(object_file.symbols().any(|symbol| symbol.name() == Ok("main")));
+    assert!(has_main_symbol(&object_file));
 
     for fixture in rejected {
         let rejected_check = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
