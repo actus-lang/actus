@@ -376,22 +376,29 @@ and executable serialization remain intentionally owned by Gates 23.11 and
 
 ### Gate 23.10: Multi-word layout and type-system validation
 
-- [ ] Register array-backed pack storage as a first-class layout identity,
-      distinct from an ordinary `Array[u8, N]` value.
-- [ ] Validate storage capacity and field offsets using checked compile-time
+- [x] Register array-backed pack storage as a first-class semantic layout
+      identity, distinct from an ordinary `Array[u8, N]` value.
+- [x] Validate storage capacity and field offsets using checked compile-time
       arithmetic with deterministic diagnostics for overflow and width errors.
-- [ ] Preserve pack identity, storage width, endianness, field metadata, and
-      generic arguments in semantic and native specialization keys.
-- [ ] Resolve field reads and writes against the storage representation while
+- [x] Preserve pack identity, storage width, endianness, field metadata,
+      generic type keys, and defaults in the semantic layout contract. Native
+      specialization keys remain owned by Gate 23.12.
+- [x] Resolve the validated field model against one storage representation,
       preserving field width, signedness, defaults, reserved fields, and
-      ownership roles.
-- [ ] Reject invalid storage element types, runtime capacities, unsupported
+      ownership roles for later native lowering.
+- [x] Reject invalid storage element types, runtime capacities, unsupported
       nested storage, duplicate fields, overlapping fields, and out-of-range
       bit slices before native lowering.
-- [ ] Prove that pack field access and raw storage indexing observe one
-      coherent representation; no aliasing or stale shadow copy is permitted.
-- [ ] Add negative tests for invalid 512-bit layouts and positive tests for
-      exact 64-byte/512-bit layouts.
+- [x] Keep pack field metadata and raw-storage identity derived from the same
+      AST storage contract; executable indexed access and aliasing proofs remain
+      owned by Gate 23.11.
+- [x] Add negative tests for invalid layouts and positive tests for exact
+      64-byte/512-bit layouts, including field metadata and defaults.
+
+Gate 23.10 is closed for the frontend and semantic layout boundary. It does
+not claim native byte indexing, executable multi-word field access, or binary
+serialization; those capabilities remain explicitly scoped to Gates 23.11 and
+23.12.
 
 ### Gate 23.11: Indexed storage access and ownership semantics
 

@@ -69,6 +69,32 @@ pub struct PackDecl {
     pub span: SourceSpan,
 }
 
+impl PackDecl {
+    pub fn layout_identity(&self) -> String {
+        let fields = self
+            .fields
+            .iter()
+            .map(|field| {
+                format!(
+                    "{}:{}:{}@{}",
+                    field_role_name(&field.role),
+                    field.name,
+                    field.ty.canonical_key(),
+                    field.offset
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "{}|storage={}|layout={:?}|fields=[{}]",
+            self.name,
+            self.storage.canonical_key(),
+            self.endianness,
+            fields
+        )
+    }
+}
+
 /// Frontend-owned representation of a pack's physical storage contract.
 ///
 /// `ByteArray` is accepted by the frontend and semantic layers as an inline,
@@ -88,6 +114,10 @@ impl PackStorage {
 
     pub fn span(&self) -> SourceSpan {
         self.type_name().span
+    }
+
+    pub fn canonical_key(&self) -> String {
+        self.type_name().canonical_key()
     }
 
     pub fn byte_capacity(&self) -> Option<u64> {
@@ -120,6 +150,15 @@ impl PackStorage {
                 })
             }
         }
+    }
+}
+
+fn field_role_name(role: &Role) -> &'static str {
+    match role {
+        Role::Erg => "erg",
+        Role::Abs => "abs",
+        Role::Dat => "dat",
+        Role::Ins => "ins",
     }
 }
 

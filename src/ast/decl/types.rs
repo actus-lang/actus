@@ -16,6 +16,20 @@ pub struct TypeName {
     pub span: SourceSpan,
 }
 
+impl TypeName {
+    pub fn canonical_key(&self) -> String {
+        if self.arguments.is_empty() {
+            self.name.clone()
+        } else {
+            format!(
+                "{}[{}]",
+                self.name,
+                self.arguments.iter().map(Self::canonical_key).collect::<Vec<_>>().join(",")
+            )
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReturnAccess {
     Owned,

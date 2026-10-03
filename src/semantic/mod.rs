@@ -34,8 +34,8 @@ pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, Unw
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{
     Binding, BorrowRecord, ConditionalFact, DynamicRoleType, ExclusiveLoan, FatPointerLayout,
-    GenericInstance, LiteralFact, Origin, OriginRecord, OriginRoot, ReachablePerformance,
-    SemanticModel,
+    GenericInstance, LiteralFact, Origin, OriginRecord, OriginRoot, PackFieldContract,
+    PackLayoutContract, ReachablePerformance, SemanticModel,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use types::{SemanticType, TypeRegistry};

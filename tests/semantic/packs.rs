@@ -29,6 +29,35 @@ fn accepts_a_bounded_u8_array_as_multi_word_pack_storage() {
 }
 
 #[test]
+fn records_multi_word_pack_layout_identity_and_field_metadata() {
+    let model = analyze_source(
+        "pack CacheLine { erg storage: Array[u8, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",
+    )
+    .expect("multi-word pack metadata should be semantic data");
+    let layout = &model.pack_layouts[0];
+    assert_eq!(layout.storage, "Array[u8,64]");
+    assert_eq!(layout.storage_bytes, 64);
+    assert_eq!(layout.storage_bits, 512);
+    assert_eq!(layout.alignment_bytes, 1);
+    assert_eq!(layout.endianness, "little");
+    assert_eq!(layout.fields[2].name, "word_2");
+    assert_eq!(layout.fields[2].offset, 256);
+    assert!(!layout.fields[2].has_default);
+    assert!(layout.identity.contains("Array[u8,64]"));
+}
+
+#[test]
+fn records_pack_field_defaults_in_the_layout_contract() {
+    let model = analyze_source(
+        "pack Flags { erg storage: u8; layout little; fields { abs enabled: u1 at 0 = 0; abs _reserved: u7 at 1 = 0; } }",
+    )
+    .expect("defaulted pack fields should be represented in semantic metadata");
+    let fields = &model.pack_layouts[0].fields;
+    assert!(fields[0].has_default);
+    assert!(fields[1].has_default);
+}
+
+#[test]
 fn rejects_invalid_multi_word_pack_storage_contracts() {
     for source in [
         "pack WrongElement { erg storage: Array[u16, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",
