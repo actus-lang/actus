@@ -69,16 +69,27 @@ The implementation work begins at Gate 24.1.
 
 ## Gate 24.1: Hierarchical resolver
 
-- [ ] Discover child directories as module members without treating them as
+- [x] Discover child directories as module members without treating them as
       unrelated package roots.
-- [ ] Require `layout/layout.act`, `runtime/runtime.act`, and equivalent
+- [x] Require `layout/layout.act`, `runtime/runtime.act`, and equivalent
       canonical facades for every declared child module.
-- [ ] Produce deterministic module paths and source ordering independent of
+- [x] Produce deterministic module paths and source ordering independent of
       host filesystem enumeration order.
-- [ ] Reject ambiguous file/directory module shapes and missing child facades
+- [x] Reject ambiguous file/directory module shapes and missing child facades
       with stable diagnostics.
-- [ ] Preserve existing package roots, dependency roots, runtime modules, and
+- [x] Preserve existing package roots, dependency roots, runtime modules, and
       facade-bypass protections.
+
+Gate 24.1 is closed. `ResolvedModule` now exposes deterministic child-module
+metadata with canonical module paths, directories, and facades. Child
+directories require a matching `<child>/<child>.act` facade; a missing facade
+uses the existing `E1101` contract, while a direct sibling-file conflict uses
+the existing `E1102` ambiguity contract. Direct child imports continue to be
+rejected through the parent facade boundary with `E1108`.
+
+Evidence is provided by the resolver suite, including sorted child discovery,
+missing-child-facade rejection, sibling/child ambiguity rejection, and the
+existing package-root and facade-bypass regressions.
 
 ## Gate 24.2: Parent-to-child facade aggregation
 
