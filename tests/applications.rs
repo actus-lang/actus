@@ -154,6 +154,44 @@ fn module_application_executes_public_wrapper_with_private_implementation() {
 }
 
 #[test]
+fn package_configuration_module_emits_without_an_anchor_verb() {
+    let source = "import config; verb main() -> Int { return LIMIT as Int; }\n";
+    let (root, input, output) = project("const-only-config", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
+        .expect("write configuration values");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(30));
+    let object = output.with_extension("obj");
+    let object_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build const-only configuration objects");
+    assert!(
+        object_build.status.success(),
+        "object build stderr: {}",
+        String::from_utf8_lossy(&object_build.stderr)
+    );
+    let module_bytes = fs::read(root.join("application.module.actus_mod_6_config.obj"))
+        .expect("read const-only configuration object");
+    let module_file = object::File::parse(module_bytes.as_slice())
+        .expect("parse const-only configuration object");
+    assert!(
+        !module_file
+            .symbols()
+            .filter_map(|symbol| symbol.name().ok())
+            .any(|symbol| symbol.contains("LIMIT"))
+    );
+    fs::remove_dir_all(root).expect("remove const-only configuration project");
+}
+
+#[test]
 fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
     let source = "import output; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);

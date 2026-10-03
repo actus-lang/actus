@@ -123,18 +123,27 @@ deliberately deferred to Gate 25.3.
 
 ## Gate 25.3: Const-only module and native lowering
 
-- [ ] Permit a module whose public implementation contains no verbs.
-- [ ] Prevent const-only modules from failing with “program has no verb
+- [x] Permit a module whose public implementation contains no verbs.
+- [x] Prevent const-only modules from failing with “program has no verb
       declarations”.
-- [ ] Represent public configuration values as compile-time bindings rather
+- [x] Represent public configuration values as compile-time bindings rather
       than runtime symbols or callable declarations.
-- [ ] Inline transitive configuration constants before native lowering.
-- [ ] Ensure nested constant expressions are fully substituted before codegen.
-- [ ] Skip empty native object emission when a module has no runtime code, or
+- [x] Inline transitive configuration constants before native lowering.
+- [x] Ensure nested constant expressions are fully substituted before codegen.
+- [x] Skip empty native object emission when a module has no runtime code, or
       define and test an equivalent deterministic metadata-only boundary.
-- [ ] Verify executable and object builds without temporary anchor verbs.
-- [ ] Confirm that no configuration constant introduces runtime storage or ABI
+- [x] Verify executable and object builds without temporary anchor verbs.
+- [x] Confirm that no configuration constant introduces runtime storage or ABI
       identity.
+
+Gate 25.3 is closed. Imported configuration modules containing only typed
+compile-time declarations now pass semantic preparation and emit a valid empty
+native object instead of failing with `program has no verb declarations`.
+Public constants are resolved through the existing compilation plan before
+native lowering, while the configuration object contributes no runtime symbol,
+storage, or ABI entry. An executable integration test proves a package can
+consume a const-only `config` facade and run without an anchor verb; the
+corresponding module object is emitted deterministically.
 
 ## Gate 25.4: Package integration and dependency safety
 

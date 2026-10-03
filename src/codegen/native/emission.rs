@@ -29,6 +29,10 @@ pub(super) fn emit_program_object_for_target(
     additional_instances: &[GenericInstance],
 ) -> Result<Vec<u8>, NativeEmitError> {
     let (program, semantic) = prepare_program(program, target, additional_instances)?;
+    let (verbs, external_verbs) = collect_declarations(&program);
+    if verbs.is_empty() && external_verbs.is_empty() && symbol.is_none() {
+        return emit_empty_object(configuration, target);
+    }
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
     let performance_registry = PerformanceRegistry::from_program_in_namespace(
         &program,
@@ -37,7 +41,6 @@ pub(super) fn emit_program_object_for_target(
     );
     performance_registry.validate().map_err(NativeEmitError)?;
     let performance_definitions = performance_registry.definitions(&program)?;
-    let (verbs, external_verbs) = collect_declarations(&program);
     validate_entry_verb(&verbs, symbol)?;
     emit_verbs_object(VerbEmission {
         program: &program,
@@ -52,6 +55,16 @@ pub(super) fn emit_program_object_for_target(
         target,
         bindings,
     })
+}
+
+fn emit_empty_object(
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+) -> Result<Vec<u8>, NativeEmitError> {
+    create_module(configuration, target)?
+        .finish()
+        .emit()
+        .map_err(|error| NativeEmitError(format!("native module emission failed: {error:?}")))
 }
 
 fn prepare_program(
