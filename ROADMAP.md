@@ -19,6 +19,10 @@ Phase 21 tracks production-language capability and Wire readiness. It is a
 prerequisite evidence phase, not a claim that Wire or Ustari is implemented.
 Phase 22 tracks enterprise compiler-platform work that is important for a
 world-class product but is independently gated from the Wire prerequisite.
+Phase 23 tracks the language/compiler capability foundation required for
+advanced bounded systems workloads. It begins with const generics, Boolean
+literal expressions, and nested place/call/control-flow support; it does not
+claim that any specific workload is implemented.
 
 Phase checkboxes describe phase-level status. A phase is marked complete only when its scope is complete or essentially closed with an explicitly documented deferral.
 
@@ -57,3 +61,4 @@ gated implementation roadmaps:
 - [ ] [Phase 20: Module Visibility and Facade-Bounded Compilation](docs/roadmap/phase-20-module-visibility-and-facade-boundaries.md)
 - [ ] [Phase 21: Production Language Capability and Wire Readiness](docs/roadmap/phase-21-production-language-capability-and-wire-readiness.md)
 - [ ] [Phase 22: Enterprise Compiler Platform](docs/roadmap/phase-22-enterprise-compiler-platform.md)
+- [ ] [Phase 23: Systems Language Capability Foundation](docs/roadmap/phase-23-systems-language-capability-foundation.md)
