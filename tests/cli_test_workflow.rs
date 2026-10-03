@@ -96,6 +96,34 @@ fn test_links_imported_module_objects_for_meta_tests() {
 
 #[cfg(unix)]
 #[test]
+fn test_compiles_meta_tests_against_their_complete_sibling_module() {
+    let root = create_test_project(
+        "runner-sibling-module",
+        "placeholder.act",
+        "meta test\nverb unused() -> Int { return 0; }\n",
+    );
+    fs::remove_file(root.join("tests/placeholder.act")).expect("remove placeholder test");
+    fs::create_dir_all(root.join("src/aie")).expect("create module directory");
+    fs::write(root.join("src/aie/aie.act"), "open fabric; open engine;\n")
+        .expect("write module facade");
+    fs::write(root.join("src/aie/fabric.act"), "open struct CorticalFabric { marker: Int, }\n")
+        .expect("write sibling type");
+    fs::write(
+        root.join("src/aie/engine.act"),
+        "meta test\nverb sees_sibling_type() -> Int {\n    erg fabric: CorticalFabric = CorticalFabric { marker: 0 };\n    return fabric.marker;\n}\n",
+    )
+    .expect("write test sibling");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("sees_sibling_type ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_propagates_non_zero_meta_test_exit_status() {
     let root = create_test_project(
         "runner-failure",
