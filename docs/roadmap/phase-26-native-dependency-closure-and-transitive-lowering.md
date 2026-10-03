@@ -61,8 +61,8 @@ reachability never widens facade visibility. The fixtures in
 `tests/fixtures/native_dependency_closure/phase-26-contract.txt` cover a
 public-to-private transitive chain, repeated-helper deduplication, private
 facade bypass, unresolved reachable helpers, and duplicate native identity.
-Gates 26.1-26.6 remain open until the compiler implements and executes this
-contract with native evidence.
+Gates 26.1-26.6 are closed below with compiler, object, executable, runtime,
+visibility, and deterministic-quality evidence.
 
 ## Gate 26.1: Reachable call-graph discovery
 
@@ -74,15 +74,13 @@ contract with native evidence.
       implementation.
 - [x] Include external bridge declarations without treating them as Actus
       function bodies.
-- [ ] Reject unresolved reachable calls before object emission with a stable
+- [x] Reject unresolved reachable calls before object emission with a stable
       diagnostic.
 - [x] Deduplicate repeated helper calls and preserve deterministic traversal.
 
 Gate 26.1 implementation is in place for reachable Actus verbs, private
-helpers, method calls, performances, external bridge declarations, and stable
-deduplicated traversal. The unresolved-reachable-call diagnostic remains open
-for Gate 26.5 because it requires source-span propagation and parity across
-check, build, test, and LSP diagnostics.
+helpers, method calls, performances, external bridge declarations, stable
+deduplicated traversal, and fail-closed unresolved-call diagnostics.
 
 ## Gate 26.2: Generic and transitive specialization
 
@@ -95,7 +93,7 @@ check, build, test, and LSP diagnostics.
 - [x] Prevent unreachable generic declarations from being emitted.
 - [x] Add accepted tests for nested generic calls across module
       and facade boundaries.
-- [ ] Add rejected tests for unresolved or ambiguous nested generic calls with
+- [x] Add rejected tests for unresolved or ambiguous nested generic calls with
       stable diagnostics.
 
 Gate 26.2 now materializes every concrete generic verb instance discovered by
@@ -103,8 +101,8 @@ the semantic instance graph, rewrites const-generic expressions and nested
 calls to deterministic specialized names, and registers those names across
 module-object symbol bindings. Native regressions cover multiple instances in
 one call graph and imported and nested facade boundaries. Rejected-call
-diagnostics remain open for Gate 26.5 because they require source-span
-propagation and parity across check, build, test, and LSP diagnostics.
+diagnostics cover unresolved and ambiguous nested generic calls with stable
+source spans.
 
 ## Gate 26.3: Aggregate return and layout dependencies
 
