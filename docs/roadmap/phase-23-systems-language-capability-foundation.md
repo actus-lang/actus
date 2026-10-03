@@ -614,7 +614,8 @@ gate closes those gaps in the compiler and proves the complete package path.
       integer-only and float-positive verification tests.
 - [x] Prove `actus check --strict`, `actus test --strict`, native object build,
       executable emission, executable execution, full repository tests,
-      clippy, formatting, documentation, source-limit, and diff checks.
+      clippy, repository formatting, documentation, source-limit, and diff
+      checks.
 
 Gate 23.16 evidence:
 
@@ -629,6 +630,9 @@ Gate 23.16 evidence:
   through `actus test`, `actus check --strict` passes, the native object and
   executable are emitted for `x86_64-unknown-linux-gnu`, and the executable
   exits with status `0`.
+- Formatter evidence: the repository formatter gate and the Phase 23
+  readiness formatter acceptance remain green; the external validation copy
+  is not used to claim a formatter result for files outside this repository.
 - IR verification: `test_zero_float_verification` and its float-positive
   companion inspect Cranelift instructions, operands, and result types in
   `src/codegen/native/ir_audit.rs`.
