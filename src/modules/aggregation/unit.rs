@@ -45,6 +45,7 @@ pub struct ModuleSource {
     path: PathBuf,
     kind: ModuleSourceKind,
     program: Program,
+    fingerprint: String,
 }
 
 impl ModuleSource {
@@ -109,8 +110,11 @@ pub fn load_module_unit_with_overlays(
         super::parsing::parse_module_with_overlays(resolver, module_path, overlays)?;
     let exports = super::exports::exports_module_with_overlays(resolver, module_path, overlays)?;
     let sources = load_sources(resolver, &resolved, overlays)?;
-    let source_key =
-        sources.iter().map(|source| normalize(source.path())).collect::<Vec<_>>().join("|");
+    let source_key = sources
+        .iter()
+        .map(|source| format!("{}@{}", normalize(source.path()), source.fingerprint))
+        .collect::<Vec<_>>()
+        .join("|");
     let namespace =
         ModuleNamespace::from_module_path(module_path).map_err(ModuleError::Resolution)?;
     let unit = ModuleUnit {
@@ -204,7 +208,22 @@ fn load_source(
     }
     let program = parse(tokens)
         .map_err(|error| ModuleError::Parse { path: path.to_owned(), error: Box::new(error) })?;
-    Ok(ModuleSource { path: path.to_owned(), kind, program })
+    Ok(ModuleSource {
+        path: path.to_owned(),
+        kind,
+        program,
+        fingerprint: source_fingerprint(&source),
+    })
+}
+
+fn source_fingerprint(source: &str) -> String {
+    let mut first = 0xcbf29ce484222325u64;
+    let mut second = 0x9e3779b185ebca87u64;
+    for byte in source.as_bytes() {
+        first = (first ^ u64::from(*byte)).wrapping_mul(0x100000001b3);
+        second = (second ^ u64::from(*byte).rotate_left(13)).wrapping_mul(0x517cc1b727220a95);
+    }
+    format!("{first:016x}{second:016x}")
 }
 
 fn normalize(path: &Path) -> String {

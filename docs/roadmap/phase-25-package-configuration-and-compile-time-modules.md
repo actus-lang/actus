@@ -147,17 +147,27 @@ corresponding module object is emitted deterministically.
 
 ## Gate 25.4: Package integration and dependency safety
 
-- [ ] Make normal modules consume `import config;` through the public facade.
-- [ ] Reject configuration-to-domain and configuration-to-runtime dependency
+- [x] Make normal modules consume `import config;` through the public facade.
+- [x] Reject configuration-to-domain and configuration-to-runtime dependency
       cycles before semantic analysis or code generation.
-- [ ] Preserve package dependency, runtime profile, target, and lockfile
+- [x] Preserve package dependency, runtime profile, target, and lockfile
       behavior.
-- [ ] Ensure configuration values participate in cache/build identity through
+- [x] Ensure configuration values participate in cache/build identity through
       canonical source and interface fingerprints.
-- [ ] Keep configuration boundaries deterministic across local dependencies,
+- [x] Keep configuration boundaries deterministic across local dependencies,
       overlays, repeated loads, and filesystem ordering.
-- [ ] Add accepted and rejected cross-module ownership/visibility fixtures to
+- [x] Add accepted and rejected cross-module ownership/visibility fixtures to
       prove configuration remains compile-time-only.
+
+Gate 25.4 is closed. Normal package modules consume `config` through the
+reserved public facade, while configuration-to-domain/runtime imports remain
+rejected before semantic analysis. Module identity now includes a stable
+fingerprint for every canonical source, including overlay content, so changing
+a configuration value invalidates the same cache/build identity as changing
+any other module source. Existing dependency, runtime-profile, target, and
+lockfile tests remain green; module tests cover repeated loading, sorted
+discovery, facade visibility, configuration rejection, and changed-source
+identity.
 
 ## Gate 25.5: Tooling and developer workflow
 
