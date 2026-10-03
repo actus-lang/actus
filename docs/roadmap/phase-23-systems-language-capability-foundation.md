@@ -586,6 +586,58 @@ resolves pack elements as typed inline array layouts, orders dependent array
 layouts before their containing pack arrays, and lowers indexed pack places
 with one checked address calculation and the correct inline storage stride.
 
+### Gate 23.16: Package test execution and native validation integrity
+
+Status: **closed**. The Phase 23 readiness workload exposed two integration
+gaps that were not covered by source checking alone: the test runner analyzed
+test files outside their package facade/module graph, and native indexed
+access could lose fixed-width index types while lowering nested places. The
+gate closes those gaps in the compiler and proves the complete package path.
+
+- [x] Compile package tests through the package facade and complete sibling
+      module graph so declarations such as `CorticalFabric` are visible to
+      `actus test --strict`.
+- [x] Keep fixed-width index types such as `u32` intact through semantic
+      expression typing, native indexed access, nested calls, and compound
+      assignment lowering. No implicit `Int` fallback may be introduced at
+      the native boundary.
+- [x] Preserve typed values through nested `if` and `case` joins, including
+      semicolon-terminated final expressions and diverging branches.
+- [x] Preserve branch-local ownership state through native merge blocks and
+      prevent double-drop when owned enum values are assigned in one branch or
+      returned from a function.
+- [x] Support pack-backed values in generic array layout and native indexed
+      access without changing their inline stride, alignment, or ownership
+      contract.
+- [x] Add a real Cranelift IR instruction audit that detects floating-point
+      instructions through opcodes, operands, and results, with explicit
+      integer-only and float-positive verification tests.
+- [x] Prove `actus check --strict`, `actus test --strict`, native object build,
+      executable emission, executable execution, full repository tests,
+      clippy, formatting, documentation, source-limit, and diff checks.
+
+Gate 23.16 evidence:
+
+- Package module-graph regression:
+  `test_compiles_meta_tests_against_their_complete_sibling_module` in
+  `tests/cli_test_workflow.rs`.
+- Typed frontend and native coverage: the parser and semantic array suites,
+  `tests/arrays_cli.rs`, and `tests/structs_cli.rs`, including nested typed
+  joins, fixed-width indexes, pack-array access, ownership merges, and
+  cleanup regressions.
+- External readiness validation: the four `tests/aie.act` package tests pass
+  through `actus test`, `actus check --strict` passes, the native object and
+  executable are emitted for `x86_64-unknown-linux-gnu`, and the executable
+  exits with status `0`.
+- IR verification: `test_zero_float_verification` and its float-positive
+  companion inspect Cranelift instructions, operands, and result types in
+  `src/codegen/native/ir_audit.rs`.
+- Repository gates pass with `cargo fmt --all -- --check`, `cargo check
+  --all-targets --all-features`, `cargo clippy --all-targets --all-features
+  -- -D warnings`, `cargo test --all-targets --all-features`,
+  `scripts/check_source_limits.sh`, `scripts/check_documentation.sh`, and
+  `git diff --check`.
+
 ## Non-goals
 
 This phase does not:
