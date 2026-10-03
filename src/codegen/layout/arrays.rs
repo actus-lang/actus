@@ -31,6 +31,9 @@ pub(crate) fn array_definitions(
                     }
                 }
             }
+            TopLevelDecl::Pack(pack) => {
+                collect_type_arrays(pack.storage.type_name(), &mut definitions)
+            }
             _ => {}
         }
     }

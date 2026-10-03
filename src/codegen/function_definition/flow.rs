@@ -38,7 +38,10 @@ pub(crate) fn emit_value_return(
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     match (return_type, return_slot) {
-        (Some(return_type), Some(destination)) if return_type.uses_sret() => {
+        (Some(return_type), Some(destination))
+            if layouts.uses_return_slot(return_type)
+                && !layouts.returns_borrowed_view(return_type) =>
+        {
             emit_sret_return(function, result, destination, return_type, layouts)
         }
         (Some(return_type), Some(destination)) if layouts.returns_borrowed_view(return_type) => {

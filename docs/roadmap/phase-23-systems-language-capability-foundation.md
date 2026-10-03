@@ -425,24 +425,36 @@ access, and serialization remain intentionally unclaimed until Gate 23.12.
 
 ### Gate 23.12: Native lowering, ABI, and serialization
 
-- [ ] Lower multi-word pack storage to contiguous inline native memory with
+- [x] Lower multi-word pack storage to contiguous inline native memory with
       deterministic alignment and no hidden allocation or C bridge.
-- [ ] Lower indexed storage operations through one checked address
+- [x] Lower indexed storage operations through one checked address
       calculation, load/store width, and bounds path; never duplicate a
       side-effecting base or index expression.
-- [ ] Lower field access at the declared bit offset with correct masking,
+- [x] Lower field access at the declared bit offset with correct masking,
       shifting, sign/zero extension, and endianness for every supported field
       width.
-- [ ] Define and test initialization, copy/move, drop, return, argument
+- [x] Define and test initialization, copy/move, drop, return, argument
       passing, and aggregate assignment for 64-byte packs.
-- [ ] Provide deterministic byte snapshot/restore behavior using ordinary
+- [x] Provide deterministic byte snapshot/restore behavior using ordinary
       Actus operations. Round trips must preserve every byte and every declared
       field value across supported endianness modes.
-- [ ] Inspect emitted objects and execute host-native tests for exact layout,
+- [x] Inspect emitted objects and execute host-native tests for exact layout,
       indexed storage mutation, field mutation, bounds failure, and snapshot
       round trips.
-- [ ] Add a freestanding/object-level parity test where the target contract
+- [x] Add a freestanding/object-level parity test where the target contract
       supports the representation; do not add a target-specific language path.
+
+Gate 23.12 evidence: `tests/arrays_cli.rs` covers indexed storage and bounds
+traps, bitfields, unaligned multi-byte fields, little- and big-endian access,
+array-backed pack return slots, Buffer snapshot/restore, and deterministic
+object emission. `cargo test --test arrays_cli` passes all 57 native/object
+tests; repository source-limit and compiler quality checks are required before
+the gate commit.
+
+Gate 23.12 is closed for the current supported representation: array-backed
+pack storage is lowered as an inline byte region, while scalar-storage packs
+retain their existing scalar ABI. No target-specific syntax or C serialization
+bridge is introduced.
 
 ### Gate 23.13: Formatter, LSP, and diagnostics parity for packed storage
 

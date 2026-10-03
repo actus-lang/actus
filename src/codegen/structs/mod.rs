@@ -2,7 +2,9 @@ mod access;
 mod cleanup;
 mod compound;
 mod construct;
+mod inline_pack;
 mod memory;
+mod pack_validation;
 mod packs;
 mod types;
 

@@ -47,9 +47,10 @@ pub(crate) fn lower_pack_field_compound_assignment<'source>(
         layouts,
     )?;
     let current = lower_pack_field(function, storage, pack_id, field, layouts)?;
-    let right = lower_expression(
+    let right = lower_pack_compound_rhs(
         function,
         value,
+        field_layout.ty,
         locals,
         local_types,
         functions,
@@ -57,11 +58,6 @@ pub(crate) fn lower_pack_field_compound_assignment<'source>(
         string_data,
         layouts,
     )?;
-    let right = super::super::expressions::coerce_to_ir_type(
-        function,
-        right,
-        layouts.ir_type(field_layout.ty)?,
-    );
     let updated =
         lower_compound_integer_operation(function, current, operator, right, field_layout.ty)?;
     let storage = lower_pack_field_write(
@@ -73,6 +69,33 @@ pub(crate) fn lower_pack_field_compound_assignment<'source>(
         pack.endianness,
         layouts,
     )?;
-    seal_checked_pack_block(function, field_layout.ty, "pack compound write block");
+    if !matches!(pack.storage, NativeType::Array(_)) {
+        seal_checked_pack_block(function, field_layout.ty, "pack compound write block");
+    }
     update_pack_binding(locals, name, storage)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_pack_compound_rhs(
+    function: &mut FunctionBuilder<'_>,
+    value: &Expr,
+    field_type: NativeType,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
+    let value = lower_expression(
+        function,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    Ok(super::super::expressions::coerce_to_ir_type(function, value, layouts.ir_type(field_type)?))
 }

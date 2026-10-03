@@ -16,6 +16,76 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_indexed_array_backed_pack_storage_natively() {
+    let status = run_array_fixture(
+        "array-backed-pack-storage",
+        "pack CacheLine { erg storage: Array[u8, 4]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; } } verb main() -> Int { erg line = CacheLine { storage: Array[u8, 4](), }; line.storage[1] = 40u8; line.byte_1 = 41u8; line.byte_1 += 0u8; return line.byte_1 as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_array_backed_pack_bit_field_access_natively() {
+    let status = run_array_fixture(
+        "array-backed-pack-bit-field",
+        "pack Flags { erg storage: Array[u8, 1]; layout little; fields { erg enabled: u1 at 0; abs _reserved: u7 at 1 = 0; } } verb main() -> Int { erg flags = Flags { storage: Array[u8, 1](), }; flags.enabled = 1; return flags.enabled as Int + 41; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_array_backed_pack_through_native_return_slot() {
+    let status = run_array_fixture(
+        "array-backed-pack-return",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb make() -> Frame { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; return frame; } verb main() -> Int { erg frame = make(); return frame.marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn respects_big_endian_array_backed_pack_fields() {
+    let status = run_array_fixture(
+        "array-backed-pack-big-endian",
+        "pack Word { erg storage: Array[u8, 2]; layout big; fields { erg high: u8 at 8; erg low: u8 at 0; } } verb main() -> Int { erg word = Word { storage: Array[u8, 2](), }; word.high = 41u8; return word.high as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn lowers_unaligned_multi_byte_pack_fields_natively() {
+    let status = run_array_fixture(
+        "array-backed-pack-unaligned-field",
+        "pack Slice { erg storage: Array[u8, 2]; layout little; fields { abs _prefix: u2 at 0 = 0; erg payload: u12 at 2; abs _suffix: u2 at 14 = 0; } } verb main() -> Int { erg slice = Slice { storage: Array[u8, 2](), }; slice.payload = 2748u16; return if slice.payload == 2748u16 { 42 } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn snapshots_array_backed_pack_bytes_through_buffer() {
+    let status = run_array_fixture(
+        "array-backed-pack-snapshot",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb snapshot(ins output: Buffer, abs frame: Frame) { append(output, frame.storage[0]); append(output, frame.storage[1]); } verb main() -> Int { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; erg output = Buffer[0]; snapshot(output: ins output, frame: abs frame); return output[0] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn restores_array_backed_pack_bytes_from_buffer() {
+    let status = run_array_fixture(
+        "array-backed-pack-restore",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb snapshot(ins output: Buffer, abs frame: Frame) { append(output, frame.storage[0]); append(output, frame.storage[1]); } verb restore(ins frame: Frame, abs input: Buffer) { frame.storage[0] = input[0]; frame.storage[1] = input[1]; } verb main() -> Int { erg source = Frame { storage: Array[u8, 2](), }; source.marker = 41u8; source.tail = 1u8; erg output = Buffer[0]; snapshot(output: ins output, frame: abs source); erg target = Frame { storage: Array[u8, 2](), }; restore(frame: ins target, input: abs output); return target.marker as Int + target.tail as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_typed_integer_literals_natively() {
     let status =
         run_array_fixture("typed-integer-literals", "verb main() -> u32 { return 1u32 + 2u32; }");
@@ -508,7 +578,7 @@ fn emits_identical_objects_for_repeated_array_builds() {
     let second = root.with_extension("second.o");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); values[1] = 41; return values[1] + 1; }",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb main() -> Int { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; return frame.marker as Int + 1; }",
     )
     .expect("write deterministic array fixture");
     for output in [&first, &second] {

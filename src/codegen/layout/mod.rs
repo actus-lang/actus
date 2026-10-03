@@ -213,7 +213,12 @@ impl LayoutRegistry {
     }
 
     pub(super) fn uses_return_slot(&self, ty: NativeType) -> bool {
-        ty.uses_sret() || self.is_borrowed_view_option(ty)
+        ty.uses_sret() || self.is_inline_pack(ty) || self.is_borrowed_view_option(ty)
+    }
+
+    pub(super) fn is_inline_pack(&self, ty: NativeType) -> bool {
+        let NativeType::Pack(id) = ty else { return false };
+        self.pack(id).is_some_and(|pack| matches!(pack.storage, NativeType::Array(_)))
     }
 
     pub(super) fn returns_borrowed_view(&self, ty: NativeType) -> bool {
