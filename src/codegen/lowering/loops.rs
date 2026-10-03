@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{InstBuilder, types};
+use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Block;
@@ -47,7 +47,7 @@ pub(super) fn lower_loop<'source>(
     let body = function.create_block();
     let exit = function.create_block();
     let (mut loop_locals, mut loop_types) =
-        initialize_loop(function, locals, types, &carried, header, body, exit)?;
+        initialize_loop(function, locals, types, layouts, &carried, header, body, exit)?;
     let flow = super::statements::lower_statements(
         function,
         &block.statements,
@@ -62,16 +62,18 @@ pub(super) fn lower_loop<'source>(
     finish_loop(function, locals, &loop_locals, &carried, header, exit, flow)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn initialize_loop<'source>(
     function: &mut FunctionBuilder<'_>,
     locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &HashMap<&'source String, NativeType>,
+    layouts: &LayoutRegistry,
     carried: &[String],
     header: cranelift_codegen::ir::Block,
     body: cranelift_codegen::ir::Block,
     exit: cranelift_codegen::ir::Block,
 ) -> Result<LoopState<'source>, NativeEmitError> {
-    append_loop_parameters(function, carried, header, exit);
+    append_loop_parameters(function, carried, types, layouts, header, exit)?;
     let initial_values = carried_values(locals, carried)?;
     jump_with_values(function, header, initial_values);
     function.switch_to_block(header);
@@ -129,11 +131,20 @@ fn find_loop_binding<'source>(
 fn append_loop_parameters(
     function: &mut FunctionBuilder<'_>,
     carried: &[String],
+    types: &HashMap<&String, NativeType>,
+    layouts: &LayoutRegistry,
     header: cranelift_codegen::ir::Block,
     exit: cranelift_codegen::ir::Block,
-) {
-    for _ in carried {
-        function.append_block_param(header, types::I32);
-        function.append_block_param(exit, types::I32);
+) -> Result<(), NativeEmitError> {
+    for name in carried {
+        let native_type = types
+            .iter()
+            .find(|(binding, _)| binding.as_str() == name)
+            .map(|(_, native_type)| *native_type)
+            .ok_or_else(|| NativeEmitError(format!("loop binding `{name}` has no native type")))?;
+        let ir_type = layouts.ir_type(native_type)?;
+        function.append_block_param(header, ir_type);
+        function.append_block_param(exit, ir_type);
     }
+    Ok(())
 }

@@ -40,6 +40,16 @@ fn executes_struct_field_access() {
 
 #[cfg(unix)]
 #[test]
+fn transfers_an_owned_enum_return_without_double_drop() {
+    build_and_run(
+        "verb produce() -> Option[u32] { erg result: Option[u32] = Option[u32].None; result = Option[u32].Some(1u32); return result; } verb main() -> Int { erg result: Option[u32] = produce(); return 42; }\n",
+        "owned-enum-return",
+        42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_struct_field_assignment() {
     build_and_run(
         "struct Point { x: Int, y: Int, } verb main() -> Int { erg point = Point { x: 40, y: 2, }; point.x = 41; return point.x + point.y; }\n",

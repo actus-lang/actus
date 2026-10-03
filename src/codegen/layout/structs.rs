@@ -179,10 +179,20 @@ impl LayoutRegistry {
     }
 
     fn pack_type_layout(&self, id: usize) -> Result<(u32, u32), NativeEmitError> {
-        self.pack(id)
-            .map(|pack| self.type_layout(pack.storage))
-            .transpose()?
-            .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))
+        if let Some(definition) = self.pack_definitions.get(id)
+            && let (Some(size), Some(alignment)) = (
+                definition.storage.byte_capacity().and_then(|size| u32::try_from(size).ok()),
+                definition
+                    .storage
+                    .alignment_bytes()
+                    .and_then(|alignment| u32::try_from(alignment).ok()),
+            )
+        {
+            return Ok((size, alignment));
+        }
+        let pack =
+            self.pack(id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+        self.type_layout(pack.storage)
     }
 
     pub(in crate::codegen) fn alignment(&self, ty: NativeType) -> Result<u32, NativeEmitError> {
@@ -203,12 +213,21 @@ impl LayoutRegistry {
             NativeType::String | NativeType::Buffer | NativeType::Arena(_) => self.pointer_size,
             NativeType::FatPointer => self.pointer_size,
             NativeType::Void => 1,
-            NativeType::Pack(id) => {
-                let pack = self
-                    .pack(id)
-                    .ok_or_else(|| NativeEmitError(format!("missing packed alignment `{id}`")))?;
-                self.alignment(pack.storage)?
-            }
+            NativeType::Pack(id) => self
+                .pack_definitions
+                .get(id)
+                .and_then(|definition| definition.storage.alignment_bytes())
+                .and_then(|alignment| u32::try_from(alignment).ok())
+                .map_or_else(
+                    || {
+                        self.pack(id)
+                            .ok_or_else(|| {
+                                NativeEmitError(format!("missing packed alignment `{id}`"))
+                            })
+                            .and_then(|pack| self.alignment(pack.storage))
+                    },
+                    Ok,
+                )?,
             NativeType::Array(id) => self
                 .array(id)
                 .map(|layout| layout.alignment)

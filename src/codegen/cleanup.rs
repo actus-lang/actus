@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
+use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
@@ -13,6 +14,7 @@ use super::native::NativeEmitError;
 use super::structs::emit_binding_drop;
 use super::types::NativeType;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_return_cleanup(
     function: &mut FunctionBuilder<'_>,
     schedule: &NativeCleanupSchedule,
@@ -21,14 +23,32 @@ pub(super) fn emit_return_cleanup(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
+    returned_expression: Option<&Expr>,
 ) -> Result<(), NativeEmitError> {
     let plan = schedule.return_plan(span).ok_or_else(|| {
         NativeEmitError(format!("missing native return cleanup plan at {span:?}"))
     })?;
+    let returned_binding = returned_expression.and_then(returned_binding_name);
     for scope in &plan.scopes {
-        emit_scope_instructions(function, scope, locals, types, functions, layouts)?;
+        emit_scope_instructions_filtered(
+            function,
+            scope,
+            locals,
+            types,
+            functions,
+            layouts,
+            returned_binding,
+        )?;
     }
     Ok(())
+}
+
+fn returned_binding_name(expression: &Expr) -> Option<&str> {
+    match expression {
+        Expr::Identifier { name, .. } => Some(name),
+        Expr::Grouping { expression, .. } => returned_binding_name(expression),
+        _ => None,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -76,6 +96,29 @@ fn emit_scope_instructions(
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     for instruction in &plan.instructions {
+        emit_cleanup_instruction(function, instruction, locals, types, functions, layouts)?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_scope_instructions_filtered(
+    function: &mut FunctionBuilder<'_>,
+    plan: &NativeCleanupPlan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+    returned_binding: Option<&str>,
+) -> Result<(), NativeEmitError> {
+    for instruction in &plan.instructions {
+        if matches!(
+            instruction,
+            NativeInstruction::DropBinding { name, .. }
+                if Some(name.as_str()) == returned_binding
+        ) {
+            continue;
+        }
         emit_cleanup_instruction(function, instruction, locals, types, functions, layouts)?;
     }
     Ok(())

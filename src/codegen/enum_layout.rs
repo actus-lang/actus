@@ -69,10 +69,18 @@ impl LayoutRegistry {
             NativeType::Void => Some(0),
             NativeType::String | NativeType::Buffer => Some(self.pointer_size),
             NativeType::FatPointer => Some(self.pointer_size * 2),
-            NativeType::Pack(id) => self.pack(id).and_then(|pack| self.type_size(pack.storage)),
+            NativeType::Pack(id) => self.pack_size(id),
             NativeType::Array(id) => self.array(id).map(|array| array.size),
             NativeType::Arena(capacity) => Some(capacity + self.pointer_size),
         }
+    }
+
+    fn pack_size(&self, id: usize) -> Option<u32> {
+        self.pack_definitions
+            .get(id)
+            .and_then(|pack| pack.storage.byte_capacity())
+            .and_then(|size| u32::try_from(size).ok())
+            .or_else(|| self.pack(id).and_then(|pack| self.type_size(pack.storage)))
     }
 
     pub(super) fn enum_layout_for(

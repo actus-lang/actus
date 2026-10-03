@@ -68,7 +68,7 @@ pub struct LayoutRegistry {
     pub(super) enum_definitions: Vec<EnumDef>,
     pub(super) enum_layouts: Vec<EnumLayout>,
     pub(super) enum_ids: HashMap<String, usize>,
-    pack_definitions: Vec<PackDecl>,
+    pub(super) pack_definitions: Vec<PackDecl>,
     pub(super) pack_layouts: Vec<PackLayout>,
     pack_ids: HashMap<String, usize>,
     array_definitions: Vec<TypeName>,
@@ -173,7 +173,13 @@ impl LayoutRegistry {
     }
 
     pub(super) fn array_id(&self, canonical: &str) -> Option<usize> {
-        self.array_ids.get(canonical).copied()
+        self.array_ids.get(canonical).copied().or_else(|| {
+            let normalized = canonical
+                .chars()
+                .filter(|character| !character.is_whitespace())
+                .collect::<String>();
+            self.array_ids.get(&normalized).copied()
+        })
     }
 
     pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, NativeEmitError> {

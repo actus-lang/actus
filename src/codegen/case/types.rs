@@ -53,7 +53,63 @@ fn body_type(
         CaseBody::Expression(expression) => {
             Ok((Some(initializer_type(expression, types, functions, layouts)?), false))
         }
-        CaseBody::Block(_) => Ok((None, true)),
+        CaseBody::Block(block) => Ok((block_type(block, types, functions, layouts)?, true)),
+    }
+}
+
+fn block_type(
+    block: &crate::ast::Block,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<Option<NativeType>, NativeEmitError> {
+    let Some(statement) = block.statements.last() else { return Ok(None) };
+    match statement {
+        crate::ast::Stmt::Expression { expression, span }
+            if span.end == expression_end(expression) =>
+        {
+            Ok(Some(initializer_type(expression, types, functions, layouts)?))
+        }
+        crate::ast::Stmt::Return { .. } => Ok(None),
+        crate::ast::Stmt::If { then_branch, else_branch, .. } => {
+            let expression = crate::ast::Expr::If {
+                condition: Box::new(crate::ast::Expr::BoolLiteral {
+                    value: true,
+                    span: crate::lexer::SourceSpan::new(0, 0),
+                }),
+                then_branch: then_branch.clone(),
+                else_branch: else_branch.clone(),
+                span: crate::lexer::SourceSpan::new(0, 0),
+            };
+            Ok(Some(initializer_type(&expression, types, functions, layouts)?))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn expression_end(expression: &crate::ast::Expr) -> usize {
+    use crate::ast::Expr;
+
+    match expression {
+        Expr::Identifier { span, .. }
+        | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
+        | Expr::BufferLiteral { span, .. }
+        | Expr::FloatLiteral { span, .. }
+        | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Cast { span, .. }
+        | Expr::Binary { span, .. }
+        | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
+        | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
+        | Expr::Case { span, .. }
+        | Expr::If { span, .. } => span.end,
     }
 }
 
@@ -63,9 +119,9 @@ fn merge_case_type(
 ) -> Result<Option<NativeType>, NativeEmitError> {
     let Some(candidate) = candidate else { return Ok(inferred) };
     match inferred {
-        Some(expected) if expected != candidate => {
-            Err(NativeEmitError("case branches have different native types".to_owned()))
-        }
+        Some(expected) if expected != candidate => Err(NativeEmitError(format!(
+            "case branches have different native types (expected {expected:?}, found {candidate:?})"
+        ))),
         Some(expected) => Ok(Some(expected)),
         None => Ok(Some(candidate)),
     }

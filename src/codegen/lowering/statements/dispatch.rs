@@ -369,7 +369,7 @@ fn lower_expression_or_drop<'source>(
     function: &mut FunctionBuilder<'_>,
     statement: &'source Stmt,
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
-    types: &HashMap<&'source String, NativeType>,
+    types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
@@ -390,15 +390,11 @@ fn lower_expression_or_drop<'source>(
             layouts,
         ),
         Stmt::If { condition, then_branch, else_branch, span } => {
-            let expression = Expr::If {
-                condition: Box::new(condition.clone()),
-                then_branch: then_branch.clone(),
-                else_branch: else_branch.clone(),
-                span: *span,
-            };
-            super::lower_expression_statement(
+            super::control_flow::lower_if_statement(
                 function,
-                &expression,
+                condition,
+                then_branch,
+                else_branch,
                 *span,
                 locals,
                 types,

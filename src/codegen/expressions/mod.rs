@@ -25,6 +25,7 @@ mod try_lowering;
 
 pub(super) use buffer::emit_buffer_drop;
 pub(super) use construct::lower_construct;
+pub(crate) use if_lowering::lower_statement_if;
 pub(super) use initializer_types::initializer_type;
 pub(super) use literals::{
     coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
@@ -158,7 +159,7 @@ fn lower_integer_expression(
     suffix: Option<&str>,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
-    let value = lower_integer(function, value)?;
+    let value = lower_integer(function, value, suffix.is_some())?;
     let Some(suffix) = suffix else { return Ok(value) };
     let Some(native_type) = NativeType::from_name(suffix) else { return Ok(value) };
     Ok(coerce_to_ir_type(function, value, native_type.ir_type(context.layouts.pointer_type)?))

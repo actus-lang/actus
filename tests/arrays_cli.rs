@@ -104,6 +104,16 @@ fn executes_boolean_literals_and_short_circuit_logic_natively() {
 
 #[cfg(unix)]
 #[test]
+fn returns_from_statement_if_with_the_enclosing_native_type() {
+    let status = run_array_fixture(
+        "statement-if-return",
+        "verb main() -> Int { if true { return 41; } return 0; }",
+    );
+    assert_eq!(status.code(), Some(41));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_const_generic_array_layouts_natively() {
     let status = run_array_fixture(
         "const-generic-array-layout",

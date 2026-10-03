@@ -54,10 +54,13 @@ pub(super) fn define_function(
         vtable_data,
         namespace_prefix,
         force_entry_return,
-    )?;
-    module
-        .define_function(metadata.id, &mut context)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+    )
+    .map_err(|error| {
+        NativeEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
+    })?;
+    module.define_function(metadata.id, &mut context).map_err(|error| {
+        NativeEmitError(format!("native function `{}` verification failed: {error:?}", verb.name))
+    })?;
     module.clear_context(&mut context);
     Ok(())
 }

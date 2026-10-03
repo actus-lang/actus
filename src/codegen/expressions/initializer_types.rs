@@ -101,13 +101,31 @@ fn block_tail_type(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<NativeType, NativeEmitError> {
-    let Some(crate::ast::Stmt::Expression { expression, span }) = block.statements.last() else {
-        return Ok(NativeType::Void);
-    };
-    if span.end != expression_end(expression) {
-        return Ok(NativeType::Void);
+    if let Some(crate::ast::Stmt::Expression { expression, span }) = block.statements.last()
+        && span.end == expression_end(expression)
+    {
+        return initializer_type(expression, types, functions, layouts);
     }
-    initializer_type(expression, types, functions, layouts)
+    Ok(block_return_type(block, types, functions, layouts)?.unwrap_or(NativeType::Void))
+}
+
+fn block_return_type(
+    block: &crate::ast::Block,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<Option<NativeType>, NativeEmitError> {
+    block
+        .statements
+        .iter()
+        .rev()
+        .find_map(|statement| match statement {
+            crate::ast::Stmt::Return { value: Some(expression), .. } => {
+                Some(initializer_type(expression, types, functions, layouts))
+            }
+            _ => None,
+        })
+        .transpose()
 }
 
 fn expression_end(expression: &Expr) -> usize {

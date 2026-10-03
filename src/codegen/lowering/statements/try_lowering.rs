@@ -49,7 +49,16 @@ pub(super) fn lower_return(
         string_data,
         layouts,
     )?;
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
+    emit_return_cleanup(
+        function,
+        cleanup_schedule,
+        span,
+        locals,
+        types,
+        functions,
+        layouts,
+        Some(expression),
+    )?;
     Ok(Flow::Return(value, None))
 }
 
@@ -116,7 +125,7 @@ fn lower_try_return(
         .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
     let result = allocate_enum(function, layout.size, functions, layouts)?;
     let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts);
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
+    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts, None)?;
     Ok(Flow::Return(return_value, Some(NativeType::Enum(enum_id))))
 }
 
@@ -258,7 +267,7 @@ fn emit_try_statement_branches(
     let continuation = function.create_block();
     function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
     function.switch_to_block(err_block);
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts)?;
+    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts, None)?;
     function.ins().return_(&[source]);
     function.seal_block(err_block);
     function.switch_to_block(ok_block);

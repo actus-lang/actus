@@ -182,7 +182,10 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmit
         entry_symbol: inputs.symbol,
         target: inputs.target,
     })?;
-    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+    module
+        .finish()
+        .emit()
+        .map_err(|error| NativeEmitError(format!("native module emission failed: {error:?}")))
 }
 
 fn build_layouts_and_metadata(
