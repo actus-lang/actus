@@ -6,7 +6,7 @@ This is the operational reference for a coding agent that must read, write,
 review, test, or explain Actus source code. It is intentionally more explicit
 than a beginner tutorial. An agent should use it as a language contract, an
 ownership checklist, a project-workflow guide, and a boundary against
-inventing syntax that is only mentioned in a roadmap.
+inventing syntax that is only described but not implemented.
 
 The repository is an alpha-stage, low-level systems language project. Actus is
 designed for deterministic systems software, embedded and freestanding work,
@@ -21,7 +21,7 @@ Before changing Actus code, determine which of the following is true:
 1. The syntax or behavior is implemented and tested.
 2. The behavior is implemented but has a known target, runtime, ABI, or
    standard-library boundary.
-3. The behavior is designed in an ADR or roadmap but is not implemented.
+3. The behavior is described as a design but is not implemented.
 4. The request requires a new language or compiler capability.
 
 Only the first two categories may be used as existing Actus behavior. Category
@@ -123,7 +123,7 @@ their position, and their line structure during formatting or refactoring.
 Public structs, enums, packs, roles, constants, external bridges, and verbs
 must document ownership, return values, errors, side effects, allocation
 behavior, and ABI behavior where applicable. Documentation must describe what
-the implementation does now, not what a roadmap says it may do later.
+the implementation does now, not what a future design may promise.
 
 ### 4.3 Whitespace and punctuation
 
@@ -1267,6 +1267,71 @@ The left-hand place of a compound assignment is evaluated exactly once; native
 lowering follows address calculation, load, operation, and store through that
 same place.
 
+#### Package-aware test execution
+
+`actus test` analyzes test sources through the package module graph. When a
+canonical facade exists, the test file is compiled as part of that aggregate,
+so sibling declarations are visible in the same way they are for `actus
+check` and `actus build`.
+
+When adding or moving tests:
+
+- keep the test in a source tree discovered by the package manifest;
+- expose sibling declarations through the canonical directory facade;
+- do not make a test pass by parsing the test file as an isolated module;
+- collect test metadata from the original source while compiling the complete
+  module aggregate;
+- verify both test discovery and package-visible type resolution.
+
+This is required for tests that refer to declarations such as
+`CorticalFabric` or `Array[Minicolumn, 64]` from sibling modules.
+
+#### Typed native control-flow joins
+
+An `if` or `case` branch that produces a value must preserve its declared
+native type through every nested block. A fixed-width value such as `u32` must
+not become `Int` merely because it passed through a branch, call result, index
+expression, or native merge block.
+
+Apply these rules when writing or reviewing control flow:
+
+- value-producing branches must have compatible native types;
+- `return`, `break`, `continue`, and typed `?` paths are diverging paths and
+  do not participate as ordinary values in a join;
+- branch-local assignments to an existing owner must be represented by a
+  native merge value, not discarded branch-local state;
+- the same owner must be cleaned exactly once after a merge or direct owned
+  return;
+- a semicolon-terminated final expression is value-producing only where the
+  enclosing expression grammar explicitly permits it.
+
+For indexed native code, preserve this sequence:
+
+```text
+evaluate base and index once -> bounds check -> calculate address -> load/store
+```
+
+Never recalculate a side-effecting base or index for a later field access. The
+rule applies to ordinary arrays, pack arrays, nested structs, and array-backed
+pack storage.
+
+#### Native IR verification
+
+When a workload promises integer-only or zero-floating-point execution, inspect
+the generated Cranelift IR rather than relying on source appearance or object
+byte-pattern guesses. A valid audit checks:
+
+- instruction opcodes for floating-point operations and constants;
+- operand types, including floating-point comparison operands whose result is
+  an integer condition;
+- result types, including floating-point vector lanes where applicable;
+- one integer-only fixture and one float-positive fixture.
+
+The audit belongs at the IR boundary, before object emission. It must identify
+the offending instruction in a test failure and remain independent from
+terminal rendering. A successful `actus check` or object build alone does not
+prove a zero-float contract.
+
 #### Array-backed packed storage
 
 The compiler supports bounded byte-array storage for hardware and binary-layout
@@ -1345,7 +1410,7 @@ violations (`E1051`).
 The canonical end-to-end evidence is:
 
 ```text
-tests/examples_cli.rs::phase23_readiness_package_passes_strict_and_native_acceptance
+the readiness package acceptance test in `tests/examples_cli.rs`
 ```
 
 That acceptance runs strict check/test/format validation, host-native build and
@@ -1433,7 +1498,7 @@ The readiness package proves the combined systems-language workflow:
 - formatting check succeeds without moving or deleting documentation;
 - native execution succeeds;
 - LSP analysis remains synchronized with the workspace source;
-- source limits and public documentation checks pass.
+- source limits, public documentation, and native IR verification checks pass.
 
 This status means the implemented capability set is working and verified. It
 does not claim that deferred features such as const expressions,
@@ -1605,7 +1670,7 @@ While editing:
 - add accepted and rejected tests;
 - update LSP/formatter/diagnostic behavior for syntax changes;
 - do not add a target-specific language special case;
-- do not mark a roadmap checkbox without direct evidence.
+- do not mark planned work complete without direct evidence.
 
 Before handoff:
 
