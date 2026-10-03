@@ -279,7 +279,8 @@ impl Analyzer {
             if matches!(parameter.kind, GenericParamKind::Const { .. }) {
                 let valid = argument.reference_role.is_none()
                     && argument.arguments.is_empty()
-                    && argument.name.parse::<usize>().is_ok_and(|value| value > 0);
+                    && (argument.name.parse::<usize>().is_ok_and(|value| value > 0)
+                        || self.is_const_generic_parameter(&argument.name));
                 if !valid {
                     return Err(SemanticError {
                         kind: SemanticErrorKind::GenericConstraintMismatch {

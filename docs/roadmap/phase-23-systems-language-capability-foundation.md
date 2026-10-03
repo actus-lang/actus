@@ -702,6 +702,44 @@ disassembly.
 - [x] Add the complete package-level check, test, native build, object, and
       executable evidence before closing this gate.
 
+### Gate 23.19: Const generic arguments in generic verbs
+
+Status: **closed**. Const generic parameters already work in aggregate layout,
+but a generic verb must also accept a const parameter as the argument of a
+generic type application in its signature and body.
+
+- [x] Allow a declared const generic parameter such as `N` wherever a positive
+      `Usize` type argument is accepted.
+- [x] Preserve the existing rejection of runtime values, zero capacities,
+      reference roles, and nested arguments in const positions.
+- [x] Add semantic and native evidence for `Buffer[N: Usize]`,
+      `clear[N: Usize](ins buffer: Buffer[N])`, and `Array[u32, N]`.
+- [x] Execute the accepted fixture with exit code `42`.
+
+Gate 23.19 evidence is provided by
+`executes_const_generic_array_argument_in_a_generic_verb` in
+`tests/arrays_cli.rs`; the fixture uses `Storage` because `Buffer` is a
+compiler-owned builtin type name.
+
+### Gate 23.20: Array return ABI through caller-owned slots
+
+Status: **closed**. Arrays are already bounded native values, but their return
+ABI must use the caller-owned return slot consistently with structs and other
+indirect values. This prevents a returned array from referring to callee stack
+storage.
+
+- [x] Classify `NativeType::Array` as an sret return type.
+- [x] Verify function signatures, call lowering, caller return-slot allocation,
+      callee copy-out, and returned indexed access as one ABI contract.
+- [x] Add native regression fixtures for `Array[u32, 2]` and `Array[u32, 8]`.
+- [x] Execute both fixtures and preserve existing scalar, struct, pack, and
+      array ownership behavior.
+
+Gate 23.20 evidence is provided by
+`returns_an_array_through_the_native_return_slot` and
+`returns_an_eight_element_array_through_the_native_return_slot` in
+`tests/arrays_cli.rs`.
+
 ## Non-goals
 
 This phase does not:
@@ -720,10 +758,12 @@ The original Phase 23 scope is closed through Gate 23.8: the three baseline
 gaps have direct evidence, the capability fixture passes strict check/test,
 native execution is verified, and formatter/LSP behavior matches the
 compiler. The multi-word packed-storage extension is closed through Gate
-23.15, and the package-level zero-float acceptance contract is closed through
-Gate 23.18. Gates 23.9–23.18 have direct evidence, including the 64-byte
+23.15, the package-level zero-float acceptance contract through Gate 23.18,
+const generic verb arguments through Gate 23.19, and array return ABI through
+Gate 23.20. Gates 23.9–23.20 have direct evidence, including the 64-byte
 systems fixture, typed `Array[Pack, N]` collection tests, and manifest-driven
-Cranelift IR verification through the same strict, native, object, formatter,
-LSP, source-limit, documentation, and repository quality checks. Any
-remaining language limitation must be recorded with an owner, an exact
-unblock condition, and a dedicated roadmap item in this phase.
+Cranelift IR verification, generic-verb native execution, and caller-owned
+array return slots through the same strict, native, object, formatter, LSP,
+source-limit, documentation, and repository quality checks. Any remaining
+language limitation must be recorded with an owner, an exact unblock
+condition, and a dedicated roadmap item in this phase.

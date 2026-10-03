@@ -124,6 +124,36 @@ fn executes_const_generic_array_layouts_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_const_generic_array_argument_in_a_generic_verb() {
+    let status = run_array_fixture(
+        "const-generic-array-verb",
+        "struct Storage[N: Usize] { erg values: Array[u32, N], } verb clear[N: Usize](ins buffer: Storage[N]) { buffer.values[0] = 42u32; } verb main() -> Int { erg buffer: Storage[4] = Storage[4] { values: Array[u32, 4](), }; clear(buffer: ins buffer); return buffer.values[0] as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_an_array_through_the_native_return_slot() {
+    let status = run_array_fixture(
+        "array-return-slot",
+        "verb make_values() -> Array[u32, 2] { erg values: Array[u32, 2] = Array[u32, 2](); values[0] = 41u32; values[1] = 42u32; return values; } verb main() -> Int { erg values: Array[u32, 2] = make_values(); if values[0] == 41u32 && values[1] == 42u32 { return 0; } return 1; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_an_eight_element_array_through_the_native_return_slot() {
+    let status = run_array_fixture(
+        "array-eight-return-slot",
+        "verb forward_impulse() -> Array[u32, 8] { erg values: Array[u32, 8] = Array[u32, 8](); values[0] = 41u32; values[7] = 42u32; return values; } verb main() -> Int { erg values: Array[u32, 8] = forward_impulse(); return values[0] as Int + values[7] as Int - 83; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn inlines_typed_named_constants_natively() {
     let status = run_array_fixture(
         "typed-named-constant",

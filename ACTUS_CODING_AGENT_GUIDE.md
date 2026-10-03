@@ -1225,6 +1225,59 @@ specialization, and strict/native acceptance. Use literal arguments such as
 `Fabric[8]`. Do not use runtime values or assume arbitrary const expressions
 are implemented.
 
+Const parameters may also be used as type arguments in generic verb
+signatures and bodies:
+
+```act
+struct Storage[N: Usize] {
+    erg values: Array[u32, N],
+}
+
+verb clear[N: Usize](ins storage: Storage[N]) {
+    storage.values[0] = 42u32;
+}
+
+verb main() -> Int {
+    erg storage: Storage[4] = Storage[4] {
+        values: Array[u32, 4](),
+    };
+    clear(storage: ins storage);
+    return storage.values[0] as Int;
+}
+```
+
+The const argument must be a positive compile-time `Usize` literal or a
+declared const parameter. Runtime expressions, zero capacities, reference
+roles, and nested arguments remain invalid. `Buffer` is a compiler-owned
+builtin type name; use a domain-specific name such as `Storage` for a user
+defined generic aggregate.
+
+#### Array return ABI
+
+Returning `Array[T, N]` uses the same caller-owned return-slot ABI as other
+indirect aggregate values. The caller allocates the destination slot, the
+callee copies the complete bounded array into it, and the caller may then
+index the returned value normally:
+
+```act
+verb make_values() -> Array[u32, 2] {
+    erg values: Array[u32, 2] = Array[u32, 2]();
+    values[0] = 41u32;
+    values[1] = 42u32;
+    return values;
+}
+
+verb main() -> Int {
+    erg values: Array[u32, 2] = make_values();
+    return values[0] as Int + values[1] as Int;
+}
+```
+
+This prevents a returned array from referring to callee-local stack storage.
+The ABI contract covers signature generation, call lowering, caller slot
+allocation, callee copy-out, cleanup, and indexed access. Validate changes
+with both small arrays and systems-sized arrays such as `Array[u32, 8]`.
+
 #### Boolean literal expressions
 
 `true` and `false` are first-class `Bool` expressions in local initializers,

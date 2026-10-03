@@ -29,7 +29,7 @@ impl NativeType {
     }
 
     pub(super) fn uses_sret(self) -> bool {
-        matches!(self, Self::Struct(_) | Self::Integer { width: 65..=128, .. })
+        matches!(self, Self::Struct(_) | Self::Array(_) | Self::Integer { width: 65..=128, .. })
     }
 
     pub(super) fn is_wide_integer(self) -> bool {
