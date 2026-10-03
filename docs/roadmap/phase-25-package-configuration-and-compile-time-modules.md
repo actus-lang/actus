@@ -97,17 +97,29 @@ facades.
 
 ## Gate 25.2: Semantic compile-time configuration
 
-- [ ] Register public configuration constants in the shared module interface.
-- [ ] Preserve constant type, initializer, source identity, and visibility.
-- [ ] Validate configuration initializers as compile-time expressions only.
-- [ ] Reject runtime calls, mutable bindings, ownership roles, and external
+- [x] Register public configuration constants in the shared module interface.
+- [x] Preserve constant type, initializer, source identity, and visibility.
+- [x] Validate configuration initializers as compile-time expressions only.
+- [x] Reject runtime calls, mutable bindings, ownership roles, and external
       dependencies inside configuration sources.
-- [ ] Support transitive constant exports through nested configuration
+- [x] Support transitive constant exports through nested configuration
       facades.
-- [ ] Reject private constants, duplicate names, cycles, overflow, and type
+- [x] Reject private constants, duplicate names, cycles, overflow, and type
       mismatches with deterministic diagnostics.
-- [ ] Verify constants in initializers, `if` conditions, `case` guards,
+- [x] Verify constants in initializers, `if` conditions, `case` guards,
       struct/pack literals, array capacities, and const-generic arguments.
+
+Gate 25.2 is closed. Module aggregation now carries public configuration
+constants through the shared export interface with their declaration identity,
+source path, type, initializer, and visibility intact. The existing semantic
+constant analyzer enforces compile-time-only initializers and deterministic
+cycle, overflow, and type-mismatch diagnostics; the module test suite covers
+the corresponding accepted and rejected paths, including transitive public
+configuration constants. Every source in the reserved configuration subtree
+is rejected when it declares a verb, external verb, role, or performance, with
+stable `E1114`; configuration imports remain rejected with `E1113`. Native
+substitution, const-only object handling, and executable emission are
+deliberately deferred to Gate 25.3.
 
 ## Gate 25.3: Const-only module and native lowering
 

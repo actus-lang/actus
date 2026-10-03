@@ -116,5 +116,28 @@ pub(super) fn validate_configuration_source(
             span: import.span,
         });
     }
+    if let Some((kind, span)) = program.declarations.iter().find_map(runtime_declaration) {
+        return Err(ModuleError::ConfigurationRuntimeDeclaration {
+            module: module_path.to_owned(),
+            path: source_path.to_owned(),
+            kind: kind.to_owned(),
+            span,
+        });
+    }
     Ok(())
+}
+
+fn runtime_declaration(declaration: &TopLevelDecl) -> Option<(&'static str, SourceSpan)> {
+    match declaration {
+        TopLevelDecl::Verb(value) => Some(("verb", value.span)),
+        TopLevelDecl::ExternalVerb(value) => Some(("external verb", value.span)),
+        TopLevelDecl::Role(value) => Some(("role", value.span)),
+        TopLevelDecl::Perform(value) => Some(("perform", value.span)),
+        TopLevelDecl::Constant(_)
+        | TopLevelDecl::Struct(_)
+        | TopLevelDecl::Pack(_)
+        | TopLevelDecl::Enum(_)
+        | TopLevelDecl::OpenSibling(_)
+        | TopLevelDecl::Import(_) => None,
+    }
 }

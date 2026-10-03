@@ -15,15 +15,49 @@ pub struct ModuleLocation {
 #[derive(Debug)]
 pub enum ModuleError {
     Resolution(ModuleResolutionError),
-    UnknownSiblingModule { module: String, sibling: String, facade: PathBuf },
-    ConfigurationImport { module: String, path: PathBuf, span: SourceSpan },
-    Read { path: PathBuf, message: String },
-    Lex { path: PathBuf, errors: Vec<LexError> },
-    Parse { path: PathBuf, error: Box<ParseError> },
+    UnknownSiblingModule {
+        module: String,
+        sibling: String,
+        facade: PathBuf,
+    },
+    ConfigurationImport {
+        module: String,
+        path: PathBuf,
+        span: SourceSpan,
+    },
+    ConfigurationRuntimeDeclaration {
+        module: String,
+        path: PathBuf,
+        kind: String,
+        span: SourceSpan,
+    },
+    Read {
+        path: PathBuf,
+        message: String,
+    },
+    Lex {
+        path: PathBuf,
+        errors: Vec<LexError>,
+    },
+    Parse {
+        path: PathBuf,
+        error: Box<ParseError>,
+    },
     DuplicateDeclaration(Box<DuplicateDeclaration>),
-    SymbolCollision { symbol: String, first_module: String, second_module: String },
-    DuplicateObjectOwner { module_path: String },
-    PrivateDeclarationAccess { module: String, symbol: String, facade: PathBuf, span: SourceSpan },
+    SymbolCollision {
+        symbol: String,
+        first_module: String,
+        second_module: String,
+    },
+    DuplicateObjectOwner {
+        module_path: String,
+    },
+    PrivateDeclarationAccess {
+        module: String,
+        symbol: String,
+        facade: PathBuf,
+        span: SourceSpan,
+    },
     Semantic(Box<crate::semantic::SemanticError>),
 }
 
@@ -65,6 +99,11 @@ impl Display for ModuleError {
             Self::ConfigurationImport { module, path, .. } => write!(
                 formatter,
                 "configuration module `{module}` cannot import `{}`",
+                path.display()
+            ),
+            Self::ConfigurationRuntimeDeclaration { module, path, kind, .. } => write!(
+                formatter,
+                "configuration module `{module}` cannot contain runtime declaration `{kind}` in `{}`",
                 path.display()
             ),
             Self::Read { path, message } => {

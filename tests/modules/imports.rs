@@ -93,6 +93,33 @@ fn rejects_imports_inside_the_configuration_subtree() {
 }
 
 #[test]
+fn rejects_runtime_declarations_inside_configuration_sources() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write("config/values.act", "open verb runtime_state() -> Int { return 1; }");
+
+    let error = load_module_unit(&ModuleResolver::new(&fixture.root), "config")
+        .expect_err("runtime config declaration must fail");
+    assert!(
+        matches!(error, ModuleError::ConfigurationRuntimeDeclaration { ref kind, .. } if kind == "verb")
+    );
+    let diagnostic = actus::diagnostics::module_diagnostic(&error);
+    assert_eq!(diagnostic.code(), "E1114");
+}
+
+#[test]
+fn accepts_transitive_public_configuration_constants_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write("config/values.act", "open const LIMIT: u8 = 30u8;");
+    fixture.write("main.act", "import config; verb main() -> Int { return LIMIT as Int; }");
+
+    let program = parse_source("import config; verb main() -> Int { return LIMIT as Int; }");
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("transitive public configuration constants should be semantic inputs");
+}
+
+#[test]
 fn rejects_imports_inside_nested_configuration_sources() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open policy;");
