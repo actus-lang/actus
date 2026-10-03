@@ -182,17 +182,19 @@ fn specialize_verb(
 fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
     instance.name == verb.name
         && instance.arguments.len() == verb.generic_parameters.len()
-        && instance.arguments.iter().all(|argument| {
-            !verb.generic_parameters.iter().any(|parameter| parameter.name == argument.name)
-        })
+        && instance
+            .arguments
+            .iter()
+            .all(|argument| !contains_generic_parameter(argument, &verb.generic_parameters))
 }
 
 fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl) -> bool {
     instance.name == verb.name
         && instance.arguments.len() == verb.generic_parameters.len()
-        && instance.arguments.iter().all(|argument| {
-            !verb.generic_parameters.iter().any(|parameter| parameter.name == argument.name)
-        })
+        && instance
+            .arguments
+            .iter()
+            .all(|argument| !contains_generic_parameter(argument, &verb.generic_parameters))
 }
 
 fn specialize_param(param: &Param, substitution: &TypeSubstitution) -> Param {

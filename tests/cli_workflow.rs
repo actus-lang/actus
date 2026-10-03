@@ -252,6 +252,38 @@ fn check_validates_a_module_sibling_through_its_facade() {
 
 #[cfg(unix)]
 #[test]
+fn native_build_propagates_nested_generic_instances_through_an_imported_module() {
+    let root =
+        std::env::temp_dir().join(format!("actus-nested-generic-module-{}", std::process::id()));
+    let module = root.join("src/aie");
+    fs::create_dir_all(&module).expect("create module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"nested-generic-module\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "import aie; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n")
+        .expect("write root source");
+    fs::write(module.join("aie.act"), "open engine;\n").expect("write module facade");
+    fs::write(
+        module.join("engine.act"),
+        "open struct Storage[N: Usize] { erg values: Array[u32, N], } open verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } open verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
+    )
+    .expect("write generic module source");
+    let output = root.join("nested-generic-module");
+    let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--emit", "exe", "-o", output.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .expect("build imported nested generic module");
+    assert!(result.status.success(), "stderr: {}", String::from_utf8_lossy(&result.stderr));
+    let status = Command::new(&output).status().expect("run nested generic module");
+    assert_eq!(status.code(), Some(4));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn watch_once_checks_the_project_entry() {
     let root = std::env::temp_dir().join(format!("actus-watch-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source directory");
