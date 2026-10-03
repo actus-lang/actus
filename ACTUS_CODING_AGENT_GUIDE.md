@@ -271,9 +271,9 @@ metaprogramming.
 
 #### 6.3.1 Const generic parameters
 
-Phase 23 adds the first production const-generic slice. A const parameter is
-distinct from a type parameter and represents a compile-time bounded numeric
-value, not mutable runtime storage:
+Actus supports a production const-generic slice. A const parameter is distinct
+from a type parameter and represents a compile-time bounded numeric value, not
+mutable runtime storage:
 
 ```act
 struct Minicolumn {
@@ -1197,10 +1197,9 @@ cargo run --bin actus -- test --strict
 The Cargo form is contributor/bootstrap workflow. It is not the end-user
 installation model.
 
-### 22.1 Phase 23 systems-language capability status
+### Current systems-language capability status
 
-Phase 23, “Systems Language Capability Foundation,” is closed for its defined
-acceptance scope. The completed capability set is compiler-owned and
+The current systems-language capability set is compiler-owned and
 target-neutral; it is not an AIE-specific lowering path and does not embed
 ARM, RISC-V, STM32, RP, or other CPU identities into Actus syntax.
 
@@ -1268,9 +1267,157 @@ The left-hand place of a compound assignment is evaluated exactly once; native
 lowering follows address calculation, load, operation, and store through that
 same place.
 
+#### Array-backed packed storage
+
+The compiler supports bounded byte-array storage for hardware and binary-layout
+packs. The production-supported form is `Array[u8, N]`; it is a distinct pack
+layout, not an ordinary array workaround. The capacity is compile-time bounded,
+the storage is inline, and the pack's total width is `N * 8` bits.
+
+The following 64-byte/512-bit shape is accepted and natively lowered:
+
+```act
+pack Minicolumn {
+    erg storage: Array[u8, 64];
+    layout little;
+    fields {
+        erg charge: u8 at 0;
+        erg threshold: u8 at 8;
+        erg coincidence_low: u64 at 64;
+        erg coincidence_high: u64 at 128;
+        erg axon_0: u32 at 192;
+        erg axon_7: u32 at 416;
+        erg inhibitory_link: u32 at 480;
+    }
+}
+```
+
+The complete readiness fixture contains the full 512-bit field map:
+`charge`, `threshold`, `myelination`, `idle_ticks`, `flags`, `payload`,
+`layer_depth`, both coincidence words, eight axon targets,
+`free_list_link`, and `inhibitory_link`. Field offsets remain explicit and
+must cover the storage contract without overlap or uncovered bits.
+
+Array-backed packs provide:
+
+- checked indexed byte reads, writes, and compound assignments;
+- bit-packed field reads/writes with masking, shifting, width validation, and
+  little-endian mapping;
+- fixed-width `u8`, `u16`, `u32`, and `u64` field arithmetic;
+- copy, move, return, aggregate initialization, and bounded inline layout;
+- `erg`, `abs`, and `ins` ownership behavior through indexed storage places;
+- deterministic bounds traps for invalid runtime indexes and compile-time
+  diagnostics for statically impossible indexes;
+- Buffer snapshot/restore through ordinary Actus operations without a hidden
+  heap allocation;
+- native executable and object emission without a C serialization bridge.
+
+For dynamic indexed byte loops, use a supported integer index such as `u32`:
+
+```act
+verb snapshot(ins output: Buffer, abs column: Minicolumn) -> Int {
+    erg index: u32 = 0;
+    loop {
+        if index >= 64 {
+            break;
+        }
+        append(output, column.storage[index]);
+        index += 1;
+    }
+    return index as Int;
+}
+```
+
+`Usize` remains the tested const-generic domain for declarations such as
+`Array[T, N]`. Do not silently substitute runtime capacity, `Array[u16, N]`,
+or an unbounded storage representation for the supported packed-storage
+contract.
+
+The formatter emits array-backed packs in canonical multiline form while
+preserving storage type, field offsets, layout, and `"""` documentation. The
+LSP exposes storage width, byte capacity, layout, field metadata, hover,
+completion, semantic tokens, definition/navigation, rename, and overlay
+reindexing for these packs. Pack diagnostics retain stable codes and exact
+source spans, including invalid storage (`E1070`), out-of-range fields
+(`E1072`), overlap (`E1073`), constant index bounds (`E1085`), and ownership
+violations (`E1051`).
+
+The canonical end-to-end evidence is:
+
+```text
+tests/examples_cli.rs::phase23_readiness_package_passes_strict_and_native_acceptance
+```
+
+That acceptance runs strict check/test/format validation, host-native build and
+execution on `x86_64-unknown-linux-gnu` with exit status `126`, object emission
+with `.text` and `main`, and rejected fixtures for overlap, field bounds,
+invalid storage elements, runtime capacity, indexed bounds, and ownership.
+Do not claim a packed-storage feature is complete from parsing alone; require
+semantic, native, formatter, LSP, rejected-fixture, and executable evidence.
+
+#### Pack values as array elements
+
+Declared `pack` types are also valid typed elements of bounded arrays. The
+supported form is `Array[Pack, N]`, where every element is stored inline using
+the pack's complete native layout and stride. A pack is not lowered as a
+pointer, opaque handle, or manually flattened byte array.
+
+```act
+pack Cell {
+    erg storage: Array[u8, 2];
+    layout little;
+    fields {
+        erg marker: u8 at 0;
+        erg tail: u8 at 8;
+    }
+}
+
+verb main() -> Int {
+    erg cells: Array[Cell, 2] = Array[Cell, 2]();
+    cells[1] = Cell { storage: Array[u8, 2](), };
+    cells[1].marker = 41u8;
+    cells[1].marker += 1u8;
+    return cells[1].marker as Int;
+}
+```
+
+The compiler registers pack declarations before validating struct and array
+references. Array layout resolution preserves pack identity, field metadata,
+alignment, size, and the complete inline element stride. Dependent storage
+arrays are laid out before arrays containing those packs, so an
+`Array[Minicolumn, 64]` layout can use a 64-byte array-backed `Minicolumn`
+without a runtime descriptor.
+
+Pack-array places support:
+
+- checked indexed element access and field access such as `cells[index].marker`;
+- field assignment and compound assignment through the same checked address;
+- one evaluation of the array base and index before native address lowering;
+- `erg`, `abs`, and `ins` ownership behavior, including an `ins` loan of one
+  pack element that restores the original array owner;
+- aggregate initialization, copy/move/return paths, and cleanup boundaries;
+- deterministic rejection of unknown pack types, invalid layouts, impossible
+  indexes, illegal aliases, use-after-move, and layout/stride overflow.
+
+The corresponding evidence is:
+
+```text
+tests/semantic/packs.rs::accepts_pack_types_as_bounded_array_elements
+tests/semantic/packs.rs::rejects_unknown_pack_types_as_array_elements
+tests/arrays_cli.rs::executes_array_of_array_backed_packs_natively
+tests/arrays_cli.rs::executes_compound_assignment_through_array_of_packs_natively
+tests/arrays_cli.rs::preserves_ins_loan_through_an_array_of_packs_natively
+tests/formatter/suite.rs::formats_pack_array_element_types_idempotently
+tests/lsp/semantic_intelligence.rs::lsp_accepts_pack_types_as_array_element_types
+```
+
+This capability is complete only when these semantic, native, formatter, and
+LSP checks remain green together with strict checking, object emission, source
+limits, documentation checks, and the full repository test suite.
+
 #### Formatter and LSP parity
 
-Phase 23 syntax is complete only when the compiler and tooling agree. The
+Implemented syntax is complete only when the compiler and tooling agree. The
 formatter preserves Actus `"""` documentation strings, imports, declaration
 order, selector structure, and reparsability. The LSP understands const
 generic parameters, Boolean literals, nested fields/places, diagnostics,
@@ -1279,7 +1426,7 @@ malformed nested documents without process termination.
 
 #### Acceptance boundary
 
-The Phase 23 readiness package proves the combined systems-language workflow:
+The readiness package proves the combined systems-language workflow:
 
 - strict package checking succeeds;
 - accepted and rejected ownership cases are tested;
@@ -1288,20 +1435,14 @@ The Phase 23 readiness package proves the combined systems-language workflow:
 - LSP analysis remains synchronized with the workspace source;
 - source limits and public documentation checks pass.
 
-This status means the implemented Phase 23 capability set is working and
-verified. It does not claim that deferred features such as const expressions,
+This status means the implemented capability set is working and verified. It
+does not claim that deferred features such as const expressions,
 arbitrary compile-time evaluation, a full target matrix, AIE, Wire, Ustari,
 closures, async execution, or a complete enterprise compiler platform already
 exist. Those require separate designs, implementations, and acceptance
 evidence.
 
-The gate-by-gate commands and test names are indexed in:
-
-```text
-/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-23-capability-evidence-index.md
-```
-
-## 23. LSP and editor behavior
+## LSP and editor behavior
 
 The compiler-backed LSP supports a workspace/document model with versioned
 overlays and module-aware analysis. An agent changing language syntax must
@@ -1508,12 +1649,6 @@ from another project directory can locate the source of truth directly:
   current ergonomic/core direction.
 - `/home/magradze/Projects/actus_project/actus/docs/decisions/ADR-0053-production-language-capability-and-wire-readiness.md`:
   production readiness boundary.
-- `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-21-production-language-capability-and-wire-readiness.md`:
-  readiness gates and evidence policy.
-- `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-22-enterprise-compiler-platform.md`: deferred enterprise
-  compiler-platform work.
-- `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-23-systems-language-capability-foundation.md`: closed Phase 23 scope and gate definitions.
-- `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-23-capability-evidence-index.md`: Phase 23 test and command evidence index.
 - `/home/magradze/Projects/actus_project/actus/examples/`: executable language examples.
 - `/home/magradze/Projects/actus_project/actus/library/std/src/`: public standard-library facades and sibling modules.
 - `/home/magradze/Projects/actus_project/actus/tests/`: compiler, native, runtime, LSP, and standard-library evidence.
