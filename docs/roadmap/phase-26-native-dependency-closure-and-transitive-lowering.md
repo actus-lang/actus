@@ -86,15 +86,25 @@ check, build, test, and LSP diagnostics.
 
 ## Gate 26.2: Generic and transitive specialization
 
-- [ ] Propagate concrete generic arguments through nested helper calls.
-- [ ] Materialize all reachable `N: Usize` const-generic instances before
+- [x] Propagate concrete generic arguments through nested helper calls.
+- [x] Materialize all reachable `N: Usize` const-generic instances before
       native declaration and lowering.
-- [ ] Propagate type substitutions through call arguments, return types,
+- [x] Propagate type substitutions through call arguments, return types,
       indexed places, and nested aggregate fields.
-- [ ] Reuse the existing generic instance identity/cache contract.
-- [ ] Prevent unreachable generic declarations from being emitted.
-- [ ] Add accepted and rejected tests for nested generic calls across module
+- [x] Reuse the existing generic instance identity/cache contract.
+- [x] Prevent unreachable generic declarations from being emitted.
+- [x] Add accepted tests for nested generic calls across module
       and facade boundaries.
+- [ ] Add rejected tests for unresolved or ambiguous nested generic calls with
+      stable diagnostics.
+
+Gate 26.2 now materializes every concrete generic verb instance discovered by
+the semantic instance graph, rewrites const-generic expressions and nested
+calls to deterministic specialized names, and registers those names across
+module-object symbol bindings. Native regressions cover multiple instances in
+one call graph and imported and nested facade boundaries. Rejected-call
+diagnostics remain open for Gate 26.5 because they require source-span
+propagation and parity across check, build, test, and LSP diagnostics.
 
 ## Gate 26.3: Aggregate return and layout dependencies
 

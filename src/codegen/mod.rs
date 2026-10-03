@@ -44,3 +44,5 @@ pub use native::{
     emit_program_object_with_configuration, emit_zero_return_object,
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
+
+pub(crate) use generic::specialized_generic_name;

@@ -129,7 +129,7 @@ pub(crate) fn emit_objects(
     let generic_instances = crate::semantic::analyze(&targeted_caller)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?
         .generic_instances;
-    let bindings = module_bindings(&object_plan)?;
+    let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(
         root.program(),
@@ -230,6 +230,7 @@ fn declared_symbols(
 
 fn module_bindings(
     plan: &crate::modules::ModuleObjectPlan,
+    generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<crate::codegen::NativeSymbolBindings, NativeEmitError> {
     let mut bindings = Vec::new();
     for unit in &plan.units()[1..] {
@@ -241,6 +242,16 @@ fn module_bindings(
             )
             .map_err(|error| NativeEmitError(error.to_string()))?;
             bindings.push((name.clone(), identity.as_str().to_owned()));
+            for instance in generic_instances.iter().filter(|instance| instance.name == *name) {
+                let specialized_name = crate::codegen::specialized_generic_name(instance);
+                let specialized_identity = crate::codegen::SymbolIdentity::new(
+                    unit.namespace().symbol_prefix(),
+                    crate::codegen::SymbolKind::Verb,
+                    &specialized_name,
+                )
+                .map_err(|error| NativeEmitError(error.to_string()))?;
+                bindings.push((specialized_name, specialized_identity.as_str().to_owned()));
+            }
         }
     }
     Ok(crate::codegen::NativeSymbolBindings::new(bindings))

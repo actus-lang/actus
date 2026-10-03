@@ -174,6 +174,16 @@ fn specializes_transitive_const_generic_verb_calls_natively() {
 
 #[cfg(unix)]
 #[test]
+fn specializes_multiple_const_generic_instances_in_one_call_graph() {
+    let status = run_array_fixture(
+        "multiple-const-generic-instances",
+        "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read_capacity[4]() as Int + read_capacity[8]() as Int; }",
+    );
+    assert_eq!(status.code(), Some(12));
+}
+
+#[cfg(unix)]
+#[test]
 fn returns_an_array_through_the_native_return_slot() {
     let status = run_array_fixture(
         "array-return-slot",
