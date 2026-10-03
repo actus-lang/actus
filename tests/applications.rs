@@ -211,6 +211,94 @@ fn package_configuration_supports_all_compile_time_consumers() {
 }
 
 #[test]
+fn imported_module_can_lower_a_configuration_constant() {
+    let source = "import worker; verb main() -> Int { return read_magic(); }\n";
+    let (root, input, output) = project("config-imported-module", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BRAIN_MAGIC: u32 = 42u32;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/worker")).expect("create worker module");
+    fs::write(root.join("src/worker/worker.act"), "open api;\n").expect("write worker facade");
+    fs::write(
+        root.join("src/worker/api.act"),
+        "import config; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
+    )
+    .expect("write worker implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(42));
+    fs::remove_dir_all(root).expect("remove imported configuration project");
+}
+
+#[test]
+fn nested_imported_module_can_lower_a_configuration_constant() {
+    let source = "import aie; verb main() -> Int { return read_magic(); }\n";
+    let (root, input, output) = project("config-nested-imported-module", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BRAIN_MAGIC: u32 = 42u32;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/aie/persistence")).expect("create nested module");
+    fs::write(root.join("src/aie/aie.act"), "open persistence;\n").expect("write aie facade");
+    fs::write(root.join("src/aie/persistence/persistence.act"), "open serialization;\n")
+        .expect("write persistence facade");
+    fs::write(
+        root.join("src/aie/persistence/serialization.act"),
+        "import config; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
+    )
+    .expect("write serialization implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(42));
+    fs::remove_dir_all(root).expect("remove nested configuration project");
+}
+
+#[test]
+fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
+    let source = "import aie; verb main() -> Int { return snapshot_is_valid(); }\n";
+    let (root, input, output) = project("config-snapshot-module", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BRAIN_MAGIC: u32 = 42u32;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/aie/persistence")).expect("create nested module");
+    fs::write(root.join("src/aie/aie.act"), "open persistence;\n").expect("write aie facade");
+    fs::write(root.join("src/aie/persistence/persistence.act"), "open serialization;\n")
+        .expect("write persistence facade");
+    fs::write(
+        root.join("src/aie/persistence/serialization.act"),
+        r#"import config;
+
+open struct Snapshot {
+    erg magic: u32,
+}
+
+open verb snapshot_is_valid() -> Int {
+    erg snapshot = Snapshot {
+        magic: BRAIN_MAGIC,
+    };
+    return case snapshot.magic == BRAIN_MAGIC {
+        true => 42,
+        _ => snapshot.magic as Int,
+    };
+}
+"#,
+    )
+    .expect("write serialization implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(42));
+    fs::remove_dir_all(root).expect("remove snapshot configuration project");
+}
+
+#[test]
 fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
     let source = "import output; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);

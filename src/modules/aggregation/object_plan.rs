@@ -95,7 +95,7 @@ fn implementation_declarations(
     module: &super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
 ) -> Program {
-    let mut declarations = module
+    let local_declarations = module
         .implementation()
         .declarations
         .iter()
@@ -104,13 +104,19 @@ fn implementation_declarations(
         })
         .cloned()
         .collect::<Vec<_>>();
+    let mut declarations = Vec::new();
     let mut imported_paths = HashSet::new();
-    let imports = module.implementation().declarations.iter().filter_map(|declaration| {
-        let TopLevelDecl::Import(import) = declaration else { return None };
-        imported_paths.insert(import.path.clone()).then(|| {
-            compilation.units().iter().find(|unit| unit.identity().module_path() == import.path)
-        })?
-    });
+    let imports = module
+        .implementation()
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let TopLevelDecl::Import(import) = declaration else { return None };
+            imported_paths.insert(import.path.clone()).then(|| {
+                compilation.units().iter().find(|unit| unit.identity().module_path() == import.path)
+            })?
+        })
+        .collect::<Vec<_>>();
     for dependency in imports {
         declarations.extend(
             dependency
@@ -120,6 +126,7 @@ fn implementation_declarations(
                 .filter_map(|declaration| exported_dependency_declaration(dependency, declaration)),
         );
     }
+    declarations.extend(local_declarations);
     append_root_generic_support(&mut declarations, module, compilation);
     Program { file_metadata: Vec::new(), declarations }
 }
