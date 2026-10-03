@@ -269,6 +269,50 @@ deterministic layout and native symbol generation. Do not assume Rust-like
 trait inference, specialization, associated types, or arbitrary generic
 metaprogramming.
 
+#### 6.3.1 Const generic parameters
+
+Phase 23 adds the first production const-generic slice. A const parameter is
+distinct from a type parameter and represents a compile-time bounded numeric
+value, not mutable runtime storage:
+
+```act
+struct Minicolumn {
+    erg charge: u8,
+}
+
+struct CorticalFabric[N: Usize] {
+    erg columns: Array[Minicolumn, N],
+}
+
+verb make_fabric() -> CorticalFabric[8] {
+    return CorticalFabric[8] {
+        columns: Array[Minicolumn, 8](),
+    };
+}
+```
+
+The currently supported and tested domain is `Usize`, with positive,
+representable integer literal arguments used as `Array[T, N]` capacities. The
+compiler preserves the const argument in generic identity, layout identity,
+specialized native symbols, and deterministic cache/build decisions.
+
+The following are required compiler behaviors:
+
+- `N: Usize` is parsed as a const parameter, not as an invalid primitive type
+  or an ordinary type bound;
+- the argument is resolved before semantic layout and native lowering;
+- runtime expressions are rejected in const-generic positions;
+- negative, zero, overflowing, or otherwise unrepresentable capacities are
+  rejected before code generation;
+- the const value is not silently allocated as mutable runtime state;
+- missing arguments, wrong domains, duplicate parameters, and unresolved
+  const references receive deterministic diagnostics.
+
+Const expressions and additional compile-time positions beyond the bounded
+`Array` capacity slice are not silently implied by this feature. They require
+their own constant-expression contract and evidence before an agent may use
+them in examples.
+
 ### 6.4 `Option` and `Result`
 
 The compiler supplies the canonical generic enum shapes:
@@ -1153,6 +1197,110 @@ cargo run --bin actus -- test --strict
 The Cargo form is contributor/bootstrap workflow. It is not the end-user
 installation model.
 
+### 22.1 Phase 23 systems-language capability status
+
+Phase 23, “Systems Language Capability Foundation,” is closed for its defined
+acceptance scope. The completed capability set is compiler-owned and
+target-neutral; it is not an AIE-specific lowering path and does not embed
+ARM, RISC-V, STM32, RP, or other CPU identities into Actus syntax.
+
+#### Const generics
+
+The initial `Usize` const-generic slice works across parsing, semantic
+resolution, bounded array capacity, aggregate layout, generic identity, native
+specialization, and strict/native acceptance. Use literal arguments such as
+`Fabric[8]`. Do not use runtime values or assume arbitrary const expressions
+are implemented.
+
+#### Boolean literal expressions
+
+`true` and `false` are first-class `Bool` expressions in local initializers,
+returns, call arguments, aggregate fields, array elements, conditions, case
+expressions, nested blocks, and value-producing branches:
+
+```act
+verb accepts_packet(abs packet: Buffer) -> Bool {
+    erg linked: Bool = false;
+    if linked || length(packet) > 0 {
+        return true;
+    }
+    return false;
+}
+```
+
+Boolean literals retain their source spans for diagnostics, formatter output,
+hover, semantic tokens, and the LSP semantic model. They do not coerce to
+integers. `&&` and `||` remain short-circuiting and require `Bool` operands.
+
+#### Nested places, calls, and control flow
+
+The parser and AST represent complete writable place chains without losing
+selector order:
+
+```act
+struct Column {
+    erg axon_0: u32,
+}
+
+struct Fabric {
+    erg columns: Array[Column, 2],
+}
+
+verb notify(erg value: u32) -> Void {
+    return;
+}
+
+verb update(erg fabric: Fabric, erg index: Usize, erg slot: u32) -> Void {
+    if index == 0 {
+        fabric.columns[index].axon_0 = slot;
+        notify(value: fabric.columns[index].axon_0);
+    }
+    return;
+}
+```
+
+Supported and tested forms include identifier assignment, field assignment,
+indexed assignment, mixed index/field chains, nested indexed aggregate places,
+calls inside nested statement blocks, all ownership argument roles, `?`
+propagation from nested calls, nested `if`/`else` expressions, typed branch
+joins, and diverging branches such as `return`, `break`, and `continue`.
+The left-hand place of a compound assignment is evaluated exactly once; native
+lowering follows address calculation, load, operation, and store through that
+same place.
+
+#### Formatter and LSP parity
+
+Phase 23 syntax is complete only when the compiler and tooling agree. The
+formatter preserves Actus `"""` documentation strings, imports, declaration
+order, selector structure, and reparsability. The LSP understands const
+generic parameters, Boolean literals, nested fields/places, diagnostics,
+hover, definitions, semantic tokens, formatting, versioned overlays, and
+malformed nested documents without process termination.
+
+#### Acceptance boundary
+
+The Phase 23 readiness package proves the combined systems-language workflow:
+
+- strict package checking succeeds;
+- accepted and rejected ownership cases are tested;
+- formatting check succeeds without moving or deleting documentation;
+- native execution succeeds;
+- LSP analysis remains synchronized with the workspace source;
+- source limits and public documentation checks pass.
+
+This status means the implemented Phase 23 capability set is working and
+verified. It does not claim that deferred features such as const expressions,
+arbitrary compile-time evaluation, a full target matrix, AIE, Wire, Ustari,
+closures, async execution, or a complete enterprise compiler platform already
+exist. Those require separate designs, implementations, and acceptance
+evidence.
+
+The gate-by-gate commands and test names are indexed in:
+
+```text
+/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-23-capability-evidence-index.md
+```
+
 ## 23. LSP and editor behavior
 
 The compiler-backed LSP supports a workspace/document model with versioned
@@ -1364,6 +1512,8 @@ from another project directory can locate the source of truth directly:
   readiness gates and evidence policy.
 - `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-22-enterprise-compiler-platform.md`: deferred enterprise
   compiler-platform work.
+- `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-23-systems-language-capability-foundation.md`: closed Phase 23 scope and gate definitions.
+- `/home/magradze/Projects/actus_project/actus/docs/roadmap/phase-23-capability-evidence-index.md`: Phase 23 test and command evidence index.
 - `/home/magradze/Projects/actus_project/actus/examples/`: executable language examples.
 - `/home/magradze/Projects/actus_project/actus/library/std/src/`: public standard-library facades and sibling modules.
 - `/home/magradze/Projects/actus_project/actus/tests/`: compiler, native, runtime, LSP, and standard-library evidence.
