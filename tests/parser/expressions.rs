@@ -349,15 +349,29 @@ fn parses_bounded_array_types_and_indexed_assignments() {
 
 #[test]
 fn rejects_malformed_bounded_array_capacity() {
-    for source in [
-        "struct Table { cells: Array[Int], }",
-        "struct Table { cells: Array[Int, 4, 8], }",
-        "struct Table { cells: Array[Int, Size], }",
-    ] {
+    for source in
+        ["struct Table { cells: Array[Int], }", "struct Table { cells: Array[Int, 4, 8], }"]
+    {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         parse(tokens).expect_err("malformed bounded array must be rejected");
     }
+}
+
+#[test]
+fn parses_const_generic_array_capacity_for_semantic_validation() {
+    let program = parse_source(
+        "struct Table[N: Usize] { cells: Array[Int, N], } verb main() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Struct(definition) = &program.declarations[0] else {
+        panic!("expected generic struct")
+    };
+    assert_eq!(definition.generic_parameters[0].name, "N");
+    assert!(matches!(
+        definition.generic_parameters[0].kind,
+        actus::ast::GenericParamKind::Const { .. }
+    ));
+    assert_eq!(definition.fields[0].ty.arguments[1].name, "N");
 }
 
 #[test]

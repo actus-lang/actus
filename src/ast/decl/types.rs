@@ -32,7 +32,14 @@ pub struct ReturnType {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenericParam {
     pub name: String,
+    pub kind: GenericParamKind,
     pub bound: Option<TypeName>,
     pub bounds: Vec<TypeName>,
     pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GenericParamKind {
+    Type,
+    Const { domain: TypeName },
 }

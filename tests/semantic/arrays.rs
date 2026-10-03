@@ -45,6 +45,18 @@ fn rejects_invalid_array_capacity() {
 }
 
 #[test]
+fn rejects_non_const_generic_array_capacity() {
+    let error = analyze_source(
+        "struct Table[N: Reader] { cells: Array[Int, N], } role Reader { verb read(); } verb main() { }",
+    )
+    .expect_err("role type parameters must not be used as array capacities");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidArrayCapacity { capacity } if capacity == "N"
+    ));
+}
+
+#[test]
 fn rejects_constant_array_index_out_of_bounds() {
     let error = analyze_source("verb main(abs values: Array[Int, 4]) { print(values[4]); }")
         .expect_err("a constant index at capacity must be rejected");

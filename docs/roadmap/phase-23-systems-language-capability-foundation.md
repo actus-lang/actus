@@ -19,7 +19,10 @@ production-shaped systems code:
 
 1. Const-generic declarations such as `struct Fabric[N: Usize]` are rejected
    because the generic parameter grammar and type resolver do not yet accept
-   a const parameter with a `Usize` domain.
+   a const parameter with a `Usize` domain. Gate 23.1 defines the first
+   production slice as positive `Usize` literal arguments used in bounded
+   `Array` capacities; const expressions and additional compile-time
+   positions remain explicit follow-up work rather than implicit syntax.
 2. Boolean literals exist in the lexical vocabulary but are not accepted as
    ordinary value expressions in every expression/initializer path. For
    example, `erg linked: Bool = false;` must be accepted and lowered.
@@ -73,25 +76,34 @@ struct CorticalFabric[N: Usize] {
 
 Required work:
 
-- [ ] Extend the AST generic-parameter model to distinguish type parameters
+- [x] Extend the AST generic-parameter model to distinguish type parameters
       from const parameters.
-- [ ] Define the accepted const-domain set, beginning with `Usize` and
+- [x] Define the accepted const-domain set, beginning with `Usize` and
       documenting whether additional fixed-width domains are allowed.
-- [ ] Parse `N: Usize` without treating `Usize` as an invalid integer type or
+- [x] Parse `N: Usize` without treating `Usize` as an invalid integer type or
       an ordinary type-only bound.
-- [ ] Resolve const parameters in array capacities, pack/layout declarations,
-      bounded arena capacities, and other approved compile-time positions.
+- [x] Resolve const parameters in bounded array capacities. Pack/layout
+      declarations, bounded arena capacities, and other positions remain
+      outside the initial approved const-generic surface.
 - [ ] Validate constant expressions, domain compatibility, non-negativity,
-      representable capacity, and dependency cycles.
-- [ ] Preserve const arguments in generic identity, monomorphization keys,
-      layout identity, cache identity, and native symbol generation.
-- [ ] Reject runtime expressions in const-generic positions before codegen.
-- [ ] Keep const-generic values out of mutable runtime storage unless source
+      representable capacity, and dependency cycles. The initial slice
+      validates positive representable `Usize` literals; expression support is
+      deferred until a constant-expression model is specified.
+- [x] Preserve const arguments in generic identity, layout identity, and
+      native specialization for the initial array-capacity slice. Cache
+      identity and const expressions remain open.
+- [x] Reject runtime expressions in const-generic positions before codegen.
+- [x] Keep const-generic values out of mutable runtime storage unless source
       explicitly materializes a value.
-- [ ] Add diagnostics for missing arguments, wrong domains, invalid values,
-      overflow, duplicate parameters, and unresolved const references.
-- [ ] Add accepted/rejected parser, semantic, layout, object, and native
-      execution tests.
+- [x] Add diagnostics for missing arguments, wrong domains, invalid values,
+      and non-const array capacities. Overflow, duplicate const parameters,
+      and unresolved const references remain follow-up diagnostics.
+- [x] Add accepted/rejected parser, semantic, layout, and native execution
+      tests for the initial `Usize`/`Array` slice. Object-level identity and
+      broader compile-time positions remain open.
+
+Gate 23.1 initial-slice evidence is recorded in
+[Gate 23.1 const-generic evidence](phase-23-gate-23.1-const-generics.md).
 
 Acceptance example:
 

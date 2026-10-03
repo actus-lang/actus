@@ -1,10 +1,14 @@
-use crate::ast::{EnumPayload, Expr, Program, Stmt, TopLevelDecl, TypeName};
+use crate::ast::{EnumDef, EnumPayload, Expr, Program, Stmt, StructDef, TopLevelDecl, TypeName};
 
 use super::super::generic::canonical_type_name;
 use super::{ArrayLayout, LayoutRegistry};
 use crate::codegen::native::NativeEmitError;
 
-pub(crate) fn array_definitions(program: &Program) -> Vec<TypeName> {
+pub(crate) fn array_definitions(
+    program: &Program,
+    specialized_structs: &[StructDef],
+    specialized_enums: &[EnumDef],
+) -> Vec<TypeName> {
     let mut definitions = Vec::new();
     for declaration in &program.declarations {
         match declaration {
@@ -30,6 +34,22 @@ pub(crate) fn array_definitions(program: &Program) -> Vec<TypeName> {
             _ => {}
         }
     }
+    for structure in specialized_structs {
+        structure.fields.iter().for_each(|field| collect_type_arrays(&field.ty, &mut definitions));
+    }
+    for enumeration in specialized_enums {
+        for variant in &enumeration.variants {
+            match &variant.payload {
+                EnumPayload::Tuple(types) => {
+                    types.iter().for_each(|ty| collect_type_arrays(ty, &mut definitions))
+                }
+                EnumPayload::Struct(fields) => {
+                    fields.iter().for_each(|field| collect_type_arrays(&field.ty, &mut definitions))
+                }
+                EnumPayload::Unit => {}
+            }
+        }
+    }
     definitions
 }
 
@@ -49,7 +69,10 @@ fn collect_external_arrays(verb: &crate::ast::ExternalVerbDecl, definitions: &mu
 }
 
 fn collect_type_arrays(type_name: &TypeName, definitions: &mut Vec<TypeName>) {
-    if type_name.name == "Array" && type_name.arguments.len() == 2 {
+    if type_name.name == "Array"
+        && type_name.arguments.len() == 2
+        && type_name.arguments[1].name.parse::<u32>().is_ok()
+    {
         let canonical = canonical_type_name(type_name);
         if !definitions.iter().any(|candidate| canonical_type_name(candidate) == canonical) {
             definitions.push(type_name.clone());

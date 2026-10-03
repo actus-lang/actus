@@ -41,6 +41,26 @@ fn rejects_too_few_and_too_many_type_arguments() {
 }
 
 #[test]
+fn accepts_usize_const_generic_arguments_and_rejects_invalid_values() {
+    analyze_source(
+        "struct Table[N: Usize] { cells: Array[Int, N], } verb main(erg table: Table[4]) { }",
+    )
+    .expect("positive Usize const arguments should resolve");
+
+    for argument in ["0", "runtime_size"] {
+        let source = format!(
+            "struct Table[N: Usize] {{ cells: Array[Int, N], }} verb main(erg table: Table[{argument}]) {{ }}"
+        );
+        let error = analyze_source(&source).expect_err("invalid const arguments must fail");
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, .. }
+                if parameter == "N" && constraint == "Usize"
+        ));
+    }
+}
+
+#[test]
 fn rejects_undeclared_generic_parameters_inside_a_declaration() {
     let error = analyze_source("verb wrap[T](erg item: U) { }")
         .expect_err("undeclared generic parameter must fail");

@@ -45,7 +45,7 @@ Status: **confirmed compiler gap**.
 The lexer recognizes `false`, but the expression parser does not yet produce a
 Boolean literal expression node for this initializer path.
 
-### Const generic array capacity
+### Const generic array capacity (historical baseline)
 
 Command:
 
@@ -60,7 +60,9 @@ Observed result:
 error[E0003] at 6:28: expected a non-negative integer array capacity, found Identifier("N")
 ```
 
-Status: **confirmed compiler gap**.
+Status at Gate 23.0: **confirmed compiler gap**. Gate 23.1 implements and
+tests this capability; the command is retained here as historical evidence of
+the pre-implementation failure.
 
 The parser accepts the generic declaration shape far enough to reach the array
 capacity, but the type/array representation still requires a literal capacity

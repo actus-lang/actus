@@ -78,6 +78,7 @@ mod tests {
     fn substitutes_nested_type_applications() {
         let parameters = vec![GenericParam {
             name: "T".to_owned(),
+            kind: crate::ast::GenericParamKind::Type,
             bound: None,
             bounds: Vec::new(),
             span: ty("T").span,

@@ -7,5 +7,6 @@ struct Fabric[N: Usize] {
 }
 
 verb main() -> Int {
+    erg fabric: Fabric[8] = Fabric[8] { cells: Array[Cell, 8]() };
     return 0;
 }

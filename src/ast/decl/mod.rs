@@ -16,4 +16,4 @@ pub use top_level::{
     ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,
     TopLevelDecl,
 };
-pub use types::{GenericParam, ReturnAccess, ReturnType, Role, TypeName};
+pub use types::{GenericParam, GenericParamKind, ReturnAccess, ReturnType, Role, TypeName};

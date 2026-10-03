@@ -111,6 +111,9 @@ impl GenericLayoutRegistry {
         if type_name.reference_role.is_some() {
             return Ok(ValueLayout { size: self.pointer_size, alignment: self.pointer_size });
         }
+        if type_name.name == "Array" {
+            return self.layout_array(type_name, visiting);
+        }
         if let Some(builtin) = lookup_builtin_type(&type_name.name) {
             return builtin_layout(builtin, self.pointer_size);
         }
@@ -126,6 +129,28 @@ impl GenericLayoutRegistry {
             return Ok(ValueLayout { size: layout.size, alignment: layout.alignment });
         }
         Err(NativeEmitError(format!("unknown generic layout type `{}`", type_name.name)))
+    }
+
+    fn layout_array(
+        &self,
+        type_name: &TypeName,
+        visiting: &mut Vec<String>,
+    ) -> Result<ValueLayout, NativeEmitError> {
+        let [element, capacity] = type_name.arguments.as_slice() else {
+            return Err(NativeEmitError(
+                "array layout requires an element type and capacity".to_owned(),
+            ));
+        };
+        let capacity =
+            capacity.name.parse::<u32>().ok().filter(|capacity| *capacity > 0).ok_or_else(
+                || NativeEmitError("array layout requires a positive capacity".to_owned()),
+            )?;
+        let element_layout = self.layout_type(element, visiting)?;
+        let size = element_layout
+            .size
+            .checked_mul(capacity)
+            .ok_or_else(|| NativeEmitError("array layout size overflow".to_owned()))?;
+        Ok(ValueLayout { size, alignment: element_layout.alignment })
     }
 }
 
@@ -243,5 +268,20 @@ mod tests {
         assert_eq!(layout.max_payload_size, 4);
         assert_eq!(layout.size, 8);
         assert_eq!(layout.variants[0].fields[0].size, 4);
+    }
+
+    #[test]
+    fn calculates_const_generic_array_field_layout() {
+        let (tokens, errors) = scan(
+            "struct Cell { erg charge: u8, } struct Fabric[N: Usize] { erg cells: Array[Cell, N], } verb main(erg fabric: Fabric[8]) { }",
+        );
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("source should parse");
+        let semantic = analyze(&program).expect("source should analyze");
+        let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
+            .expect("generic layout should pass");
+        let layout = layouts.struct_layout("Fabric[8]").expect("Fabric[8] should be laid out");
+        assert_eq!(layout.size, 8);
+        assert_eq!(layout.fields[0].size, 8);
     }
 }

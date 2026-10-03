@@ -1,7 +1,7 @@
 use crate::lexer::SourceSpan;
 
 use super::data::{EnumDef, EnumPayload, EnumVariant};
-use super::types::{GenericParam, TypeName};
+use super::types::{GenericParam, GenericParamKind, TypeName};
 
 pub fn builtin_enum_definitions() -> Vec<EnumDef> {
     vec![option_definition(), result_definition()]
@@ -56,7 +56,13 @@ fn result_definition() -> EnumDef {
 }
 
 fn generic_parameter(name: &str) -> GenericParam {
-    GenericParam { name: name.to_owned(), bound: None, bounds: Vec::new(), span: zero_span() }
+    GenericParam {
+        name: name.to_owned(),
+        kind: GenericParamKind::Type,
+        bound: None,
+        bounds: Vec::new(),
+        span: zero_span(),
+    }
 }
 
 fn type_name(name: &str) -> TypeName {

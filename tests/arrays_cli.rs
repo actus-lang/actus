@@ -24,6 +24,16 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_const_generic_array_layouts_natively() {
+    let status = run_array_fixture(
+        "const-generic-array-layout",
+        "struct Cell { erg charge: u8, } struct Fabric[N: Usize] { erg cells: Array[Cell, N], } verb main() -> Int { erg fabric: Fabric[2] = Fabric[2] { cells: Array[Cell, 2](), }; fabric.cells[0].charge = 41u8; return fabric.cells[0].charge as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn inlines_typed_named_constants_natively() {
     let status = run_array_fixture(
         "typed-named-constant",

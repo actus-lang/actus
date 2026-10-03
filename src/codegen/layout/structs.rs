@@ -48,8 +48,14 @@ impl LayoutRegistry {
         } else {
             self.native_type_for_type_name(&field.ty, visiting)?
         };
-        let (size, field_alignment) =
-            if indirect { (self.pointer_size, self.pointer_size) } else { self.type_layout(ty)? };
+        let (size, field_alignment) = if indirect {
+            (self.pointer_size, self.pointer_size)
+        } else if field.ty.name == "Array" {
+            let array = self.array_layout_for(&field.ty)?;
+            (array.size, array.alignment)
+        } else {
+            self.type_layout(ty)?
+        };
         let layout = FieldLayout {
             name: field.name.clone(),
             offset: 0,

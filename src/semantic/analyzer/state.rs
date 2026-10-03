@@ -51,6 +51,7 @@ pub(crate) struct Analyzer {
     pub(crate) expression_arena_provenance: HashMap<(usize, usize), usize>,
     pub(crate) next_arena_id: usize,
     pub(crate) generic_scopes: Vec<HashSet<String>>,
+    pub(crate) const_generic_scopes: Vec<HashSet<String>>,
     pub(crate) generic_bounds: HashMap<String, Vec<String>>,
     pub(crate) generic_instances: super::super::generic_cache::GenericInstanceCache,
     pub(crate) expected_expression_type: Option<crate::ast::TypeName>,

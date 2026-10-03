@@ -93,7 +93,7 @@ impl LayoutRegistry {
     ) -> Result<Self, NativeEmitError> {
         let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
         let pack_definitions = pack_definitions(program);
-        let array_definitions = array_definitions(program);
+        let array_definitions = array_definitions(program, &definitions, &enum_definitions);
         let mut registry = Self::new(
             pointer_type,
             definitions,

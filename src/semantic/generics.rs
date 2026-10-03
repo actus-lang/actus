@@ -1,4 +1,4 @@
-use crate::ast::{GenericParam, TypeName};
+use crate::ast::{GenericParam, GenericParamKind, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -33,8 +33,16 @@ impl Analyzer {
         }
         self.generic_scopes
             .push(parameters.iter().map(|parameter| parameter.name.clone()).collect());
+        self.const_generic_scopes.push(
+            parameters
+                .iter()
+                .filter(|parameter| matches!(parameter.kind, GenericParamKind::Const { .. }))
+                .map(|parameter| parameter.name.clone())
+                .collect(),
+        );
         let result = self.validate_generic_bounds(parameters).and_then(|()| validate(self));
         self.generic_scopes.pop();
+        self.const_generic_scopes.pop();
         for (name, bound) in previous {
             match bound {
                 Some(bound) => {
@@ -50,6 +58,19 @@ impl Analyzer {
 
     fn validate_generic_bounds(&self, parameters: &[GenericParam]) -> Result<(), SemanticError> {
         for parameter in parameters {
+            if let GenericParamKind::Const { domain } = &parameter.kind {
+                if domain.name != "Usize" || !domain.arguments.is_empty() {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::GenericConstraintMismatch {
+                            parameter: parameter.name.clone(),
+                            constraint: "Usize".to_owned(),
+                            argument: domain.name.clone(),
+                        },
+                        span: domain.span,
+                    });
+                }
+                continue;
+            }
             for bound in parameter_bounds(parameter) {
                 if !bound.arguments.is_empty() {
                     return Err(arity_error(&bound.name, 0, bound.arguments.len(), bound.span));
@@ -96,14 +117,24 @@ impl Analyzer {
         if type_name.arguments.is_empty() {
             return Ok(ResolvedType::Concrete(name.to_owned()));
         }
-        if let Some(parameters) = self.named_type_parameters(name) {
-            TypeSubstitution::for_type(name, &parameters, &type_name.arguments, type_name.span)?;
-            self.validate_type_arguments(&parameters, &type_name.arguments)?;
+        let parameters = self.named_type_parameters(name);
+        if let Some(parameters) = &parameters {
+            TypeSubstitution::for_type(name, parameters, &type_name.arguments, type_name.span)?;
+            self.validate_type_arguments(parameters, &type_name.arguments)?;
         }
         let arguments = type_name
             .arguments
             .iter()
-            .map(|argument| self.resolve_type_reference(argument))
+            .enumerate()
+            .map(|(index, argument)| {
+                if parameters.as_ref().and_then(|parameters| parameters.get(index)).is_some_and(
+                    |parameter| matches!(parameter.kind, GenericParamKind::Const { .. }),
+                ) {
+                    Ok(ResolvedType::Concrete(argument.name.clone()))
+                } else {
+                    self.resolve_type_reference(argument)
+                }
+            })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(ResolvedType::Applied { name: name.to_owned(), arguments })
     }
@@ -123,9 +154,10 @@ impl Analyzer {
         let element = &type_name.arguments[0];
         let capacity = &type_name.arguments[1];
         let parsed_capacity = capacity.name.parse::<usize>().ok();
+        let const_parameter = self.is_const_generic_parameter(&capacity.name);
         if capacity.reference_role.is_some()
             || !capacity.arguments.is_empty()
-            || parsed_capacity.is_none()
+            || (!const_parameter && parsed_capacity.is_none())
             || parsed_capacity == Some(0)
         {
             return Err(SemanticError {
@@ -171,6 +203,10 @@ impl Analyzer {
 
     pub(super) fn is_generic_parameter(&self, name: &str) -> bool {
         self.generic_scopes.iter().rev().any(|scope| scope.contains(name))
+    }
+
+    pub(super) fn is_const_generic_parameter(&self, name: &str) -> bool {
+        self.const_generic_scopes.iter().rev().any(|scope| scope.contains(name))
     }
 
     fn named_type_arity(&self, name: &str) -> Option<usize> {
@@ -240,6 +276,22 @@ impl Analyzer {
         arguments: &[TypeName],
     ) -> Result<(), SemanticError> {
         for (parameter, argument) in parameters.iter().zip(arguments) {
+            if matches!(parameter.kind, GenericParamKind::Const { .. }) {
+                let valid = argument.reference_role.is_none()
+                    && argument.arguments.is_empty()
+                    && argument.name.parse::<usize>().is_ok_and(|value| value > 0);
+                if !valid {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::GenericConstraintMismatch {
+                            parameter: parameter.name.clone(),
+                            constraint: "Usize".to_owned(),
+                            argument: canonical_type_name(argument),
+                        },
+                        span: argument.span,
+                    });
+                }
+                continue;
+            }
             for bound in parameter_bounds(parameter) {
                 if bound.name == "Numeric"
                     && !self.is_generic_parameter(&argument.name)
