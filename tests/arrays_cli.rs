@@ -184,6 +184,16 @@ fn specializes_multiple_const_generic_instances_in_one_call_graph() {
 
 #[cfg(unix)]
 #[test]
+fn returns_transitive_aggregate_values_through_native_slots() {
+    let status = run_array_fixture(
+        "transitive-aggregate-return-slots",
+        "struct Point { erg x: Int, } pack Frame { erg storage: Array[u8, 1]; layout little; fields { erg marker: u8 at 0; } } struct Box[N: Usize] { erg values: Array[u32, N], } verb make_point() -> Point { return Point { x: 41, }; } verb forward_point() -> Point { return make_point(); } verb make_frame() -> Frame { erg frame = Frame { storage: Array[u8, 1](), }; frame.marker = 41u8; return frame; } verb forward_frame() -> Frame { return make_frame(); } verb make_array() -> Array[u32, 2] { erg values: Array[u32, 2] = Array[u32, 2](); values[0] = 41u32; return values; } verb forward_array() -> Array[u32, 2] { return make_array(); } verb make_box[N: Usize]() -> Box[N] { erg box: Box[N] = Box[N] { values: Array[u32, N](), }; box.values[0] = 41u32; return box; } verb forward_box[N: Usize]() -> Box[N] { return make_box(); } verb main() -> Int { erg point = forward_point(); erg frame = forward_frame(); erg values: Array[u32, 2] = forward_array(); erg box: Box[2] = forward_box(); if point.x == 41 && frame.marker == 41u8 && values[0] == 41u32 && box.values[0] == 41u32 { return 0; } return 1; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn returns_an_array_through_the_native_return_slot() {
     let status = run_array_fixture(
         "array-return-slot",

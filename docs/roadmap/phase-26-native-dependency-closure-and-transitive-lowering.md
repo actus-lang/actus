@@ -108,16 +108,23 @@ propagation and parity across check, build, test, and LSP diagnostics.
 
 ## Gate 26.3: Aggregate return and layout dependencies
 
-- [ ] Register reachable struct, pack, enum, array, and option/result layouts
+- [x] Register reachable struct, pack, enum, array, and option/result layouts
       before lowering dependent functions.
-- [ ] Register caller return slots and callee return lowering consistently for
+- [x] Register caller return slots and callee return lowering consistently for
       aggregate return types.
-- [ ] Preserve array-backed pack stride, alignment, ownership, and copy/move
+- [x] Preserve array-backed pack stride, alignment, ownership, and copy/move
       behavior across helper calls.
-- [ ] Ensure aggregate dependencies are included even when they are referenced
+- [x] Ensure aggregate dependencies are included even when they are referenced
       only by a return type or specialized signature.
-- [ ] Add native tests for scalar, array, struct, pack, and generic aggregate
+- [x] Add native tests for scalar, array, struct, pack, and generic aggregate
       returns through transitive helpers.
+
+Gate 26.3 is covered by native return-slot and layout evidence. The
+transitive aggregate regression exercises scalar and generic helper returns,
+plain arrays, structs, and array-backed packs; it also verifies that a
+specialized `Array[T, N]()` constructor receives the concrete capacity before
+native lowering. Existing enum and option/result layout tests remain part of
+the aggregate ABI coverage.
 
 ## Gate 26.4: Object emission and symbol boundaries
 

@@ -184,28 +184,58 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
     let callee = if callee.contains('[') {
-        specialize_callee_name(callee)
+        specialize_callee_name(callee, substitution)
     } else {
         substitution.apply_call(callee).map_or_else(|| callee.clone(), str::to_owned)
     };
     Expr::Call { callee, arguments: specialize_arguments(arguments, substitution), span: *span }
 }
 
-fn specialize_callee_name(callee: &str) -> String {
+fn specialize_callee_name(callee: &str, substitution: &TypeSubstitution) -> String {
     let Some((name, arguments)) = callee.split_once('[') else { return callee.to_owned() };
-    if !name.chars().next().is_some_and(|character| character.is_ascii_lowercase()) {
-        return callee.to_owned();
-    }
     let arguments = arguments.strip_suffix(']').unwrap_or(arguments);
+    let arguments = split_type_arguments(arguments)
+        .into_iter()
+        .map(|argument| specialize_type_argument(argument.trim(), substitution))
+        .collect::<Vec<_>>();
+    if !name.chars().next().is_some_and(|character| character.is_ascii_lowercase()) {
+        return format!("{name}[{}]", arguments.join(","));
+    }
     let encoded = arguments
-        .split(',')
-        .map(str::trim)
-        .collect::<Vec<_>>()
         .join("_")
         .chars()
         .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
         .collect::<String>();
     format!("{name}__{encoded}")
+}
+
+fn specialize_type_argument(argument: &str, substitution: &TypeSubstitution) -> String {
+    if let Some(value) = substitution.apply_const(argument) {
+        return value.to_owned();
+    }
+    if argument.contains('[') {
+        return specialize_callee_name(argument, substitution);
+    }
+    argument.to_owned()
+}
+
+fn split_type_arguments(arguments: &str) -> Vec<&str> {
+    let mut result = Vec::new();
+    let mut start = 0;
+    let mut depth = 0;
+    for (index, character) in arguments.char_indices() {
+        match character {
+            '[' => depth += 1,
+            ']' => depth -= 1,
+            ',' if depth == 0 => {
+                result.push(&arguments[start..index]);
+                start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    result.push(&arguments[start..]);
+    result
 }
 
 fn specialize_method_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
