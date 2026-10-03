@@ -14,16 +14,17 @@ pub(in crate::codegen) fn specialize_program(
     program: &Program,
     instances: &[GenericInstance],
 ) -> Result<Program, NativeEmitError> {
+    let instances = expand_transitive_instances(program, instances)?;
     let mut declarations = Vec::with_capacity(program.declarations.len());
     for declaration in &program.declarations {
         match declaration {
             TopLevelDecl::Verb(verb) if !verb.generic_parameters.is_empty() => {
-                if let Some(specialized) = specialize_verb(verb, instances)? {
+                if let Some(specialized) = specialize_verb(verb, &instances)? {
                     declarations.push(TopLevelDecl::Verb(specialized));
                 }
             }
             TopLevelDecl::ExternalVerb(verb) if !verb.generic_parameters.is_empty() => {
-                if let Some(specialized) = specialize_external_verb(verb, instances)? {
+                if let Some(specialized) = specialize_external_verb(verb, &instances)? {
                     declarations.push(TopLevelDecl::ExternalVerb(specialized));
                 }
             }
@@ -31,6 +32,87 @@ pub(in crate::codegen) fn specialize_program(
         }
     }
     Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
+}
+
+fn expand_transitive_instances(
+    program: &Program,
+    instances: &[GenericInstance],
+) -> Result<Vec<GenericInstance>, NativeEmitError> {
+    let mut expanded = instances.to_vec();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for caller_instance in expanded.clone() {
+            let Some(caller_parameters) = generic_parameters_for(program, &caller_instance.name)
+            else {
+                continue;
+            };
+            let substitution = TypeSubstitution::for_type(
+                &caller_instance.name,
+                caller_parameters,
+                &caller_instance.arguments,
+                crate::lexer::SourceSpan::new(0, 0),
+            )
+            .map_err(|error| {
+                NativeEmitError(format!("generic instance expansion failed: {error:?}"))
+            })?;
+            for nested_template in expanded.clone().into_iter().filter(|instance| {
+                instance.caller.as_deref() == Some(caller_instance.name.as_str())
+            }) {
+                let arguments = nested_template
+                    .arguments
+                    .iter()
+                    .map(|argument| substitution.apply(argument))
+                    .collect::<Vec<_>>();
+                if arguments
+                    .iter()
+                    .any(|argument| contains_generic_parameter(argument, caller_parameters))
+                {
+                    continue;
+                }
+                let canonical_key = format!(
+                    "{}[{}]",
+                    nested_template.name,
+                    arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+                );
+                if expanded.iter().any(|instance| instance.canonical_key == canonical_key) {
+                    continue;
+                }
+                expanded.push(GenericInstance {
+                    name: nested_template.name,
+                    arguments,
+                    canonical_key,
+                    caller: Some(caller_instance.name.clone()),
+                });
+                changed = true;
+            }
+        }
+    }
+    Ok(expanded)
+}
+
+fn generic_parameters_for<'a>(
+    program: &'a Program,
+    name: &str,
+) -> Option<&'a [crate::ast::GenericParam]> {
+    program.declarations.iter().find_map(|declaration| match declaration {
+        TopLevelDecl::Verb(verb) if verb.name == name => Some(verb.generic_parameters.as_slice()),
+        TopLevelDecl::ExternalVerb(verb) if verb.name == name => {
+            Some(verb.generic_parameters.as_slice())
+        }
+        _ => None,
+    })
+}
+
+fn contains_generic_parameter(
+    type_name: &TypeName,
+    parameters: &[crate::ast::GenericParam],
+) -> bool {
+    parameters.iter().any(|parameter| parameter.name == type_name.name)
+        || type_name
+            .arguments
+            .iter()
+            .any(|argument| contains_generic_parameter(argument, parameters))
 }
 
 fn specialize_external_verb(

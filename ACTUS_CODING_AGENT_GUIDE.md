@@ -1286,6 +1286,24 @@ roles, and nested arguments remain invalid. `Buffer` is a compiler-owned
 builtin type name; use a domain-specific name such as `Storage` for a user
 defined generic aggregate.
 
+Generic verbs may call other generic verbs without manually materializing the
+helper. The compiler propagates the concrete caller substitution transitively:
+
+```act
+verb inner[N: Usize](ins storage: Storage[N]) -> u32 {
+    return N as u32;
+}
+
+verb outer[N: Usize](ins storage: Storage[N]) -> u32 {
+    return inner(storage: ins storage);
+}
+```
+
+When `outer` is reached as `outer[4]`, the compiler also materializes the
+reachable `inner[4]` instance before native declaration and lowering. This
+propagation is deterministic and deduplicated; do not add duplicate helper
+verbs or handwritten concrete wrappers.
+
 #### Array return ABI
 
 Returning `Array[T, N]` uses the same caller-owned return-slot ABI as other

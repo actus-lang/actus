@@ -154,6 +154,16 @@ fn specializes_const_generic_expression_values_from_struct_arguments() {
 
 #[cfg(unix)]
 #[test]
+fn specializes_transitive_const_generic_verb_calls_natively() {
+    let status = run_array_fixture(
+        "transitive-const-generic-verb",
+        "struct Storage[N: Usize] { erg values: Array[u32, N], } verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); } verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
 fn returns_an_array_through_the_native_return_slot() {
     let status = run_array_fixture(
         "array-return-slot",

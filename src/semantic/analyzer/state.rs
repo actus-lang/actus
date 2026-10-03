@@ -54,6 +54,7 @@ pub(crate) struct Analyzer {
     pub(crate) const_generic_scopes: Vec<HashSet<String>>,
     pub(crate) generic_bounds: HashMap<String, Vec<String>>,
     pub(crate) generic_instances: super::super::generic_cache::GenericInstanceCache,
+    pub(crate) current_generic_owner: Option<String>,
     pub(crate) expected_expression_type: Option<crate::ast::TypeName>,
     pub(crate) inferred_expression_types: HashMap<(usize, usize), crate::ast::TypeName>,
     pub(crate) case_result_types: HashMap<(usize, usize), crate::ast::TypeName>,

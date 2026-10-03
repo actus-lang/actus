@@ -76,6 +76,7 @@ pub struct GenericInstance {
     pub name: String,
     pub arguments: Vec<TypeName>,
     pub canonical_key: String,
+    pub caller: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

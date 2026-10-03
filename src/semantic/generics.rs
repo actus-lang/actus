@@ -262,6 +262,7 @@ impl Analyzer {
             name: type_name.name.clone(),
             arguments: type_name.arguments.clone(),
             canonical_key,
+            caller: None,
         });
     }
 

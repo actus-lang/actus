@@ -765,6 +765,29 @@ Gate 23.21 evidence is provided by the semantic generic-argument fixtures in
 `specializes_const_generic_expression_values_from_struct_arguments` in
 `tests/arrays_cli.rs`.
 
+### Gate 23.22: Transitive generic verb specialization
+
+Status: **closed**. A generic verb may call another generic verb through an
+inferred generic argument. When the outer verb is materialized for a concrete
+instance, every reachable nested helper must be materialized for the same
+substituted arguments before native declaration and lowering.
+
+- [x] Record generic-call provenance without changing ordinary generic type
+      instance identity.
+- [x] Propagate concrete caller substitutions through nested generic-call
+      instances to a fixed point, with deterministic deduplication.
+- [x] Emit every reachable nested generic helper and keep its native call
+      target available during lowering.
+- [x] Add accepted and rejected coverage for nested generic calls, including
+      const-generic `N` substitution through `outer[N] -> inner[N]`.
+- [x] Verify strict checking, native execution, object emission, and the full
+      compiler quality checks with the transitive-specialization fixture.
+
+Gate 23.22 evidence is provided by
+`specializes_transitive_const_generic_verb_calls_natively` in
+`tests/arrays_cli.rs`, together with the existing semantic rejection fixtures
+for invalid const arguments and the repository-wide compiler checks.
+
 ## Non-goals
 
 This phase does not:

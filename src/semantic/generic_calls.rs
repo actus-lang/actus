@@ -60,6 +60,7 @@ impl Analyzer {
             name: name.to_owned(),
             arguments,
             canonical_key,
+            caller: self.current_generic_owner.clone(),
         });
     }
 
