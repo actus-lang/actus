@@ -1,0 +1,7 @@
+open verb control_value() -> Int {
+    return safe_default();
+}
+
+verb safe_default() -> Int {
+    return 24;
+}

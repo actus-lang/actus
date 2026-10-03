@@ -178,15 +178,25 @@ executes them with the complete child sibling scope.
 
 ## Gate 24.6: Documentation and developer workflow
 
-- [ ] Document hierarchical module layout, canonical child facades, and
+- [x] Document hierarchical module layout, canonical child facades, and
       parent-controlled exports in the language guide.
-- [ ] Document valid and invalid import paths with examples.
-- [ ] Add a production-shaped example using a single public facade and
+- [x] Document valid and invalid import paths with examples.
+- [x] Add a production-shaped example using a single public facade and
       responsibility-specific child directories.
-- [ ] Update diagnostics and module architecture documentation without
+- [x] Update diagnostics and module architecture documentation without
       contradicting the existing direct-sibling rules.
-- [ ] Add an executable module-tree example to the repository acceptance
+- [x] Add an executable module-tree example to the repository acceptance
       suite.
+
+Gate 24.6 is closed. The Alpha guide and coding-agent guide document
+canonical nested facades, explicit parent-controlled exports, and valid and
+invalid import paths. The compiler architecture documentation records the
+shared module-unit identity used across resolution, semantic analysis, native
+planning, formatter, LSP, and test tooling. The
+`examples/hierarchical_modules` package provides a production-shaped parent
+facade with responsibility-specific child directories, and its acceptance
+test proves strict checking, formatting, native linking, and execution with
+exit code `24`.
 
 ## Gate 24.7: End-to-end acceptance
 
