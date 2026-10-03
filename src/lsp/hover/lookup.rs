@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::ast::{Program, TopLevelDecl};
+use crate::ast::{GenericParamKind, Program, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::{SourceSpan, Token};
 use crate::modules::ModuleResolver;
@@ -13,7 +13,7 @@ use super::super::position::{LineIndex, LspPosition};
 use super::super::uri::file_uri_to_path;
 use super::formatting::{
     block_info, declaration_documentation, declaration_signature, format_markdown, pack_field_info,
-    parameter_info, role_name,
+    parameter_info, role_name, type_name,
 };
 use super::model::SymbolInfo;
 use super::tokens::{identifier_at, operator_at, range};
@@ -31,6 +31,16 @@ pub(crate) fn find_hover(
         return Some(super::HoverInfo {
             contents: operator_documentation(operator).to_owned(),
             range: range(source, span),
+        });
+    }
+    if let Some(token) = tokens.iter().find(|token| {
+        token.span.start <= offset
+            && offset <= token.span.end
+            && matches!(token.kind, crate::lexer::TokenKind::True | crate::lexer::TokenKind::False)
+    }) {
+        return Some(super::HoverInfo {
+            contents: "```actus\ntype Bool\n```".to_owned(),
+            range: range(source, token.span),
         });
     }
     let (name, name_span) = identifier_at(&tokens, offset)?;
@@ -233,7 +243,15 @@ fn arena_place_info(
 
 fn local_info(source: &str, program: &Program, name: &str, offset: usize) -> Option<SymbolInfo> {
     for declaration in &program.declarations {
+        if let Some(info) = generic_parameter_info(source, declaration, name, offset) {
+            return Some(info);
+        }
         if let Some(info) = declaration_info(source, declaration, name) {
+            return Some(info);
+        }
+        if let TopLevelDecl::Struct(definition) = declaration
+            && let Some(info) = struct_field_info(source, definition, name)
+        {
             return Some(info);
         }
         if let TopLevelDecl::Pack(pack) = declaration
@@ -254,6 +272,54 @@ fn local_info(source: &str, program: &Program, name: &str, offset: usize) -> Opt
         }
     }
     None
+}
+
+fn struct_field_info(
+    source: &str,
+    definition: &crate::ast::StructDef,
+    name: &str,
+) -> Option<SymbolInfo> {
+    let field = definition.fields.iter().find(|field| field.name == name)?;
+    let role = match field.role {
+        crate::ast::StructFieldRole::Value => "value",
+        crate::ast::StructFieldRole::Erg => "erg",
+        crate::ast::StructFieldRole::Abs => "abs",
+        crate::ast::StructFieldRole::Ins => "ins",
+    };
+    Some(SymbolInfo {
+        signature: format!("{role} {}: {}", field.name, type_name(&field.ty)),
+        span: super::tokens::identifier_span(source, field.span, name).unwrap_or(field.span),
+        documentation: field.doc.clone(),
+    })
+}
+
+fn generic_parameter_info(
+    source: &str,
+    declaration: &TopLevelDecl,
+    name: &str,
+    offset: usize,
+) -> Option<SymbolInfo> {
+    let (parameters, declaration_span) = match declaration {
+        TopLevelDecl::Verb(value) => (&value.generic_parameters, value.span),
+        TopLevelDecl::ExternalVerb(value) => (&value.generic_parameters, value.span),
+        TopLevelDecl::Struct(value) => (&value.generic_parameters, value.span),
+        TopLevelDecl::Enum(value) => (&value.generic_parameters, value.span),
+        _ => return None,
+    };
+    if !(declaration_span.start <= offset && offset <= declaration_span.end) {
+        return None;
+    }
+    let parameter = parameters.iter().find(|parameter| parameter.name == name)?;
+    let signature = match &parameter.kind {
+        GenericParamKind::Type => format!("type {name}"),
+        GenericParamKind::Const { domain } => format!("const {name}: {}", type_name(domain)),
+    };
+    Some(SymbolInfo {
+        signature,
+        span: super::tokens::identifier_span(source, parameter.span, name)
+            .unwrap_or(parameter.span),
+        documentation: Some("Generic parameter declared by this declaration.".to_owned()),
+    })
 }
 
 fn declaration_info(source: &str, declaration: &TopLevelDecl, name: &str) -> Option<SymbolInfo> {

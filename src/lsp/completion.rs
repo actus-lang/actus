@@ -54,8 +54,8 @@ pub(super) fn items(
         .map(|label| {
             let mut item = json!({
                 "label": label,
-                "kind": 25,
-                "detail": "Actus symbol",
+                "kind": completion_kind(&label),
+                "detail": completion_detail(&label),
                 "data": {"uri": uri, "symbol": label, "version": context.document_version},
             });
             if let Some(range) = replacement.clone() {
@@ -71,6 +71,22 @@ pub(super) fn items(
         item
     }));
     serde_json::Value::Array(items)
+}
+
+fn completion_kind(label: &str) -> u8 {
+    match label {
+        "true" | "false" => 17,
+        _ => 25,
+    }
+}
+
+fn completion_detail(label: &str) -> &'static str {
+    match label {
+        "true" | "false" => "Actus Boolean literal",
+        "Int" | "Bool" | "Char" | "String" | "Buffer" | "Array" | "Arena" | "Option" | "Result"
+        | "Map" | "Usize" | "Void" | "f32" | "f64" => "Actus type",
+        _ => "Actus symbol",
+    }
 }
 
 fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
@@ -239,6 +255,8 @@ fn builtin_labels() -> Vec<String> {
         "Void".to_owned(),
         "Int".to_owned(),
         "Bool".to_owned(),
+        "true".to_owned(),
+        "false".to_owned(),
         "Char".to_owned(),
         "String".to_owned(),
         "Buffer".to_owned(),

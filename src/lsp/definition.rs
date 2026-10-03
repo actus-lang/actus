@@ -42,6 +42,10 @@ fn local_definition(
     let mut definitions = Vec::new();
     for declaration in &program.declarations {
         collect_top_level_definition(source, declaration, name, &mut definitions);
+        collect_generic_parameter_definitions(source, declaration, name, &mut definitions);
+        if let TopLevelDecl::Struct(definition) = declaration {
+            collect_struct_field_definitions(source, definition, name, &mut definitions);
+        }
         if let TopLevelDecl::Pack(pack) = declaration {
             collect_pack_field_definitions(source, pack, name, &mut definitions);
         }
@@ -54,6 +58,43 @@ fn local_definition(
         }
     }
     definitions.into_iter().filter(|span| span.start <= use_offset).max_by_key(|span| span.start)
+}
+
+fn collect_generic_parameter_definitions(
+    source: &str,
+    declaration: &TopLevelDecl,
+    name: &str,
+    definitions: &mut Vec<SourceSpan>,
+) {
+    let parameters = match declaration {
+        TopLevelDecl::Verb(value) => &value.generic_parameters,
+        TopLevelDecl::ExternalVerb(value) => &value.generic_parameters,
+        TopLevelDecl::Struct(value) => &value.generic_parameters,
+        TopLevelDecl::Enum(value) => &value.generic_parameters,
+        _ => return,
+    };
+    for parameter in parameters {
+        if parameter.name == name
+            && let Some(identifier) = identifier_span(source, parameter.span, name)
+        {
+            definitions.push(identifier);
+        }
+    }
+}
+
+fn collect_struct_field_definitions(
+    source: &str,
+    definition: &crate::ast::StructDef,
+    name: &str,
+    definitions: &mut Vec<SourceSpan>,
+) {
+    for field in &definition.fields {
+        if field.name == name
+            && let Some(identifier) = identifier_span(source, field.span, name)
+        {
+            definitions.push(identifier);
+        }
+    }
 }
 
 fn collect_pack_field_definitions(

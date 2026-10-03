@@ -1,4 +1,4 @@
-use crate::ast::{PackDecl, Param, Role, Stmt, TypeName};
+use crate::ast::{GenericParamKind, PackDecl, Param, Role, Stmt, TypeName};
 
 use super::model::SymbolInfo;
 use super::tokens::identifier_span;
@@ -140,18 +140,48 @@ fn return_type(return_type: Option<&crate::ast::ReturnType>) -> String {
 
 pub(super) fn declaration_signature(declaration: &crate::ast::TopLevelDecl) -> Option<String> {
     match declaration {
-        crate::ast::TopLevelDecl::Verb(verb) => {
-            Some(format!("verb {}{}", verb.name, verb_signature(verb)))
-        }
-        crate::ast::TopLevelDecl::ExternalVerb(verb) => {
-            Some(format!("extern verb {}{}", verb.name, external_signature(verb)))
-        }
-        crate::ast::TopLevelDecl::Struct(definition) => Some(format!("struct {}", definition.name)),
-        crate::ast::TopLevelDecl::Enum(definition) => Some(format!("enum {}", definition.name)),
+        crate::ast::TopLevelDecl::Verb(verb) => Some(format!(
+            "verb {}{}{}",
+            verb.name,
+            generic_label(&verb.generic_parameters),
+            verb_signature(verb)
+        )),
+        crate::ast::TopLevelDecl::ExternalVerb(verb) => Some(format!(
+            "extern verb {}{}{}",
+            verb.name,
+            generic_label(&verb.generic_parameters),
+            external_signature(verb)
+        )),
+        crate::ast::TopLevelDecl::Struct(definition) => Some(format!(
+            "struct {}{}",
+            definition.name,
+            generic_label(&definition.generic_parameters)
+        )),
+        crate::ast::TopLevelDecl::Enum(definition) => Some(format!(
+            "enum {}{}",
+            definition.name,
+            generic_label(&definition.generic_parameters)
+        )),
         crate::ast::TopLevelDecl::Role(role) => Some(format!("role {}", role.name)),
         crate::ast::TopLevelDecl::Pack(pack) => Some(pack_signature(pack)),
         _ => None,
     }
+}
+
+fn generic_label(parameters: &[crate::ast::GenericParam]) -> String {
+    if parameters.is_empty() {
+        return String::new();
+    }
+    let values = parameters
+        .iter()
+        .map(|parameter| match &parameter.kind {
+            GenericParamKind::Type => parameter.name.clone(),
+            GenericParamKind::Const { domain } => {
+                format!("{}: {}", parameter.name, type_name(domain))
+            }
+        })
+        .collect::<Vec<_>>();
+    format!("[{}]", values.join(", "))
 }
 
 pub(super) fn declaration_documentation(declaration: &crate::ast::TopLevelDecl) -> Option<String> {

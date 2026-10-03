@@ -37,7 +37,7 @@ pub(super) fn initialize_result(target: &TargetSpec, params: &Value) -> Value {
             "codeLensProvider": {"resolveProvider": false},
             "semanticTokensProvider": {
                 "full": true,
-                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator"], "tokenModifiers": ["inactive-target"]}
+                "legend": {"tokenTypes": ["type", "number", "ownership-erg", "ownership-abs", "ownership-dat", "ownership-ins", "pack-keyword", "pack-name", "pack-field", "operator", "boolean"], "tokenModifiers": ["inactive-target"]}
             },
             "actusSemanticModelProvider": true,
             "actusMemoryGraphProvider": true,

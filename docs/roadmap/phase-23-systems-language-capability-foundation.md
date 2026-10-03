@@ -277,17 +277,17 @@ repository quality checks pass for this gate.
 The language feature is incomplete until all compiler-owned tools understand
 the same syntax and semantic model.
 
-- [ ] Format const-generic declarations without changing their meaning.
-- [ ] Format Boolean literals, nested places, and nested calls idempotently.
-- [ ] Preserve Actus triple-quoted documentation strings and imports.
-- [ ] Add LSP diagnostics for all rejected forms with correct spans.
-- [ ] Add hover/type information for const parameters and Boolean literals.
-- [ ] Add definition/navigation for nested fields, indexed bindings, and
+- [x] Format const-generic declarations without changing their meaning.
+- [x] Format Boolean literals, nested places, and nested calls idempotently.
+- [x] Preserve Actus triple-quoted documentation strings and imports.
+- [x] Add LSP diagnostics for all rejected forms with correct spans.
+- [x] Add hover/type information for const parameters and Boolean literals.
+- [x] Add definition/navigation for nested fields, indexed bindings, and
       generic declarations.
-- [ ] Ensure semantic tokens and completion do not treat `true`, `false`, or
+- [x] Ensure semantic tokens and completion do not treat `true`, `false`, or
       `Usize` as ordinary identifiers.
-- [ ] Test open-document overlays and malformed/incomplete nested edits.
-- [ ] Verify formatter and LSP do not move or delete source documentation.
+- [x] Test open-document overlays and malformed/incomplete nested edits.
+- [x] Verify formatter and LSP do not move or delete source documentation.
 
 ## Gate 23.7: Strict and native acceptance
 

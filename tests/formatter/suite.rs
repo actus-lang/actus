@@ -60,6 +60,17 @@ fn formats_boolean_literals_without_rewriting_their_values() {
 }
 
 #[test]
+fn formats_const_generic_declarations_without_changing_meaning() {
+    let formatted = format_source(
+        "struct Fabric[N: Usize] { cells: Array[Int, N], } verb main() -> Bool { return false; }",
+    );
+    assert!(formatted.contains("struct Fabric[N: Usize] {"));
+    assert!(formatted.contains("cells: Array[Int, N]"));
+    assert!(formatted.contains("return false;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_nested_places_without_collapsing_selectors() {
     let formatted = format_source(
         "verb main() { erg values: Array[Int, 2] = Array[Int, 2](); values[1].field = 7; values[1].field += 1; }",

@@ -48,6 +48,29 @@ fn lsp_rejects_invalid_incremental_changes_without_partial_overlay_mutation() {
 }
 
 #[test]
+fn lsp_keeps_malformed_nested_overlay_live_and_reports_a_precise_diagnostic() {
+    let uri = "file:///tmp/actus-lsp-incomplete-nested.act";
+    let valid = "verb main() -> Int { return 0; }\n";
+    let incomplete = "verb main() -> Int { if true { nested_call(\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":valid}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":incomplete}]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":5}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":42}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":["), "missing malformed-source diagnostics: {stdout}");
+    assert!(stdout.contains("\"id\":2"), "hover response missing after malformed edit: {stdout}");
+    assert!(
+        stdout.contains("\"id\":3"),
+        "completion response missing after malformed edit: {stdout}"
+    );
+}
+
+#[test]
 fn lsp_removes_closed_overlay_and_falls_back_to_disk_module() {
     let root = temp_root();
     let module = root.join("src/math");
