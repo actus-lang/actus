@@ -171,17 +171,28 @@ identity.
 
 ## Gate 25.5: Tooling and developer workflow
 
-- [ ] Make formatter preserve configuration facades, `open const` declarations,
+- [x] Make formatter preserve configuration facades, `open const` declarations,
       and deterministic sibling ordering.
-- [ ] Make LSP diagnostics and navigation resolve configuration constants through
+- [x] Make LSP diagnostics and navigation resolve configuration constants through
       the same public facade interface as native compilation.
-- [ ] Keep malformed or partially edited configuration sources recoverable in
+- [x] Keep malformed or partially edited configuration sources recoverable in
       the language server.
-- [ ] Ensure the test runner treats configuration sources as package modules,
+- [x] Ensure the test runner treats configuration sources as package modules,
       not independent test roots.
-- [ ] Document the configuration boundary in the Alpha guide and coding-agent
+- [x] Document the configuration boundary in the Alpha guide and coding-agent
       guide without duplicating manifest configuration rules.
-- [ ] Add production-shaped configuration examples and editor fixtures.
+- [x] Add production-shaped configuration examples and editor fixtures.
+
+Gate 25.5 is closed. Formatter idempotence and canonical sibling ordering
+remain covered for nested facades. LSP definition lookup now treats constants
+like other public declarations and resolves a transitive configuration
+constant back to its source file through the `config` facade; invalid or
+partially edited sources retain the existing recoverable lifecycle state. The
+test runner has a package-level regression proving that configuration values
+are available to `meta test` verbs without treating config files as independent
+test roots. The Alpha guide and coding-agent guide document the reserved
+configuration boundary, its compile-time-only rules, and its separation from
+`Actus.toml`.
 
 ## Gate 25.6: End-to-end acceptance
 

@@ -947,14 +947,39 @@ Sibling files share internal module scope. External users see only declarations
 exposed through the canonical facade. Direct sibling bypasses, missing
 facades, duplicate declarations, and malformed exports must be rejected.
 
-### 17.3 Visibility
+### 17.3 Package configuration facade
+
+`src/config/config.act` is the reserved package configuration facade when a
+package uses source-level configuration:
+
+```act
+// src/config/config.act
+open values;
+
+// src/config/values.act
+open const DEFAULT_THRESHOLD: u8 = 30u8;
+```
+
+Normal package code consumes it through `import config;`. Configuration files
+are compile-time-only and may contain typed constants plus supporting
+type-level declarations, but they must not import application, runtime,
+hardware, or standard-library modules, and must not declare verbs, external
+verbs, roles, or performances. The canonical facade controls visibility;
+private constants and direct child-module imports remain unavailable.
+
+Use `Actus.toml` for package, build, target, and runtime configuration. Do not
+put mutable runtime state or deployment settings in `src/config`. The compiler,
+formatter, LSP, test runner, and native backend must all resolve this facade
+through the same module boundary.
+
+### 17.4 Visibility
 
 `open` on a declaration or sibling export is the Actus visibility mechanism.
 Do not use Rust `pub`, Go `export`, or C header conventions in Actus source.
 Fields do not have a separate `pub` keyword; aggregate visibility follows the
 declared facade and type contract.
 
-### 17.4 Hierarchical facades
+### 17.5 Hierarchical facades
 
 When a module grows beyond a single responsibility, use nested canonical
 facades instead of making implementation files independently importable:

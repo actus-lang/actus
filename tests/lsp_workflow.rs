@@ -43,6 +43,42 @@ fn lsp_definition_resolves_local_and_facade_exported_symbols() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn lsp_definition_resolves_a_configuration_constant_through_its_facade() {
+    let root = temp_root();
+    fs::create_dir_all(root.join("src/config")).expect("create config directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-config-demo\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/config/config.act"), "open values;\n").expect("write config facade");
+    fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
+        .expect("write config values");
+    let source =
+        "import config;\nverb main() -> Int { erg number = LIMIT as Int; return number; }\n";
+    let main = root.join("src/main.act");
+    fs::write(&main, source).expect("write main");
+    let uri = file_uri(&main);
+    let stdout = run_lsp(configuration_definition_messages(&uri, source));
+    let values_uri = file_uri(&root.join("src/config/values.act"));
+    assert!(stdout.contains(&values_uri), "configuration definition missing: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+fn configuration_definition_messages(uri: &str, source: &str) -> Vec<Value> {
+    let local_position = position_after(source, "return number");
+    let external_position = position_after(source, "= LIMIT");
+    vec![
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":local_position}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":external_position}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ]
+}
+
 fn write_definition_fixture(root: &Path) -> String {
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(

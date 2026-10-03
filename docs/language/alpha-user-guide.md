@@ -171,6 +171,28 @@ Use responsibility-specific child directories and keep one stable parent
 facade for external consumers. The resolver, semantic analyzer, native linker,
 formatter, LSP, and test runner all consume the same hierarchy.
 
+### Package configuration
+
+Packages may reserve `src/config/config.act` as a package-wide configuration
+facade:
+
+```text
+src/
+├── config/
+│   ├── config.act
+│   └── values.act
+└── main.act
+```
+
+The facade may open configuration siblings, and normal package modules consume
+its public constants with `import config;`. Configuration sources are
+compile-time-only: they may expose typed constants and supporting type-level
+declarations, but may not import domain/runtime modules or declare verbs.
+Private constants remain private to the configuration subtree. `Actus.toml`
+continues to own package, build, target, and runtime settings; source
+configuration is for typed compile-time policy values only. The formatter,
+LSP, semantic checker, and test runner use the same facade boundary.
+
 ## 5. Check, build, run, test, format, and watch
 
 After installing an Actus Alpha release, the user-facing workflow is:
