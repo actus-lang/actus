@@ -74,6 +74,28 @@ fn module_unit_keeps_internal_program_separate_from_public_exports() {
 }
 
 #[test]
+fn module_unit_records_child_sources_in_hierarchical_order() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime;");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 42; }");
+
+    let unit = load_module_unit(&ModuleResolver::new(&fixture.root), "aie")
+        .expect("hierarchical module unit should load");
+
+    assert_eq!(unit.sources().len(), 3);
+    assert!(matches!(
+        unit.sources()[1].kind(),
+        ModuleSourceKind::ChildFacade { module_path } if module_path == "aie::runtime"
+    ));
+    assert!(matches!(
+        unit.sources()[2].kind(),
+        ModuleSourceKind::ChildSibling { module_path, name }
+            if module_path == "aie::runtime" && name == "api"
+    ));
+}
+
+#[test]
 fn repeated_unit_loads_have_equal_identity_and_export_order() {
     let fixture = Fixture::new();
     fixture.write("math/math.act", "open operations;");

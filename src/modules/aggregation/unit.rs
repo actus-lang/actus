@@ -6,7 +6,7 @@ use crate::ast::Program;
 use crate::lexer::scan;
 use crate::parser::parse;
 
-use super::super::resolver::ModuleResolver;
+use super::super::resolver::{ModuleResolver, ResolvedModule};
 use super::identity::ModuleNamespace;
 use super::signature_visibility::validate_exported_signatures;
 use super::types::{ModuleError, ModuleExports};
@@ -36,6 +36,8 @@ impl ModuleIdentity {
 pub enum ModuleSourceKind {
     Facade,
     Sibling { name: String },
+    ChildFacade { module_path: String },
+    ChildSibling { module_path: String, name: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,7 +108,7 @@ pub fn load_module_unit_with_overlays(
     let implementation =
         super::parsing::parse_module_with_overlays(resolver, module_path, overlays)?;
     let exports = super::exports::exports_module_with_overlays(resolver, module_path, overlays)?;
-    let sources = load_sources(resolved.facade(), resolved.siblings(), overlays)?;
+    let sources = load_sources(resolver, &resolved, overlays)?;
     let source_key =
         sources.iter().map(|source| normalize(source.path())).collect::<Vec<_>>().join("|");
     let namespace =
@@ -123,21 +125,66 @@ pub fn load_module_unit_with_overlays(
 }
 
 fn load_sources(
-    facade: &Path,
-    siblings: &[PathBuf],
+    resolver: &ModuleResolver,
+    resolved: &ResolvedModule,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<Vec<ModuleSource>, ModuleError> {
-    let mut sources = Vec::with_capacity(siblings.len() + 1);
-    sources.push(load_source(facade, ModuleSourceKind::Facade, overlays)?);
-    for sibling in siblings {
-        let name = sibling.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
-        sources.push(load_source(
-            sibling,
-            ModuleSourceKind::Sibling { name: name.to_owned() },
-            overlays,
-        )?);
+    let mut sources = Vec::new();
+    load_module_sources(resolved, overlays, &mut sources, false)?;
+    for child in resolved.children() {
+        let child = resolver
+            .resolve_child(
+                resolved.module_path(),
+                child.module_path().rsplit("::").next().unwrap_or_default(),
+            )
+            .map_err(ModuleError::Resolution)?;
+        load_child_sources(resolver, &child, overlays, &mut sources)?;
     }
     Ok(sources)
+}
+
+fn load_module_sources(
+    resolved: &ResolvedModule,
+    overlays: &HashMap<PathBuf, String>,
+    sources: &mut Vec<ModuleSource>,
+    child: bool,
+) -> Result<(), ModuleError> {
+    let facade_kind = if child {
+        ModuleSourceKind::ChildFacade { module_path: resolved.module_path().to_owned() }
+    } else {
+        ModuleSourceKind::Facade
+    };
+    sources.push(load_source(resolved.facade(), facade_kind, overlays)?);
+    for sibling in resolved.siblings() {
+        let name = sibling.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
+        let kind = if child {
+            ModuleSourceKind::ChildSibling {
+                module_path: resolved.module_path().to_owned(),
+                name: name.to_owned(),
+            }
+        } else {
+            ModuleSourceKind::Sibling { name: name.to_owned() }
+        };
+        sources.push(load_source(sibling, kind, overlays)?);
+    }
+    Ok(())
+}
+
+fn load_child_sources(
+    resolver: &ModuleResolver,
+    resolved: &ResolvedModule,
+    overlays: &HashMap<PathBuf, String>,
+    sources: &mut Vec<ModuleSource>,
+) -> Result<(), ModuleError> {
+    load_module_sources(resolved, overlays, sources, true)?;
+    for child in resolved.children() {
+        let child_path = child.module_path().rsplit("::").next().unwrap_or_default();
+        let nested = resolver
+            .resolve_child(resolved.module_path(), child_path)
+            .map_err(ModuleError::Resolution)?;
+        load_child_sources(resolver, &nested, overlays, sources)?;
+    }
+    Ok(())
 }
 
 fn load_source(

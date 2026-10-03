@@ -136,7 +136,7 @@ tests for these boundaries.
 
 - [ ] Make parsing, semantic analysis, generic discovery, native object
       planning, and linking consume the same hierarchical module graph.
-- [ ] Ensure imported child implementations are emitted exactly once and
+- [x] Ensure imported child implementations are emitted exactly once and
       parent facades do not create duplicate object owners.
 - [ ] Preserve transitive generic specialization across child modules,
       including const-generic values and nested generic calls.
@@ -144,6 +144,14 @@ tests for these boundaries.
       module boundaries.
 - [ ] Add native execution tests for a parent facade that re-exports code from
       multiple child directories.
+
+Gate 24.4 progress: hierarchical child sources are now part of the owning
+`ModuleUnit` source identity and are loaded in deterministic facade/sibling
+order. Object planning keeps the complete child implementation under the
+parent module owner, so a child directory does not create a second object
+owner or duplicate emission. The module suite provides 58 passing tests for
+this boundary. Full graph-wide generic discovery and native linking evidence
+remain open in this gate.
 
 ## Gate 24.5: Tooling parity
 
