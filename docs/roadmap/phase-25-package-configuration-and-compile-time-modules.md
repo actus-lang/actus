@@ -56,14 +56,21 @@ cycles and keeps package policy available before runtime code generation.
 
 ## Gate 25.0: Configuration contract and diagnostics
 
-- [ ] Define the reserved `config` module identity and its package-root scope.
-- [ ] Define the accepted filesystem layout and canonical `config/config.act`
+- [x] Define the reserved `config` module identity and its package-root scope.
+- [x] Define the accepted filesystem layout and canonical `config/config.act`
       facade rule.
-- [ ] Define the allowed declaration categories inside configuration sources.
-- [ ] Define stable diagnostics for imports, runtime declarations, private
+- [x] Define the allowed declaration categories inside configuration sources.
+- [x] Define stable diagnostics for imports, runtime declarations, private
       exports, duplicate exports, cycles, and invalid configuration roots.
-- [ ] Record the distinction between source configuration and `Actus.toml`.
-- [ ] Add positive and negative contract fixtures before implementation.
+- [x] Record the distinction between source configuration and `Actus.toml`.
+- [x] Add positive and negative contract fixtures before implementation.
+
+Gate 25.0 is closed. ADR-0054 defines the reserved package-level `config`
+facade, its one-way dependency contract, compile-time-only declaration
+boundary, public visibility rules, diagnostic obligations, and separation from
+`Actus.toml`. The positive and negative layouts in
+`tests/fixtures/configuration/phase-25-contract.txt` establish the contract
+before compiler implementation begins.
 
 ## Gate 25.1: Parser, resolver, and facade policy
 
