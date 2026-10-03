@@ -4,13 +4,14 @@ mod scopes;
 mod statements;
 
 pub(super) use super::model::NativeCleanupSchedule;
+use super::types::NativeType;
 pub(super) use body::{lower_body, lower_case_block};
 pub(super) use statements::lower_statements;
 
 #[derive(Clone, Copy)]
 pub(super) enum Flow {
     Fallthrough,
-    Return(cranelift_codegen::ir::Value),
+    Return(cranelift_codegen::ir::Value, Option<NativeType>),
     VoidReturn,
     Break,
     Continue,

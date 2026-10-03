@@ -1,4 +1,4 @@
-use crate::ast::{Block, CompoundAssignmentOp, CompoundAssignmentTarget, Stmt};
+use crate::ast::{Block, CompoundAssignmentOp, Place, Stmt};
 
 use super::{Formatter, role_name};
 
@@ -29,20 +29,9 @@ impl Formatter<'_> {
             Stmt::OwnerDecl { role, name, ty, initializer, .. } => {
                 self.owner_declaration(role, name, ty.as_deref(), initializer);
             }
-            Stmt::Assignment { name, value, .. } => {
-                self.output.push_str(name);
+            Stmt::Assignment { target, value, .. } => {
+                self.place(target);
                 self.output.push_str(" = ");
-                self.expression(value);
-                self.output.push(';');
-            }
-            Stmt::FieldAssignment { object, field, value, .. } => {
-                self.field_assignment(object, field, value);
-            }
-            Stmt::IndexAssignment { target, index, value, .. } => {
-                self.expression(target);
-                self.output.push('[');
-                self.expression(index);
-                self.output.push_str("] = ");
                 self.expression(value);
                 self.output.push(';');
             }
@@ -76,19 +65,19 @@ impl Formatter<'_> {
 
     fn compound_assignment(
         &mut self,
-        target: &CompoundAssignmentTarget,
+        target: &Place,
         operator: CompoundAssignmentOp,
         value: &crate::ast::Expr,
     ) {
         match target {
-            CompoundAssignmentTarget::Identifier(name) => self.output.push_str(name),
-            CompoundAssignmentTarget::Field { object, field } => {
-                self.expression(object);
+            Place::Binding { name, .. } => self.output.push_str(name),
+            Place::Field { object, field, .. } => {
+                self.place(object);
                 self.output.push('.');
                 self.output.push_str(field);
             }
-            CompoundAssignmentTarget::Index { target, index } => {
-                self.expression(target);
+            Place::Index { target, index, .. } => {
+                self.place(target);
                 self.output.push('[');
                 self.expression(index);
                 self.output.push(']');
@@ -118,18 +107,21 @@ impl Formatter<'_> {
         self.output.push(';');
     }
 
-    fn field_assignment(
-        &mut self,
-        object: &crate::ast::Expr,
-        field: &str,
-        value: &crate::ast::Expr,
-    ) {
-        self.expression(object);
-        self.output.push('.');
-        self.output.push_str(field);
-        self.output.push_str(" = ");
-        self.expression(value);
-        self.output.push(';');
+    fn place(&mut self, place: &Place) {
+        match place {
+            Place::Binding { name, .. } => self.output.push_str(name),
+            Place::Field { object, field, .. } => {
+                self.place(object);
+                self.output.push('.');
+                self.output.push_str(field);
+            }
+            Place::Index { target, index, .. } => {
+                self.place(target);
+                self.output.push('[');
+                self.expression(index);
+                self.output.push(']');
+            }
+        }
     }
 
     fn return_statement(&mut self, value: Option<&crate::ast::Expr>) {
@@ -146,8 +138,6 @@ fn statement_span(statement: &Stmt) -> crate::lexer::SourceSpan {
     match statement {
         Stmt::OwnerDecl { span, .. }
         | Stmt::Assignment { span, .. }
-        | Stmt::FieldAssignment { span, .. }
-        | Stmt::IndexAssignment { span, .. }
         | Stmt::CompoundAssignment { span, .. }
         | Stmt::Expression { span, .. }
         | Stmt::If { span, .. }

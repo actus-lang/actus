@@ -9,6 +9,7 @@ use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
 use crate::ast::VerbDecl;
+use crate::configuration::NativeBackendConfiguration;
 
 use super::declarations::{native_signature_for_definition, native_signature_for_entry};
 use super::layout::LayoutRegistry;
@@ -19,6 +20,7 @@ use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 use flow::emit_flow;
+pub(crate) use flow::emit_value_return;
 use parameters::{BoundParameters, bind_parameters, declare_function_refs};
 
 #[allow(clippy::too_many_arguments)]
@@ -34,6 +36,7 @@ pub(super) fn define_function(
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
     force_entry_return: bool,
+    configuration: &NativeBackendConfiguration,
 ) -> Result<(), NativeEmitError> {
     let mut context = module.make_context();
     context.func.signature = if force_entry_return {
@@ -53,10 +56,22 @@ pub(super) fn define_function(
         vtable_data,
         namespace_prefix,
         force_entry_return,
-    )?;
-    module
-        .define_function(metadata.id, &mut context)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+    )
+    .map_err(|error| {
+        NativeEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
+    })?;
+    if configuration.verifies_no_float_ir() {
+        let floating = super::native::ir_audit::floating_point_instructions(&context.func);
+        if !floating.is_empty() {
+            return Err(NativeEmitError(format!(
+                "native function `{}` contains floating-point IR instructions: {floating:?}",
+                verb.name
+            )));
+        }
+    }
+    module.define_function(metadata.id, &mut context).map_err(|error| {
+        NativeEmitError(format!("native function `{}` verification failed: {error:?}", verb.name))
+    })?;
     module.clear_context(&mut context);
     Ok(())
 }

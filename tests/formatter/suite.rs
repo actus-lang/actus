@@ -52,6 +52,76 @@ fn preserves_typed_float_literal_suffixes() {
 }
 
 #[test]
+fn formats_boolean_literals_without_rewriting_their_values() {
+    let formatted = format_source("verb main() -> Bool { erg linked: Bool = false; return true; }");
+    assert!(formatted.contains("linked: Bool = false;"));
+    assert!(formatted.contains("return true;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_const_generic_declarations_without_changing_meaning() {
+    let formatted = format_source(
+        "struct Fabric[N: Usize] { cells: Array[Int, N], } verb main() -> Bool { return false; }",
+    );
+    assert!(formatted.contains("struct Fabric[N: Usize] {"));
+    assert!(formatted.contains("cells: Array[Int, N]"));
+    assert!(formatted.contains("return false;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_array_backed_packs_idempotently_with_layout_metadata() {
+    let source = "pack Frame { erg storage: Array[u8, 4]; layout big; fields { erg marker: u8 at 0; abs tail: u8 at 24 = 0; } }";
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("erg storage: Array[u8, 4];"));
+    assert!(formatted.contains("layout big;"));
+    assert!(formatted.contains("erg marker: u8 at 0;"));
+    assert!(formatted.contains("abs tail: u8 at 24 = 0;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_pack_array_element_types_idempotently() {
+    let source = "pack Cell { erg storage: u8; layout little; fields { erg marker: u8 at 0; } } struct Fabric { cells: Array[Cell, 2], }";
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("cells: Array[Cell, 2]"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn keeps_pack_storage_and_field_documentation_in_place() {
+    let source = concat!(
+        "\"\"\"Frame layout.\"\"\"\n",
+        "pack Frame {\n",
+        "\"\"\"Raw storage bytes.\"\"\"\n",
+        "erg storage: Array[u8, 2];\n",
+        "layout little; fields {\n",
+        "\"\"\"Message marker.\"\"\"\n",
+        "erg marker: u8 at 0;\n",
+        "abs tail: u8 at 8 = 0;\n",
+        "}\n}\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("\"\"\"Raw storage bytes.\"\"\"\n    erg storage"));
+    assert!(formatted.contains("\"\"\"Message marker.\"\"\"\n        erg marker"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_nested_places_without_collapsing_selectors() {
+    let formatted = format_source(
+        "verb main() { erg values: Array[Int, 2] = Array[Int, 2](); values[1].field = 7; values[1].field += 1; }",
+    );
+    assert!(formatted.contains("values[1].field = 7;"));
+    assert!(formatted.contains("values[1].field += 1;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_typed_constants_and_keeps_their_documentation() {
     let formatted = format_source(
         "\"\"\"Frame size.\"\"\" open const FRAME_SIZE: u16 = 32u16; verb main() { return; }",

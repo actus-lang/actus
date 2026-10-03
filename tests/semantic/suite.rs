@@ -122,6 +122,59 @@ fn validates_named_and_positional_call_arguments() {
 }
 
 #[test]
+fn validates_nested_call_roles_and_try_propagation() {
+    analyze_source(
+        "enum IoError { Failed, } verb update(ins slot: Int) { slot += 1; } verb observe(abs slot: Int) { } verb consume(dat slot: Int) { } verb produce() -> Result[Int, IoError] { return Ok(42); } verb worker() -> Result[Int, IoError] { erg value = 0; if true { update(slot: ins value); } else { observe(slot: abs value); } { erg owned = 0; consume(slot: dat owned); } loop { case true { true => { break; }, _ => { continue; }, }; } return produce()?; }",
+    )
+    .expect("nested calls must preserve ownership roles and try propagation");
+}
+
+#[test]
+fn validates_case_branch_result_types_and_divergence() {
+    analyze_source(
+        "verb choose(erg ready: Bool) -> Int { return case ready { true => { return 41; }, _ => 42, }; }",
+    )
+    .expect("a diverging case branch may coexist with the typed branch");
+
+    let error = analyze_source(
+        "verb choose(erg ready: Bool) { erg selected = case ready { true => 41, _ => 42u8, }; }",
+    )
+    .expect_err("case branches with incompatible inferred types must fail");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::TypeMismatch { callee, .. } if callee == "case")
+    );
+}
+
+#[test]
+fn rejects_invalid_nested_call_contracts() {
+    let invalid_role = analyze_source(
+        "verb update(ins slot: Int) { } verb main() { erg value = 0; if true { update(slot: abs value); } }",
+    )
+    .expect_err("invalid nested ownership marker must fail");
+    assert!(matches!(invalid_role.kind, SemanticErrorKind::InvalidArgumentRole { .. }));
+
+    let missing_argument = analyze_source(
+        "verb update(erg slot: Int) { } verb main() { if true { update(other: 1); } }",
+    )
+    .expect_err("unknown nested argument name must fail");
+    assert!(matches!(missing_argument.kind, SemanticErrorKind::UnknownParameter { .. }));
+
+    let unknown_verb = analyze_source("verb main() { if true { missing(); } }")
+        .expect_err("unknown nested verb must fail");
+    assert!(
+        matches!(unknown_verb.kind, SemanticErrorKind::UnknownVerb { name } if name == "missing")
+    );
+
+    let incompatible_try = analyze_source(
+        "enum IoError { Failed, } verb produce() -> Result[Int, IoError] { return Ok(1); } verb main() -> Int { if true { produce()?; } return 0; }",
+    )
+    .expect_err("nested try must match the enclosing return type");
+    assert!(
+        matches!(incompatible_try.kind, SemanticErrorKind::TypeMismatch { callee, .. } if callee == "?")
+    );
+}
+
+#[test]
 fn validates_call_roles_and_rejects_ambiguous_positional_calls() {
     let invalid_abs = analyze_source(
         "verb inspect_view(abs view: Buffer) { inspect(view); } verb caller() { erg buffer = make(); inspect_view(buffer); }",

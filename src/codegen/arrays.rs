@@ -38,7 +38,9 @@ pub(super) fn lower_array_index(
         string_data,
         layouts,
     )?;
-    if matches!(element, NativeType::Struct(_) | NativeType::Array(_)) {
+    if matches!(element, NativeType::Struct(_) | NativeType::Array(_))
+        || layouts.is_inline_pack(element)
+    {
         return Ok(address);
     }
     Ok(function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0))
@@ -78,7 +80,9 @@ pub(super) fn lower_array_assignment(
         string_data,
         layouts,
     )?;
-    if matches!(element, NativeType::Struct(_) | NativeType::Array(_)) {
+    if matches!(element, NativeType::Struct(_) | NativeType::Array(_))
+        || layouts.is_inline_pack(element)
+    {
         let size = layouts
             .type_size(element)
             .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
@@ -115,7 +119,9 @@ pub(super) fn lower_array_compound_assignment(
         string_data,
         layouts,
     )?;
-    if matches!(element, NativeType::Struct(_) | NativeType::Array(_)) {
+    if matches!(element, NativeType::Struct(_) | NativeType::Array(_))
+        || layouts.is_inline_pack(element)
+    {
         return Err(NativeEmitError(
             "compound assignment requires a scalar array element".to_owned(),
         ));

@@ -1,10 +1,16 @@
-use crate::ast::{EnumPayload, Expr, Program, Stmt, TopLevelDecl, TypeName};
+use crate::ast::{
+    EnumDef, EnumPayload, Expr, PackDecl, Program, Stmt, StructDef, TopLevelDecl, TypeName,
+};
 
 use super::super::generic::canonical_type_name;
 use super::{ArrayLayout, LayoutRegistry};
 use crate::codegen::native::NativeEmitError;
 
-pub(crate) fn array_definitions(program: &Program) -> Vec<TypeName> {
+pub(crate) fn array_definitions(
+    program: &Program,
+    specialized_structs: &[StructDef],
+    specialized_enums: &[EnumDef],
+) -> Vec<TypeName> {
     let mut definitions = Vec::new();
     for declaration in &program.declarations {
         match declaration {
@@ -27,10 +33,64 @@ pub(crate) fn array_definitions(program: &Program) -> Vec<TypeName> {
                     }
                 }
             }
+            TopLevelDecl::Pack(pack) => {
+                collect_type_arrays(pack.storage.type_name(), &mut definitions)
+            }
             _ => {}
         }
     }
+    for structure in specialized_structs {
+        structure.fields.iter().for_each(|field| collect_type_arrays(&field.ty, &mut definitions));
+    }
+    for enumeration in specialized_enums {
+        for variant in &enumeration.variants {
+            match &variant.payload {
+                EnumPayload::Tuple(types) => {
+                    types.iter().for_each(|ty| collect_type_arrays(ty, &mut definitions))
+                }
+                EnumPayload::Struct(fields) => {
+                    fields.iter().for_each(|field| collect_type_arrays(&field.ty, &mut definitions))
+                }
+                EnumPayload::Unit => {}
+            }
+        }
+    }
+    sort_array_definitions(&mut definitions, program);
     definitions
+}
+
+fn sort_array_definitions(definitions: &mut [TypeName], program: &Program) {
+    let packs = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Pack(pack) => Some((pack.name.as_str(), pack)),
+            _ => None,
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    definitions
+        .sort_by_key(|definition| array_dependency_depth(definition, &packs, &mut Vec::new()));
+}
+
+fn array_dependency_depth(
+    type_name: &TypeName,
+    packs: &std::collections::HashMap<&str, &PackDecl>,
+    visiting: &mut Vec<String>,
+) -> usize {
+    if type_name.name == "Array" {
+        return type_name
+            .arguments
+            .first()
+            .map_or(0, |element| 1 + array_dependency_depth(element, packs, visiting));
+    }
+    let Some(pack) = packs.get(type_name.name.as_str()) else { return 0 };
+    if visiting.iter().any(|name| name == &pack.name) {
+        return 0;
+    }
+    visiting.push(pack.name.clone());
+    let depth = array_dependency_depth(pack.storage.type_name(), packs, visiting);
+    visiting.pop();
+    depth + 1
 }
 
 fn collect_verb_arrays(verb: &crate::ast::VerbDecl, definitions: &mut Vec<TypeName>) {
@@ -49,7 +109,10 @@ fn collect_external_arrays(verb: &crate::ast::ExternalVerbDecl, definitions: &mu
 }
 
 fn collect_type_arrays(type_name: &TypeName, definitions: &mut Vec<TypeName>) {
-    if type_name.name == "Array" && type_name.arguments.len() == 2 {
+    if type_name.name == "Array"
+        && type_name.arguments.len() == 2
+        && type_name.arguments[1].name.parse::<u32>().is_ok()
+    {
         let canonical = canonical_type_name(type_name);
         if !definitions.iter().any(|candidate| canonical_type_name(candidate) == canonical) {
             definitions.push(type_name.clone());
@@ -67,27 +130,16 @@ fn collect_block_arrays(block: &crate::ast::Block, definitions: &mut Vec<TypeNam
                 }
                 collect_expression_arrays(initializer, definitions);
             }
-            Stmt::Assignment { value, .. }
-            | Stmt::Expression { expression: value, .. }
+            Stmt::Assignment { target, value, .. } => {
+                collect_expression_arrays(&target.to_expr(), definitions);
+                collect_expression_arrays(value, definitions);
+            }
+            Stmt::Expression { expression: value, .. }
             | Stmt::Return { value: Some(value), .. } => {
                 collect_expression_arrays(value, definitions);
             }
-            Stmt::FieldAssignment { object, value, .. }
-            | Stmt::IndexAssignment { target: object, value, .. } => {
-                collect_expression_arrays(object, definitions);
-                collect_expression_arrays(value, definitions);
-            }
             Stmt::CompoundAssignment { target, value, .. } => {
-                match target {
-                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
-                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
-                        collect_expression_arrays(object, definitions)
-                    }
-                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
-                        collect_expression_arrays(target, definitions);
-                        collect_expression_arrays(index, definitions);
-                    }
-                }
+                collect_expression_arrays(&target.to_expr(), definitions);
                 collect_expression_arrays(value, definitions);
             }
             Stmt::Loop(nested) | Stmt::Block(nested) => collect_block_arrays(nested, definitions),
@@ -157,6 +209,7 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }
         | Expr::BufferLiteral { .. } => {}

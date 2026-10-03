@@ -9,6 +9,7 @@ use super::super::native::NativeEmitError;
 pub(in crate::codegen) fn lower_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
+    typed: bool,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let is_hex = value.starts_with("0x") || value.starts_with("0X");
     let magnitude = value
@@ -17,7 +18,7 @@ pub(in crate::codegen) fn lower_integer(
         .map_or_else(|| value.parse::<u128>(), |digits| u128::from_str_radix(digits, 16))
         .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}")))?;
     if magnitude <= i64::MAX as u128 {
-        if !is_hex && magnitude > i32::MAX as u128 {
+        if !typed && !is_hex && magnitude > i32::MAX as u128 {
             return Err(NativeEmitError(
                 "invalid integer literal: exceeds native Int width".to_owned(),
             ));

@@ -141,6 +141,7 @@ fn emit_try_error_return(
         context.local_types,
         context.functions,
         context.layouts,
+        None,
     )?;
     function.ins().return_(&[source]);
     Ok(())

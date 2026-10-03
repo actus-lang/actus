@@ -42,6 +42,10 @@ fn local_definition(
     let mut definitions = Vec::new();
     for declaration in &program.declarations {
         collect_top_level_definition(source, declaration, name, &mut definitions);
+        collect_generic_parameter_definitions(source, declaration, name, &mut definitions);
+        if let TopLevelDecl::Struct(definition) = declaration {
+            collect_struct_field_definitions(source, definition, name, &mut definitions);
+        }
         if let TopLevelDecl::Pack(pack) = declaration {
             collect_pack_field_definitions(source, pack, name, &mut definitions);
         }
@@ -56,12 +60,54 @@ fn local_definition(
     definitions.into_iter().filter(|span| span.start <= use_offset).max_by_key(|span| span.start)
 }
 
+fn collect_generic_parameter_definitions(
+    source: &str,
+    declaration: &TopLevelDecl,
+    name: &str,
+    definitions: &mut Vec<SourceSpan>,
+) {
+    let parameters = match declaration {
+        TopLevelDecl::Verb(value) => &value.generic_parameters,
+        TopLevelDecl::ExternalVerb(value) => &value.generic_parameters,
+        TopLevelDecl::Struct(value) => &value.generic_parameters,
+        TopLevelDecl::Enum(value) => &value.generic_parameters,
+        _ => return,
+    };
+    for parameter in parameters {
+        if parameter.name == name
+            && let Some(identifier) = identifier_span(source, parameter.span, name)
+        {
+            definitions.push(identifier);
+        }
+    }
+}
+
+fn collect_struct_field_definitions(
+    source: &str,
+    definition: &crate::ast::StructDef,
+    name: &str,
+    definitions: &mut Vec<SourceSpan>,
+) {
+    for field in &definition.fields {
+        if field.name == name
+            && let Some(identifier) = identifier_span(source, field.span, name)
+        {
+            definitions.push(identifier);
+        }
+    }
+}
+
 fn collect_pack_field_definitions(
     source: &str,
     pack: &crate::ast::PackDecl,
     name: &str,
     definitions: &mut Vec<SourceSpan>,
 ) {
+    if pack.storage_name == name
+        && let Some(span) = pack_storage_definition_span(source, pack)
+    {
+        definitions.push(span);
+    }
     for field in &pack.fields {
         if field.name == name
             && let Some(identifier) = identifier_span(source, field.span, name)
@@ -69,6 +115,20 @@ fn collect_pack_field_definitions(
             definitions.push(identifier);
         }
     }
+}
+
+fn pack_storage_definition_span(source: &str, pack: &crate::ast::PackDecl) -> Option<SourceSpan> {
+    let start = pack.span.start.min(source.len());
+    let end = pack.span.end.min(source.len()).max(start);
+    let tokens = scan(&source[start..end]).0;
+    tokens.windows(2).find_map(|window| {
+        if !matches!(window[0].kind, TokenKind::Erg) {
+            return None;
+        }
+        let TokenKind::Identifier(name) = &window[1].kind else { return None };
+        (name == &pack.storage_name)
+            .then_some(SourceSpan::new(start + window[1].span.start, start + window[1].span.end))
+    })
 }
 
 fn collect_top_level_definition(

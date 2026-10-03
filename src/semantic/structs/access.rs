@@ -31,8 +31,10 @@ impl Analyzer {
                 span,
             });
         };
+        let is_pack_storage = field == "storage" && self.pack_types.contains_key(&struct_name);
         if self.struct_field(&struct_name, field).is_none()
             && self.pack_field(&struct_name, field).is_none()
+            && !is_pack_storage
         {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownStructField {

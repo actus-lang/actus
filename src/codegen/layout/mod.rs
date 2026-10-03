@@ -68,7 +68,7 @@ pub struct LayoutRegistry {
     pub(super) enum_definitions: Vec<EnumDef>,
     pub(super) enum_layouts: Vec<EnumLayout>,
     pub(super) enum_ids: HashMap<String, usize>,
-    pack_definitions: Vec<PackDecl>,
+    pub(super) pack_definitions: Vec<PackDecl>,
     pub(super) pack_layouts: Vec<PackLayout>,
     pack_ids: HashMap<String, usize>,
     array_definitions: Vec<TypeName>,
@@ -93,7 +93,7 @@ impl LayoutRegistry {
     ) -> Result<Self, NativeEmitError> {
         let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
         let pack_definitions = pack_definitions(program);
-        let array_definitions = array_definitions(program);
+        let array_definitions = array_definitions(program, &definitions, &enum_definitions);
         let mut registry = Self::new(
             pointer_type,
             definitions,
@@ -145,11 +145,10 @@ impl LayoutRegistry {
             .iter()
             .map(|pack| self.pack_layout_for(pack))
             .collect::<Result<Vec<_>, _>>()?;
-        self.array_layouts = self
-            .array_definitions
-            .iter()
-            .map(|array| self.array_layout_for(array))
-            .collect::<Result<Vec<_>, _>>()?;
+        self.array_layouts.clear();
+        for array in self.array_definitions.clone() {
+            self.array_layouts.push(self.array_layout_for(&array)?);
+        }
         Ok(())
     }
 
@@ -174,7 +173,13 @@ impl LayoutRegistry {
     }
 
     pub(super) fn array_id(&self, canonical: &str) -> Option<usize> {
-        self.array_ids.get(canonical).copied()
+        self.array_ids.get(canonical).copied().or_else(|| {
+            let normalized = canonical
+                .chars()
+                .filter(|character| !character.is_whitespace())
+                .collect::<String>();
+            self.array_ids.get(&normalized).copied()
+        })
     }
 
     pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, NativeEmitError> {
@@ -213,7 +218,12 @@ impl LayoutRegistry {
     }
 
     pub(super) fn uses_return_slot(&self, ty: NativeType) -> bool {
-        ty.uses_sret() || self.is_borrowed_view_option(ty)
+        ty.uses_sret() || self.is_inline_pack(ty) || self.is_borrowed_view_option(ty)
+    }
+
+    pub(super) fn is_inline_pack(&self, ty: NativeType) -> bool {
+        let NativeType::Pack(id) = ty else { return false };
+        self.pack(id).is_some_and(|pack| matches!(pack.storage, NativeType::Array(_)))
     }
 
     pub(super) fn returns_borrowed_view(&self, ty: NativeType) -> bool {

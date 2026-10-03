@@ -151,7 +151,7 @@ fn lower_special_initializer(
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     let value = match (declared_native, initializer) {
         (Some(NativeType::Array(id)), Expr::Call { callee, arguments, .. })
-            if arguments.is_empty() =>
+            if arguments.is_empty() && layouts.array_id(callee).is_some() =>
         {
             let expected = layouts
                 .array_id(callee)

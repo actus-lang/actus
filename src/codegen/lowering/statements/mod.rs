@@ -16,6 +16,7 @@ use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
 mod compound;
+mod control_flow;
 mod dispatch;
 mod owners;
 mod try_lowering;
@@ -100,6 +101,7 @@ fn lower_void_return(
         types,
         functions,
         layouts,
+        None,
     )?;
     Ok(Flow::VoidReturn)
 }

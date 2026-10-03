@@ -1,0 +1,7 @@
+pack InvalidBounds {
+    erg storage: Array[u8, 1];
+    layout little;
+    fields {
+        erg outside: u8 at 8;
+    }
+}

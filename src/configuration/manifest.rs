@@ -56,6 +56,7 @@ pub(crate) struct BuildManifest {
     pub(crate) entry_contract: Option<crate::target::EntryContract>,
     pub(crate) native_module: Option<String>,
     pub(crate) position_independent: Option<bool>,
+    pub(crate) verify_no_float_ir: Option<bool>,
     #[serde(default)]
     pub(crate) library_paths: Vec<String>,
     #[serde(default)]

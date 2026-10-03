@@ -76,6 +76,9 @@ fn lower_pack_field_access(
         string_data,
         layouts,
     )?;
+    if field == "storage" {
+        return Ok(storage);
+    }
     super::packs::lower_pack_field(function, storage, id, field, layouts)
 }
 
@@ -119,7 +122,7 @@ fn load_struct_field(
             field_layout.offset as i32,
         ));
     }
-    if matches!(field_layout.ty, NativeType::Struct(_)) {
+    if matches!(field_layout.ty, NativeType::Struct(_)) || layouts.is_inline_pack(field_layout.ty) {
         return Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)));
     }
     Ok(function.ins().load(
@@ -204,6 +207,32 @@ pub(crate) fn lower_field_compound_assignment<'source>(
         string_data,
         layouts,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_field_address_for_ins<'source>(
+    function: &mut FunctionBuilder<'_>,
+    object: &Expr,
+    field: &str,
+    locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    let (address, field_layout) = lower_field_address(
+        function,
+        object,
+        field,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)))
 }
 
 struct FieldCompoundContext<'input, 'source, 'function> {
@@ -374,7 +403,9 @@ fn store_struct_field(
         || matches!(field_layout.ty, NativeType::Enum(id) if layouts.is_niche_option(id))
     {
         function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
-    } else if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_)) {
+    } else if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_))
+        || layouts.is_inline_pack(field_layout.ty)
+    {
         let size = layouts
             .type_size(field_layout.ty)
             .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;

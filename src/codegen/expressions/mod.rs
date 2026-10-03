@@ -25,6 +25,7 @@ mod try_lowering;
 
 pub(super) use buffer::emit_buffer_drop;
 pub(super) use construct::lower_construct;
+pub(crate) use if_lowering::lower_statement_if;
 pub(super) use initializer_types::initializer_type;
 pub(super) use literals::{
     coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
@@ -88,6 +89,7 @@ fn lower_expression_with_context(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     match expression {
+        Expr::BoolLiteral { value, .. } => lower_bool_literal(function, *value),
         Expr::Integer { value, suffix, .. } => {
             lower_integer_expression(function, value, suffix.as_deref(), context)
         }
@@ -110,36 +112,45 @@ fn lower_expression_with_context(
         Expr::Cast { expression, target, .. } => {
             cast::lower_cast(function, expression, target, context)
         }
-        Expr::Index { target, index, .. } => match super::structs::expression_native_type(
-            target,
-            context.local_types,
-            context.layouts,
-        ) {
-            Some(NativeType::Buffer) => super::buffer_index::lower_buffer_index(
-                function,
-                target,
-                index,
-                context.locals,
-                context.local_types,
-                context.functions,
-                context.cleanup_schedule,
-                context.string_data,
-                context.layouts,
-            ),
-            _ => super::arrays::lower_array_index(
-                function,
-                target,
-                index,
-                context.locals,
-                context.local_types,
-                context.functions,
-                context.cleanup_schedule,
-                context.string_data,
-                context.layouts,
-            ),
-        },
+        Expr::Index { target, index, .. } => {
+            lower_index_expression(function, target, index, context)
+        }
         _ => lower_complex_expression(function, expression, context),
     }
+}
+
+fn lower_bool_literal(
+    function: &mut FunctionBuilder<'_>,
+    value: bool,
+) -> Result<Value, NativeEmitError> {
+    Ok(function.ins().iconst(cranelift_codegen::ir::types::I32, i64::from(value)))
+}
+
+fn lower_index_expression(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    index: &Expr,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, NativeEmitError> {
+    let lower = match super::structs::expression_native_type(
+        target,
+        context.local_types,
+        context.layouts,
+    ) {
+        Some(NativeType::Buffer) => super::buffer_index::lower_buffer_index,
+        _ => super::arrays::lower_array_index,
+    };
+    lower(
+        function,
+        target,
+        index,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )
 }
 
 fn lower_integer_expression(
@@ -148,7 +159,7 @@ fn lower_integer_expression(
     suffix: Option<&str>,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
-    let value = lower_integer(function, value)?;
+    let value = lower_integer(function, value, suffix.is_some())?;
     let Some(suffix) = suffix else { return Ok(value) };
     let Some(native_type) = NativeType::from_name(suffix) else { return Ok(value) };
     Ok(coerce_to_ir_type(function, value, native_type.ir_type(context.layouts.pointer_type)?))

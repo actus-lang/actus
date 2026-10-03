@@ -34,29 +34,11 @@ pub(super) fn inline_constants(program: &mut Program) {
 fn inline_block(block: &mut Block, constants: &HashMap<String, Expr>) {
     for statement in &mut block.statements {
         match statement {
-            Stmt::OwnerDecl { initializer, .. } | Stmt::Assignment { value: initializer, .. } => {
-                inline_expression(initializer, constants)
-            }
-            Stmt::FieldAssignment { object, value, .. } => {
-                inline_expression(object, constants);
-                inline_expression(value, constants);
-            }
-            Stmt::IndexAssignment { target, index, value, .. } => {
-                inline_expression(target, constants);
-                inline_expression(index, constants);
-                inline_expression(value, constants);
-            }
-            Stmt::CompoundAssignment { target, value, .. } => {
-                match target {
-                    crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
-                        inline_expression(object, constants)
-                    }
-                    crate::ast::CompoundAssignmentTarget::Index { target, index } => {
-                        inline_expression(target, constants);
-                        inline_expression(index, constants);
-                    }
-                    crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
-                }
+            Stmt::OwnerDecl { initializer, .. } => inline_expression(initializer, constants),
+            Stmt::Assignment { target, value, .. }
+            | Stmt::CompoundAssignment { target, value, .. } => {
+                let mut target_expression = target.to_expr();
+                inline_expression(&mut target_expression, constants);
                 inline_expression(value, constants);
             }
             Stmt::Expression { expression, .. } => inline_expression(expression, constants),
@@ -129,6 +111,7 @@ fn inline_expression(expression: &mut Expr, constants: &HashMap<String, Expr>) {
             inline_conditional(condition, then_branch, else_branch.as_mut(), constants);
         }
         Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }

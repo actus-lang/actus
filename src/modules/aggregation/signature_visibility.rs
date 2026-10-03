@@ -73,7 +73,7 @@ fn validate_declaration(
             Ok(())
         }
         TopLevelDecl::Pack(value) => {
-            validate_type(&value.storage, private, unit)?;
+            validate_type(value.storage.type_name(), private, unit)?;
             for field in &value.fields {
                 validate_type(&field.ty, private, unit)?;
             }

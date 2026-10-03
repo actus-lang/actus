@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use cranelift_object::ObjectModule;
 
 use crate::ast::{ExternalVerbDecl, TopLevelDecl, VerbDecl};
+use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
 use super::super::abi::{validate_external_native_signature, validate_native_signature};
@@ -130,6 +131,7 @@ pub(super) fn define_verbs(
     namespace_prefix: &str,
     entry_symbol: Option<&str>,
     target: &TargetSpec,
+    configuration: &NativeBackendConfiguration,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let meta = functions
@@ -150,6 +152,7 @@ pub(super) fn define_verbs(
             vtable_data,
             namespace_prefix,
             force_entry_return,
+            configuration,
         )?;
     }
     Ok(())

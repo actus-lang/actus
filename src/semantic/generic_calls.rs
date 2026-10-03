@@ -14,9 +14,20 @@ impl Analyzer {
         name: &str,
         signature: &VerbSignature,
         arguments: &[Argument],
+        explicit_arguments: Option<&[TypeName]>,
         span: SourceSpan,
     ) -> Result<VerbSignature, SemanticError> {
-        let bindings = self.infer_generic_bindings(signature, arguments);
+        let bindings = if let Some(explicit_arguments) = explicit_arguments {
+            self.validate_type_arguments(&signature.generic_parameters, explicit_arguments)?;
+            signature
+                .generic_parameters
+                .iter()
+                .zip(explicit_arguments)
+                .map(|(parameter, argument)| (parameter.name.clone(), argument.clone()))
+                .collect()
+        } else {
+            self.infer_generic_bindings(signature, arguments)
+        };
         self.record_generic_call_instance(name, signature, &bindings);
         let specialized = self.specialize_signature(signature, bindings, span)?;
         self.record_specialized_signature_instances(&specialized, span)?;
@@ -49,6 +60,7 @@ impl Analyzer {
             name: name.to_owned(),
             arguments,
             canonical_key,
+            caller: self.current_generic_owner.clone(),
         });
     }
 

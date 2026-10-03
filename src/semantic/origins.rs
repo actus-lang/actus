@@ -51,6 +51,7 @@ impl Analyzer {
             }
             Expr::Case { .. } | Expr::If { .. } => Origin::Unknown,
             Expr::BufferLiteral { .. }
+            | Expr::BoolLiteral { .. }
             | Expr::Integer { .. }
             | Expr::FloatLiteral { .. }
             | Expr::StringLiteral { .. }
@@ -178,6 +179,7 @@ fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
         | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }

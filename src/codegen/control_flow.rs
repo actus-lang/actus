@@ -23,20 +23,10 @@ pub(super) fn assigned_outer_bindings(
     let mut names = Vec::new();
     for statement in statements {
         let name = match statement {
-            Stmt::Assignment { name, .. }
-                if locals.keys().any(|binding| binding.as_str() == name) =>
-            {
-                Some(name)
+            Stmt::Assignment { target, .. } | Stmt::CompoundAssignment { target, .. } => {
+                place_binding_name(target)
+                    .filter(|name| locals.keys().any(|binding| binding.as_str() == *name))
             }
-            Stmt::FieldAssignment { .. } => None,
-            Stmt::CompoundAssignment { target, .. } => match target {
-                crate::ast::CompoundAssignmentTarget::Identifier(name)
-                    if locals.keys().any(|binding| binding.as_str() == name) =>
-                {
-                    Some(name)
-                }
-                _ => None,
-            },
             Stmt::Block(block) | Stmt::Loop(block) => {
                 names.extend(assigned_outer_bindings(&block.statements, locals));
                 None
@@ -67,6 +57,13 @@ pub(super) fn assigned_outer_bindings(
     names.sort();
     names.dedup();
     names
+}
+
+fn place_binding_name(place: &crate::ast::Place) -> Option<&String> {
+    match place {
+        crate::ast::Place::Binding { name, .. } => Some(name),
+        crate::ast::Place::Field { .. } | crate::ast::Place::Index { .. } => None,
+    }
 }
 
 pub(super) fn carried_values(

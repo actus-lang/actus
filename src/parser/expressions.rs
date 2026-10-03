@@ -33,6 +33,8 @@ impl Parser {
             TokenKind::Integer { value, suffix } => {
                 Ok(Expr::Integer { value, suffix, span: token.span })
             }
+            TokenKind::True => Ok(Expr::BoolLiteral { value: true, span: token.span }),
+            TokenKind::False => Ok(Expr::BoolLiteral { value: false, span: token.span }),
             TokenKind::FloatLiteral { value, suffix } => {
                 Ok(Expr::FloatLiteral { value, suffix, span: token.span })
             }
@@ -154,9 +156,6 @@ impl Parser {
         span: SourceSpan,
     ) -> Result<Option<Expr>, ParseError> {
         if self.match_simple(TokenKind::LeftParen) {
-            if !type_arguments.is_empty() && !matches!(name, "Arena" | "Array") {
-                return Err(self.error_at_current("a struct literal after type arguments"));
-            }
             let arguments = self.parse_arguments()?;
             let end = self.expect_simple(TokenKind::RightParen, "`)`")?.span.end;
             let callee = if type_arguments.is_empty() {

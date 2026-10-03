@@ -101,7 +101,7 @@ fn validate_pack(definition: &PackDecl, issues: &mut Vec<DocumentationIssue>) {
     check_doc(
         definition.storage_doc.as_deref(),
         format!("storage field {}.{}", definition.name, definition.storage_name),
-        definition.storage.span,
+        definition.storage.span(),
         Contract::field("erg"),
         issues,
     );

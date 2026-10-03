@@ -5,7 +5,9 @@ use crate::codegen::native::NativeEmitError;
 
 impl LayoutRegistry {
     pub(super) fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, NativeEmitError> {
-        let storage = self.native_type(&pack.storage.name, &mut Vec::new())?;
+        let storage = self.type_for_type_name(pack.storage.type_name()).ok_or_else(|| {
+            NativeEmitError(format!("unknown packed storage `{}`", pack.storage.canonical_key()))
+        })?;
         let fields = pack
             .fields
             .iter()

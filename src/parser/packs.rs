@@ -1,4 +1,4 @@
-use crate::ast::{LayoutEndianness, PackDecl, PackField, Role};
+use crate::ast::{LayoutEndianness, PackDecl, PackField, PackStorage, Role, TypeName};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
@@ -22,7 +22,7 @@ impl Parser {
             name,
             storage_name,
             storage_doc,
-            storage,
+            storage: classify_storage(storage),
             endianness,
             fields,
             span: SourceSpan::new(start, end),
@@ -113,6 +113,21 @@ impl Parser {
             Err(unexpected(token.kind, token.span, format!("`{expected}`")))
         }
     }
+}
+
+fn classify_storage(type_name: TypeName) -> PackStorage {
+    if type_name.name != "Array" || type_name.arguments.len() != 2 {
+        return PackStorage::Scalar(type_name);
+    }
+    let element = type_name.arguments[0].clone();
+    let Some(capacity) = parse_capacity(&type_name.arguments[1]) else {
+        return PackStorage::Scalar(type_name);
+    };
+    PackStorage::ByteArray { type_name, element, capacity }
+}
+
+fn parse_capacity(type_name: &TypeName) -> Option<u64> {
+    type_name.name.parse::<u64>().ok()
 }
 
 fn parse_offset(kind: &TokenKind) -> Option<u16> {

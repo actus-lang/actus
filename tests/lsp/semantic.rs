@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 
 use serde_json::json;
 
-use crate::lsp_support::{file_uri, frame, position_after, run_lsp, temp_root};
+use crate::lsp_support::{file_uri, frame, position_after, response_with_id, run_lsp, temp_root};
 
 #[test]
 fn lsp_covers_current_ownership_surface_and_diagnostics() {
@@ -168,6 +168,53 @@ fn lsp_exposes_gate_36_primitives_in_hover_completion_and_tokens() {
     assert!(stdout.contains("\"label\":\"u128\""));
     assert!(stdout.contains("semanticTokensProvider"));
     assert!(stdout.contains("\"data\":["));
+}
+
+#[test]
+fn lsp_keeps_systems_syntax_parity_for_generics_booleans_and_fields() {
+    let uri = "file:///tmp/actus-lsp-systems-parity.act";
+    let source = "struct Fabric[N: Usize] { cells: Array[Int, N], }\nverb inspect(erg fabric: Fabric[4]) -> Int { return fabric.cells[0]; }\nverb main() -> Bool { erg ready: Bool = false; if ready { return true; } return false; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "N")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "false")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":position_after(source, "fabric.cells")}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let generic_hover = response_with_id(&stdout, 2).to_string();
+    let boolean_hover = response_with_id(&stdout, 3).to_string();
+    let definition = response_with_id(&stdout, 4).to_string();
+    assert!(generic_hover.contains("const N: Usize"), "generic hover missing: {generic_hover}");
+    assert!(boolean_hover.contains("type Bool"), "boolean hover missing: {boolean_hover}");
+    assert!(definition.contains("range"), "field definition missing: {definition}");
+    assert!(stdout.contains("\"label\":\"true\""), "boolean completion missing: {stdout}");
+    assert!(stdout.contains("\"boolean\""), "boolean semantic token legend missing: {stdout}");
+}
+
+#[test]
+fn lsp_understands_the_phase23_readiness_source_without_overlay_drift() {
+    let root =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_readiness");
+    let path = root.join("src/main.act");
+    let source = std::fs::read_to_string(&path).expect("read Phase 23.8 source");
+    let uri = file_uri(&path);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "readiness diagnostics drifted: {stdout}");
+    assert!(stdout.contains("\"id\":2"), "readiness formatting response missing: {stdout}");
+    assert!(stdout.contains("\"id\":3"), "readiness semantic token response missing: {stdout}");
 }
 
 #[test]

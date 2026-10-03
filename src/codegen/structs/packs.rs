@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{InstBuilder, Value, condcodes::IntCC, types};
+use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, StructFieldInit};
@@ -11,6 +11,7 @@ use super::super::literals::StringDataValues;
 use super::super::model::NativeCleanupSchedule;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_pack_literal(
@@ -152,7 +153,9 @@ fn lower_pack_field_assignment_inner(
         pack.endianness,
         context.layouts,
     )?;
-    seal_checked_pack_block(context.function, field_layout.ty, "pack write block");
+    if !matches!(pack.storage, NativeType::Array(_)) {
+        seal_checked_pack_block(context.function, field_layout.ty, "pack write block");
+    }
     update_pack_binding(context.locals, name, updated)?;
     Ok(())
 }
@@ -179,18 +182,21 @@ fn lower_indexed_pack_field_assignment(
             "indexed pack layout does not match field assignment".to_owned(),
         ));
     }
+    write_indexed_pack_field(context, pack_id, address)
+}
+
+fn write_indexed_pack_field(
+    mut context: PackAssignmentContext<'_, '_, '_>,
+    pack_id: usize,
+    address: cranelift_codegen::ir::Value,
+) -> Result<(), NativeEmitError> {
     let pack = context
         .layouts
         .pack(pack_id)
         .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, context.field)?;
     ensure_pack_field_is_mutable(field_layout, context.field)?;
-    let storage = context.function.ins().load(
-        context.layouts.ir_type(pack.storage)?,
-        cranelift_codegen::ir::MemFlagsData::new(),
-        address,
-        0,
-    );
+    let storage = indexed_pack_storage(&mut context, pack.storage, address)?;
     let new_value = lower_expression(
         context.function,
         context.value,
@@ -210,34 +216,32 @@ fn lower_indexed_pack_field_assignment(
         pack.endianness,
         context.layouts,
     )?;
-    context.function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), updated, address, 0);
-    seal_checked_pack_block(context.function, field_layout.ty, "indexed pack write block");
-    Ok(())
-}
-
-pub(super) fn seal_checked_pack_block(
-    function: &mut cranelift_frontend::FunctionBuilder<'_>,
-    field_type: NativeType,
-    block_name: &str,
-) {
-    if field_type == (NativeType::Integer { signed: false, width: 8 }) {
-        let block = function.current_block().expect(block_name);
-        function.seal_block(block);
+    if !matches!(pack.storage, NativeType::Array(_)) {
+        context.function.ins().store(
+            cranelift_codegen::ir::MemFlagsData::new(),
+            updated,
+            address,
+            0,
+        );
+        seal_checked_pack_block(context.function, field_layout.ty, "indexed pack write block");
     }
+    Ok(())
 }
 
-pub(super) fn update_pack_binding(
-    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
-    name: &str,
-    updated: cranelift_codegen::ir::Value,
-) -> Result<(), NativeEmitError> {
-    let binding = locals
-        .keys()
-        .find(|candidate| candidate.as_str() == name)
-        .copied()
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
-    locals.insert(binding, updated);
-    Ok(())
+fn indexed_pack_storage(
+    context: &mut PackAssignmentContext<'_, '_, '_>,
+    storage_type: NativeType,
+    address: cranelift_codegen::ir::Value,
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if matches!(storage_type, NativeType::Array(_)) {
+        return Ok(address);
+    }
+    Ok(context.function.ins().load(
+        context.layouts.ir_type(storage_type)?,
+        cranelift_codegen::ir::MemFlagsData::new(),
+        address,
+        0,
+    ))
 }
 
 pub(super) fn ensure_pack_field_is_mutable(
@@ -295,6 +299,16 @@ pub(crate) fn lower_pack_field(
     let pack =
         layouts.pack(pack_id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, field)?;
+    if let NativeType::Array(_) = pack.storage {
+        return super::inline_pack::lower_inline_pack_field(
+            function,
+            storage,
+            field_layout,
+            pack.storage,
+            pack.endianness,
+            layouts,
+        );
+    }
     let storage_type = layouts.ir_type(pack.storage)?;
     let bit_offset = mapped_bit_offset(pack, field_layout, layouts)?;
     let shifted = if bit_offset == 0 {
@@ -330,7 +344,19 @@ pub(super) fn lower_pack_field_write(
     endianness: crate::ast::LayoutEndianness,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    validate_unsigned_byte_value(function, new_value, field.ty)?;
+    if matches!(storage_native_type, NativeType::Array(_)) {
+        super::inline_pack::lower_inline_pack_field_write(
+            function,
+            storage,
+            new_value,
+            field,
+            storage_native_type,
+            endianness,
+            layouts,
+        )?;
+        return Ok(storage);
+    }
+    super::pack_validation::validate_unsigned_byte_value(function, new_value, field.ty)?;
     let storage_type = layouts.ir_type(storage_native_type)?;
     let storage_bits = packed_storage_bits(storage_native_type, layouts)?;
     let mask_value = field_mask(function, field.width, storage_bits, storage_type);
@@ -348,30 +374,6 @@ pub(super) fn lower_pack_field_write(
     let value = function.ins().band(value, mask_value);
     let value = shift_value(function, value, bit_offset, storage_type);
     Ok(function.ins().bor(cleared, value))
-}
-
-fn validate_unsigned_byte_value(
-    function: &mut FunctionBuilder<'_>,
-    value: Value,
-    field_type: NativeType,
-) -> Result<(), NativeEmitError> {
-    if field_type != (NativeType::Integer { signed: false, width: 8 }) {
-        return Ok(());
-    }
-    let source_type = function.func.dfg.value_type(value);
-    let comparison_type =
-        if source_type.bytes() < types::I32.bytes() { types::I32 } else { source_type };
-    let value = super::super::expressions::coerce_to_ir_type(function, value, comparison_type);
-    let limit = function.ins().iconst(comparison_type, 256);
-    let valid = function.ins().icmp(IntCC::UnsignedLessThan, value, limit);
-    let ok_block = function.create_block();
-    let trap_block = function.create_block();
-    function.ins().brif(valid, ok_block, &[], trap_block, &[]);
-    function.switch_to_block(trap_block);
-    function.ins().trap(cranelift_codegen::ir::TrapCode::HEAP_OUT_OF_BOUNDS);
-    function.seal_block(trap_block);
-    function.switch_to_block(ok_block);
-    Ok(())
 }
 
 fn shift_value(
@@ -398,7 +400,7 @@ pub(super) fn packed_field<'a>(
         .ok_or_else(|| NativeEmitError(format!("unknown packed field `{field}`")))
 }
 
-fn field_mask(
+pub(super) fn field_mask(
     function: &mut FunctionBuilder<'_>,
     width: u8,
     storage_bits: u16,
@@ -414,7 +416,7 @@ fn field_mask(
     function.ins().isub(shifted, one_again)
 }
 
-fn sign_extend_field(
+pub(super) fn sign_extend_field(
     function: &mut FunctionBuilder<'_>,
     value: cranelift_codegen::ir::Value,
     field_type: NativeType,
@@ -458,7 +460,7 @@ fn mapped_bit_offset(
     mapped_bit_offset_for_storage(field, pack.endianness, size)
 }
 
-fn mapped_bit_offset_for_storage(
+pub(super) fn mapped_bit_offset_for_storage(
     field: &PackFieldLayout,
     endianness: crate::ast::LayoutEndianness,
     storage_size: u32,

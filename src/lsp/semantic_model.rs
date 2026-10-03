@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::ast::{MetaAttribute, Program, TopLevelDecl, TypeName, primitive_type};
+use crate::ast::{MetaAttribute, PackStorage, Program, TopLevelDecl, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 use crate::semantic::{
     AccessState, CleanupAction, OwnershipState, SemanticModel, analyze, filter_program_for_target,
@@ -208,14 +208,13 @@ fn packs(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Pack(pack) = declaration else { return None };
-            let storage_bits = primitive_type(&pack.storage.name).and_then(|primitive| match primitive {
-                crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
-                _ => None,
-            });
+            let (storage_bits, storage_bytes, storage_capacity) = pack_storage_facts(&pack.storage);
             Some(json!({
                 "name": pack.name,
-                "storage": format_type(&pack.storage),
+                "storage": format_type(pack.storage.type_name()),
                 "storageBits": storage_bits,
+                "storageBytes": storage_bytes,
+                "storageCapacity": storage_capacity,
                 "layout": format!("{:?}", pack.endianness).to_lowercase(),
                 "range": span_range(source, index, pack.span),
                 "fields": pack.fields.iter().map(|field| {
@@ -228,6 +227,27 @@ fn packs(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
             }))
         })
         .collect()
+}
+
+fn pack_storage_facts(storage: &PackStorage) -> (Option<u64>, Option<u64>, Option<u64>) {
+    match storage {
+        PackStorage::ByteArray { element, capacity, .. } => {
+            let element_width =
+                primitive_type(&element.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => Some(u64::from(width)),
+                    _ => None,
+                });
+            let bits = element_width.and_then(|width| width.checked_mul(*capacity));
+            (bits, Some(*capacity), Some(*capacity))
+        }
+        PackStorage::Scalar(type_name) => {
+            let bits = primitive_type(&type_name.name).and_then(|primitive| match primitive {
+                crate::ast::PrimitiveType::Integer { width, .. } => Some(u64::from(width)),
+                _ => None,
+            });
+            (bits, bits.map(|value| value / 8), None)
+        }
+    }
 }
 
 fn declarations(

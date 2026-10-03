@@ -54,7 +54,9 @@ impl Analyzer {
         self.validate_expected_literal(&constant.initializer, &constant.ty)?;
         let literal_initializer = matches!(
             constant.initializer,
-            crate::ast::Expr::Integer { .. } | crate::ast::Expr::FloatLiteral { .. }
+            crate::ast::Expr::BoolLiteral { .. }
+                | crate::ast::Expr::Integer { .. }
+                | crate::ast::Expr::FloatLiteral { .. }
         );
         if !literal_initializer
             && let Some(found) = self.expression_type_name(&constant.initializer)
@@ -90,7 +92,7 @@ fn is_compile_time_expression(
     constants: &std::collections::HashMap<String, crate::ast::TypeName>,
 ) -> bool {
     match expression {
-        Expr::Integer { .. } | Expr::FloatLiteral { .. } => true,
+        Expr::BoolLiteral { .. } | Expr::Integer { .. } | Expr::FloatLiteral { .. } => true,
         Expr::Identifier { name, .. } => constants.contains_key(name),
         Expr::Grouping { expression, .. }
         | Expr::Unary { expression, .. }
@@ -172,7 +174,8 @@ fn collect_dependencies(
             }
         }
         Expr::If { condition, .. } => collect_dependencies(condition, constants, dependencies),
-        Expr::Integer { .. }
+        Expr::BoolLiteral { .. }
+        | Expr::Integer { .. }
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. } => {}

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{CaseBody, CaseBranch, Expr};
+use crate::ast::{CaseBody, CaseBranch, Expr, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -40,6 +40,7 @@ impl Analyzer {
             &subject_type,
             &branch_state,
             branch_count,
+            span,
         )?;
         self.validate_branch_join(&branch_results, span)?;
         if let Some(joined_state) = branch_results.first() {
@@ -49,6 +50,7 @@ impl Analyzer {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn validate_case_branches(
         &mut self,
         mode: crate::ast::CaseMode,
@@ -57,8 +59,10 @@ impl Analyzer {
         subject_type: &str,
         branch_state: &[(OwnershipState, AccessState)],
         branch_count: usize,
+        case_span: SourceSpan,
     ) -> Result<Vec<Vec<(OwnershipState, AccessState)>>, SemanticError> {
         let mut branch_results = Vec::new();
+        let mut result_type: Option<String> = None;
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
         for branch in branches {
@@ -74,8 +78,29 @@ impl Analyzer {
                 self.validate_case_guard(guard, branch.span)?;
             }
             self.visit_case_body(&branch.body)?;
+            if let Some(candidate) = super::analyzer::case_branch_type(self, &branch.body) {
+                if let Some(expected) = &result_type
+                    && expected != &candidate
+                {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::TypeMismatch {
+                            callee: "case".to_owned(),
+                            parameter: "branches".to_owned(),
+                            expected: expected.clone(),
+                            found: candidate,
+                        },
+                        span: branch.span,
+                    });
+                }
+                result_type = Some(candidate);
+            }
             self.leave_scope();
             branch_results.push(self.snapshot_binding_prefix(branch_count));
+        }
+        if let Some(result_type) = result_type
+            && let Some(type_name) = super::calls::parse_type_name_key(&result_type, case_span)
+        {
+            self.case_result_types.insert((case_span.start, case_span.end), type_name);
         }
         Ok(branch_results)
     }
@@ -157,5 +182,5 @@ impl Analyzer {
 }
 
 fn is_plain_case_type(type_name: &str) -> bool {
-    matches!(type_name, "Int" | "Bool" | "String")
+    matches!(type_name, "Int" | "Bool" | "String" | "Usize") || primitive_type(type_name).is_some()
 }

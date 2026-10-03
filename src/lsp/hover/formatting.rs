@@ -1,4 +1,4 @@
-use crate::ast::{PackDecl, Param, Role, Stmt, TypeName};
+use crate::ast::{GenericParamKind, PackDecl, Param, Role, Stmt, TypeName};
 
 use super::model::SymbolInfo;
 use super::tokens::identifier_span;
@@ -21,7 +21,7 @@ pub(super) fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Opti
             format_mask(width),
         ),
         span: identifier_span(source, field.span, name).unwrap_or(field.span),
-        documentation: None,
+        documentation: Some(pack_storage_details(pack)),
     })
 }
 
@@ -37,11 +37,39 @@ pub(super) fn pack_signature(pack: &PackDecl) -> String {
         crate::ast::LayoutEndianness::Big => "big",
     };
     format!(
-        "pack {} {{ storage: {}; layout {}; }}",
+        "pack {} {{ storage: {}; layout {}; }} [{}]",
         pack.name,
-        type_name(&pack.storage),
-        endianness
+        type_name(pack.storage.type_name()),
+        endianness,
+        pack_storage_details(pack),
     )
+}
+
+fn pack_storage_details(pack: &PackDecl) -> String {
+    match &pack.storage {
+        crate::ast::PackStorage::ByteArray { element, capacity, .. } => {
+            let width =
+                crate::ast::primitive_type(&element.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => Some(u64::from(width)),
+                    _ => None,
+                });
+            match width.and_then(|value| value.checked_mul(*capacity)) {
+                Some(bits) => format!("storage: {capacity} bytes, {bits} bits"),
+                None => format!("storage: {capacity} bytes"),
+            }
+        }
+        crate::ast::PackStorage::Scalar(type_name) => {
+            let bits =
+                crate::ast::primitive_type(&type_name.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
+                    _ => None,
+                });
+            bits.map_or_else(
+                || "storage width unavailable".to_owned(),
+                |value| format!("storage: {} bits", value),
+            )
+        }
+    }
 }
 
 pub(super) fn parameter_info(source: &str, params: &[Param], name: &str) -> Option<SymbolInfo> {
@@ -140,18 +168,48 @@ fn return_type(return_type: Option<&crate::ast::ReturnType>) -> String {
 
 pub(super) fn declaration_signature(declaration: &crate::ast::TopLevelDecl) -> Option<String> {
     match declaration {
-        crate::ast::TopLevelDecl::Verb(verb) => {
-            Some(format!("verb {}{}", verb.name, verb_signature(verb)))
-        }
-        crate::ast::TopLevelDecl::ExternalVerb(verb) => {
-            Some(format!("extern verb {}{}", verb.name, external_signature(verb)))
-        }
-        crate::ast::TopLevelDecl::Struct(definition) => Some(format!("struct {}", definition.name)),
-        crate::ast::TopLevelDecl::Enum(definition) => Some(format!("enum {}", definition.name)),
+        crate::ast::TopLevelDecl::Verb(verb) => Some(format!(
+            "verb {}{}{}",
+            verb.name,
+            generic_label(&verb.generic_parameters),
+            verb_signature(verb)
+        )),
+        crate::ast::TopLevelDecl::ExternalVerb(verb) => Some(format!(
+            "extern verb {}{}{}",
+            verb.name,
+            generic_label(&verb.generic_parameters),
+            external_signature(verb)
+        )),
+        crate::ast::TopLevelDecl::Struct(definition) => Some(format!(
+            "struct {}{}",
+            definition.name,
+            generic_label(&definition.generic_parameters)
+        )),
+        crate::ast::TopLevelDecl::Enum(definition) => Some(format!(
+            "enum {}{}",
+            definition.name,
+            generic_label(&definition.generic_parameters)
+        )),
         crate::ast::TopLevelDecl::Role(role) => Some(format!("role {}", role.name)),
         crate::ast::TopLevelDecl::Pack(pack) => Some(pack_signature(pack)),
         _ => None,
     }
+}
+
+fn generic_label(parameters: &[crate::ast::GenericParam]) -> String {
+    if parameters.is_empty() {
+        return String::new();
+    }
+    let values = parameters
+        .iter()
+        .map(|parameter| match &parameter.kind {
+            GenericParamKind::Type => parameter.name.clone(),
+            GenericParamKind::Const { domain } => {
+                format!("{}: {}", parameter.name, type_name(domain))
+            }
+        })
+        .collect::<Vec<_>>();
+    format!("[{}]", values.join(", "))
 }
 
 pub(super) fn declaration_documentation(declaration: &crate::ast::TopLevelDecl) -> Option<String> {

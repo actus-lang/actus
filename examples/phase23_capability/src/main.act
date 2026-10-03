@@ -1,0 +1,31 @@
+"""
+Phase 23 strict/native capability fixture.
+
+This package combines a Usize const-generic layout, Boolean control flow,
+nested indexed field mutation, and a call from inside a conditional block.
+"""
+struct Cell {
+    charge: u8,
+}
+
+struct Fabric[N: Usize] {
+    cells: Array[Cell, N],
+}
+
+verb notify(erg value: Int) -> Void {
+    return;
+}
+
+verb update(ins fabric: Fabric[2]) {
+    if true {
+        fabric.cells[1].charge = 41u8;
+        erg charge = fabric.cells[1].charge as Int;
+        notify(value: erg charge);
+    }
+}
+
+verb main() -> Int {
+    erg fabric: Fabric[2] = Fabric[2] {cells: Array[Cell, 2]()};
+    update(fabric: ins fabric);
+    return fabric.cells[1].charge as Int + 1;
+}

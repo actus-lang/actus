@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::{
-    BuiltinType, EnumDef, Program, StructDef, TopLevelDecl, TypeName, builtin_enum_definitions,
-    lookup_builtin_type, primitive_type,
+    BuiltinType, EnumDef, PackDecl, Program, StructDef, TopLevelDecl, TypeName,
+    builtin_enum_definitions, lookup_builtin_type, primitive_type,
 };
 use crate::semantic::GenericInstance;
 
@@ -51,6 +51,7 @@ pub(super) struct ValueLayout {
 pub(crate) struct GenericLayoutRegistry {
     pub(super) structs: HashMap<String, StructDef>,
     pub(super) enums: HashMap<String, EnumDef>,
+    pub(super) packs: HashMap<String, PackDecl>,
     pub(super) pointer_size: u32,
     struct_layouts: BTreeMap<String, GenericStructLayout>,
     enum_layouts: BTreeMap<String, GenericEnumLayout>,
@@ -66,6 +67,7 @@ impl GenericLayoutRegistry {
         let mut registry = Self {
             structs,
             enums,
+            packs: pack_definitions(program),
             pointer_size,
             struct_layouts: BTreeMap::new(),
             enum_layouts: BTreeMap::new(),
@@ -111,11 +113,17 @@ impl GenericLayoutRegistry {
         if type_name.reference_role.is_some() {
             return Ok(ValueLayout { size: self.pointer_size, alignment: self.pointer_size });
         }
+        if type_name.name == "Array" {
+            return self.layout_array(type_name, visiting);
+        }
         if let Some(builtin) = lookup_builtin_type(&type_name.name) {
             return builtin_layout(builtin, self.pointer_size);
         }
         if let Some(primitive) = primitive_type(&type_name.name) {
             return primitive_layout(primitive);
+        }
+        if let Some(pack) = self.packs.get(&type_name.name) {
+            return self.layout_type(pack.storage.type_name(), visiting);
         }
         if let Some(definition) = self.structs.get(&type_name.name) {
             let layout = self.layout_struct(definition, &type_name.arguments, visiting)?;
@@ -126,6 +134,28 @@ impl GenericLayoutRegistry {
             return Ok(ValueLayout { size: layout.size, alignment: layout.alignment });
         }
         Err(NativeEmitError(format!("unknown generic layout type `{}`", type_name.name)))
+    }
+
+    fn layout_array(
+        &self,
+        type_name: &TypeName,
+        visiting: &mut Vec<String>,
+    ) -> Result<ValueLayout, NativeEmitError> {
+        let [element, capacity] = type_name.arguments.as_slice() else {
+            return Err(NativeEmitError(
+                "array layout requires an element type and capacity".to_owned(),
+            ));
+        };
+        let capacity =
+            capacity.name.parse::<u32>().ok().filter(|capacity| *capacity > 0).ok_or_else(
+                || NativeEmitError("array layout requires a positive capacity".to_owned()),
+            )?;
+        let element_layout = self.layout_type(element, visiting)?;
+        let size = element_layout
+            .size
+            .checked_mul(capacity)
+            .ok_or_else(|| NativeEmitError("array layout size overflow".to_owned()))?;
+        Ok(ValueLayout { size, alignment: element_layout.alignment })
     }
 }
 
@@ -149,6 +179,17 @@ pub(super) fn definitions(
         }
     }
     (structs, enums)
+}
+
+fn pack_definitions(program: &Program) -> HashMap<String, PackDecl> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Pack(pack) => Some((pack.name.clone(), pack.clone())),
+            _ => None,
+        })
+        .collect()
 }
 
 fn builtin_layout(builtin: BuiltinType, pointer_size: u32) -> Result<ValueLayout, NativeEmitError> {
@@ -243,5 +284,35 @@ mod tests {
         assert_eq!(layout.max_payload_size, 4);
         assert_eq!(layout.size, 8);
         assert_eq!(layout.variants[0].fields[0].size, 4);
+    }
+
+    #[test]
+    fn calculates_const_generic_array_field_layout() {
+        let (tokens, errors) = scan(
+            "struct Cell { erg charge: u8, } struct Fabric[N: Usize] { erg cells: Array[Cell, N], } verb main(erg fabric: Fabric[8]) { }",
+        );
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("source should parse");
+        let semantic = analyze(&program).expect("source should analyze");
+        let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
+            .expect("generic layout should pass");
+        let layout = layouts.struct_layout("Fabric[8]").expect("Fabric[8] should be laid out");
+        assert_eq!(layout.size, 8);
+        assert_eq!(layout.fields[0].size, 8);
+    }
+
+    #[test]
+    fn calculates_const_generic_arrays_of_pack_elements() {
+        let (tokens, errors) = scan(
+            "pack Column { erg storage: u32; layout little; fields { erg marker: u32 at 0; } } struct Fabric[N: Usize] { erg columns: Array[Column, N], } verb main(erg fabric: Fabric[2]) { }",
+        );
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("source should parse");
+        let semantic = analyze(&program).expect("source should analyze");
+        let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
+            .expect("generic pack-array layout should pass");
+        let layout = layouts.struct_layout("Fabric[2]").expect("Fabric[2] should be laid out");
+        assert_eq!(layout.size, 8);
+        assert_eq!(layout.fields[0].size, 8);
     }
 }

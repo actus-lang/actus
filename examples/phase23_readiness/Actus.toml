@@ -1,0 +1,5 @@
+[package]
+name = "phase23-readiness"
+version = "0.1.0"
+edition = "alpha"
+entry = "main"

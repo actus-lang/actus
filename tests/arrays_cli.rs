@@ -16,10 +16,180 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_indexed_array_backed_pack_storage_natively() {
+    let status = run_array_fixture(
+        "array-backed-pack-storage",
+        "pack CacheLine { erg storage: Array[u8, 4]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; } } verb main() -> Int { erg line = CacheLine { storage: Array[u8, 4](), }; line.storage[1] = 40u8; line.byte_1 = 41u8; line.byte_1 += 0u8; return line.byte_1 as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_array_backed_pack_bit_field_access_natively() {
+    let status = run_array_fixture(
+        "array-backed-pack-bit-field",
+        "pack Flags { erg storage: Array[u8, 1]; layout little; fields { erg enabled: u1 at 0; abs _reserved: u7 at 1 = 0; } } verb main() -> Int { erg flags = Flags { storage: Array[u8, 1](), }; flags.enabled = 1; return flags.enabled as Int + 41; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_array_backed_pack_through_native_return_slot() {
+    let status = run_array_fixture(
+        "array-backed-pack-return",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb make() -> Frame { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; return frame; } verb main() -> Int { erg frame = make(); return frame.marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn respects_big_endian_array_backed_pack_fields() {
+    let status = run_array_fixture(
+        "array-backed-pack-big-endian",
+        "pack Word { erg storage: Array[u8, 2]; layout big; fields { erg high: u8 at 8; erg low: u8 at 0; } } verb main() -> Int { erg word = Word { storage: Array[u8, 2](), }; word.high = 41u8; return word.high as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn lowers_unaligned_multi_byte_pack_fields_natively() {
+    let status = run_array_fixture(
+        "array-backed-pack-unaligned-field",
+        "pack Slice { erg storage: Array[u8, 2]; layout little; fields { abs _prefix: u2 at 0 = 0; erg payload: u12 at 2; abs _suffix: u2 at 14 = 0; } } verb main() -> Int { erg slice = Slice { storage: Array[u8, 2](), }; slice.payload = 2748u16; return if slice.payload == 2748u16 { 42 } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn snapshots_array_backed_pack_bytes_through_buffer() {
+    let status = run_array_fixture(
+        "array-backed-pack-snapshot",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb snapshot(ins output: Buffer, abs frame: Frame) { append(output, frame.storage[0]); append(output, frame.storage[1]); } verb main() -> Int { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; erg output = Buffer[0]; snapshot(output: ins output, frame: abs frame); return output[0] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn restores_array_backed_pack_bytes_from_buffer() {
+    let status = run_array_fixture(
+        "array-backed-pack-restore",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb snapshot(ins output: Buffer, abs frame: Frame) { append(output, frame.storage[0]); append(output, frame.storage[1]); } verb restore(ins frame: Frame, abs input: Buffer) { frame.storage[0] = input[0]; frame.storage[1] = input[1]; } verb main() -> Int { erg source = Frame { storage: Array[u8, 2](), }; source.marker = 41u8; source.tail = 1u8; erg output = Buffer[0]; snapshot(output: ins output, frame: abs source); erg target = Frame { storage: Array[u8, 2](), }; restore(frame: ins target, input: abs output); return target.marker as Int + target.tail as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_typed_integer_literals_natively() {
     let status =
         run_array_fixture("typed-integer-literals", "verb main() -> u32 { return 1u32 + 2u32; }");
     assert_eq!(status.code(), Some(3));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_boolean_literals_and_short_circuit_logic_natively() {
+    let status = run_array_fixture(
+        "boolean-literals",
+        "verb main() -> Int { erg linked: Bool = false; erg result: Int = if true && !linked { 42 } else { 0 }; return result; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_from_statement_if_with_the_enclosing_native_type() {
+    let status = run_array_fixture(
+        "statement-if-return",
+        "verb main() -> Int { if true { return 41; } return 0; }",
+    );
+    assert_eq!(status.code(), Some(41));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_const_generic_array_layouts_natively() {
+    let status = run_array_fixture(
+        "const-generic-array-layout",
+        "struct Cell { erg charge: u8, } struct Fabric[N: Usize] { erg cells: Array[Cell, N], } verb main() -> Int { erg fabric: Fabric[2] = Fabric[2] { cells: Array[Cell, 2](), }; fabric.cells[0].charge = 41u8; return fabric.cells[0].charge as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_const_generic_array_argument_in_a_generic_verb() {
+    let status = run_array_fixture(
+        "const-generic-array-verb",
+        "struct Storage[N: Usize] { erg values: Array[u32, N], } verb clear[N: Usize](ins buffer: Storage[N]) { buffer.values[0] = 42u32; } verb main() -> Int { erg buffer: Storage[4] = Storage[4] { values: Array[u32, 4](), }; clear(buffer: ins buffer); return buffer.values[0] as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_const_generic_parameter_as_a_compile_time_expression_value() {
+    let status = run_array_fixture(
+        "const-generic-expression-value",
+        "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { erg value: u32 = read_capacity[4](); return value as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
+fn specializes_const_generic_expression_values_from_struct_arguments() {
+    let status = run_array_fixture(
+        "const-generic-expression-from-struct",
+        "struct Storage[N: Usize] { erg values: Array[u32, N], } verb capacity[N: Usize](ins storage: Storage[N]) -> u32 { if 0u32 < (N as u32) { return N as u32; } return 0u32; } verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return capacity(storage: ins storage) as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
+fn accepts_const_generic_values_in_case_guards() {
+    let status = run_array_fixture(
+        "const-generic-case-guard",
+        "verb choose[N: Usize]() -> u32 { return case true { true if 0u32 < (N as u32) => N as u32, _ => 0u32, }; } verb main() -> Int { return choose[4]() as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
+fn specializes_transitive_const_generic_verb_calls_natively() {
+    let status = run_array_fixture(
+        "transitive-const-generic-verb",
+        "struct Storage[N: Usize] { erg values: Array[u32, N], } verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); } verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_an_array_through_the_native_return_slot() {
+    let status = run_array_fixture(
+        "array-return-slot",
+        "verb make_values() -> Array[u32, 2] { erg values: Array[u32, 2] = Array[u32, 2](); values[0] = 41u32; values[1] = 42u32; return values; } verb main() -> Int { erg values: Array[u32, 2] = make_values(); if values[0] == 41u32 && values[1] == 42u32 { return 0; } return 1; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn returns_an_eight_element_array_through_the_native_return_slot() {
+    let status = run_array_fixture(
+        "array-eight-return-slot",
+        "verb forward_impulse() -> Array[u32, 8] { erg values: Array[u32, 8] = Array[u32, 8](); values[0] = 41u32; values[7] = 42u32; return values; } verb main() -> Int { erg values: Array[u32, 8] = forward_impulse(); return values[0] as Int + values[7] as Int - 83; }",
+    );
+    assert_eq!(status.code(), Some(0));
 }
 
 #[cfg(unix)]
@@ -68,6 +238,56 @@ fn executes_nested_value_producing_conditionals() {
     let status = run_array_fixture(
         "nested-conditional-expression",
         "verb main() -> Int { return if 1 < 2 { if 2 < 3 { 42 } else { 0 } } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_nested_if_expression_with_a_diverging_branch() {
+    let status = run_array_fixture(
+        "nested-if-diverging-branch",
+        "verb choose(erg ready: Bool) -> Int { erg selected = if ready { if true { 41 } else { 42 } } else { return 0; }; return selected + 1; } verb main() -> Int { erg ready = true; return choose(ready: ready); }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_typed_case_branch_with_a_returning_branch() {
+    let status = run_array_fixture(
+        "typed-case-diverging-branch",
+        "verb choose() -> Int { return case true { true => { return 41; }, _ => 0, }; } verb main() -> Int { return choose() + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_calls_across_nested_statement_blocks() {
+    let status = run_array_fixture(
+        "nested-call-statements",
+        "verb append_one(ins bytes: Buffer) { append(bytes, 1u8); } verb worker() -> Int { erg bytes = Buffer[0]; if true { { append_one(bytes: ins bytes); } } return bytes[0] as Int + 41; } verb main() -> Int { return worker(); }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_calls_inside_loop_and_case_blocks() {
+    let status = run_array_fixture(
+        "nested-loop-case-call",
+        "verb marker() -> Int { return 1; } verb main() -> Int { erg value = 0; loop { case value { 0 => { value = marker(); break; }, _ => { break; }, }; } return value + 41; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn propagates_try_from_a_nested_call_statement() {
+    let status = run_array_fixture(
+        "nested-call-try",
+        "enum IoError { Failed, } verb produce() -> Result[Int, IoError] { return Ok(41); } verb worker() -> Result[Int, IoError] { if true { produce()?; } return Ok(41); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(value) => value + 1, Result.Err(_) => 0, }; }",
     );
     assert_eq!(status.code(), Some(42));
 }
@@ -371,6 +591,36 @@ fn copies_aggregate_array_elements_without_copying_the_array() {
 
 #[cfg(unix)]
 #[test]
+fn executes_nested_array_struct_place_assignment() {
+    let status = run_array_fixture(
+        "nested-array-struct-place",
+        "struct Point { x: Int, y: Int, } verb main() -> Int { erg points: Array[Point, 2] = Array[Point, 2](); points[1] = Point { x: 19, y: 3, }; points[1].x = 40; points[1].x += 2; return points[1].x + points[1].y; }",
+    );
+    assert_eq!(status.code(), Some(45));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_ins_loan_for_a_nested_array_struct_place() {
+    let status = run_array_fixture(
+        "nested-array-struct-ins",
+        "struct Point { x: Int, } verb mutate(ins slot: Int) { slot = 42; } verb main() -> Int { erg points: Array[Point, 2] = Array[Point, 2](); points[1] = Point { x: 0, }; mutate(slot: ins points[1].x); return points[1].x; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_nested_place_in_a_generic_array_aggregate() {
+    let status = run_array_fixture(
+        "nested-generic-array-place",
+        "struct Box[T] { item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1] = Box[Int] { item: 7, }; boxes[1].item = 35; return boxes[1].item + 7; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn places_contiguous_arrays_in_an_arena_without_reallocation() {
     let status = run_array_fixture(
         "array-arena",
@@ -387,6 +637,36 @@ fn mutates_indexed_pack_fields_in_place() {
         "pack Control { erg storage: u8; layout little; fields { erg enabled: u1 at 0; abs _reserved: u7 at 1; } } verb main() -> Int { erg controls: Array[Control, 2] = Array[Control, 2](); controls[1] = Control { storage: 0, }; controls[1].enabled = 1; return controls[1].enabled; }",
     );
     assert_eq!(status.code(), Some(1));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_array_of_array_backed_packs_natively() {
+    let status = run_array_fixture(
+        "array-of-array-backed-packs",
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); cells[1] = Cell { storage: Array[u8, 2](), }; cells[1].marker = 41u8; return cells[1].marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_compound_assignment_through_array_of_packs_natively() {
+    let status = run_array_fixture(
+        "array-of-packs-compound",
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); cells[1] = Cell { storage: Array[u8, 2](), }; cells[1].marker = 40u8; cells[1].marker += 1u8; return cells[1].marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_ins_loan_through_an_array_of_packs_natively() {
+    let status = run_array_fixture(
+        "array-of-packs-ins",
+        "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb mutate(ins cell: Cell) { cell.marker = 41u8; } verb main() -> Int { erg cells: Array[Cell, 2] = Array[Cell, 2](); cells[1] = Cell { storage: Array[u8, 2](), }; mutate(cell: ins cells[1]); return cells[1].marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
 }
 
 #[cfg(unix)]
@@ -408,7 +688,7 @@ fn emits_identical_objects_for_repeated_array_builds() {
     let second = root.with_extension("second.o");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); values[1] = 41; return values[1] + 1; }",
+        "pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } verb main() -> Int { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; return frame.marker as Int + 1; }",
     )
     .expect("write deterministic array fixture");
     for output in [&first, &second] {

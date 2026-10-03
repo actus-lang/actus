@@ -228,23 +228,38 @@ impl Formatter<'_> {
 
     pub(super) fn pack_definition(&mut self, definition: &crate::ast::PackDecl) {
         self.documentation(definition.doc.as_deref());
+        self.line_indent();
         if definition.is_open {
             self.output.push_str("open ");
         }
         self.output.push_str("pack ");
         self.output.push_str(&definition.name);
-        self.output.push_str(" { erg storage: ");
-        self.type_name(&definition.storage);
-        self.output.push_str("; layout ");
+        self.output.push_str(" {");
+        self.output.push('\n');
+        self.indent += 1;
+        self.emit_comments_before(definition.storage.span().start);
+        self.documentation(definition.storage_doc.as_deref());
+        self.line_indent();
+        self.output.push_str("erg ");
+        self.output.push_str(&definition.storage_name);
+        self.output.push_str(": ");
+        self.type_name(definition.storage.type_name());
+        self.output.push_str(";\n");
+        self.line_indent();
+        self.output.push_str("layout ");
         self.output.push_str(match definition.endianness {
             crate::ast::LayoutEndianness::Little => "little",
             crate::ast::LayoutEndianness::Big => "big",
         });
-        self.output.push_str("; fields {");
+        self.output.push_str(";\n");
+        self.line_indent();
+        self.output.push_str("fields {");
+        self.output.push('\n');
+        self.indent += 1;
         for field in &definition.fields {
             self.emit_comments_before(field.span.start);
             self.documentation(field.doc.as_deref());
-            self.output.push(' ');
+            self.line_indent();
             self.output.push_str(role_name(&field.role));
             self.output.push(' ');
             self.output.push_str(&field.name);
@@ -257,8 +272,14 @@ impl Formatter<'_> {
                 self.expression(default_value);
             }
             self.output.push(';');
+            self.output.push('\n');
         }
-        self.output.push_str(" } }");
+        self.indent -= 1;
+        self.line_indent();
+        self.output.push_str("}\n");
+        self.indent -= 1;
+        self.line_indent();
+        self.output.push('}');
     }
 
     pub(super) fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {

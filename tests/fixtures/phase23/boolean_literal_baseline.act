@@ -1,0 +1,4 @@
+verb main() -> Bool {
+    erg linked: Bool = false;
+    return linked;
+}

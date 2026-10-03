@@ -55,19 +55,39 @@ impl Analyzer {
         if let Some(result) = self.visit_special_call(callee, arguments, span)? {
             return result;
         }
-        let Some(mut signature) = self.signatures.get(callee).cloned() else {
+        let explicit_type_application = parse_generic_call_arguments(callee, span);
+        let lookup_name = explicit_type_application
+            .as_ref()
+            .map_or(callee, |type_name| type_name.name.as_str())
+            .to_owned();
+        let Some(mut signature) = self.signatures.get(&lookup_name).cloned() else {
             for argument in arguments {
                 self.visit_expression(&argument.expression)?;
             }
             return Err(SemanticError {
-                kind: SemanticErrorKind::UnknownVerb { name: callee.to_owned() },
+                kind: SemanticErrorKind::UnknownVerb { name: lookup_name.clone() },
                 span,
             });
         };
         if !signature.generic_parameters.is_empty() {
-            signature = self.instantiate_generic_signature(callee, &signature, arguments, span)?;
+            signature = self.instantiate_generic_signature(
+                &lookup_name,
+                &signature,
+                arguments,
+                explicit_type_application.as_ref().map(|type_name| type_name.arguments.as_slice()),
+                span,
+            )?;
+        } else if let Some(type_name) = explicit_type_application {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::GenericArityMismatch {
+                    name: lookup_name.to_owned(),
+                    expected: 0,
+                    found: type_name.arguments.len(),
+                },
+                span: type_name.span,
+            });
         }
-        self.visit_call_with_signature(callee, arguments, span, &signature)
+        self.visit_call_with_signature(&lookup_name, arguments, span, &signature)
     }
 
     fn visit_special_call(
@@ -300,4 +320,9 @@ fn arena_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::
 
 fn array_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
     callee.starts_with("Array[").then(|| parse_type_name_key(callee, span)).flatten()
+}
+
+fn parse_generic_call_arguments(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
+    let type_name = parse_type_name_key(callee, span)?;
+    (!type_name.arguments.is_empty()).then_some(type_name)
 }

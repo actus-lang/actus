@@ -35,7 +35,7 @@ pub(crate) fn lower_body(
         string_data,
         layouts,
     )? {
-        flow @ (Flow::Return(_) | Flow::VoidReturn | Flow::Fallthrough) => Ok(flow),
+        flow @ (Flow::Return(_, _) | Flow::VoidReturn | Flow::Fallthrough) => Ok(flow),
         Flow::Break | Flow::Continue => {
             Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
         }

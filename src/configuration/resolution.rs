@@ -15,11 +15,17 @@ pub(super) fn build_settings(
     directory: &Path,
 ) -> (BuildProfile, NativeBackendConfiguration, Vec<LinkLibrary>, Vec<PathBuf>) {
     let profile = build.profile.unwrap_or(environment.profile);
+    let verify_no_float_ir = build.verify_no_float_ir.unwrap_or(false);
     let native_backend = NativeBackendConfiguration::new(
         build.native_module.unwrap_or_else(|| environment.native_backend.module_name().to_owned()),
         build.position_independent.unwrap_or(environment.native_backend.position_independent()),
     )
     .with_optimization_level(optimization_level(profile, profiles));
+    let native_backend = if verify_no_float_ir {
+        native_backend.with_no_float_ir_verification()
+    } else {
+        native_backend
+    };
     let libraries = build
         .libraries
         .into_iter()

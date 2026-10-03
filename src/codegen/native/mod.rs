@@ -10,6 +10,7 @@ use super::types::NativeType;
 
 mod declarations;
 mod emission;
+pub(super) mod ir_audit;
 mod object;
 
 #[derive(Debug)]

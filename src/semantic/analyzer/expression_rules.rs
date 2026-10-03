@@ -79,7 +79,7 @@ pub(super) fn is_cast_integer_type(name: &str) -> bool {
     is_integer_type_name(name)
 }
 
-pub(super) fn cast_literal_fits(literal: &str, negative: bool, target: &str) -> bool {
+pub(crate) fn cast_literal_fits(literal: &str, negative: bool, target: &str) -> bool {
     let Some(magnitude) = parse_integer_magnitude(literal) else { return false };
     if target == "Int" {
         return (!negative && magnitude < (1u128 << 31)) || (negative && magnitude <= 1u128 << 31);

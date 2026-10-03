@@ -1,0 +1,98 @@
+"""
+Phase 23.14 systems-readiness fixture.
+
+This bounded workload exercises the complete 64-byte Minicolumn storage map:
+indexed byte access, packed field mutation, nested calls, Boolean control flow,
+fixed-width arithmetic, ownership-aware Buffer serialization, and restoration.
+"""
+"""A cache-line-sized packed cortical state with an exact 512-bit layout."""
+pack Minicolumn {
+    erg storage: Array[u8, 64];
+    layout little;
+    fields {
+        erg charge: u8 at 0;
+        erg threshold: u8 at 8;
+        erg myelination: u8 at 16;
+        erg idle_ticks: u8 at 24;
+        erg flags: u8 at 32;
+        erg payload: u8 at 40;
+        erg layer_depth: u16 at 48;
+        erg coincidence_low: u64 at 64;
+        erg coincidence_high: u64 at 128;
+        erg axon_0: u32 at 192;
+        erg axon_1: u32 at 224;
+        erg axon_2: u32 at 256;
+        erg axon_3: u32 at 288;
+        erg axon_4: u32 at 320;
+        erg axon_5: u32 at 352;
+        erg axon_6: u32 at 384;
+        erg axon_7: u32 at 416;
+        erg free_list_link: u32 at 448;
+        erg inhibitory_link: u32 at 480;
+    }
+}
+
+"""Advance one column using fixed-width arithmetic and a Boolean threshold."""
+verb advance(ins column: Minicolumn) -> Int {
+    column.charge += 2u8;
+    if column.charge >= column.threshold {
+        column.flags |= 1u8;
+    }
+    return column.charge as Int;
+}
+
+"""Serialize every byte of one packed column into caller-owned storage."""
+verb snapshot(ins output: Buffer, abs column: Minicolumn) -> Int {
+    erg index: u32 = 0;
+    loop {
+        if index >= 64 {
+            break;
+        }
+        append(output, column.storage[index]);
+        index += 1;
+    }
+    return index as Int;
+}
+
+"""Restore every byte into the same exclusive packed-column owner."""
+verb restore(ins column: Minicolumn, abs input: Buffer) {
+    erg index: u32 = 0;
+    loop {
+        if index >= 64 {
+            break;
+        }
+        column.storage[index] = input[index];
+        index += 1;
+    }
+}
+
+verb main() -> Int {
+    erg source = Minicolumn {storage: Array[u8, 64]()};
+    source.charge = 40u8;
+    source.threshold = 42u8;
+    source.layer_depth = 7u16;
+    source.coincidence_low = 0x0102030405060708;
+    source.coincidence_high = 0x1112131415161718;
+    source.axon_0 = 11u32;
+    source.axon_7 = 17u32;
+    source.inhibitory_link = 63u32;
+    erg advanced = advance(column: ins source);
+    erg snapshot_bytes = Buffer[0];
+    erg written = snapshot(output: ins snapshot_bytes, column: abs source);
+    erg restored = Minicolumn {storage: Array[u8, 64]()};
+    restore(column: ins restored, input: abs snapshot_bytes);
+    erg complete: Bool = restored.storage[63] == 0u8;
+    if restored.flags == 1u8 {
+        if restored.charge == 42u8 {
+            complete = true;
+        } else {
+            complete = false;
+        }
+    }
+    if complete {
+        if restored.coincidence_low == source.coincidence_low {
+            restored.payload += 1u8;
+        }
+    }
+    return advanced + written + restored.layer_depth as Int + restored.axon_0 as Int + restored.flags as Int + restored.payload as Int;
+}

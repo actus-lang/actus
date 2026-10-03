@@ -87,6 +87,19 @@ fn lower_indirect_ins_argument(
             )?;
             Ok(address)
         }
+        Expr::FieldAccess { object, field, .. } => {
+            super::super::structs::lower_field_address_for_ins(
+                function,
+                object,
+                field,
+                context.locals,
+                context.local_types,
+                context.functions,
+                context.cleanup_schedule,
+                context.string_data,
+                context.layouts,
+            )
+        }
         Expr::Identifier { name, .. } => lower_scalar_ins_identifier(function, name, context),
         _ => Err(NativeEmitError(
             "native `ins` arguments require an addressable scalar or indexed slot".to_owned(),

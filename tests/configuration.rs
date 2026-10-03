@@ -33,6 +33,22 @@ fn loads_build_settings_from_an_actus_manifest() {
 }
 
 #[test]
+fn loads_package_zero_float_native_policy() {
+    let path =
+        std::env::temp_dir().join(format!("actus-config-no-float-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"systems\"\nversion = \"1.0.0\"\n\n[build]\nverify_no_float_ir = true\n",
+    )
+    .expect("write manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest(&path).expect("zero-float package policy should load");
+    assert!(configuration.native_backend().verifies_no_float_ir());
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn loads_explicit_standard_runtime_profile() {
     let root = std::env::temp_dir().join(format!("actus-runtime-std-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");

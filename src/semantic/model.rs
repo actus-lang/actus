@@ -76,6 +76,29 @@ pub struct GenericInstance {
     pub name: String,
     pub arguments: Vec<TypeName>,
     pub canonical_key: String,
+    pub caller: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackLayoutContract {
+    pub name: String,
+    pub identity: String,
+    pub storage: String,
+    pub storage_bytes: u64,
+    pub storage_bits: u64,
+    pub alignment_bytes: u64,
+    pub endianness: String,
+    pub fields: Vec<PackFieldContract>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackFieldContract {
+    pub name: String,
+    pub role: String,
+    pub ty: String,
+    pub offset: u16,
+    pub width: u8,
+    pub has_default: bool,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -114,6 +137,7 @@ pub struct SemanticModel {
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,
+    pub pack_layouts: Vec<PackLayoutContract>,
     pub reachable_performances: Vec<ReachablePerformance>,
     pub dynamic_roles: Vec<DynamicRoleType>,
     pub drop_types: Vec<String>,

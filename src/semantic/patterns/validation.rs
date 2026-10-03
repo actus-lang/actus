@@ -4,6 +4,7 @@ use crate::ast::{CaseBranch, EnumPayload, Expr, LiteralPattern, Pattern, Variant
 use crate::lexer::SourceSpan;
 
 use super::super::analyzer::Analyzer;
+use super::super::analyzer::cast_literal_fits;
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::super::pattern_support::{
     duplicate_pattern, is_wildcard, non_exhaustive, pattern_type_mismatch, variant_key,
@@ -33,6 +34,9 @@ impl Analyzer {
     fn validate_guard_access(&self, expression: &Expr) -> Result<(), SemanticError> {
         match expression {
             Expr::Identifier { name, span } => {
+                if self.is_const_generic_parameter(name) {
+                    return Ok(());
+                }
                 let index = self.binding(name, *span)?;
                 if self.model.bindings[index].ownership.is_live() {
                     Ok(())
@@ -57,6 +61,7 @@ impl Analyzer {
                 Err(self.invalid_guard_access(callee, *span))
             }
             Expr::Integer { .. }
+            | Expr::BoolLiteral { .. }
             | Expr::BufferLiteral { .. }
             | Expr::FloatLiteral { .. }
             | Expr::StringLiteral { .. } => Ok(()),
@@ -150,7 +155,9 @@ impl Analyzer {
             LiteralPattern::Integer(_) => "Int",
             LiteralPattern::Bool(_) => "Bool",
         };
-        if pattern_type == subject_type {
+        if pattern_type == subject_type
+            || matches!(pattern, LiteralPattern::Integer(literal) if cast_literal_fits(literal, false, subject_type))
+        {
             Ok(())
         } else {
             Err(pattern_type_mismatch(subject_type, pattern_type, span))

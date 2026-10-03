@@ -9,11 +9,11 @@ pub use callable::{
     DispatchMode, ExternalVerbDecl, LimitlessScope, MetaAttribute, Param, VerbDecl,
 };
 pub use data::{
-    EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField, StructDef,
-    StructField, StructFieldRole,
+    EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField,
+    PackStorage, StructDef, StructField, StructFieldRole,
 };
 pub use top_level::{
     ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,
     TopLevelDecl,
 };
-pub use types::{GenericParam, ReturnAccess, ReturnType, Role, TypeName};
+pub use types::{GenericParam, GenericParamKind, ReturnAccess, ReturnType, Role, TypeName};

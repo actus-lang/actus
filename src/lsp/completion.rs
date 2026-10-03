@@ -54,8 +54,8 @@ pub(super) fn items(
         .map(|label| {
             let mut item = json!({
                 "label": label,
-                "kind": 25,
-                "detail": "Actus symbol",
+                "kind": completion_kind(&label),
+                "detail": completion_detail(&label),
                 "data": {"uri": uri, "symbol": label, "version": context.document_version},
             });
             if let Some(range) = replacement.clone() {
@@ -73,6 +73,22 @@ pub(super) fn items(
     serde_json::Value::Array(items)
 }
 
+fn completion_kind(label: &str) -> u8 {
+    match label {
+        "true" | "false" => 17,
+        _ => 25,
+    }
+}
+
+fn completion_detail(label: &str) -> &'static str {
+    match label {
+        "true" | "false" => "Actus Boolean literal",
+        "Int" | "Bool" | "Char" | "String" | "Buffer" | "Array" | "Arena" | "Option" | "Result"
+        | "Map" | "Usize" | "Void" | "f32" | "f64" => "Actus type",
+        _ => "Actus symbol",
+    }
+}
+
 fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
     program
         .declarations
@@ -82,7 +98,18 @@ fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
             _ => None,
         })
         .flat_map(|pack| {
-            pack.fields.iter().map(|field| {
+            let storage = std::iter::once(json!({
+                "label": pack.storage_name,
+                "kind": 5,
+                "detail": format!(
+                    "pack {} storage: {} [{}]",
+                    pack.name,
+                    pack.storage.type_name().canonical_key(),
+                    pack_storage_detail(&pack.storage),
+                ),
+                "data": {"kind": "pack-storage", "pack": pack.name, "symbol": pack.storage_name},
+            }));
+            let fields = pack.fields.iter().map(|field| {
                 let width =
                     crate::ast::primitive_type(&field.ty.name).and_then(
                         |primitive| match primitive {
@@ -104,9 +131,34 @@ fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
                     ),
                     "data": {"kind": "pack-field", "pack": pack.name, "symbol": field.name},
                 })
-            })
+            });
+            storage.chain(fields)
         })
         .collect()
+}
+
+fn pack_storage_detail(storage: &crate::ast::PackStorage) -> String {
+    match storage {
+        crate::ast::PackStorage::ByteArray { capacity, element, .. } => {
+            let bits =
+                crate::ast::primitive_type(&element.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => {
+                        Some(u64::from(width).saturating_mul(*capacity))
+                    }
+                    _ => None,
+                });
+            bits.map_or_else(
+                || format!("{capacity} bytes"),
+                |value| format!("{capacity} bytes, {value} bits"),
+            )
+        }
+        crate::ast::PackStorage::Scalar(type_name) => crate::ast::primitive_type(&type_name.name)
+            .and_then(|primitive| match primitive {
+                crate::ast::PrimitiveType::Integer { width, .. } => Some(format!("{width} bits")),
+                _ => None,
+            })
+            .unwrap_or_else(|| "storage width unavailable".to_owned()),
+    }
 }
 
 fn binding_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
@@ -239,6 +291,8 @@ fn builtin_labels() -> Vec<String> {
         "Void".to_owned(),
         "Int".to_owned(),
         "Bool".to_owned(),
+        "true".to_owned(),
+        "false".to_owned(),
         "Char".to_owned(),
         "String".to_owned(),
         "Buffer".to_owned(),

@@ -43,6 +43,17 @@ fn validates_typed_constants_and_resolves_constant_references() {
 }
 
 #[test]
+fn validates_boolean_literals_and_rejects_integer_bindings() {
+    analyze_source(
+        "const DEFAULT_LINKED: Bool = false; verb main() -> Bool { erg linked: Bool = false; return linked; }",
+    )
+    .expect("Boolean literals should be valid values and constants");
+    let error = analyze_source("verb main() { erg count: Int = true; }")
+        .expect_err("Boolean literals must not coerce to integers");
+    assert!(matches!(error.kind, SemanticErrorKind::BindingTypeMismatch { .. }));
+}
+
+#[test]
 fn rejects_duplicate_and_overflowing_constants() {
     let duplicate =
         analyze_source("const LIMIT: u8 = 4u8; const LIMIT: u8 = 8u8; verb main() { return; }")

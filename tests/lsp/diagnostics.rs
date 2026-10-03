@@ -49,6 +49,25 @@ fn lsp_accepts_statement_conditionals_and_type_directed_integer_indexing() {
 }
 
 #[test]
+fn lsp_reports_pack_storage_contracts_with_stable_codes_and_spans() {
+    let uri = "file:///tmp/actus-lsp-pack-diagnostics.act";
+    let source = "pack Control { erg storage: Array[u16, 2]; layout little; fields { erg first: u8 at 0; } }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"code\":\"E1070\""), "storage diagnostic missing: {stdout}");
+    assert!(
+        stdout.contains("pack `Control` requires unsigned fixed storage"),
+        "storage message missing: {stdout}"
+    );
+    assert!(stdout.contains("\"range\":{\"end\":{\"character\":41,\"line\":0},\"start\":{\"character\":28,\"line\":0}"), "storage span drifted: {stdout}");
+}
+
+#[test]
 fn lsp_publishes_current_version_and_clears_after_replacement_and_close() {
     let uri = "file:///tmp/actus-lsp-versioned.act";
     let invalid = "verb main() { @ }";

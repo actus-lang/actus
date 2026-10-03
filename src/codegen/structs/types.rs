@@ -64,7 +64,10 @@ pub(crate) fn field_type(
             .fields
             .iter()
             .find(|candidate| candidate.name == field)
-            .map(|candidate| candidate.ty),
+            .map(|candidate| candidate.ty)
+            .or_else(|| {
+                (field == "storage").then(|| layouts.pack(id).map(|pack| pack.storage)).flatten()
+            }),
         _ => None,
     }
 }

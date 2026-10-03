@@ -1,5 +1,5 @@
 use actus::ast::{
-    EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PrimitiveType,
+    EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, PrimitiveType,
     ReturnAccess, Role, Stmt, TopLevelDecl, primitive_type,
 };
 use actus::lexer::scan;
@@ -94,6 +94,23 @@ fn keeps_if_expression_distinct_from_statement_if() {
     let Stmt::Return { value: Some(Expr::If { .. }), .. } = &verb.body.statements[0] else {
         panic!("expected value-producing if expression")
     };
+}
+
+#[test]
+fn preserves_a_semicolon_terminated_final_expression_value() {
+    let program =
+        parse_source("verb choose(erg ready: Bool) -> Int { return if ready { 1; } else { 2; }; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::If { then_branch, .. }), .. } = &verb.body.statements[0]
+    else {
+        panic!("expected value-producing if expression")
+    };
+    let Stmt::Expression { expression: Expr::Integer { span, .. }, span: statement_span } =
+        &then_branch.statements[0]
+    else {
+        panic!("expected final integer expression")
+    };
+    assert_eq!(span, statement_span);
 }
 
 #[test]
@@ -279,7 +296,7 @@ fn parses_pack_storage_layout_and_role_qualified_fields() {
     );
     let TopLevelDecl::Pack(pack) = &program.declarations[0] else { panic!("expected pack") };
     assert_eq!(pack.name, "Control");
-    assert_eq!(pack.storage.name, "u32");
+    assert_eq!(pack.storage.type_name().name, "u32");
     assert_eq!(pack.endianness, LayoutEndianness::Little);
     assert_eq!(pack.fields.len(), 4);
     assert_eq!(pack.fields[0].role, Role::Erg);
@@ -288,6 +305,22 @@ fn parses_pack_storage_layout_and_role_qualified_fields() {
     assert!(
         matches!(pack.fields[3].default_value, Some(Expr::Integer { ref value, .. }) if value == "0")
     );
+}
+
+#[test]
+fn parses_array_backed_pack_storage_as_a_distinct_frontend_contract() {
+    let program = parse_source(
+        "pack CacheLine { erg storage: Array[u8, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",
+    );
+    let TopLevelDecl::Pack(pack) = &program.declarations[0] else { panic!("expected pack") };
+    let PackStorage::ByteArray { element, capacity, .. } = &pack.storage else {
+        panic!("expected array-backed pack storage")
+    };
+    assert_eq!(element.name, "u8");
+    assert_eq!(*capacity, 64);
+    assert_eq!(pack.storage.byte_capacity(), Some(64));
+    assert_eq!(pack.storage.bit_capacity(), Some(512));
+    assert_eq!(pack.storage.alignment_bytes(), Some(1));
 }
 
 #[test]

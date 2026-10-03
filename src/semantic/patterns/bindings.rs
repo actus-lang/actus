@@ -146,6 +146,15 @@ impl Analyzer {
             binding.span,
         )?;
         let index = self.binding(&binding.name, binding.span)?;
+        self.binding_type_names.insert(
+            index,
+            crate::ast::TypeName {
+                name: type_name.to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span: binding.span,
+            },
+        );
         if self.struct_types.contains_key(type_name) {
             self.binding_struct_types.insert(index, type_name.to_owned());
         }

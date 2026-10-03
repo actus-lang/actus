@@ -1,5 +1,5 @@
 use actus::ast::{
-    CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Stmt, StructFieldRole, TopLevelDecl,
+    CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Place, Stmt, StructFieldRole, TopLevelDecl,
     VariantPayload,
 };
 use actus::diagnostics::render_parse_error;
@@ -20,14 +20,14 @@ fn parses_compound_assignment_targets_and_operators() {
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
     assert!(matches!(
         &verb.body.statements[1],
-        Stmt::CompoundAssignment { operator: actus::ast::CompoundAssignmentOp::Add, target: actus::ast::CompoundAssignmentTarget::Identifier(name), .. }
+        Stmt::CompoundAssignment { operator: actus::ast::CompoundAssignmentOp::Add, target: Place::Binding { name, .. }, .. }
             if name == "index"
     ));
     assert!(matches!(
         &verb.body.statements[2],
         Stmt::CompoundAssignment {
             operator: actus::ast::CompoundAssignmentOp::ShiftLeft,
-            target: actus::ast::CompoundAssignmentTarget::Index { .. },
+            target: Place::Index { .. },
             ..
         }
     ));
@@ -60,6 +60,20 @@ fn parses_case_variants_literals_and_wildcard_with_spans() {
     assert!(matches!(branches[0].body, CaseBody::Expression(_)));
     assert!(branches[0].span.start < branches[0].span.end);
     assert!(span.start < span.end);
+}
+
+#[test]
+fn parses_boolean_literals_as_value_expressions() {
+    let program = parse_source("verb main() -> Bool { erg linked: Bool = false; return true; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::OwnerDecl { initializer, .. } = &verb.body.statements[0] else {
+        panic!("expected owner declaration")
+    };
+    assert!(matches!(initializer, Expr::BoolLiteral { value: false, .. }));
+    let Stmt::Return { value: Some(value), .. } = &verb.body.statements[1] else {
+        panic!("expected return")
+    };
+    assert!(matches!(value, Expr::BoolLiteral { value: true, .. }));
 }
 
 #[test]
@@ -231,8 +245,11 @@ fn parses_field_assignment() {
     let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
     assert!(matches!(
         &verb.body.statements[1],
-        Stmt::FieldAssignment { field, value: Expr::Integer { value, .. }, .. }
-            if field == "x" && value == "2"
+        Stmt::Assignment {
+            target: Place::Field { field, .. },
+            value: Expr::Integer { value, .. },
+            ..
+        } if field == "x" && value == "2"
     ));
 }
 
@@ -247,6 +264,28 @@ fn parses_nested_borrow_and_named_call_arguments() {
     };
     assert!(matches!(initializer, Expr::BufferLiteral { .. }));
     assert!(matches!(verb.body.statements[1], Stmt::Block(_)));
+}
+
+#[test]
+fn parses_calls_in_nested_statement_blocks_with_all_argument_roles() {
+    let program = parse_source(
+        "verb update(ins slot: Int) { slot += 1; } verb observe(abs slot: Int) { } verb consume(dat slot: Int) { } verb main() { erg value = 0; if true { update(slot: ins value); } else { { observe(slot: abs value); } } loop { case true { true => { consume(slot: dat value); break; }, _ => { continue; }, }; } }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[3] else { panic!("expected main verb") };
+    assert!(matches!(verb.body.statements[1], Stmt::If { .. }));
+    assert!(matches!(verb.body.statements[2], Stmt::Loop(_)));
+}
+
+#[test]
+fn requires_semicolons_after_nested_call_statements() {
+    let (tokens, errors) = scan(
+        "verb update(erg slot: Int) { slot = 1; } verb main() { erg value = 0; if true { update(value: value) } }",
+    );
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("nested call statements require semicolons");
+    assert!(
+        matches!(error.kind, ParseErrorKind::UnexpectedToken { expected, .. } if expected == "`;`")
+    );
 }
 
 #[test]
@@ -324,12 +363,13 @@ fn parses_bounded_array_types_and_indexed_assignments() {
     let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
     assert!(matches!(
         &verb.body.statements[1],
-        Stmt::IndexAssignment {
-            target: Expr::Identifier { name, .. },
-            index: Expr::Integer { value, .. },
+        Stmt::Assignment {
+            target: Place::Index { target, index, .. },
             value: Expr::Integer { value: assigned, .. },
             ..
-        } if name == "table" && value == "1" && assigned == "2"
+        } if matches!(target.as_ref(), Place::Binding { name, .. } if name == "table")
+            && matches!(index, Expr::Integer { value, .. } if value == "1")
+            && assigned == "2"
     ));
     let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =
         &verb.body.statements[2]
@@ -348,16 +388,65 @@ fn parses_bounded_array_types_and_indexed_assignments() {
 }
 
 #[test]
+fn parses_nested_field_and_index_place_chains() {
+    let program = parse_source(
+        "verb main() { erg fabric = value(); fabric.columns[0].axon_0 = 1; fabric.columns[0].axon_0 += 1; fabric.columns[0][1].axon_0 = 2; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else {
+        panic!("expected verb");
+    };
+
+    assert!(matches!(
+        &verb.body.statements[1],
+        Stmt::Assignment { target: Place::Field { object, field, .. }, .. }
+            if field == "axon_0"
+                && matches!(object.as_ref(), Place::Index { target, .. }
+                    if matches!(target.as_ref(), Place::Field { field, .. } if field == "columns"))
+    ));
+    assert!(matches!(
+        &verb.body.statements[2],
+        Stmt::CompoundAssignment {
+            target: Place::Field { object, field, .. }, ..
+        }
+            if field == "axon_0"
+                && matches!(object.as_ref(), Place::Index { target, .. }
+                    if matches!(target.as_ref(), Place::Field { field, .. } if field == "columns"))
+    ));
+    assert!(matches!(
+        &verb.body.statements[3],
+        Stmt::Assignment { target: Place::Field { object, field, .. }, .. }
+            if field == "axon_0"
+                && matches!(object.as_ref(), Place::Index { target, .. }
+                    if matches!(target.as_ref(), Place::Index { target, .. }
+                        if matches!(target.as_ref(), Place::Field { field, .. } if field == "columns")))
+    ));
+}
+
+#[test]
 fn rejects_malformed_bounded_array_capacity() {
-    for source in [
-        "struct Table { cells: Array[Int], }",
-        "struct Table { cells: Array[Int, 4, 8], }",
-        "struct Table { cells: Array[Int, Size], }",
-    ] {
+    for source in
+        ["struct Table { cells: Array[Int], }", "struct Table { cells: Array[Int, 4, 8], }"]
+    {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         parse(tokens).expect_err("malformed bounded array must be rejected");
     }
+}
+
+#[test]
+fn parses_const_generic_array_capacity_for_semantic_validation() {
+    let program = parse_source(
+        "struct Table[N: Usize] { cells: Array[Int, N], } verb main() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Struct(definition) = &program.declarations[0] else {
+        panic!("expected generic struct")
+    };
+    assert_eq!(definition.generic_parameters[0].name, "N");
+    assert!(matches!(
+        definition.generic_parameters[0].kind,
+        actus::ast::GenericParamKind::Const { .. }
+    ));
+    assert_eq!(definition.fields[0].ty.arguments[1].name, "N");
 }
 
 #[test]

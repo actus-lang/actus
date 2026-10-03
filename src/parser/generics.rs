@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{GenericParam, TypeName};
+use crate::ast::{GenericParam, GenericParamKind, TypeName};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
@@ -29,9 +29,16 @@ impl Parser {
                 Vec::new()
             };
             let bound = bounds.first().cloned();
+            let kind = match bound.as_ref() {
+                Some(domain) if domain.name == "Usize" && domain.arguments.is_empty() => {
+                    GenericParamKind::Const { domain: domain.clone() }
+                }
+                _ => GenericParamKind::Type,
+            };
             let end = bounds.last().map_or(name_token.span.end, |ty| ty.span.end);
             parameters.push(GenericParam {
                 name,
+                kind,
                 bound,
                 bounds,
                 span: SourceSpan::new(name_token.span.start, end),
@@ -93,14 +100,11 @@ impl Parser {
             });
         }
         let capacity = &arguments[1];
-        if !capacity.arguments.is_empty()
-            || capacity.reference_role.is_some()
-            || !capacity.name.chars().all(|character| character.is_ascii_digit())
-        {
+        if !capacity.arguments.is_empty() || capacity.reference_role.is_some() {
             return Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
-                    expected: "a non-negative integer array capacity".to_owned(),
+                    expected: "an integer literal or const generic array capacity".to_owned(),
                     found: TokenKind::Identifier(capacity.name.clone()),
                 },
                 span: capacity.span,

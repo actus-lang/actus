@@ -1,4 +1,6 @@
-use crate::ast::{BinaryOp, Expr, PrimitiveType, TypeName, UnaryOp, primitive_type};
+use crate::ast::{
+    BinaryOp, CaseBody, Expr, IfBranch, PrimitiveType, Stmt, TypeName, UnaryOp, primitive_type,
+};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
@@ -34,6 +36,7 @@ impl Analyzer {
     pub(crate) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         self.record_origin(expression);
         match expression {
+            Expr::BoolLiteral { value, span } => self.visit_bool_literal(*value, *span),
             Expr::BufferLiteral { length, .. } => self.visit_buffer_literal(length),
             Expr::Identifier { name, span } => self.visit_identifier(name, *span),
             Expr::Binary { left, operator, right, .. } => {
@@ -89,6 +92,12 @@ impl Analyzer {
         }
     }
 
+    fn visit_bool_literal(&mut self, value: bool, span: SourceSpan) -> Result<(), SemanticError> {
+        let value = if value { "true" } else { "false" };
+        self.record_literal_fact("boolean", value, &None, span);
+        Ok(())
+    }
+
     fn record_literal_fact(
         &mut self,
         kind: &'static str,
@@ -99,7 +108,11 @@ impl Analyzer {
         if self.model.literal_facts.iter().any(|fact| fact.span == span) {
             return;
         }
-        let type_name = suffix.clone().or_else(|| (kind == "float").then(|| "f64".to_owned()));
+        let type_name = suffix.clone().or_else(|| {
+            (kind == "float")
+                .then(|| "f64".to_owned())
+                .or_else(|| (kind == "boolean").then(|| "Bool".to_owned()))
+        });
         self.model.literal_facts.push(super::super::model::LiteralFact {
             span,
             kind,
@@ -202,7 +215,7 @@ impl Analyzer {
     }
 
     fn visit_identifier(&self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
-        if self.constants.contains_key(name) {
+        if self.constants.contains_key(name) || self.is_const_generic_parameter(name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
@@ -414,6 +427,42 @@ fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
         }
         Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
             is_unsuffixed_integer_literal(expression)
+        }
+        _ => false,
+    }
+}
+
+pub(crate) fn case_branch_type(analyzer: &Analyzer, body: &CaseBody) -> Option<String> {
+    match body {
+        CaseBody::Expression(expression) => analyzer.expression_type_name(expression),
+        CaseBody::Block(block) if block_diverges(block) => None,
+        CaseBody::Block(block) => block_tail_type(analyzer, block),
+    }
+}
+
+fn block_tail_type(analyzer: &Analyzer, block: &crate::ast::Block) -> Option<String> {
+    let Some(Stmt::Expression { expression, span }) = block.statements.last() else {
+        return None;
+    };
+    (span.end == expression_span(expression).end)
+        .then(|| analyzer.expression_type_name(expression))?
+}
+
+fn block_diverges(block: &crate::ast::Block) -> bool {
+    block.statements.last().is_some_and(statement_diverges)
+}
+
+fn statement_diverges(statement: &Stmt) -> bool {
+    match statement {
+        Stmt::Return { .. } | Stmt::Break { .. } | Stmt::Continue { .. } => true,
+        Stmt::If { then_branch, else_branch, .. } => {
+            block_diverges(then_branch)
+                && else_branch.as_ref().is_some_and(|branch| match branch {
+                    IfBranch::Block(block) => block_diverges(block),
+                    IfBranch::ElseIf(expression) => {
+                        matches!(expression.as_ref(), Expr::If { .. })
+                    }
+                })
         }
         _ => false,
     }

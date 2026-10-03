@@ -162,6 +162,9 @@ fn lower_guarded_case_branch<'a>(
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+    let guard_block = function
+        .current_block()
+        .ok_or_else(|| NativeEmitError("guard lowering has no active block".to_owned()))?;
     let condition = lower_expression(
         function,
         guard,
@@ -174,7 +177,7 @@ fn lower_guarded_case_branch<'a>(
     )?;
     let body = function.create_block();
     emit_guard_branch(function, condition, body, following, merge)?;
-    function.seal_block(function.current_block().expect("guard block is active"));
+    function.seal_block(guard_block);
     function.switch_to_block(body);
     let branch_value = lower_case_body(function, branch, branch_locals, result_type, context)?;
     function.seal_block(body);
@@ -272,7 +275,7 @@ fn finish_case_flow(
     result_type: NativeType,
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     match flow {
-        Flow::Return(value) => {
+        Flow::Return(value, _) => {
             function.ins().return_(&[value]);
             Ok(None)
         }

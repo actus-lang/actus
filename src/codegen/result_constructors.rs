@@ -81,28 +81,14 @@ fn normalize_statement(
         Stmt::OwnerDecl { name, ty, initializer, .. } => {
             normalize_owner_declaration(name, ty.as_deref(), initializer, signatures, locals)
         }
-        Stmt::Assignment { name, value, .. } => {
-            normalize_assignment(name, value, signatures, locals)
-        }
-        Stmt::FieldAssignment { value, .. } => {
-            normalize_expression(value, None, signatures, locals);
-        }
-        Stmt::IndexAssignment { target, index, value, .. } => {
-            normalize_expression(target, None, signatures, locals);
-            normalize_expression(index, None, signatures, locals);
+        Stmt::Assignment { target, value, .. } => {
+            let mut target_expression = target.to_expr();
+            normalize_expression(&mut target_expression, None, signatures, locals);
             normalize_expression(value, None, signatures, locals);
         }
         Stmt::CompoundAssignment { target, value, .. } => {
-            match target {
-                crate::ast::CompoundAssignmentTarget::Identifier(_) => {}
-                crate::ast::CompoundAssignmentTarget::Field { object, .. } => {
-                    normalize_expression(object, None, signatures, locals)
-                }
-                crate::ast::CompoundAssignmentTarget::Index { target, index } => {
-                    normalize_expression(target, None, signatures, locals);
-                    normalize_expression(index, None, signatures, locals);
-                }
-            }
+            let mut target_expression = target.to_expr();
+            normalize_expression(&mut target_expression, None, signatures, locals);
             normalize_expression(value, None, signatures, locals);
         }
         Stmt::Expression { expression, .. } => {
@@ -143,16 +129,6 @@ fn normalize_owner_declaration(
     }
 }
 
-fn normalize_assignment(
-    name: &str,
-    value: &mut Expr,
-    signatures: &HashMap<String, Vec<(String, TypeName)>>,
-    locals: &mut HashMap<String, TypeName>,
-) {
-    let expected = locals.get(name).cloned();
-    normalize_expression(value, expected.as_ref(), signatures, locals);
-}
-
 fn normalize_expression(
     expression: &mut Expr,
     expected: Option<&TypeName>,
@@ -186,6 +162,7 @@ fn normalize_expression(
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }
         | Expr::BufferLiteral { .. } => {}
@@ -364,6 +341,7 @@ fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
         | Expr::If { span, .. }
         | Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
         | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }

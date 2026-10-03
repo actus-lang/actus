@@ -51,6 +51,14 @@ impl Analyzer {
     }
 
     fn identifier_type_name(&self, name: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
+        if self.is_const_generic_parameter(name) {
+            return Some(TypeName {
+                name: "Usize".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span,
+            });
+        }
         let index = self.binding(name, span).ok()?;
         self.binding_type_names
             .get(&index)
@@ -67,7 +75,16 @@ impl Analyzer {
             })
     }
 
-    fn specialized_field_type(&self, type_name: &TypeName, field: &str) -> Option<TypeName> {
+    pub(crate) fn specialized_field_type(
+        &self,
+        type_name: &TypeName,
+        field: &str,
+    ) -> Option<TypeName> {
+        if field == "storage"
+            && let Some(pack) = self.pack_types.get(&type_name.name)
+        {
+            return Some(pack.storage.type_name().clone());
+        }
         if let Some(pack_field) = self.pack_field(&type_name.name, field) {
             return Some(pack_field.ty.clone());
         }

@@ -1,0 +1,6 @@
+"""Strict test-runner fixture for bounded systems readiness."""
+meta test
+verb bounded_boolean_state() -> Int {
+    erg enabled: Bool = true;
+    return 0;
+}

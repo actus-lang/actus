@@ -1,0 +1,13 @@
+pack InvalidIndex {
+    erg storage: Array[u8, 2];
+    layout little;
+    fields {
+        erg first: u8 at 0;
+        erg second: u8 at 8;
+    }
+}
+
+verb invalid() {
+    erg value = InvalidIndex {storage: Array[u8, 2]()};
+    value.storage[2] = 1u8;
+}
