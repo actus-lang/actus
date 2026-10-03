@@ -21,6 +21,28 @@ fn accepts_fully_covered_u8_u16_and_u32_packs() {
 }
 
 #[test]
+fn accepts_a_bounded_u8_array_as_multi_word_pack_storage() {
+    analyze_source(
+        "pack CacheLine { erg storage: Array[u8, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",
+    )
+    .expect("a 64-byte array-backed pack should validate its frontend layout");
+}
+
+#[test]
+fn rejects_invalid_multi_word_pack_storage_contracts() {
+    for source in [
+        "pack WrongElement { erg storage: Array[u16, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",
+        "pack Empty { erg storage: Array[u8, 0]; layout little; fields { } }",
+        "struct Config { erg capacity: Usize, } pack Runtime { erg storage: Array[u8, N]; layout little; fields { } }",
+    ] {
+        assert!(matches!(
+            analyze_source(source),
+            Err(SemanticErrorKind::InvalidPackStorage { .. })
+        ));
+    }
+}
+
+#[test]
 fn rejects_unsupported_pack_storage_types() {
     for source in [
         "pack Signed { erg storage: i32; layout little; fields { erg all: u32 at 0; } }",

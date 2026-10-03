@@ -9,8 +9,8 @@ pub use callable::{
     DispatchMode, ExternalVerbDecl, LimitlessScope, MetaAttribute, Param, VerbDecl,
 };
 pub use data::{
-    EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField, StructDef,
-    StructField, StructFieldRole,
+    EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField,
+    PackStorage, StructDef, StructField, StructFieldRole,
 };
 pub use top_level::{
     ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,

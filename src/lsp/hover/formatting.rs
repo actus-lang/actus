@@ -39,7 +39,7 @@ pub(super) fn pack_signature(pack: &PackDecl) -> String {
     format!(
         "pack {} {{ storage: {}; layout {}; }}",
         pack.name,
-        type_name(&pack.storage),
+        type_name(pack.storage.type_name()),
         endianness
     )
 }

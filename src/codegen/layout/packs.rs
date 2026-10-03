@@ -1,11 +1,19 @@
-use crate::ast::{PackDecl, PackField, PrimitiveType, Role, StructFieldRole, primitive_type};
+use crate::ast::{
+    PackDecl, PackField, PackStorage, PrimitiveType, Role, StructFieldRole, primitive_type,
+};
 
 use super::{LayoutRegistry, PackFieldLayout, PackLayout};
 use crate::codegen::native::NativeEmitError;
 
 impl LayoutRegistry {
     pub(super) fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, NativeEmitError> {
-        let storage = self.native_type(&pack.storage.name, &mut Vec::new())?;
+        if matches!(pack.storage, PackStorage::ByteArray { .. }) {
+            return Err(NativeEmitError(format!(
+                "multi-word pack storage `{}` requires packed-storage native lowering",
+                pack.name
+            )));
+        }
+        let storage = self.native_type(&pack.storage.type_name().name, &mut Vec::new())?;
         let fields = pack
             .fields
             .iter()

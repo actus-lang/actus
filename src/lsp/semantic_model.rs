@@ -208,13 +208,13 @@ fn packs(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Pack(pack) = declaration else { return None };
-            let storage_bits = primitive_type(&pack.storage.name).and_then(|primitive| match primitive {
+            let storage_bits = primitive_type(&pack.storage.type_name().name).and_then(|primitive| match primitive {
                 crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
                 _ => None,
             });
             Some(json!({
                 "name": pack.name,
-                "storage": format_type(&pack.storage),
+                "storage": format_type(pack.storage.type_name()),
                 "storageBits": storage_bits,
                 "layout": format!("{:?}", pack.endianness).to_lowercase(),
                 "range": span_range(source, index, pack.span),

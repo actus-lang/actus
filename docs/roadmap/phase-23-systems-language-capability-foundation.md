@@ -326,6 +326,149 @@ the same syntax and semantic model.
 - [x] Only after this gate is closed may an advanced systems workload be
       claimed as compiler-validated rather than source-level experimental code.
 
+## Phase 23 extension: multi-word packed storage
+
+The original Phase 23 acceptance scope is closed, but the readiness workload
+exposed a separate compiler capability required for cache-line-sized register
+maps and fixed binary state: a `pack` currently accepts only one fixed-width
+unsigned scalar as its storage representation. An array-backed storage field
+such as:
+
+```act
+open pack Minicolumn {
+    erg storage: Array[u8, 64];
+    layout little;
+    fields {
+        erg charge: u8 at 0;
+        erg threshold: u8 at 8;
+        erg coincidence_low: u64 at 64;
+        erg inhibitory_link: u32 at 480;
+    }
+}
+```
+
+must not be treated as a source-level workaround. It requires a complete
+representation, semantic, native, tooling, and acceptance contract. The
+following extension gates remain open and are the next Phase 23 work items.
+
+### Gate 23.9: Multi-word pack representation contract
+
+- [x] Define the AST and semantic representation for scalar and contiguous
+      multi-word pack storage without leaking Cranelift or C ABI types into the
+      frontend.
+- [x] Accept a bounded storage form beginning with `Array[u8, N]` and define
+      the supported element families, capacity domain, and maximum bit width.
+- [x] Preserve the existing `pack` field syntax and explicit bit offsets;
+      reject negative offsets, overlapping fields, offsets past storage width,
+      and non-representable total layouts before code generation.
+- [x] Define endianness for byte-array storage and document the mapping between
+      byte index, bit offset, and field value.
+- [x] Define deterministic size, alignment, stride, and zero-initialization
+      rules for multi-word packs. The representation must be inline and
+      bounded; it must not allocate a heap object.
+- [x] Add accepted and rejected parser/AST/semantic fixtures, including the
+      exact `Array[u8, 64]`/512-bit shape needed by the systems workload.
+
+Gate 23.9 is closed for the frontend and semantic representation contract.
+Native argument passing, inline code generation, indexed storage operations,
+and executable serialization remain intentionally owned by Gates 23.11 and
+23.12; no native support is claimed until those gates provide direct evidence.
+
+### Gate 23.10: Multi-word layout and type-system validation
+
+- [ ] Register array-backed pack storage as a first-class layout identity,
+      distinct from an ordinary `Array[u8, N]` value.
+- [ ] Validate storage capacity and field offsets using checked compile-time
+      arithmetic with deterministic diagnostics for overflow and width errors.
+- [ ] Preserve pack identity, storage width, endianness, field metadata, and
+      generic arguments in semantic and native specialization keys.
+- [ ] Resolve field reads and writes against the storage representation while
+      preserving field width, signedness, defaults, reserved fields, and
+      ownership roles.
+- [ ] Reject invalid storage element types, runtime capacities, unsupported
+      nested storage, duplicate fields, overlapping fields, and out-of-range
+      bit slices before native lowering.
+- [ ] Prove that pack field access and raw storage indexing observe one
+      coherent representation; no aliasing or stale shadow copy is permitted.
+- [ ] Add negative tests for invalid 512-bit layouts and positive tests for
+      exact 64-byte/512-bit layouts.
+
+### Gate 23.11: Indexed storage access and ownership semantics
+
+- [ ] Parse and type-check `column.storage[index]` for array-backed pack
+      storage as a normal nested place and expression, including reads,
+      writes, compound assignments, and calls from nested control flow.
+- [ ] Evaluate the base pack and index exactly once for assignment and
+      compound assignment.
+- [ ] Enforce bounds checks using the declared storage capacity and reject
+      statically impossible indexes where the existing constant rules allow it.
+- [ ] Preserve `erg`, `abs`, `ins`, and `dat` contracts when storage bytes are
+      borrowed, inspected, mutated, or transferred. An `ins` loan must restore
+      the same pack owner without allocating a second storage array.
+- [ ] Reject mutation through `abs` storage, overlapping loans, use after
+      move/drop, and invalid storage aliases with stable diagnostics.
+- [ ] Add native and semantic tests for byte reads/writes, field-plus-storage
+      access, nested array-of-pack places, and cleanup through early return,
+      `break`, `continue`, and `?` paths.
+
+### Gate 23.12: Native lowering, ABI, and serialization
+
+- [ ] Lower multi-word pack storage to contiguous inline native memory with
+      deterministic alignment and no hidden allocation or C bridge.
+- [ ] Lower indexed storage operations through one checked address
+      calculation, load/store width, and bounds path; never duplicate a
+      side-effecting base or index expression.
+- [ ] Lower field access at the declared bit offset with correct masking,
+      shifting, sign/zero extension, and endianness for every supported field
+      width.
+- [ ] Define and test initialization, copy/move, drop, return, argument
+      passing, and aggregate assignment for 64-byte packs.
+- [ ] Provide deterministic byte snapshot/restore behavior using ordinary
+      Actus operations. Round trips must preserve every byte and every declared
+      field value across supported endianness modes.
+- [ ] Inspect emitted objects and execute host-native tests for exact layout,
+      indexed storage mutation, field mutation, bounds failure, and snapshot
+      round trips.
+- [ ] Add a freestanding/object-level parity test where the target contract
+      supports the representation; do not add a target-specific language path.
+
+### Gate 23.13: Formatter, LSP, and diagnostics parity for packed storage
+
+- [ ] Format array-backed pack declarations idempotently without changing
+      storage type, field offsets, layout keywords, or documentation strings.
+- [ ] Add parser and semantic diagnostics with exact spans for invalid storage
+      elements, capacities, offsets, overlap, width, and endianness.
+- [ ] Add LSP hover and semantic model data for storage width, byte capacity,
+      field offsets, field widths, and endianness.
+- [ ] Add definition/navigation, completion, semantic-token, and rename
+      coverage for `storage` indexes and pack fields.
+- [ ] Verify open-document overlays reindex pack layout changes and do not
+      report stale `unknown type` or field metadata errors.
+- [ ] Test malformed nested storage expressions and invalid incremental edits
+      without crashing or partially mutating the workspace overlay.
+
+### Gate 23.14: Packed-storage systems readiness acceptance
+
+- [ ] Replace the current experimental `Minicolumn` storage blocker with a
+      real accepted fixture using `Array[u8, 64]` and the complete 512-bit
+      field map.
+- [ ] Make `actus check --strict`, `actus test --strict`, `actus fmt --check`,
+      native executable build/run, and object emission pass for the fixture.
+- [ ] Prove indexed byte storage, bit-packed field access, fixed-width
+      arithmetic, nested calls, Boolean control flow, ownership cleanup, and
+      serialization in one bounded workload.
+- [ ] Add rejected fixtures for invalid field overlap, out-of-range offsets,
+      wrong storage element types, runtime capacity, bounds violations, and
+      ownership violations.
+- [ ] Verify the compiler, formatter, LSP, source-limit checks, documentation
+      checks, and full repository quality suite are green.
+- [ ] Update the Phase 23 evidence index with exact test names, commands,
+      target profile, expected outputs, and the closing compiler revision.
+
+No gate in this extension may be closed by changing the AIE source to use a
+different representation. The compiler capability itself must be implemented,
+tested, and documented first.
+
 ## Non-goals
 
 This phase does not:
@@ -340,8 +483,11 @@ This phase does not:
 
 ## Completion criteria
 
-Phase 23 closes only when every gate has direct evidence, the three baseline
-gaps are resolved, `actus check --strict` and `actus test --strict` pass for the
-capability fixture, native execution is verified, and formatter/LSP behavior
-matches the compiler. Any remaining language limitation must be recorded with
-an owner, an exact unblock condition, and a dedicated roadmap item.
+The original Phase 23 scope is closed through Gate 23.8: the three baseline
+gaps have direct evidence, the capability fixture passes strict check/test,
+native execution is verified, and formatter/LSP behavior matches the
+compiler. The multi-word packed-storage extension closes only when Gates
+23.9–23.14 have direct evidence and the 64-byte systems fixture passes the
+same strict, native, object, formatter, LSP, source-limit, documentation, and
+repository quality checks. Any remaining language limitation must be recorded
+with an owner, an exact unblock condition, and a dedicated roadmap item.

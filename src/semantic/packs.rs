@@ -1,6 +1,8 @@
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use crate::ast::{PackDecl, PackField, PrimitiveType, Program, Role, TopLevelDecl, primitive_type};
+use crate::ast::{
+    PackDecl, PackField, PackStorage, PrimitiveType, Program, Role, TopLevelDecl, primitive_type,
+};
 
 type PackCoverage = (Vec<bool>, Vec<(u16, u16)>);
 
@@ -36,7 +38,7 @@ impl Analyzer {
         };
         let storage = self.validate_pack_literal_fields(name, fields, span)?;
         self.visit_expression(&storage.value)?;
-        self.validate_expected_literal(&storage.value, &pack.storage)
+        self.validate_expected_literal(&storage.value, pack.storage.type_name())
     }
 
     fn validate_pack_literal_fields<'a>(
@@ -151,7 +153,27 @@ fn validate_pack_overlap(
 }
 
 fn storage_capacity(pack: &PackDecl) -> Result<u16, SemanticError> {
-    match primitive_type(&pack.storage.name) {
+    if let PackStorage::ByteArray { element, capacity, .. } = &pack.storage {
+        if primitive_type(&element.name) != Some(PrimitiveType::Integer { signed: false, width: 8 })
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidPackStorage {
+                    pack: pack.name.clone(),
+                    ty: element.name.clone(),
+                },
+                span: pack.storage.span(),
+            });
+        }
+        let bits = capacity.checked_mul(8).filter(|bits| *bits > 0 && *bits <= u64::from(u16::MAX));
+        return bits.map(|bits| bits as u16).ok_or_else(|| SemanticError {
+            kind: SemanticErrorKind::InvalidPackStorage {
+                pack: pack.name.clone(),
+                ty: format!("Array[u8, {capacity}]"),
+            },
+            span: pack.storage.span(),
+        });
+    }
+    match primitive_type(&pack.storage.type_name().name) {
         Some(PrimitiveType::Integer { signed: false, width })
             if matches!(width, 8 | 16 | 32 | 64 | 128) =>
         {
@@ -160,9 +182,9 @@ fn storage_capacity(pack: &PackDecl) -> Result<u16, SemanticError> {
         _ => Err(SemanticError {
             kind: SemanticErrorKind::InvalidPackStorage {
                 pack: pack.name.clone(),
-                ty: pack.storage.name.clone(),
+                ty: pack.storage.type_name().name.clone(),
             },
-            span: pack.storage.span,
+            span: pack.storage.span(),
         }),
     }
 }

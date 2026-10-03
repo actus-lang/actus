@@ -234,7 +234,7 @@ impl Formatter<'_> {
         self.output.push_str("pack ");
         self.output.push_str(&definition.name);
         self.output.push_str(" { erg storage: ");
-        self.type_name(&definition.storage);
+        self.type_name(definition.storage.type_name());
         self.output.push_str("; layout ");
         self.output.push_str(match definition.endianness {
             crate::ast::LayoutEndianness::Little => "little",
