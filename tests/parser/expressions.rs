@@ -63,6 +63,20 @@ fn parses_case_variants_literals_and_wildcard_with_spans() {
 }
 
 #[test]
+fn parses_boolean_literals_as_value_expressions() {
+    let program = parse_source("verb main() -> Bool { erg linked: Bool = false; return true; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::OwnerDecl { initializer, .. } = &verb.body.statements[0] else {
+        panic!("expected owner declaration")
+    };
+    assert!(matches!(initializer, Expr::BoolLiteral { value: false, .. }));
+    let Stmt::Return { value: Some(value), .. } = &verb.body.statements[1] else {
+        panic!("expected return")
+    };
+    assert!(matches!(value, Expr::BoolLiteral { value: true, .. }));
+}
+
+#[test]
 fn parses_case_payload_patterns() {
     let program = parse_source(
         "enum Message { Move(Int, Int), Write { text: String, }, } verb main() { case message { Message.Move(x, y) => x + y, Message.Write(text: t) => 1, }; }",

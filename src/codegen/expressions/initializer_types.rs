@@ -16,6 +16,7 @@ pub(crate) fn initializer_type(
     layouts: &LayoutRegistry,
 ) -> Result<NativeType, NativeEmitError> {
     match expression {
+        Expr::BoolLiteral { .. } => Ok(NativeType::Int),
         Expr::Identifier { name, .. } => types.get(name).copied().ok_or_else(|| {
             NativeEmitError(format!("native type for binding `{name}` is unavailable"))
         }),
@@ -113,6 +114,7 @@ fn expression_end(expression: &Expr) -> usize {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
         | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }

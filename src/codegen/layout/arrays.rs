@@ -180,6 +180,7 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }
         | Expr::BufferLiteral { .. } => {}

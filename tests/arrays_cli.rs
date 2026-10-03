@@ -24,6 +24,16 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_boolean_literals_and_short_circuit_logic_natively() {
+    let status = run_array_fixture(
+        "boolean-literals",
+        "verb main() -> Int { erg linked: Bool = false; erg result: Int = if true && !linked { 42 } else { 0 }; return result; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_const_generic_array_layouts_natively() {
     let status = run_array_fixture(
         "const-generic-array-layout",

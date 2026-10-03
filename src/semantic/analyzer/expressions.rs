@@ -34,6 +34,7 @@ impl Analyzer {
     pub(crate) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         self.record_origin(expression);
         match expression {
+            Expr::BoolLiteral { value, span } => self.visit_bool_literal(*value, *span),
             Expr::BufferLiteral { length, .. } => self.visit_buffer_literal(length),
             Expr::Identifier { name, span } => self.visit_identifier(name, *span),
             Expr::Binary { left, operator, right, .. } => {
@@ -89,6 +90,12 @@ impl Analyzer {
         }
     }
 
+    fn visit_bool_literal(&mut self, value: bool, span: SourceSpan) -> Result<(), SemanticError> {
+        let value = if value { "true" } else { "false" };
+        self.record_literal_fact("boolean", value, &None, span);
+        Ok(())
+    }
+
     fn record_literal_fact(
         &mut self,
         kind: &'static str,
@@ -99,7 +106,11 @@ impl Analyzer {
         if self.model.literal_facts.iter().any(|fact| fact.span == span) {
             return;
         }
-        let type_name = suffix.clone().or_else(|| (kind == "float").then(|| "f64".to_owned()));
+        let type_name = suffix.clone().or_else(|| {
+            (kind == "float")
+                .then(|| "f64".to_owned())
+                .or_else(|| (kind == "boolean").then(|| "Bool".to_owned()))
+        });
         self.model.literal_facts.push(super::super::model::LiteralFact {
             span,
             kind,

@@ -157,6 +157,7 @@ pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
         | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }

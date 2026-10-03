@@ -23,9 +23,9 @@ production-shaped systems code:
    production slice as positive `Usize` literal arguments used in bounded
    `Array` capacities; const expressions and additional compile-time
    positions remain explicit follow-up work rather than implicit syntax.
-2. Boolean literals exist in the lexical vocabulary but are not accepted as
-   ordinary value expressions in every expression/initializer path. For
-   example, `erg linked: Bool = false;` must be accepted and lowered.
+2. Boolean literals exist in the lexical vocabulary but were not accepted as
+   ordinary value expressions in every expression/initializer path. Gate 23.2
+   closes this frontend, semantic, formatter, and native-lowering gap.
 3. A nested-control-flow failure was reported for combinations of indexed and
    field places, nested calls, and value-producing branches. The minimal
    current fixture must reproduce the exact failure before parser changes are
@@ -129,20 +129,22 @@ fixture is a capability contract, not permission to bypass type checking.
 `true` and `false` must be first-class expressions everywhere an ordinary
 literal may appear, subject to normal type checking.
 
-- [ ] Add boolean literal nodes to the AST expression model.
-- [ ] Accept boolean literals in local initializers, return values, call
+- [x] Add boolean literal nodes to the AST expression model.
+- [x] Accept boolean literals in local initializers, return values, call
       arguments, struct fields, enum payloads, array elements, constants,
       conditions, case expressions, and nested blocks.
-- [ ] Resolve both literals to `Bool` without numeric coercion.
-- [ ] Lower boolean values correctly in branches, merges, comparisons, and
+- [x] Resolve both literals to `Bool` without numeric coercion.
+- [x] Lower boolean values correctly in branches, merges, comparisons, and
       native returns.
-- [ ] Preserve literal spans in diagnostics, formatter output, hover, and
+- [x] Preserve literal spans in diagnostics, formatter output, hover, and
       semantic model responses.
-- [ ] Reject `true`/`false` where an integer, buffer, or unrelated aggregate is
+- [x] Reject `true`/`false` where an integer, buffer, or unrelated aggregate is
       required, with a stable type diagnostic.
-- [ ] Prove short-circuit behavior when a Boolean literal controls `&&` or
+- [x] Prove short-circuit behavior when a Boolean literal controls `&&` or
       `||`.
 - [ ] Add hosted and freestanding/object-level evidence where applicable.
+      Hosted native evidence is present; freestanding/object parity remains
+      part of Gate 23.7.
 
 Minimum acceptance fixtures:
 

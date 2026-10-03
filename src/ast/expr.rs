@@ -16,6 +16,10 @@ pub enum Expr {
         suffix: Option<String>,
         span: SourceSpan,
     },
+    BoolLiteral {
+        value: bool,
+        span: SourceSpan,
+    },
     BufferLiteral {
         length: Box<Expr>,
         span: SourceSpan,

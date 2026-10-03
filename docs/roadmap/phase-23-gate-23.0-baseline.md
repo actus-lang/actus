@@ -25,7 +25,7 @@ advanced systems workload is supported.
 
 ## Reproduction results
 
-### Boolean literal expression
+### Boolean literal expression (historical baseline)
 
 Command:
 
@@ -40,7 +40,9 @@ Observed result:
 error[E0003] at 2:24: expected expression, found False
 ```
 
-Status: **confirmed compiler gap**.
+Status at Gate 23.0: **confirmed compiler gap**. Gate 23.2 implements and
+tests this capability; the command is retained here as historical evidence of
+the pre-implementation failure.
 
 The lexer recognizes `false`, but the expression parser does not yet produce a
 Boolean literal expression node for this initializer path.

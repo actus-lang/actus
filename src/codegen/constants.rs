@@ -129,6 +129,7 @@ fn inline_expression(expression: &mut Expr, constants: &HashMap<String, Expr>) {
             inline_conditional(condition, then_branch, else_branch.as_mut(), constants);
         }
         Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }

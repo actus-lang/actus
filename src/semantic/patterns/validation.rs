@@ -57,6 +57,7 @@ impl Analyzer {
                 Err(self.invalid_guard_access(callee, *span))
             }
             Expr::Integer { .. }
+            | Expr::BoolLiteral { .. }
             | Expr::BufferLiteral { .. }
             | Expr::FloatLiteral { .. }
             | Expr::StringLiteral { .. } => Ok(()),

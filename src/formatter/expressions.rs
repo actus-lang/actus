@@ -17,6 +17,9 @@ impl Formatter<'_> {
                     self.output.push_str(suffix);
                 }
             }
+            Expr::BoolLiteral { value, .. } => {
+                self.output.push_str(if *value { "true" } else { "false" });
+            }
             Expr::FloatLiteral { value, suffix, .. } => {
                 self.output.push_str(value);
                 if let Some(suffix) = suffix {

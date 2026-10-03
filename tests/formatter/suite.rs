@@ -52,6 +52,14 @@ fn preserves_typed_float_literal_suffixes() {
 }
 
 #[test]
+fn formats_boolean_literals_without_rewriting_their_values() {
+    let formatted = format_source("verb main() -> Bool { erg linked: Bool = false; return true; }");
+    assert!(formatted.contains("linked: Bool = false;"));
+    assert!(formatted.contains("return true;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_typed_constants_and_keeps_their_documentation() {
     let formatted = format_source(
         "\"\"\"Frame size.\"\"\" open const FRAME_SIZE: u16 = 32u16; verb main() { return; }",

@@ -186,6 +186,7 @@ fn normalize_expression(
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }
         | Expr::BufferLiteral { .. } => {}
@@ -364,6 +365,7 @@ fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
         | Expr::If { span, .. }
         | Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
         | Expr::BufferLiteral { span, .. }
         | Expr::FloatLiteral { span, .. }
         | Expr::StringLiteral { span, .. }

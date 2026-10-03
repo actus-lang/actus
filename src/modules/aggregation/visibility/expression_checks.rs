@@ -102,6 +102,7 @@ fn check_expr_with_context(
         Expr::If { .. } => check_if_expression(expression, context)?,
         Expr::Identifier { .. }
         | Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. } => {}

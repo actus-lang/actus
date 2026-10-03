@@ -9,6 +9,7 @@ use super::super::analyzer::expression_span;
 impl Analyzer {
     pub(crate) fn expression_type(&self, expression: &Expr) -> Option<BuiltinType> {
         match expression {
+            Expr::BoolLiteral { .. } => Some(BuiltinType::Bool),
             Expr::Integer { .. } => Some(BuiltinType::Int),
             Expr::BufferLiteral { .. } => Some(BuiltinType::Buffer),
             Expr::FloatLiteral { .. } => None,
@@ -165,6 +166,7 @@ impl Analyzer {
 
     fn literal_type_name(&self, expression: &Expr) -> Option<String> {
         match expression {
+            Expr::BoolLiteral { .. } => Some("Bool".to_owned()),
             Expr::Integer { suffix: Some(suffix), .. }
                 if matches!(
                     primitive_type(suffix),

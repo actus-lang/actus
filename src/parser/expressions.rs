@@ -33,6 +33,8 @@ impl Parser {
             TokenKind::Integer { value, suffix } => {
                 Ok(Expr::Integer { value, suffix, span: token.span })
             }
+            TokenKind::True => Ok(Expr::BoolLiteral { value: true, span: token.span }),
+            TokenKind::False => Ok(Expr::BoolLiteral { value: false, span: token.span }),
             TokenKind::FloatLiteral { value, suffix } => {
                 Ok(Expr::FloatLiteral { value, suffix, span: token.span })
             }
