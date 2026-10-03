@@ -458,18 +458,33 @@ bridge is introduced.
 
 ### Gate 23.13: Formatter, LSP, and diagnostics parity for packed storage
 
-- [ ] Format array-backed pack declarations idempotently without changing
+- [x] Format array-backed pack declarations idempotently without changing
       storage type, field offsets, layout keywords, or documentation strings.
-- [ ] Add parser and semantic diagnostics with exact spans for invalid storage
+- [x] Add parser and semantic diagnostics with exact spans for invalid storage
       elements, capacities, offsets, overlap, width, and endianness.
-- [ ] Add LSP hover and semantic model data for storage width, byte capacity,
+- [x] Add LSP hover and semantic model data for storage width, byte capacity,
       field offsets, field widths, and endianness.
-- [ ] Add definition/navigation, completion, semantic-token, and rename
+- [x] Add definition/navigation, completion, semantic-token, and rename
       coverage for `storage` indexes and pack fields.
-- [ ] Verify open-document overlays reindex pack layout changes and do not
+- [x] Verify open-document overlays reindex pack layout changes and do not
       report stale `unknown type` or field metadata errors.
-- [ ] Test malformed nested storage expressions and invalid incremental edits
+- [x] Test malformed nested storage expressions and invalid incremental edits
       without crashing or partially mutating the workspace overlay.
+
+Gate 23.13 evidence: formatter coverage is provided by
+`formats_array_backed_packs_idempotently_with_layout_metadata` and
+`keeps_pack_storage_and_field_documentation_in_place` in `tests/formatter`.
+Pack contract diagnostics retain stable E1070-E1074 classifications and source
+spans through semantic tests in `tests/semantic/packs.rs`; the LSP projection
+is pinned by `lsp_reports_pack_storage_contracts_with_stable_codes_and_spans`.
+The LSP suite covers storage width/bytes/capacity/layout facts, hover,
+completion, semantic tokens, overlay reindexing, storage definition, and rename
+through `lsp_exposes_array_pack_layout_facts_and_reindexes_overlay_changes`,
+`lsp_exposes_pack_registers_in_hover_completion_and_tokens`, and
+`lsp_navigates_and_renames_array_pack_storage`. Existing workspace recovery
+tests cover malformed nested overlays and invalid incremental edits without
+partial mutation. The formatter and LSP suites pass with 18 and 75 tests,
+respectively; repository quality checks are required before the gate commit.
 
 ### Gate 23.14: Packed-storage systems readiness acceptance
 

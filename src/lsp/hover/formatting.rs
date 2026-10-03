@@ -21,7 +21,7 @@ pub(super) fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Opti
             format_mask(width),
         ),
         span: identifier_span(source, field.span, name).unwrap_or(field.span),
-        documentation: None,
+        documentation: Some(pack_storage_details(pack)),
     })
 }
 
@@ -37,11 +37,39 @@ pub(super) fn pack_signature(pack: &PackDecl) -> String {
         crate::ast::LayoutEndianness::Big => "big",
     };
     format!(
-        "pack {} {{ storage: {}; layout {}; }}",
+        "pack {} {{ storage: {}; layout {}; }} [{}]",
         pack.name,
         type_name(pack.storage.type_name()),
-        endianness
+        endianness,
+        pack_storage_details(pack),
     )
+}
+
+fn pack_storage_details(pack: &PackDecl) -> String {
+    match &pack.storage {
+        crate::ast::PackStorage::ByteArray { element, capacity, .. } => {
+            let width =
+                crate::ast::primitive_type(&element.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => Some(u64::from(width)),
+                    _ => None,
+                });
+            match width.and_then(|value| value.checked_mul(*capacity)) {
+                Some(bits) => format!("storage: {capacity} bytes, {bits} bits"),
+                None => format!("storage: {capacity} bytes"),
+            }
+        }
+        crate::ast::PackStorage::Scalar(type_name) => {
+            let bits =
+                crate::ast::primitive_type(&type_name.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
+                    _ => None,
+                });
+            bits.map_or_else(
+                || "storage width unavailable".to_owned(),
+                |value| format!("storage: {} bits", value),
+            )
+        }
+    }
 }
 
 pub(super) fn parameter_info(source: &str, params: &[Param], name: &str) -> Option<SymbolInfo> {

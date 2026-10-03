@@ -103,6 +103,11 @@ fn collect_pack_field_definitions(
     name: &str,
     definitions: &mut Vec<SourceSpan>,
 ) {
+    if pack.storage_name == name
+        && let Some(span) = pack_storage_definition_span(source, pack)
+    {
+        definitions.push(span);
+    }
     for field in &pack.fields {
         if field.name == name
             && let Some(identifier) = identifier_span(source, field.span, name)
@@ -110,6 +115,20 @@ fn collect_pack_field_definitions(
             definitions.push(identifier);
         }
     }
+}
+
+fn pack_storage_definition_span(source: &str, pack: &crate::ast::PackDecl) -> Option<SourceSpan> {
+    let start = pack.span.start.min(source.len());
+    let end = pack.span.end.min(source.len()).max(start);
+    let tokens = scan(&source[start..end]).0;
+    tokens.windows(2).find_map(|window| {
+        if !matches!(window[0].kind, TokenKind::Erg) {
+            return None;
+        }
+        let TokenKind::Identifier(name) = &window[1].kind else { return None };
+        (name == &pack.storage_name)
+            .then_some(SourceSpan::new(start + window[1].span.start, start + window[1].span.end))
+    })
 }
 
 fn collect_top_level_definition(

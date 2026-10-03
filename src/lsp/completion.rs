@@ -98,7 +98,18 @@ fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
             _ => None,
         })
         .flat_map(|pack| {
-            pack.fields.iter().map(|field| {
+            let storage = std::iter::once(json!({
+                "label": pack.storage_name,
+                "kind": 5,
+                "detail": format!(
+                    "pack {} storage: {} [{}]",
+                    pack.name,
+                    pack.storage.type_name().canonical_key(),
+                    pack_storage_detail(&pack.storage),
+                ),
+                "data": {"kind": "pack-storage", "pack": pack.name, "symbol": pack.storage_name},
+            }));
+            let fields = pack.fields.iter().map(|field| {
                 let width =
                     crate::ast::primitive_type(&field.ty.name).and_then(
                         |primitive| match primitive {
@@ -120,9 +131,34 @@ fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
                     ),
                     "data": {"kind": "pack-field", "pack": pack.name, "symbol": field.name},
                 })
-            })
+            });
+            storage.chain(fields)
         })
         .collect()
+}
+
+fn pack_storage_detail(storage: &crate::ast::PackStorage) -> String {
+    match storage {
+        crate::ast::PackStorage::ByteArray { capacity, element, .. } => {
+            let bits =
+                crate::ast::primitive_type(&element.name).and_then(|primitive| match primitive {
+                    crate::ast::PrimitiveType::Integer { width, .. } => {
+                        Some(u64::from(width).saturating_mul(*capacity))
+                    }
+                    _ => None,
+                });
+            bits.map_or_else(
+                || format!("{capacity} bytes"),
+                |value| format!("{capacity} bytes, {value} bits"),
+            )
+        }
+        crate::ast::PackStorage::Scalar(type_name) => crate::ast::primitive_type(&type_name.name)
+            .and_then(|primitive| match primitive {
+                crate::ast::PrimitiveType::Integer { width, .. } => Some(format!("{width} bits")),
+                _ => None,
+            })
+            .unwrap_or_else(|| "storage width unavailable".to_owned()),
+    }
 }
 
 fn binding_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {

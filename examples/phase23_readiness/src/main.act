@@ -10,7 +10,16 @@ enum EncodeError {
     Invalid,
 }
 
-pack SnapshotHeader { erg storage: u32; layout little; fields { erg node_count: u8 at 0; erg threshold: u8 at 8; erg flags: u8 at 16; abs _reserved: u8 at 24 = 0; } }
+pack SnapshotHeader {
+    erg storage: u32;
+    layout little;
+    fields {
+        erg node_count: u8 at 0;
+        erg threshold: u8 at 8;
+        erg flags: u8 at 16;
+        abs _reserved: u8 at 24 = 0;
+    }
+}
 
 struct Node {
     value: u32,
