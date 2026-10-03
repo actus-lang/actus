@@ -1341,10 +1341,45 @@ byte-pattern guesses. A valid audit checks:
 - result types, including floating-point vector lanes where applicable;
 - one integer-only fixture and one float-positive fixture.
 
-The audit belongs at the IR boundary, before object emission. It must identify
-the offending instruction in a test failure and remain independent from
-terminal rendering. A successful `actus check` or object build alone does not
-prove a zero-float contract.
+The compiler owns this audit at the native lowering boundary. Backend-focused
+tests can enable it with the native configuration builder:
+
+```rust
+let configuration = NativeBackendConfiguration::default()
+    .with_no_float_ir_verification();
+```
+
+The default remains disabled so existing floating-point native workloads keep
+their documented behavior. With the option enabled, every generated native
+function is inspected after Actus lowering and before object emission. A
+failure identifies the owning function and the detected floating-point IR
+instruction identities; it is not inferred from disassembly or byte-pattern
+heuristics. The compiler-level evidence is covered by
+`test_zero_float_verification_inspects_generated_integer_ir`,
+`zero_float_verification_rejects_generated_float_ir`, and the unit audit tests
+in `src/codegen/native/ir_audit.rs`.
+
+For a package-wide contract, configure the same compiler-owned audit in the
+manifest rather than enabling it only in an individual backend test:
+
+```toml
+[build]
+verify_no_float_ir = true
+```
+
+This package policy is forwarded to every Actus-generated native object unit,
+including module, generic, and performance specializations. The acceptance
+workflow should run `check --strict` and `test --strict` first, then build both
+an object and an executable. `check` validates source and semantics but does
+not itself generate IR; the zero-float claim is established by the native
+build report before object emission. The package-level evidence is covered by
+the positive and negative zero-float CLI workflow tests in
+`tests/cli_workflow.rs`.
+
+The contract covers generated Actus IR only. Separately linked runtime
+objects, external ABI implementations, compiler intrinsics, and platform
+libraries require their own audit and must not be presented as covered by
+`verify_no_float_ir`.
 
 #### Array-backed packed storage
 
