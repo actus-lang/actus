@@ -267,6 +267,28 @@ fn parses_nested_borrow_and_named_call_arguments() {
 }
 
 #[test]
+fn parses_calls_in_nested_statement_blocks_with_all_argument_roles() {
+    let program = parse_source(
+        "verb update(ins slot: Int) { slot += 1; } verb observe(abs slot: Int) { } verb consume(dat slot: Int) { } verb main() { erg value = 0; if true { update(slot: ins value); } else { { observe(slot: abs value); } } loop { case true { true => { consume(slot: dat value); break; }, _ => { continue; }, }; } }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[3] else { panic!("expected main verb") };
+    assert!(matches!(verb.body.statements[1], Stmt::If { .. }));
+    assert!(matches!(verb.body.statements[2], Stmt::Loop(_)));
+}
+
+#[test]
+fn requires_semicolons_after_nested_call_statements() {
+    let (tokens, errors) = scan(
+        "verb update(erg slot: Int) { slot = 1; } verb main() { erg value = 0; if true { update(value: value) } }",
+    );
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("nested call statements require semicolons");
+    assert!(
+        matches!(error.kind, ParseErrorKind::UnexpectedToken { expected, .. } if expected == "`;`")
+    );
+}
+
+#[test]
 fn parses_integer_expression_precedence() {
     let program = parse_source("verb main() -> Int { return 2 + 3 * 4; }");
     let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };

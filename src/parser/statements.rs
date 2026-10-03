@@ -12,6 +12,18 @@ impl Parser {
         &mut self,
         allow_statement_conditionals: bool,
     ) -> Result<Block, ParseError> {
+        self.parse_block_with_options(allow_statement_conditionals, false)
+    }
+
+    pub(super) fn parse_expression_block(&mut self) -> Result<Block, ParseError> {
+        self.parse_block_with_options(false, true)
+    }
+
+    fn parse_block_with_options(
+        &mut self,
+        allow_statement_conditionals: bool,
+        allow_implicit_final_expression: bool,
+    ) -> Result<Block, ParseError> {
         let start = self.expect_simple(TokenKind::LeftBrace, "`{`")?.span.start;
         let mut statements = Vec::new();
         while !self.check_simple(&TokenKind::RightBrace) {
@@ -22,19 +34,23 @@ impl Parser {
             if self.check_simple(&TokenKind::RightBrace) {
                 break;
             }
-            statements.push(self.parse_statement_with_conditionals(allow_statement_conditionals)?);
+            statements.push(self.parse_statement_with_options(
+                allow_statement_conditionals,
+                allow_implicit_final_expression,
+            )?);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(Block { statements, span: SourceSpan::new(start, end) })
     }
 
     pub(super) fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
-        self.parse_statement_with_conditionals(true)
+        self.parse_statement_with_options(true, false)
     }
 
-    fn parse_statement_with_conditionals(
+    fn parse_statement_with_options(
         &mut self,
         allow_statement_conditionals: bool,
+        allow_implicit_final_expression: bool,
     ) -> Result<Stmt, ParseError> {
         if self.check_simple(&TokenKind::LeftBrace) {
             return Ok(Stmt::Block(self.parse_block()?));
@@ -66,17 +82,21 @@ impl Parser {
             return self.parse_drop_statement();
         }
         let expression = self.parse_expression()?;
-        self.parse_expression_statement(expression)
+        self.parse_expression_statement(expression, allow_implicit_final_expression)
     }
 
-    fn parse_expression_statement(&mut self, expression: Expr) -> Result<Stmt, ParseError> {
+    fn parse_expression_statement(
+        &mut self,
+        expression: Expr,
+        allow_implicit_final_expression: bool,
+    ) -> Result<Stmt, ParseError> {
         if self.match_simple(TokenKind::Equals) {
             return self.parse_assignment(expression);
         }
         if let Some(operator) = self.match_compound_assignment() {
             return self.parse_compound_assignment(expression, operator);
         }
-        if self.check_simple(&TokenKind::RightBrace) {
+        if allow_implicit_final_expression && self.check_simple(&TokenKind::RightBrace) {
             let span = expression_span(&expression);
             return Ok(Stmt::Expression { expression, span });
         }

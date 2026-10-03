@@ -94,6 +94,36 @@ fn executes_nested_value_producing_conditionals() {
 
 #[cfg(unix)]
 #[test]
+fn executes_calls_across_nested_statement_blocks() {
+    let status = run_array_fixture(
+        "nested-call-statements",
+        "verb append_one(ins bytes: Buffer) { append(bytes, 1u8); } verb worker() -> Int { erg bytes = Buffer[0]; if true { { append_one(bytes: ins bytes); } } return bytes[0] as Int + 41; } verb main() -> Int { return worker(); }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_calls_inside_loop_and_case_blocks() {
+    let status = run_array_fixture(
+        "nested-loop-case-call",
+        "verb marker() -> Int { return 1; } verb main() -> Int { erg value = 0; loop { case value { 0 => { value = marker(); break; }, _ => { break; }, }; } return value + 41; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn propagates_try_from_a_nested_call_statement() {
+    let status = run_array_fixture(
+        "nested-call-try",
+        "enum IoError { Failed, } verb produce() -> Result[Int, IoError] { return Ok(41); } verb worker() -> Result[Int, IoError] { if true { produce()?; } return Ok(41); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(value) => value + 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_compound_assignments_natively() {
     let status = run_array_fixture(
         "compound-assignments",

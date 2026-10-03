@@ -208,20 +208,21 @@ quality checks pass for this gate.
 
 ## Gate 23.4: Nested call and statement parsing
 
-Calls inside nested blocks must be parsed as statements when their result is
+Status: **closed**. Calls inside nested blocks are
+parsed as statements when their result is
 discarded and as expressions when their result is consumed.
 
-- [ ] Parse calls inside `if`, `else`, `case` block bodies, loops, and nested
+- [x] Parse calls inside `if`, `else`, `case` block bodies, loops, and nested
       lexical blocks.
-- [ ] Parse named arguments and explicit ownership markers in every nested
+- [x] Parse named arguments and explicit ownership markers in every nested
       call position.
-- [ ] Preserve `?` propagation on nested fallible calls.
-- [ ] Distinguish a call statement from a declaration, assignment, or malformed
+- [x] Preserve `?` propagation on nested fallible calls.
+- [x] Distinguish a call statement from a declaration, assignment, or malformed
       expression without recovery ambiguity.
-- [ ] Verify nested calls with `erg`, `abs`, `dat`, and `ins` arguments.
-- [ ] Add diagnostics for missing semicolons, invalid ownership markers,
+- [x] Verify nested calls with `erg`, `abs`, `dat`, and `ins` arguments.
+- [x] Add diagnostics for missing semicolons, invalid ownership markers,
       unknown verbs, wrong argument names, and incompatible return use.
-- [ ] Prove that a nested call cannot bypass cleanup or borrow-state updates.
+- [x] Prove that a nested call cannot bypass cleanup or borrow-state updates.
 
 Acceptance shape:
 
@@ -231,6 +232,10 @@ if condition {
     update(target: ins buffer)?;
 }
 ```
+
+The implementation and acceptance evidence are recorded in [Gate 23.4
+nested-call evidence](phase-23-gate-23.4-nested-calls.md). The full repository
+quality checks pass for this gate.
 
 ## Gate 23.5: Typed nested control-flow joins
 

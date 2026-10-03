@@ -29,8 +29,11 @@ impl Parser {
         allow_statement_conditionals: bool,
     ) -> Result<(Expr, crate::ast::Block, Option<IfBranch>, usize), ParseError> {
         let condition = self.parse_expression()?;
-        let then_branch =
-            self.parse_block_with_statement_conditionals(allow_statement_conditionals)?;
+        let then_branch = if allow_statement_conditionals {
+            self.parse_block_with_statement_conditionals(true)?
+        } else {
+            self.parse_expression_block()?
+        };
         let else_branch = self.parse_else_branch(allow_statement_conditionals)?;
         let end = else_branch.as_ref().map_or(then_branch.span.end, |branch| match branch {
             IfBranch::Block(block) => block.span.end,
@@ -51,8 +54,11 @@ impl Parser {
                 self.parse_if_expression(self.previous().span)?,
             ))));
         }
-        Ok(Some(IfBranch::Block(
-            self.parse_block_with_statement_conditionals(allow_statement_conditionals)?,
-        )))
+        let block = if allow_statement_conditionals {
+            self.parse_block_with_statement_conditionals(true)?
+        } else {
+            self.parse_expression_block()?
+        };
+        Ok(Some(IfBranch::Block(block)))
     }
 }

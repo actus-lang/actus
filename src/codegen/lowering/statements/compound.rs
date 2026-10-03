@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::Value;
+use cranelift_codegen::ir::{InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, CompoundAssignmentOp, Expr, Place};
@@ -91,11 +91,12 @@ fn lower_identifier<'source>(
         .find(|candidate| candidate.as_str() == name)
         .copied()
         .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
-    let left = locals[&binding];
+    let destination = locals[&binding];
     let left_type = types
         .get(&binding)
         .copied()
         .ok_or_else(|| NativeEmitError(format!("native type for `{name}` is unavailable")))?;
+    let left = load_indirect_scalar(function, destination, left_type, layouts)?;
     let right = lower_expression(
         function,
         expression,
@@ -110,8 +111,37 @@ fn lower_identifier<'source>(
         .ir_type(layouts.pointer_type)
         .map(|ty| super::super::super::expressions::coerce_to_ir_type(function, right, ty))?;
     let updated = lower_compound_integer_operation(function, left, operator, right, left_type)?;
-    locals.insert(binding, updated);
+    if is_indirect_scalar(function, destination, left_type, layouts) {
+        function.ins().store(MemFlagsData::new(), updated, destination, 0);
+    } else {
+        locals.insert(binding, updated);
+    }
     Ok(Flow::Fallthrough)
+}
+
+fn load_indirect_scalar(
+    function: &mut FunctionBuilder<'_>,
+    destination: Value,
+    native_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
+    if is_indirect_scalar(function, destination, native_type, layouts) {
+        let ty = native_type.ir_type(layouts.pointer_type)?;
+        return Ok(function.ins().load(ty, MemFlagsData::new(), destination, 0));
+    }
+    Ok(destination)
+}
+
+fn is_indirect_scalar(
+    function: &FunctionBuilder<'_>,
+    destination: Value,
+    native_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> bool {
+    native_type.ir_type(layouts.pointer_type).is_ok_and(|ty| {
+        ty != layouts.pointer_type
+            && function.func.dfg.value_type(destination) == layouts.pointer_type
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
