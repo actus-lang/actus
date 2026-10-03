@@ -11,7 +11,7 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
         "smoke.act",
         "meta test\nverb smoke() -> Int { return 0; }\n",
     );
-    let output = run_test_command(&root);
+    let output = run_command(&root, &["test", "--strict"]);
     assert!(output.status.success(), "test command failed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1 passed; 0 failed"));

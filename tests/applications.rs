@@ -192,6 +192,25 @@ fn package_configuration_module_emits_without_an_anchor_verb() {
 }
 
 #[test]
+fn package_configuration_supports_all_compile_time_consumers() {
+    let source = "import config; struct Settings { erg threshold: u8, } struct Storage[N: Usize] { erg values: Array[u8, N], } verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = LIMIT; erg settings = Settings { threshold: values[0], }; erg storage: Storage[2] = Storage[2] { values: Array[u8, 2](), }; storage.values[0] = settings.threshold; erg result = storage.values[0] as Int; if ENABLED == true { return result; } return 2; }\n";
+    let (root, input, output) = project("config-acceptance", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        "open const LIMIT: u8 = 30u8; open const ENABLED: Bool = true;\n",
+    )
+    .expect("write configuration values");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(30));
+    fs::remove_dir_all(root).expect("remove configuration acceptance project");
+}
+
+#[test]
 fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
     let source = "import output; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);

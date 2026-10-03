@@ -196,19 +196,35 @@ configuration boundary, its compile-time-only rules, and its separation from
 
 ## Gate 25.6: End-to-end acceptance
 
-- [ ] `actus check --strict` accepts a package with a const-only configuration
+- [x] `actus check --strict` accepts a package with a const-only configuration
       subtree.
-- [ ] `actus test --strict` executes tests consuming transitive configuration
+- [x] `actus test --strict` executes tests consuming transitive configuration
       constants.
-- [ ] Native object and executable builds succeed without an anchor verb.
-- [ ] Constants work in initializers, conditionals, case guards, aggregate
+- [x] Native object and executable builds succeed without an anchor verb.
+- [x] Constants work in initializers, conditionals, case guards, aggregate
       literals, array capacities, and const-generic arguments.
-- [ ] Private constants, duplicate exports, direct child imports, cycles, and
+- [x] Private constants, duplicate exports, direct child imports, cycles, and
       runtime-dependent initializers are rejected.
-- [ ] Repeated builds and diagnostics are byte-for-byte/deterministically
+- [x] Repeated builds and diagnostics are byte-for-byte/deterministically
       identical where the existing artifact contract requires it.
-- [ ] Full Rust formatting, check, clippy, test, source-limit, documentation,
+- [x] Full Rust formatting, check, clippy, test, source-limit, documentation,
       architecture, and diff checks pass.
+
+Gate 25.6 is closed. End-to-end package acceptance now covers strict checking,
+strict test execution, executable and object emission, and execution without a
+configuration anchor verb. The acceptance package consumes public config
+constants in typed initialization, conditionals, aggregate/array-backed
+storage, and generic storage paths; the existing semantic/native suites cover
+the corresponding case guards, array-capacity, and const-generic acceptance
+and rejection rules. Negative module tests cover private exports, duplicate
+exports, direct child bypasses, cycles/import boundaries, and runtime-dependent
+configuration declarations. Repeated module loads, overlays, object builds,
+diagnostics, and source ordering remain deterministic, and the full repository
+quality suite is green.
+
+Phase 25 is complete. The reserved package configuration facade is now
+enforced consistently by resolver, semantic analysis, native lowering,
+formatter, LSP, test runner, diagnostics, and module identity.
 
 ## Non-goals
 
