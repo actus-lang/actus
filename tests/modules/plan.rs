@@ -159,3 +159,29 @@ fn imported_object_program_excludes_module_directives() {
             && !matches!(declaration, actus::ast::TopLevelDecl::OpenSibling(_))
     }));
 }
+
+#[test]
+fn hierarchical_child_implementation_has_one_parent_object_owner() {
+    let fixture = Fixture::new();
+    fixture.write("device/device.act", "open runtime;");
+    fixture.write("device/runtime/runtime.act", "open api;");
+    fixture.write(
+        "device/runtime/api.act",
+        "verb private_helper() -> Int { return 41; } open verb read() -> Int { return private_helper() + 1; }",
+    );
+    let (tokens, errors) = scan("import device; verb main() -> Int { return read(); }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    assert_eq!(objects.units().len(), 2);
+    assert!(matches!(
+        objects.units()[1].owner(),
+        ModuleObjectOwner::Imported { module_path } if module_path == "device"
+    ));
+    assert!(objects.units()[1].program().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::Verb(verb) if verb.name == "private_helper")
+    }));
+    assert_eq!(objects.units()[1].exported_verbs(), &["read".to_owned()]);
+}

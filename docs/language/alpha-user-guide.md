@@ -122,6 +122,55 @@ This also applies to the standard library: `std::io`, `std::fs`, and
 bridges remain private implementation declarations. Applications must call the
 typed facade operation rather than a runtime bridge symbol.
 
+### 4.1 Nested module trees
+
+For a larger package, a directory may contain child directories. Every child
+directory must have its own canonical facade, and the parent facade must open
+the child explicitly:
+
+```text
+src/control/control.act
+src/control/runtime/runtime.act
+src/control/runtime/safety.act
+src/main.act
+```
+
+```act
+// src/control/control.act
+open runtime;
+
+// src/control/runtime/runtime.act
+open safety;
+```
+
+The application imports only the parent:
+
+```act
+import control;
+verb main() -> Int {
+    return control_value();
+}
+```
+
+`runtime.act` is the canonical facade because its name matches its directory.
+The parent controls the public boundary: declarations opened by `runtime.act`
+become available through `control` only because `control.act` opens `runtime`.
+Sibling implementation files share the child module's internal scope, but
+private declarations do not cross the facade.
+
+Valid application code uses `import control;` and `import std::io;`. These
+forms are invalid because they bypass a parent facade or address a source file:
+
+```act
+import control::runtime;
+import control::runtime::safety;
+import control::runtime::runtime;
+```
+
+Use responsibility-specific child directories and keep one stable parent
+facade for external consumers. The resolver, semantic analyzer, native linker,
+formatter, LSP, and test runner all consume the same hierarchy.
+
 ## 5. Check, build, run, test, format, and watch
 
 After installing an Actus Alpha release, the user-facing workflow is:

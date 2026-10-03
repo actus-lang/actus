@@ -954,6 +954,30 @@ Do not use Rust `pub`, Go `export`, or C header conventions in Actus source.
 Fields do not have a separate `pub` keyword; aggregate visibility follows the
 declared facade and type contract.
 
+### 17.4 Hierarchical facades
+
+When a module grows beyond a single responsibility, use nested canonical
+facades instead of making implementation files independently importable:
+
+```text
+src/control/control.act
+src/control/runtime/runtime.act
+src/control/runtime/safety.act
+```
+
+`control.act` may contain `open runtime;`, and `runtime.act` may contain
+`open safety;`. External code imports only `control`. Every child directory
+must contain a matching `<directory>/<directory>.act` facade. Child siblings
+share internal scope, while only declarations explicitly opened through the
+facade chain are public.
+
+Valid application code uses `import control;`. Direct child paths such as
+`import control::runtime;`, implementation paths such as
+`import control::runtime::safety;`, and facade filenames as import segments
+are invalid because they bypass the parent-controlled API. Keep the hierarchy
+target-neutral and responsibility-oriented; filesystem enumeration must never
+silently widen the public namespace.
+
 ## 18. Roles and performance implementations
 
 A role is a compile-time callable contract:

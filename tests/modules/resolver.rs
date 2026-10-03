@@ -40,7 +40,7 @@ fn resolves_directory_facade_and_sorted_siblings() {
     fixture.write("driver/gpio/z_ops.act");
     fixture.write("driver/gpio/a_registers.act");
     fixture.write("driver/gpio/ignored.txt");
-    fixture.write("driver/gpio/nested/hidden.act");
+    fixture.write("driver/gpio/nested/nested.act");
 
     let module = ModuleResolver::new(&fixture.root)
         .resolve("driver::gpio")
@@ -50,6 +50,82 @@ fn resolves_directory_facade_and_sorted_siblings() {
     assert_eq!(module.facade(), fixture.root.join("driver/gpio/gpio.act").as_path());
     assert_eq!(names(module.siblings()), vec!["a_registers.act", "z_ops.act"]);
     assert_eq!(module.source_files().count(), 3);
+    assert_eq!(module.children().len(), 1);
+    assert_eq!(module.children()[0].module_path(), "driver::gpio::nested");
+    assert_eq!(module.children()[0].facade(), fixture.root.join("driver/gpio/nested/nested.act"));
+}
+
+#[test]
+fn discovers_sorted_hierarchical_child_directories() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act");
+    fixture.write("aie/layout/layout.act");
+    fixture.write("aie/runtime/runtime.act");
+    fixture.write("aie/runtime/fabric.act");
+    fixture.write("aie/persistence/persistence.act");
+
+    let module =
+        ModuleResolver::new(&fixture.root).resolve("aie").expect("parent facade should resolve");
+
+    assert_eq!(module.facade(), fixture.root.join("aie/aie.act").as_path());
+    assert!(module.siblings().is_empty());
+    assert_eq!(module.source_files().count(), 1);
+    assert_eq!(module.children().len(), 3);
+    assert_eq!(
+        module.children().iter().map(|child| child.module_path()).collect::<Vec<_>>(),
+        vec!["aie::layout", "aie::persistence", "aie::runtime"]
+    );
+}
+
+#[test]
+fn rejects_child_directory_without_a_canonical_facade() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act");
+    fixture.write("aie/runtime/fabric.act");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("aie")
+        .expect_err("child directory without a facade should fail");
+
+    assert!(matches!(
+        error,
+        ModuleResolutionError::MissingFacade { module, .. } if module == "aie::runtime"
+    ));
+}
+
+#[test]
+fn rejects_child_directory_that_conflicts_with_a_direct_sibling() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act");
+    fixture.write("aie/runtime.act");
+    fixture.write("aie/runtime/runtime.act");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("aie")
+        .expect_err("child directory and sibling file should conflict");
+
+    assert!(matches!(
+        error,
+        ModuleResolutionError::AmbiguousModule { module, .. } if module == "aie::runtime"
+    ));
+}
+
+#[test]
+fn records_hierarchical_module_baseline_and_rejects_child_facade_bypass() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act");
+    fixture.write("aie/runtime/runtime.act");
+
+    let error = ModuleResolver::new(&fixture.root)
+        .resolve("aie::runtime")
+        .expect_err("child modules must be reached through the parent facade");
+
+    assert!(
+        matches!(&error, ModuleResolutionError::BypassesFacade { parent, .. } if parent == "aie")
+    );
+    let diagnostic =
+        actus::diagnostics::module_diagnostic(&actus::modules::ModuleError::Resolution(error));
+    assert_eq!(diagnostic.code(), "E1108");
 }
 
 #[test]

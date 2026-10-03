@@ -54,6 +54,35 @@ fn resolves_only_facade_exports_into_the_importing_unit() {
 }
 
 #[test]
+fn resolves_public_child_declarations_through_the_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime;");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 7; }");
+    let program = parse_source("import aie; verb main() -> Int { return start(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("child exports should be visible through the parent facade");
+}
+
+#[test]
+fn resolves_generic_nested_calls_through_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("device/device.act", "open runtime;");
+    fixture.write("device/runtime/runtime.act", "open api;");
+    fixture.write(
+        "device/runtime/api.act",
+        "open struct Packet[T] { item: T, } open verb inner[T](erg value: T) -> Packet[T] { return Packet[T] { item: value, }; } open verb outer[T](erg value: T) -> Packet[T] { return inner(value: erg value); }",
+    );
+    let program = parse_source(
+        "import device; verb main() -> Int { erg value = 41; erg packet = outer(value: erg value); return packet.item + 1; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("generic nested calls should resolve through the parent facade");
+}
+
+#[test]
 fn rejects_private_imported_types() {
     let fixture = Fixture::new();
     fixture.write("driver/gpio/gpio.act", "open registers;");
@@ -67,6 +96,45 @@ fn rejects_private_imported_types() {
     assert!(
         matches!(error, ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "HiddenBank")
     );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
+}
+
+#[test]
+fn rejects_private_pack_literals_through_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("device/device.act", "open runtime;");
+    fixture.write("device/runtime/runtime.act", "open api;");
+    fixture.write(
+        "device/runtime/api.act",
+        "pack HiddenRegister { erg storage: u8; layout little; fields { erg ready: u1 at 0; } }",
+    );
+    let program = parse_source(
+        "import device; verb main() -> Int { erg register = HiddenRegister { storage: 0u8, }; return 0; }",
+    );
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("private pack declarations must not cross the parent facade");
+    assert!(matches!(
+        error,
+        ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "HiddenRegister"
+    ));
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
+}
+
+#[test]
+fn rejects_private_constants_through_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("device/device.act", "open runtime;");
+    fixture.write("device/runtime/runtime.act", "open api;");
+    fixture.write("device/runtime/api.act", "const SECRET: u8 = 7u8;");
+    let program = parse_source("import device; verb main() -> Int { return SECRET as Int; }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("private constants must not cross the parent facade");
+    assert!(matches!(
+        error,
+        ModuleError::PrivateDeclarationAccess { ref symbol, .. } if symbol == "SECRET"
+    ));
     assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1109");
 }
 

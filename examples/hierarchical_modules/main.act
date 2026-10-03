@@ -1,0 +1,5 @@
+import control;
+
+verb main() -> Int {
+    return control_value();
+}

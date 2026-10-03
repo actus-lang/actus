@@ -8,6 +8,7 @@ use super::super::unit::ModuleUnit;
 struct VisibilityContext<'a> {
     private_verbs: &'a HashSet<String>,
     private_types: &'a HashSet<String>,
+    private_constants: &'a HashSet<String>,
     module_path: &'a str,
     unit: &'a ModuleUnit,
 }
@@ -16,10 +17,12 @@ pub(super) fn check_block(
     block: &Block,
     private_verbs: &HashSet<String>,
     private_types: &HashSet<String>,
+    private_constants: &HashSet<String>,
     module_path: &str,
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
-    let context = VisibilityContext { private_verbs, private_types, module_path, unit };
+    let context =
+        VisibilityContext { private_verbs, private_types, private_constants, module_path, unit };
     check_block_with_context(block, &context)
 }
 
@@ -85,8 +88,14 @@ fn check_expr_with_context(
         Expr::FieldAccess { .. } | Expr::Index { .. } => check_access(expression, context)?,
         Expr::Case { .. } => check_case(expression, context)?,
         Expr::If { .. } => check_if_expression(expression, context)?,
-        Expr::Identifier { .. }
-        | Expr::Integer { .. }
+        Expr::Identifier { name, span } => super::reject_private(
+            name,
+            &context.private_types.union(context.private_constants).cloned().collect(),
+            context.module_path,
+            context.unit,
+            *span,
+        )?,
+        Expr::Integer { .. }
         | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. }
         | Expr::FloatLiteral { .. }
@@ -169,6 +178,7 @@ fn check_case_branches(
     context: &VisibilityContext<'_>,
 ) -> Result<(), ModuleError> {
     for branch in branches {
+        check_pattern(&branch.pattern, context)?;
         if let Some(guard) = &branch.guard {
             check_expr_with_context(guard, context)?;
         }
@@ -176,6 +186,22 @@ fn check_case_branches(
             CaseBody::Expression(value) => check_expr_with_context(value, context)?,
             CaseBody::Block(block) => check_block_with_context(block, context)?,
         }
+    }
+    Ok(())
+}
+
+fn check_pattern(
+    pattern: &crate::ast::Pattern,
+    context: &VisibilityContext<'_>,
+) -> Result<(), ModuleError> {
+    if let crate::ast::Pattern::Variant { enum_name, span, .. } = pattern {
+        super::reject_private(
+            enum_name,
+            context.private_types,
+            context.module_path,
+            context.unit,
+            *span,
+        )?;
     }
     Ok(())
 }

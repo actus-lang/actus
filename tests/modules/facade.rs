@@ -46,6 +46,72 @@ fn facade_reexports_open_sibling_symbols() {
 }
 
 #[test]
+fn facade_reexports_open_child_module_symbols() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime;");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write(
+        "aie/runtime/api.act",
+        "open verb start() -> Int { return private_helper(); } verb private_helper() -> Int { return 7; }",
+    );
+
+    let exports = exports_module(&ModuleResolver::new(&fixture.root), "aie")
+        .expect("parent facade should aggregate child exports");
+
+    assert!(exports.contains("verb", "start"));
+    assert!(!exports.contains("verb", "private_helper"));
+}
+
+#[test]
+fn closed_child_module_is_not_reexported_by_parent_facade() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 7; }");
+
+    let exports = exports_module(&ModuleResolver::new(&fixture.root), "aie")
+        .expect("parent facade should resolve without opening the child");
+
+    assert!(!exports.contains("verb", "start"));
+}
+
+#[test]
+fn rejects_duplicate_exports_from_two_child_siblings() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime;");
+    fixture.write("aie/runtime/runtime.act", "open first; open second;");
+    fixture.write("aie/runtime/first.act", "open verb start() -> Int { return 1; }");
+    fixture.write("aie/runtime/second.act", "open verb start() -> Int { return 2; }");
+
+    let error = exports_module(&ModuleResolver::new(&fixture.root), "aie")
+        .expect_err("duplicate child exports must be rejected");
+    let ModuleError::SymbolCollision { symbol, first_module, second_module } = error else {
+        panic!("expected child export collision");
+    };
+    assert_eq!(symbol, "verb `start`");
+    assert_eq!(first_module, "aie::runtime");
+    assert_eq!(second_module, "aie::runtime");
+}
+
+#[test]
+fn rejects_parent_child_export_collision() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open api; open runtime;");
+    fixture.write("aie/api.act", "open verb start() -> Int { return 1; }");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 2; }");
+
+    let error = exports_module(&ModuleResolver::new(&fixture.root), "aie")
+        .expect_err("parent and child export collisions must be rejected");
+    let ModuleError::SymbolCollision { symbol, first_module, second_module } = error else {
+        panic!("expected parent-child export collision");
+    };
+    assert_eq!(symbol, "verb `start`");
+    assert_eq!(first_module, "aie");
+    assert_eq!(second_module, "aie::runtime");
+}
+
+#[test]
 fn unlisted_sibling_symbols_are_not_external_exports() {
     let fixture = Fixture::new();
     fixture.write("driver/gpio/gpio.act", "open registers;");
@@ -73,6 +139,27 @@ fn facade_controls_performance_exports_as_well() {
 
     assert!(exports.contains("perform", "PublicRole for PublicType"));
     assert!(!exports.contains("perform", "HiddenRole for HiddenType"));
+}
+
+#[test]
+fn parent_facade_preserves_generic_pack_constant_and_performance_exports() {
+    let fixture = Fixture::new();
+    fixture.write("device/device.act", "open runtime;");
+    fixture.write("device/runtime/runtime.act", "open api;");
+    fixture.write(
+        "device/runtime/api.act",
+        "open struct Packet[T] { item: T, } open pack Register { erg storage: u8; layout little; fields { erg ready: u1 at 0; } } open const LIMIT: u8 = 8u8; open verb make[T](erg item: T) -> Packet[T] { return Packet[T] { item: item, }; } open role Reader { verb read(abs self: Register) -> u8; } open perform Reader for Register { verb read(abs self: Register) -> u8 { return self.ready; } }",
+    );
+
+    let exports = exports_module(&ModuleResolver::new(&fixture.root), "device")
+        .expect("parent facade should preserve child export categories");
+
+    assert!(exports.contains("struct", "Packet"));
+    assert!(exports.contains("pack", "Register"));
+    assert!(exports.contains("const", "LIMIT"));
+    assert!(exports.contains("verb", "make"));
+    assert!(exports.contains("role", "Reader"));
+    assert!(exports.contains("perform", "Reader for Register"));
 }
 
 #[test]

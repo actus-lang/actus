@@ -11,4 +11,4 @@ pub use aggregation::{
     build_compilation_plan_with_overlays, exports_module, exports_module_with_overlays,
     load_module_unit, load_module_unit_with_overlays, parse_module, resolve_imports,
 };
-pub use resolver::{ModuleResolutionError, ModuleResolver, ResolvedModule};
+pub use resolver::{ModuleResolutionError, ModuleResolver, ResolvedChildModule, ResolvedModule};

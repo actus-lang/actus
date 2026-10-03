@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -70,6 +70,7 @@ pub struct ResolvedModule {
     module_path: String,
     facade: PathBuf,
     siblings: Vec<PathBuf>,
+    children: Vec<ResolvedChildModule>,
 }
 
 impl ResolvedModule {
@@ -85,8 +86,38 @@ impl ResolvedModule {
         &self.siblings
     }
 
+    /// Returns child directory modules discovered beneath this module.
+    pub fn children(&self) -> &[ResolvedChildModule] {
+        &self.children
+    }
+
     pub fn source_files(&self) -> impl Iterator<Item = &Path> {
         std::iter::once(self.facade.as_path()).chain(self.siblings.iter().map(PathBuf::as_path))
+    }
+}
+
+/// A child directory module and its canonical facade discovered by the resolver.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedChildModule {
+    module_path: String,
+    directory: PathBuf,
+    facade: PathBuf,
+}
+
+impl ResolvedChildModule {
+    /// Returns the canonical `::`-separated module path.
+    pub fn module_path(&self) -> &str {
+        &self.module_path
+    }
+
+    /// Returns the child module directory.
+    pub fn directory(&self) -> &Path {
+        &self.directory
+    }
+
+    /// Returns the child module's canonical facade.
+    pub fn facade(&self) -> &Path {
+        &self.facade
     }
 }
 
@@ -139,27 +170,7 @@ impl ModuleResolver {
         if let Some(module_name) = segments.get(1)
             && segments.first() == Some(&"std")
         {
-            let Some(root) = self.runtime_module_roots.get(*module_name) else {
-                let root = self
-                    .runtime_source_root
-                    .as_ref()
-                    .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
-                let expected = root.join(module_name).join(format!("{module_name}.act"));
-                if expected.is_file() {
-                    return Err(ModuleResolutionError::IncompatibleRuntime {
-                        module: module_path.to_owned(),
-                        expected,
-                    });
-                }
-                return Err(ModuleResolutionError::MissingFacade {
-                    module: module_path.to_owned(),
-                    expected,
-                });
-            };
-            if segments.len() != 2 {
-                return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
-            }
-            return resolve_directory(module_path, root, module_name);
+            return self.resolve_runtime_module(module_path, &segments, module_name);
         }
         let (root, module_segments) = self.root_and_segments(&segments);
         if module_segments.is_empty() {
@@ -184,12 +195,76 @@ impl ModuleResolver {
                 module_path: module_path.to_owned(),
                 facade: file,
                 siblings: Vec::new(),
+                children: Vec::new(),
             });
         }
         Err(ModuleResolutionError::MissingFacade {
             module: module_path.to_owned(),
             expected: directory.join(format!("{}.act", module_segments.last().expect("path"))),
         })
+    }
+
+    fn resolve_runtime_module(
+        &self,
+        module_path: &str,
+        segments: &[&str],
+        module_name: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        let Some(root) = self.runtime_module_roots.get(module_name) else {
+            let root = self
+                .runtime_source_root
+                .as_ref()
+                .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
+            let expected = root.join(module_name).join(format!("{module_name}.act"));
+            return if expected.is_file() {
+                Err(ModuleResolutionError::IncompatibleRuntime {
+                    module: module_path.to_owned(),
+                    expected,
+                })
+            } else {
+                Err(ModuleResolutionError::MissingFacade {
+                    module: module_path.to_owned(),
+                    expected,
+                })
+            };
+        };
+        if segments.len() != 2 {
+            return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
+        }
+        resolve_directory(module_path, root, module_name)
+    }
+
+    /// Resolves a child through an already-resolved parent facade.
+    ///
+    /// This is the internal aggregation path. External imports must continue
+    /// to use [`Self::resolve`] so direct child-facade bypasses remain rejected.
+    pub fn resolve_child(
+        &self,
+        parent_module_path: &str,
+        child_name: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        if !valid_segment(child_name) {
+            return Err(ModuleResolutionError::InvalidPath(format!(
+                "{parent_module_path}::{child_name}"
+            )));
+        }
+        let parent = self.resolve(parent_module_path)?;
+        let Some(child) = parent
+            .children()
+            .iter()
+            .find(|child| child.module_path().rsplit("::").next() == Some(child_name))
+        else {
+            return Err(ModuleResolutionError::MissingFacade {
+                module: format!("{parent_module_path}::{child_name}"),
+                expected: parent
+                    .facade()
+                    .parent()
+                    .unwrap_or_else(|| Path::new(""))
+                    .join(child_name)
+                    .join(format!("{child_name}.act")),
+            });
+        };
+        resolve_directory(child.module_path(), child.directory(), child_name)
     }
 
     fn root_and_segments<'a>(&'a self, segments: &'a [&str]) -> (PathBuf, &'a [&'a str]) {
@@ -268,7 +343,8 @@ fn resolve_directory(
     }
     let mut siblings = discover_siblings(directory, &facade)?;
     siblings.sort_by_key(|path| normalized_path(path));
-    Ok(ResolvedModule { module_path: module_path.to_owned(), facade, siblings })
+    let children = discover_children(module_path, directory, &siblings)?;
+    Ok(ResolvedModule { module_path: module_path.to_owned(), facade, siblings, children })
 }
 
 fn discover_siblings(
@@ -284,6 +360,54 @@ fn discover_siblings(
         }
     }
     Ok(siblings)
+}
+
+fn discover_children(
+    module_path: &str,
+    directory: &Path,
+    siblings: &[PathBuf],
+) -> Result<Vec<ResolvedChildModule>, ModuleResolutionError> {
+    let sibling_names = siblings
+        .iter()
+        .filter_map(|path| path.file_stem().and_then(|stem| stem.to_str()))
+        .collect::<HashSet<_>>();
+    let entries = fs::read_dir(directory).map_err(|error| io_error(directory, error))?;
+    let mut children = Vec::new();
+    for entry in entries {
+        let child_directory = entry.map_err(|error| io_error(directory, error))?.path();
+        if !child_directory.is_dir() {
+            continue;
+        }
+        let Some(child_name) =
+            child_directory.file_name().and_then(|name| name.to_str()).map(str::to_owned)
+        else {
+            continue;
+        };
+        if !valid_segment(&child_name) {
+            continue;
+        }
+        let child_facade = child_directory.join(format!("{child_name}.act"));
+        if sibling_names.contains(child_name.as_str()) {
+            return Err(ModuleResolutionError::AmbiguousModule {
+                module: format!("{module_path}::{child_name}"),
+                directory: child_directory,
+                file: directory.join(format!("{child_name}.act")),
+            });
+        }
+        if !child_facade.is_file() {
+            return Err(ModuleResolutionError::MissingFacade {
+                module: format!("{module_path}::{child_name}"),
+                expected: child_facade,
+            });
+        }
+        children.push(ResolvedChildModule {
+            module_path: format!("{module_path}::{child_name}"),
+            directory: child_directory,
+            facade: child_facade,
+        });
+    }
+    children.sort_by(|left, right| left.module_path.cmp(&right.module_path));
+    Ok(children)
 }
 
 fn is_act_file(path: &Path) -> bool {

@@ -45,6 +45,23 @@ fn combines_sibling_asts_into_one_semantic_scope() {
 }
 
 #[test]
+fn aggregates_open_child_implementation_into_parent_scope() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime; verb main() -> Int { return start(); }");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture.write(
+        "aie/runtime/api.act",
+        "open verb start() -> Int { return private_helper(); } verb private_helper() -> Int { return 42; }",
+    );
+
+    let resolver = ModuleResolver::new(&fixture.root);
+    let program = parse_module(&resolver, "aie").expect("child implementation should aggregate");
+
+    assert_eq!(program.declarations.len(), 5);
+    analyze_module(&resolver, "aie").expect("parent should resolve child declarations internally");
+}
+
+#[test]
 fn reports_duplicate_declarations_with_both_source_locations() {
     let fixture = Fixture::new();
     fixture.write("demo/demo.act", "struct Shared { number: Int, }");

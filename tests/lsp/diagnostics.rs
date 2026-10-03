@@ -1,6 +1,8 @@
+use std::fs;
+
 use serde_json::json;
 
-use crate::lsp_support::{response_with_id, run_lsp};
+use crate::lsp_support::{file_uri, response_with_id, run_lsp, temp_root};
 
 #[test]
 fn lsp_recovers_incomplete_source_at_document_end() {
@@ -46,6 +48,36 @@ fn lsp_accepts_statement_conditionals_and_type_directed_integer_indexing() {
     ];
     let stdout = run_lsp(messages.to_vec());
     assert!(stdout.contains("\"diagnostics\":[]"), "valid ergonomics were rejected: {stdout}");
+}
+
+#[test]
+fn lsp_analyzes_nested_child_documents_through_the_outer_facade() {
+    let root = temp_root();
+    let child = root.join("src/aie/runtime");
+    fs::create_dir_all(&child).expect("create nested module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"nested-lsp\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(root.join("src/main.act"), "import aie;\nverb main() -> Int { return 0; }\n")
+        .expect("write package entry");
+    fs::write(root.join("src/aie/aie.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "open engine;\n").expect("write child facade");
+    let engine = child.join("engine.act");
+    let source = "open verb runtime_value() -> Int { return 42; }\n";
+    fs::write(&engine, source).expect("write nested implementation");
+    let uri = file_uri(&engine);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(!stdout.contains("E1108"), "nested child was treated as a root: {stdout}");
+    assert!(stdout.contains("\"diagnostics\":[]"), "nested child diagnostics failed: {stdout}");
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
