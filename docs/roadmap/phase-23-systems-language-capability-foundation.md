@@ -291,19 +291,19 @@ the same syntax and semantic model.
 
 ## Gate 23.7: Strict and native acceptance
 
-- [ ] Add a focused capability package under the repository's accepted example
+- [x] Add a focused capability package under the repository's accepted example
       or integration-test location; do not add a separate target-specific
       language dialect.
-- [ ] Make `actus check --strict` pass for the package.
-- [ ] Make `actus test --strict` pass with accepted and rejected fixtures.
-- [ ] Build an executable and verify native behavior for Boolean values,
+- [x] Make `actus check --strict` pass for the package.
+- [x] Make `actus test --strict` pass with accepted and rejected fixtures.
+- [x] Build an executable and verify native behavior for Boolean values,
       const-generic layout, nested indexed writes, and nested calls.
-- [ ] Emit and inspect an object artifact where the ABI/layout contract is
+- [x] Emit and inspect an object artifact where the ABI/layout contract is
       relevant.
-- [ ] Verify no hidden allocation, C bridge, or handwritten lowering is used
+- [x] Verify no hidden allocation, C bridge, or handwritten lowering is used
       solely to make the fixtures pass.
-- [ ] Run the repository quality suite and source-limit checks.
-- [ ] Record exact commands, compiler revision, target profile, and expected
+- [x] Run the repository quality suite and source-limit checks.
+- [x] Record exact commands, compiler revision, target profile, and expected
       outputs in the evidence index.
 
 ## Gate 23.8: Readiness for advanced systems workloads

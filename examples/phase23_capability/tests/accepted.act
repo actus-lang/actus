@@ -1,0 +1,6 @@
+"""Strict test-runner fixture for the Phase 23 language capability package."""
+meta test
+verb accepted_boolean_join() -> Int {
+    erg ready: Bool = false;
+    return 0;
+}
