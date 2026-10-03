@@ -488,21 +488,40 @@ respectively; repository quality checks are required before the gate commit.
 
 ### Gate 23.14: Packed-storage systems readiness acceptance
 
-- [ ] Replace the current experimental `Minicolumn` storage blocker with a
+- [x] Replace the current experimental `Minicolumn` storage blocker with a
       real accepted fixture using `Array[u8, 64]` and the complete 512-bit
       field map.
-- [ ] Make `actus check --strict`, `actus test --strict`, `actus fmt --check`,
+- [x] Make `actus check --strict`, `actus test --strict`, `actus fmt --check`,
       native executable build/run, and object emission pass for the fixture.
-- [ ] Prove indexed byte storage, bit-packed field access, fixed-width
+- [x] Prove indexed byte storage, bit-packed field access, fixed-width
       arithmetic, nested calls, Boolean control flow, ownership cleanup, and
       serialization in one bounded workload.
-- [ ] Add rejected fixtures for invalid field overlap, out-of-range offsets,
+- [x] Add rejected fixtures for invalid field overlap, out-of-range offsets,
       wrong storage element types, runtime capacity, bounds violations, and
       ownership violations.
-- [ ] Verify the compiler, formatter, LSP, source-limit checks, documentation
+- [x] Verify the compiler, formatter, LSP, source-limit checks, documentation
       checks, and full repository quality suite are green.
-- [ ] Update the Phase 23 evidence index with exact test names, commands,
+- [x] Update the Phase 23 evidence index with exact test names, commands,
       target profile, expected outputs, and the closing compiler revision.
+
+Gate 23.14 evidence: `examples/phase23_readiness/src/main.act` is the
+accepted `Array[u8, 64]`/512-bit `Minicolumn` fixture with all declared fields
+from `charge` through `inhibitory_link`. The package acceptance test
+`phase23_readiness_package_passes_strict_and_native_acceptance` in
+`tests/examples_cli.rs` runs `actus check --strict`, `actus test --strict`,
+and `actus fmt --check`, builds and executes the host target
+`x86_64-unknown-linux-gnu` with exit status `126`, emits an object containing
+`.text` and `main`, and checks all rejected fixtures.
+
+The accepted workload covers dynamic indexed byte serialization/restoration,
+packed field reads and writes, `u8` compound arithmetic, nested `ins` calls,
+Boolean branch joins, 64-bit field comparison, and automatic Buffer/pack
+cleanup. Rejected fixtures cover overlap (`E1073`), out-of-range fields
+(`E1072`), invalid storage elements (`E1070`), runtime capacity, constant
+index bounds (`E1085`), and read-only ownership (`E1051`), in addition to the
+existing invalid Buffer-owner fixture. The final compiler, formatter, LSP,
+source-limit, documentation, and repository test checks are required before
+the gate commit.
 
 No gate in this extension may be closed by changing the AIE source to use a
 different representation. The compiler capability itself must be implemented,

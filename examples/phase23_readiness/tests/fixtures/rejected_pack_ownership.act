@@ -1,0 +1,11 @@
+pack InvalidOwnership {
+    erg storage: Array[u8, 1];
+    layout little;
+    fields {
+        erg byte: u8 at 0;
+    }
+}
+
+verb invalid(abs value: InvalidOwnership) {
+    value.storage[0] = 1u8;
+}

@@ -1,0 +1,11 @@
+struct Config {
+    erg capacity: Usize,
+}
+
+pack RuntimeCapacity {
+    erg storage: Array[u8, capacity];
+    layout little;
+    fields {
+        erg byte: u8 at 0;
+    }
+}

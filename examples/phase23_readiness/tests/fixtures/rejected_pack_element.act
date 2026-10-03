@@ -1,0 +1,8 @@
+pack InvalidElement {
+    erg storage: Array[u16, 4];
+    layout little;
+    fields {
+        erg word: u16 at 0;
+        abs _reserved: u48 at 16 = 0;
+    }
+}

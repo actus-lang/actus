@@ -195,14 +195,25 @@ fn phase23_readiness_package_passes_strict_and_native_acceptance() {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_readiness");
     let binary =
         std::env::temp_dir().join(format!("actus-phase23-readiness-{}.bin", std::process::id()));
-    let rejected = root.join("tests/fixtures/rejected_buffer_owner.act");
+    let object =
+        std::env::temp_dir().join(format!("actus-phase23-readiness-{}.o", std::process::id()));
+    let rejected = [
+        "rejected_buffer_owner.act",
+        "rejected_pack_overlap.act",
+        "rejected_pack_bounds.act",
+        "rejected_pack_element.act",
+        "rejected_pack_runtime_capacity.act",
+        "rejected_pack_index_bounds.act",
+        "rejected_pack_ownership.act",
+    ]
+    .map(|name| root.join("tests/fixtures").join(name));
 
     for arguments in [vec!["check", "--strict"], vec!["test", "--strict"], vec!["fmt", "--check"]] {
         let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
             .args(arguments)
             .current_dir(&root)
             .output()
-            .expect("run strict Phase 23.8 package command");
+            .expect("run strict Phase 23.14 package command");
         assert!(result.status.success(), "readiness command failed: {:?}", result);
     }
 
@@ -211,17 +222,33 @@ fn phase23_readiness_package_passes_strict_and_native_acceptance() {
         .arg(&binary)
         .current_dir(&root)
         .output()
-        .expect("build Phase 23.8 readiness executable");
+        .expect("build Phase 23.14 readiness executable");
     assert!(build.status.success(), "readiness build failed: {:?}", build);
     let execution =
-        std::process::Command::new(&binary).output().expect("run Phase 23.8 readiness executable");
-    assert_eq!(execution.status.code(), Some(41));
+        std::process::Command::new(&binary).output().expect("run Phase 23.14 readiness executable");
+    assert_eq!(execution.status.code(), Some(126));
 
-    let rejected_check = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
-        .args(["check", rejected.to_str().expect("rejected fixture path"), "--strict"])
+    let object_build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
         .current_dir(&root)
         .output()
-        .expect("check rejected Phase 23.8 fixture");
-    assert!(!rejected_check.status.success());
+        .expect("build Phase 23.14 readiness object");
+    assert!(object_build.status.success(), "readiness object failed: {:?}", object_build);
+    let object_bytes = std::fs::read(&object).expect("read Phase 23.14 object");
+    let object_file =
+        object::File::parse(object_bytes.as_slice()).expect("parse Phase 23.14 object");
+    assert!(object_file.section_by_name(".text").is_some());
+    assert!(object_file.symbols().any(|symbol| symbol.name() == Ok("main")));
+
+    for fixture in rejected {
+        let rejected_check = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(["check", fixture.to_str().expect("rejected fixture path"), "--strict"])
+            .current_dir(&root)
+            .output()
+            .expect("check rejected Phase 23.14 fixture");
+        assert!(!rejected_check.status.success(), "fixture unexpectedly accepted: {fixture:?}");
+    }
     let _ = std::fs::remove_file(binary);
+    let _ = std::fs::remove_file(object);
 }

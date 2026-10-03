@@ -1,0 +1,9 @@
+pack InvalidOverlap {
+    erg storage: Array[u8, 2];
+    layout little;
+    fields {
+        erg first: u8 at 0;
+        abs second: u8 at 4;
+        abs _reserved: u8 at 16 = 0;
+    }
+}
