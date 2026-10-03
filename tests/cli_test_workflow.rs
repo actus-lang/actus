@@ -174,6 +174,62 @@ fn test_discovers_meta_tests_inside_a_child_facade_tree() {
 
 #[cfg(unix)]
 #[test]
+fn file_limitless_metadata_does_not_change_nested_native_dependency_roots() {
+    let root = create_test_project(
+        "runner-limitless-roots",
+        "nested.act",
+        "meta limitless(\"file\")\nimport aie;\nmeta test\nverb forwards_through_nested_facade() -> Int { return step() - 42; }\n",
+    );
+    let forwarding = root.join("src/aie/runtime");
+    fs::create_dir_all(&forwarding).expect("create nested runtime directory");
+    fs::write(root.join("src/aie/aie.act"), "open runtime;\n").expect("write root facade");
+    fs::write(forwarding.join("runtime.act"), "open forwarding;\n").expect("write child facade");
+    fs::write(
+        forwarding.join("forwarding.act"),
+        "meta limitless(\"file\")\nopen verb step() -> Int { return private_step(); }\nverb private_step() -> Int { return leaf_step(); }\nverb leaf_step() -> Int { return 42; }\n",
+    )
+    .expect("write nested forwarding implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("forwards_through_nested_facade ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_specializes_nested_generic_facade_dependencies() {
+    let root = create_test_project(
+        "runner-generic-closure",
+        "nested_generic.act",
+        "import aie;\nmeta test\nverb nested_generic() -> Int {\n    erg storage: Storage[4] = Storage[4] { values: Array[u32, 4]() };\n    return outer(storage: ins storage) as Int - 4;\n}\n",
+    );
+    let api = root.join("src/aie/runtime");
+    fs::create_dir_all(&api).expect("create nested generic module");
+    fs::write(root.join("src/aie/aie.act"), "open runtime;\n").expect("write root facade");
+    fs::write(api.join("runtime.act"), "open api;\n").expect("write child facade");
+    fs::write(
+        api.join("api.act"),
+        "open struct Storage[N: Usize] { erg values: Array[u32, N], }\nverb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; }\nopen verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
+    )
+    .expect("write generic implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("nested_generic ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_propagates_non_zero_meta_test_exit_status() {
     let root = create_test_project(
         "runner-failure",

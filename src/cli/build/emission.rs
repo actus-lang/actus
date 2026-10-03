@@ -167,13 +167,14 @@ fn emit_module_objects(
     let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
         let bytes =
-            crate::codegen::emit_module_object_for_target_in_namespace_with_bindings_and_instances(
+            crate::codegen::emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
                 unit.program(),
                 unit.namespace().symbol_prefix(),
                 configuration.native_backend(),
                 configuration.target(),
                 bindings,
                 generic_instances,
+                Some(unit.exported_verbs()),
             )
             .map_err(|error| {
                 NativeEmitError(format!(

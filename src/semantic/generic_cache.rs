@@ -4,7 +4,7 @@ use super::model::GenericInstance;
 
 pub(super) struct GenericInstanceCache {
     toolchain_hash: String,
-    entries: BTreeMap<(String, String), GenericInstance>,
+    entries: BTreeMap<(String, String, String), GenericInstance>,
 }
 
 impl Default for GenericInstanceCache {
@@ -24,7 +24,8 @@ impl GenericInstanceCache {
     }
 
     pub(super) fn insert(&mut self, instance: GenericInstance) {
-        let key = (self.toolchain_hash.clone(), instance.canonical_key.clone());
+        let caller = instance.caller.clone().unwrap_or_default();
+        let key = (self.toolchain_hash.clone(), instance.canonical_key.clone(), caller);
         self.entries.entry(key).or_insert(instance);
     }
 
@@ -34,7 +35,7 @@ impl GenericInstanceCache {
 
     #[cfg(test)]
     fn contains(&self, canonical_key: &str) -> bool {
-        self.entries.keys().any(|(_, key)| key == canonical_key)
+        self.entries.keys().any(|(_, key, _)| key == canonical_key)
     }
 }
 

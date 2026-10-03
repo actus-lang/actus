@@ -132,7 +132,10 @@ fn expand_transitive_instances(
                     nested_template.name,
                     arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
                 );
-                if expanded.iter().any(|instance| instance.canonical_key == canonical_key) {
+                if expanded.iter().any(|instance| {
+                    instance.canonical_key == canonical_key
+                        && instance.caller == Some(caller_instance.name.clone())
+                }) {
                     continue;
                 }
                 expanded.push(GenericInstance {
@@ -177,16 +180,20 @@ fn specialize_external_verbs(
     instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
 ) -> Result<Vec<ExternalVerbDecl>, NativeEmitError> {
-    instances
-        .iter()
-        .filter(|instance| instance_matches_external(instance, verb))
-        .map(|instance| specialize_external_verb(verb, instance, call_bindings))
-        .collect()
+    let mut specialized = Vec::new();
+    let mut names = std::collections::HashSet::new();
+    for instance in instances.iter().filter(|instance| instance_matches_external(instance, verb)) {
+        if names.insert(specialized_name(instance)) {
+            specialized.push(specialize_external_verb(verb, instance, instances, call_bindings)?);
+        }
+    }
+    Ok(specialized)
 }
 
 fn specialize_external_verb(
     verb: &ExternalVerbDecl,
     instance: &GenericInstance,
+    instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
 ) -> Result<ExternalVerbDecl, NativeEmitError> {
     let substitution = TypeSubstitution::for_type(
@@ -195,8 +202,15 @@ fn specialize_external_verb(
         &instance.arguments,
         verb.span,
     )
-    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?
-    .with_call_bindings(call_bindings);
+    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    let call_bindings = nested_call_bindings(
+        &verb.name,
+        &verb.generic_parameters,
+        instance,
+        instances,
+        call_bindings,
+    )?;
+    let substitution = substitution.with_call_bindings(&call_bindings);
     Ok(ExternalVerbDecl {
         is_open: verb.is_open,
         doc: verb.doc.clone(),
@@ -220,16 +234,20 @@ fn specialize_verbs(
     instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
 ) -> Result<Vec<VerbDecl>, NativeEmitError> {
-    instances
-        .iter()
-        .filter(|instance| instance_matches_verb(instance, verb))
-        .map(|instance| specialize_verb(verb, instance, call_bindings))
-        .collect()
+    let mut specialized = Vec::new();
+    let mut names = std::collections::HashSet::new();
+    for instance in instances.iter().filter(|instance| instance_matches_verb(instance, verb)) {
+        if names.insert(specialized_name(instance)) {
+            specialized.push(specialize_verb(verb, instance, instances, call_bindings)?);
+        }
+    }
+    Ok(specialized)
 }
 
 fn specialize_verb(
     verb: &VerbDecl,
     instance: &GenericInstance,
+    instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
 ) -> Result<VerbDecl, NativeEmitError> {
     let substitution = TypeSubstitution::for_type(
@@ -238,8 +256,15 @@ fn specialize_verb(
         &instance.arguments,
         verb.span,
     )
-    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?
-    .with_call_bindings(call_bindings);
+    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    let call_bindings = nested_call_bindings(
+        &verb.name,
+        &verb.generic_parameters,
+        instance,
+        instances,
+        call_bindings,
+    )?;
+    let substitution = substitution.with_call_bindings(&call_bindings);
     Ok(VerbDecl {
         is_open: verb.is_open,
         doc: verb.doc.clone(),
@@ -254,6 +279,44 @@ fn specialize_verb(
         body: specialize_block(&verb.body, &substitution),
         span: verb.span,
     })
+}
+
+fn nested_call_bindings(
+    caller_name: &str,
+    parameters: &[crate::ast::GenericParam],
+    caller_instance: &GenericInstance,
+    instances: &[GenericInstance],
+    inherited: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, NativeEmitError> {
+    let substitution = TypeSubstitution::for_type(
+        caller_name,
+        parameters,
+        &caller_instance.arguments,
+        crate::lexer::SourceSpan::new(0, 0),
+    )
+    .map_err(|error| NativeEmitError(format!("nested generic substitution failed: {error:?}")))?;
+    let mut bindings = inherited.clone();
+    for template in instances.iter().filter(|instance| {
+        instance.caller.as_deref() == Some(caller_name)
+            && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
+    }) {
+        let arguments = template
+            .arguments
+            .iter()
+            .map(|argument| substitution.apply(argument))
+            .collect::<Vec<_>>();
+        let canonical_key = format!(
+            "{}[{}]",
+            template.name,
+            arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+        );
+        if let Some(concrete) =
+            instances.iter().find(|instance| instance.canonical_key == canonical_key)
+        {
+            bindings.insert(template.name.clone(), specialized_name(concrete));
+        }
+    }
+    Ok(bindings)
 }
 
 pub(crate) fn specialized_generic_name(instance: &GenericInstance) -> String {

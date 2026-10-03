@@ -1033,6 +1033,9 @@ span and identifies both the caller and missing helper; it must not be hidden
 until linking.
 
 Object builds, executable builds, and the test runner use this contract.
+For imported module objects, native roots come from the resolved facade export
+set, including concrete generic instances when available; they must not be
+inferred from source-limit metadata or from a declaration's local `open` flag.
 Formatter and source-limit checks remain independent of native reachability.
 Changes to call collection, generic specialization, module facades, or symbol
 bindings require semantic, native, and multi-object regression evidence.

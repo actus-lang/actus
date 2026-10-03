@@ -11,15 +11,16 @@ use super::NativeEmitError;
 /// has already established which declarations are legal. This pass only keeps
 /// private implementation helpers reachable from a legal public root while
 /// retaining external bridges as declarations.
-pub(super) fn reachable_declarations<'a>(
+pub(super) fn reachable_declarations_with_roots<'a>(
     verbs: &[&'a VerbDecl],
     external_verbs: &[&'a ExternalVerbDecl],
     symbol: Option<&str>,
+    exported_roots: Option<&[String]>,
 ) -> Result<(Vec<&'a VerbDecl>, Vec<&'a ExternalVerbDecl>), NativeEmitError> {
     let local = verbs.iter().map(|verb| (verb.name.as_str(), *verb)).collect::<HashMap<_, _>>();
     let external =
         external_verbs.iter().map(|verb| (verb.name.as_str(), *verb)).collect::<HashMap<_, _>>();
-    let roots = root_names(verbs, symbol)?;
+    let roots = root_names(verbs, symbol, exported_roots)?;
     let mut queue = VecDeque::from(roots);
     let mut visited = HashSet::new();
     while let Some(name) = queue.pop_front() {
@@ -70,12 +71,29 @@ fn format_unresolved_call(caller: &str, call: &NativeCall) -> String {
     )
 }
 
-fn root_names(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<Vec<String>, NativeEmitError> {
+fn root_names(
+    verbs: &[&VerbDecl],
+    symbol: Option<&str>,
+    exported_roots: Option<&[String]>,
+) -> Result<Vec<String>, NativeEmitError> {
     if let Some(symbol) = symbol {
         if !verbs.iter().any(|verb| verb.name == symbol) {
             return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
         }
         return Ok(vec![symbol.to_owned()]);
+    }
+    if let Some(exported_roots) = exported_roots {
+        return Ok(exported_roots
+            .iter()
+            .flat_map(|root| {
+                verbs
+                    .iter()
+                    .filter(move |verb| {
+                        verb.name == *root || verb.name.starts_with(&format!("{root}__"))
+                    })
+                    .map(|verb| verb.name.clone())
+            })
+            .collect());
     }
     let public =
         verbs.iter().filter(|verb| verb.is_open).map(|verb| verb.name.clone()).collect::<Vec<_>>();
@@ -228,7 +246,7 @@ fn collect_case_calls(
 
 #[cfg(test)]
 mod tests {
-    use super::reachable_declarations;
+    use super::reachable_declarations_with_roots;
     use crate::ast::TopLevelDecl;
     use crate::lexer::scan;
     use crate::parser::parse;
@@ -248,7 +266,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let (selected, external) =
-            reachable_declarations(&verbs, &[], Some("main")).expect("root should resolve");
+            reachable_declarations_with_roots(&verbs, &[], Some("main"), None)
+                .expect("root should resolve");
         assert!(external.is_empty());
         assert_eq!(
             selected.iter().map(|verb| verb.name.as_str()).collect::<Vec<_>>(),
@@ -270,7 +289,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        let error = reachable_declarations(&verbs, &[], Some("main"))
+        let error = reachable_declarations_with_roots(&verbs, &[], Some("main"), None)
             .expect_err("unresolved dependency should fail closed");
         assert!(error.0.contains("unresolved native dependency `missing`"));
         assert!(error.0.contains("called from `main` at 28:37"));
