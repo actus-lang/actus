@@ -64,7 +64,7 @@ impl Analyzer {
         self.ensure_struct_field_mutable(&parent_type, field, span)
     }
 
-    fn ensure_struct_field_mutable(
+    pub(crate) fn ensure_struct_field_mutable(
         &self,
         struct_name: &str,
         field: &str,

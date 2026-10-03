@@ -58,6 +58,38 @@ fn records_pack_field_defaults_in_the_layout_contract() {
 }
 
 #[test]
+fn accepts_indexed_pack_storage_reads_writes_and_nested_control_flow() {
+    analyze_source(
+        "pack CacheLine { erg storage: Array[u8, 4]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; } } verb mutate(ins slot: u8) { slot += 1; } verb update(erg column: CacheLine, abs index: Int) { if true { column.storage[index] = 7; column.storage[index] += 1; mutate(slot: ins column.storage[index]); } } verb read(abs column: CacheLine, abs index: Int) -> u8 { return column.storage[index]; }",
+    )
+    .expect("pack storage indexing should follow ordinary array place rules");
+}
+
+#[test]
+fn rejects_a_constant_index_outside_pack_storage_capacity() {
+    let error = analyze_source(
+        "pack CacheLine { erg storage: Array[u8, 2]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; } } verb read(abs column: CacheLine) -> u8 { return column.storage[2]; }",
+    )
+    .expect_err("pack storage indexing must use its declared byte capacity");
+    assert!(matches!(
+        error,
+        SemanticErrorKind::IndexOutOfBounds { index, capacity } if index == "2" && capacity == "2"
+    ));
+}
+
+#[test]
+fn rejects_indexed_mutation_through_an_abs_pack_storage_owner() {
+    let error = analyze_source(
+        "pack CacheLine { erg storage: Array[u8, 2]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; } } verb update(abs column: CacheLine) { column.storage[0] = 7; }",
+    )
+    .expect_err("an abs pack must not expose mutable indexed storage");
+    assert!(matches!(
+        error,
+        SemanticErrorKind::InvalidMutation { name } if name == "column"
+    ));
+}
+
+#[test]
 fn rejects_invalid_multi_word_pack_storage_contracts() {
     for source in [
         "pack WrongElement { erg storage: Array[u16, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",

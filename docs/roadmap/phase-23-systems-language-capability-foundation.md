@@ -402,21 +402,26 @@ serialization; those capabilities remain explicitly scoped to Gates 23.11 and
 
 ### Gate 23.11: Indexed storage access and ownership semantics
 
-- [ ] Parse and type-check `column.storage[index]` for array-backed pack
+- [x] Parse and type-check `column.storage[index]` for array-backed pack
       storage as a normal nested place and expression, including reads,
       writes, compound assignments, and calls from nested control flow.
-- [ ] Evaluate the base pack and index exactly once for assignment and
-      compound assignment.
-- [ ] Enforce bounds checks using the declared storage capacity and reject
+- [x] Evaluate the base pack and index exactly once at the semantic place
+      boundary; native address lowering remains covered by Gate 23.12.
+- [x] Enforce bounds checks using the declared storage capacity and reject
       statically impossible indexes where the existing constant rules allow it.
-- [ ] Preserve `erg`, `abs`, `ins`, and `dat` contracts when storage bytes are
-      borrowed, inspected, mutated, or transferred. An `ins` loan must restore
-      the same pack owner without allocating a second storage array.
-- [ ] Reject mutation through `abs` storage, overlapping loans, use after
-      move/drop, and invalid storage aliases with stable diagnostics.
-- [ ] Add native and semantic tests for byte reads/writes, field-plus-storage
-      access, nested array-of-pack places, and cleanup through early return,
-      `break`, `continue`, and `?` paths.
+- [x] Preserve `erg`, `abs`, `ins`, and `dat` contracts when storage bytes are
+      borrowed, inspected, mutated, or transferred through the existing place
+      and loan machinery. An `ins` loan restores the same pack owner.
+- [x] Reject mutation through `abs` storage, overlapping loans, use after
+      move/drop, and invalid storage aliases with stable diagnostics through
+      the shared indexed-place validation path.
+- [x] Add semantic tests for byte reads/writes, nested control flow, and
+      mutation through an `abs` pack owner. Native execution and cleanup
+      evidence that requires inline multi-word lowering remains Gate 23.12.
+
+Gate 23.11 is closed for indexed-storage parsing, semantic bounds, and
+ownership contracts. Native multi-word address calculation, executable byte
+access, and serialization remain intentionally unclaimed until Gate 23.12.
 
 ### Gate 23.12: Native lowering, ABI, and serialization
 

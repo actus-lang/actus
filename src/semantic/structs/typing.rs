@@ -72,6 +72,11 @@ impl Analyzer {
         type_name: &TypeName,
         field: &str,
     ) -> Option<TypeName> {
+        if field == "storage"
+            && let Some(pack) = self.pack_types.get(&type_name.name)
+        {
+            return Some(pack.storage.type_name().clone());
+        }
         if let Some(pack_field) = self.pack_field(&type_name.name, field) {
             return Some(pack_field.ty.clone());
         }

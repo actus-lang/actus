@@ -176,16 +176,43 @@ impl Analyzer {
         index: &Expr,
         value: &Expr,
     ) -> Result<(), SemanticError> {
-        if let Expr::Identifier { name, span: target_span } = target {
-            let binding = self.binding(name, *target_span)?;
-            self.ensure_mutable(binding, name, *target_span)?;
-        }
+        self.validate_index_assignment_owner(target)?;
         self.visit_expression(target)?;
         self.visit_expression(index)?;
         self.validate_index_value(target, index, value)?;
         self.visit_expression(value)?;
         self.plan_try_unwind(value);
         Ok(())
+    }
+
+    fn validate_index_assignment_owner(&self, target: &Expr) -> Result<(), SemanticError> {
+        match target {
+            Expr::Identifier { name, span } => {
+                let binding = self.binding(name, *span)?;
+                self.ensure_mutable(binding, name, *span)
+            }
+            Expr::FieldAccess { object, field, span } => {
+                self.validate_index_assignment_owner(object)?;
+                if let Some(pack_name) = self.expression_pack_type(object) {
+                    let Some(pack_field) = self.pack_field(&pack_name, field) else {
+                        return Ok(());
+                    };
+                    if matches!(pack_field.role, crate::ast::Role::Abs) {
+                        return Err(SemanticError {
+                            kind: super::super::errors::SemanticErrorKind::InvalidFieldAssignmentTarget {
+                                field: field.clone(),
+                            },
+                            span: *span,
+                        });
+                    }
+                } else if let Some(struct_name) = self.expression_struct_type(object) {
+                    self.ensure_struct_field_mutable(&struct_name, field, *span)?;
+                }
+                Ok(())
+            }
+            Expr::Index { target, .. } => self.validate_index_assignment_owner(target),
+            _ => Ok(()),
+        }
     }
 
     fn visit_owner_decl(
