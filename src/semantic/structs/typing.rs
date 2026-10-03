@@ -51,6 +51,14 @@ impl Analyzer {
     }
 
     fn identifier_type_name(&self, name: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
+        if self.is_const_generic_parameter(name) {
+            return Some(TypeName {
+                name: "Usize".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span,
+            });
+        }
         let index = self.binding(name, span).ok()?;
         self.binding_type_names
             .get(&index)

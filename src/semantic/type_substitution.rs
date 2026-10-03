@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{GenericParam, TypeName};
+use crate::ast::{GenericParam, GenericParamKind, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::errors::{SemanticError, SemanticErrorKind};
@@ -12,6 +12,7 @@ use super::errors::{SemanticError, SemanticErrorKind};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TypeSubstitution {
     bindings: HashMap<String, TypeName>,
+    const_bindings: HashMap<String, String>,
 }
 
 impl TypeSubstitution {
@@ -31,12 +32,23 @@ impl TypeSubstitution {
                 span,
             });
         }
-        let bindings = parameters
-            .iter()
-            .zip(arguments)
-            .map(|(parameter, argument)| (parameter.name.clone(), argument.clone()))
-            .collect();
-        Ok(Self { bindings })
+        let mut bindings = HashMap::new();
+        let mut const_bindings = HashMap::new();
+        for (parameter, argument) in parameters.iter().zip(arguments) {
+            match &parameter.kind {
+                GenericParamKind::Type => {
+                    bindings.insert(parameter.name.clone(), argument.clone());
+                }
+                GenericParamKind::Const { .. } => {
+                    const_bindings.insert(parameter.name.clone(), argument.name.clone());
+                }
+            }
+        }
+        Ok(Self { bindings, const_bindings })
+    }
+
+    pub(crate) fn apply_const(&self, name: &str) -> Option<&str> {
+        self.const_bindings.get(name).map(String::as_str)
     }
 
     // Used by the forthcoming monomorphization pass after concrete instances
@@ -45,6 +57,14 @@ impl TypeSubstitution {
     pub(crate) fn apply(&self, type_name: &TypeName) -> TypeName {
         if let Some(argument) = self.bindings.get(&type_name.name) {
             return Self::replace_root(argument, type_name.span);
+        }
+        if let Some(value) = self.apply_const(&type_name.name) {
+            return TypeName {
+                name: value.to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span: type_name.span,
+            };
         }
         TypeName {
             name: type_name.name.clone(),
@@ -102,5 +122,20 @@ mod tests {
         };
         assert_eq!(substitution.apply(&applied).arguments[0].name, "Int");
         assert_eq!(substitution.apply(&applied).arguments[1].arguments[0].name, "Int");
+    }
+
+    #[test]
+    fn exposes_const_arguments_for_expression_specialization() {
+        let parameters = vec![GenericParam {
+            name: "N".to_owned(),
+            kind: crate::ast::GenericParamKind::Const { domain: ty("Usize") },
+            bound: None,
+            bounds: Vec::new(),
+            span: ty("N").span,
+        }];
+        let substitution =
+            TypeSubstitution::for_type("Buffer", &parameters, &[ty("4")], ty("Buffer").span)
+                .expect("arity should match");
+        assert_eq!(substitution.apply_const("N"), Some("4"));
     }
 }

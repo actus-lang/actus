@@ -740,6 +740,31 @@ Gate 23.20 evidence is provided by
 `returns_an_eight_element_array_through_the_native_return_slot` in
 `tests/arrays_cli.rs`.
 
+### Gate 23.21: Const generic parameters as compile-time expression values
+
+Status: **closed**. Const generic parameters now participate in type, layout,
+semantic expression, and native code-generation substitution.
+
+- [x] Represent const arguments separately from type arguments in generic
+      substitution and expose their literal values to specialization.
+- [x] Resolve a const generic identifier as `Usize` in semantic expression
+      typing while keeping it outside runtime ownership and mutable-binding
+      state.
+- [x] Specialize const identifiers recursively through casts, binary
+      expressions, indexing, conditionals, and nested calls.
+- [x] Accept explicit generic verb calls such as `read_capacity[4]()` and
+      reject runtime, zero, nested, or role-qualified const arguments.
+- [x] Add native evidence for `N as u32`, `N < limit`, and a generic struct
+      signature using `Array[u32, N]`, with exit code `4` for the capacity
+      fixture.
+
+Gate 23.21 evidence is provided by the semantic generic-argument fixtures in
+`tests/semantic/generics.rs`, the substitution unit test in
+`src/semantic/type_substitution.rs`, and the native exit-code fixtures
+`executes_const_generic_parameter_as_a_compile_time_expression_value` and
+`specializes_const_generic_expression_values_from_struct_arguments` in
+`tests/arrays_cli.rs`.
+
 ## Non-goals
 
 This phase does not:
@@ -759,8 +784,10 @@ gaps have direct evidence, the capability fixture passes strict check/test,
 native execution is verified, and formatter/LSP behavior matches the
 compiler. The multi-word packed-storage extension is closed through Gate
 23.15, the package-level zero-float acceptance contract through Gate 23.18,
-const generic verb arguments through Gate 23.19, and array return ABI through
-Gate 23.20. Gates 23.9–23.20 have direct evidence, including the 64-byte
+const generic verb arguments through Gate 23.19, array return ABI through
+Gate 23.20, and const generic expression values through Gate 23.21. Gates
+23.9–23.21 have direct evidence,
+including the 64-byte
 systems fixture, typed `Array[Pack, N]` collection tests, and manifest-driven
 Cranelift IR verification, generic-verb native execution, and caller-owned
 array return slots through the same strict, native, object, formatter, LSP,

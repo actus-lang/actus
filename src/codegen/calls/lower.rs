@@ -18,7 +18,8 @@ pub(crate) fn lower_call(
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
-    let target = call_target(context.functions, callee)?;
+    let callee_name = callee.split_once('[').map_or(callee, |(name, _)| name);
+    let target = call_target(context.functions, callee_name)?;
     let mut values = lower_call_arguments(
         function,
         arguments,
@@ -28,14 +29,14 @@ pub(crate) fn lower_call(
         &target.ins_params,
         context,
     )?;
-    let target = resolve_call_target(function, callee, arguments, target, &values, context)?;
-    normalize_call_arguments(function, callee, &mut values)?;
+    let target = resolve_call_target(function, callee_name, arguments, target, &values, context)?;
+    normalize_call_arguments(function, callee_name, &mut values)?;
     let result_address = allocate_return_address(function, target.return_type, context.layouts)?;
     if let Some(address) = result_address {
         values.insert(0, address);
     }
     let call = function.ins().call(target.reference, &values);
-    finish_call(function, call, result_address, target.return_type, callee, context.layouts)
+    finish_call(function, call, result_address, target.return_type, callee_name, context.layouts)
 }
 
 fn call_target<'a>(

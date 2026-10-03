@@ -150,6 +150,14 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
             expression: specialize_expression(expression, substitution),
             span: *span,
         },
+        Stmt::If { condition, then_branch, else_branch, span } => Stmt::If {
+            condition: specialize_expression(condition, substitution),
+            then_branch: specialize_block(then_branch, substitution),
+            else_branch: else_branch
+                .as_ref()
+                .map(|branch| specialize_if_branch(branch, substitution)),
+            span: *span,
+        },
         Stmt::Return { value: Some(value), span } => {
             Stmt::Return { value: Some(specialize_expression(value, substitution)), span: *span }
         }
@@ -191,8 +199,26 @@ fn specialize_owner_declaration(statement: &Stmt, substitution: &TypeSubstitutio
     }
 }
 
+fn specialize_if_branch(
+    branch: &crate::ast::IfBranch,
+    substitution: &TypeSubstitution,
+) -> crate::ast::IfBranch {
+    match branch {
+        crate::ast::IfBranch::Block(block) => {
+            crate::ast::IfBranch::Block(specialize_block(block, substitution))
+        }
+        crate::ast::IfBranch::ElseIf(expression) => {
+            crate::ast::IfBranch::ElseIf(Box::new(specialize_expression(expression, substitution)))
+        }
+    }
+}
+
 fn specialize_expression(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     match expression {
+        Expr::Identifier { name, span } => substitution.apply_const(name).map_or_else(
+            || expression.clone(),
+            |value| Expr::Integer { value: value.to_owned(), suffix: None, span: *span },
+        ),
         Expr::Grouping { expression: child, span } => Expr::Grouping {
             expression: Box::new(specialize_expression(child, substitution)),
             span: *span,
@@ -210,11 +236,18 @@ fn specialize_expression(expression: &Expr, substitution: &TypeSubstitution) -> 
             expression: Box::new(specialize_expression(child, substitution)),
             span: *span,
         },
+        Expr::Cast { expression: child, target, span } => Expr::Cast {
+            expression: Box::new(specialize_expression(child, substitution)),
+            target: substitution.apply(target),
+            span: *span,
+        },
         Expr::Binary { .. }
         | Expr::Call { .. }
         | Expr::MethodCall { .. }
         | Expr::StructLit { .. }
         | Expr::FieldAccess { .. }
+        | Expr::Index { .. }
+        | Expr::If { .. }
         | Expr::Case { .. } => specialize_complex_expression(expression, substitution),
         _ => expression.clone(),
     }
@@ -227,6 +260,19 @@ fn specialize_complex_expression(expression: &Expr, substitution: &TypeSubstitut
         Expr::MethodCall { .. } => specialize_method_call(expression, substitution),
         Expr::StructLit { .. } => specialize_struct_literal(expression, substitution),
         Expr::FieldAccess { .. } => specialize_field_access(expression, substitution),
+        Expr::Index { target, index, span } => Expr::Index {
+            target: Box::new(specialize_expression(target, substitution)),
+            index: Box::new(specialize_expression(index, substitution)),
+            span: *span,
+        },
+        Expr::If { condition, then_branch, else_branch, span } => Expr::If {
+            condition: Box::new(specialize_expression(condition, substitution)),
+            then_branch: specialize_block(then_branch, substitution),
+            else_branch: else_branch
+                .as_ref()
+                .map(|branch| specialize_if_branch(branch, substitution)),
+            span: *span,
+        },
         Expr::Case { .. } => specialize_case(expression, substitution),
         _ => expression.clone(),
     }
@@ -245,7 +291,7 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
     Expr::Call {
-        callee: callee.clone(),
+        callee: callee.split_once('[').map_or_else(|| callee.clone(), |(name, _)| name.to_owned()),
         arguments: specialize_arguments(arguments, substitution),
         span: *span,
     }

@@ -270,7 +270,7 @@ impl Analyzer {
             || type_name.arguments.iter().any(|argument| self.contains_generic_parameter(argument))
     }
 
-    fn validate_type_arguments(
+    pub(super) fn validate_type_arguments(
         &self,
         parameters: &[GenericParam],
         arguments: &[TypeName],

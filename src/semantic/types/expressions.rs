@@ -134,6 +134,11 @@ impl Analyzer {
         if let Some(type_name) = self.literal_type_name(expression) {
             return Some(type_name);
         }
+        if let Expr::Identifier { name, .. } = expression
+            && self.is_const_generic_parameter(name)
+        {
+            return Some("Usize".to_owned());
+        }
         if let Some(type_name) = self.unary_type_name(expression) {
             return Some(type_name);
         }
