@@ -63,15 +63,15 @@ source-level literal workarounds.
 
 ## Gate 31.2: Native lowering parity
 
-- [ ] Pass the resolved constant environment into native normalization and
+- [x] Pass the resolved constant environment into native normalization and
       identifier lowering.
-- [ ] Substitute a typed compile-time initializer before an identifier can be
+- [x] Substitute a typed compile-time initializer before an identifier can be
       treated as a runtime/native binding.
-- [ ] Preserve the declared constant type and source span during substitution.
-- [ ] Ensure object and executable emission use the same environment and
+- [x] Preserve the declared constant type and source span during substitution.
+- [x] Ensure object and executable emission use the same environment and
       produce the same semantic result.
-- [ ] Ensure constants do not allocate storage or create external ABI symbols.
-- [ ] Replace the internal missing-native-binding failure with the correct
+- [x] Ensure constants do not allocate storage or create external ABI symbols.
+- [x] Replace the internal missing-native-binding failure with the correct
       semantic/visibility diagnostic when the constant is not reachable.
 
 ### Gate 31.2 evidence
@@ -80,6 +80,9 @@ source-level literal workarounds.
 - Predicate/branch-condition native test.
 - Aggregate-field and pack-field native tests.
 - Object and executable output both pass.
+- `nested_facade_constant_has_object_and_executable_parity` verifies the
+  scalar initializer, predicate, aggregate field, executable result `24`, and
+  absence of a `BUFFER_STRIDE` runtime symbol in the imported object.
 
 ## Gate 31.3: Generic specialization propagation
 

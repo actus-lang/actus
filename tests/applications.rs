@@ -283,6 +283,72 @@ fn canonical_parent_facade_exposes_nested_configuration_constant() {
 }
 
 #[test]
+fn nested_facade_constant_has_object_and_executable_parity() {
+    let source = "import feature; verb main() -> Int { return inspect() as Int; }\n";
+    let (root, input, output) = project("constant-native-parity", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open struct Settings {
+    erg stride: u16,
+}
+
+open verb inspect() -> u16 {
+    erg settings = Settings { stride: BUFFER_STRIDE, };
+    if BUFFER_STRIDE == 24u16 {
+        return settings.stride;
+    }
+    return 0u16;
+}
+"#,
+    )
+    .expect("write feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(24));
+
+    let object = output.with_extension("obj");
+    let object_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build native objects");
+    assert!(
+        object_build.status.success(),
+        "object build stderr: {}",
+        String::from_utf8_lossy(&object_build.stderr)
+    );
+    let feature_object = fs::read_dir(&root)
+        .expect("read project outputs")
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry.file_name().to_string_lossy().contains("feature")
+                && entry.path().extension().is_some_and(|extension| extension == "obj")
+        })
+        .expect("feature object");
+    let bytes = fs::read(feature_object.path()).expect("read feature object");
+    let object_file = object::File::parse(bytes.as_slice()).expect("parse feature object");
+    assert!(
+        !object_file
+            .symbols()
+            .filter_map(|symbol| symbol.name().ok())
+            .any(|symbol| symbol.contains("BUFFER_STRIDE"))
+    );
+    fs::remove_dir_all(root).expect("remove native parity project");
+}
+
+#[test]
 fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
     let source = "import aie; verb main() -> Int { return snapshot_is_valid(); }\n";
     let (root, input, output) = project("config-snapshot-module", source);
