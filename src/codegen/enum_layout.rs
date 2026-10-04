@@ -75,6 +75,31 @@ impl LayoutRegistry {
         }
     }
 
+    pub(super) fn is_trivially_copyable_struct(&self, id: usize) -> bool {
+        self.get(id).is_some_and(|layout| {
+            layout.fields.iter().all(|field| self.is_trivially_copyable(field.ty))
+        })
+    }
+
+    fn is_trivially_copyable(&self, ty: NativeType) -> bool {
+        match ty {
+            NativeType::Int
+            | NativeType::Integer { .. }
+            | NativeType::Float { .. }
+            | NativeType::Void
+            | NativeType::Pack(_) => true,
+            NativeType::Struct(id) => self.is_trivially_copyable_struct(id),
+            NativeType::Array(id) => {
+                self.array(id).is_some_and(|layout| self.is_trivially_copyable(layout.element))
+            }
+            NativeType::String
+            | NativeType::Buffer
+            | NativeType::Arena(_)
+            | NativeType::Enum(_)
+            | NativeType::FatPointer => false,
+        }
+    }
+
     fn pack_size(&self, id: usize) -> Option<u32> {
         self.pack_definitions
             .get(id)

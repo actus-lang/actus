@@ -265,6 +265,16 @@ fn lower_assignment<'source>(
         function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), value, *destination, 0);
         return Ok(Flow::Fallthrough);
     }
+    if let Some(NativeType::Struct(id)) = types.get(name).copied()
+        && layouts.is_trivially_copyable_struct(id)
+        && let Some(destination) = locals.get(name).copied()
+    {
+        let size = layouts
+            .type_size(NativeType::Struct(id))
+            .ok_or_else(|| NativeEmitError("aggregate binding has no native size".to_owned()))?;
+        super::super::structs::copy_bytes(function, value, destination, size);
+        return Ok(Flow::Fallthrough);
+    }
     locals.insert(name, value);
     Ok(Flow::Fallthrough)
 }

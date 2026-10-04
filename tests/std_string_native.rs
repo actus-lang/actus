@@ -184,3 +184,109 @@ verb main() -> Int {
     assert!(input.is_file());
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn hosted_nested_facade_preserves_borrowed_string_arguments() {
+    let root = std::env::temp_dir().join(format!("actus-nested-string-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src/text/tokenizer")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"nested_string\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    fs::write(root.join("src/text/text.act"), "open tokenizer;\n").expect("facade");
+    fs::write(root.join("src/text/tokenizer/tokenizer.act"), "open byte;\n")
+        .expect("nested facade");
+    fs::write(
+        root.join("src/text/tokenizer/byte.act"),
+        r#"import std::string;
+open const TOKEN_VERSION: u16 = 1u16;
+open struct ByteRecord { id: u32, offset: u32, length: u16, version: u16, }
+open struct TokenSequence { records: Array[ByteRecord, 256], length: u32, valid: Bool, status: Int, }
+open verb inspect(abs text: String) -> TokenSequence {
+    erg sequence: TokenSequence = TokenSequence { records: Array[ByteRecord, 256](), length: 0u32, valid: true, status: 1 };
+    erg length_result = string_length(text: abs text);
+    erg text_length: u32 = case dat length_result {
+        Result.Ok(value) => value as u32,
+        Result.Err(_) => 0u32,
+    };
+    erg position: u32 = 0u32;
+    loop {
+        if position >= text_length { break; }
+        erg byte_index: Int = position as Int;
+        erg result = string_byte_at(text: abs text, index: erg byte_index);
+        erg token: ByteRecord = ByteRecord { id: 0u32, offset: 0u32, length: 0u16, version: TOKEN_VERSION };
+        case dat result {
+            Result.Ok(byte) => {
+                token = ByteRecord { id: byte as u32, offset: position, length: 1u16, version: TOKEN_VERSION };
+                sequence.records[position as Usize] = token;
+            },
+            Result.Err(_) => {},
+        };
+        if token.length == 0u16 {
+            sequence.status = 2;
+            sequence.valid = false;
+            return sequence;
+        }
+        sequence.length = position + 1u32;
+        position += 1u32;
+    }
+    if sequence.valid && sequence.length == text_length
+        && sequence.records[0u32].id == 72u32
+        && sequence.records[11u32].id == 105u32
+    {
+        sequence.status = 0;
+    }
+    return sequence;
+}
+"#,
+    )
+    .expect("nested implementation");
+    fs::write(
+        root.join("src/main.act"),
+        r#"import text;
+import std::io;
+import std::time;
+import std::string;
+meta limitless("verb")
+verb main() -> Int {
+    erg phrase: String = "Hello Giorgi";
+    erg direct_index: Int = 0;
+    erg direct_result = string_byte_at(text: abs phrase, index: erg direct_index);
+    erg result = inspect(text: abs phrase);
+    return result.status;
+}
+"#,
+    )
+    .expect("source");
+    let object = root.join("nested-string.o");
+    let output = root.join("nested-string");
+    let check = Command::new(compiler())
+        .current_dir(&root)
+        .args(["check", "--strict"])
+        .output()
+        .expect("check");
+    assert!(check.status.success(), "{}", String::from_utf8_lossy(&check.stderr));
+    let object_build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .output()
+        .expect("object build");
+    assert!(object_build.status.success(), "{}", String::from_utf8_lossy(&object_build.stderr));
+    assert!(
+        String::from_utf8_lossy(&object_build.stdout)
+            .contains("verified generated native IR: no floating-point instructions")
+    );
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let run = Command::new(&output).current_dir(&root).output().expect("run");
+    assert_eq!(run.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
+}
