@@ -131,3 +131,17 @@ existing deterministic native bounds checks.
 Semantic evidence is in `tests/semantic/arrays.rs`,
 `tests/semantic/packs.rs`, and `tests/semantic/loans.rs`. Native indexed access
 evidence is in `tests/arrays_cli.rs`.
+
+## Gate 32.4 implementation evidence
+
+Native lowering keeps explicit scalar reuse as a value operation: the
+validated operand is lowered directly without identity arithmetic. Indexed
+selection uses the declared element size for address calculation and retains
+the native bounds check. Existing packed-field and aggregate tests verify that
+stride and field offsets remain stable, while deterministic object tests and
+architecture checks cover reproducibility and the absence of raw pointer
+escape paths.
+
+Native executable evidence is in `tests/arrays_cli.rs`, including
+`executes_explicit_scalar_copy_natively` and
+`executes_direct_and_computed_fixed_slot_selection_natively`.

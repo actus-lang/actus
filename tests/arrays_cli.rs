@@ -104,6 +104,16 @@ fn executes_explicit_scalar_copy_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_direct_and_computed_fixed_slot_selection_natively() {
+    let status = run_array_fixture(
+        "direct-and-computed-fixed-slot-selection",
+        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2] = 41u32; erg index: u32 = 2u32; erg direct: u32 = values[2]; erg computed: u32 = values[index]; return (direct + computed) as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(83));
+}
+
+#[cfg(unix)]
+#[test]
 fn lowers_maximum_u64_literal_natively() {
     let status = run_array_fixture(
         "maximum-u64-literal",

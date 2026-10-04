@@ -57,11 +57,18 @@ passes 72 tests, including dynamic bounds traps and contiguous indexed access.
 
 ### Gate 32.4 — Native lowering
 
-- [ ] Lower eligible scalar reuse without identity arithmetic.
-- [ ] Lower fixed-slot selection to deterministic native code.
-- [ ] Verify aggregate stride and packed field offsets are unchanged.
-- [ ] Verify no raw pointer escapes are introduced.
-- [ ] Add native executable tests for repeated use and slot selection.
+- [x] Lower eligible scalar reuse without identity arithmetic.
+- [x] Lower fixed-slot selection to deterministic native code.
+- [x] Verify aggregate stride and packed field offsets are unchanged.
+- [x] Verify no raw pointer escapes are introduced.
+- [x] Add native executable tests for repeated use and slot selection.
+
+Evidence: scalar `copy` lowers directly to its validated operand, while
+indexed access uses the declared element size and native bounds checks. Native
+coverage in `tests/arrays_cli.rs` includes explicit scalar reuse, direct and
+computed fixed-slot selection, contiguous array access, packed field offsets,
+aggregate stride, and deterministic repeated object generation. The compiler
+architecture checks reject raw pointer escapes at the language boundary.
 
 ### Gate 32.5 — Tooling and conformance
 
