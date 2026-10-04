@@ -324,3 +324,41 @@ fn deadline_overflow_is_rejected_natively() {
     assert!(execution.stderr.is_empty());
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn zero_duration_busy_wait_delay_runs_natively() {
+    let root = std::env::temp_dir().join(format!("actus-std-time-delay-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("delay-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_delay\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb main() -> Int { erg zero: Duration = Duration { nanos: 0u64, }; erg result = delay(duration: abs zero); return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, }; }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "busy-wait delay build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("delay executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}

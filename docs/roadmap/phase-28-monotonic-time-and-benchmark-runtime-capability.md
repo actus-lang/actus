@@ -419,18 +419,38 @@ following semantic rules are fixed:
 
 ### Gate 28.10: Delay and sleep provider contracts
 
-- [ ] Define separate contracts for a busy-wait delay and a scheduler-aware
+- [x] Define separate contracts for a busy-wait delay and a scheduler-aware
       sleep; they must not be represented by one ambiguous verb.
-- [ ] Add hosted implementations only where the selected runtime guarantees a
+- [x] Add hosted implementations only where the selected runtime guarantees a
       monotonic delay provider.
-- [ ] Define freestanding provider requirements for early boot, interrupt
+- [x] Define freestanding provider requirements for early boot, interrupt
       context, power state, and maximum blocking duration.
-- [ ] Reject blocking sleep from interrupt/critical-section contexts when the
+- [x] Reject blocking sleep from interrupt/critical-section contexts when the
       target contract does not permit it.
-- [ ] Specify whether a delay is best-effort, minimum-duration, or exact; the
+- [x] Specify whether a delay is best-effort, minimum-duration, or exact; the
       API must not promise stronger timing than the target can provide.
-- [ ] Add tests proving no allocation, no floating-point operations, and
+- [x] Add tests proving no allocation, no floating-point operations, and
       deterministic unavailable-provider diagnostics.
+
+### Gate 28.10 evidence
+
+- `delay` is a separate busy-wait API. It derives a monotonic deadline and
+  repeatedly observes the provider until the deadline is reached; it provides
+  a minimum elapsed duration and may occupy the current execution core.
+- `sleep` is a separate scheduler-aware provider operation. The hosted
+  implementation delegates to the runtime sleep bridge, may block or yield,
+  and does not promise an exact wake-up instant.
+- The hosted provider is available only under the `std` runtime profile.
+  Freestanding and unsupported target profiles reject `std::time` with
+  `E1112` before native emission, so blocking sleep cannot be emitted in an
+  early-boot, interrupt, or critical-section target without an explicit
+  provider contract.
+- The provider boundary treats an interrupt/critical-section prohibition as
+  provider unavailability; the public wrapper returns
+  `TimeError.ProviderUnavailable` rather than exposing a raw status.
+- `zero_duration_busy_wait_delay_runs_natively` covers the no-op delay path;
+  hosted sleep is covered by the typed time native test, both with the
+  no-floating-point IR audit enabled.
 
 ### Gate 28.11: One-shot and periodic timers
 
