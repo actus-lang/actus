@@ -89,14 +89,27 @@ deduplication and repeated-build determinism remain covered by Gate 27.3.
 
 ## Gate 27.2: Native data declaration and symbol integrity
 
-- [ ] Preserve the existing `DataDescription` storage and `lower_string()`
+- [x] Preserve the existing `DataDescription` storage and `lower_string()`
       lookup path.
-- [ ] Deduplicate identical literals in one native module.
-- [ ] Generate deterministic symbols for distinct literals.
-- [ ] Reject a missing collected symbol with a stable diagnostic and source
+- [x] Deduplicate identical literals in one native module.
+- [x] Generate deterministic symbols for distinct literals.
+- [x] Reject a missing collected symbol with a stable diagnostic and source
       context.
-- [ ] Verify object emission contains every referenced string data symbol and
+- [x] Verify object emission contains every referenced string data symbol and
       no unreachable duplicate data entries.
+
+Gate 27.2 evidence: the existing native ABI remains unchanged: string bytes
+are defined through `DataDescription`, referenced through the matching
+`StringDataValues`, and lowered by `lower_string()`. Collection deduplicates
+exact values before sorting them, so repeated literals share one data entry and
+distinct values receive stable `string_0`, `string_1`, and subsequent symbols.
+The missing-entry path remains a hard `NativeEmitError` containing the literal
+value (`string literal \`...\` has no native data`), preserving actionable
+literal context instead of emitting an invalid pointer. The regression
+`native_string_data_is_deduplicated_and_deterministic` builds the same project
+twice, compares both object files and symbol manifests byte-for-byte, and
+verifies exactly two compiler-owned string data symbols for two distinct
+literals despite the runtime bridge being referenced as well.
 
 ## Gate 27.3: Compiler regression and acceptance evidence
 
