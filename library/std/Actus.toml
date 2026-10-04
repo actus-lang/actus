@@ -22,3 +22,8 @@ targets = ["hosted"]
 name = "path"
 path = "src/path"
 targets = ["hosted"]
+
+[[runtime.modules]]
+name = "time"
+path = "src/time"
+targets = ["hosted"]

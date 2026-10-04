@@ -129,16 +129,33 @@ provide direct source, native, and execution evidence.
 
 ## Gate 28.1: Public `std::time` API and facade
 
-- [ ] Add the canonical `std::time` directory facade and sibling declaration
+- [x] Add the canonical `std::time` directory facade and sibling declaration
       according to standard-library module rules.
-- [ ] Declare `open verb monotonic_nanos() -> u64` with complete Actus
+- [x] Declare `open verb monotonic_nanos() -> u64` with complete Actus
       documentation.
-- [ ] Keep the Actus-facing declaration independent of C types, pointers,
+- [x] Keep the Actus-facing declaration independent of C types, pointers,
       `timespec`, `Instant`, or platform-specific structures.
-- [ ] Define the public behavior for repeated reads, process lifetime, and
+- [x] Define the public behavior for repeated reads, process lifetime, and
       `u64` representability.
-- [ ] Add accepted and rejected semantic fixtures for importing and calling
+- [x] Add accepted and rejected semantic fixtures for importing and calling
       the API.
+
+### Gate 28.1 evidence
+
+- Added `library/std/src/time/time.act` as the canonical facade and
+  `library/std/src/time/monotonic.act` as its sibling declaration.
+- Registered `time` as a hosted builtin module in `library/std/Actus.toml`.
+- Exposed only `monotonic_nanos() -> u64`; the raw
+  `actus_monotonic_nanos() -> u64` bridge remains private to the module.
+- Documented non-decreasing sequential reads, unspecified monotonic origin,
+  lack of wall-clock meaning, no allocation, no platform type exposure, and
+  no one-nanosecond resolution guarantee.
+- Added semantic fixtures for valid import/call usage and rejection of the
+  private bridge. Added a runtime-plan fixture proving canonical
+  `import std::time;` resolves to the builtin facade.
+- Verified the public facade and sibling module with the documentation and
+  module visibility suites. Native linkage is intentionally deferred to
+  Gate 28.2.
 
 ## Gate 28.2: Hosted runtime bridge
 

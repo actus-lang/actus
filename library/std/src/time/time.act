@@ -1,0 +1,8 @@
+"""
+The `std::time` facade is the public gateway for hosted monotonic timing.
+
+Only declarations re-exported here are visible to external consumers. The
+platform bridge remains private to this module and is implemented by the
+hosted runtime in a later capability gate.
+"""
+open monotonic;

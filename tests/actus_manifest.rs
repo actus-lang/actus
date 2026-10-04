@@ -135,6 +135,30 @@ fn resolves_builtin_standard_library_from_runtime_profile() {
 }
 
 #[test]
+fn resolves_canonical_std_time_facade_from_runtime_profile() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "Actus.toml",
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n\n[build]\nruntime = \"std\"\n",
+    );
+    fixture.write("src/main.act", "import std::time;");
+
+    let configuration = CompilerConfiguration::from_input_path(&fixture.root.join("src/main.act"))
+        .expect("std runtime manifest should load");
+    let program = imported_program("import std::time;");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+    let plan = build_compilation_plan(&program, &resolver).expect("std time facade should resolve");
+    let module_paths =
+        plan.units().iter().map(|unit| unit.identity().module_path()).collect::<Vec<_>>();
+    assert_eq!(module_paths, vec!["std::time"]);
+}
+
+#[test]
 fn builtin_runtime_plan_contains_only_imported_modules() {
     let fixture = Fixture::new();
     fixture.write(

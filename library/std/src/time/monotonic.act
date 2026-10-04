@@ -1,0 +1,21 @@
+"""
+Return a monotonic nanosecond tick count for the current hosted runtime.
+
+Sequential successful reads in one runtime instance are non-decreasing. The
+origin is unspecified and is not a wall-clock or calendar timestamp. The
+return value is an integer `u64`; this API performs no allocation, exposes no
+platform clock structure, and does not promise one-nanosecond hardware
+resolution.
+"""
+unsafe extern "C" verb actus_monotonic_nanos() -> u64;
+
+"""
+Read the hosted runtime's monotonic clock in nanoseconds.
+
+The value is suitable for checked subtraction of an earlier and later read.
+The runtime bridge owns platform selection and checked conversion; Actus code
+does not receive a pointer, a platform-specific type, or wall-clock data.
+"""
+open verb monotonic_nanos() -> u64 {
+    return actus_monotonic_nanos();
+}
