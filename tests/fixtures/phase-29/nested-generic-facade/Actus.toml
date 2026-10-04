@@ -3,3 +3,5 @@ name = "phase29_nested_generic_facade"
 version = "0.1.0"
 edition = "alpha"
 
+[build]
+verify_no_float_ir = true

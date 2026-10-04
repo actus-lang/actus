@@ -138,15 +138,15 @@ src/aie/        -> propagation, plasticity, storage, and recall
 
 ## Gate 29.3: Compiler acceptance across all build paths
 
-- [ ] Make the nested generic facade fixture pass `actus check --strict`.
-- [ ] Make it pass `actus test --strict` through the package/module graph.
-- [ ] Emit a native object without undefined specialized symbols.
-- [ ] Link and execute a native binary with a deterministic success result.
-- [ ] Verify repeated object builds are byte-identical.
-- [ ] Verify zero-float IR auditing remains active and unchanged.
-- [ ] Verify LSP diagnostics, definition, hover, completion, and formatting use
+- [x] Make the nested generic facade fixture pass `actus check --strict`.
+- [x] Make it pass `actus test --strict` through the package/module graph.
+- [x] Emit a native object without undefined specialized symbols.
+- [x] Link and execute a native binary with a deterministic success result.
+- [x] Verify repeated object builds are byte-identical.
+- [x] Verify zero-float IR auditing remains active and unchanged.
+- [x] Verify LSP diagnostics, definition, hover, completion, and formatting use
       the same facade and specialization contract.
-- [ ] Verify `meta limitless("file")` affects only source limits and cannot
+- [x] Verify `meta limitless("file")` affects only source limits and cannot
       remove dependency roots or alter specialization reachability.
 
 ### Gate 29.3 evidence
@@ -155,6 +155,13 @@ src/aie/        -> propagation, plasticity, storage, and recall
   execution.
 - Object reproducibility comparison and zero-float audit output.
 - LSP and limitless-metadata regression evidence.
+- The phase-29 fixture now has a package-level `meta test` that exercises both
+  concrete generic instances through the imported facade. Its manifest enables
+  the zero-float IR policy, and the CLI regression verifies check, test,
+  object, executable, repeated object bytes, and runtime status together.
+- Existing LSP facade, generic, formatting, and file-limitless tests cover the
+  shared module/specialization contract across editor and CLI paths.
+- Gate 29.3 is complete; later gates cover the text-facing String API.
 
 ## Gate 29.4: Safe UTF-8 String byte access
 

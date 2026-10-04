@@ -343,6 +343,7 @@ fn phase29_nested_generic_facade_baseline_passes_all_native_stages() {
         .output()
         .expect("build phase 29 baseline object");
     assert!(object.status.success(), "stderr: {}", String::from_utf8_lossy(&object.stderr));
+    assert!(String::from_utf8_lossy(&object.stdout).contains("no floating-point instructions"));
 
     let second_object =
         std::env::temp_dir().join(format!("actus-phase29-second-{}.obj", std::process::id()));
@@ -373,6 +374,18 @@ fn phase29_nested_generic_facade_baseline_passes_all_native_stages() {
 
     let run = Command::new(&executable).output().expect("run phase 29 baseline executable");
     assert_eq!(run.status.code(), Some(24));
+
+    let tests = Command::new(compiler)
+        .args(["test", "--strict"])
+        .current_dir(&fixture)
+        .output()
+        .expect("run phase 29 package tests");
+    assert!(tests.status.success(), "stderr: {}", String::from_utf8_lossy(&tests.stderr));
+    assert!(
+        String::from_utf8_lossy(&tests.stdout).contains("nested_generic_test ... ok"),
+        "stdout: {}",
+        String::from_utf8_lossy(&tests.stdout)
+    );
 
     let _ = fs::remove_file(first_object);
     let _ = fs::remove_file(second_object);
