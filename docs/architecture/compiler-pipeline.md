@@ -54,3 +54,10 @@ runner. Formatter and source-limit checks remain independent of native
 reachability. Any change to call collection, generic specialization, module
 facades, or symbol binding must include semantic, native, and multi-object
 regression evidence.
+
+Compile-time constants use the same facade dependency graph. Before native
+identifier lowering, each imported object receives the public constant
+declarations reachable through its transitive canonical-facade imports. Private
+constants remain excluded, repeated declarations are deduplicated by identity,
+and constants do not become runtime or ABI symbols. This keeps semantic,
+object, executable, test-runner, and LSP visibility contracts aligned.

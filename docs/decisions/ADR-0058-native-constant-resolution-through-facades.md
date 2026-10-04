@@ -1,6 +1,6 @@
 # ADR-0058: Native Resolution of Facade-Exported Compile-Time Constants
 
-- Status: Proposed / Phase 31 contract
+- Status: Accepted and implemented / Phase 31
 - Date: 2026-10-04
 - Scope: compile-time constants, canonical module facades, semantic-to-native
   parity, generic specialization, object emission, and executable linking
@@ -150,3 +150,31 @@ This ADR does not introduce runtime global variables, mutable configuration,
 new import syntax, a second facade system, or application-specific constants.
 It does not change any external project or embed AIE-specific behavior in the
 Actus compiler.
+
+## Implementation evidence
+
+The implementation is contained in the native object-plan aggregation boundary.
+Imported module objects now collect public declarations through the complete
+transitive facade dependency graph, while preserving private visibility and
+deduplicating declaration identities. Compile-time constants therefore reach
+normalization and native lowering without acquiring runtime storage or ABI
+symbols.
+
+Evidence covers nested facade execution, generic specialization,
+scalar/predicate/aggregate use, object and executable parity, private-constant
+rejection, direct-facade-bypass rejection, deterministic object emission, and
+symbol-table inspection.
+
+The following checks passed after implementation:
+
+```text
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+scripts/check_source_limits.sh
+git diff --check
+```
+
+The implementation commits are `43b0819`, `2bcf9a4`, `ad17a60`, `90504ec`,
+and `8b93b26` on the Phase 31 branch.

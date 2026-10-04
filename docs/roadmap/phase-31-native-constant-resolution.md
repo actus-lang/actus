@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned. Phase 31 implements [ADR-0058](../decisions/ADR-0058-native-constant-resolution-through-facades.md).
+Complete. Phase 31 implements [ADR-0058](../decisions/ADR-0058-native-constant-resolution-through-facades.md).
 The phase addresses the compiler boundary where semantic analysis resolves a
 facade-exported compile-time constant but native lowering cannot yet materialize
 the same value in a nested module or generic specialization.
@@ -176,12 +176,23 @@ source-level literal workarounds.
 
 ## Gate 31.7: Completion and documentation
 
-- [ ] Record exact command evidence for every completed gate.
-- [ ] Update ADR-0058 with implementation evidence and approved deviations.
-- [ ] Update the compiler architecture documentation and language guide so
+- [x] Record exact command evidence for every completed gate.
+- [x] Update ADR-0058 with implementation evidence and approved deviations.
+- [x] Update the compiler architecture documentation and language guide so
       they describe the actual constant visibility and native behavior.
-- [ ] Mark Phase 31 complete only after every applicable acceptance criterion
+- [x] Mark Phase 31 complete only after every applicable acceptance criterion
       has direct repository evidence.
+
+### Gate 31.7 evidence
+
+- ADR-0058 is accepted and records the implementation boundary, negative
+  behavior, regression evidence, and exact quality commands.
+- `docs/architecture/compiler-pipeline.md` documents transitive compile-time
+  constant resolution at the native object-plan boundary.
+- `ACTUS_CODING_AGENT_GUIDE.md` already documents package configuration
+  constants, nested facades, native lowering, and the required validation
+  commands; no unsupported language behavior was added.
+- Phase 31 is complete; no AIE or external-project source was introduced.
 
 ## Non-goals
 
