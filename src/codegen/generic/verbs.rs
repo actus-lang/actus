@@ -54,6 +54,13 @@ pub(in crate::codegen) fn specialize_program(
     Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
 }
 
+pub(crate) fn expand_generic_instances(
+    program: &Program,
+    instances: &[GenericInstance],
+) -> Result<Vec<GenericInstance>, NativeEmitError> {
+    expand_transitive_instances(program, instances)
+}
+
 fn generic_call_site_bindings(
     instances: &[GenericInstance],
 ) -> HashMap<(String, usize, usize), String> {

@@ -22,7 +22,8 @@ pub fn exports_module_with_overlays(
     module_path: &str,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<ModuleExports, ModuleError> {
-    let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
+    let resolved =
+        resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
     let parsed = parse_sources(resolved.source_files(), overlays)?;
     validate_open_siblings(
         module_path,

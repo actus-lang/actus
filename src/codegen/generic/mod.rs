@@ -7,5 +7,6 @@ mod verbs;
 
 pub(super) use definitions::{canonical_type_name, specialized_enums, specialized_structs};
 pub(super) use layout::GenericLayoutRegistry;
+pub(crate) use verbs::expand_generic_instances;
 pub(super) use verbs::specialize_program;
 pub(crate) use verbs::specialized_generic_name;

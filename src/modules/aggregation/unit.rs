@@ -105,7 +105,8 @@ pub fn load_module_unit_with_overlays(
     module_path: &str,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<ModuleUnit, ModuleError> {
-    let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
+    let resolved =
+        resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
     let implementation =
         super::parsing::parse_module_with_overlays(resolver, module_path, overlays)?;
     let exports = super::exports::exports_module_with_overlays(resolver, module_path, overlays)?;

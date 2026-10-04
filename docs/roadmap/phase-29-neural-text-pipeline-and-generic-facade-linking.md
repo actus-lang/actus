@@ -317,6 +317,40 @@ phase.
 - Gate 29.9 is complete; Phase 29 is complete for the Actus compiler/runtime
   boundary.
 
+## Gate 29.10: Cross-module root generic specialization and internal loading
+
+- [x] Preserve concrete generic instances discovered in a root verb when the
+      called generic declaration is exported through one or more nested
+      module facades.
+- [x] Propagate the fixed-point generic instance set to every imported native
+      object that may define a specialized dependency.
+- [x] Resolve nested child modules through their admitted parent facade during
+      compiler-internal aggregation without weakening the external
+      facade-bypass diagnostic.
+- [x] Keep direct child-module imports rejected while allowing the compiler's
+      own object planner to load an already-admitted child implementation.
+- [x] Emit deterministic specialized symbols and link the root object against
+      the imported object without manual concrete calls in source code.
+- [x] Add a neutral regression test covering a root generic wrapper, a
+      multi-level facade chain, a generic imported verb, object/executable
+      emission, linking, and deterministic execution.
+
+### Gate 29.10 evidence
+
+- `tests/cli_workflow.rs::native_build_specializes_root_generic_calls_through_nested_facades`
+  builds and executes a neutral `device -> runtime -> implementation` module
+  tree; the root generic wrapper reaches the imported generic verb and the
+  executable returns `4`.
+- Native emission now expands the transitive generic instance set before
+  imported module objects are emitted, so specialized dependencies are not
+  left as undefined linker symbols.
+- Compiler-internal aggregation uses a separate admitted-child resolution
+  path. Public resolver calls continue to reject facade bypasses, and the
+  existing resolver, module, standard-library, and native regression suites
+  remain green.
+- Gate 29.10 is complete; no source-level workaround or domain-specific
+  compiler dependency was introduced.
+
 ## Non-goals
 
 - This phase does not promise human-level intelligence, semantic truth, or

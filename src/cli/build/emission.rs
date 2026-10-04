@@ -129,6 +129,8 @@ pub(crate) fn emit_objects(
     let generic_instances = crate::semantic::analyze(&targeted_caller)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?
         .generic_instances;
+    let generic_instances =
+        crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(
