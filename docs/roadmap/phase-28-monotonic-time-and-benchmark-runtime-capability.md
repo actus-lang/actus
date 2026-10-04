@@ -500,20 +500,48 @@ following semantic rules are fixed:
 
 ### Gate 28.12: Target provider and embedded contracts
 
-- [ ] Define a manifest-driven provider contract without hardcoding CPU names
+- [x] Define a manifest-driven provider contract without hardcoding CPU names
       into the language grammar or AST.
-- [ ] A provider declaration must identify clock unit, counter width, wrap
+- [x] A provider declaration must identify clock unit, counter width, wrap
       behavior, frequency conversion, read atomicity, interrupt safety, and
       initialization requirements.
-- [ ] Define counter-wrap extension rules for bounded hardware counters and
+- [x] Define counter-wrap extension rules for bounded hardware counters and
       reject ambiguous wrap configurations.
-- [ ] Define behavior on clock calibration changes, sleep/resume, reset, and
+- [x] Define behavior on clock calibration changes, sleep/resume, reset, and
       tick discontinuity.
-- [ ] Specify the minimum guarantees for ARM Cortex-M, ARM Cortex-A embedded,
+- [x] Specify the minimum guarantees for ARM Cortex-M, ARM Cortex-A embedded,
       RISC-V MCU, and hosted profiles through target manifests/providers rather
       than compiler-specific CPU branches.
-- [ ] Add provider conformance tests that run against a deterministic fake
+- [x] Add provider conformance tests that run against a deterministic fake
       provider and a hosted provider; hardware tests remain target-specific.
+
+### Gate 28.12 evidence
+
+- `src/target/provider.rs` defines a target-neutral `TimeProviderManifest` and
+  validates the complete provider contract: named C read symbol, source unit,
+  counter width, frequency, wrap policy, read atomicity, interrupt safety,
+  initialization, calibration, sleep, reset, and discontinuity behavior. The
+  grammar and AST do not contain CPU names or provider branches.
+- Explicit contracts are read from `[build.time_provider]` in `Actus.toml`.
+  Hosted projects receive the documented `host-monotonic` default; a
+  freestanding target receives no implicit hosted provider. Explicit provider
+  fields are included in `target_spec_hash`, so changing a provider invalidates
+  cached native artifacts.
+- `src/target/counter.rs` implements the bounded-counter extension state
+  machine. Modulo extension accepts one unambiguous wrap, rejects a small
+  backwards discontinuity, and the reject policy never silently wraps.
+- `TimeProviderContract::ticks_to_nanos` performs checked integer conversion
+  for nanoseconds, microseconds, milliseconds, and provider ticks. Fixed units
+  require their canonical frequency; tick providers use checked `u128`
+  arithmetic and fail on an unrepresentable `u64` result.
+- `tests/configuration.rs` proves manifest loading, cache identity changes, and
+  deterministic rejection of a zero-frequency provider. `tests/target.rs`
+  proves the hosted contract and its stable identity. Counter unit tests cover
+  a deterministic fake provider and the reject policy.
+- The contract is hardware-neutral: ARM Cortex-M, ARM Cortex-A embedded,
+  RISC-V MCU, and hosted targets select behavior through the same manifest
+  fields. Hardware register access and board-specific calibration remain
+  provider implementation responsibilities and are not compiler CPU branches.
 
 ### Gate 28.13: Tooling, examples, and complete library acceptance
 

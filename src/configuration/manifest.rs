@@ -57,6 +57,7 @@ pub(crate) struct BuildManifest {
     pub(crate) native_module: Option<String>,
     pub(crate) position_independent: Option<bool>,
     pub(crate) verify_no_float_ir: Option<bool>,
+    pub(crate) time_provider: Option<crate::target::TimeProviderManifest>,
     #[serde(default)]
     pub(crate) library_paths: Vec<String>,
     #[serde(default)]

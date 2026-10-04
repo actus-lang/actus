@@ -116,6 +116,15 @@ provider contract in its runtime/target manifest. That provider must specify:
 - ABI symbol ownership and linkage;
 - whether the provider is allocation-free and integer-only.
 
+The Phase 28 provider contract is represented by `[build.time_provider]` in
+`Actus.toml`. It is target-neutral and includes the provider read symbol,
+clock unit, counter width, wrap policy, frequency, read atomicity, interrupt
+safety, initialization, calibration, sleep, reset, and discontinuity policy.
+The compiler validates the declaration before code generation and includes an
+explicit contract in the target artifact identity. Bounded counter extension
+and unit conversion use checked integer arithmetic; a small backwards sample,
+ambiguous wrap, or unrepresentable nanosecond result is rejected.
+
 The compiler must never link the hosted implementation into a freestanding
 artifact implicitly.
 

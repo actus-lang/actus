@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use super::types::CompilerConfiguration;
 use super::{BuildProfile, RuntimeProfile, SourceLimitMode};
-use crate::target::{EntryContract, LinkerFlavor, TargetSpec};
+use crate::target::{EntryContract, LinkerFlavor, TargetSpec, TimeProviderContract};
 
 impl CompilerConfiguration {
     pub fn source_root(&self) -> &Path {
@@ -92,6 +92,10 @@ impl CompilerConfiguration {
 
     pub fn target_spec_hash(&self) -> &str {
         &self.target_spec_hash
+    }
+
+    pub fn time_provider(&self) -> Option<&TimeProviderContract> {
+        self.time_provider.as_ref()
     }
 
     pub const fn profile(&self) -> BuildProfile {
