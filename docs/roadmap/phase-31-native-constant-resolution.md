@@ -147,28 +147,32 @@ source-level literal workarounds.
 
 ## Gate 31.6: Quality, architecture, and regression acceptance
 
-- [ ] Keep the implementation within the repository's file and function size
+- [x] Keep the implementation within the repository's file and function size
       limits, decomposing responsibility-specific code where necessary.
-- [ ] Add focused compiler regressions rather than one opaque end-to-end test.
-- [ ] Preserve the one-way lexer -> parser -> AST -> semantic -> codegen
+- [x] Add focused compiler regressions rather than one opaque end-to-end test.
+- [x] Preserve the one-way lexer -> parser -> AST -> semantic -> codegen
       pipeline.
-- [ ] Confirm no project-specific names, AIE logic, or external application
+- [x] Confirm no project-specific names, AIE logic, or external application
       sources were introduced.
-- [ ] Run:
+- [x] Run:
       `cargo fmt --all -- --check`
-- [ ] Run:
+- [x] Run:
       `cargo check --all-targets --all-features`
-- [ ] Run:
+- [x] Run:
       `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] Run:
+- [x] Run:
       `cargo test --all-targets --all-features`
-- [ ] Run `scripts/check_source_limits.sh` and `git diff --check`.
+- [x] Run `scripts/check_source_limits.sh` and `git diff --check`.
 
 ### Gate 31.6 evidence
 
 - All required checks pass from a clean working tree state.
 - Regression evidence covers semantic rejection, object emission, executable
   execution, deterministic symbols, and generic specialization.
+- The implementation remains confined to the compiler aggregation boundary and
+  neutral compiler regression tests; no external application source was added.
+- The complete required check suite passed after the native dependency-closure
+  implementation and again during the commit validation hook.
 
 ## Gate 31.7: Completion and documentation
 
