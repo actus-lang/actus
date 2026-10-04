@@ -207,6 +207,46 @@ fn imported_object_program_excludes_module_directives() {
 }
 
 #[test]
+fn imported_object_program_carries_only_facade_exported_constants() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write(
+        "config/values.act",
+        "open const BUFFER_STRIDE: u16 = 24u16; const PRIVATE_STRIDE: u16 = 7u16;",
+    );
+    fixture.write("feature/feature.act", "open implementation;");
+    fixture.write(
+        "feature/implementation.act",
+        "import config; open verb stride() -> u16 { return BUFFER_STRIDE; }",
+    );
+    let (tokens, errors) = scan("import feature; verb main() -> Int { return stride() as Int; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    let feature = objects
+        .units()
+        .iter()
+        .find(|unit| matches!(unit.owner(), ModuleObjectOwner::Imported { module_path } if module_path == "feature"))
+        .expect("feature object should be present");
+    assert!(feature.program().declarations.iter().any(|declaration| {
+        matches!(
+            declaration,
+            actus::ast::TopLevelDecl::Constant(constant)
+                if constant.name == "BUFFER_STRIDE"
+        )
+    }));
+    assert!(!feature.program().declarations.iter().any(|declaration| {
+        matches!(
+            declaration,
+            actus::ast::TopLevelDecl::Constant(constant)
+                if constant.name == "PRIVATE_STRIDE"
+        )
+    }));
+}
+
+#[test]
 fn hierarchical_child_implementation_has_one_parent_object_owner() {
     let fixture = Fixture::new();
     fixture.write("device/device.act", "open runtime;");

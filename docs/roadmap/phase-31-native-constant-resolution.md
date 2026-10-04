@@ -42,19 +42,24 @@ source-level literal workarounds.
 
 ## Gate 31.1: Facade-exported constant environment
 
-- [ ] Build a deterministic constant environment from legal module exports.
-- [ ] Traverse child facades only through their canonical parent exports.
-- [ ] Preserve declaration provenance so same-name constants from different
+- [x] Build a deterministic constant environment from legal module exports.
+- [x] Traverse child facades only through their canonical parent exports.
+- [x] Preserve declaration provenance so same-name constants from different
       modules cannot be silently conflated.
-- [ ] Include only public constants visible to the consuming compilation unit.
-- [ ] Reject duplicate or incompatible exported constants deterministically.
-- [ ] Keep private constants out of external environments.
+- [x] Include only public constants visible to the consuming compilation unit.
+- [x] Reject duplicate or incompatible exported constants deterministically.
+- [x] Keep private constants out of external environments.
 
 ### Gate 31.1 evidence
 
 - Accepted nested-facade constant fixture.
 - Rejected private-constant and duplicate-export fixtures.
 - Rejected direct-child-facade-bypass fixture.
+- `imported_object_program_carries_only_facade_exported_constants` proves that
+  the imported native object program carries `BUFFER_STRIDE` through the
+  `config -> feature` dependency edge while excluding `PRIVATE_STRIDE`.
+- Existing module aggregation tests cover duplicate exports, private
+  constants, and direct child-facade bypass diagnostics.
 
 ## Gate 31.2: Native lowering parity
 
