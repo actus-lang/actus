@@ -43,11 +43,22 @@ control flow.
 
 ## Gate 27.0: String lowering contract audit
 
-- [ ] Document the current `StringLiteral` AST, native data declaration, and
+- [x] Document the current `StringLiteral` AST, native data declaration, and
       `lower_string()` symbol contract.
-- [ ] Identify every AST visitor used by native string data collection.
-- [ ] Define literal deduplication and deterministic symbol naming rules.
-- [ ] Define the exact stdout contract for the updated AIE demonstration.
+- [x] Identify every AST visitor used by native string data collection.
+- [x] Define literal deduplication and deterministic symbol naming rules.
+- [x] Define the exact stdout contract for the updated AIE demonstration.
+
+Gate 27.0 audit result: `Expr::StringLiteral` is lowered as a pointer to a
+module-local `DataDescription` containing the UTF-8 bytes plus a trailing null
+byte. `define_string_data()` collects literal values from reachable verbs,
+deduplicates them by exact string value in a `HashSet`, sorts them before
+assigning `string_0`, `string_1`, and subsequent deterministic symbols, and
+`lower_string()` resolves the same value through `StringDataValues`. The
+collection traversal currently covers ordinary expressions, calls, fields,
+indexes, statements, loops, and direct conditional blocks, but misses case
+guards, case block bodies, and `else if` branches. Gate 27.1 addresses those
+specific gaps without changing the ABI or data representation.
 
 ## Gate 27.1: Complete recursive string collection
 
