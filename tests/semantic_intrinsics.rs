@@ -19,12 +19,48 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert!(lookup_intrinsic("allocate").is_none());
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert_eq!(IntrinsicKind::Copy.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
     assert_eq!(lookup_intrinsic("drop"), Some(IntrinsicKind::Drop));
     assert!(lookup_call_intrinsic("drop").is_none());
     assert_eq!(lookup_call_intrinsic("print"), Some(IntrinsicKind::Print));
+    assert_eq!(lookup_call_intrinsic("copy"), Some(IntrinsicKind::Copy));
     assert!(lookup_intrinsic("user_function").is_none());
+}
+
+#[test]
+fn accepts_explicit_copy_of_integer_and_boolean_scalars() {
+    analyze_source(
+        "verb main() -> Int { erg value: u32 = 41u32; erg repeated: u32 = copy(value: abs value); erg flag: Bool = true; erg repeated_flag: Bool = copy(value: abs flag); if repeated_flag { return repeated as Int; } return 0; }",
+    )
+    .expect("explicit copy should preserve eligible scalar values");
+}
+
+#[test]
+fn rejects_copy_without_an_explicit_read_only_role() {
+    let error = analyze_source(
+        "verb main() { erg value: u32 = 41u32; erg repeated: u32 = copy(value: value); }",
+    )
+    .expect_err("copy must require an explicit abs view");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidArgumentRole { callee, parameter }
+            if callee == "copy" && parameter == "value"
+    ));
+}
+
+#[test]
+fn rejects_copy_of_owned_aggregate_values() {
+    let error = analyze_source(
+        "verb main() { erg buffer: Buffer = Buffer[4]; erg repeated = copy(value: abs buffer); drop(buffer); drop(repeated); }",
+    )
+    .expect_err("copy must reject cleanup-bearing aggregates");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
+            if callee == "copy" && parameter == "value"
+    ));
 }
 
 #[test]

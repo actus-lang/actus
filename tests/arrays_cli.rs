@@ -94,6 +94,16 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_explicit_scalar_copy_natively() {
+    let status = run_array_fixture(
+        "explicit-scalar-copy",
+        "verb main() -> Int { erg value: u32 = 41u32; erg repeated: u32 = copy(value: abs value); return repeated as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn lowers_maximum_u64_literal_natively() {
     let status = run_array_fixture(
         "maximum-u64-literal",

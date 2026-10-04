@@ -19,12 +19,12 @@ layout, bounds, or native safety guarantees.
 
 ### Gate 32.1 — Contract and type eligibility
 
-- [ ] Define the source syntax for explicit scalar reuse.
-- [ ] Define the compiler-approved eligible type set.
-- [ ] Reject reuse for buffers, resources, aggregates with cleanup, and
+- [x] Define the source syntax for explicit scalar reuse.
+- [x] Define the compiler-approved eligible type set.
+- [x] Reject reuse for buffers, resources, aggregates with cleanup, and
       unsupported user-defined types.
-- [ ] Preserve `erg`, `abs`, `dat`, and `ins` meaning at every call boundary.
-- [ ] Document diagnostics and migration guidance.
+- [x] Preserve `erg`, `abs`, `dat`, and `ins` meaning at every call boundary.
+- [x] Document diagnostics and migration guidance.
 
 ### Gate 32.2 — Semantic analysis
 

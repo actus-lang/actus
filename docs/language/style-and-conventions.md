@@ -207,6 +207,19 @@ rules are defined in
 [ADR-0017](../decisions/ADR-0017-dynamic-role-abi-and-cross-unit-metadata.md).
 Dynamic dispatch does not grant ownership or mutation capabilities.
 
+### Explicit scalar reuse
+
+`copy(value: abs value)` is the explicit scalar reuse operation. It requires an
+`abs` argument and is accepted only for compiler-approved integer and boolean
+scalar values. It does not copy buffers, strings, resources, aggregates with
+cleanup obligations, or user-defined types. Ownership roles remain visible at
+the call boundary; an owning call still moves its `erg` or `dat` argument.
+
+Use this operation when the same eligible scalar must be passed to multiple
+owning-role call sites. Do not use identity arithmetic such as `value + 0u32`
+to express a copy. Unsupported types and calls without an explicit `abs` role
+are rejected during semantic analysis.
+
 ## 7. Canonical Formatting
 
 The canonical formatter must enforce:

@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IntrinsicKind {
     Append,
+    Copy,
     Print,
     Drop,
 }
@@ -20,6 +21,11 @@ impl IntrinsicKind {
                 parameters: &["handle", "byte"],
                 status: RegistryStatus::Active,
             },
+            Self::Copy => IntrinsicSpec {
+                name: "copy",
+                parameters: &["value"],
+                status: RegistryStatus::Active,
+            },
             Self::Print => IntrinsicSpec {
                 name: "print",
                 parameters: &["value"],
@@ -37,6 +43,7 @@ impl IntrinsicKind {
 pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match name {
         "append" => Some(IntrinsicKind::Append),
+        "copy" => Some(IntrinsicKind::Copy),
         "print" => Some(IntrinsicKind::Print),
         "drop" => Some(IntrinsicKind::Drop),
         _ => None,
@@ -45,7 +52,9 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
 
 pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match lookup_intrinsic(name) {
-        Some(IntrinsicKind::Append) | Some(IntrinsicKind::Print) => lookup_intrinsic(name),
+        Some(IntrinsicKind::Append | IntrinsicKind::Copy | IntrinsicKind::Print) => {
+            lookup_intrinsic(name)
+        }
         Some(IntrinsicKind::Drop) | None => None,
     }
 }

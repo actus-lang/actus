@@ -1,6 +1,6 @@
 # ADR-0059: Ownership-Safe Value Reuse and Fixed-Slot Selection
 
-- **Status:** Proposed
+- **Status:** Accepted for Gate 32.1
 - **Date:** 2026-10-04
 - **Decision owners:** Actus language and compiler maintainers
 
@@ -105,3 +105,16 @@ The feature adds a small amount of type metadata and semantic checking. In
 exchange, Actus source can express repeated read-only scalar use and bounded
 slot traversal directly, while aggregate ownership and cleanup remain
 fail-closed.
+
+## Gate 32.1 implementation evidence
+
+The first accepted form is:
+
+```act
+erg repeated: u32 = copy(value: abs value);
+```
+
+The compiler accepts `Int`, `Bool`, and fixed-width integer values. It rejects
+calls without an explicit `abs` role and rejects cleanup-bearing aggregates.
+Semantic coverage is in `tests/semantic_intrinsics.rs`; native executable
+coverage is in `tests/arrays_cli.rs`.

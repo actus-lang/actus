@@ -48,7 +48,9 @@ fn infer_complex_initializer_type(
 ) -> Result<NativeType, NativeEmitError> {
     match expression {
         Expr::Try { expression, .. } => infer_try_type(expression, types, functions, layouts),
-        Expr::Call { callee, .. } => infer_call_type(callee, functions, layouts),
+        Expr::Call { callee, arguments, .. } => {
+            infer_call_type(callee, arguments, types, functions, layouts)
+        }
         Expr::MethodCall { .. } => infer_method_type(expression, types, functions, layouts),
         Expr::StructLit { name, type_arguments, .. } => {
             infer_struct_type(name, type_arguments, layouts)
@@ -169,9 +171,17 @@ fn infer_try_type(
 
 fn infer_call_type(
     callee: &str,
+    arguments: &[crate::ast::Argument],
+    types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<NativeType, NativeEmitError> {
+    if callee == "copy" {
+        let argument = arguments
+            .first()
+            .ok_or_else(|| NativeEmitError("copy requires one value".to_owned()))?;
+        return initializer_type(&argument.expression, types, functions, layouts);
+    }
     if let Some(id) = layouts.array_id(callee) {
         return Ok(NativeType::Array(id));
     }

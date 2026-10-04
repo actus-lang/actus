@@ -35,6 +35,12 @@ fn lower_call_or_array_constructor(
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+    if callee == "copy" {
+        let argument = arguments
+            .first()
+            .ok_or_else(|| NativeEmitError("copy requires one value".to_owned()))?;
+        return super::lower_expression_with_context(function, &argument.expression, context);
+    }
     if arguments.is_empty()
         && let Some(id) = context.layouts.array_id(callee)
     {
