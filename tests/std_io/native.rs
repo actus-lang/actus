@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use actus::cli::run_with_args;
+use object::{Object, ObjectSymbol};
 
 use super::fixtures::library_source;
 
@@ -108,6 +109,108 @@ fn std_io_native_bridge_prints_string_text() {
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"HelloHello\n");
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn native_string_collection_covers_case_blocks_and_else_if() {
+    let (root, input, output) = project(
+        "string-control-flow",
+        "open stdout;\nopen error;\n",
+        &["stdout.act", "error.act"],
+        r#"import io;
+verb main() -> Int {
+    erg selected = "selected";
+    case true {
+        true if false => {
+            erg guard_text = "guard branch";
+            print(abs guard_text);
+        },
+        _ => {
+            print(abs selected);
+        },
+    };
+    if false {
+        erg unreachable = "unreachable";
+        print(abs unreachable);
+    } else if true {
+        erg nested = "else-if branch";
+        println(abs nested);
+    }
+    return 0;
+}
+"#,
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("string control-flow fixture");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"selectedelse-if branch\n");
+    assert_eq!(execution.stderr, b"");
+    let object = output.with_extension("obj");
+    let object_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build string control-flow object");
+    assert!(object_build.status.success(), "object build failed: {:?}", object_build);
+    assert!(object.is_file());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn native_string_data_is_deduplicated_and_deterministic() {
+    let (root, input, output) = project(
+        "string-data",
+        "open stdout;\nopen error;\n",
+        &["stdout.act", "error.act"],
+        r#"import io;
+verb main() -> Int {
+    erg first = "zeta";
+    erg repeated = "alpha";
+    print(abs first);
+    println(abs repeated);
+    return 0;
+}
+"#,
+    );
+    let first = output.with_extension("first.obj");
+    let second = output.with_extension("second.obj");
+    for object in [&first, &second] {
+        let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args([
+                "build",
+                input.to_str().expect("source path"),
+                "--strict",
+                "--emit",
+                "obj",
+                "-o",
+            ])
+            .arg(object)
+            .current_dir(&root)
+            .output()
+            .expect("build string object");
+        assert!(result.status.success(), "object build failed: {:?}", result);
+    }
+    assert_eq!(fs::read(&first).expect("first object"), fs::read(&second).expect("second object"));
+    assert_eq!(
+        fs::read_to_string(root.join("string-data.first.symbols")).expect("first symbols"),
+        fs::read_to_string(root.join("string-data.second.symbols")).expect("second symbols")
+    );
+    let bytes = fs::read(&first).expect("read string object");
+    let object_file = object::File::parse(bytes.as_slice()).expect("parse string object");
+    let string_symbols = object_file
+        .symbols()
+        .filter_map(|symbol| symbol.name().ok())
+        .filter(|name| {
+            name.contains("__data_string_")
+                && !name.starts_with(".refptr.")
+                && !name.starts_with("__imp_")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(string_symbols.len(), 2, "string symbols: {string_symbols:?}");
+    assert!(string_symbols.iter().any(|name| name.contains("__data_string_5f0")));
+    assert!(string_symbols.iter().any(|name| name.contains("__data_string_5f1")));
+    fs::remove_dir_all(root).expect("remove string data project");
 }
 
 #[test]

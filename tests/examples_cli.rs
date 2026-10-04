@@ -138,6 +138,39 @@ fn runtime_profile_example_builds_and_executes_with_builtin_std() {
 
 #[cfg(unix)]
 #[test]
+fn native_strings_example_builds_and_emits_readable_control_flow_events() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/native_strings");
+    let source = root.join("src/main.act");
+    let output =
+        std::env::temp_dir().join(format!("actus-native-strings-{}.bin", std::process::id()));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source.display().to_string(),
+            "--strict".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let execution = std::process::Command::new(&output)
+        .current_dir(&root)
+        .output()
+        .expect("run native strings example");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(
+        execution.stdout,
+        b"ACTUS_EVENT branch=case status=ready\nACTUS_EVENT branch=else-if status=complete\n"
+    );
+    assert_eq!(execution.stderr, b"");
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
 fn phase23_capability_package_passes_strict_test_native_and_object_acceptance() {
     let root =
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_capability");
