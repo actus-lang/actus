@@ -94,6 +94,16 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn lowers_maximum_u64_literal_natively() {
+    let status = run_array_fixture(
+        "maximum-u64-literal",
+        "verb main() -> Int { erg maximum: u64 = 18446744073709551615u64; if maximum == 18446744073709551615u64 { return 0; } return 1; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_boolean_literals_and_short_circuit_logic_natively() {
     let status = run_array_fixture(
         "boolean-literals",

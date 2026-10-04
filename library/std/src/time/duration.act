@@ -1,0 +1,192 @@
+"""
+Owned, integer-only monotonic duration operations.
+
+`Duration` stores a non-negative span in nanoseconds. It contains no platform
+clock state, allocates no storage, and can be borrowed with `abs` by arithmetic
+and conversion operations. Checked operations return `TimeError` instead of
+wrapping, clamping, truncating, or panicking.
+"""
+"""
+A bounded non-negative elapsed span represented exactly in nanoseconds.
+
+The field is a logical duration value, not a wall-clock timestamp. A duration
+does not own a provider, thread, timer, or operating-system resource.
+"""
+open struct Duration {
+    """The owned exact non-negative nanosecond count represented by this value."""
+    erg nanos: u64,
+}
+
+"""
+Construct a duration from an exact nanosecond count.
+
+The input is transferred into the returned value; no allocation or runtime
+provider access occurs. Every `u64` nanosecond count is representable.
+"""
+open verb duration_nanos(erg nanos: u64) -> Duration {
+    return Duration {nanos: nanos};
+}
+
+"""
+Read the exact nanosecond count from a borrowed duration.
+
+The `abs` borrow does not consume or mutate `duration`. The result is a plain
+`u64` count with no unit conversion or precision loss.
+"""
+open verb duration_as_nanos(abs duration: Duration) -> u64 {
+    return duration.nanos;
+}
+
+"""
+Return the nanosecond count through the standard typed result surface.
+
+The `abs` duration is borrowed and remains owned by the caller. `Ok` contains
+the exact count and no allocation is performed. The result form keeps the
+accessor consistent with fallible unit conversions and reserves the typed
+error channel for future provider or representation checks.
+"""
+open verb duration_value(abs duration: Duration) -> Result[u64, TimeError] {
+    return Result[u64, TimeError].Ok(duration.nanos);
+}
+
+"""
+Construct a duration from whole seconds with checked nanosecond scaling.
+
+Returns `Err(TimeError.Overflow)` when multiplication by one billion would
+exceed `u64`. Whole seconds are exact; no rounding or fractional unit is
+accepted. The input is borrowed only for the call and no allocation occurs.
+"""
+open verb duration_seconds(erg seconds: u64) -> Result[Duration, TimeError] {
+    if seconds > MAX_SECONDS {
+        return Result[Duration, TimeError].Err(TimeError.Overflow);
+    }
+    erg nanos: u64 = seconds * NANOS_PER_SECOND;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}
+
+"""
+Construct a duration from whole milliseconds with checked scaling.
+
+Returns `Err(TimeError.Overflow)` when multiplication by one million exceeds
+`u64`. The conversion is exact and integer-only.
+"""
+open verb duration_milliseconds(erg milliseconds: u64) -> Result[Duration, TimeError] {
+    if milliseconds > MAX_MILLISECONDS {
+        return Result[Duration, TimeError].Err(TimeError.Overflow);
+    }
+    erg nanos: u64 = milliseconds * NANOS_PER_MILLISECOND;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}
+
+"""
+Construct a duration from whole microseconds with checked scaling.
+
+Returns `Err(TimeError.Overflow)` when multiplication by one thousand exceeds
+`u64`. The conversion is exact and integer-only.
+"""
+open verb duration_microseconds(erg microseconds: u64) -> Result[Duration, TimeError] {
+    if microseconds > MAX_MICROSECONDS {
+        return Result[Duration, TimeError].Err(TimeError.Overflow);
+    }
+    erg nanos: u64 = microseconds * NANOS_PER_MICROSECOND;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}
+
+"""
+Convert a duration to whole seconds without discarding precision.
+
+Returns `Err(TimeError.PrecisionLoss)` when the duration contains a non-zero
+sub-second remainder. The borrowed duration is unchanged.
+"""
+open verb duration_as_seconds(abs duration: Duration) -> Result[u64, TimeError] {
+    if duration.nanos % NANOS_PER_SECOND != 0u64 {
+        return Result[u64, TimeError].Err(TimeError.PrecisionLoss);
+    }
+    return Result[u64, TimeError].Ok(duration.nanos / NANOS_PER_SECOND);
+}
+
+"""
+Convert a duration to whole milliseconds without discarding precision.
+
+Returns `Err(TimeError.PrecisionLoss)` when microseconds or nanoseconds remain
+below the millisecond boundary.
+"""
+open verb duration_as_milliseconds(abs duration: Duration) -> Result[u64, TimeError] {
+    if duration.nanos % NANOS_PER_MILLISECOND != 0u64 {
+        return Result[u64, TimeError].Err(TimeError.PrecisionLoss);
+    }
+    return Result[u64, TimeError].Ok(duration.nanos / NANOS_PER_MILLISECOND);
+}
+
+"""
+Convert a duration to whole microseconds without discarding nanoseconds.
+
+Returns `Err(TimeError.PrecisionLoss)` when the duration is not an exact whole
+number of microseconds.
+"""
+open verb duration_as_microseconds(abs duration: Duration) -> Result[u64, TimeError] {
+    if duration.nanos % NANOS_PER_MICROSECOND != 0u64 {
+        return Result[u64, TimeError].Err(TimeError.PrecisionLoss);
+    }
+    return Result[u64, TimeError].Ok(duration.nanos / NANOS_PER_MICROSECOND);
+}
+
+"""
+Add two borrowed durations with checked nanosecond arithmetic.
+
+Returns `Err(TimeError.Overflow)` instead of wrapping when the sum exceeds
+`u64`. Neither input is consumed or mutated.
+"""
+open verb duration_add(abs left: Duration, abs right: Duration) -> Result[Duration, TimeError] {
+    if left.nanos > U64_MAX - right.nanos {
+        return Result[Duration, TimeError].Err(TimeError.Overflow);
+    }
+    erg nanos: u64 = left.nanos + right.nanos;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}
+
+"""
+Subtract `right` from `left` with checked unsigned arithmetic.
+
+Returns `Err(TimeError.NegativeDuration)` when `right` is larger than `left`.
+Neither input is consumed or mutated.
+"""
+open verb duration_sub(abs left: Duration, abs right: Duration) -> Result[Duration, TimeError] {
+    if left.nanos < right.nanos {
+        return Result[Duration, TimeError].Err(TimeError.NegativeDuration);
+    }
+    erg nanos: u64 = left.nanos - right.nanos;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}
+
+"""
+Multiply a borrowed duration by an unsigned scalar with checked overflow.
+
+Returns `Err(TimeError.Overflow)` when the product exceeds `u64`. A zero
+multiplier is valid and returns an exact zero duration.
+"""
+open verb duration_mul(abs duration: Duration, erg multiplier: u64) -> Result[Duration, TimeError] {
+    if multiplier != 0u64 && duration.nanos > U64_MAX / multiplier {
+        return Result[Duration, TimeError].Err(TimeError.Overflow);
+    }
+    erg nanos: u64 = duration.nanos * multiplier;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}
+
+"""
+Divide a borrowed duration by an unsigned scalar.
+
+Returns `Err(TimeError.ZeroDivisor)` for zero and
+`Err(TimeError.PrecisionLoss)` when the nanosecond count is not divisible by
+the scalar. The operation never silently truncates elapsed time.
+"""
+open verb duration_div(abs duration: Duration, erg divisor: u64) -> Result[Duration, TimeError] {
+    if divisor == 0u64 {
+        return Result[Duration, TimeError].Err(TimeError.ZeroDivisor);
+    }
+    if duration.nanos % divisor != 0u64 {
+        return Result[Duration, TimeError].Err(TimeError.PrecisionLoss);
+    }
+    erg nanos: u64 = duration.nanos / divisor;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}

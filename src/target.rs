@@ -7,6 +7,16 @@ use target_lexicon::{
     PointerWidth, Triple,
 };
 
+mod counter;
+mod provider;
+
+pub use counter::{CounterExtender, CounterSampleError};
+pub use provider::{
+    CalibrationPolicy, ClockUnit, DiscontinuityPolicy, Initialization, InterruptSafety,
+    ProviderContractError, ProviderConversionError, ReadAtomicity, ResetPolicy, SleepPolicy,
+    TimeProviderContract, TimeProviderManifest, WrapBehavior,
+};
+
 #[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkerFlavor {

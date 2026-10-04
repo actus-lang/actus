@@ -75,6 +75,14 @@ fn infallible_verbs() -> BTreeSet<&'static str> {
         "buffered_writer",
         "cursor",
         "drop",
+        "monotonic_nanos",
+        "now",
+        "instant_ticks",
+        "duration_nanos",
+        "duration_as_nanos",
+        "expired",
+        "timer_one_shot",
+        "timer_state",
     ]
     .into_iter()
     .collect()

@@ -238,6 +238,15 @@ fn parses_struct_literals_and_field_access() {
 }
 
 #[test]
+fn parses_uppercase_constants_in_statement_conditions() {
+    let program = parse_source(
+        "const MAX_SECONDS: u64 = 18446744073u64; verb main() -> Int { erg seconds: u64 = 1u64; if seconds > MAX_SECONDS { return 1; } return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    assert!(matches!(verb.body.statements[1], Stmt::If { .. }));
+}
+
+#[test]
 fn parses_field_assignment() {
     let program = parse_source(
         "struct Point { x: Int, } verb main() { erg point = Point { x: 1, }; point.x = 2; }",

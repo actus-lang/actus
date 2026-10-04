@@ -60,6 +60,28 @@ fn formats_boolean_literals_without_rewriting_their_values() {
 }
 
 #[test]
+fn formats_the_complete_monotonic_time_surface_idempotently() {
+    let source = concat!(
+        "import std::time;\n",
+        "verb main() -> Int {\n",
+        "erg started: Instant = now();\n",
+        "erg budget: Duration = duration_nanos(nanos: erg 1000u64);\n",
+        "erg deadline = deadline_after(start: abs started, duration: abs budget);\n",
+        "erg timer = timer_one_shot();\n",
+        "erg delayed = delay(duration: abs budget);\n",
+        "return 0;\n",
+        "}\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("import std::time;"));
+    assert!(formatted.contains("deadline_after(start: abs started"));
+    assert!(formatted.contains("timer_one_shot()"));
+    assert!(formatted.contains("delay(duration: abs budget)"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_const_generic_declarations_without_changing_meaning() {
     let formatted = format_source(
         "struct Fabric[N: Usize] { cells: Array[Int, N], } verb main() -> Bool { return false; }",

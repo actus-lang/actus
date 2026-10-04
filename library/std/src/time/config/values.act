@@ -1,0 +1,26 @@
+"""
+Internal numeric contracts for the `std::time` implementation.
+
+These constants keep unit scales and representability limits in one place.
+They remain private to the time module.
+"""
+"""Largest value representable by the time library's unsigned counter."""
+const U64_MAX: u64 = 18446744073709551615u64;
+
+"""Exact nanoseconds contained in one microsecond."""
+const NANOS_PER_MICROSECOND: u64 = 1000u64;
+
+"""Exact nanoseconds contained in one millisecond."""
+const NANOS_PER_MILLISECOND: u64 = 1000000u64;
+
+"""Exact nanoseconds contained in one second."""
+const NANOS_PER_SECOND: u64 = 1000000000u64;
+
+"""Largest whole-second input that can be converted to nanoseconds."""
+const MAX_SECONDS: u64 = 18446744073u64;
+
+"""Largest whole-millisecond input that can be converted to nanoseconds."""
+const MAX_MILLISECONDS: u64 = 18446744073709u64;
+
+"""Largest whole-microsecond input that can be converted to nanoseconds."""
+const MAX_MICROSECONDS: u64 = 18446744073709551u64;

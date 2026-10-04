@@ -21,6 +21,8 @@ impl CompilerConfiguration {
             source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
             dependency_roots: std::collections::BTreeMap::new(),
             target_spec_hash: target.spec_hash(),
+            time_provider: (entry_contract == super::EntryContract::Hosted)
+                .then(crate::target::TimeProviderContract::hosted_default),
             target,
             profile: super::BuildProfile::Debug,
             profiles: manifest::ProfilesManifest::default(),
@@ -93,6 +95,8 @@ fn build_from_manifest(
 ) -> Result<CompilerConfiguration, ConfigurationError> {
     let (target, linker_flavor, entry_contract, linker) =
         resolve_manifest_target(&manifest, &environment)?;
+    let time_provider = resolve_time_provider(&manifest, entry_contract)?;
+    let explicit_time_provider = manifest.build.time_provider.is_some();
     let runtime = manifest.build.runtime.unwrap_or_default();
     validate_runtime_profile(runtime, entry_contract)?;
     validate_runtime_dependency_alias(runtime, &dependency_graph.roots)?;
@@ -108,8 +112,13 @@ fn build_from_manifest(
         project_root: manifest_directory.to_path_buf(),
         source_root,
         dependency_roots: dependency_graph.roots,
-        target_spec_hash: target.spec_hash(),
+        target_spec_hash: time_provider_hash(
+            explicit_time_provider,
+            &target,
+            time_provider.as_ref(),
+        ),
         target,
+        time_provider,
         profile,
         profiles: manifest.profile,
         linker,
@@ -127,6 +136,39 @@ fn build_from_manifest(
         libraries,
         ..environment
     })
+}
+
+fn resolve_time_provider(
+    manifest: &manifest::ActusManifest,
+    entry_contract: super::EntryContract,
+) -> Result<Option<crate::target::TimeProviderContract>, ConfigurationError> {
+    manifest
+        .build
+        .time_provider
+        .clone()
+        .map(crate::target::TimeProviderContract::validate)
+        .transpose()
+        .map_err(|error| ConfigurationError(error.to_string()))
+        .map(|provider| {
+            provider.or_else(|| {
+                (entry_contract == super::EntryContract::Hosted)
+                    .then(crate::target::TimeProviderContract::hosted_default)
+            })
+        })
+}
+
+fn time_provider_hash(
+    explicit_time_provider: bool,
+    target: &crate::target::TargetSpec,
+    provider: Option<&crate::target::TimeProviderContract>,
+) -> String {
+    if explicit_time_provider {
+        provider
+            .expect("validated explicit time provider must be present")
+            .spec_hash(&target.spec_hash())
+    } else {
+        target.spec_hash()
+    }
 }
 
 fn validate_runtime_dependency_alias(

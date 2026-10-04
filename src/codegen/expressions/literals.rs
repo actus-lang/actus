@@ -17,7 +17,7 @@ pub(in crate::codegen) fn lower_integer(
         .or_else(|| value.strip_prefix("0X"))
         .map_or_else(|| value.parse::<u128>(), |digits| u128::from_str_radix(digits, 16))
         .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}")))?;
-    if magnitude <= i64::MAX as u128 {
+    if magnitude <= u64::MAX as u128 {
         if !typed && !is_hex && magnitude > i32::MAX as u128 {
             return Err(NativeEmitError(
                 "invalid integer literal: exceeds native Int width".to_owned(),

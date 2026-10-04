@@ -1,0 +1,9 @@
+"""
+Private configuration facade for the `std::time` implementation.
+
+This facade is opened only by `time.act`. It imports the implementation's
+typed numeric values into the module scope; those values are not part of the
+public `std::time` API and this configuration subtree contains no runtime
+verbs or platform imports.
+"""
+open values;

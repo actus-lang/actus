@@ -1,0 +1,71 @@
+"""
+Monotonic deadlines derived from an `Instant` and a `Duration`.
+
+A `Deadline` is valid only in the provider domain of its originating instant.
+It has no calendar meaning, does not own an OS timer, and cannot be used as a
+wall-clock timestamp. Deadline operations do not allocate.
+"""
+"""
+An immutable monotonic expiration point.
+
+The stored value is a provider-domain tick boundary. It is meaningful only
+with the same monotonic provider that created the originating instant.
+"""
+open struct Deadline {
+    """The owned provider-domain tick at which this deadline becomes expired."""
+    erg expires_at: u64,
+}
+
+"""
+Create a deadline by adding a duration to an instant.
+
+Both inputs are borrowed and remain owned by the caller. Returns
+`Err(TimeError.Overflow)` if the provider-domain tick addition cannot fit in
+`u64`; otherwise returns a deadline with no allocation or provider read.
+"""
+open verb deadline_after(abs start: Instant, abs duration: Duration) -> Result[Deadline, TimeError] {
+    if start.ticks > U64_MAX - duration.nanos {
+        return Result[Deadline, TimeError].Err(TimeError.Overflow);
+    }
+    erg expires_at: u64 = start.ticks + duration.nanos;
+    return Result[Deadline, TimeError].Ok(Deadline {expires_at: expires_at});
+}
+
+"""
+Create a deadline relative to the current monotonic instant.
+
+The duration is borrowed. The active provider supplies the start instant and
+overflow is returned as `TimeError.Overflow` rather than wrapped.
+"""
+open verb deadline_from_now(abs duration: Duration) -> Result[Deadline, TimeError] {
+    erg start: Instant = now();
+    return deadline_after(start: abs start, duration: abs duration);
+}
+
+"""
+Report whether the current monotonic instant has reached the deadline.
+
+The deadline is borrowed and remains unchanged. The operation is a provider
+read and has no allocation; it returns `true` at or after expiration.
+"""
+open verb expired(abs deadline: Deadline) -> Bool {
+    erg current: Instant = now();
+    return current.ticks >= deadline.expires_at;
+}
+
+"""
+Return the remaining monotonic duration.
+
+An expired deadline returns `Ok(Duration(0))`. An active deadline returns the
+non-negative provider-domain difference. The deadline is borrowed and no
+allocation occurs; provider failures follow the active runtime contract.
+"""
+open verb remaining(abs deadline: Deadline) -> Result[Duration, TimeError] {
+    erg current: Instant = now();
+    if current.ticks >= deadline.expires_at {
+        erg zero: u64 = 0u64;
+        return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg zero));
+    }
+    erg nanos: u64 = deadline.expires_at - current.ticks;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg nanos));
+}

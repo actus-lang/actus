@@ -1,0 +1,35 @@
+"""
+The public `std::time` facade.
+
+This facade exposes typed monotonic timing, duration arithmetic, deadlines,
+busy-wait delays, and provider-backed sleep. It deliberately does not expose
+wall-clock, calendar, timezone, platform clock structures, raw pointers, or
+the private runtime bridge symbols. Hosted availability is selected by the
+standard-library runtime profile; unsupported profiles fail before emission.
+"""
+"""Keep implementation constants private to the time module."""
+open config;
+
+"""Re-export the typed time error variants used by fallible operations."""
+open errors;
+
+"""Re-export exact integer duration construction and arithmetic."""
+open duration;
+
+"""Re-export monotonic expiration and remaining-time operations."""
+open deadline;
+
+"""Re-export the short, scheduler-independent busy-wait delay."""
+open delay;
+
+"""Re-export monotonic instant capture and elapsed-time operations."""
+open instant;
+
+"""Re-export the private-provider-backed monotonic clock wrapper."""
+open monotonic;
+
+"""Re-export provider-backed scheduler-aware sleeping."""
+open sleep;
+
+"""Re-export allocation-free one-shot and periodic timer state machines."""
+open timer;

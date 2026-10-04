@@ -59,6 +59,19 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
     assert!(!freestanding.matches_platform("unix"));
 }
 
+#[test]
+fn hosted_provider_contract_is_explicit_and_cache_stable() {
+    let provider = actus::target::TimeProviderContract::hosted_default();
+    assert_eq!(provider.clock_unit(), actus::target::ClockUnit::Nanoseconds);
+    assert_eq!(provider.counter_width(), 64);
+    assert_eq!(provider.frequency_hz(), 1_000_000_000);
+    assert_eq!(provider.read_symbol(), "actus_monotonic_nanos");
+    assert_eq!(provider.interrupt_safety(), actus::target::InterruptSafety::Safe);
+    assert_eq!(provider.sleep(), actus::target::SleepPolicy::Continues);
+    assert_eq!(provider.ticks_to_nanos(7), Ok(7));
+    assert_eq!(provider.spec_hash("target"), provider.spec_hash("target"));
+}
+
 #[cfg(unix)]
 #[test]
 fn native_build_ignores_non_matching_target_symbols() {

@@ -185,14 +185,29 @@ impl Parser {
         let is_type_name = name.chars().next().is_some_and(char::is_uppercase);
         if !self.case_subject
             && (is_type_name || !type_arguments.is_empty())
-            && self.match_simple(TokenKind::LeftBrace)
+            && self.looks_like_struct_literal()
         {
+            self.expect_simple(TokenKind::LeftBrace, "`{`")?;
             return self.parse_struct_literal(name, type_arguments, span.start);
         }
         if !type_arguments.is_empty() {
             return Err(self.error_at_current("a struct literal after type arguments"));
         }
         Ok(Expr::Identifier { name, span })
+    }
+
+    fn looks_like_struct_literal(&self) -> bool {
+        if !self.check_simple(&TokenKind::LeftBrace) {
+            return false;
+        }
+        let Some(first) = self.tokens.get(self.cursor + 1) else { return false };
+        if matches!(first.kind, TokenKind::RightBrace) {
+            return true;
+        }
+        matches!(
+            (&first.kind, self.tokens.get(self.cursor + 2).map(|token| &token.kind)),
+            (TokenKind::Identifier(_), Some(TokenKind::Colon))
+        )
     }
 
     fn parse_field_access(&mut self, mut expression: Expr) -> Result<Expr, ParseError> {

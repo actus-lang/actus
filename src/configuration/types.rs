@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use super::manifest;
 use super::manifest::{BuildProfile, LibraryKind, OptimizationLevel, RuntimeProfile};
-use crate::target::{EntryContract, LinkerFlavor, TargetSpec};
+use crate::target::{EntryContract, LinkerFlavor, TargetSpec, TimeProviderContract};
 
 pub(super) const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 pub(super) const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
@@ -97,6 +97,7 @@ pub struct CompilerConfiguration {
     pub(super) dependency_roots: BTreeMap<String, PathBuf>,
     pub(super) target: TargetSpec,
     pub(super) target_spec_hash: String,
+    pub(super) time_provider: Option<TimeProviderContract>,
     pub(super) profile: BuildProfile,
     pub(super) profiles: manifest::ProfilesManifest,
     pub(super) linker: OsString,

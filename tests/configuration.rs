@@ -49,6 +49,41 @@ fn loads_package_zero_float_native_policy() {
 }
 
 #[test]
+fn loads_and_hashes_an_explicit_manifest_time_provider() {
+    let path =
+        std::env::temp_dir().join(format!("actus-time-provider-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build.time_provider]\nname = \"fake-counter\"\nread_symbol = \"fake_read\"\nclock_unit = \"ticks\"\ncounter_width = 32\nwrap_behavior = \"extendmodulo\"\nfrequency_hz = 1000000\nread_atomicity = \"singleword\"\ninterrupt_safety = \"safe\"\ninitialization = \"readyatentry\"\ncalibration = \"fixed\"\nsleep = \"continues\"\nreset = \"resets\"\ndiscontinuity = \"reject\"\n",
+    )
+    .expect("write provider manifest");
+
+    let configuration = CompilerConfiguration::from_manifest(&path)
+        .expect("explicit provider manifest should load");
+    let provider = configuration.time_provider().expect("provider should be configured");
+    assert_eq!(provider.name(), "fake-counter");
+    assert_eq!(provider.counter_width(), 32);
+    assert_ne!(configuration.target_spec_hash(), TargetSpec::host().unwrap().spec_hash());
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn rejects_ambiguous_time_provider_contracts() {
+    let path = std::env::temp_dir()
+        .join(format!("actus-time-provider-invalid-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[build.time_provider]\nname = \"fake-counter\"\nread_symbol = \"fake_read\"\nclock_unit = \"ticks\"\ncounter_width = 32\nwrap_behavior = \"extendmodulo\"\nfrequency_hz = 0\nread_atomicity = \"singleword\"\ninterrupt_safety = \"safe\"\ninitialization = \"readyatentry\"\ncalibration = \"fixed\"\nsleep = \"continues\"\nreset = \"resets\"\ndiscontinuity = \"reject\"\n",
+    )
+    .expect("write invalid provider manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path)
+        .expect_err("zero provider frequency must be rejected");
+    assert!(error.to_string().contains("frequency_hz must be positive"));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn loads_explicit_standard_runtime_profile() {
     let root = std::env::temp_dir().join(format!("actus-runtime-std-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");

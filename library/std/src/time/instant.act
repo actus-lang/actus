@@ -1,0 +1,67 @@
+"""
+Monotonic instants and elapsed-time operations.
+
+An `Instant` belongs to the selected runtime provider's monotonic domain. Its
+numeric origin is private to the provider and must not be interpreted as a
+wall-clock or calendar timestamp. Instants are copy-readable views for
+comparison; they do not own an operating-system handle or allocated storage.
+"""
+"""
+An immutable monotonic point captured from the active provider.
+
+The stored tick value is provider-domain data. Applications should use the
+time operations below rather than treating it as an epoch timestamp.
+"""
+open struct Instant {
+    """The owned provider-domain tick used for same-domain ordering and subtraction."""
+    erg ticks: u64,
+}
+
+"""
+Capture the current instant from the active monotonic provider.
+
+Returns a typed `Instant` with no allocation and no wall-clock semantics. The
+selected runtime must provide a monotonic clock for this operation to exist.
+"""
+open verb now() -> Instant {
+    return Instant {ticks: monotonic_nanos()};
+}
+
+"""
+Read an instant's provider-domain tick value.
+
+`instant` is borrowed as `abs` and remains owned by the caller. The returned
+`u64` is meaningful only when compared with an instant from the same provider
+domain; it is not a Unix timestamp.
+"""
+open verb instant_ticks(abs instant: Instant) -> u64 {
+    return instant.ticks;
+}
+
+"""
+Calculate the non-negative span from `earlier` to `later`.
+
+Both instants are borrowed and must belong to the same monotonic provider
+domain. Returns `Ok(Duration)` on valid ordering or
+`Err(TimeError.NegativeDuration)` when `later` precedes `earlier`; no unsigned
+underflow, wrapping, or allocation is permitted.
+"""
+open verb duration_since(abs later: Instant, abs earlier: Instant) -> Result[Duration, TimeError] {
+    if later.ticks < earlier.ticks {
+        return Result[Duration, TimeError].Err(TimeError.NegativeDuration);
+    }
+    erg elapsed_nanos: u64 = later.ticks - earlier.ticks;
+    return Result[Duration, TimeError].Ok(duration_nanos(nanos: erg elapsed_nanos));
+}
+
+"""
+Calculate elapsed time from an earlier instant to the current instant.
+
+The earlier instant is borrowed and remains owned by the caller. The result is
+typed and uses the same provider domain as `now()`; ordering failure is
+reported as `TimeError.NegativeDuration`.
+"""
+open verb elapsed_since(abs earlier: Instant) -> Result[Duration, TimeError] {
+    erg current: Instant = now();
+    return duration_since(later: abs current, earlier: abs earlier);
+}

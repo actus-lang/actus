@@ -1,0 +1,33 @@
+"""
+Provider-backed scheduler-aware sleeping for a monotonic duration.
+
+`sleep` may block or yield the current execution context. It is not a
+busy-wait delay and must not be called from an interrupt or critical section
+unless the selected provider explicitly permits it. The public wrapper does
+not expose the hosted runtime ABI or allocate Actus storage.
+"""
+"""
+Private runtime bridge receiving an exact nanosecond duration.
+
+The C ABI returns zero for success and a non-zero status for provider failure.
+This raw declaration is intentionally private; public callers receive a
+typed `Result` from `sleep`.
+"""
+unsafe extern "C" verb actus_sleep_nanos(erg nanos: u64) -> Int;
+
+"""
+Sleep for at least the requested duration using the selected provider.
+
+The duration is borrowed and remains owned by the caller. `Ok(0)` means the
+provider accepted the sleep request; `Err(TimeError.ProviderUnavailable)`
+means the selected runtime cannot provide scheduler-aware sleeping. The
+operation may block and does not promise an exact wake-up instant.
+"""
+open verb sleep(abs duration: Duration) -> Result[Int, TimeError] {
+    erg nanos: u64 = duration.nanos;
+    erg status = actus_sleep_nanos(nanos: erg nanos);
+    return case status {
+        0 => Result[Int, TimeError].Ok(0),
+        _ => Result[Int, TimeError].Err(TimeError.ProviderUnavailable),
+    };
+}

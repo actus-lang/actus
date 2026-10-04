@@ -116,6 +116,15 @@ provider contract in its runtime/target manifest. That provider must specify:
 - ABI symbol ownership and linkage;
 - whether the provider is allocation-free and integer-only.
 
+The Phase 28 provider contract is represented by `[build.time_provider]` in
+`Actus.toml`. It is target-neutral and includes the provider read symbol,
+clock unit, counter width, wrap policy, frequency, read atomicity, interrupt
+safety, initialization, calibration, sleep, reset, and discontinuity policy.
+The compiler validates the declaration before code generation and includes an
+explicit contract in the target artifact identity. Bounded counter extension
+and unit conversion use checked integer arithmetic; a small backwards sample,
+ambiguous wrap, or unrepresentable nanosecond result is rejected.
+
 The compiler must never link the hosted implementation into a freestanding
 artifact implicitly.
 
@@ -135,6 +144,18 @@ hosted runtime before implementation is accepted:
 The chosen policy must be identical in semantic checks, native lowering,
 runtime behavior, and documentation. The initial implementation must not
 invent an implicit sentinel timestamp.
+
+For this phase, the failure boundary is fixed as follows:
+
+- an unavailable runtime/target combination is rejected during module
+  compatibility validation with the existing `E1112` incompatible-runtime
+  diagnostic;
+- a hosted provider conversion that cannot be represented as nanoseconds in
+  `u64` is a hard typed runtime failure. It must not wrap, clamp, or truncate;
+  if that failure reaches native execution, the deterministic execution
+  diagnostic is reserved as `E1899`;
+- the public signature remains `monotonic_nanos() -> u64`; no sentinel value
+  is introduced to encode failure.
 
 ## Compiler and tooling obligations
 

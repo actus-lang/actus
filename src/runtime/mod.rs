@@ -7,6 +7,7 @@ mod fs;
 mod input;
 mod path;
 mod stream;
+mod time;
 mod types;
 
 pub use allocation::{
@@ -24,11 +25,13 @@ pub use contract::{
     ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS,
     BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_RESERVE_SYMBOL,
     BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
-    FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL,
+    FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL, MONOTONIC_NANOS_SYMBOL,
     PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
     PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
     PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
-    RUNTIME_ABI_VERSION, RuntimeCapability, WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
+    RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_CONTEXT_CRITICAL_SECTION,
+    SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL, SLEEP_CONTEXT_INTERRUPT,
+    SLEEP_NANOS_SYMBOL, WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
     is_successful_count,
 };
 pub use fs::{
@@ -60,6 +63,9 @@ pub use stream::{
     actus_buffer_length, actus_buffer_validate_utf8, actus_buffered_write_stdout,
     actus_cursor_flush, actus_cursor_read, actus_cursor_seek, actus_cursor_write,
     actus_flush_buffered_stdout, actus_write_buffer_stdout,
+};
+pub use time::{
+    actus_monotonic_nanos, actus_sleep_context_enter, actus_sleep_context_exit, actus_sleep_nanos,
 };
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
 
