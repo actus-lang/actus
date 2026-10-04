@@ -106,20 +106,23 @@ source-level literal workarounds.
 
 ## Gate 31.4: Native dependency and symbol integrity
 
-- [ ] Verify that compile-time constants are not added to runtime dependency
+- [x] Verify that compile-time constants are not added to runtime dependency
       roots or native symbol registries.
-- [ ] Verify that one constant reference remains one compile-time value even
+- [x] Verify that one constant reference remains one compile-time value even
       when several facades expose the same declaration.
-- [ ] Reject incompatible external/native declarations without weakening the
+- [x] Reject incompatible external/native declarations without weakening the
       existing symbol-collision rules.
-- [ ] Keep object symbol tables free of duplicate constant symbols.
-- [ ] Compare repeated object and executable emission for deterministic output.
+- [x] Keep object symbol tables free of duplicate constant symbols.
+- [x] Compare repeated object and executable emission for deterministic output.
 
 ### Gate 31.4 evidence
 
 - Object-symbol inspection with no generated constant ABI symbol.
 - Duplicate-reference and repeated-build tests.
 - Existing native ABI and external-symbol regression suites remain green.
+- `facade_constant_objects_are_deterministic_and_symbol_free` compares
+  repeated object output, rejects duplicate symbols, and verifies that
+  `BUFFER_STRIDE` has no runtime/native symbol.
 
 ## Gate 31.5: Tooling and diagnostic parity
 
