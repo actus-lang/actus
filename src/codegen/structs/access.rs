@@ -122,7 +122,7 @@ fn load_struct_field(
             field_layout.offset as i32,
         ));
     }
-    if matches!(field_layout.ty, NativeType::Struct(_))
+    if matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Array(_))
         || matches!(field_layout.ty, NativeType::Enum(id) if !layouts.is_niche_option(id))
         || layouts.is_inline_pack(field_layout.ty)
     {

@@ -50,6 +50,16 @@ fn preserves_generic_array_type_when_passing_a_struct_field() {
 
 #[cfg(unix)]
 #[test]
+fn copies_inline_array_struct_fields_across_native_return_and_call_boundaries() {
+    build_and_run(
+        "struct Snapshot { erg magic: u32, erg columns: Array[u8, 4], } verb make() -> Snapshot { erg snapshot: Snapshot = Snapshot { magic: 42u32, columns: Array[u8, 4](), }; snapshot.columns[0] = 41u8; return snapshot; } verb inspect(abs snapshot: Snapshot) -> Int { return snapshot.columns[0] as Int + snapshot.magic as Int; } verb main() -> Int { erg snapshot: Snapshot = make(); return inspect(snapshot: abs snapshot); }",
+        "inline-array-struct-return",
+        83,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn transfers_an_owned_enum_return_without_double_drop() {
     build_and_run(
         "verb produce() -> Option[u32] { erg result: Option[u32] = Option[u32].None; result = Option[u32].Some(1u32); return result; } verb main() -> Int { erg result: Option[u32] = produce(); return 42; }\n",
