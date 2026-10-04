@@ -201,7 +201,11 @@ verb main() -> Int {
     let string_symbols = object_file
         .symbols()
         .filter_map(|symbol| symbol.name().ok())
-        .filter(|name| name.contains("__data_string_"))
+        .filter(|name| {
+            name.contains("__data_string_")
+                && !name.starts_with(".refptr.")
+                && !name.starts_with("__imp_")
+        })
         .collect::<Vec<_>>();
     assert_eq!(string_symbols.len(), 2, "string symbols: {string_symbols:?}");
     assert!(string_symbols.iter().any(|name| name.contains("__data_string_5f0")));
