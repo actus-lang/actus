@@ -20,7 +20,6 @@ fn hosted_std_time_bridge_builds_and_runs() {
         "import std::time; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); erg elapsed: u64 = finished - started; if finished >= started && elapsed >= 0u64 { return 0; } return 1; }",
     )
     .expect("fixture source should be written");
-
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args([
             "build",
@@ -357,6 +356,41 @@ fn zero_duration_busy_wait_delay_runs_natively() {
     assert!(status.success(), "busy-wait delay build failed: {status}");
 
     let execution = Command::new(&output).output().expect("delay executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn timer_state_machine_and_missed_tick_policies_run_natively() {
+    let root = std::env::temp_dir().join(format!("actus-std-time-timer-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("timer-example");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_timer\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(source_root.join("main.act"), include_str!("fixtures/std_time_timer.act"))
+        .expect("timer fixture source should be written");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "timer build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("timer executable should run");
     assert_eq!(execution.status.code(), Some(0));
     assert!(execution.stdout.is_empty());
     assert!(execution.stderr.is_empty());

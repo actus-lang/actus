@@ -17,4 +17,8 @@ open enum TimeError {
     PrecisionLoss,
     """The selected runtime has no compatible provider for the operation."""
     ProviderUnavailable,
+    """A periodic timer was configured with a zero-length period."""
+    InvalidTimerPeriod,
+    """A timer operation was requested for an incompatible lifecycle state."""
+    InvalidTimerState,
 }

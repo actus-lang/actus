@@ -30,3 +30,6 @@ open monotonic;
 
 """Re-export provider-backed scheduler-aware sleeping."""
 open sleep;
+
+"""Re-export allocation-free one-shot and periodic timer state machines."""
+open timer;

@@ -454,19 +454,49 @@ following semantic rules are fixed:
 
 ### Gate 28.11: One-shot and periodic timers
 
-- [ ] Define an explicit timer state model: created, armed, expired, canceled,
+- [x] Define an explicit timer state model: created, armed, expired, canceled,
       and completed where applicable.
-- [ ] Add one-shot timer creation and cancellation with ownership-safe handles.
-- [ ] Add periodic timer creation with an explicit missed-tick policy:
+- [x] Add one-shot timer creation and cancellation with ownership-safe handles.
+- [x] Add periodic timer configuration with an explicit missed-tick policy:
       coalesce, catch-up, or skip; no implicit policy is allowed.
-- [ ] Define timer callback/notification boundaries without requiring hidden
+- [x] Define timer callback/notification boundaries without requiring hidden
       heap allocation or dynamic dispatch in the core API.
-- [ ] Define behavior for cancellation races, deadline overflow, provider
+- [x] Define behavior for cancellation races, deadline overflow, provider
       resolution, and timer reuse.
-- [ ] Keep scheduler integration separate from the core clock and duration
+- [x] Keep scheduler integration separate from the core clock and duration
       types; `std::time` must not silently become an operating-system scheduler.
-- [ ] Add deterministic fake-provider tests before hosted or hardware timing
+- [x] Add deterministic fake-provider tests before hosted or hardware timing
       tests.
+
+### Gate 28.11 evidence
+
+- `library/std/src/time/timer.act` defines the public `TimerMode`,
+  `MissedTickPolicy`, `TimerState`, and `TimerPoll` contracts. The lifecycle is
+  explicit: `Created -> Armed -> Expired -> Completed` for one-shot timers;
+  cancellation is terminal and returns `Canceled` on polling.
+- Timer storage is caller-owned bounded scalar state. `timer_one_shot` creates
+  the value, while `timer_periodic(ins timer, ...)` configures the same storage
+  and returns `Result[Int, TimeError]`; no aggregate timer is smuggled through
+  a result ABI, no callback is registered, and no scheduler or dynamic dispatch
+  is hidden behind the API.
+- Periodic polling implements all three explicit policies. `Coalesce` emits one
+  notification and schedules from the current instant, `CatchUp` preserves the
+  phase by advancing one period, and `Skip` discards the overdue notification
+  and schedules from the current instant.
+- The single-owner `ins` contract makes concurrent mutation races impossible in
+  the core API. Cross-thread cancellation and scheduler registration are not
+  silently modeled; those require a future target provider contract. Overflow,
+  zero periods, invalid lifecycle transitions, and one-shot reuse are rejected
+  deterministically.
+- `tests/fixtures/std_time_timer.act`, executed by
+  `timer_state_machine_and_missed_tick_policies_run_natively`, exercises fake
+  `Instant` values for one-shot firing/completion, cancellation, periodic
+  coalescing/catch-up/skipping, zero-period rejection, and completed-timer
+  reuse rejection. The test performs strict check, native executable emission,
+  execution, and no-floating-point IR verification.
+- `tests/std_time_native.rs`, `tests/std_time_semantic.rs`, and the public
+  documentation suite pass for the timer facade. Scheduler-aware `sleep`
+  remains a separate provider operation and is not used by timer polling.
 
 ### Gate 28.12: Target provider and embedded contracts
 

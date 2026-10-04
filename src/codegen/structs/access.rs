@@ -122,7 +122,10 @@ fn load_struct_field(
             field_layout.offset as i32,
         ));
     }
-    if matches!(field_layout.ty, NativeType::Struct(_)) || layouts.is_inline_pack(field_layout.ty) {
+    if matches!(field_layout.ty, NativeType::Struct(_))
+        || matches!(field_layout.ty, NativeType::Enum(id) if !layouts.is_niche_option(id))
+        || layouts.is_inline_pack(field_layout.ty)
+    {
         return Ok(function.ins().iadd_imm_s(address, i64::from(field_layout.offset)));
     }
     Ok(function.ins().load(

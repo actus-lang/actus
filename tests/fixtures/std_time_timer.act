@@ -1,0 +1,204 @@
+meta limitless("file")
+
+import std::time;
+
+verb poll_code(erg result: Result[TimerPoll, TimeError]) -> Int {
+    return case dat result {
+        Result.Ok(value) => case dat value {
+            TimerPoll.Pending => 0,
+            TimerPoll.Fired => 1,
+            TimerPoll.Canceled => 2,
+            TimerPoll.Completed => 3,
+        },
+        Result.Err(_) => 9,
+    };
+}
+
+verb policy_probe(abs policy: MissedTickPolicy) -> Int {
+    return case abs policy {
+        MissedTickPolicy.Coalesce => 0,
+        MissedTickPolicy.CatchUp => 1,
+        MissedTickPolicy.Skip => 2,
+    };
+}
+
+verb invalid_period_code(erg result: Result[Int, TimeError]) -> Int {
+    return case dat result {
+        Result.Err(error) => case dat error {
+            TimeError.InvalidTimerPeriod => 0,
+            _ => 1,
+        },
+        Result.Ok(_) => 2,
+    };
+}
+
+verb one_shot_check() -> Int {
+    erg start: Instant = Instant {ticks: 100u64};
+    erg zero: Duration = Duration {nanos: 10u64};
+    erg timer: Timer = timer_one_shot();
+    erg armed = timer_arm_at(
+        timer: ins timer,
+        start: abs start,
+        delay: abs zero
+    );
+    return case dat armed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+verb cancel_check() -> Int {
+    erg start: Instant = Instant {ticks: 100u64};
+    erg period: Duration = Duration {nanos: 10u64};
+    erg timer: Timer = timer_one_shot();
+    erg armed = timer_arm_at(
+        timer: ins timer,
+        start: abs start,
+        delay: abs period
+    );
+    erg canceled = timer_cancel(timer: ins timer);
+    erg polled = timer_poll_at(timer: ins timer, instant: abs start);
+    erg arm_code = case dat armed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+    erg cancel_code = case dat canceled {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+    erg poll_result = poll_code(result: erg polled);
+    if arm_code == 0 && cancel_code == 0 && poll_result == 2 {
+        return 0;
+    }
+    return 1;
+}
+
+verb reuse_rejection_check() -> Int {
+    erg start: Instant = Instant {ticks: 100u64};
+    erg zero: Duration = Duration {nanos: 0u64};
+    erg timer: Timer = timer_one_shot();
+    erg armed = timer_arm_at(
+        timer: ins timer,
+        start: abs start,
+        delay: abs zero
+    );
+    erg fired = timer_poll_at(timer: ins timer, instant: abs start);
+    erg completed = timer_poll_at(timer: ins timer, instant: abs start);
+    erg rearmed = timer_arm_at(
+        timer: ins timer,
+        start: abs start,
+        delay: abs zero
+    );
+    erg arm_code = case dat armed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+    erg fire_code = poll_code(result: erg fired);
+    erg complete_code = poll_code(result: erg completed);
+    erg rearm_code = case dat rearmed {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+    if arm_code == 0 && fire_code == 1 && complete_code == 3 && rearm_code == 0 {
+        return 0;
+    }
+    return 1;
+}
+
+verb policy_check(abs policy: MissedTickPolicy, abs expected: Int) -> Int {
+    erg start: Instant = Instant {ticks: 100u64};
+    erg current: Instant = Instant {ticks: 135u64};
+    erg before: Instant = Instant {ticks: 105u64};
+    erg period: Duration = Duration {nanos: 10u64};
+    erg timer: Timer = timer_one_shot();
+    erg timer_result = timer_periodic(
+        timer: ins timer,
+        period: abs period,
+        policy: abs policy
+    );
+    case dat timer_result {
+        Result.Err(_) => {
+            return 1;
+        },
+        Result.Ok(_) => {
+            erg armed = timer_arm_at(
+                timer: ins timer,
+                start: abs start,
+                delay: abs period
+            );
+            erg first = timer_poll_at(timer: ins timer, instant: abs current);
+            erg second = timer_poll_at(timer: ins timer, instant: abs before);
+            erg arm_code = case dat armed {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 1,
+            };
+            erg first_code = poll_code(result: erg first);
+            erg second_code = poll_code(result: erg second);
+            if arm_code == 0 && first_code == expected && second_code == 0 {
+                return 0;
+            }
+            return 1;
+        },
+    };
+    return 1;
+}
+
+verb catch_up_check() -> Int {
+    erg start: Instant = Instant {ticks: 100u64};
+    erg current: Instant = Instant {ticks: 135u64};
+    erg period: Duration = Duration {nanos: 10u64};
+    erg policy: MissedTickPolicy = MissedTickPolicy.CatchUp;
+    erg timer: Timer = timer_one_shot();
+    erg timer_result = timer_periodic(
+        timer: ins timer,
+        period: abs period,
+        policy: abs policy
+    );
+    case dat timer_result {
+        Result.Err(_) => {
+            return 1;
+        },
+        Result.Ok(_) => {
+            erg armed = timer_arm_at(
+                timer: ins timer,
+                start: abs start,
+                delay: abs period
+            );
+            erg first = timer_poll_at(timer: ins timer, instant: abs current);
+            erg second = timer_poll_at(timer: ins timer, instant: abs current);
+            erg arm_code = case dat armed {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 1,
+            };
+            erg first_code = poll_code(result: erg first);
+            erg second_code = poll_code(result: erg second);
+            if arm_code == 0 && first_code == 1 && second_code == 1 {
+                return 0;
+            }
+            return first_code * 10 + second_code;
+        },
+    };
+    return 1;
+}
+
+verb main() -> Int {
+    erg zero: Duration = Duration {nanos: 0u64};
+    erg policy: MissedTickPolicy = MissedTickPolicy.Coalesce;
+    erg invalid_timer: Timer = timer_one_shot();
+    erg invalid = timer_periodic(
+        timer: ins invalid_timer,
+        period: abs zero,
+        policy: abs policy
+    );
+    erg invalid_code = invalid_period_code(result: erg invalid);
+    erg one_code = one_shot_check();
+    erg cancel_code = cancel_check();
+    erg reuse_code = reuse_rejection_check();
+    erg fired_expected: Int = 1;
+    erg coalesce_code = policy_check(policy: abs policy, expected: abs fired_expected);
+    erg catch_up_code = catch_up_check();
+    erg skip_policy: MissedTickPolicy = MissedTickPolicy.Skip;
+    erg pending_expected: Int = 0;
+    erg skip_code = policy_check(policy: abs skip_policy, expected: abs pending_expected);
+    return invalid_code + one_code + cancel_code + reuse_code + coalesce_code + catch_up_code + skip_code;
+}

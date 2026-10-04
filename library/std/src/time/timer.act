@@ -1,0 +1,281 @@
+"""
+Allocation-free monotonic one-shot and periodic timers.
+
+Timers are owned value objects. Their lifecycle is explicit and their mutable
+operations use `ins`, so no hidden heap handle, callback allocation, dynamic
+dispatch, or scheduler ownership is introduced. `timer_poll_at` is the
+deterministic provider boundary used by fake clocks and target providers;
+`timer_poll` is the hosted-clock convenience wrapper.
+"""
+open enum TimerMode {
+    """A timer that fires once and then completes after its expired state."""
+    OneShot,
+    """A timer that remains armed after each delivered firing."""
+    Periodic,
+}
+
+"""Explicit policy for handling periodic deadlines missed by a poll."""
+open enum MissedTickPolicy {
+    """Deliver one event for all missed periods and restart from current time."""
+    Coalesce,
+    """Deliver one event per poll and preserve the periodic phase for catch-up."""
+    CatchUp,
+    """Discard overdue events and schedule the next period from current time."""
+    Skip,
+}
+
+"""Lifecycle state reported by an owned timer state machine."""
+open enum TimerState {
+    """A timer exists but has not been armed."""
+    Created,
+    """A timer has a valid future or immediately eligible deadline."""
+    Armed,
+    """A one-shot timer fired and awaits its terminal completion observation."""
+    Expired,
+    """The timer was canceled and cannot be armed again."""
+    Canceled,
+    """A one-shot timer completed after its expiration was observed."""
+    Completed,
+}
+
+"""Result notification returned by a timer poll operation."""
+open enum TimerPoll {
+    """The timer remains armed and its deadline has not been reached."""
+    Pending,
+    """The timer delivered one firing notification."""
+    Fired,
+    """The timer is canceled and will not deliver another firing."""
+    Canceled,
+    """The one-shot timer reached its terminal completed state."""
+    Completed,
+}
+
+"""
+An owned timer state machine with no heap allocation.
+
+`state`, `mode`, and `policy` are lifecycle metadata. `period_nanos` is zero
+for one-shot timers and positive for periodic timers. `deadline_ticks` is
+meaningful only while armed and belongs to the active monotonic provider
+domain. Callers must mutate this value only through the timer verbs.
+"""
+open struct Timer {
+    """Owned lifecycle tag: 0 created, 1 armed, 2 expired, 3 canceled, 4 completed."""
+    erg state: u8,
+    """Owned mode tag: 0 one-shot or 1 periodic."""
+    erg mode: u8,
+    """Owned policy tag: 0 coalesce, 1 catch-up, or 2 skip."""
+    erg policy: u8,
+    """Owned positive periodic interval in provider-domain nanoseconds."""
+    erg period_nanos: u64,
+    """Owned provider-domain deadline used by the armed state."""
+    erg deadline_ticks: u64,
+}
+
+"""
+Create an unarmed one-shot timer.
+
+The returned timer owns only bounded scalar state. It has no active provider
+registration, callback, thread, or allocation and must be armed before poll.
+"""
+open verb timer_one_shot() -> Timer {
+    return Timer {
+        state: 0u8,
+        mode: 0u8,
+        policy: 0u8,
+        period_nanos: 0u64,
+        deadline_ticks: 0u64,
+    };
+}
+
+"""
+Configure an owned timer as periodic with an explicit missed-tick policy.
+
+The timer is supplied through an exclusive `ins` loan, so the operation reuses
+caller-owned bounded storage. A zero period is rejected with
+`TimeError.InvalidTimerPeriod`; an invalid lifecycle state is rejected without
+changing the timer. No aggregate timer value crosses a result ABI boundary.
+"""
+open verb timer_periodic(ins timer: Timer, abs period: Duration, abs policy: MissedTickPolicy) -> Result[Int, TimeError] {
+    if period.nanos == 0u64 {
+        return Result[Int, TimeError].Err(TimeError.InvalidTimerPeriod);
+    }
+    if timer.state != 0u8 {
+        return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+    }
+    erg policy_code: u8 = timer_policy_code(policy: abs policy);
+    timer.mode = 1u8;
+    timer.policy = policy_code;
+    timer.period_nanos = period.nanos;
+    timer.deadline_ticks = 0u64;
+    return Result[Int, TimeError].Ok(0);
+}
+
+verb timer_policy_code(abs policy: MissedTickPolicy) -> u8 {
+    return case abs policy {
+        MissedTickPolicy.Coalesce => 0u8,
+        MissedTickPolicy.CatchUp => 1u8,
+        MissedTickPolicy.Skip => 2u8,
+    };
+}
+
+"""
+Arm an owned timer from the current monotonic provider time.
+
+`ins` is an exclusive call-scope loan restored to the caller after mutation.
+Created, canceled, expired, and completed transitions are validated; deadline
+overflow returns `TimeError.Overflow` without changing the timer state.
+"""
+open verb timer_arm(ins timer: Timer, abs delay: Duration) -> Result[Int, TimeError] {
+    erg start: Instant = now();
+    return timer_arm_at(timer: ins timer, start: abs start, delay: abs delay);
+}
+
+"""
+Arm an owned timer against an explicitly supplied instant.
+
+This is the deterministic fake-provider and embedded-provider boundary. The
+instant and resulting deadline must belong to the same monotonic provider
+domain; no wall-clock conversion is performed.
+"""
+open verb timer_arm_at(ins timer: Timer, abs start: Instant, abs delay: Duration) -> Result[Int, TimeError] {
+    erg state = timer.state;
+    case state {
+        3 => { return Result[Int, TimeError].Err(TimeError.InvalidTimerState); },
+        4 => { return Result[Int, TimeError].Err(TimeError.InvalidTimerState); },
+        _ => { },
+    };
+    erg deadline_result = deadline_after(start: abs start, duration: abs delay);
+    case dat deadline_result {
+        Result.Err(error) => {
+            return Result[Int, TimeError].Err(error);
+        },
+        Result.Ok(deadline) => {
+            timer.deadline_ticks = deadline.expires_at;
+            timer.state = 1u8;
+            return Result[Int, TimeError].Ok(0);
+        },
+    };
+    return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+}
+
+"""
+Poll an owned timer using the current monotonic provider.
+
+The operation mutates only lifecycle/deadline fields through `ins`. It emits
+one `TimerPoll.Fired` event at most per call and never invokes callbacks.
+"""
+open verb timer_poll(ins timer: Timer) -> Result[TimerPoll, TimeError] {
+    erg current: Instant = now();
+    return timer_poll_at(timer: ins timer, instant: abs current);
+}
+
+"""
+Poll an owned timer against a deterministic instant.
+
+One-shot timers transition `Armed -> Expired -> Completed`. Periodic timers
+remain armed: `Coalesce` emits once and restarts from current time, `CatchUp`
+advances one period while preserving phase, and `Skip` discards overdue work
+and schedules from current time. The timer is borrowed through `ins`, returns
+`Err(TimeError.InvalidTimerState)` for invalid lifecycle use and
+`Err(TimeError.Overflow)` for an unrepresentable periodic deadline. No policy
+allocates or performs callbacks.
+"""
+open verb timer_poll_at(ins timer: Timer, abs instant: Instant) -> Result[TimerPoll, TimeError] {
+    erg state = timer.state;
+    case state {
+        0 => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+        3 => { return Result[TimerPoll, TimeError].Ok(TimerPoll.Canceled); },
+        4 => { return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed); },
+        2 => {
+            timer.state = 4u8;
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed);
+        },
+        1 => { },
+        _ => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+    };
+    if instant.ticks < timer.deadline_ticks {
+        return Result[TimerPoll, TimeError].Ok(TimerPoll.Pending);
+    }
+    erg mode = timer.mode;
+    case mode {
+        0 => {
+            timer.state = 2u8;
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Fired);
+        },
+        1 => {
+            return timer_poll_periodic(timer: ins timer, instant: abs instant);
+        },
+        _ => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+    };
+    return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+}
+
+"""
+Cancel an owned timer and prevent future firing notifications.
+
+The timer is mutated through an exclusive `ins` loan and restored to the
+caller. The operation returns `Ok(0)` when cancellation is accepted or already
+applied, and `Err(TimeError.InvalidTimerState)` for a completed timer.
+"""
+open verb timer_cancel(ins timer: Timer) -> Result[Int, TimeError] {
+    erg state = timer.state;
+    case state {
+        4 => {
+            return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+        },
+        3 => {
+            return Result[Int, TimeError].Ok(0);
+        },
+        _ => {
+            timer.state = 3u8;
+            return Result[Int, TimeError].Ok(0);
+        },
+    };
+    return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+}
+
+"""
+Read timer lifecycle metadata without mutating or consuming the timer.
+
+The timer is borrowed with `abs`; the returned `TimerState` is a value and no
+allocation or provider access occurs.
+"""
+open verb timer_state(abs timer: Timer) -> TimerState {
+    erg state = timer.state;
+    return case state {
+        0 => TimerState.Created,
+        1 => TimerState.Armed,
+        2 => TimerState.Expired,
+        3 => TimerState.Canceled,
+        _ => TimerState.Completed,
+    };
+}
+
+verb timer_poll_periodic(ins timer: Timer, abs instant: Instant) -> Result[TimerPoll, TimeError] {
+    erg policy = timer.policy;
+    case policy {
+        0 => {
+            if instant.ticks > U64_MAX - timer.period_nanos {
+                return Result[TimerPoll, TimeError].Err(TimeError.Overflow);
+            }
+            timer.deadline_ticks = instant.ticks + timer.period_nanos;
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Fired);
+        },
+        1 => {
+            if timer.deadline_ticks > U64_MAX - timer.period_nanos {
+                return Result[TimerPoll, TimeError].Err(TimeError.Overflow);
+            }
+            timer.deadline_ticks += timer.period_nanos;
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Fired);
+        },
+        2 => {
+            if instant.ticks > U64_MAX - timer.period_nanos {
+                return Result[TimerPoll, TimeError].Err(TimeError.Overflow);
+            }
+            timer.deadline_ticks = instant.ticks + timer.period_nanos;
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Pending);
+        },
+        _ => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+    };
+    return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+}
