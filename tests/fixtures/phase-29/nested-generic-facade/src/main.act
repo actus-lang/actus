@@ -1,0 +1,7 @@
+import aie;
+
+verb main() -> Int {
+    erg storage: Storage[4] = Storage[4] { values: Array[u32, 4]() };
+    return root(storage: ins storage) as Int;
+}
+

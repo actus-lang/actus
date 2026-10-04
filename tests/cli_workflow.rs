@@ -321,6 +321,43 @@ fn native_build_propagates_nested_generics_through_a_child_facade() {
 
 #[cfg(unix)]
 #[test]
+fn phase29_nested_generic_facade_baseline_passes_all_native_stages() {
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/phase-29/nested-generic-facade");
+    let compiler = env!("CARGO_BIN_EXE_actus");
+
+    let check = Command::new(compiler)
+        .args(["check", "--strict"])
+        .current_dir(&fixture)
+        .output()
+        .expect("run phase 29 baseline check");
+    assert!(check.status.success(), "stderr: {}", String::from_utf8_lossy(&check.stderr));
+
+    let object = Command::new(compiler)
+        .args(["build", "--strict", "--emit", "obj"])
+        .current_dir(&fixture)
+        .output()
+        .expect("build phase 29 baseline object");
+    assert!(object.status.success(), "stderr: {}", String::from_utf8_lossy(&object.stderr));
+
+    let executable = std::env::temp_dir().join(format!("actus-phase29-{}", std::process::id()));
+    let build = Command::new(compiler)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&executable)
+        .current_dir(&fixture)
+        .output()
+        .expect("build phase 29 baseline executable");
+    assert!(build.status.success(), "stderr: {}", String::from_utf8_lossy(&build.stderr));
+
+    let run = Command::new(&executable).output().expect("run phase 29 baseline executable");
+    assert_eq!(run.status.code(), Some(8));
+
+    let _ = fs::remove_file(executable);
+    let _ = fs::remove_dir_all(fixture.join("capsula"));
+}
+
+#[cfg(unix)]
+#[test]
 fn native_build_links_multiple_child_facades_once() {
     let root = std::env::temp_dir().join(format!("actus-multiple-children-{}", std::process::id()));
     let runtime = root.join("src/device/runtime");
