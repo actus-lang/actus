@@ -214,15 +214,29 @@ provide direct source, native, and execution evidence.
 
 ## Gate 28.4: Monotonicity, arithmetic, and runtime safety
 
-- [ ] Add a native ordering test proving `finished >= started` for sequential
+- [x] Add a native ordering test proving `finished >= started` for sequential
       reads in one process.
-- [ ] Add a repeated-read test that does not assume a specific clock
+- [x] Add a repeated-read test that does not assume a specific clock
       resolution or exact elapsed duration.
-- [ ] Test elapsed subtraction with `u64` values in the language.
-- [ ] Define and test behavior for a counter conversion overflow.
-- [ ] Verify no negative duration is representable through the public unsigned
+- [x] Test elapsed subtraction with `u64` values in the language.
+- [x] Define and test behavior for a counter conversion overflow.
+- [x] Verify no negative duration is representable through the public unsigned
       API without an explicit source-level underflow diagnostic or trap.
-- [ ] Verify the bridge does not allocate and does not expose platform state.
+- [x] Verify the bridge does not allocate and does not expose platform state.
+
+### Gate 28.4 evidence
+
+- Hosted native acceptance performs two reads, computes `finished - started`
+  as `u64`, and checks the ordering without assuming a specific resolution or
+  elapsed duration.
+- Runtime unit coverage proves sequential reads are non-decreasing and that
+  nanosecond conversion rejects a value beyond `u64` instead of truncating it.
+- A source fixture with unsigned elapsed underflow cannot produce a successful
+  native execution; the runtime terminates with a non-zero failure at the
+  native trap boundary.
+- The bridge stores only a process-local `Instant` in a static `OnceLock`,
+  performs no heap allocation or platform-state exposure in its Actus-facing
+  ABI, and uses no floating-point operations.
 
 ## Gate 28.5: Tooling and cross-profile behavior
 

@@ -17,7 +17,7 @@ fn hosted_std_time_bridge_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); if finished >= started { return 0; } return 1; }",
+        "import std::time; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); erg elapsed: u64 = finished - started; if finished >= started && elapsed >= 0u64 { return 0; } return 1; }",
     )
     .expect("fixture source should be written");
 
@@ -91,5 +91,42 @@ fn freestanding_std_time_is_rejected_before_native_emission() {
         .expect("Actus check should start");
     assert!(!check.status.success());
     assert!(String::from_utf8_lossy(&check.stderr).contains("E1112"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn unsigned_elapsed_underflow_is_rejected_before_native_execution() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-time-underflow-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("underflow-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_underflow\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); return (started - finished) as Int; }",
+    )
+    .expect("fixture source should be written");
+
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(build.success(), "unsigned underflow fixture should compile: {build}");
+    let execution = Command::new(&output).output().expect("underflow executable should run");
+    assert!(!execution.status.success(), "unsigned elapsed underflow was accepted");
+    assert_ne!(execution.status.code(), Some(0), "underflow returned success");
     let _ = fs::remove_dir_all(root);
 }
