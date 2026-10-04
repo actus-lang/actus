@@ -64,6 +64,26 @@ fn rejects_copy_of_owned_aggregate_values() {
 }
 
 #[test]
+fn rejects_copy_after_an_owning_transfer() {
+    let error = analyze_source(
+        "verb consume(dat value: u32) { } verb main() { erg value: u32 = 41u32; consume(value: dat value); erg repeated: u32 = copy(value: abs value); }",
+    )
+    .expect_err("an owning transfer must leave the source unavailable");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UseAfterMove { name } if name == "value"
+    ));
+}
+
+#[test]
+fn scalar_copy_preserves_the_owner_across_branch_joins() {
+    analyze_source(
+        "verb main() -> Int { erg value: u32 = 41u32; if true { erg left: u32 = copy(value: abs value); } else { erg right: u32 = copy(value: abs value); } return value as Int + 1; }",
+    )
+    .expect("read-only scalar reuse must restore the owner at a branch join");
+}
+
+#[test]
 fn validates_print_arguments() {
     analyze_source("verb main() { print(42); }").expect("integer output should be valid");
     analyze_source("verb main() { print(\"text\"); }")

@@ -28,11 +28,17 @@ layout, bounds, or native safety guarantees.
 
 ### Gate 32.2 — Semantic analysis
 
-- [ ] Add accepted fixtures for repeated scalar reuse.
-- [ ] Add rejected fixtures for implicit or unsupported copying.
-- [ ] Verify moved bindings remain rejected after an owning call.
-- [ ] Verify read-only scalar calls do not consume the caller binding.
-- [ ] Verify branch joins and cleanup state remain deterministic.
+- [x] Add accepted fixtures for repeated scalar reuse.
+- [x] Add rejected fixtures for implicit or unsupported copying.
+- [x] Verify moved bindings remain rejected after an owning call.
+- [x] Verify read-only scalar calls do not consume the caller binding.
+- [x] Verify branch joins and cleanup state remain deterministic.
+
+Evidence: `tests/semantic_intrinsics.rs` covers accepted repeated scalar use,
+rejection of implicit and aggregate copying, use-after-move diagnostics after
+an owning transfer, owner preservation across branch joins, and the existing
+cleanup-aware semantic checks. The targeted semantic suite passes with
+47 tests.
 
 ### Gate 32.3 — Fixed-slot selection
 
