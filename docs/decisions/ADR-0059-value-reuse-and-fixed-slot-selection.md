@@ -1,6 +1,6 @@
 # ADR-0059: Ownership-Safe Value Reuse and Fixed-Slot Selection
 
-- **Status:** Accepted for Gate 32.1
+- **Status:** Accepted through Gate 32.3
 - **Date:** 2026-10-04
 - **Decision owners:** Actus language and compiler maintainers
 
@@ -118,3 +118,16 @@ The compiler accepts `Int`, `Bool`, and fixed-width integer values. It rejects
 calls without an explicit `abs` role and rejects cleanup-bearing aggregates.
 Semantic coverage is in `tests/semantic_intrinsics.rs`; native executable
 coverage is in `tests/arrays_cli.rs`.
+
+## Gate 32.3 implementation evidence
+
+The existing indexed place form, `values[index]`, is the bounded fixed-slot
+access form. It preserves the array element type and declared capacity during
+semantic analysis, retains packed layout metadata for pack-backed storage, and
+enforces ownership roles for indexed views and mutations. Constant invalid
+indexes are rejected during semantic analysis; computed indexes use the
+existing deterministic native bounds checks.
+
+Semantic evidence is in `tests/semantic/arrays.rs`,
+`tests/semantic/packs.rs`, and `tests/semantic/loans.rs`. Native indexed access
+evidence is in `tests/arrays_cli.rs`.

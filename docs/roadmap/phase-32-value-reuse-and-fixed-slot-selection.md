@@ -42,11 +42,18 @@ cleanup-aware semantic checks. The targeted semantic suite passes with
 
 ### Gate 32.3 — Fixed-slot selection
 
-- [ ] Define the bounded fixed-slot accessor or equivalent language form.
-- [ ] Preserve element type, slot count, layout, and alignment metadata.
-- [ ] Add accepted indexed-selection fixtures.
-- [ ] Add rejected out-of-range and invalid-role fixtures.
-- [ ] Verify direct and computed indexes produce identical bounds behavior.
+- [x] Define the bounded fixed-slot accessor or equivalent language form.
+- [x] Preserve element type, slot count, layout, and alignment metadata.
+- [x] Add accepted indexed-selection fixtures.
+- [x] Add rejected out-of-range and invalid-role fixtures.
+- [x] Verify direct and computed indexes produce identical bounds behavior.
+
+Evidence: indexed access through `values[index]` is the bounded fixed-slot
+form. Semantic coverage in `tests/semantic/arrays.rs`, `tests/semantic/packs.rs`,
+and `tests/semantic/loans.rs` verifies element typing, declared capacity,
+packed layout metadata, constant out-of-range rejection, invalid index types,
+and ownership-role restrictions. Native coverage in `tests/arrays_cli.rs`
+passes 72 tests, including dynamic bounds traps and contiguous indexed access.
 
 ### Gate 32.4 — Native lowering
 

@@ -22,6 +22,14 @@ fn accepts_array_reads_and_in_place_writes() {
 }
 
 #[test]
+fn accepts_direct_and_computed_fixed_slot_reads_with_the_same_element_contract() {
+    analyze_source(
+        "verb read(abs values: Array[u32, 4], abs index: u32) -> u32 { erg direct: u32 = values[1]; erg computed: u32 = values[index]; return direct + computed; }",
+    )
+    .expect("direct and computed fixed-slot reads should preserve element type and capacity");
+}
+
+#[test]
 fn accepts_nested_array_struct_place_assignment() {
     analyze_source(
         "struct Point { x: Int, y: Int, } verb write(erg points: Array[Point, 2]) { points[1].x = 7; points[1].x += 1; }",
