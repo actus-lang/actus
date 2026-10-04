@@ -187,15 +187,30 @@ provide direct source, native, and execution evidence.
 
 ## Gate 28.3: Compiler semantic and native lowering support
 
-- [ ] Register the `std::time` declaration in the same semantic and module
+- [x] Register the `std::time` declaration in the same semantic and module
       visibility path as other standard-library APIs.
-- [ ] Lower the call with the declared `u64` return type and existing native
+- [x] Lower the call with the declared `u64` return type and existing native
       call conventions.
-- [ ] Preserve the call through imported facades and nested package module
+- [x] Preserve the call through imported facades and nested package module
       graphs.
-- [ ] Ensure native dependency closure includes the timer bridge exactly once.
-- [ ] Reject unavailable runtime/target combinations before native emission.
-- [ ] Verify generated integer IR contains no floating-point instructions.
+- [x] Ensure native dependency closure includes the timer bridge exactly once.
+- [x] Reject unavailable runtime/target combinations before native emission.
+- [x] Verify generated integer IR contains no floating-point instructions.
+
+### Gate 28.3 evidence
+
+- The existing semantic/module resolver path resolves canonical
+  `import std::time;` imports and exposes only the facade's public verb.
+- The existing external-verb lowering path preserves the declared `u64`
+  return ABI without adding a time-specific expression-lowering branch.
+- Hosted object acceptance verifies that the undefined canonical `std::time`
+  facade wrapper appears exactly once in the emitted object, while executable
+  acceptance proves its transitive `actus_monotonic_nanos` runtime link
+  resolves.
+- A freestanding `std` project importing `std::time` is rejected with
+  `E1112` during target/module validation, before native emission.
+- The hosted acceptance manifest enables `verify_no_float_ir`; the build and
+  generated IR audit pass with no floating-point instructions.
 
 ## Gate 28.4: Monotonicity, arithmetic, and runtime safety
 
