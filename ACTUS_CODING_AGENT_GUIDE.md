@@ -235,10 +235,9 @@ cleanup. Capacity, invalid UTF-8, invalid storage, and bounds failures are
 typed `StringError` results. Raw runtime bridges remain private; application
 code uses the typed facade and `Result` errors.
 
-This is the supported boundary for tokenizer and embedded protocol work:
-borrow `String` when reading static text, and use owned `Utf8Buffer` when
-building or retaining dynamic UTF-8. A direct `String` to owned-`String`
-conversion is not currently part of the language contract.
+For text processing, borrow `String` when reading static text, and use owned
+`Utf8Buffer` when building or retaining dynamic UTF-8. A direct `String` to
+owned-`String` conversion is not currently part of the language contract.
 
 ## 5. Keywords and words
 

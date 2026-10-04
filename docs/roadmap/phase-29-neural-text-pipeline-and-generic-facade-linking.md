@@ -8,46 +8,30 @@ coverage, native evidence, and documentation are present in the repository.
 
 ## Objective
 
-Make Actus capable of expressing a production-quality text-to-neural pipeline
-without forcing application code to reproduce the internal AIE storage layout.
-The phase begins with a compiler correctness fix: instantiated generic calls
-that cross nested module facades must be discovered and emitted by native
-dependency collection. Only after that foundation is proven will the language
-surface be extended for safe UTF-8 access, byte-to-string construction,
-tokenization, sparse encodings, and high-level phrase training/recall APIs.
+Make Actus capable of serving production systems that need safe text and
+binary boundaries without embedding a particular neural application into the
+compiler or standard library. The phase begins with a compiler correctness
+fix: instantiated generic calls that cross nested module facades must be
+discovered and emitted by native dependency collection. It then establishes
+the hosted String/UTF-8 ownership boundary and the tooling/runtime contracts
+that external applications can build on.
 
-The intended application surface is:
-
-```act
-erg phrase: String = "Hello Giorgi";
-train_phrase(fabric: ins fabric, phrase: abs phrase);
-
-erg result: String = recall_phrase(fabric: ins fabric, input: abs phrase);
-println(text: abs result);
-```
-
-The internal neural representation may remain explicit and hardware-oriented
-inside its implementation modules. That representation must not leak into the
-text-facing API.
+Tokenizer, vocabulary, sparse encoding, neural storage, training, and recall
+belong to external application projects. They are not Actus compiler or
+standard-library responsibilities and are intentionally excluded from this
+phase.
 
 ## Architectural boundaries
 
-```text
-src/tokenizer/  -> String/UTF-8 input into tokens
-src/encoding/   -> token identifiers into fixed-width sparse codes
-src/aie/        -> propagation, plasticity, storage, and recall
-```
-
-- `src/tokenizer/` owns vocabulary lookup, UTF-8 token boundaries, token IDs,
-  and decoding policy. It must not know AIE node layout.
-- `src/encoding/` owns token-ID-to-code mapping and 128-bit sparse-code
-  operations. It must not own phrase storage or module resolution.
-- `src/aie/` owns neural propagation and learning. It must not parse UTF-8 or
-  hardcode a user-facing phrase vocabulary.
+- External applications own tokenizer, vocabulary, encoding, neural
+  propagation, and learning policy. Those modules must consume the typed
+  Actus text/buffer APIs rather than require compiler-specific hooks.
+- Actus owns only the language, standard-library, runtime, ABI, ownership, and
+  module-resolution contracts needed by those external applications.
 - Compiler module facades remain the only public gateway. Private helpers may
   be emitted as native dependencies but must not become source-visible API.
-- Static training fixtures are data contracts, not compiler implementation
-  logic. They must be deterministic, versioned, and independently testable.
+- Application fixtures and neural data are external project contracts, not
+  compiler implementation logic.
 
 ## Gate 29.0: Baseline and failure reproduction
 
@@ -230,125 +214,72 @@ src/aie/        -> propagation, plasticity, storage, and recall
   semantic facade tests.
 - The guide documents the distinction between legacy borrowed `String` and
   owned `Utf8Buffer`, including ownership roles and provider limitations.
-- Gate 29.5 is complete; Gate 29.6 begins tokenizer and vocabulary work.
+- Gate 29.5 is complete; Gate 29.6 begins external-consumer integration
+  readiness work.
 
-## Gate 29.6: Tokenizer module and vocabulary contract
+## Gate 29.6: External consumer integration boundary
 
-- [ ] Create `src/tokenizer/` with a canonical facade and responsibility-sized
-      sibling modules.
-- [ ] Define token ID width, unknown-token behavior, vocabulary ownership, and
-      deterministic ordering.
-- [ ] Separate UTF-8 decoding from vocabulary lookup.
-- [ ] Define tokenization of whitespace, punctuation, repeated separators,
-      multibyte characters, and unknown sequences.
-- [ ] Make vocabulary data manifest- or fixture-driven rather than hardcoded
-      inside compiler code.
-- [ ] Add encode/decode round-trip tests and rejected malformed-input tests.
-- [ ] Keep tokenizer API independent of AIE node and axon structures.
+- [x] Document the supported `String`, `Utf8Buffer`, `Buffer`, and `Result`
+      contracts for external application modules.
+- [x] Verify that external consumers can import the public standard-library
+      facade without accessing private runtime bridges.
+- [x] Define the boundary between Actus-provided text storage and
+      application-owned tokenizer, vocabulary, and encoding code.
+- [x] Document hosted versus freestanding limitations for the text APIs.
+- [x] Add a generic, non-domain-specific consumer fixture proving that an
+      external module can read UTF-8 bytes and write owned bytes without
+      compiler or application-specific hooks.
 
 ### Gate 29.6 evidence
 
-- Deterministic tokenizer fixtures with expected token IDs and reconstructed
-  text.
-- Static vocabulary fixture checksum and version identity.
-- Native tests for bounded storage and failure behavior.
+- Public facade semantic tests and private-bridge rejection tests.
+- Native object and executable evidence for the generic consumer fixture.
+- Ownership, capacity, invalid-input, and zero-float evidence at the public
+  boundary.
+- Checked-in fixture: `tests/fixtures/phase-29/external-text-consumer/`.
+- The fixture imports only `std::string`, transfers caller-owned `Buffer`
+  storage into `Utf8Buffer`, reads a validated byte, and returns zero after
+  strict check, object emission, executable linking, and execution.
+- Existing `std::string` semantic/runtime/native tests provide the private
+  bridge, malformed-input, capacity, ownership, and zero-float evidence.
+- Gate 29.6 is complete; Gate 29.7 covers tooling and public API
+  synchronization.
 
-## Gate 29.7: Sparse 128-bit encoding module
+## Gate 29.7: Tooling and public API synchronization
 
-- [ ] Create `src/encoding/` with a canonical facade.
-- [ ] Define the exact 128-bit code representation and active-bit invariant.
-- [ ] Define deterministic token-ID-to-pattern mapping and collision behavior.
-- [ ] Provide integer-only bind, bundle, permutation, overlap, and population
-      count operations appropriate to the selected representation.
-- [ ] Keep bit patterns and mapping policy outside user-facing phrase code.
-- [ ] Add tests for determinism, orthogonality/collision expectations, zero
-      codes, maximum IDs, and unsupported IDs.
-- [ ] Verify no floating-point instructions, hidden allocation, or unstable
-      platform-dependent bit ordering.
-
-### Gate 29.7 evidence
-
-- Golden vectors for every encoding operation.
-- Native IR zero-float audit and deterministic object comparison.
-- Benchmark measurements separated from correctness assertions.
-
-## Gate 29.8: High-level phrase training and recall API
-
-- [ ] Define a public `train_phrase` API that accepts `String` and an explicit
-      exclusive `ins` fabric/storage contract.
-- [ ] Define a public `recall_phrase` API with typed success and failure
-      behavior, including unknown input and insufficient-capacity cases.
-- [ ] Keep 64-byte minicolumn layout, axon slots, free-list, and plasticity
-      rules private to the AIE implementation facade.
-- [ ] Ensure training and recall do not require callers to write one verb per
-      character or hand-assign 128-bit patterns.
-- [ ] Define repeat training, conflicting phrases, capacity exhaustion,
-      deterministic replay, and persistence behavior.
-- [ ] Add end-to-end tests for `String -> train -> recall -> String`.
-
-### Gate 29.8 evidence
-
-- A readable application fixture using only the high-level phrase API.
-- Exact success/failure outputs and deterministic replay assertions.
-- Ownership, allocation, and native execution evidence for training and recall.
-
-## Gate 29.9: Static fixture and benchmark data separation
-
-- [ ] Move phrase/token/pattern data into a versioned static fixture format.
-- [ ] Remove hand-written per-character benchmark setup from executable
-      application code.
-- [ ] Define fixture schema, version, checksum, ordering, and compatibility
-      policy.
-- [ ] Separate correctness fixtures from performance workloads.
-- [ ] Keep benchmark output reproducible and label machine/scheduler/compiler
-      conditions without presenting timing as a universal guarantee.
-- [ ] Add fixture corruption, truncation, version mismatch, and duplicate-entry
-      rejection tests.
-
-### Gate 29.9 evidence
-
-- Checked-in static fixture and schema documentation.
-- Loader tests for valid and invalid fixtures.
-- A benchmark that consumes fixture data without embedding its contents in
-  source-level control flow.
-
-## Gate 29.10: Tooling and public API synchronization
-
-- [ ] Add formatter coverage for tokenizer, encoding, and phrase APIs.
+- [ ] Add formatter coverage for the public String and UTF-8 APIs.
 - [ ] Add LSP completion, hover, definition, diagnostics, and visibility tests
-      through all new facades.
+      through the String and UTF-8 facades.
 - [ ] Ensure `check`, `test`, object emission, executable emission, and LSP use
       the same module and native dependency graph.
 - [ ] Document every public type, verb, error, ownership role, and ABI boundary.
 - [ ] Update the coding guide, language guide, runtime documentation, API
-      index, ADRs, and examples in the same logical change.
-- [ ] Verify no private AIE layout or raw bridge leaks into public completion or
+      index, ADRs, and generic examples in the same logical change.
+- [ ] Verify no private runtime bridge leaks into public completion or
       documentation.
 
-## Gate 29.11: Resource, determinism, and safety acceptance
+## Gate 29.8: Resource, determinism, and safety acceptance
 
-- [ ] Define memory ownership and bounded-storage behavior for tokenizer,
-      encoding, training, and recall.
 - [ ] Add no-allocation tests for APIs that promise caller-owned storage.
 - [ ] Add malformed-input, capacity-exhaustion, stale-handle, and bounds
       rejection tests.
 - [ ] Verify deterministic cleanup on every error and early-return path.
-- [ ] Verify zero-float IR for integer-only encoding and neural operations.
+- [ ] Verify zero-float IR for integer-only text and buffer operations.
 - [ ] Add reproducible object and executable build checks.
 - [ ] Confirm no unsafe bridge is exposed without a typed, documented boundary.
 
-## Gate 29.12: End-to-end production acceptance
+## Gate 29.9: End-to-end compiler and runtime acceptance
 
-- [ ] `actus check --strict` passes for the complete text pipeline project.
-- [ ] `actus test --strict` passes all tokenizer, encoding, AIE, fixture, and
-      linker regression tests.
+- [ ] `actus check --strict` passes for the complete generic text consumer
+      fixture.
+- [ ] `actus test --strict` passes all String, UTF-8, facade, and linker
+      regression tests.
 - [ ] Native object and executable builds pass with no undefined specialized
       facade symbols.
-- [ ] A readable phrase training and recall example executes successfully.
-- [ ] The example does not contain per-character pattern assignments or manual
-      internal layout construction.
+- [ ] The generic consumer example executes successfully without
+      application-specific neural structures.
 - [ ] Zero-float, allocation, determinism, visibility, source-limit, and
-      documentation checks pass.
+      documentation checks pass at the Actus boundary.
 - [ ] The final API and evidence are reviewed against every earlier gate; no
       checkbox is closed from a source-level check alone.
 
@@ -356,9 +287,10 @@ src/aie/        -> propagation, plasticity, storage, and recall
 
 - This phase does not promise human-level intelligence, semantic truth, or
   general language understanding.
-- This phase does not require BPE, a specific tokenizer algorithm, or a neural
-  learning law before the corresponding contract is reviewed.
-- This phase does not expose AIE hardware layout as a general application API.
+- This phase does not implement tokenizers, vocabularies, sparse encoders,
+  neural engines, training, or recall APIs.
+- This phase does not expose application-specific neural hardware layout as a
+  general Actus API.
 - This phase does not add a desktop UI, hosted product integration, or a
   commercial application.
 - This phase does not hide allocation, scheduler, persistence, or hardware
@@ -368,7 +300,7 @@ src/aie/        -> propagation, plasticity, storage, and recall
 
 Phase 29 is complete only when nested generic calls through module facades are
 correctly specialized and linked without manual concrete calls, String/UTF-8
-boundaries are typed and tested, tokenizer/encoding/AIE responsibilities are
-separate, phrase training and recall use a readable public API, fixtures are
-versioned and deterministic, and all compiler/tooling/native/resource gates
-have direct evidence.
+boundaries are typed and tested, external consumers have a documented and
+verified integration boundary, and all compiler/tooling/native/resource gates
+have direct evidence. Application tokenization, encoding, and neural behavior
+are validated in their own repositories.
