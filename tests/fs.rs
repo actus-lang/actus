@@ -286,6 +286,20 @@ fn std_fs_one_shot_write_and_read_to_string_execute_natively() {
 }
 
 #[test]
+fn std_fs_round_trips_a_large_position_independent_payload() {
+    let root = std::env::temp_dir().join(format!("actus-fs-large-payload-{}", std::process::id()));
+    let data_path = root.join("large.brain");
+    let path = path_literal(&data_path);
+    let source = format!(
+        "import io; import fs; verb fill(ins buffer: Buffer) {{ erg index: u32 = 0u32; loop {{ if index >= 4096u32 {{ break; }} append(buffer, 65u8); index += 1u32; }} }} verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; erg capacity: Int = 4116; reserve(buffer: ins contents, capacity: erg capacity); fill(buffer: ins contents); erg written = write_file(path: abs path, contents: abs contents); return case dat written {{ Result.Ok(count) => case count {{ 4096 => 0, _ => 1, }}, Result.Err(_) => 2, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    assert_eq!(fs::read(&data_path).expect("read large payload fixture").len(), 4096);
+    fs::remove_dir_all(root).expect("remove large payload fixture");
+}
+
+#[test]
 fn std_fs_read_to_bytes_and_rejects_invalid_utf8() {
     let root = std::env::temp_dir().join(format!("actus-fs-bytes-{}", std::process::id()));
     let data_path = root.join("bytes.bin");

@@ -52,6 +52,13 @@ fn transfers_buffer_return_ownership() {
 
 #[cfg(unix)]
 #[test]
+fn transfers_and_appends_a_large_buffer_without_native_fault() {
+    let source = "verb fill(ins buffer: Buffer) { erg index: u32 = 0u32; loop { if index >= 4096u32 { break; } append(buffer, 65u8); index += 1u32; } } verb create() -> Buffer { erg buffer: Buffer = Buffer[4116]; fill(buffer: ins buffer); return buffer; } verb main() -> Int { erg buffer: Buffer = create(); return buffer[4116u32] as Int; }\n";
+    assert_eq!(build_and_run(source, "buffer-large-return-owner"), 65);
+}
+
+#[cfg(unix)]
+#[test]
 fn transfers_dat_buffer_without_duplicate_cleanup() {
     let source = "verb consume(dat buffer: Buffer) -> Int { return 42; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; return consume(buffer: buffer); }\n";
     assert_eq!(build_and_run(source, "buffer-dat"), 42);
