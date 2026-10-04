@@ -373,6 +373,44 @@ fn generic_nested_module_lowers_facade_constant_without_native_binding() {
 }
 
 #[test]
+fn generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization() {
+    let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let (root, input, output) = project("generic-constant-uses", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open struct Settings {
+    erg stride: u16,
+}
+
+open verb inspect[N: Usize]() -> u16 {
+    erg scalar: u16 = BUFFER_STRIDE;
+    erg settings = Settings { stride: BUFFER_STRIDE, };
+    if scalar == BUFFER_STRIDE && (N as u16) == 2u16 {
+        return settings.stride + (N as u16);
+    }
+    return 0u16;
+}
+"#,
+    )
+    .expect("write generic feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(26));
+    fs::remove_dir_all(root).expect("remove generic constant uses project");
+}
+
+#[test]
 fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
     let source = "import aie; verb main() -> Int { return snapshot_is_valid(); }\n";
     let (root, input, output) = project("config-snapshot-module", source);

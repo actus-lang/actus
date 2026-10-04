@@ -86,20 +86,23 @@ source-level literal workarounds.
 
 ## Gate 31.3: Generic specialization propagation
 
-- [ ] Carry the resolved constant environment into generic verb instances.
-- [ ] Resolve constants inside generic bodies after specialization without
+- [x] Carry the resolved constant environment into generic verb instances.
+- [x] Resolve constants inside generic bodies after specialization without
       falling back to the unspecialized identifier.
-- [ ] Preserve const-generic arguments and ordinary type arguments separately.
-- [ ] Support a generic nested module whose body returns or consumes an
+- [x] Preserve const-generic arguments and ordinary type arguments separately.
+- [x] Support a generic nested module whose body returns or consumes an
       exported facade constant.
-- [ ] Cache equivalent specialized constant environments deterministically.
-- [ ] Reject incomplete or conflicting environments before native emission.
+- [x] Cache equivalent specialized constant environments deterministically.
+- [x] Reject incomplete or conflicting environments before native emission.
 
 ### Gate 31.3 evidence
 
 - Generic nested-facade acceptance test with a concrete executable result.
 - Generic scalar, predicate, and aggregate-use coverage.
 - Repeated specialization produces no duplicate native declaration.
+- `generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization`
+  verifies constant substitution together with `N` specialization and returns
+  the expected executable result `26`.
 
 ## Gate 31.4: Native dependency and symbol integrity
 
