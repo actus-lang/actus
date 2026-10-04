@@ -20,20 +20,25 @@ source-level literal workarounds.
 
 ## Gate 31.0: Contract and module-graph inventory
 
-- [ ] Adopt ADR-0058 as the governing decision for this phase.
-- [ ] Identify the existing constant declaration, export, aggregation,
+- [x] Adopt ADR-0058 as the governing decision for this phase.
+- [x] Identify the existing constant declaration, export, aggregation,
       normalization, generic specialization, and native-emission boundaries.
-- [ ] Document the single shared representation of a resolved constant's
+- [x] Document the single shared representation of a resolved constant's
       declaration identity, type, initializer, provenance, and source span.
-- [ ] Confirm that canonical parent facades remain the only external gateway
+- [x] Confirm that canonical parent facades remain the only external gateway
       to nested modules.
-- [ ] Add a neutral minimal reproducer showing strict check success followed by
-      native failure for an exported nested constant.
+- [x] Add a neutral minimal reproducer covering strict checking and native
+      emission for an exported nested constant.
 
 ### Gate 31.0 evidence
 
-- Reproducer and failure diagnostic recorded in a compiler regression test.
-- No changes outside the Actus compiler, tests, and required documentation.
+- Reproducer `canonical_parent_facade_exposes_nested_configuration_constant`
+  covers `config -> feature facade -> implementation -> consumer`, strict
+  checking, native emission, and the expected executable result.
+- The ADR records the observed native-binding failure shape; existing
+  configuration tests cover accepted scalar, aggregate, predicate, and nested
+  module cases.
+- No changes outside the Actus compiler tests and required documentation.
 
 ## Gate 31.1: Facade-exported constant environment
 
