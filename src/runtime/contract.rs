@@ -41,6 +41,8 @@ pub const BUFFERED_WRITE_STDOUT_SYMBOL: &str = "actus_buffered_write_stdout";
 pub const FLUSH_BUFFERED_STDOUT_SYMBOL: &str = "actus_flush_buffered_stdout";
 pub const ENUM_ALLOCATE_SYMBOL: &str = "actus_enum_allocate";
 pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
+/// Stable hosted runtime symbol for monotonic nanosecond reads.
+pub const MONOTONIC_NANOS_SYMBOL: &str = "actus_monotonic_nanos";
 
 /// Runtime operations are explicit capabilities rather than implicit compiler
 /// services. Freestanding targets may provide none of these capabilities.

@@ -75,6 +75,7 @@ fn infallible_verbs() -> BTreeSet<&'static str> {
         "buffered_writer",
         "cursor",
         "drop",
+        "monotonic_nanos",
     ]
     .into_iter()
     .collect()

@@ -69,6 +69,14 @@ fn exposes_the_versioned_runtime_contract_symbols() {
     assert_eq!(actus::runtime::BUFFER_ALLOCATE_SYMBOL, "actus_buffer_allocate");
     assert_eq!(actus::runtime::BUFFER_APPEND_SYMBOL, "actus_buffer_append");
     assert_eq!(actus::runtime::BUFFER_DROP_SYMBOL, "actus_buffer_drop");
+    assert_eq!(actus::runtime::MONOTONIC_NANOS_SYMBOL, "actus_monotonic_nanos");
+}
+
+#[test]
+fn hosted_monotonic_clock_reads_are_non_decreasing() {
+    let first = actus::runtime::actus_monotonic_nanos();
+    let second = actus::runtime::actus_monotonic_nanos();
+    assert!(second >= first);
 }
 
 #[test]

@@ -159,14 +159,31 @@ provide direct source, native, and execution evidence.
 
 ## Gate 28.2: Hosted runtime bridge
 
-- [ ] Add the documented native bridge for the hosted `std` runtime.
-- [ ] Use a platform monotonic clock rather than wall-clock time.
-- [ ] Convert the platform result to nanoseconds with checked arithmetic.
-- [ ] Return a deterministic typed failure or target diagnostic if the clock
+- [x] Add the documented native bridge for the hosted `std` runtime.
+- [x] Use a platform monotonic clock rather than wall-clock time.
+- [x] Convert the platform result to nanoseconds with checked arithmetic.
+- [x] Return a deterministic typed failure or target diagnostic if the clock
       cannot be read or its value cannot fit in `u64`.
-- [ ] Keep the bridge allocation-free and free of floating-point operations.
-- [ ] Register the bridge through the existing runtime/native symbol boundary;
+- [x] Keep the bridge allocation-free and free of floating-point operations.
+- [x] Register the bridge through the existing runtime/native symbol boundary;
       do not add special handling to unrelated code-generation paths.
+
+### Gate 28.2 evidence
+
+- Added `src/runtime/time.rs` with a process-local `OnceLock<Instant>` origin
+  and a hosted `actus_monotonic_nanos() -> u64` C-ABI symbol.
+- The bridge uses `Instant`, never wall-clock/calendar APIs, and converts
+  `Duration::as_nanos()` through checked `u64::try_from`.
+- Conversion overflow is not wrapped, clamped, or truncated; the bridge uses
+  the documented hard runtime failure boundary. The overflow conversion path
+  has a direct regression test.
+- Registered the stable symbol in `src/runtime/contract.rs` and exported it
+  through `src/runtime/mod.rs`; no code-generation special case was added.
+- Added native hosted acceptance coverage that builds and executes a package
+  importing `std::time`, performs two reads, enables `verify_no_float_ir`, and
+  requires exit code `0` with empty output.
+- Runtime and semantic evidence passed: 10 runtime tests, 3 `std::time`
+  semantic tests, and the hosted native executable test.
 
 ## Gate 28.3: Compiler semantic and native lowering support
 

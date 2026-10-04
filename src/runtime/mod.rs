@@ -7,6 +7,7 @@ mod fs;
 mod input;
 mod path;
 mod stream;
+mod time;
 mod types;
 
 pub use allocation::{
@@ -24,7 +25,7 @@ pub use contract::{
     ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS,
     BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_RESERVE_SYMBOL,
     BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
-    FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL,
+    FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL, MONOTONIC_NANOS_SYMBOL,
     PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
     PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
     PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
@@ -61,6 +62,7 @@ pub use stream::{
     actus_cursor_flush, actus_cursor_read, actus_cursor_seek, actus_cursor_write,
     actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
+pub use time::actus_monotonic_nanos;
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
