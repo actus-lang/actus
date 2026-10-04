@@ -47,7 +47,7 @@ Copy chunks through ins reader and writer loans using one reusable allocation.
 The result is the exact count or a typed error; EndOfStream is handled as the
 successful termination condition and all scratch storage is cleaned up.
 """
-open verb copy[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
+open verb copy_stream[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
     erg scratch = Buffer[0]; erg capacity = 4096;
     erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
     case reserved { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };

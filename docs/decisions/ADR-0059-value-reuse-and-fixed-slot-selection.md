@@ -1,6 +1,6 @@
 # ADR-0059: Ownership-Safe Value Reuse and Fixed-Slot Selection
 
-- **Status:** Accepted through Gate 32.5
+- **Status:** Accepted through Gate 32.5; Gates 32.6–32.9 in progress
 - **Date:** 2026-10-04
 - **Decision owners:** Actus language and compiler maintainers
 
@@ -163,3 +163,30 @@ Compatibility impact: the declaration namespace permits a module-scoped verb
 named `copy` so existing standard-library APIs remain valid. Intrinsic
 dispatch is a fallback when no local signature exists; the explicit scalar
 form remains available in sources without a local `copy` declaration.
+
+## Follow-up: imported generic `copy` and intrinsic dispatch
+
+Gate 32.5 established that a module-scoped verb named `copy` may coexist with
+the scalar reuse intrinsic. Native module aggregation exposed a second case:
+an imported standard-library generic `copy[R, W]` can be visible in the same
+semantic environment as a scalar call written as
+`copy(value: abs scalar)`. That call must not be inferred as a two-parameter
+reader/writer generic invocation. The compiler must resolve the call by shape
+and provenance:
+
+1. a local module-scoped `copy` declaration keeps source-level precedence;
+2. a two-argument `reader`/`writer` call resolves to the imported generic verb;
+3. a one-argument scalar `value` call resolves to the compiler-checked copy
+   intrinsic when no local declaration shadows it;
+4. unsupported intrinsic values remain rejected by the existing copy contract.
+
+This rule applies before generic specialization so an unresolved parameter such
+as `W` cannot leak into the second native semantic pass. Gates 32.6–32.8 add
+the regression and native evidence for this boundary.
+
+The first native run after this dispatch fix exposed the next compiler
+boundary: during the second semantic analysis after specialization, an
+imported aggregate member declared as `u32` can be reported as
+`Result[Int, IoError]`. This is tracked in Gate 32.9 and must be fixed in the
+compiler's type propagation path rather than by changing the application
+source.

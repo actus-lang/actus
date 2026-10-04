@@ -329,7 +329,7 @@ fn std_io_native_copy_propagates_reader_failure() {
         "copy-reader-error",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
-        "import io; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+        "import io; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy reader error fixture should run");
@@ -343,7 +343,7 @@ fn std_io_native_copy_propagates_writer_failure() {
         "copy-writer-error",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
-        "import io; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+        "import io; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy writer error fixture should run");
@@ -371,7 +371,7 @@ fn std_io_native_copy_transfers_cursor_streams_until_eof() {
         "cursor-copy",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg input = Buffer[0]; append(input, 65); append(input, 66); append(input, 67); erg source = Cursor { buffer: input, position: 0, }; erg output = Buffer[0]; erg target = Cursor { buffer: output, position: 0, }; copy(reader: ins source, writer: ins target); erg offset = 0; seek(self: ins target, offset: offset); erg result = Buffer[0]; cursor_read(self: ins target, buffer: ins result); printb(text: abs result); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg input = Buffer[0]; append(input, 65); append(input, 66); append(input, 67); erg source = Cursor { buffer: input, position: 0, }; erg output = Buffer[0]; erg target = Cursor { buffer: output, position: 0, }; copy_stream(reader: ins source, writer: ins target); erg offset = 0; seek(self: ins target, offset: offset); erg result = Buffer[0]; cursor_read(self: ins target, buffer: ins result); printb(text: abs result); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy fixture should run");

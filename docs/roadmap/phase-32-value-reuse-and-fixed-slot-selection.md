@@ -1,6 +1,6 @@
 # Phase 32: Value Reuse and Fixed-Slot Selection
 
-**Status:** Complete
+**Status:** In progress — Gates 32.6–32.9
 
 This phase implements [ADR-0059](../decisions/ADR-0059-value-reuse-and-fixed-slot-selection.md).
 It improves source clarity for repeated read-only scalar use and bounded
@@ -92,8 +92,59 @@ architecture/ownership checks pass. The compatibility change permits a
 module-scoped verb named `copy`; intrinsic dispatch is used only when no local
 signature is present, preserving existing standard-library APIs.
 
+### Gate 32.6 — Intrinsic and imported generic name resolution
+
+- [x] Reproduce the failure where an imported generic `copy[R, W]` prevents
+      scalar `copy(value: abs scalar)` from reaching intrinsic dispatch.
+- [x] Preserve local module-scoped `copy` declarations as the higher-priority
+      source-level declaration.
+- [x] Route the one-argument scalar form to the validated intrinsic when only
+      an imported generic `copy` is visible.
+- [x] Keep the two-argument reader/writer form bound to the imported generic
+      standard-library verb.
+
+Evidence: `tests/applications.rs` covers both a direct imported `io` module
+and a nested facade importing `io`. Both scalar intrinsic reuse and the
+standard-library reader/writer copy path pass native execution.
+
+### Gate 32.7 — Nested facade and ownership regression coverage
+
+- [x] Add a nested-facade fixture combining an imported generic verb, a
+      `case dat` payload, and an `ins` aggregate call.
+- [x] Verify the fixture preserves concrete generic arguments after native
+      specialization.
+- [x] Verify no unresolved generic parameter reaches the second semantic pass.
+
+Evidence: `nested_facade_keeps_scalar_copy_intrinsic_separate_from_imported_io_copy`
+passes object emission, executable emission, and execution.
+
+### Gate 32.8 — Native acceptance and compatibility
+
+- [x] Pass strict check, object emission, executable emission, and execution
+      for the regression fixture.
+- [x] Pass the existing standard-library `io::copy` tests and value reuse tests.
+- [ ] Record the diagnostic and dispatch rule in the language and coding
+      guides.
+- [ ] Close the phase only after the full compiler and twin-e evidence passes.
+
+Gate 32.8 evidence so far: full `cargo test` passes, including 22 application
+tests, 25 standard-IO tests, 73 native array tests, 192 semantic tests, and
+the new nested-facade regression. The remaining twin-e command now reaches a
+real source ownership diagnostic in `history_contains`; it no longer fails
+with unresolved generic parameter `W`.
+
+### Gate 32.9 — Native reanalysis preserves imported aggregate field types
+
+- [x] Reproduce the post-specialization mismatch where an imported aggregate
+      field typed as `u32` is observed as `Result[Int, IoError]`.
+- [ ] Preserve field and member types across the second semantic analysis.
+- [ ] Add a nested-facade regression using an imported aggregate and a generic
+      call graph.
+- [ ] Pass twin-e context and generation native acceptance after the fix.
+
 ## Completion criteria
 
 Phase 32 closes when explicit value reuse is visible in source, unsupported
-copying remains rejected, fixed-slot selection is bounded and layout-safe, and
-all semantic, native, ownership, and tooling gates pass.
+copying remains rejected, fixed-slot selection is bounded and layout-safe, the
+intrinsic/imported-generic collision is resolved, and all semantic, native,
+ownership, and tooling gates pass.

@@ -8,7 +8,7 @@ verb copy_transfers_cursor_streams() -> Int {
     erg reader: Cursor = Cursor { buffer: input_bytes, position: 0, };
     erg output_bytes = Buffer[0];
     erg writer: Cursor = Cursor { buffer: output_bytes, position: 0, };
-    erg result = copy(reader: ins reader, writer: ins writer);
+    erg result = copy_stream(reader: ins reader, writer: ins writer);
     case dat result {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },

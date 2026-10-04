@@ -21,6 +21,7 @@ impl Analyzer {
                 &verb.generic_parameters,
                 verb.span,
                 verb.signature(),
+                false,
             ),
             TopLevelDecl::ExternalVerb(verb) => self.register_signature(
                 &verb.name,
@@ -29,6 +30,7 @@ impl Analyzer {
                 &verb.generic_parameters,
                 verb.span,
                 verb.signature(),
+                verb.module_import,
             ),
             _ => Ok(()),
         }
@@ -42,6 +44,7 @@ impl Analyzer {
         generic_parameters: &[GenericParam],
         span: crate::lexer::SourceSpan,
         signature: VerbSignature,
+        imported: bool,
     ) -> Result<(), SemanticError> {
         self.validate_signature_types(params, return_type, generic_parameters)?;
         if super::super::intrinsics::is_reserved_name(name) {
@@ -57,6 +60,9 @@ impl Analyzer {
             });
         }
         self.signatures.insert(name.to_owned(), signature);
+        if !imported {
+            self.local_signatures.insert(name.to_owned());
+        }
         Ok(())
     }
 
