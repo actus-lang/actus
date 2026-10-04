@@ -1,0 +1,16 @@
+"""
+Typed failures for bounded, borrowed UTF-8 String inspection.
+
+The error domain keeps runtime status values private and makes null input,
+encoding failure, and bounds failure distinguishable to callers.
+"""
+open enum StringError {
+    """The ABI provider received a null string pointer."""
+    Null,
+    """The null-terminated byte sequence is not valid UTF-8."""
+    InvalidUtf8,
+    """The requested byte index or representable length is invalid."""
+    OutOfBounds,
+    """The selected runtime has no String inspection provider."""
+    ProviderUnavailable,
+}

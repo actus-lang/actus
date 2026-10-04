@@ -19,7 +19,7 @@ pub use console::{
     actus_flush_stderr, actus_flush_stdout, actus_print_buffer_stderr, actus_print_buffer_stdout,
     actus_print_int, actus_print_int_stderr, actus_print_line_buffer_stderr,
     actus_print_line_buffer_stdout, actus_print_string, actus_print_string_stderr,
-    actus_write_string_stdout,
+    actus_string_byte_at, actus_string_length, actus_write_string_stdout,
 };
 pub use contract::{
     ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS,
@@ -31,8 +31,9 @@ pub use contract::{
     PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
     RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_CONTEXT_CRITICAL_SECTION,
     SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL, SLEEP_CONTEXT_INTERRUPT,
-    SLEEP_NANOS_SYMBOL, WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
-    is_successful_count,
+    SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL, STRING_LENGTH_SYMBOL, STRING_STATUS_INVALID_UTF8,
+    STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS, WRITE_BUFFER_STDOUT_SYMBOL,
+    WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
 };
 pub use fs::{
     actus_file_close, actus_file_close_buffer, actus_file_copy_buffer, actus_file_copy_path,

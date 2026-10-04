@@ -25,6 +25,16 @@ pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";
+/// Stable runtime symbol for checked UTF-8 byte-length inspection.
+pub const STRING_LENGTH_SYMBOL: &str = "actus_string_length";
+/// Stable runtime symbol for checked UTF-8 byte inspection.
+pub const STRING_BYTE_AT_SYMBOL: &str = "actus_string_byte_at";
+/// String pointer was null at the ABI boundary.
+pub const STRING_STATUS_NULL: i32 = -1;
+/// String bytes were not valid UTF-8.
+pub const STRING_STATUS_INVALID_UTF8: i32 = -2;
+/// The requested byte index was outside the validated string.
+pub const STRING_STATUS_OUT_OF_BOUNDS: i32 = -3;
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";

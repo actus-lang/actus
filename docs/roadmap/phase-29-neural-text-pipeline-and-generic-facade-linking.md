@@ -165,22 +165,40 @@ src/aie/        -> propagation, plasticity, storage, and recall
 
 ## Gate 29.4: Safe UTF-8 String byte access
 
-- [ ] Define the public ownership contract for reading UTF-8 bytes from
+- [x] Define the public ownership contract for reading UTF-8 bytes from
       `String` without exposing raw pointers.
-- [ ] Provide a bounded, allocation-aware byte view or iterator with explicit
+- [x] Provide a bounded, allocation-aware byte view or iterator with explicit
       `abs`/`ins` roles.
-- [ ] Define behavior for empty strings, multibyte UTF-8 sequences, invalid
+- [x] Define behavior for empty strings, multibyte UTF-8 sequences, invalid
       UTF-8, and index bounds.
-- [ ] Ensure byte access cannot create an escaping view or mutate an `abs`
+- [x] Ensure byte access cannot create an escaping view or mutate an `abs`
       source.
-- [ ] Keep the existing String ABI and text output behavior compatible.
-- [ ] Add accepted and rejected semantic tests for ownership and UTF-8 cases.
+- [x] Keep the existing String ABI and text output behavior compatible.
+- [x] Add accepted and rejected semantic tests for ownership and UTF-8 cases.
 
 ### Gate 29.4 evidence
 
 - Native tests for ASCII, multibyte UTF-8, empty input, and bounds failures.
 - Allocation and ownership evidence for the selected byte-access contract.
 - Documentation of whether iteration is byte-wise, scalar-value-wise, or both.
+
+### Gate 29.4 evidence
+
+- Added the hosted-only `std::string` facade with a documented `abs String`
+  contract and typed `StringError` results. The API is byte-wise, not scalar-
+  value iteration; multibyte code points therefore produce multiple validated
+  UTF-8 bytes.
+- Added private runtime bridges for checked length and indexed-byte access.
+  They validate UTF-8 without allocation, reject null input and out-of-bounds
+  indices deterministically, and preserve the existing null-terminated String
+  ABI used by console output.
+- Semantic tests verify the public facade and reject direct access to private
+  bridge symbols. Native tests verify ASCII, multibyte UTF-8, empty strings,
+  bounds errors, executable output status, and `verify_no_float_ir` builds.
+- Runtime tests verify invalid UTF-8 and null-pointer statuses directly at the
+  provider boundary. No String pointer or borrowed view escapes the call.
+- Gate 29.4 is complete; Gate 29.5 covers constructing owned String values
+  from UTF-8 bytes.
 
 ## Gate 29.5: Constructing String values from UTF-8 bytes
 
