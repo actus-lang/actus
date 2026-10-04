@@ -40,6 +40,16 @@ fn executes_struct_field_access() {
 
 #[cfg(unix)]
 #[test]
+fn preserves_generic_array_type_when_passing_a_struct_field() {
+    build_and_run(
+        "struct Rule { erg value: u32, } struct Vocabulary { erg rules: Array[Rule, 2], } verb inspect(abs rules: Array[Rule, 2]) -> u32 { return rules[0].value; } verb main() -> Int { erg vocabulary: Vocabulary = Vocabulary { rules: Array[Rule, 2](), }; vocabulary.rules[0].value = 41u32; return inspect(rules: abs vocabulary.rules) as Int; }",
+        "generic-array-struct-field-argument",
+        41,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn transfers_an_owned_enum_return_without_double_drop() {
     build_and_run(
         "verb produce() -> Option[u32] { erg result: Option[u32] = Option[u32].None; result = Option[u32].Some(1u32); return result; } verb main() -> Int { erg result: Option[u32] = produce(); return 42; }\n",

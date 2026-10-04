@@ -175,6 +175,7 @@ impl Analyzer {
         self.binding_type_name(expression)
             .or_else(|| self.constant_type_name(expression))
             .or_else(|| self.index_type_name(expression))
+            .or_else(|| self.field_type_name(expression))
             .or_else(|| self.expression_case_type_name(expression))
             .or_else(|| self.expression_if_type_name(expression))
             .or_else(|| self.expression_type(expression).map(|ty| ty.spec().name.to_owned()))
@@ -238,6 +239,14 @@ impl Analyzer {
         let Expr::Index { target, index, .. } = expression else { return None };
         self.validate_index_access(target, index)
             .ok()
+            .map(|type_name| super::super::analyzer::canonical_type_name(&type_name))
+    }
+
+    fn field_type_name(&self, expression: &Expr) -> Option<String> {
+        if !matches!(expression, Expr::FieldAccess { .. }) {
+            return None;
+        }
+        self.resolved_type_name(expression)
             .map(|type_name| super::super::analyzer::canonical_type_name(&type_name))
     }
 

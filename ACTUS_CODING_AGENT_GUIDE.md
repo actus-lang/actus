@@ -1063,6 +1063,12 @@ facade boundary. Native lowering must resolve them in the same public export
 namespace used by semantic analysis; replacing them with source-level
 literal workarounds is incorrect.
 
+The native object plan must collect compile-time constants from the full
+transitive canonical-facade dependency graph. Only public exports may enter
+the imported object program; private constants and facade-bypass declarations
+remain unavailable. Constants must be materialized before native identifier
+lowering and must never become runtime storage or native ABI symbols.
+
 This contract also applies through nested module facades. For example,
 `src/aie/persistence/serialization.act` may import `config` and use a
 constant exported by `src/config/config.act` even when the final native

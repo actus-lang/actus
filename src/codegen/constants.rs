@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Block, CaseBody, Expr, IfBranch, Program, Stmt, TopLevelDecl};
+use crate::ast::{Block, CaseBody, Expr, IfBranch, Place, Program, Stmt, TopLevelDecl};
 
 /// Inlines validated constant values before native lowering.
 ///
@@ -37,8 +37,7 @@ fn inline_block(block: &mut Block, constants: &HashMap<String, Expr>) {
             Stmt::OwnerDecl { initializer, .. } => inline_expression(initializer, constants),
             Stmt::Assignment { target, value, .. }
             | Stmt::CompoundAssignment { target, value, .. } => {
-                let mut target_expression = target.to_expr();
-                inline_expression(&mut target_expression, constants);
+                inline_place(target, constants);
                 inline_expression(value, constants);
             }
             Stmt::Expression { expression, .. } => inline_expression(expression, constants),
@@ -57,6 +56,17 @@ fn inline_block(block: &mut Block, constants: &HashMap<String, Expr>) {
             | Stmt::Break { .. }
             | Stmt::Continue { .. }
             | Stmt::Drop { .. } => {}
+        }
+    }
+}
+
+fn inline_place(place: &mut Place, constants: &HashMap<String, Expr>) {
+    match place {
+        Place::Binding { .. } => {}
+        Place::Field { object, .. } => inline_place(object, constants),
+        Place::Index { target, index, .. } => {
+            inline_place(target, constants);
+            inline_expression(index, constants);
         }
     }
 }

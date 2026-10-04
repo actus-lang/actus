@@ -259,6 +259,210 @@ fn nested_imported_module_can_lower_a_configuration_constant() {
 }
 
 #[test]
+fn canonical_parent_facade_exposes_nested_configuration_constant() {
+    let source = "import feature; verb main() -> Int { return stride() as Int; }\n";
+    let (root, input, output) = project("canonical-constant-facade", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "import config; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
+    )
+    .expect("write feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(24));
+    fs::remove_dir_all(root).expect("remove canonical constant project");
+}
+
+#[test]
+fn nested_facade_constant_has_object_and_executable_parity() {
+    let source = "import feature; verb main() -> Int { return inspect() as Int; }\n";
+    let (root, input, output) = project("constant-native-parity", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open struct Settings {
+    erg stride: u16,
+}
+
+open verb inspect() -> u16 {
+    erg settings = Settings { stride: BUFFER_STRIDE, };
+    if BUFFER_STRIDE == 24u16 {
+        return settings.stride;
+    }
+    return 0u16;
+}
+"#,
+    )
+    .expect("write feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(24));
+
+    let object = output.with_extension("obj");
+    let object_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build native objects");
+    assert!(
+        object_build.status.success(),
+        "object build stderr: {}",
+        String::from_utf8_lossy(&object_build.stderr)
+    );
+    let feature_object = fs::read_dir(&root)
+        .expect("read project outputs")
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry.file_name().to_string_lossy().contains("feature")
+                && entry.path().extension().is_some_and(|extension| extension == "obj")
+        })
+        .expect("feature object");
+    let bytes = fs::read(feature_object.path()).expect("read feature object");
+    let object_file = object::File::parse(bytes.as_slice()).expect("parse feature object");
+    assert!(
+        !object_file
+            .symbols()
+            .filter_map(|symbol| symbol.name().ok())
+            .any(|symbol| symbol.contains("BUFFER_STRIDE"))
+    );
+    fs::remove_dir_all(root).expect("remove native parity project");
+}
+
+#[test]
+fn generic_nested_module_lowers_facade_constant_without_native_binding() {
+    let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let (root, input, output) = project("generic-constant-facade", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "import config; open verb inspect[N: Usize]() -> u16 { return BUFFER_STRIDE + (N as u16); }\n",
+    )
+    .expect("write generic feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(26));
+    fs::remove_dir_all(root).expect("remove generic constant project");
+}
+
+#[test]
+fn generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization() {
+    let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let (root, input, output) = project("generic-constant-uses", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open struct Settings {
+    erg stride: u16,
+}
+
+open verb inspect[N: Usize]() -> u16 {
+    erg scalar: u16 = BUFFER_STRIDE;
+    erg settings = Settings { stride: BUFFER_STRIDE, };
+    if scalar == BUFFER_STRIDE && (N as u16) == 2u16 {
+        return settings.stride + (N as u16);
+    }
+    return 0u16;
+}
+"#,
+    )
+    .expect("write generic feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(26));
+    fs::remove_dir_all(root).expect("remove generic constant uses project");
+}
+
+#[test]
+fn facade_constant_objects_are_deterministic_and_symbol_free() {
+    let source = "import feature; verb main() -> Int { return stride() as Int; }\n";
+    let (root, input, output) = project("constant-symbol-integrity", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "import config; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
+    )
+    .expect("write feature implementation");
+
+    let first = output.with_extension("first.obj");
+    let second = output.with_extension("second.obj");
+    for object in [&first, &second] {
+        let result = Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(["build", input.to_str().expect("source path"), "--emit", "obj", "-o"])
+            .arg(object)
+            .current_dir(&root)
+            .output()
+            .expect("build deterministic object");
+        assert!(
+            result.status.success(),
+            "object build stderr: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+    assert_eq!(
+        fs::read(&first).expect("read first object"),
+        fs::read(&second).expect("read second object")
+    );
+
+    for entry in fs::read_dir(&root).expect("read object outputs").flatten() {
+        if entry.path().extension().is_none_or(|extension| extension != "obj") {
+            continue;
+        }
+        let bytes = fs::read(entry.path()).expect("read emitted object");
+        let object = object::File::parse(bytes.as_slice()).expect("parse emitted object");
+        let symbols = object.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+        let unique = symbols.iter().collect::<std::collections::HashSet<_>>();
+        assert_eq!(symbols.len(), unique.len(), "duplicate symbols in {:?}", entry.path());
+        assert!(!symbols.iter().any(|symbol| symbol.contains("BUFFER_STRIDE")));
+    }
+    fs::remove_dir_all(root).expect("remove symbol integrity project");
+}
+
+#[test]
 fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
     let source = "import aie; verb main() -> Int { return snapshot_is_valid(); }\n";
     let (root, input, output) = project("config-snapshot-module", source);
@@ -296,6 +500,47 @@ open verb snapshot_is_valid() -> Int {
     let execution = run(&root, &output, b"");
     assert_eq!(execution.status.code(), Some(42));
     fs::remove_dir_all(root).expect("remove snapshot configuration project");
+}
+
+#[test]
+fn nested_facade_constants_lower_inside_indexed_snapshot_loops() {
+    let source = "import feature; verb main() -> Int { return emit(); }\n";
+    let (root, input, output) = project("constant-indexed-loop", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        "open const STRIDE: u16 = 24u16; open const COUNT: u32 = 4u32;\n",
+    )
+    .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open verb emit() -> Int {
+    erg bytes: Array[u8, 24] = Array[u8, 24]();
+    erg index: u32 = 0u32;
+    loop {
+        if index >= COUNT {
+            break;
+        }
+        bytes[index * (STRIDE as u32) / (STRIDE as u32)] = index as u8;
+        index += 1u32;
+    }
+    return bytes[3u32] as Int + STRIDE as Int;
+}
+"#,
+    )
+    .expect("write feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(27));
+    fs::remove_dir_all(root).expect("remove indexed constant project");
 }
 
 #[test]
