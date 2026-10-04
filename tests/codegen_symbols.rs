@@ -134,6 +134,76 @@ fn emits_each_reachable_generic_instance_once_in_its_namespace() {
     assert_eq!(symbols.iter().filter(|symbol| symbol.contains("__verb_read_5f_5f8")).count(), 1);
 }
 
+#[test]
+fn generic_specializations_are_scoped_by_module_namespace() {
+    let source = "verb read[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read[4]() as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let target = TargetSpec::host().unwrap();
+    let configuration = NativeBackendConfiguration::default();
+    let left = actus::codegen::emit_program_object_for_target_in_namespace(
+        &program,
+        "main",
+        "actus_mod_4_left",
+        &configuration,
+        &target,
+    )
+    .unwrap();
+    let right = actus::codegen::emit_program_object_for_target_in_namespace(
+        &program,
+        "main",
+        "actus_mod_5_right",
+        &configuration,
+        &target,
+    )
+    .unwrap();
+    let left_file = object::File::parse(left.as_slice()).unwrap();
+    let right_file = object::File::parse(right.as_slice()).unwrap();
+    let left_symbols =
+        left_file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    let right_symbols =
+        right_file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(left_symbols.iter().any(|symbol| symbol.contains("actus_mod_4_left")));
+    assert!(right_symbols.iter().any(|symbol| symbol.contains("actus_mod_5_right")));
+    assert!(!left_symbols.iter().any(|symbol| symbol.contains("actus_mod_5_right")));
+    assert!(!right_symbols.iter().any(|symbol| symbol.contains("actus_mod_4_left")));
+}
+
+#[test]
+fn failed_specialization_does_not_poison_a_later_emission() {
+    let invalid = "verb read[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return missing(); }";
+    let (tokens, errors) = scan(invalid);
+    assert!(errors.is_empty());
+    let invalid_program = parse(tokens).unwrap();
+    assert!(
+        actus::codegen::emit_program_object_for_target_in_namespace(
+            &invalid_program,
+            "main",
+            "actus_mod_retry",
+            &NativeBackendConfiguration::default(),
+            &TargetSpec::host().unwrap(),
+        )
+        .is_err()
+    );
+
+    let valid = "verb read[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read[4]() as Int; }";
+    let (tokens, errors) = scan(valid);
+    assert!(errors.is_empty());
+    let valid_program = parse(tokens).unwrap();
+    let bytes = actus::codegen::emit_program_object_for_target_in_namespace(
+        &valid_program,
+        "main",
+        "actus_mod_retry",
+        &NativeBackendConfiguration::default(),
+        &TargetSpec::host().unwrap(),
+    )
+    .expect("a failed emission must not poison a later valid emission");
+    let file = object::File::parse(bytes.as_slice()).unwrap();
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert_eq!(symbols.iter().filter(|symbol| symbol.contains("__verb_read_5f_5f4")).count(), 1);
+}
+
 fn symbol_matches(actual: &str, expected: &str) -> bool {
     actual == expected || actual.strip_prefix('_') == Some(expected)
 }

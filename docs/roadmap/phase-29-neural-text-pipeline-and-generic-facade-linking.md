@@ -110,19 +110,19 @@ src/aie/        -> propagation, plasticity, storage, and recall
 
 ## Gate 29.2: Visibility, ownership, and specialization identity
 
-- [ ] Keep private child declarations inaccessible through direct source
+- [x] Keep private child declarations inaccessible through direct source
       imports and public completion results.
-- [ ] Allow private declarations to enter the native dependency graph only
+- [x] Allow private declarations to enter the native dependency graph only
       when reached from an already-accepted public or test root.
-- [ ] Include module namespace, declaration identity, and concrete generic
+- [x] Include module namespace, declaration identity, and concrete generic
       arguments in specialization cache keys.
-- [ ] Reject collisions between equal-looking generic symbols from different
+- [x] Reject collisions between equal-looking generic symbols from different
       modules.
-- [ ] Ensure generic instances preserve ownership, `ins`, `abs`, and `dat`
+- [x] Ensure generic instances preserve ownership, `ins`, `abs`, and `dat`
       roles after substitution.
-- [ ] Ensure aggregate return types and return-slot requirements are registered
+- [x] Ensure aggregate return types and return-slot requirements are registered
       transitively with the specialized dependency.
-- [ ] Verify that failed specialization cannot leave a partially registered
+- [x] Verify that failed specialization cannot leave a partially registered
       native symbol available to a later build.
 
 ### Gate 29.2 evidence
@@ -130,6 +130,11 @@ src/aie/        -> propagation, plasticity, storage, and recall
 - Accepted and rejected semantic visibility tests.
 - Native symbol and cache-key collision tests across two module namespaces.
 - Ownership regression tests for nested generic calls and aggregate returns.
+- Existing facade visibility, private-dependency, ownership, aggregate-return,
+  and failed-build cleanup tests provide the accepted/rejected evidence; the
+  namespace-scoped generic symbol regression is in `tests/codegen_symbols.rs`.
+- Gate 29.2 is complete. Gate 29.3 adds the cross-command and LSP parity
+  verification.
 
 ## Gate 29.3: Compiler acceptance across all build paths
 
