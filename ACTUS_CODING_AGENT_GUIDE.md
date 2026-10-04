@@ -155,6 +155,45 @@ Unsuffixed integer literals can be directed by a known integer context when
 the value fits. Do not rely on implicit signed/unsigned conversion between
 variables. Explicit casts use `as`.
 
+String literals are native data, not temporary text buffers. During native
+emission the compiler collects every reachable `String` literal through the
+complete AST, stores its UTF-8 bytes with a trailing null byte in a module-local
+`DataDescription`, and lowers the expression to a pointer to that data. The
+existing String ABI and `std::io` text bridge remain unchanged.
+
+The collector traverses string-bearing expressions in declarations, returns,
+assignments, compound assignments, calls, method calls, field access, indexes,
+casts, aggregates, loops, nested blocks, `if` blocks, `else if` branches, and
+all `case` forms including subjects, guards, expression bodies, and block
+bodies. An agent must not add a special-case collector for a project or domain
+module. A missing collected data symbol is a native emission error and must
+not become an invalid pointer.
+
+Exact duplicate literal values are emitted once per native module. Distinct
+values are sorted before deterministic symbols such as `string_0` and
+`string_1` are assigned. This makes repeated object builds reproducible and
+prevents source traversal order from changing the data-symbol identity.
+
+For readable output, use the public `std::io` facade:
+
+```act
+import std::io;
+
+verb main() -> Void {
+    erg message = "ACTUS_EVENT status=ready";
+    println(abs message);
+}
+```
+
+The executable example at
+`examples/native_strings/src/main.act` demonstrates String literals in a
+selected `case` branch, an unreachable `if` branch, and a selected `else if`
+branch. Its acceptance test verifies strict build, executable output, empty
+stderr, and deterministic exit status. Do not replace text output with a
+Buffer workaround when a `String` is the intended API value. Case guards still
+follow their semantic access rules; arbitrary calls in guards are rejected and
+must not be forced into an invalid native example.
+
 ## 5. Keywords and words
 
 The implemented vocabulary includes the following groups.

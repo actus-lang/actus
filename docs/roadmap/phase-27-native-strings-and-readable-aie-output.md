@@ -160,16 +160,27 @@ special case is involved.
 
 ## Gate 27.5: Tooling, documentation, and completion
 
-- [ ] Keep formatter, strict check, test runner, object build, executable
+- [x] Keep formatter, strict check, test runner, object build, executable
       build, and LSP behavior consistent with the String contract.
-- [ ] Update the coding-agent guide with the implemented String literal rules
+- [x] Update the coding-agent guide with the implemented String literal rules
       and examples.
-- [ ] Record native object, executable, runtime stdout, and deterministic
+- [x] Record native object, executable, runtime stdout, and deterministic
       symbol evidence.
-- [ ] Pass Rust formatting, check, clippy, tests, source limits, architecture,
+- [x] Pass Rust formatting, check, clippy, tests, source limits, architecture,
       documentation, and diff checks.
-- [ ] Close the phase only when no temporary Buffer workaround or opaque
+- [x] Close the phase only when no temporary Buffer workaround or opaque
       integer-code output remains in the production examples.
+
+Gate 27.5 evidence: the coding-agent guide now documents the native String
+data contract, complete AST collection coverage, deterministic deduplication,
+the public `std::io` usage pattern, and the general `native_strings` example.
+The full repository validation passed: `cargo fmt --all -- --check`,
+`cargo check --all-targets --all-features`, `cargo clippy --all-targets
+--all-features -- -D warnings`, `cargo test --all-targets --all-features`,
+source-limit checks, architecture/documentation checks, and `git diff --check`.
+The test suite includes LSP behavior, object emission, executable execution,
+exact stdout, deterministic string symbols, and the general readable-string
+example. No AIE-specific artifact or compiler behavior is part of this phase.
 
 ## Non-goals
 
