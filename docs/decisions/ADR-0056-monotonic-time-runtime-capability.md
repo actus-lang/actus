@@ -136,6 +136,18 @@ The chosen policy must be identical in semantic checks, native lowering,
 runtime behavior, and documentation. The initial implementation must not
 invent an implicit sentinel timestamp.
 
+For this phase, the failure boundary is fixed as follows:
+
+- an unavailable runtime/target combination is rejected during module
+  compatibility validation with the existing `E1112` incompatible-runtime
+  diagnostic;
+- a hosted provider conversion that cannot be represented as nanoseconds in
+  `u64` is a hard typed runtime failure. It must not wrap, clamp, or truncate;
+  if that failure reaches native execution, the deterministic execution
+  diagnostic is reserved as `E1899`;
+- the public signature remains `monotonic_nanos() -> u64`; no sentinel value
+  is introduced to encode failure.
+
 ## Compiler and tooling obligations
 
 The following components must consume one shared contract:

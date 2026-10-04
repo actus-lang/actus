@@ -76,14 +76,56 @@ freestanding artifact by accident.
 
 ## Gate 28.0: Capability and target audit
 
-- [ ] Inventory existing standard-library facades, runtime profiles, external
+- [x] Inventory existing standard-library facades, runtime profiles, external
       bridge declarations, native symbol bindings, and target policy checks.
-- [ ] Identify the current hosted and freestanding runtime boundaries.
-- [ ] Define the stable diagnostic for unavailable monotonic time.
-- [ ] Define overflow behavior when a platform timestamp cannot be represented
+- [x] Identify the current hosted and freestanding runtime boundaries.
+- [x] Define the stable diagnostic for unavailable monotonic time.
+- [x] Define overflow behavior when a platform timestamp cannot be represented
       as nanoseconds in `u64`.
-- [ ] Record the API, ABI, ownership, allocation, and precision boundaries in
+- [x] Record the API, ABI, ownership, allocation, and precision boundaries in
       this roadmap before implementation.
+
+### Gate 28.0 evidence
+
+The audit confirms the following existing boundaries:
+
+- `library/std/src/lib.act` is the standard-library root facade. The existing
+  module facades are `io/io.act`, `fs/fs.act`, and `path/path.act`; their
+  builtin registration and target classes are declared in
+  `library/std/Actus.toml`.
+- `RuntimeProfile` is the closed manifest-level profile set in
+  `src/configuration/manifest.rs`: `core`, `std`, and `freestanding`. Omitted
+  runtime selects `core`; target entry contracts are derived by
+  `src/target.rs` and validated during configuration loading.
+- Runtime module target compatibility is already enforced by the module
+  resolver. A builtin module that exists but is unavailable for the selected
+  target uses the stable module diagnostic `E1112` (`IncompatibleRuntime`),
+  before native emission. `std::time` will use this same unavailable-module
+  contract rather than inventing a second visibility path.
+- Native external declarations and symbol bindings are owned by the existing
+  `src/codegen/native` and `src/runtime` boundaries. The timer bridge must be
+  registered there, not through a special case in expression lowering.
+- The hosted boundary is the `Hosted` entry contract and the existing hosted
+  runtime bridges. Freestanding/core builds do not inherit a host clock; a
+  future explicit provider must be declared by runtime/target metadata before
+  native lowering.
+
+The Phase 28 failure policy is now fixed:
+
+- unavailable `std::time` on the selected runtime/target is rejected with
+  `E1112` during module/runtime compatibility validation;
+- a hosted provider timestamp that cannot be checked-converted to nanoseconds
+  in `u64` is a hard runtime-contract failure, never wrapping, clamping, or
+  truncating. The bridge implementation will expose that failure through the
+  existing typed runtime failure boundary and reserve `E1899` for the
+  deterministic execution diagnostic when the failure reaches native runtime;
+- the public API remains exactly `monotonic_nanos() -> u64`, with no pointer,
+  platform structure, allocation, wall-clock semantics, or floating-point
+  operation.
+
+This closes the audit gate with architecture evidence only. No timer facade,
+bridge, or runtime implementation is claimed complete until Gates 28.1–28.4
+provide direct source, native, and execution evidence.
 
 ## Gate 28.1: Public `std::time` API and facade
 
