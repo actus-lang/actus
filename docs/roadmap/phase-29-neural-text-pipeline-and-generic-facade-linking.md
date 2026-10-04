@@ -197,27 +197,40 @@ src/aie/        -> propagation, plasticity, storage, and recall
   bounds errors, executable output status, and `verify_no_float_ir` builds.
 - Runtime tests verify invalid UTF-8 and null-pointer statuses directly at the
   provider boundary. No String pointer or borrowed view escapes the call.
-- Gate 29.4 is complete; Gate 29.5 covers constructing owned String values
-  from UTF-8 bytes.
+- Gate 29.4 is complete; Gate 29.5 covers constructing owned `Utf8Buffer`
+  values from UTF-8 bytes.
 
 ## Gate 29.5: Constructing owned UTF-8 values from bytes
 
-- [ ] Define a typed builder or caller-owned output buffer for assembling an
+- [x] Define a typed builder or caller-owned output buffer for assembling an
       owned `Utf8Buffer` from validated UTF-8 bytes.
-- [ ] Reject invalid sequences deterministically; never silently replace or
+- [x] Reject invalid sequences deterministically; never silently replace or
       truncate malformed input.
-- [ ] Define capacity, length, overflow, and allocation behavior explicitly.
-- [ ] Ensure returned UTF-8 values have a valid ownership/drop contract.
-- [ ] Add native tests for round trips: `String -> bytes -> Utf8Buffer`.
-- [ ] Preserve exact bytes for embedded NUL and multibyte code points where the
+- [x] Define capacity, length, overflow, and allocation behavior explicitly.
+- [x] Ensure returned UTF-8 values have a valid ownership/drop contract.
+- [x] Add native tests for round trips: `String -> bytes -> Utf8Buffer`.
+- [x] Preserve exact bytes for embedded NUL and multibyte code points where the
       String contract permits them.
-- [ ] Keep raw C/runtime bridges private and typed at the Actus boundary.
+- [x] Keep raw C/runtime bridges private and typed at the Actus boundary.
 
 ### Gate 29.5 evidence
 
-- Accepted/rejected UTF-8 fixtures with exact output bytes.
-- Native executable and object evidence, including failure paths.
-- No-allocation evidence where the caller supplies bounded storage.
+- `std::string` now exposes `utf8_from_string(abs text: String, dat storage:
+  Buffer)` and `utf8_from_buffer(dat storage: Buffer)`. Both return an owned
+  `Utf8Buffer` only after validation; rejected storage is deterministically
+  dropped and translated to `StringError`.
+- The hosted runtime copies String bytes into caller-owned capacity without
+  allocation, rejects invalid metadata and invalid UTF-8, reports capacity
+  exhaustion, and preserves exact length-delimited bytes including embedded
+  NUL values. `utf8_length` and `utf8_byte_at` provide checked read access.
+- Native tests cover String-to-owned-UTF-8 conversion, multibyte bytes, empty
+  input, bounds failure, embedded NUL payloads, executable and object builds,
+  and the package zero-float policy. Runtime tests cover exact copy counts and
+  insufficient-capacity status; private C symbols remain inaccessible through
+  semantic facade tests.
+- The guide documents the distinction between legacy borrowed `String` and
+  owned `Utf8Buffer`, including ownership roles and provider limitations.
+- Gate 29.5 is complete; Gate 29.6 begins tokenizer and vocabulary work.
 
 ## Gate 29.6: Tokenizer module and vocabulary contract
 

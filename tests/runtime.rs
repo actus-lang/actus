@@ -39,6 +39,31 @@ fn rejects_null_and_invalid_utf8_string_inputs() {
 }
 
 #[test]
+fn copies_string_bytes_into_caller_owned_storage_with_capacity_status() {
+    let text = std::ffi::CString::new("Actus").expect("string should be valid");
+    let storage = actus_buffer_allocate(0);
+    assert!(!storage.is_null());
+    unsafe { assert_eq!(actus::runtime::actus_buffer_reserve(storage, 5), 5) };
+    let copied =
+        unsafe { actus::runtime::actus_string_copy_to_buffer(text.as_ptr().cast(), storage) };
+    assert_eq!(copied, 5);
+    unsafe {
+        assert_eq!((*storage).length, 5);
+        assert_eq!(std::slice::from_raw_parts((*storage).data, 5), b"Actus");
+        actus_buffer_drop(storage);
+    }
+
+    let small = actus_buffer_allocate(0);
+    assert!(!small.is_null());
+    unsafe { assert_eq!(actus::runtime::actus_buffer_reserve(small, 4), 4) };
+    assert_eq!(
+        unsafe { actus::runtime::actus_string_copy_to_buffer(text.as_ptr().cast(), small) },
+        actus::runtime::STRING_COPY_STATUS_CAPACITY
+    );
+    unsafe { actus_buffer_drop(small) };
+}
+
+#[test]
 fn prints_exact_buffer_length_without_a_null_terminator() {
     let mut storage = [b'A', 0, b'Z'];
     let mut buffer =

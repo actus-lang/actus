@@ -13,6 +13,8 @@ open enum StringError {
     OutOfBounds,
     """The supplied buffer metadata or UTF-8 payload is inconsistent."""
     InvalidStorage,
+    """The caller-provided destination buffer has insufficient capacity."""
+    CapacityExceeded,
     """The selected runtime has no String inspection provider."""
     ProviderUnavailable,
 }

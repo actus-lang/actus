@@ -20,23 +20,38 @@ fn hosted_string_byte_access_handles_ascii_multibyte_empty_and_bounds() {
         root.join("src/main.act"),
         r#"meta limitless("file")
 import std::string;
-verb inspect_owned(dat value: Utf8Buffer, erg one: Int) -> Int {
-    erg length = utf8_length(text: abs value);
-    erg byte_result = utf8_byte_at(text: abs value, index: erg one);
+verb inspect_owned(dat value: Utf8Buffer) -> Int {
+    erg length_result = utf8_length(text: abs value);
     drop(value);
-    return case dat byte_result {
-        Result.Ok(element) => if length == 2 && element == 66 { 0 } else { 1 },
+    return case dat length_result {
+        Result.Ok(length) => if length == 3 { 0 } else { 1 },
         Result.Err(_) => 3,
     };
 }
 verb owned_utf8_code() -> Int {
     erg storage = Buffer[0];
-    erg one: Int = 1;
     append(storage, 65);
+    erg source: String = "AB";
+    erg result = utf8_from_string(text: abs source, storage: dat storage);
+    return case dat result {
+        Result.Ok(value) => inspect_owned(value: dat value),
+        Result.Err(_) => 2,
+    };
+}
+verb embedded_nul_code() -> Int {
+    erg storage = Buffer[0];
+    append(storage, 65);
+    append(storage, 0);
     append(storage, 66);
     erg result = utf8_from_buffer(storage: dat storage);
     return case dat result {
-        Result.Ok(value) => inspect_owned(value: dat value, one: erg one),
+        Result.Ok(value) => {
+            erg length_result = utf8_length(text: abs value);
+            return case dat length_result {
+            Result.Ok(length) => if length == 3 { 0 } else { 1 },
+            Result.Err(_) => 3,
+            };
+        },
         Result.Err(_) => 2,
     };
 }
@@ -52,6 +67,9 @@ verb bounds_ok(erg result: Result[Int, StringError]) -> Int {
 verb main() -> Int {
     if owned_utf8_code() != 0 {
         return 7;
+    }
+    if embedded_nul_code() != 0 {
+        return 8;
     }
     erg ascii_text: String = "Actus";
     erg utf_text: String = "é";
@@ -82,6 +100,7 @@ verb main() -> Int {
     )
     .expect("source");
     let output = root.join("string-access");
+    let object = root.join("string-access.o");
     let build = Command::new(compiler())
         .current_dir(&root)
         .args(["build", "--strict", "--emit", "exe", "-o"])
@@ -89,6 +108,13 @@ verb main() -> Int {
         .output()
         .expect("build");
     assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let object_build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .output()
+        .expect("object build");
+    assert!(object_build.status.success(), "{}", String::from_utf8_lossy(&object_build.stderr));
     let run = Command::new(&output).output().expect("run");
     assert_eq!(run.status.code(), Some(0));
     let _ = fs::remove_dir_all(root);

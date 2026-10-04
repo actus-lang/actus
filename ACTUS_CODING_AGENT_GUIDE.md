@@ -223,13 +223,17 @@ verb make_text(dat storage: Buffer) -> Result[Utf8Buffer, StringError] {
 ```
 
 `utf8_from_buffer(dat storage: Buffer)` validates the caller-provided,
-length-delimited buffer and transfers it only on success. `Utf8Buffer` owns
-the validated storage and exposes `utf8_length(abs text: Utf8Buffer)` and
-`utf8_byte_at(abs text: Utf8Buffer, erg index: Int)`. It is allocation-free
-when the caller supplies the buffer, preserves embedded NUL bytes because it
-is length-delimited, and releases storage through normal Actus cleanup. Raw
-runtime bridges remain private; application code uses the typed facade and
-`Result` errors.
+length-delimited buffer and transfers it only on success. For a `String`
+source, `utf8_from_string(abs text: String, dat storage: Buffer)` copies into
+the caller-provided storage and then returns the owned value. Both paths
+expose `utf8_length(abs text: Utf8Buffer)` and
+`utf8_byte_at(abs text: Utf8Buffer, erg index: Int)`, both with typed
+`Result` returns. They are allocation-free
+when the caller supplies storage, preserve embedded NUL bytes because the
+representation is length-delimited, and release storage through normal Actus
+cleanup. Capacity, invalid UTF-8, invalid storage, and bounds failures are
+typed `StringError` results. Raw runtime bridges remain private; application
+code uses the typed facade and `Result` errors.
 
 This is the supported boundary for tokenizer and embedded protocol work:
 borrow `String` when reading static text, and use owned `Utf8Buffer` when
@@ -1320,7 +1324,9 @@ the existing `String` ABI; and `Utf8Buffer`, an owned length-delimited UTF-8
 value backed by a caller-supplied `Buffer`.
 
 Use `utf8_from_buffer(dat storage: Buffer)` for validation and ownership
-transfer, `utf8_length(abs text: Utf8Buffer)` for the exact byte length, and
+transfer, or `utf8_from_string(abs text: String, dat storage: Buffer)` for a
+caller-buffer-backed String-to-owned-UTF-8 conversion. Use
+`utf8_length(abs text: Utf8Buffer)` for the exact byte length, and
 `utf8_byte_at(abs text: Utf8Buffer, erg index: Int)` for checked byte access.
 Use `std::io::print`/`println` for `String` and `printb`/`printlnb` for raw
 `Buffer` bytes; these representations must not be confused.

@@ -32,6 +32,10 @@ pub const STRING_STATUS_NULL: i32 = -1;
 pub const STRING_STATUS_INVALID_UTF8: i32 = -2;
 /// The requested byte index was outside the validated string.
 pub const STRING_STATUS_OUT_OF_BOUNDS: i32 = -3;
+/// Destination storage did not have enough remaining capacity.
+pub const STRING_COPY_STATUS_CAPACITY: i32 = -2;
+/// Source string bytes were not valid UTF-8.
+pub const STRING_COPY_STATUS_INVALID_UTF8: i32 = -3;
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";
