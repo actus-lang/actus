@@ -246,6 +246,16 @@ fn executes_short_result_constructors_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_explicit_result_err_with_user_enum_natively() {
+    build_and_run(
+        "enum Failure { Failed, } verb main() -> Int { erg result = Result[Int, Failure].Err(Failure.Failed); return case dat result { Result.Ok(_) => 1, Result.Err(error) => case dat error { Failure.Failed => 0, }, }; }\n",
+        "explicit-result-err-user-enum",
+        0,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn avoids_double_drop_after_moving_owned_field() {
     build_and_run(
         "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) -> Int { drop(payload); return 0; } verb main() -> Int { erg holder = Holder { payload: Buffer[4], value: 42, }; consume(payload: holder.payload); return 42; }\n",
