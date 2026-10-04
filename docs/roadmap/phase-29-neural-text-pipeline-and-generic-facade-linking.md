@@ -271,13 +271,24 @@ phase.
 
 ## Gate 29.8: Resource, determinism, and safety acceptance
 
-- [ ] Add no-allocation tests for APIs that promise caller-owned storage.
-- [ ] Add malformed-input, capacity-exhaustion, stale-handle, and bounds
+- [x] Add no-allocation tests for APIs that promise caller-owned storage.
+- [x] Add malformed-input, capacity-exhaustion, stale-handle, and bounds
       rejection tests.
-- [ ] Verify deterministic cleanup on every error and early-return path.
-- [ ] Verify zero-float IR for integer-only text and buffer operations.
-- [ ] Add reproducible object and executable build checks.
-- [ ] Confirm no unsafe bridge is exposed without a typed, documented boundary.
+- [x] Verify deterministic cleanup on every error and early-return path.
+- [x] Verify zero-float IR for integer-only text and buffer operations.
+- [x] Add reproducible object and executable build checks.
+- [x] Confirm no unsafe bridge is exposed without a typed, documented boundary.
+
+### Gate 29.8 evidence
+
+- `std::string` native and runtime tests cover malformed UTF-8, invalid
+  storage, capacity exhaustion, bounds rejection, and owned-buffer cleanup.
+- The external-consumer fixture uses caller-owned storage and verifies
+  zero-float native output plus byte-identical repeated object emission.
+- Semantic visibility tests keep unsafe runtime bridges private while public
+  APIs return typed `Result` errors.
+- Gate 29.8 is complete; Gate 29.9 covers end-to-end compiler/runtime
+  acceptance.
 
 ## Gate 29.9: End-to-end compiler and runtime acceptance
 

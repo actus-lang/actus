@@ -15,6 +15,7 @@ fn generic_external_text_consumer_passes_all_native_boundaries() {
     let root = fixture_root();
     let output = root.join("target/external-text-consumer");
     let object = root.join("target/external-text-consumer.o");
+    let repeated_object = root.join("target/external-text-consumer-repeat.o");
 
     let check = Command::new(compiler())
         .args(["check", "--strict"])
@@ -30,6 +31,9 @@ fn generic_external_text_consumer_passes_all_native_boundaries() {
         .output()
         .expect("object build");
     assert!(object_build.status.success(), "{}", String::from_utf8_lossy(&object_build.stderr));
+    assert!(
+        String::from_utf8_lossy(&object_build.stdout).contains("no floating-point instructions")
+    );
 
     let executable_build = Command::new(compiler())
         .args(["build", "--strict", "--emit", "exe", "-o"])
@@ -47,6 +51,18 @@ fn generic_external_text_consumer_passes_all_native_boundaries() {
     assert_eq!(run.status.code(), Some(0));
     assert!(object.exists());
     assert!(output.exists());
+
+    let repeated_build = Command::new(compiler())
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&repeated_object)
+        .current_dir(&root)
+        .output()
+        .expect("repeated object build");
+    assert!(repeated_build.status.success(), "{}", String::from_utf8_lossy(&repeated_build.stderr));
+    assert_eq!(
+        fs::read(&object).expect("read object"),
+        fs::read(&repeated_object).expect("read repeated object")
+    );
 
     let _ = fs::remove_dir_all(root.join("target"));
 }
