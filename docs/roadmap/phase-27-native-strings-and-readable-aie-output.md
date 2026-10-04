@@ -113,14 +113,26 @@ literals despite the runtime bridge being referenced as well.
 
 ## Gate 27.3: Compiler regression and acceptance evidence
 
-- [ ] Add a native test for a String literal inside a `case` block.
-- [ ] Add a native test for a String literal inside a case guard.
-- [ ] Add a native test for nested `if`/`case` blocks containing strings.
-- [ ] Verify object and executable builds.
-- [ ] Execute the binary and assert exact stdout.
-- [ ] Verify repeated literals are deduplicated.
-- [ ] Verify different literals receive deterministic symbols across repeated
+- [x] Add a native test for a String literal inside a `case` block.
+- [x] Add a parser/codegen traversal regression for a String literal inside a
+      case guard. Case guards intentionally reject arbitrary call expressions
+      during semantic analysis, so this path is verified at the collector
+      boundary rather than by forcing an invalid native program.
+- [x] Add a native test for nested `if`/`case` blocks containing strings.
+- [x] Verify object and executable builds.
+- [x] Execute the binary and assert exact stdout.
+- [x] Verify repeated literals are deduplicated.
+- [x] Verify different literals receive deterministic symbols across repeated
       builds.
+
+Gate 27.3 evidence: the native `std_io` regression builds both executable and
+object artifacts for a program containing a case block, nested `if`/`else if`
+branches, reachable and unreachable strings, and exact stdout assertions. The
+collector unit regression covers case guards directly because the semantic
+language contract rejects call expressions in guards (`InvalidGuardAccess`);
+the acceptance suite does not bypass that rule with an invalid program. The
+object regression builds twice, compares object bytes and symbol manifests,
+and confirms deduplication and deterministic distinct data symbols.
 
 ## Gate 27.4: Readable AIE demonstration
 

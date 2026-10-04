@@ -145,6 +145,15 @@ verb main() -> Int {
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"selectedelse-if branch\n");
     assert_eq!(execution.stderr, b"");
+    let object = output.with_extension("obj");
+    let object_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build string control-flow object");
+    assert!(object_build.status.success(), "object build failed: {:?}", object_build);
+    assert!(object.is_file());
     let _ = fs::remove_dir_all(root);
 }
 
