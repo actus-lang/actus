@@ -119,3 +119,68 @@ verb main() -> Int {
     assert_eq!(run.status.code(), Some(0));
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn hosted_io_and_string_facades_share_compatible_buffer_bridge() {
+    let root = std::env::temp_dir().join(format!("actus-io-string-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"io_string_bridge\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    fs::write(
+        root.join("src/main.act"),
+        r#"import std::io;
+import std::string;
+
+verb main() -> Int {
+    erg text: String = "abc";
+    erg text_result = string_length(text: abs text);
+    erg buffer = Buffer[0];
+    append(buffer, 65);
+    erg buffer_result = buffer_length(buffer: abs buffer);
+    return case text_result {
+        Result.Ok(text_length) => case buffer_result {
+            Result.Ok(buffer_length_value) => if text_length == 3 && buffer_length_value == 1 { 0 } else { 1 },
+            Result.Err(_) => 2,
+        },
+        Result.Err(_) => 3,
+    };
+}
+"#,
+    )
+    .expect("source");
+    let input = root.join("src/main.act");
+    let object = root.join("io-string-bridge.o");
+    let output = root.join("io-string-bridge");
+    let check = Command::new(compiler())
+        .current_dir(&root)
+        .args(["check", "--strict"])
+        .output()
+        .expect("check");
+    assert!(check.status.success(), "{}", String::from_utf8_lossy(&check.stderr));
+    let object_build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .output()
+        .expect("object build");
+    assert!(object_build.status.success(), "{}", String::from_utf8_lossy(&object_build.stderr));
+    let executable_build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("executable build");
+    assert!(
+        executable_build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&executable_build.stderr)
+    );
+    let run = Command::new(&output).current_dir(&root).output().expect("run");
+    assert_eq!(run.status.code(), Some(0));
+    assert!(input.is_file());
+    let _ = fs::remove_dir_all(root);
+}

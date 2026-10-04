@@ -100,6 +100,52 @@ fn rejects_ambiguous_native_symbols_before_codegen() {
 }
 
 #[test]
+fn deduplicates_compatible_external_symbols_across_modules() {
+    let fixture = Fixture::new();
+    fixture.write("left/left.act", "open bridge;");
+    fixture.write(
+        "left/bridge.act",
+        "unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;",
+    );
+    fixture.write("right/right.act", "open bridge;");
+    fixture.write(
+        "right/bridge.act",
+        "unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;",
+    );
+    let (tokens, errors) = scan("import left; import right; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect("compatible external ABI declarations should be shared");
+}
+
+#[test]
+fn rejects_incompatible_external_symbols_across_modules() {
+    let fixture = Fixture::new();
+    fixture.write("left/left.act", "open bridge;");
+    fixture.write(
+        "left/bridge.act",
+        "unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;",
+    );
+    fixture.write("right/right.act", "open bridge;");
+    fixture.write(
+        "right/bridge.act",
+        "unsafe extern \"C\" verb shared_bridge(ins buffer: Buffer) -> Int;",
+    );
+    let (tokens, errors) = scan("import left; import right; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let error = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect_err("incompatible external ABI declarations must fail");
+    assert!(
+        matches!(error, ModuleError::SymbolCollision { ref symbol, .. } if symbol == "native symbol `shared_bridge`")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1110");
+}
+
+#[test]
 fn object_plan_orders_root_and_imported_units_by_canonical_module_path() {
     let fixture = Fixture::new();
     fixture.write("zeta/zeta.act", "open api;");

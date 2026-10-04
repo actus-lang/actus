@@ -351,6 +351,36 @@ phase.
 - Gate 29.10 is complete; no source-level workaround or domain-specific
   compiler dependency was introduced.
 
+## Gate 29.11: Shared external ABI symbols across standard-library facades
+
+- [x] Treat compatible external declarations with the same native symbol name
+      as one shared ABI contract during module aggregation.
+- [x] Compare ABI, generic signature, parameter types, ownership roles,
+      dispatch modes, and return access before allowing deduplication.
+- [x] Preserve deterministic `E1110` diagnostics for incompatible external
+      declarations that reuse one native symbol name.
+- [x] Keep native bridge declarations private to their owning facade while
+      allowing multiple public facades to reference the compatible bridge.
+- [x] Do not rename or duplicate the runtime ABI symbol as a source-level
+      workaround.
+- [x] Add accepted and rejected compiler regression tests for compatible and
+      incompatible external declarations across modules.
+- [x] Add an end-to-end hosted test importing both `std::io` and
+      `std::string`, covering strict check, object emission, executable
+      linking, and deterministic execution.
+
+### Gate 29.11 evidence
+
+- Compatible declarations sharing one external buffer-length ABI are accepted
+  and emitted as references to the same native symbol.
+- Incompatible ownership contracts for the same external symbol are rejected
+  with `E1110` before native emission.
+- The combined standard-library fixture passes strict checking, object build,
+  executable build, and execution with exit code `0`.
+- Full compiler tests, clippy, source-limit validation, and diff validation
+  pass after the change.
+- Gate 29.11 is complete.
+
 ## Non-goals
 
 - This phase does not promise human-level intelligence, semantic truth, or

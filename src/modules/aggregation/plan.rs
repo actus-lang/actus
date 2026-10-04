@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
+use crate::ast::{
+    DispatchMode, ExternalVerbDecl, ForeignAbi, GenericParamKind, Program, ReturnAccess, Role,
+    TopLevelDecl,
+};
 
 use super::super::resolver::ModuleResolver;
 use super::object_plan::{ModuleObjectPlan, build_object_plan};
@@ -121,22 +124,112 @@ fn validate_symbol_collisions(
 fn record_symbols(
     module: &str,
     declarations: &[TopLevelDecl],
-    symbols: &mut HashMap<(String, String), String>,
+    symbols: &mut HashMap<(String, String), SymbolRecord>,
 ) -> Result<(), ModuleError> {
     for declaration in declarations {
         let Some((kind, name)) = export_identity(declaration) else { continue };
         let key = (kind.to_owned(), name.clone());
-        if let Some(first_module) = symbols.insert(key, module.to_owned())
-            && first_module != module
+        let record = SymbolRecord {
+            module: module.to_owned(),
+            external_contract: external_contract(declaration),
+        };
+        if let Some(first) = symbols.get(&key)
+            && first.module != module
         {
+            if first.external_contract.is_some()
+                && first.external_contract == record.external_contract
+            {
+                continue;
+            }
             return Err(ModuleError::SymbolCollision {
-                symbol: format!("{kind} `{name}`"),
-                first_module,
+                symbol: if record.external_contract.is_some() {
+                    format!("native symbol `{name}`")
+                } else {
+                    format!("{kind} `{name}`")
+                },
+                first_module: first.module.clone(),
                 second_module: module.to_owned(),
             });
         }
+        symbols.insert(key, record);
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SymbolRecord {
+    module: String,
+    external_contract: Option<ExternalContract>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ExternalContract {
+    abi: ForeignAbi,
+    unsafe_boundary: bool,
+    generic_parameters: Vec<String>,
+    parameters: Vec<String>,
+    return_type: Option<String>,
+}
+
+fn external_contract(declaration: &TopLevelDecl) -> Option<ExternalContract> {
+    let TopLevelDecl::ExternalVerb(verb) = declaration else { return None };
+    Some(ExternalContract {
+        abi: verb.abi,
+        unsafe_boundary: verb.unsafe_boundary,
+        generic_parameters: verb.generic_parameters.iter().map(generic_parameter_key).collect(),
+        parameters: verb.params.iter().map(parameter_key).collect(),
+        return_type: verb.return_type.as_ref().map(|return_type| {
+            format!("{}:{}", return_access_key(return_type.access), return_type.ty.canonical_key())
+        }),
+    })
+}
+
+fn generic_parameter_key(parameter: &crate::ast::GenericParam) -> String {
+    let kind = match &parameter.kind {
+        GenericParamKind::Type => "type".to_owned(),
+        GenericParamKind::Const { domain } => format!("const:{}", domain.canonical_key()),
+    };
+    let bound =
+        parameter.bound.as_ref().map(crate::ast::TypeName::canonical_key).unwrap_or_default();
+    let bounds = parameter
+        .bounds
+        .iter()
+        .map(crate::ast::TypeName::canonical_key)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{kind}:{bound}:{bounds}")
+}
+
+fn parameter_key(parameter: &crate::ast::Param) -> String {
+    format!(
+        "{}:{}:{}",
+        role_key(&parameter.role),
+        dispatch_key(parameter.dispatch),
+        parameter.ty.canonical_key()
+    )
+}
+
+fn role_key(role: &Role) -> &'static str {
+    match role {
+        Role::Erg => "erg",
+        Role::Abs => "abs",
+        Role::Dat => "dat",
+        Role::Ins => "ins",
+    }
+}
+
+fn dispatch_key(dispatch: DispatchMode) -> &'static str {
+    match dispatch {
+        DispatchMode::Static => "static",
+        DispatchMode::Dynamic => "dynamic",
+    }
+}
+
+fn return_access_key(access: ReturnAccess) -> &'static str {
+    match access {
+        ReturnAccess::Owned => "owned",
+        ReturnAccess::Abs => "abs",
+    }
 }
 
 fn collect_unit(
