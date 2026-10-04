@@ -106,29 +106,57 @@ fn implementation_declarations(
         .collect::<Vec<_>>();
     let mut declarations = Vec::new();
     let mut imported_paths = HashSet::new();
+    let mut declaration_identities = HashSet::new();
+    append_imported_declarations(
+        module,
+        compilation,
+        &mut imported_paths,
+        &mut declaration_identities,
+        &mut declarations,
+    );
+    declarations.extend(local_declarations);
+    append_root_generic_support(&mut declarations, module, compilation);
+    Program { file_metadata: Vec::new(), declarations }
+}
+
+fn append_imported_declarations(
+    module: &super::unit::ModuleUnit,
+    compilation: &ModuleCompilationPlan,
+    imported_paths: &mut HashSet<String>,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
     let imports = module
         .implementation()
         .declarations
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Import(import) = declaration else { return None };
-            imported_paths.insert(import.path.clone()).then(|| {
-                compilation.units().iter().find(|unit| unit.identity().module_path() == import.path)
-            })?
+            compilation.units().iter().find(|unit| unit.identity().module_path() == import.path)
         })
         .collect::<Vec<_>>();
     for dependency in imports {
-        declarations.extend(
-            dependency
-                .implementation()
-                .declarations
-                .iter()
-                .filter_map(|declaration| exported_dependency_declaration(dependency, declaration)),
+        if !imported_paths.insert(dependency.identity().module_path().to_owned()) {
+            continue;
+        }
+        for declaration in &dependency.implementation().declarations {
+            let Some(exported) = exported_dependency_declaration(dependency, declaration) else {
+                continue;
+            };
+            let Some((kind, name)) = export_identity(&exported) else { continue };
+            let identity = (kind.to_owned(), name);
+            if declaration_identities.insert(identity) {
+                declarations.push(exported);
+            }
+        }
+        append_imported_declarations(
+            dependency,
+            compilation,
+            imported_paths,
+            declaration_identities,
+            declarations,
         );
     }
-    declarations.extend(local_declarations);
-    append_root_generic_support(&mut declarations, module, compilation);
-    Program { file_metadata: Vec::new(), declarations }
 }
 
 fn append_root_generic_support(
