@@ -13,15 +13,12 @@ pub const ABI_STATUS_END_OF_STREAM: i32 = -2;
 /// Failed opaque-handle C-ABI result.
 pub const ABI_HANDLE_FAILURE: i64 = -1;
 
-/// Returns whether a scalar status is a non-negative byte count or position.
-pub const fn is_successful_count(status: i32) -> bool {
-    status >= ABI_STATUS_SUCCESS
-}
-
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
+/// Stable runtime symbol for checked borrowed-buffer byte access.
+pub const BUFFER_BYTE_AT_SYMBOL: &str = "actus_buffer_byte_at";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";
@@ -72,4 +69,9 @@ pub const SLEEP_CONTEXT_CRITICAL_SECTION: u32 = 2;
 pub enum RuntimeCapability {
     Buffer,
     Stdout,
+}
+
+/// Returns whether a scalar status is a non-negative byte count or position.
+pub const fn is_successful_count(status: i32) -> bool {
+    status >= ABI_STATUS_SUCCESS
 }

@@ -200,15 +200,15 @@ src/aie/        -> propagation, plasticity, storage, and recall
 - Gate 29.4 is complete; Gate 29.5 covers constructing owned String values
   from UTF-8 bytes.
 
-## Gate 29.5: Constructing String values from UTF-8 bytes
+## Gate 29.5: Constructing owned UTF-8 values from bytes
 
-- [ ] Define a typed builder or caller-owned output buffer for assembling a
-      `String` from validated UTF-8 bytes.
+- [ ] Define a typed builder or caller-owned output buffer for assembling an
+      owned `Utf8Buffer` from validated UTF-8 bytes.
 - [ ] Reject invalid sequences deterministically; never silently replace or
       truncate malformed input.
 - [ ] Define capacity, length, overflow, and allocation behavior explicitly.
-- [ ] Ensure returned strings have a valid ownership/drop contract.
-- [ ] Add native tests for round trips: `String -> bytes -> String`.
+- [ ] Ensure returned UTF-8 values have a valid ownership/drop contract.
+- [ ] Add native tests for round trips: `String -> bytes -> Utf8Buffer`.
 - [ ] Preserve exact bytes for embedded NUL and multibyte code points where the
       String contract permits them.
 - [ ] Keep raw C/runtime bridges private and typed at the Actus boundary.

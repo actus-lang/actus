@@ -11,6 +11,8 @@ open enum StringError {
     InvalidUtf8,
     """The requested byte index or representable length is invalid."""
     OutOfBounds,
+    """The supplied buffer metadata or UTF-8 payload is inconsistent."""
+    InvalidStorage,
     """The selected runtime has no String inspection provider."""
     ProviderUnavailable,
 }

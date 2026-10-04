@@ -1,0 +1,62 @@
+"""
+Owned UTF-8 values backed by caller-provided `Buffer` storage.
+
+`Utf8Buffer` is deliberately separate from the legacy `String` pointer view.
+Construction consumes (`dat`) the supplied buffer only after the hosted
+provider validates its bytes. Rejected storage is dropped before returning a
+typed error. No allocation occurs in this layer and the owned buffer is
+released by the normal Actus aggregate cleanup rules.
+"""
+open struct Utf8Buffer {
+    """Owned validated UTF-8 bytes; the field is not exposed as a pointer."""
+    erg storage: Buffer,
+    """Logical byte length of the validated payload."""
+    erg length: Int,
+}
+
+unsafe extern "C" verb actus_buffer_validate_utf8(abs storage: Buffer) -> Int;
+unsafe extern "C" verb actus_buffer_length(abs storage: Buffer) -> Int;
+unsafe extern "C" verb actus_buffer_byte_at(abs storage: Buffer, erg index: Int) -> Int;
+
+"""
+Validate and take ownership of a caller-provided UTF-8 buffer.
+
+The buffer is consumed only on success. Invalid UTF-8, invalid buffer
+metadata, and an unrepresentable length return typed errors after cleanup.
+Embedded NUL bytes remain valid length-delimited UTF-8 payload bytes because
+this representation is buffer-backed and does not use the C string ABI.
+"""
+open verb utf8_from_buffer(dat storage: Buffer) -> Result[Utf8Buffer, StringError] {
+    erg validation = actus_buffer_validate_utf8(storage: abs storage);
+    if validation != 0 {
+        drop(storage);
+        return Err(StringError.InvalidStorage);
+    }
+    erg length = actus_buffer_length(storage: abs storage);
+    if length < 0 {
+        drop(storage);
+        return Err(StringError.InvalidStorage);
+    }
+    return Ok(Utf8Buffer {storage: storage, length: length});
+}
+
+"""Read the exact byte length of an owned UTF-8 value without consuming it."""
+open verb utf8_length(abs text: Utf8Buffer) -> Int {
+    return text.length;
+}
+
+"""
+Read one byte from an owned UTF-8 value without transferring its storage.
+
+The borrowed `abs` view remains immutable. The result is `Err(OutOfBounds)`
+for a negative or out-of-range index and `Err(InvalidStorage)` if the backing
+buffer metadata is invalid.
+"""
+open verb utf8_byte_at(abs text: Utf8Buffer, erg index: Int) -> Result[Int, StringError] {
+    erg status = actus_buffer_byte_at(storage: abs text.storage, index: erg index);
+    return case status {
+        -1 => Err(StringError.InvalidStorage),
+        -2 => Err(StringError.OutOfBounds),
+        _ => Ok(status),
+    };
+}

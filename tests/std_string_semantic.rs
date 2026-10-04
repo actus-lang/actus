@@ -14,6 +14,9 @@ fn string_facade_exports_borrowed_byte_api() {
     let exports = exports_module(&resolver, "string").expect("string facade should resolve");
     assert!(exports.contains("verb", "string_length"));
     assert!(exports.contains("verb", "string_byte_at"));
+    assert!(exports.contains("verb", "utf8_from_buffer"));
+    assert!(exports.contains("verb", "utf8_byte_at"));
+    assert!(exports.contains("struct", "Utf8Buffer"));
     assert!(exports.contains("enum", "StringError"));
     analyze_with_imports(
         &parse(scan("import string; verb main() -> Int { return 0; }").0).expect("parse"),

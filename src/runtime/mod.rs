@@ -23,8 +23,8 @@ pub use console::{
 };
 pub use contract::{
     ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS,
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_RESERVE_SYMBOL,
-    BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_BYTE_AT_SYMBOL, BUFFER_DROP_SYMBOL,
+    BUFFER_RESERVE_SYMBOL, BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
     FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL, MONOTONIC_NANOS_SYMBOL,
     PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
     PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
@@ -61,9 +61,9 @@ pub use path::{
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
 };
 pub use stream::{
-    actus_buffer_length, actus_buffer_validate_utf8, actus_buffered_write_stdout,
-    actus_cursor_flush, actus_cursor_read, actus_cursor_seek, actus_cursor_write,
-    actus_flush_buffered_stdout, actus_write_buffer_stdout,
+    actus_buffer_byte_at, actus_buffer_length, actus_buffer_validate_utf8,
+    actus_buffered_write_stdout, actus_cursor_flush, actus_cursor_read, actus_cursor_seek,
+    actus_cursor_write, actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
 pub use time::{
     actus_monotonic_nanos, actus_sleep_context_enter, actus_sleep_context_exit, actus_sleep_nanos,

@@ -20,6 +20,26 @@ fn hosted_string_byte_access_handles_ascii_multibyte_empty_and_bounds() {
         root.join("src/main.act"),
         r#"meta limitless("file")
 import std::string;
+verb inspect_owned(dat value: Utf8Buffer, erg one: Int) -> Int {
+    erg length = utf8_length(text: abs value);
+    erg byte_result = utf8_byte_at(text: abs value, index: erg one);
+    drop(value);
+    return case dat byte_result {
+        Result.Ok(element) => if length == 2 && element == 66 { 0 } else { 1 },
+        Result.Err(_) => 3,
+    };
+}
+verb owned_utf8_code() -> Int {
+    erg storage = Buffer[0];
+    erg one: Int = 1;
+    append(storage, 65);
+    append(storage, 66);
+    erg result = utf8_from_buffer(storage: dat storage);
+    return case dat result {
+        Result.Ok(value) => inspect_owned(value: dat value, one: erg one),
+        Result.Err(_) => 2,
+    };
+}
 verb bounds_ok(erg result: Result[Int, StringError]) -> Int {
     return case dat result {
         Result.Err(error) => case dat error {
@@ -30,6 +50,9 @@ verb bounds_ok(erg result: Result[Int, StringError]) -> Int {
     };
 }
 verb main() -> Int {
+    if owned_utf8_code() != 0 {
+        return 7;
+    }
     erg ascii_text: String = "Actus";
     erg utf_text: String = "é";
     erg empty_text: String = "";

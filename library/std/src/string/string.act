@@ -10,3 +10,5 @@ provides the same checked provider contract.
 open errors;
 """Re-export allocation-free borrowed byte and length operations."""
 open access;
+"""Re-export owned, caller-buffer-backed UTF-8 construction."""
+open owned;
