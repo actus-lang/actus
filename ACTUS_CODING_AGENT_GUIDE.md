@@ -1835,6 +1835,21 @@ verb snapshot(ins output: Buffer, abs column: Minicolumn) -> Int {
 or an unbounded storage representation for the supported packed-storage
 contract.
 
+#### Explicit scalar reuse
+
+Use `copy(value: abs value)` when an eligible scalar must be reused at an
+owning call boundary. The compiler accepts `Int`, `Bool`, and fixed-width
+integer values. The `abs` role is mandatory and the operation does not consume
+the caller. Do not use identity arithmetic such as `value + 0u32` to express
+reuse. Buffers, strings, resources, cleanup-bearing aggregates, and
+unsupported user-defined values are rejected with `E1021`; a missing explicit
+`abs` role is rejected with `E1016`.
+
+Indexed selection remains bounded through `values[index]`. Constant indexes
+outside `0 <= index < N` produce `E1085`; computed indexes retain the native
+bounds check. Indexed views preserve the source ownership role, so an
+exclusive `ins` view cannot be created from an `abs` owner (`E1016`).
+
 The formatter emits array-backed packs in canonical multiline form while
 preserving storage type, field offsets, layout, and `"""` documentation. The
 LSP exposes storage width, byte capacity, layout, field metadata, hover,

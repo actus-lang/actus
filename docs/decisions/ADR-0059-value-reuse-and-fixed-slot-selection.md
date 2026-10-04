@@ -1,6 +1,6 @@
 # ADR-0059: Ownership-Safe Value Reuse and Fixed-Slot Selection
 
-- **Status:** Accepted through Gate 32.3
+- **Status:** Accepted through Gate 32.5
 - **Date:** 2026-10-04
 - **Decision owners:** Actus language and compiler maintainers
 
@@ -145,3 +145,21 @@ escape paths.
 Native executable evidence is in `tests/arrays_cli.rs`, including
 `executes_explicit_scalar_copy_natively` and
 `executes_direct_and_computed_fixed_slot_selection_natively`.
+
+## Gate 32.5 implementation evidence
+
+Parser and formatter fixtures preserve explicit scalar reuse and indexed
+selection. The language server exposes the reuse intrinsic through completion,
+hover, signature help, and semantic tokens. The language guide and coding
+guide document the accepted type set and stable diagnostics `E1016`, `E1021`,
+and `E1085`.
+
+The accepted conformance fixture is
+`tests/fixtures/phase32/value_reuse_and_fixed_slots.act`. Strict checking,
+native executable emission and execution, semantic analysis, native indexed
+tests, LSP tests, architecture checks, and ownership tests all pass.
+
+Compatibility impact: the declaration namespace permits a module-scoped verb
+named `copy` so existing standard-library APIs remain valid. Intrinsic
+dispatch is a fallback when no local signature exists; the explicit scalar
+form remains available in sources without a local `copy` declaration.

@@ -64,6 +64,9 @@ fn token_type(tokens: &[crate::lexer::Token], index: usize) -> Option<u32> {
         return Some(6);
     }
     if let TokenKind::Identifier(name) = kind {
+        if matches!(name.as_str(), "append" | "copy" | "print" | "println") {
+            return Some(11);
+        }
         if matches!(
             name.as_str(),
             "Int"

@@ -34,6 +34,21 @@ fn parses_compound_assignment_targets_and_operators() {
 }
 
 #[test]
+fn parses_explicit_scalar_reuse_and_indexed_selection() {
+    let program = parse_source(
+        "verb main() { erg values: Array[u32, 2] = Array[u32, 2](); erg value: u32 = copy(value: abs values[1]); }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::OwnerDecl { initializer: Expr::Call { callee, arguments, .. }, .. } =
+        &verb.body.statements[1]
+    else {
+        panic!("expected copy call initializer");
+    };
+    assert_eq!(callee, "copy");
+    assert_eq!(arguments.len(), 1);
+}
+
+#[test]
 fn parses_case_variants_literals_and_wildcard_with_spans() {
     let program = parse_source(
         "enum Color { Red, } verb main() -> Int { return case value { Color.Red => 1, true => 2, _ => 0, }; }",

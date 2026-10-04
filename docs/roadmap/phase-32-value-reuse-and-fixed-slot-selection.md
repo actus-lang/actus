@@ -1,6 +1,6 @@
 # Phase 32: Value Reuse and Fixed-Slot Selection
 
-**Status:** Planned
+**Status:** Complete
 
 This phase implements [ADR-0059](../decisions/ADR-0059-value-reuse-and-fixed-slot-selection.md).
 It improves source clarity for repeated read-only scalar use and bounded
@@ -72,11 +72,25 @@ architecture checks reject raw pointer escapes at the language boundary.
 
 ### Gate 32.5 — Tooling and conformance
 
-- [ ] Update parser, formatter, semantic tokens, hover, and completion data.
-- [ ] Update the language guide and standard conformance fixtures.
-- [ ] Add diagnostics to the coding guide.
-- [ ] Run strict check, native build, executable tests, and ownership audits.
-- [ ] Record compatibility impact and close this phase only with all evidence.
+- [x] Update parser, formatter, semantic tokens, hover, and completion data.
+- [x] Update the language guide and standard conformance fixtures.
+- [x] Add diagnostics to the coding guide.
+- [x] Run strict check, native build, executable tests, and ownership audits.
+- [x] Record compatibility impact and close this phase only with all evidence.
+
+Evidence: parser and formatter fixtures cover `copy(value: abs value)` and
+indexed selection. LSP coverage verifies completion, hover, signature help
+catalogs, and semantic-token classification for the intrinsic; the existing
+indexed access model remains exposed with type, capacity, layout, and bounds
+facts. The accepted conformance fixture is
+`tests/fixtures/phase32/value_reuse_and_fixed_slots.act`.
+
+Acceptance results: `actus check --strict` accepts the fixture, strict native
+build and execution succeed, parser 76/76, formatter 22/22, conformance 4/4,
+LSP 82/82, strict CLI 9/9, semantic 192/192, native executable 73/73, and
+architecture/ownership checks pass. The compatibility change permits a
+module-scoped verb named `copy`; intrinsic dispatch is used only when no local
+signature is present, preserving existing standard-library APIs.
 
 ## Completion criteria
 

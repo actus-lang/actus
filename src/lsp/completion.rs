@@ -306,6 +306,7 @@ fn builtin_labels() -> Vec<String> {
         "abs".to_owned(),
         "dat".to_owned(),
         "ins".to_owned(),
+        "copy".to_owned(),
         "as".to_owned(),
         "<".to_owned(),
         "<=".to_owned(),

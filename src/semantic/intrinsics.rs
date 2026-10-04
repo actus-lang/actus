@@ -10,7 +10,11 @@ use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 pub(super) fn is_reserved_name(name: &str) -> bool {
-    name == "allocate" || (lookup_intrinsic(name).is_some() && name != "print")
+    // `copy` is also a public standard-library verb name. Intrinsic dispatch
+    // already yields to a locally registered signature, so the name must remain
+    // available to module-scoped declarations without weakening the intrinsic
+    // fallback for scalar reuse.
+    name == "allocate" || (lookup_intrinsic(name).is_some() && !matches!(name, "print" | "copy"))
 }
 
 impl Analyzer {
