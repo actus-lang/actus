@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{CaseBody, CaseBranch, Expr, primitive_type};
+use crate::ast::{CaseBody, CaseBranch, Expr, Stmt, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -95,7 +95,9 @@ impl Analyzer {
                 result_type = Some(candidate);
             }
             self.leave_scope();
-            branch_results.push(self.snapshot_binding_prefix(branch_count));
+            if !case_branch_diverges(&branch.body) {
+                branch_results.push(self.snapshot_binding_prefix(branch_count));
+            }
         }
         if let Some(result_type) = result_type
             && let Some(type_name) = super::calls::parse_type_name_key(&result_type, case_span)
@@ -179,6 +181,13 @@ impl Analyzer {
             CaseBody::Block(block) => self.visit_block(block),
         }
     }
+}
+
+fn case_branch_diverges(body: &CaseBody) -> bool {
+    let CaseBody::Block(block) = body else { return false };
+    block.statements.last().is_some_and(|statement| {
+        matches!(statement, Stmt::Return { .. } | Stmt::Break { .. } | Stmt::Continue { .. })
+    })
 }
 
 fn is_plain_case_type(type_name: &str) -> bool {
