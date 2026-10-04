@@ -1,0 +1,65 @@
+# Phase 32: Value Reuse and Fixed-Slot Selection
+
+**Status:** Planned
+
+This phase implements [ADR-0059](../decisions/ADR-0059-value-reuse-and-fixed-slot-selection.md).
+It improves source clarity for repeated read-only scalar use and bounded
+selection across fixed-layout fields without weakening Actus ownership,
+layout, bounds, or native safety guarantees.
+
+## Scope
+
+- explicit reuse for compiler-approved small scalar values;
+- read-only scalar parameter contracts;
+- bounded fixed-slot selection;
+- semantic diagnostics and native lowering evidence;
+- formatter, LSP, documentation, and conformance updates.
+
+## Gates
+
+### Gate 32.1 — Contract and type eligibility
+
+- [ ] Define the source syntax for explicit scalar reuse.
+- [ ] Define the compiler-approved eligible type set.
+- [ ] Reject reuse for buffers, resources, aggregates with cleanup, and
+      unsupported user-defined types.
+- [ ] Preserve `erg`, `abs`, `dat`, and `ins` meaning at every call boundary.
+- [ ] Document diagnostics and migration guidance.
+
+### Gate 32.2 — Semantic analysis
+
+- [ ] Add accepted fixtures for repeated scalar reuse.
+- [ ] Add rejected fixtures for implicit or unsupported copying.
+- [ ] Verify moved bindings remain rejected after an owning call.
+- [ ] Verify read-only scalar calls do not consume the caller binding.
+- [ ] Verify branch joins and cleanup state remain deterministic.
+
+### Gate 32.3 — Fixed-slot selection
+
+- [ ] Define the bounded fixed-slot accessor or equivalent language form.
+- [ ] Preserve element type, slot count, layout, and alignment metadata.
+- [ ] Add accepted indexed-selection fixtures.
+- [ ] Add rejected out-of-range and invalid-role fixtures.
+- [ ] Verify direct and computed indexes produce identical bounds behavior.
+
+### Gate 32.4 — Native lowering
+
+- [ ] Lower eligible scalar reuse without identity arithmetic.
+- [ ] Lower fixed-slot selection to deterministic native code.
+- [ ] Verify aggregate stride and packed field offsets are unchanged.
+- [ ] Verify no raw pointer escapes are introduced.
+- [ ] Add native executable tests for repeated use and slot selection.
+
+### Gate 32.5 — Tooling and conformance
+
+- [ ] Update parser, formatter, semantic tokens, hover, and completion data.
+- [ ] Update the language guide and standard conformance fixtures.
+- [ ] Add diagnostics to the coding guide.
+- [ ] Run strict check, native build, executable tests, and ownership audits.
+- [ ] Record compatibility impact and close this phase only with all evidence.
+
+## Completion criteria
+
+Phase 32 closes when explicit value reuse is visible in source, unsupported
+copying remains rejected, fixed-slot selection is bounded and layout-safe, and
+all semantic, native, ownership, and tooling gates pass.
