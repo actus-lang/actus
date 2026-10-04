@@ -1,0 +1,24 @@
+import std::string;
+
+meta test
+verb public_text_boundary_test() -> Int {
+    erg storage = Buffer[0];
+    append(storage, 65);
+    append(storage, 99);
+    append(storage, 116);
+    append(storage, 117);
+    append(storage, 115);
+    erg value = utf8_from_buffer(storage: dat storage);
+    return case dat value {
+        Result.Ok(text) => {
+            erg zero: Int = 0;
+            erg first = utf8_byte_at(text: abs text, index: erg zero);
+            drop(text);
+            return case dat first {
+                Result.Ok(byte) => if byte == 65 { 0 } else { 1 },
+                Result.Err(_) => 2,
+            };
+        },
+        Result.Err(_) => 3,
+    };
+}

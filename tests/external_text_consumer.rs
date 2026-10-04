@@ -24,6 +24,14 @@ fn generic_external_text_consumer_passes_all_native_boundaries() {
         .expect("strict check");
     assert!(check.status.success(), "{}", String::from_utf8_lossy(&check.stderr));
 
+    let tests = Command::new(compiler())
+        .args(["test", "--strict"])
+        .current_dir(&root)
+        .output()
+        .expect("strict test runner");
+    assert!(tests.status.success(), "{}", String::from_utf8_lossy(&tests.stderr));
+    assert!(String::from_utf8_lossy(&tests.stdout).contains("1 passed"));
+
     let object_build = Command::new(compiler())
         .args(["build", "--strict", "--emit", "obj", "-o"])
         .arg(&object)

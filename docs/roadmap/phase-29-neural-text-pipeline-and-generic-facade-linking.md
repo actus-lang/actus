@@ -292,18 +292,30 @@ phase.
 
 ## Gate 29.9: End-to-end compiler and runtime acceptance
 
-- [ ] `actus check --strict` passes for the complete generic text consumer
+- [x] `actus check --strict` passes for the complete generic text consumer
       fixture.
-- [ ] `actus test --strict` passes all String, UTF-8, facade, and linker
+- [x] `actus test --strict` passes all String, UTF-8, facade, and linker
       regression tests.
-- [ ] Native object and executable builds pass with no undefined specialized
+- [x] Native object and executable builds pass with no undefined specialized
       facade symbols.
-- [ ] The generic consumer example executes successfully without
+- [x] The generic consumer example executes successfully without
       application-specific neural structures.
-- [ ] Zero-float, allocation, determinism, visibility, source-limit, and
+- [x] Zero-float, allocation, determinism, visibility, source-limit, and
       documentation checks pass at the Actus boundary.
-- [ ] The final API and evidence are reviewed against every earlier gate; no
+- [x] The final API and evidence are reviewed against every earlier gate; no
       checkbox is closed from a source-level check alone.
+
+### Gate 29.9 evidence
+
+- The external-consumer fixture now passes `actus check --strict`,
+  `actus test --strict`, native object emission, native executable linking,
+  and executable execution.
+- The package test runner exercises the same `std::string` facade and typed
+  `Utf8Buffer` boundary as the executable entry point.
+- Full repository checks pass, including formatter, compiler checks, clippy,
+  all-target tests, source limits, documentation validation, and diff checks.
+- Gate 29.9 is complete; Phase 29 is complete for the Actus compiler/runtime
+  boundary.
 
 ## Non-goals
 
