@@ -45,6 +45,16 @@ pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
 pub const MONOTONIC_NANOS_SYMBOL: &str = "actus_monotonic_nanos";
 /// Stable hosted runtime symbol for scheduler-aware monotonic sleeping.
 pub const SLEEP_NANOS_SYMBOL: &str = "actus_sleep_nanos";
+/// Stable runtime symbol used by a target provider to enter a restricted
+/// execution context for blocking operations.
+pub const SLEEP_CONTEXT_ENTER_SYMBOL: &str = "actus_sleep_context_enter";
+/// Stable runtime symbol used by a target provider to leave a restricted
+/// execution context for blocking operations.
+pub const SLEEP_CONTEXT_EXIT_SYMBOL: &str = "actus_sleep_context_exit";
+/// Execution-context flag indicating interrupt context.
+pub const SLEEP_CONTEXT_INTERRUPT: u32 = 1;
+/// Execution-context flag indicating a critical section.
+pub const SLEEP_CONTEXT_CRITICAL_SECTION: u32 = 2;
 
 /// Runtime operations are explicit capabilities rather than implicit compiler
 /// services. Freestanding targets may provide none of these capabilities.

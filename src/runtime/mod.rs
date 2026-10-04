@@ -29,8 +29,10 @@ pub use contract::{
     PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
     PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
     PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
-    RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_NANOS_SYMBOL, WRITE_BUFFER_STDOUT_SYMBOL,
-    WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
+    RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_CONTEXT_CRITICAL_SECTION,
+    SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL, SLEEP_CONTEXT_INTERRUPT,
+    SLEEP_NANOS_SYMBOL, WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
+    is_successful_count,
 };
 pub use fs::{
     actus_file_close, actus_file_close_buffer, actus_file_copy_buffer, actus_file_copy_path,
@@ -62,7 +64,9 @@ pub use stream::{
     actus_cursor_flush, actus_cursor_read, actus_cursor_seek, actus_cursor_write,
     actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
-pub use time::{actus_monotonic_nanos, actus_sleep_nanos};
+pub use time::{
+    actus_monotonic_nanos, actus_sleep_context_enter, actus_sleep_context_exit, actus_sleep_nanos,
+};
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
