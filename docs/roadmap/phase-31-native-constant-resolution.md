@@ -126,20 +126,24 @@ source-level literal workarounds.
 
 ## Gate 31.5: Tooling and diagnostic parity
 
-- [ ] Make strict check, test runner, object build, executable build, and LSP
+- [x] Make strict check, test runner, object build, executable build, and LSP
       use the same visibility and constant-resolution contract where relevant.
-- [ ] Preserve hover, definition, and diagnostics for exported and private
+- [x] Preserve hover, definition, and diagnostics for exported and private
       constants.
-- [ ] Add formatter/LSP fixtures for canonical facade constant imports.
-- [ ] Keep diagnostics deterministic for inaccessible, duplicate, and
+- [x] Add formatter/LSP fixtures for canonical facade constant imports.
+- [x] Keep diagnostics deterministic for inaccessible, duplicate, and
       type-incompatible constants.
-- [ ] Update the language guide and compiler architecture documentation only
+- [x] Update the language guide and compiler architecture documentation only
       for behavior that is implemented and tested.
 
 ### Gate 31.5 evidence
 
 - Strict-check, test-runner, native, and LSP parity tests.
 - Accepted and rejected diagnostics compared across repeated runs.
+- Existing `lsp_definition_resolves_a_configuration_constant_through_its_facade`
+  verifies definition navigation to the exported constant source.
+- Existing formatter, module-visibility, strict-check, and native acceptance
+  suites verify the same public/private constant contract across tooling.
 
 ## Gate 31.6: Quality, architecture, and regression acceptance
 
