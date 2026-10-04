@@ -360,16 +360,30 @@ following semantic rules are fixed:
 
 ### Gate 28.8: Duration units and checked arithmetic
 
-- [ ] Add explicit constructors for seconds, milliseconds, microseconds, and
+- [x] Add explicit constructors for seconds, milliseconds, microseconds, and
       nanoseconds.
-- [ ] Add checked conversion operations between all supported units.
-- [ ] Add checked addition, subtraction, multiplication by an unsigned scalar,
+- [x] Add checked conversion operations between all supported units.
+- [x] Add checked addition, subtraction, multiplication by an unsigned scalar,
       and division by a non-zero unsigned scalar.
-- [ ] Define and test overflow, underflow, zero divisor, and precision-loss
+- [x] Define and test overflow, underflow, zero divisor, and precision-loss
       behavior with typed diagnostics or typed errors.
-- [ ] Do not silently round, truncate, wrap, or promote a duration across a
+- [x] Do not silently round, truncate, wrap, or promote a duration across a
       unit boundary.
-- [ ] Add native tests for boundary values and verify integer-only IR.
+- [x] Add native tests for boundary values and verify integer-only IR.
+
+### Gate 28.8 evidence
+
+- `library/std/src/time/duration.act` now provides exact nanosecond,
+  microsecond, millisecond, and second constructors, checked conversions, and
+  checked arithmetic over `u64` nanoseconds.
+- Overflow, unsigned underflow, zero divisors, and non-exact conversions are
+  represented by `TimeError`; division and unit conversion never silently
+  discard elapsed-time precision.
+- `duration_boundaries_and_typed_failures_run_natively` covers maximum valid
+  seconds, constructor overflow at each larger unit, exact division,
+  precision loss, zero division, and subtraction underflow in a native
+  executable.
+- The native boundary test passes with the no-floating-point IR audit enabled.
 
 ### Gate 28.9: Deadlines and remaining-time calculations
 

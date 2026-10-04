@@ -244,3 +244,43 @@ fn unsigned_elapsed_underflow_is_rejected_before_native_execution() {
     assert_ne!(execution.status.code(), Some(0), "underflow returned success");
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn duration_boundaries_and_typed_failures_run_natively() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-time-boundaries-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("duration-boundaries-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_boundaries\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb is_overflow(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.Overflow => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_precision_loss(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.PrecisionLoss => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_zero_divisor(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.ZeroDivisor => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_negative(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.NegativeDuration => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_exact(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Ok(value) => if duration_as_nanos(abs value) == 2u64 { 0 } else { 1 }, Result.Err(_) => 2, }; } verb main() -> Int { erg max_input: u64 = 18446744073u64; erg overflow_input: u64 = 18446744074u64; erg overflow_millis_input: u64 = 18446744073710u64; erg overflow_micros_input: u64 = 18446744073709552u64; erg divisor: u64 = 2u64; erg zero: u64 = 0u64; erg four: Duration = Duration { nanos: 4u64, }; erg five: Duration = Duration { nanos: 5u64, }; erg one: Duration = Duration { nanos: 1u64, }; erg two: Duration = Duration { nanos: 2u64, }; erg max_seconds = duration_seconds(seconds: erg max_input); erg overflow_seconds = duration_seconds(seconds: erg overflow_input); erg overflow_millis = duration_milliseconds(milliseconds: erg overflow_millis_input); erg overflow_micros = duration_microseconds(microseconds: erg overflow_micros_input); erg exact = duration_div(duration: abs four, divisor: erg divisor); erg non_exact = duration_div(duration: abs five, divisor: erg divisor); erg zero_divisor = duration_div(duration: abs four, divisor: erg zero); erg underflow = duration_sub(left: abs one, right: abs two); if is_overflow(result: erg overflow_seconds) != 0 || is_overflow(result: erg overflow_millis) != 0 || is_overflow(result: erg overflow_micros) != 0 || is_precision_loss(result: erg non_exact) != 0 || is_zero_divisor(result: erg zero_divisor) != 0 || is_negative(result: erg underflow) != 0 || is_exact(result: erg exact) != 0 || is_overflow(result: erg max_seconds) != 2 { return 1; } return 0; }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "duration boundary build failed: {status}");
+
+    let execution =
+        Command::new(&output).output().expect("duration boundary executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
