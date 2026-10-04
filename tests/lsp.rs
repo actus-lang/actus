@@ -21,5 +21,7 @@ mod lsp_semantic;
 mod lsp_semantic_intelligence;
 #[path = "lsp/semantic_states.rs"]
 mod lsp_semantic_states;
+#[path = "lsp/text_boundary.rs"]
+mod lsp_text_boundary;
 #[path = "lsp/workspace.rs"]
 mod lsp_workspace;

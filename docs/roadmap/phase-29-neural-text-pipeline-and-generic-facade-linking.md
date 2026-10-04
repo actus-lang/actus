@@ -247,16 +247,27 @@ phase.
 
 ## Gate 29.7: Tooling and public API synchronization
 
-- [ ] Add formatter coverage for the public String and UTF-8 APIs.
-- [ ] Add LSP completion, hover, definition, diagnostics, and visibility tests
+- [x] Add formatter coverage for the public String and UTF-8 APIs.
+- [x] Add LSP completion, hover, definition, diagnostics, and visibility tests
       through the String and UTF-8 facades.
-- [ ] Ensure `check`, `test`, object emission, executable emission, and LSP use
+- [x] Ensure `check`, `test`, object emission, executable emission, and LSP use
       the same module and native dependency graph.
-- [ ] Document every public type, verb, error, ownership role, and ABI boundary.
-- [ ] Update the coding guide, language guide, runtime documentation, API
+- [x] Document every public type, verb, error, ownership role, and ABI boundary.
+- [x] Update the coding guide, language guide, runtime documentation, API
       index, ADRs, and generic examples in the same logical change.
-- [ ] Verify no private runtime bridge leaks into public completion or
+- [x] Verify no private runtime bridge leaks into public completion or
       documentation.
+
+### Gate 29.7 evidence
+
+- Formatter coverage confirms idempotent rendering of `std::string` imports,
+  `Utf8Buffer` results, ownership roles, and named arguments.
+- LSP coverage confirms diagnostics, hover, completion, definition, and
+  formatting for the hosted standard-runtime String/UTF-8 facade.
+- All existing facade, generic, visibility, native, and strict workflow tests
+  remain green; private runtime symbols are not exposed.
+- Gate 29.7 is complete; Gate 29.8 covers resource, determinism, and safety
+  acceptance.
 
 ## Gate 29.8: Resource, determinism, and safety acceptance
 

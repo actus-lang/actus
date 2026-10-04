@@ -82,6 +82,22 @@ fn formats_the_complete_monotonic_time_surface_idempotently() {
 }
 
 #[test]
+fn formats_the_public_utf8_boundary_idempotently() {
+    let source = concat!(
+        "import std::string;\n",
+        "verb copy_text(dat storage: Buffer, abs source: String) -> Result[Utf8Buffer, StringError] {\n",
+        "erg result = utf8_from_string(text: abs source, storage: dat storage);\n",
+        "return result;\n",
+        "}\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("import std::string;"));
+    assert!(formatted.contains("utf8_from_string(text: abs source, storage: dat storage)"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_const_generic_declarations_without_changing_meaning() {
     let formatted = format_source(
         "struct Fabric[N: Usize] { cells: Array[Int, N], } verb main() -> Bool { return false; }",
