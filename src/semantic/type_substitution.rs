@@ -14,6 +14,7 @@ pub(crate) struct TypeSubstitution {
     bindings: HashMap<String, TypeName>,
     const_bindings: HashMap<String, String>,
     call_bindings: HashMap<String, String>,
+    call_site_bindings: HashMap<(String, usize, usize), String>,
 }
 
 impl TypeSubstitution {
@@ -45,7 +46,12 @@ impl TypeSubstitution {
                 }
             }
         }
-        Ok(Self { bindings, const_bindings, call_bindings: HashMap::new() })
+        Ok(Self {
+            bindings,
+            const_bindings,
+            call_bindings: HashMap::new(),
+            call_site_bindings: HashMap::new(),
+        })
     }
 
     pub(crate) fn with_call_bindings(mut self, call_bindings: &HashMap<String, String>) -> Self {
@@ -53,8 +59,20 @@ impl TypeSubstitution {
         self
     }
 
+    pub(crate) fn with_call_site_bindings(
+        mut self,
+        call_site_bindings: &HashMap<(String, usize, usize), String>,
+    ) -> Self {
+        self.call_site_bindings = call_site_bindings.clone();
+        self
+    }
+
     pub(crate) fn apply_call(&self, name: &str) -> Option<&str> {
         self.call_bindings.get(name).map(String::as_str)
+    }
+
+    pub(crate) fn apply_call_at(&self, name: &str, span: SourceSpan) -> Option<&str> {
+        self.call_site_bindings.get(&(name.to_owned(), span.start, span.end)).map(String::as_str)
     }
 
     pub(crate) fn apply_const(&self, name: &str) -> Option<&str> {

@@ -28,7 +28,7 @@ impl Analyzer {
         } else {
             self.infer_generic_bindings(signature, arguments)
         };
-        self.record_generic_call_instance(name, signature, &bindings);
+        self.record_generic_call_instance(name, signature, &bindings, span);
         let specialized = self.specialize_signature(signature, bindings, span)?;
         self.record_specialized_signature_instances(&specialized, span)?;
         Ok(specialized)
@@ -39,6 +39,7 @@ impl Analyzer {
         name: &str,
         signature: &VerbSignature,
         bindings: &HashMap<String, TypeName>,
+        span: SourceSpan,
     ) {
         let arguments = signature
             .generic_parameters
@@ -61,6 +62,7 @@ impl Analyzer {
             arguments,
             canonical_key,
             caller: self.current_generic_owner.clone(),
+            call_span: span,
         });
     }
 

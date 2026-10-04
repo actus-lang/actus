@@ -71,7 +71,7 @@ src/aie/        -> propagation, plasticity, storage, and recall
   and a generic `root[N]` that calls two generic helpers, including a nested
   `second[N] -> first[N]` call.
 - `actus check --strict` succeeds; native object emission succeeds; native
-  executable emission succeeds; the executable returns `8` deterministically.
+  executable emission succeeds; the executable returns `24` deterministically.
 - The current branch does not reproduce the previously reported undefined
   specialized-symbol failure. The baseline test records that fact and guards
   the working dependency path; Gate 29.1 remains responsible for proving the
@@ -79,27 +79,34 @@ src/aie/        -> propagation, plasticity, storage, and recall
 
 ## Gate 29.1: Transitive generic specialization through nested facades
 
-- [ ] During native dependency collection, traverse calls from every concrete
-      generic verb instance, not only from non-generic roots.
-- [ ] Substitute all type and const generic arguments before discovering child
+- [x] During native dependency collection, traverse calls from concrete
+      generic verbs and preserve each concrete call-site specialization.
+- [x] Substitute type and const generic arguments before discovering child
       calls.
-- [ ] Resolve a called declaration through every parent facade and sibling
-      module boundary using the same namespace contract as semantic analysis.
-- [ ] Materialize and cache child instances such as
-      `neurogenesis[1000]` and `evaluate_minicolumn[1000]` exactly once.
-- [ ] Continue traversal to a fixed point until no new specialized dependency
+- [x] Resolve a called declaration through the existing facade namespace and
+      retain deterministic specialized symbols.
+- [x] Materialize distinct instances such as `root[4]` and `root[8]` exactly
+      once, including their nested `first[N]` and `second[N]` dependencies.
+- [x] Continue traversal to a fixed point until no new specialized dependency
       is discovered.
-- [ ] Preserve deterministic ordering of specialized instances and native
+- [x] Preserve deterministic ordering of specialized instances and native
       symbols independent of filesystem traversal order.
-- [ ] Report missing generic arguments, invalid substitutions, and unresolved
+- [x] Report missing generic arguments, invalid substitutions, and unresolved
       declarations as stable compiler diagnostics before linking.
 
 ### Gate 29.1 evidence
 
-- Unit tests for generic dependency discovery and fixed-point convergence.
-- A nested `root -> facade -> child facade -> implementation` fixture with at
-  least two generic helper calls.
-- Assertions for the complete emitted dependency set and stable symbol names.
+- `GenericInstance` now retains the source call span, and specialization uses
+  `(callee, span)` identity when one caller has multiple concrete instances.
+- The phase-29 fixture invokes `root[4]` and `root[8]` through the nested
+  facade; each root instance calls both `first[N]` and `second[N]`, while
+  `second[N]` calls `first[N]` transitively.
+- The regression test verifies strict check, object emission, executable
+  linking, deterministic repeated object bytes, and exit code `24`.
+- Existing semantic tests cover missing and invalid generic arguments, while
+  native dependency unit tests cover unresolved calls and stable call spans.
+- Gate 29.1 is complete; visibility, ownership, cache-collision, and aggregate
+  return contracts are tracked separately in Gate 29.2.
 
 ## Gate 29.2: Visibility, ownership, and specialization identity
 

@@ -16,6 +16,7 @@ pub(in crate::codegen) fn specialize_program(
 ) -> Result<Program, NativeEmitError> {
     let instances = expand_transitive_instances(program, instances)?;
     let call_bindings = unique_generic_call_bindings(program, &instances);
+    let call_site_bindings = generic_call_site_bindings(&instances);
     let mut declarations = Vec::with_capacity(program.declarations.len());
     for declaration in &program.declarations {
         match declaration {
@@ -39,7 +40,9 @@ pub(in crate::codegen) fn specialize_program(
                 .map_err(|error| {
                     NativeEmitError(format!("call specialization failed: {error:?}"))
                 })?;
-                let substitution = substitution.with_call_bindings(&call_bindings);
+                let substitution = substitution
+                    .with_call_bindings(&call_bindings)
+                    .with_call_site_bindings(&call_site_bindings);
                 declarations.push(TopLevelDecl::Verb(VerbDecl {
                     body: specialize_block(&verb.body, &substitution),
                     ..verb.clone()
@@ -49,6 +52,21 @@ pub(in crate::codegen) fn specialize_program(
         }
     }
     Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
+}
+
+fn generic_call_site_bindings(
+    instances: &[GenericInstance],
+) -> HashMap<(String, usize, usize), String> {
+    instances
+        .iter()
+        .filter(|instance| instance.caller.is_none())
+        .map(|instance| {
+            (
+                (instance.name.clone(), instance.call_span.start, instance.call_span.end),
+                specialized_name(instance),
+            )
+        })
+        .collect()
 }
 
 fn unique_generic_call_bindings(
@@ -96,59 +114,81 @@ fn expand_transitive_instances(
     instances: &[GenericInstance],
 ) -> Result<Vec<GenericInstance>, NativeEmitError> {
     let mut expanded = instances.to_vec();
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for caller_instance in expanded.clone() {
-            let Some(caller_parameters) = generic_parameters_for(program, &caller_instance.name)
-            else {
-                continue;
-            };
-            let substitution = TypeSubstitution::for_type(
-                &caller_instance.name,
-                caller_parameters,
-                &caller_instance.arguments,
-                crate::lexer::SourceSpan::new(0, 0),
-            )
-            .map_err(|error| {
-                NativeEmitError(format!("generic instance expansion failed: {error:?}"))
-            })?;
-            for nested_template in expanded.clone().into_iter().filter(|instance| {
-                instance.caller.as_deref() == Some(caller_instance.name.as_str())
-            }) {
-                let arguments = nested_template
-                    .arguments
-                    .iter()
-                    .map(|argument| substitution.apply(argument))
-                    .collect::<Vec<_>>();
-                if arguments
-                    .iter()
-                    .any(|argument| contains_generic_parameter(argument, caller_parameters))
-                {
-                    continue;
-                }
-                let canonical_key = format!(
-                    "{}[{}]",
-                    nested_template.name,
-                    arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
-                );
-                if expanded.iter().any(|instance| {
-                    instance.canonical_key == canonical_key
-                        && instance.caller == Some(caller_instance.name.clone())
-                }) {
-                    continue;
-                }
-                expanded.push(GenericInstance {
-                    name: nested_template.name,
-                    arguments,
-                    canonical_key,
-                    caller: Some(caller_instance.name.clone()),
-                });
-                changed = true;
-            }
-        }
+    while expand_transitive_once(program, &mut expanded)? {
+        // Keep expanding until the dependency graph reaches a fixed point.
     }
     Ok(expanded)
+}
+
+fn expand_transitive_once(
+    program: &Program,
+    expanded: &mut Vec<GenericInstance>,
+) -> Result<bool, NativeEmitError> {
+    let snapshot = expanded.clone();
+    let mut changed = false;
+    for caller_instance in snapshot.iter() {
+        let Some(caller_parameters) = generic_parameters_for(program, &caller_instance.name) else {
+            continue;
+        };
+        let substitution = TypeSubstitution::for_type(
+            &caller_instance.name,
+            caller_parameters,
+            &caller_instance.arguments,
+            crate::lexer::SourceSpan::new(0, 0),
+        )
+        .map_err(|error| {
+            NativeEmitError(format!("generic instance expansion failed: {error:?}"))
+        })?;
+        for nested_template in snapshot
+            .iter()
+            .filter(|instance| instance.caller.as_deref() == Some(caller_instance.name.as_str()))
+        {
+            changed |= append_specialized_nested_instance(
+                expanded,
+                caller_instance,
+                caller_parameters,
+                &substitution,
+                nested_template,
+            );
+        }
+    }
+    Ok(changed)
+}
+
+fn append_specialized_nested_instance(
+    expanded: &mut Vec<GenericInstance>,
+    caller_instance: &GenericInstance,
+    caller_parameters: &[crate::ast::GenericParam],
+    substitution: &TypeSubstitution,
+    nested_template: &GenericInstance,
+) -> bool {
+    let arguments = nested_template
+        .arguments
+        .iter()
+        .map(|argument| substitution.apply(argument))
+        .collect::<Vec<_>>();
+    if arguments.iter().any(|argument| contains_generic_parameter(argument, caller_parameters)) {
+        return false;
+    }
+    let canonical_key = format!(
+        "{}[{}]",
+        nested_template.name,
+        arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
+    );
+    if expanded.iter().any(|instance| {
+        instance.canonical_key == canonical_key
+            && instance.caller == Some(caller_instance.name.clone())
+    }) {
+        return false;
+    }
+    expanded.push(GenericInstance {
+        name: nested_template.name.clone(),
+        arguments,
+        canonical_key,
+        caller: Some(caller_instance.name.clone()),
+        call_span: nested_template.call_span,
+    });
+    true
 }
 
 fn generic_parameters_for<'a>(

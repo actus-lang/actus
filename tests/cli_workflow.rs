@@ -333,12 +333,34 @@ fn phase29_nested_generic_facade_baseline_passes_all_native_stages() {
         .expect("run phase 29 baseline check");
     assert!(check.status.success(), "stderr: {}", String::from_utf8_lossy(&check.stderr));
 
+    let first_object =
+        std::env::temp_dir().join(format!("actus-phase29-first-{}.obj", std::process::id()));
     let object = Command::new(compiler)
         .args(["build", "--strict", "--emit", "obj"])
+        .args(["-o"])
+        .arg(&first_object)
         .current_dir(&fixture)
         .output()
         .expect("build phase 29 baseline object");
     assert!(object.status.success(), "stderr: {}", String::from_utf8_lossy(&object.stderr));
+
+    let second_object =
+        std::env::temp_dir().join(format!("actus-phase29-second-{}.obj", std::process::id()));
+    let repeated_object = Command::new(compiler)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&second_object)
+        .current_dir(&fixture)
+        .output()
+        .expect("repeat phase 29 baseline object build");
+    assert!(
+        repeated_object.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&repeated_object.stderr)
+    );
+    assert_eq!(
+        fs::read(&first_object).expect("read first phase 29 object"),
+        fs::read(&second_object).expect("read second phase 29 object")
+    );
 
     let executable = std::env::temp_dir().join(format!("actus-phase29-{}", std::process::id()));
     let build = Command::new(compiler)
@@ -350,8 +372,10 @@ fn phase29_nested_generic_facade_baseline_passes_all_native_stages() {
     assert!(build.status.success(), "stderr: {}", String::from_utf8_lossy(&build.stderr));
 
     let run = Command::new(&executable).output().expect("run phase 29 baseline executable");
-    assert_eq!(run.status.code(), Some(8));
+    assert_eq!(run.status.code(), Some(24));
 
+    let _ = fs::remove_file(first_object);
+    let _ = fs::remove_file(second_object);
     let _ = fs::remove_file(executable);
     let _ = fs::remove_dir_all(fixture.join("capsula"));
 }
