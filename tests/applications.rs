@@ -413,6 +413,29 @@ open verb scalar_copy() -> Int {
 }
 
 #[test]
+fn nested_runtime_facade_qualifies_sibling_imports() {
+    let source = "import feature; verb main() -> Int { return runtime_probe(); }\n";
+    let (root, input, output) = project("nested-runtime-sibling-import", source);
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("enable standard runtime");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature module");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "import std::fs; open verb runtime_probe() -> Int { return 0; }\n",
+    )
+    .expect("write runtime import fixture");
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(0));
+    fs::remove_dir_all(root).expect("remove nested runtime import project");
+}
+
+#[test]
 fn generic_nested_module_lowers_facade_constant_without_native_binding() {
     let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-facade", source);
