@@ -284,3 +284,43 @@ fn duration_boundaries_and_typed_failures_run_natively() {
     assert!(execution.stderr.is_empty());
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn deadline_overflow_is_rejected_natively() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-std-time-deadline-overflow-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("deadline-overflow-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_deadline_overflow\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb is_overflow(erg result: Result[Deadline, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.Overflow => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb main() -> Int { erg start: Instant = Instant { ticks: 18446744073709551615u64, }; erg duration: Duration = Duration { nanos: 1u64, }; erg result = deadline_after(start: abs start, duration: abs duration); return is_overflow(result: erg result); }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "deadline overflow build failed: {status}");
+
+    let execution =
+        Command::new(&output).output().expect("deadline overflow executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}

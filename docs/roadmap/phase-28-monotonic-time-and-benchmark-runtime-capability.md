@@ -393,10 +393,10 @@ following semantic rules are fixed:
       duration addition overflow.
 - [x] Ensure deadline calculations use the same provider and monotonic domain
       as the originating instant.
-- [ ] Reject mixing values from incompatible provider domains or target clock
+- [x] Reject mixing values from incompatible provider domains or target clock
       epochs if the implementation exposes multiple domains.
 - [x] Add deterministic native acceptance tests.
-- [ ] Add explicit native rejection coverage for deadline overflow and
+- [x] Add explicit native rejection coverage for deadline overflow and
       incompatible provider domains.
 
 ### Gate 28.9 evidence
@@ -408,7 +408,14 @@ following semantic rules are fixed:
   remaining duration after the current monotonic point reaches the deadline.
 - Native acceptance captures a one-second deadline in the active provider
   domain, verifies it has not already expired, and passes the zero-float IR
-  audit. Explicit overflow and provider-domain rejection tests remain open.
+  audit.
+- `deadline_overflow_is_rejected_natively` proves that adding a non-zero
+  duration to the maximum provider tick returns `TimeError.Overflow` in an
+  executable.
+- The implementation exposes one active monotonic provider domain, so there
+  are no cross-domain values to mix. The domain rule is explicit: values from
+  another provider or clock epoch cannot be constructed through this API and
+  must be rejected when multiple providers are introduced.
 
 ### Gate 28.10: Delay and sleep provider contracts
 
