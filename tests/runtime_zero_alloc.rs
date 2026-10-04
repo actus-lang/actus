@@ -43,6 +43,22 @@ fn borrowed_path_inspection_does_not_allocate() {
     let mut component = ActusPathComponent { source: std::ptr::null(), offset: 0, length: 0 };
     let mut iterator = ActusPathComponents { source: std::ptr::null(), offset: 0, limit: 0 };
     let mut view = ActusPathCView { data: std::ptr::null(), length: 0 };
+
+    // LLVM coverage initializes instrumentation lazily on the first call into
+    // an instrumented function. Warm that one-time test-process overhead before
+    // measuring the runtime contract; allocations made by the path API on each
+    // call still change the counter and fail the assertion below.
+    #[cfg(coverage)]
+    unsafe {
+        let _ = actus_path_is_absolute(&path);
+        let _ = actus_path_parent(&mut component, &path);
+        let _ = actus_path_file_name(&mut component, &path);
+        let _ = actus_path_extension(&mut component, &path);
+        actus_path_components(&mut iterator, &path);
+        let _ = actus_path_next_component(&mut component, &mut iterator);
+        let _ = actus_path_c_view(&mut view, &path);
+    }
+
     let before = ALLOCATIONS.load(Ordering::Relaxed);
 
     unsafe {

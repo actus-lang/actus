@@ -19,9 +19,14 @@ use super::declarations::{
 use super::object::create_module;
 use super::{NativeEmitError, NativeSymbolBindings};
 
+pub(super) struct NativeRootSelection<'a> {
+    pub(super) symbol: Option<&'a str>,
+    pub(super) exported: Option<&'a [String]>,
+}
+
 pub(super) fn emit_program_object_for_target(
     program: &Program,
-    symbol: Option<&str>,
+    roots: NativeRootSelection<'_>,
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
@@ -29,8 +34,14 @@ pub(super) fn emit_program_object_for_target(
     additional_instances: &[GenericInstance],
 ) -> Result<Vec<u8>, NativeEmitError> {
     let (program, semantic) = prepare_program(program, target, additional_instances)?;
-    let (verbs, external_verbs) = collect_declarations(&program);
-    if verbs.is_empty() && external_verbs.is_empty() && symbol.is_none() {
+    let (all_verbs, all_external_verbs) = collect_declarations(&program);
+    let (verbs, external_verbs) = super::dependencies::reachable_declarations_with_roots(
+        &all_verbs,
+        &all_external_verbs,
+        roots.symbol,
+        roots.exported,
+    )?;
+    if verbs.is_empty() && external_verbs.is_empty() && roots.symbol.is_none() {
         return emit_empty_object(configuration, target);
     }
     let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
@@ -41,14 +52,14 @@ pub(super) fn emit_program_object_for_target(
     );
     performance_registry.validate().map_err(NativeEmitError)?;
     let performance_definitions = performance_registry.definitions(&program)?;
-    validate_entry_verb(&verbs, symbol)?;
+    validate_entry_verb(&verbs, roots.symbol)?;
     emit_verbs_object(VerbEmission {
         program: &program,
         verbs: &verbs,
         external_verbs: &external_verbs,
         generic_instances: &semantic.generic_instances,
         performance_definitions: &performance_definitions,
-        symbol,
+        symbol: roots.symbol,
         namespace_prefix,
         cleanup_schedule: &cleanup_schedule,
         configuration,
@@ -130,7 +141,9 @@ fn append_generic_instances(
         if !relevant {
             continue;
         }
-        if !target.iter().any(|instance| instance.canonical_key == addition.canonical_key) {
+        if !target.iter().any(|instance| {
+            instance.canonical_key == addition.canonical_key && instance.caller == addition.caller
+        }) {
             target.push(addition.clone());
         }
     }

@@ -128,7 +128,7 @@ fn test_compilation_plan(
     test: &DiscoveredTest,
     configuration: &CompilerConfiguration,
 ) -> Result<crate::modules::ModuleCompilationPlan, String> {
-    let mut program = test.source_program.clone();
+    let mut program = test_program(&test.source_program, &test.name);
     if program
         .declarations
         .iter()
@@ -144,6 +144,19 @@ fn test_compilation_plan(
         configuration.runtime_module_roots(),
     );
     build_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
+}
+
+fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate::ast::Program {
+    let mut program = source_program.clone();
+    program.declarations.retain(|declaration| {
+        !matches!(
+            declaration,
+            TopLevelDecl::Verb(verb)
+                if verb.metadata.contains(&crate::ast::MetaAttribute::Test)
+                    && verb.name != test_name
+        )
+    });
+    program
 }
 
 struct TestArtifactPaths {

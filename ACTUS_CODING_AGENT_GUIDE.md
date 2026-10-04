@@ -1016,6 +1016,44 @@ At least one regression test must cover a constant imported through a nested
 facade and used in an aggregate initializer or predicate. The test should
 verify native execution, not only semantic acceptance.
 
+#### 17.3.2 Native dependency closure
+
+Native emission starts from the requested entry verb or public facade roots
+and computes a deterministic transitive closure of Actus verbs. Reachable
+private helpers are emitted in their owning object; unreachable private verbs
+are omitted. Generic verbs are specialized before declaration and lowering,
+and concrete instances retain deterministic names across root-to-module
+linker bindings.
+
+The closure includes nested blocks, conditional expressions, indexed places,
+method/performance calls, aggregate return dependencies, and external bridge
+declarations. Built-in constructors and runtime intrinsics are not Actus verb
+bodies. An unresolved native dependency fails closed at the originating call
+span and identifies both the caller and missing helper; it must not be hidden
+until linking.
+
+Object builds, executable builds, and the test runner use this contract.
+For imported module objects, native roots come from the resolved facade export
+set, including concrete generic instances when available; they must not be
+inferred from source-limit metadata or from a declaration's local `open` flag.
+Formatter and source-limit checks remain independent of native reachability.
+Changes to call collection, generic specialization, module facades, or symbol
+bindings require semantic, native, and multi-object regression evidence.
+
+#### 17.3.3 Shared resolution boundaries
+
+`actus check --strict` and the LSP use the shared module/facade semantic
+resolution contract. They must resolve sibling declarations, nested facades,
+visibility, and public exports consistently, but they intentionally stop before
+native code generation.
+
+`actus test --strict`, object builds, and executable builds use the shared
+native dependency-closure contract described above. They must start from the
+same selected public roots, materialize the same reachable private and generic
+dependencies, and preserve the same symbol and diagnostic identity across
+surfaces. Do not implement a separate dependency scanner for one command or
+force semantic-only commands to invoke code generation.
+
 ### 17.4 Visibility
 
 `open` on a declaration or sibling export is the Actus visibility mechanism.

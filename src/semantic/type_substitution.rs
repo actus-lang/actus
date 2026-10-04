@@ -13,6 +13,7 @@ use super::errors::{SemanticError, SemanticErrorKind};
 pub(crate) struct TypeSubstitution {
     bindings: HashMap<String, TypeName>,
     const_bindings: HashMap<String, String>,
+    call_bindings: HashMap<String, String>,
 }
 
 impl TypeSubstitution {
@@ -44,7 +45,16 @@ impl TypeSubstitution {
                 }
             }
         }
-        Ok(Self { bindings, const_bindings })
+        Ok(Self { bindings, const_bindings, call_bindings: HashMap::new() })
+    }
+
+    pub(crate) fn with_call_bindings(mut self, call_bindings: &HashMap<String, String>) -> Self {
+        self.call_bindings = call_bindings.clone();
+        self
+    }
+
+    pub(crate) fn apply_call(&self, name: &str) -> Option<&str> {
+        self.call_bindings.get(name).map(String::as_str)
     }
 
     pub(crate) fn apply_const(&self, name: &str) -> Option<&str> {

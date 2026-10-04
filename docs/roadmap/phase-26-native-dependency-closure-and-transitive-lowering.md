@@ -43,94 +43,145 @@ public exports -> native dependency closure -> object emission -> linker
 
 ## Gate 26.0: Dependency-closure contract
 
-- [ ] Define the native dependency graph nodes and edges for verbs, generic
+- [x] Define the native dependency graph nodes and edges for verbs, generic
       instances, aggregate types, performances, and external bridges.
-- [ ] Define the root set for hosted entry verbs, configured freestanding
+- [x] Define the root set for hosted entry verbs, configured freestanding
       entries, object emission, and test-runner entry points.
-- [ ] Define deterministic identity and ordering for reachable dependencies.
-- [ ] Define cycle handling and diagnostics for recursive or invalid native
+- [x] Define deterministic identity and ordering for reachable dependencies.
+- [x] Define cycle handling and diagnostics for recursive or invalid native
       dependency paths.
-- [ ] Record that native reachability never changes facade visibility.
-- [ ] Add architecture fixtures for a public verb, private helper, nested
+- [x] Record that native reachability never changes facade visibility.
+- [x] Add architecture fixtures for a public verb, private helper, nested
       facade, and cross-module helper chain.
+
+Gate 26.0 is closed as the dependency-closure contract gate. The contract
+defines public/native roots, reachable declaration categories, canonical
+identity and ordering, cycle/duplicate handling, and the rule that native
+reachability never widens facade visibility. The fixtures in
+`tests/fixtures/native_dependency_closure/phase-26-contract.txt` cover a
+public-to-private transitive chain, repeated-helper deduplication, private
+facade bypass, unresolved reachable helpers, and duplicate native identity.
+Gates 26.1-26.6 are closed below with compiler, object, executable, runtime,
+visibility, and deterministic-quality evidence.
 
 ## Gate 26.1: Reachable call-graph discovery
 
-- [ ] Traverse direct calls from every selected public/native root.
-- [ ] Recursively discover private helpers in the same module object.
-- [ ] Resolve calls across nested facade-owned module objects through the
+- [x] Traverse direct calls from every selected public/native root.
+- [x] Recursively discover private helpers in the same module object.
+- [x] Resolve calls across nested facade-owned module objects through the
       canonical module identity.
-- [ ] Include method/performance dispatch dependencies required by the native
+- [x] Include method/performance dispatch dependencies required by the native
       implementation.
-- [ ] Include external bridge declarations without treating them as Actus
+- [x] Include external bridge declarations without treating them as Actus
       function bodies.
-- [ ] Reject unresolved reachable calls before object emission with a stable
+- [x] Reject unresolved reachable calls before object emission with a stable
       diagnostic.
-- [ ] Deduplicate repeated helper calls and preserve deterministic traversal.
+- [x] Deduplicate repeated helper calls and preserve deterministic traversal.
+
+Gate 26.1 implementation is in place for reachable Actus verbs, private
+helpers, method calls, performances, external bridge declarations, stable
+deduplicated traversal, and fail-closed unresolved-call diagnostics.
 
 ## Gate 26.2: Generic and transitive specialization
 
-- [ ] Propagate concrete generic arguments through nested helper calls.
-- [ ] Materialize all reachable `N: Usize` const-generic instances before
+- [x] Propagate concrete generic arguments through nested helper calls.
+- [x] Materialize all reachable `N: Usize` const-generic instances before
       native declaration and lowering.
-- [ ] Propagate type substitutions through call arguments, return types,
+- [x] Propagate type substitutions through call arguments, return types,
       indexed places, and nested aggregate fields.
-- [ ] Reuse the existing generic instance identity/cache contract.
-- [ ] Prevent unreachable generic declarations from being emitted.
-- [ ] Add accepted and rejected tests for nested generic calls across module
+- [x] Reuse the existing generic instance identity/cache contract.
+- [x] Prevent unreachable generic declarations from being emitted.
+- [x] Add accepted tests for nested generic calls across module
       and facade boundaries.
+- [x] Add rejected tests for unresolved or ambiguous nested generic calls with
+      stable diagnostics.
+
+Gate 26.2 now materializes every concrete generic verb instance discovered by
+the semantic instance graph, rewrites const-generic expressions and nested
+calls to deterministic specialized names, and registers those names across
+module-object symbol bindings. Native regressions cover multiple instances in
+one call graph and imported and nested facade boundaries. Rejected-call
+diagnostics cover unresolved and ambiguous nested generic calls with stable
+source spans.
 
 ## Gate 26.3: Aggregate return and layout dependencies
 
-- [ ] Register reachable struct, pack, enum, array, and option/result layouts
+- [x] Register reachable struct, pack, enum, array, and option/result layouts
       before lowering dependent functions.
-- [ ] Register caller return slots and callee return lowering consistently for
+- [x] Register caller return slots and callee return lowering consistently for
       aggregate return types.
-- [ ] Preserve array-backed pack stride, alignment, ownership, and copy/move
+- [x] Preserve array-backed pack stride, alignment, ownership, and copy/move
       behavior across helper calls.
-- [ ] Ensure aggregate dependencies are included even when they are referenced
+- [x] Ensure aggregate dependencies are included even when they are referenced
       only by a return type or specialized signature.
-- [ ] Add native tests for scalar, array, struct, pack, and generic aggregate
+- [x] Add native tests for scalar, array, struct, pack, and generic aggregate
       returns through transitive helpers.
+
+Gate 26.3 is covered by native return-slot and layout evidence. The
+transitive aggregate regression exercises scalar and generic helper returns,
+plain arrays, structs, and array-backed packs; it also verifies that a
+specialized `Array[T, N]()` constructor receives the concrete capacity before
+native lowering. Existing enum and option/result layout tests remain part of
+the aggregate ABI coverage.
 
 ## Gate 26.4: Object emission and symbol boundaries
 
-- [ ] Emit each reachable private helper exactly once in its owning native
+- [x] Emit each reachable private helper exactly once in its owning native
       object or the defined shared object boundary.
-- [ ] Keep private helper symbols internal or deterministically namespaced.
-- [ ] Preserve public facade symbols and external bindings without exposing
+- [x] Keep private helper symbols internal or deterministically namespaced.
+- [x] Preserve public facade symbols and external bindings without exposing
       private implementation declarations.
-- [ ] Link root and imported objects using the computed closure metadata.
-- [ ] Reject duplicate native identities before linking.
-- [ ] Verify that empty or unreachable modules do not produce spurious runtime
+- [x] Link root and imported objects using the computed closure metadata.
+- [x] Reject duplicate native identities before linking.
+- [x] Verify that empty or unreachable modules do not produce spurious runtime
       symbols.
+
+Gate 26.4 is covered by object-symbol tests and the multi-object CLI suite.
+Reachable private helpers and each concrete generic instance are emitted once,
+specialized symbols are namespace-qualified deterministically, and root-to-
+module bindings preserve public calls without exporting unused declarations.
 
 ## Gate 26.5: Tooling and diagnostics parity
 
-- [ ] Make strict check, test runner, object build, executable build, and LSP
-      use the same dependency-resolution contract where applicable.
-- [ ] Report unresolved native dependencies with the originating call span and
+- [x] Use the shared module/facade resolution contract in strict check and LSP,
+      and the shared native dependency-closure contract in the test runner,
+      object build, and executable build.
+- [x] Report unresolved native dependencies with the originating call span and
       actionable module/helper identity.
-- [ ] Keep formatter and source-limit checks independent of native reachability.
-- [ ] Add regression coverage for malformed nested facades, missing helpers,
+- [x] Keep formatter and source-limit checks independent of native reachability.
+- [x] Add regression coverage for malformed nested facades, missing helpers,
       generic mismatch, duplicate symbols, and private-export bypass attempts.
-- [ ] Document the dependency-closure contract in the coding-agent guide and
+- [x] Document the dependency-closure contract in the coding-agent guide and
       compiler architecture documentation after implementation.
+
+Gate 26.5 now fails closed on unresolved native calls during dependency
+traversal, preserving the originating AST span and caller/helper identities.
+Strict check and LSP intentionally stop at the shared module/facade semantic
+contract; they do not invoke native code generation. The test runner, object
+build, and executable build share `emit_objects`, which applies the native
+dependency closure before declaration and linking. The closure contract is
+documented for coding agents and compiler maintainers.
 
 ## Gate 26.6: End-to-end acceptance
 
-- [ ] `actus check --strict` accepts the nested facade dependency fixture.
-- [ ] `actus test --strict` executes tests using private transitive helpers.
-- [ ] `actus build --strict --emit obj` emits all reachable objects and symbols.
-- [ ] `actus build --strict --emit exe` links and executes the fixture.
-- [ ] Nested generic helper chains execute with the expected concrete values.
-- [ ] Aggregate return helpers execute without invalid return-slot or layout
+- [x] `actus check --strict` accepts the nested facade dependency fixture.
+- [x] `actus test --strict` executes tests using private transitive helpers.
+- [x] `actus build --strict --emit obj` emits all reachable objects and symbols.
+- [x] `actus build --strict --emit exe` links and executes the fixture.
+- [x] Nested generic helper chains execute with the expected concrete values.
+- [x] Aggregate return helpers execute without invalid return-slot or layout
       behavior.
-- [ ] Private helpers remain absent from the public facade/API surface.
-- [ ] Repeated builds, object identities, diagnostics, and dependency ordering
+- [x] Private helpers remain absent from the public facade/API surface.
+- [x] Repeated builds, object identities, diagnostics, and dependency ordering
       are deterministic.
-- [ ] Full Rust formatting, check, clippy, test, source-limit, documentation,
+- [x] Full Rust formatting, check, clippy, test, source-limit, documentation,
       architecture, and diff checks pass.
+
+Gate 26.6 is closed by the nested-facade CLI fixtures, transitive generic
+execution tests, aggregate return-slot tests, private-surface visibility tests,
+deterministic object and diagnostic tests, and the complete repository quality
+suite. The acceptance evidence exercises the same semantic and native
+resolution boundaries described in Gate 26.5.
 
 ## Non-goals
 

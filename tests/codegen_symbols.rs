@@ -92,8 +92,7 @@ fn native_objects_follow_namespace_context_deterministically() {
 
 #[test]
 fn imported_module_objects_emit_without_an_entry_and_preserve_public_wrappers() {
-    let source =
-        "verb hidden() -> Int { return 41; } open verb add() -> Int { return hidden() + 1; }";
+    let source = "verb hidden() -> Int { return 41; } verb unused() -> Int { return 99; } open verb add() -> Int { return hidden() + 1; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
@@ -110,6 +109,29 @@ fn imported_module_objects_emit_without_an_entry_and_preserve_public_wrappers() 
     assert!(
         symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_hidden") })
     );
+    assert!(
+        !symbols.iter().any(|symbol| { symbol_matches(symbol, "actus_mod_4_math__verb_unused") })
+    );
+}
+
+#[test]
+fn emits_each_reachable_generic_instance_once_in_its_namespace() {
+    let source = "verb read[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read[4]() as Int + read[8]() as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let bytes = actus::codegen::emit_program_object_for_target_in_namespace(
+        &program,
+        "main",
+        "actus_mod_generic",
+        &NativeBackendConfiguration::default(),
+        &TargetSpec::host().unwrap(),
+    )
+    .unwrap();
+    let file = object::File::parse(bytes.as_slice()).unwrap();
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert_eq!(symbols.iter().filter(|symbol| symbol.contains("__verb_read_5f_5f4")).count(), 1);
+    assert_eq!(symbols.iter().filter(|symbol| symbol.contains("__verb_read_5f_5f8")).count(), 1);
 }
 
 fn symbol_matches(actual: &str, expected: &str) -> bool {

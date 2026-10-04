@@ -38,9 +38,13 @@ pub use model::{
 pub use native::{
     NativeEmitError, NativeSymbolBindings, emit_module_object_for_target_in_namespace,
     emit_module_object_for_target_in_namespace_with_bindings,
-    emit_module_object_for_target_in_namespace_with_bindings_and_instances, emit_program_object,
-    emit_program_object_for_target, emit_program_object_for_target_in_namespace,
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances,
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots,
+    emit_program_object, emit_program_object_for_target,
+    emit_program_object_for_target_in_namespace,
     emit_program_object_for_target_in_namespace_with_bindings,
     emit_program_object_with_configuration, emit_zero_return_object,
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
+
+pub(crate) use generic::specialized_generic_name;

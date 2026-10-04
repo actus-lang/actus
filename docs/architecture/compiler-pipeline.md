@@ -32,3 +32,25 @@ The resolver, parser aggregation, semantic visibility checks, native object
 planning, formatter, LSP, and test runner consume this same module-unit
 identity. Filesystem order is not an API contract, and a child directory must
 not create a second object owner when its parent module is compiled.
+
+## Native dependency closure
+
+Native object emission begins from the requested entry verb or the public
+facade roots and computes a deterministic transitive closure of Actus verbs.
+Reachable private helpers are emitted in their owning object; unreachable
+private verbs are omitted. Generic verbs are specialized before declaration and
+lowering, so each concrete instance has a deterministic symbol identity that
+is preserved across root-to-module linker bindings.
+
+The closure walk includes nested blocks, conditional expressions, indexed
+places, method/performance calls, aggregate return dependencies, and external
+bridge declarations. Built-in constructors and runtime intrinsics are not
+treated as Actus verb bodies. An unresolved native dependency fails closed at
+the originating call span with both the caller and missing helper name; it
+must never be silently dropped and discovered later as an opaque linker error.
+
+This contract is shared by object builds, executable builds, and the test
+runner. Formatter and source-limit checks remain independent of native
+reachability. Any change to call collection, generic specialization, module
+facades, or symbol binding must include semantic, native, and multi-object
+regression evidence.

@@ -9,9 +9,12 @@ use crate::target::TargetSpec;
 use super::types::NativeType;
 
 mod declarations;
+mod dependencies;
 mod emission;
 pub(super) mod ir_audit;
 mod object;
+
+use emission::NativeRootSelection;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub String);
@@ -83,7 +86,7 @@ pub fn emit_program_object_for_target(
 ) -> Result<Vec<u8>, NativeEmitError> {
     emission::emit_program_object_for_target(
         program,
-        Some(symbol),
+        NativeRootSelection { symbol: Some(symbol), exported: None },
         "actus_root",
         configuration,
         target,
@@ -119,7 +122,7 @@ pub fn emit_program_object_for_target_in_namespace_with_bindings(
 ) -> Result<Vec<u8>, NativeEmitError> {
     emission::emit_program_object_for_target(
         program,
-        Some(symbol),
+        NativeRootSelection { symbol: Some(symbol), exported: None },
         namespace_prefix,
         configuration,
         target,
@@ -168,9 +171,29 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances(
     bindings: &NativeSymbolBindings,
     generic_instances: &[super::super::semantic::GenericInstance],
 ) -> Result<Vec<u8>, NativeEmitError> {
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
+        program,
+        namespace_prefix,
+        configuration,
+        target,
+        bindings,
+        generic_instances,
+        None,
+    )
+}
+
+pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
+    program: &Program,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+    target: &TargetSpec,
+    bindings: &NativeSymbolBindings,
+    generic_instances: &[super::super::semantic::GenericInstance],
+    exported_roots: Option<&[String]>,
+) -> Result<Vec<u8>, NativeEmitError> {
     emission::emit_program_object_for_target(
         program,
-        None,
+        NativeRootSelection { symbol: None, exported: exported_roots },
         namespace_prefix,
         configuration,
         target,

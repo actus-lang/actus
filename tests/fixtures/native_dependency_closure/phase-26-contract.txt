@@ -1,0 +1,36 @@
+PHASE 26 NATIVE DEPENDENCY CLOSURE CONTRACT FIXTURES
+
+[accepted: public-to-private-transitive-chain]
+src/main.act
+  import aie;
+  verb main() -> Int { return wavefront_entry(); }
+src/aie/aie.act
+  open runtime;
+src/aie/runtime/runtime.act
+  open forwarding;
+src/aie/runtime/forwarding.act
+  open verb wavefront_entry() -> Int { return private_step(); }
+  verb private_step() -> Int { return module_step(); }
+src/aie/runtime/module.act
+  open verb module_step() -> Int { return 42; }
+
+[accepted: repeated-helper-deduplication]
+src/aie/runtime/forwarding.act
+  open verb wavefront_entry() -> Int {
+    return private_step() + private_step();
+  }
+  verb private_step() -> Int { return 21; }
+
+[rejected: private-export-bypass]
+src/main.act
+  import aie::runtime::forwarding;
+
+[rejected: unresolved-reachable-helper]
+src/aie/runtime/forwarding.act
+  open verb wavefront_entry() -> Int { return missing_helper(); }
+
+[rejected: duplicate-native-identity]
+src/aie/runtime/forwarding.act
+  verb duplicate() -> Int { return 1; }
+src/other/forwarding.act
+  verb duplicate() -> Int { return 2; }
