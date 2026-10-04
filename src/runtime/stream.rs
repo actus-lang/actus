@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use super::contract::{ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
+use super::contract::{ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
 use super::types::{ActusBuffer, BufferHandle};
 
 pub(super) unsafe fn write_buffer(handle: BufferHandle, stderr: bool, newline: bool) -> i32 {
@@ -141,6 +141,28 @@ pub unsafe extern "C" fn actus_buffer_length(handle: BufferHandle) -> i32 {
     }
     let buffer = unsafe { &*handle };
     i32::try_from(buffer.length).unwrap_or(ABI_STATUS_FAILURE)
+}
+
+/// Returns one byte from a valid buffer, or `-1` for invalid metadata and
+/// `-2` for an out-of-bounds index.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_buffer_byte_at(handle: BufferHandle, index: i32) -> i32 {
+    if handle.is_null() || index < 0 {
+        return ABI_STATUS_FAILURE;
+    }
+    let buffer = unsafe { &*handle };
+    if buffer.length > buffer.capacity || (buffer.length > 0 && buffer.data.is_null()) {
+        return ABI_STATUS_FAILURE;
+    }
+    let index = index as usize;
+    if index >= buffer.length {
+        return ABI_STATUS_END_OF_STREAM;
+    }
+    unsafe { buffer.data.add(index).read() }.into()
 }
 
 /// Returns zero when a buffer contains valid UTF-8, or -1 otherwise.

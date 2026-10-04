@@ -47,4 +47,5 @@ pub use native::{
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
+pub(crate) use generic::expand_generic_instances;
 pub(crate) use generic::specialized_generic_name;

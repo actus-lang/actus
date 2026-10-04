@@ -204,6 +204,51 @@ impl ModuleResolver {
         })
     }
 
+    /// Resolves a module for compiler-internal aggregation after its parent
+    /// facade has already admitted the child. Direct external resolution must
+    /// continue to use [`Self::resolve`] so facade bypasses remain rejected.
+    pub(crate) fn resolve_for_aggregation(
+        &self,
+        module_path: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        let segments = parse_segments(module_path)?;
+        if segments.len() <= 1 {
+            return self.resolve(module_path);
+        }
+        if segments.first() == Some(&"std") {
+            return self.resolve(module_path);
+        }
+        let parent_path = segments[..segments.len() - 1].join("::");
+        match self.resolve_for_aggregation_parent(&parent_path) {
+            Ok(parent) => self.resolve_child_from_parent(
+                parent,
+                &parent_path,
+                segments.last().expect("non-empty path"),
+            ),
+            Err(ModuleResolutionError::MissingFacade { .. }) if segments.len() == 2 => {
+                self.resolve(module_path)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn resolve_for_aggregation_parent(
+        &self,
+        module_path: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        let segments = parse_segments(module_path)?;
+        if segments.len() <= 1 {
+            return self.resolve(module_path);
+        }
+        let parent_path = segments[..segments.len() - 1].join("::");
+        let parent = self.resolve_for_aggregation_parent(&parent_path)?;
+        self.resolve_child_from_parent(
+            parent,
+            &parent_path,
+            segments.last().expect("non-empty path"),
+        )
+    }
+
     fn resolve_runtime_module(
         &self,
         module_path: &str,
@@ -248,7 +293,16 @@ impl ModuleResolver {
                 "{parent_module_path}::{child_name}"
             )));
         }
-        let parent = self.resolve(parent_module_path)?;
+        let parent = self.resolve_for_aggregation(parent_module_path)?;
+        self.resolve_child_from_parent(parent, parent_module_path, child_name)
+    }
+
+    fn resolve_child_from_parent(
+        &self,
+        parent: ResolvedModule,
+        parent_module_path: &str,
+        child_name: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
         let Some(child) = parent
             .children()
             .iter()

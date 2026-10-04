@@ -1,0 +1,11 @@
+import aie;
+
+meta test
+verb nested_generic_test() -> Int {
+    erg small: Storage[4] = Storage[4] { values: Array[u32, 4]() };
+    erg large: Storage[8] = Storage[8] { values: Array[u32, 8]() };
+    if root(storage: ins small) as Int + root(storage: ins large) as Int == 24 {
+        return 0;
+    }
+    return 1;
+}

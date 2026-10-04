@@ -66,6 +66,7 @@ mod tests {
             }],
             canonical_key: key.to_owned(),
             caller: None,
+            call_span: SourceSpan::new(0, 0),
         }
     }
 

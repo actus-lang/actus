@@ -1,0 +1,44 @@
+"""
+Allocation-free, byte-oriented access to borrowed UTF-8 Strings.
+
+`String` is read through `abs`; the source remains owned by the caller and
+cannot be mutated or escaped by these operations. Results contain one byte or
+the validated byte length. The hosted provider validates UTF-8 before exposing
+either result, so malformed data is never silently replaced or truncated.
+"""
+unsafe extern "C" verb actus_string_length(abs text: String) -> Int;
+unsafe extern "C" verb actus_string_byte_at(abs text: String, erg index: Int) -> Int;
+
+"""
+Return the validated UTF-8 byte length of a borrowed String.
+
+Returns `Ok(length)` on success. Returns `Err(StringError.Null)` for null
+input, `Err(StringError.InvalidUtf8)` for malformed bytes, and
+`Err(StringError.OutOfBounds)` when the provider cannot represent the length.
+"""
+open verb string_length(abs text: String) -> Result[Int, StringError] {
+    erg status: Int = actus_string_length(text: abs text);
+    return case status {
+        -1 => Err(StringError.Null),
+        -2 => Err(StringError.InvalidUtf8),
+        -3 => Err(StringError.OutOfBounds),
+        _ => Ok(status),
+    };
+}
+
+"""
+Return one validated UTF-8 byte without consuming or mutating the String.
+
+Returns `Ok(byte)` on success. Returns `Err(StringError.Null)` for null input,
+`Err(StringError.InvalidUtf8)` for malformed bytes, and
+`Err(StringError.OutOfBounds)` for a negative or out-of-range index.
+"""
+open verb string_byte_at(abs text: String, erg index: Int) -> Result[Int, StringError] {
+    erg status: Int = actus_string_byte_at(text: abs text, index: erg index);
+    return case status {
+        -1 => Err(StringError.Null),
+        -2 => Err(StringError.InvalidUtf8),
+        -3 => Err(StringError.OutOfBounds),
+        _ => Ok(status),
+    };
+}

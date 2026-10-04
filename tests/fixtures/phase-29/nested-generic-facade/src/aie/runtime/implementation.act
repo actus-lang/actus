@@ -1,0 +1,17 @@
+meta limitless("file")
+
+open struct Storage[N: Usize] {
+    erg values: Array[u32, N],
+}
+
+open verb first[N: Usize](ins storage: Storage[N]) -> u32 {
+    return N as u32;
+}
+
+open verb second[N: Usize](ins storage: Storage[N]) -> u32 {
+    return first(storage: ins storage);
+}
+
+open verb root[N: Usize](ins storage: Storage[N]) -> u32 {
+    return first(storage: ins storage) + second(storage: ins storage);
+}

@@ -186,7 +186,10 @@ fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let callee = if callee.contains('[') {
         specialize_callee_name(callee, substitution)
     } else {
-        substitution.apply_call(callee).map_or_else(|| callee.clone(), str::to_owned)
+        substitution
+            .apply_call_at(callee, *span)
+            .or_else(|| substitution.apply_call(callee))
+            .map_or_else(|| callee.clone(), str::to_owned)
     };
     Expr::Call { callee, arguments: specialize_arguments(arguments, substitution), span: *span }
 }

@@ -194,6 +194,51 @@ Buffer workaround when a `String` is the intended API value. Case guards still
 follow their semantic access rules; arbitrary calls in guards are rejected and
 must not be forced into an invalid native example.
 
+### 4.1 String views and owned UTF-8 storage
+
+`String` and `Utf8Buffer` are intentionally different representations.
+`String` is the existing immutable, null-terminated text view used by string
+literals and `std::io` text output. Its native ABI is a pointer to compiler-
+owned UTF-8 data with a trailing null byte. Do not treat it as an owned,
+mutable byte buffer and do not return a pointer to a local buffer as `String`.
+
+The hosted `std::string` facade provides allocation-free, borrowed inspection.
+`string_length(abs text: String)` and
+`string_byte_at(abs text: String, erg index: Int)` both return
+`Result[Int, StringError]`. They validate UTF-8 before exposing bytes;
+`StringError` distinguishes null input, invalid UTF-8, bounds, invalid storage,
+and an unavailable provider. Access is byte-wise, so a multibyte code point
+contributes multiple UTF-8 bytes. The `abs` role prevents mutation, ownership
+transfer, and escaping views.
+
+When bytes must become an owned text value, use `Utf8Buffer` instead of
+changing the `String` ABI:
+
+```act
+import std::string;
+
+verb make_text(dat storage: Buffer) -> Result[Utf8Buffer, StringError] {
+    return utf8_from_buffer(storage: dat storage);
+}
+```
+
+`utf8_from_buffer(dat storage: Buffer)` validates the caller-provided,
+length-delimited buffer and transfers it only on success. For a `String`
+source, `utf8_from_string(abs text: String, dat storage: Buffer)` copies into
+the caller-provided storage and then returns the owned value. Both paths
+expose `utf8_length(abs text: Utf8Buffer)` and
+`utf8_byte_at(abs text: Utf8Buffer, erg index: Int)`, both with typed
+`Result` returns. They are allocation-free
+when the caller supplies storage, preserve embedded NUL bytes because the
+representation is length-delimited, and release storage through normal Actus
+cleanup. Capacity, invalid UTF-8, invalid storage, and bounds failures are
+typed `StringError` results. Raw runtime bridges remain private; application
+code uses the typed facade and `Result` errors.
+
+For text processing, borrow `String` when reading static text, and use owned
+`Utf8Buffer` when building or retaining dynamic UTF-8. A direct `String` to
+owned-`String` conversion is not currently part of the language contract.
+
 ## 5. Keywords and words
 
 The implemented vocabulary includes the following groups.
@@ -1222,7 +1267,8 @@ needs hosted standard-library modules opts into `std`:
 runtime = "std"
 ```
 
-The compiler resolves canonical `std::io`, `std::fs`, and `std::path` imports
+The compiler resolves canonical `std::io`, `std::fs`, `std::path`, and
+`std::string` imports
 from the packaged library. Applications must use public typed facade APIs,
 not the internal C bridge symbols.
 
@@ -1267,6 +1313,22 @@ handling for failures. Do not pass a `String` to `printb` or a `Buffer` to
 
 `Result.Ok(count)` is the number of bytes processed, not merely a boolean
 success flag. EOF is a typed result condition where the API defines it.
+
+### 20.3 `std::string`
+
+`std::string` is hosted-only until a freestanding target supplies the same
+checked provider contract. It contains `StringError` for null, invalid UTF-8,
+bounds, invalid-storage, and provider failures; borrowed byte inspection for
+the existing `String` ABI; and `Utf8Buffer`, an owned length-delimited UTF-8
+value backed by a caller-supplied `Buffer`.
+
+Use `utf8_from_buffer(dat storage: Buffer)` for validation and ownership
+transfer, or `utf8_from_string(abs text: String, dat storage: Buffer)` for a
+caller-buffer-backed String-to-owned-UTF-8 conversion. Use
+`utf8_length(abs text: Utf8Buffer)` for the exact byte length, and
+`utf8_byte_at(abs text: Utf8Buffer, erg index: Int)` for checked byte access.
+Use `std::io::print`/`println` for `String` and `printb`/`printlnb` for raw
+`Buffer` bytes; these representations must not be confused.
 
 ### 20.2 `std::time`
 

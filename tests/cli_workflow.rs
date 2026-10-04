@@ -321,6 +321,124 @@ fn native_build_propagates_nested_generics_through_a_child_facade() {
 
 #[cfg(unix)]
 #[test]
+fn native_build_specializes_root_generic_calls_through_nested_facades() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cross-module-generic-{}", std::process::id()));
+    let implementation = root.join("src/device/runtime");
+    fs::create_dir_all(&implementation).expect("create nested module tree");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"cross-module-generic\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "import device; verb wrapper[N: Usize](ins value: Storage[N]) -> u32 { return forward(value: ins value); } verb main() -> Int { erg value: Storage[4] = Storage[4] { values: Array[u32, 4]() }; return wrapper(value: ins value) as Int; }\n",
+    )
+    .expect("write root source");
+    fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
+    fs::write(root.join("src/device/runtime/runtime.act"), "open implementation;\n")
+        .expect("write child facade");
+    fs::write(
+        implementation.join("implementation.act"),
+        "open struct Storage[N: Usize] { erg values: Array[u32, N], } open verb forward[N: Usize](ins value: Storage[N]) -> u32 { return N as u32; }\n",
+    )
+    .expect("write generic implementation");
+
+    let output = root.join("cross-module-generic");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&root)
+        .output()
+        .expect("build cross-module generic fixture");
+    assert!(
+        build.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let status = Command::new(&output).status().expect("run cross-module generic fixture");
+    assert_eq!(status.code(), Some(4));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn phase29_nested_generic_facade_baseline_passes_all_native_stages() {
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/phase-29/nested-generic-facade");
+    let compiler = env!("CARGO_BIN_EXE_actus");
+
+    let check = Command::new(compiler)
+        .args(["check", "--strict"])
+        .current_dir(&fixture)
+        .output()
+        .expect("run phase 29 baseline check");
+    assert!(check.status.success(), "stderr: {}", String::from_utf8_lossy(&check.stderr));
+
+    let first_object =
+        std::env::temp_dir().join(format!("actus-phase29-first-{}.obj", std::process::id()));
+    let object = Command::new(compiler)
+        .args(["build", "--strict", "--emit", "obj"])
+        .args(["-o"])
+        .arg(&first_object)
+        .current_dir(&fixture)
+        .output()
+        .expect("build phase 29 baseline object");
+    assert!(object.status.success(), "stderr: {}", String::from_utf8_lossy(&object.stderr));
+    assert!(String::from_utf8_lossy(&object.stdout).contains("no floating-point instructions"));
+
+    let second_object =
+        std::env::temp_dir().join(format!("actus-phase29-second-{}.obj", std::process::id()));
+    let repeated_object = Command::new(compiler)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&second_object)
+        .current_dir(&fixture)
+        .output()
+        .expect("repeat phase 29 baseline object build");
+    assert!(
+        repeated_object.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&repeated_object.stderr)
+    );
+    assert_eq!(
+        fs::read(&first_object).expect("read first phase 29 object"),
+        fs::read(&second_object).expect("read second phase 29 object")
+    );
+
+    let executable = std::env::temp_dir().join(format!("actus-phase29-{}", std::process::id()));
+    let build = Command::new(compiler)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&executable)
+        .current_dir(&fixture)
+        .output()
+        .expect("build phase 29 baseline executable");
+    assert!(build.status.success(), "stderr: {}", String::from_utf8_lossy(&build.stderr));
+
+    let run = Command::new(&executable).output().expect("run phase 29 baseline executable");
+    assert_eq!(run.status.code(), Some(24));
+
+    let tests = Command::new(compiler)
+        .args(["test", "--strict"])
+        .current_dir(&fixture)
+        .output()
+        .expect("run phase 29 package tests");
+    assert!(tests.status.success(), "stderr: {}", String::from_utf8_lossy(&tests.stderr));
+    assert!(
+        String::from_utf8_lossy(&tests.stdout).contains("nested_generic_test ... ok"),
+        "stdout: {}",
+        String::from_utf8_lossy(&tests.stdout)
+    );
+
+    let _ = fs::remove_file(first_object);
+    let _ = fs::remove_file(second_object);
+    let _ = fs::remove_file(executable);
+    let _ = fs::remove_dir_all(fixture.join("capsula"));
+}
+
+#[cfg(unix)]
+#[test]
 fn native_build_links_multiple_child_facades_once() {
     let root = std::env::temp_dir().join(format!("actus-multiple-children-{}", std::process::id()));
     let runtime = root.join("src/device/runtime");

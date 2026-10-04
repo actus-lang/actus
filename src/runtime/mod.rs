@@ -19,20 +19,23 @@ pub use console::{
     actus_flush_stderr, actus_flush_stdout, actus_print_buffer_stderr, actus_print_buffer_stdout,
     actus_print_int, actus_print_int_stderr, actus_print_line_buffer_stderr,
     actus_print_line_buffer_stdout, actus_print_string, actus_print_string_stderr,
+    actus_string_byte_at, actus_string_copy_to_buffer, actus_string_length,
     actus_write_string_stdout,
 };
 pub use contract::{
     ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS,
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_RESERVE_SYMBOL,
-    BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_BYTE_AT_SYMBOL, BUFFER_DROP_SYMBOL,
+    BUFFER_RESERVE_SYMBOL, BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
     FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL, MONOTONIC_NANOS_SYMBOL,
     PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
     PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL,
     PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL,
     RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_CONTEXT_CRITICAL_SECTION,
     SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL, SLEEP_CONTEXT_INTERRUPT,
-    SLEEP_NANOS_SYMBOL, WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
-    is_successful_count,
+    SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL, STRING_COPY_STATUS_CAPACITY,
+    STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL, STRING_STATUS_INVALID_UTF8,
+    STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS, WRITE_BUFFER_STDOUT_SYMBOL,
+    WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
 };
 pub use fs::{
     actus_file_close, actus_file_close_buffer, actus_file_copy_buffer, actus_file_copy_path,
@@ -60,9 +63,9 @@ pub use path::{
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
 };
 pub use stream::{
-    actus_buffer_length, actus_buffer_validate_utf8, actus_buffered_write_stdout,
-    actus_cursor_flush, actus_cursor_read, actus_cursor_seek, actus_cursor_write,
-    actus_flush_buffered_stdout, actus_write_buffer_stdout,
+    actus_buffer_byte_at, actus_buffer_length, actus_buffer_validate_utf8,
+    actus_buffered_write_stdout, actus_cursor_flush, actus_cursor_read, actus_cursor_seek,
+    actus_cursor_write, actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };
 pub use time::{
     actus_monotonic_nanos, actus_sleep_context_enter, actus_sleep_context_exit, actus_sleep_nanos,

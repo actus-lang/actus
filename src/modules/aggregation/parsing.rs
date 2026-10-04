@@ -13,7 +13,8 @@ use super::validation::{
 };
 
 pub fn parse_module(resolver: &ModuleResolver, module_path: &str) -> Result<Program, ModuleError> {
-    let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
+    let resolved =
+        resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
     let sources = resolved.source_files().map(Path::to_path_buf).collect::<Vec<_>>();
     let program = parse_sources(
         sources,
@@ -36,7 +37,8 @@ pub fn parse_module_with_overlays(
     module_path: &str,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<Program, ModuleError> {
-    let resolved = resolver.resolve(module_path).map_err(ModuleError::Resolution)?;
+    let resolved =
+        resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
     let sources = resolved.source_files().map(Path::to_path_buf).collect::<Vec<_>>();
     let program = parse_sources(
         sources,

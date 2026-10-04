@@ -1,0 +1,9 @@
+[package]
+name = "phase29_external_text_consumer"
+version = "0.1.0"
+edition = "alpha"
+entry = "main"
+
+[build]
+runtime = "std"
+verify_no_float_ir = true

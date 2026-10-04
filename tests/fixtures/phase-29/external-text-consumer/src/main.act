@@ -1,0 +1,28 @@
+"""Generic external-consumer fixture for the public text boundary."""
+import std::string;
+
+verb inspect_text(dat storage: Buffer) -> Int {
+    erg owned = utf8_from_buffer(storage: dat storage);
+    return case dat owned {
+        Result.Ok(value) => {
+            erg zero: Int = 0;
+            erg first = utf8_byte_at(text: abs value, index: erg zero);
+            drop(value);
+            return case dat first {
+                Result.Ok(first_byte) => if first_byte == 65 { 0 } else { 1 },
+                Result.Err(_) => 2,
+            };
+        },
+        Result.Err(_) => 4,
+    };
+}
+
+verb main() -> Int {
+    erg storage = Buffer[0];
+    append(storage, 65);
+    append(storage, 99);
+    append(storage, 116);
+    append(storage, 117);
+    append(storage, 115);
+    return inspect_text(storage: dat storage);
+}

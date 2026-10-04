@@ -13,18 +13,29 @@ pub const ABI_STATUS_END_OF_STREAM: i32 = -2;
 /// Failed opaque-handle C-ABI result.
 pub const ABI_HANDLE_FAILURE: i64 = -1;
 
-/// Returns whether a scalar status is a non-negative byte count or position.
-pub const fn is_successful_count(status: i32) -> bool {
-    status >= ABI_STATUS_SUCCESS
-}
-
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
+/// Stable runtime symbol for checked borrowed-buffer byte access.
+pub const BUFFER_BYTE_AT_SYMBOL: &str = "actus_buffer_byte_at";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";
+/// Stable runtime symbol for checked UTF-8 byte-length inspection.
+pub const STRING_LENGTH_SYMBOL: &str = "actus_string_length";
+/// Stable runtime symbol for checked UTF-8 byte inspection.
+pub const STRING_BYTE_AT_SYMBOL: &str = "actus_string_byte_at";
+/// String pointer was null at the ABI boundary.
+pub const STRING_STATUS_NULL: i32 = -1;
+/// String bytes were not valid UTF-8.
+pub const STRING_STATUS_INVALID_UTF8: i32 = -2;
+/// The requested byte index was outside the validated string.
+pub const STRING_STATUS_OUT_OF_BOUNDS: i32 = -3;
+/// Destination storage did not have enough remaining capacity.
+pub const STRING_COPY_STATUS_CAPACITY: i32 = -2;
+/// Source string bytes were not valid UTF-8.
+pub const STRING_COPY_STATUS_INVALID_UTF8: i32 = -3;
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";
@@ -62,4 +73,9 @@ pub const SLEEP_CONTEXT_CRITICAL_SECTION: u32 = 2;
 pub enum RuntimeCapability {
     Buffer,
     Stdout,
+}
+
+/// Returns whether a scalar status is a non-negative byte count or position.
+pub const fn is_successful_count(status: i32) -> bool {
+    status >= ABI_STATUS_SUCCESS
 }
