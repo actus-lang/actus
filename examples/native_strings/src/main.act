@@ -1,0 +1,31 @@
+"""
+Readable native String output across ordinary control-flow branches.
+
+The example deliberately keeps the messages application-defined. It proves
+that String literals remain usable in a normal Actus program without any
+compiler or domain-specific runtime path.
+"""
+import std::io;
+
+verb main() -> Void {
+    erg ready: Bool = true;
+
+    case ready {
+        true => {
+            erg message = "ACTUS_EVENT branch=case status=ready";
+            println(abs message);
+        },
+        _ => {
+            erg not_ready_message = "ACTUS_EVENT branch=case status=not-ready";
+            println(abs not_ready_message);
+        },
+    };
+
+    if false {
+        erg skipped_message = "ACTUS_EVENT branch=if status=skipped";
+        println(abs skipped_message);
+    } else if true {
+        erg complete_message = "ACTUS_EVENT branch=else-if status=complete";
+        println(abs complete_message);
+    }
+}

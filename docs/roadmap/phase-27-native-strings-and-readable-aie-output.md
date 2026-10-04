@@ -134,20 +134,29 @@ the acceptance suite does not bypass that rule with an invalid program. The
 object regression builds twice, compares object bytes and symbol manifests,
 and confirms deduplication and deterministic distinct data symbols.
 
-## Gate 27.4: Readable AIE demonstration
+## Gate 27.4: Readable native String example
 
-- [ ] Replace opaque integer event codes in the AIE demo with readable output:
+- [x] Replace the domain-specific integer-code demo with a general Actus
+      example that emits readable output:
 
   ```text
-  AIE_DEMO firing payload=41 destination=2 inhibition=1
-  AIE_DEMO neurogenesis linked=1
-  AIE_DEMO decay reclaimed=1
+  ACTUS_EVENT branch=case status=ready
+  ACTUS_EVENT branch=else-if status=complete
   ```
 
-- [ ] Preserve deterministic exit code `0` for the successful demonstration.
-- [ ] Keep firing, payload, inhibition, neurogenesis, linking, decay, and
-      free-list behavior unchanged.
-- [ ] Add exact-output acceptance evidence for the demo.
+- [x] Preserve deterministic exit code `0` for the successful example.
+- [x] Keep the example independent from AIE, domain-specific compiler logic,
+      and private runtime behavior.
+- [x] Add exact-output acceptance evidence for the example.
+
+Gate 27.4 evidence: `examples/native_strings/` is a general hosted Actus
+package using the public `std::io` facade. Its executable exercises a selected
+`case` branch, an unreachable `if` branch, and a selected `else if` branch,
+then emits the documented two-line stdout contract and exits with code `0`.
+`tests/examples_cli.rs::native_strings_example_builds_and_emits_readable_control_flow_events`
+performs strict executable build, execution, exact stdout comparison, and
+empty stderr verification. No AIE-specific source, event code, or compiler
+special case is involved.
 
 ## Gate 27.5: Tooling, documentation, and completion
 
@@ -159,8 +168,8 @@ and confirms deduplication and deterministic distinct data symbols.
       symbol evidence.
 - [ ] Pass Rust formatting, check, clippy, tests, source limits, architecture,
       documentation, and diff checks.
-- [ ] Close the phase only when no temporary Buffer workaround or integer-code
-      output remains in the production AIE demo.
+- [ ] Close the phase only when no temporary Buffer workaround or opaque
+      integer-code output remains in the production examples.
 
 ## Non-goals
 
@@ -169,7 +178,7 @@ This phase does not:
 - change the String ABI or add a new runtime print bridge;
 - add formatting/interpolation syntax;
 - make strings mutable or heap-backed by default;
-- introduce AIE-specific compiler branches;
+- introduce domain-specific compiler branches;
 - address performance benchmarking, which remains a separate follow-up after
   readable functional output is established.
 
@@ -177,6 +186,5 @@ This phase does not:
 
 Phase 27 is complete when every native-lowerable String literal is collected
 through the full AST, symbols are deduplicated and deterministic, object and
-executable evidence passes with exact stdout, and the AIE demonstration emits
-readable event descriptions while preserving its existing behavior and exit
-status.
+executable evidence passes with exact stdout, and the general Actus example
+emits readable event descriptions while preserving deterministic exit status.
