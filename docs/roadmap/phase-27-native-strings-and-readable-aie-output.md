@@ -62,16 +62,30 @@ specific gaps without changing the ABI or data representation.
 
 ## Gate 27.1: Complete recursive string collection
 
-- [ ] Update `src/codegen/literals.rs` so `collect_case()` visits the subject,
+- [x] Update `src/codegen/literals.rs` so `collect_case()` visits the subject,
       every guard, expression body, and block body.
-- [ ] Ensure `collect_block()` recursively visits all statements that can
+- [x] Ensure `collect_block()` recursively visits all statements that can
       contain expressions.
-- [ ] Ensure `collect_expression()` recursively visits `IfBranch::Block` and
+- [x] Ensure `collect_expression()` recursively visits `IfBranch::Block` and
       `IfBranch::ElseIf`.
-- [ ] Cover nested `if`/`case`, loops, returns, assignments, calls, indexing,
+- [x] Cover nested `if`/`case`, loops, returns, assignments, calls, indexing,
       casts, and aggregate literals through the shared traversal.
-- [ ] Keep collection independent from semantic validation and source-limit
+- [x] Keep collection independent from semantic validation and source-limit
       policy.
+
+Gate 27.1 evidence: `src/codegen/literals.rs` now uses one shared recursive
+traversal for all string-bearing control-flow paths. Statement and expression
+conditionals visit both block branches and nested `else if` expressions. Case
+collection visits the subject, optional guards, expression bodies, and block
+bodies. The traversal continues through calls, method calls, struct fields,
+indexes, casts, assignments, returns, loops, and nested blocks without
+consulting semantic validation or source-limit policy. The focused regression
+test `collects_strings_from_nested_control_flow` proves collection of strings
+from a direct branch, an `else if`, a case guard, and a case block.
+The native regression `native_string_collection_covers_case_blocks_and_else_if`
+also builds and executes the same control-flow shape through `std::io`,
+verifying exit code `0`, exact stdout, and empty stderr. Object-level symbol
+deduplication and repeated-build determinism remain covered by Gate 27.3.
 
 ## Gate 27.2: Native data declaration and symbol integrity
 

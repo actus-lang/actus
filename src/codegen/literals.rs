@@ -4,7 +4,7 @@ use cranelift_codegen::ir::GlobalValue;
 use cranelift_module::{DataDescription, DataId, Linkage, Module};
 use cranelift_object::ObjectModule;
 
-use crate::ast::{Expr, Stmt, VerbDecl};
+use crate::ast::{CaseBody, Expr, IfBranch, Stmt, VerbDecl};
 
 use super::symbols::{SymbolIdentity, SymbolKind};
 
@@ -95,9 +95,7 @@ fn collect_block(statements: &[Stmt], values: &mut HashSet<String>) {
             Stmt::If { condition, then_branch, else_branch, .. } => {
                 collect_expression(condition, values);
                 collect_block(&then_branch.statements, values);
-                if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
-                    collect_block(&block.statements, values);
-                }
+                collect_if_branch(else_branch.as_ref(), values);
             }
             Stmt::Loop(block) | Stmt::Block(block) => collect_block(&block.statements, values),
             Stmt::Return { value: None, .. }
@@ -137,9 +135,7 @@ fn collect_expression(expression: &Expr, values: &mut HashSet<String>) {
         Expr::If { condition, then_branch, else_branch, .. } => {
             collect_expression(condition, values);
             collect_block(&then_branch.statements, values);
-            if let Some(crate::ast::IfBranch::Block(block)) = else_branch {
-                collect_block(&block.statements, values);
-            }
+            collect_if_branch(else_branch.as_ref(), values);
         }
         Expr::Identifier { .. }
         | Expr::Integer { .. }
@@ -161,11 +157,74 @@ fn collect_arguments(arguments: &[crate::ast::Argument], values: &mut HashSet<St
     }
 }
 
+fn collect_if_branch(branch: Option<&IfBranch>, values: &mut HashSet<String>) {
+    if let Some(branch) = branch {
+        match branch {
+            IfBranch::Block(block) => collect_block(&block.statements, values),
+            IfBranch::ElseIf(expression) => collect_expression(expression, values),
+        }
+    }
+}
+
 fn collect_case(subject: &Expr, branches: &[crate::ast::CaseBranch], values: &mut HashSet<String>) {
     collect_expression(subject, values);
     for branch in branches {
-        if let crate::ast::CaseBody::Expression(expression) = &branch.body {
-            collect_expression(expression, values);
+        if let Some(guard) = &branch.guard {
+            collect_expression(guard, values);
         }
+        match &branch.body {
+            CaseBody::Expression(expression) => collect_expression(expression, values),
+            CaseBody::Block(block) => collect_block(&block.statements, values),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_block;
+    use crate::ast::TopLevelDecl;
+    use crate::lexer::scan;
+    use crate::parser::parse;
+    use std::collections::HashSet;
+
+    #[test]
+    fn collects_strings_from_nested_control_flow() {
+        let source = r#"
+            verb main() -> Int {
+                if true {
+                    print("then");
+                } else if false {
+                    print("else-if");
+                } else {
+                    case true {
+                        true if false => { print("guard"); },
+                        _ => { print("case-block"); },
+                    };
+                }
+                return 0;
+            }
+        "#;
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("source should parse");
+        let verb = program
+            .declarations
+            .iter()
+            .find_map(|declaration| match declaration {
+                TopLevelDecl::Verb(verb) => Some(verb),
+                _ => None,
+            })
+            .expect("verb declaration");
+        let mut values = HashSet::new();
+        collect_block(&verb.body.statements, &mut values);
+        assert_eq!(
+            values,
+            HashSet::from([
+                "then".to_owned(),
+                "else-if".to_owned(),
+                "guard".to_owned(),
+                "case-block".to_owned(),
+            ])
+        );
     }
 }

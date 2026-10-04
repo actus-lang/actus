@@ -111,6 +111,43 @@ fn std_io_native_bridge_prints_string_text() {
 }
 
 #[test]
+fn native_string_collection_covers_case_blocks_and_else_if() {
+    let (root, input, output) = project(
+        "string-control-flow",
+        "open stdout;\nopen error;\n",
+        &["stdout.act", "error.act"],
+        r#"import io;
+verb main() -> Int {
+    erg selected = "selected";
+    case true {
+        true if false => {
+            erg guard_text = "guard branch";
+            print(abs guard_text);
+        },
+        _ => {
+            print(abs selected);
+        },
+    };
+    if false {
+        erg unreachable = "unreachable";
+        print(abs unreachable);
+    } else if true {
+        erg nested = "else-if branch";
+        println(abs nested);
+    }
+    return 0;
+}
+"#,
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("string control-flow fixture");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"selectedelse-if branch\n");
+    assert_eq!(execution.stderr, b"");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn std_io_native_bridge_reads_line_into_exclusive_buffer() {
     let (root, input, output) = project(
         "stdin",
