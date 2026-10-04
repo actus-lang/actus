@@ -503,6 +503,47 @@ open verb snapshot_is_valid() -> Int {
 }
 
 #[test]
+fn nested_facade_constants_lower_inside_indexed_snapshot_loops() {
+    let source = "import feature; verb main() -> Int { return emit(); }\n";
+    let (root, input, output) = project("constant-indexed-loop", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        "open const STRIDE: u16 = 24u16; open const COUNT: u32 = 4u32;\n",
+    )
+    .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open verb emit() -> Int {
+    erg bytes: Array[u8, 24] = Array[u8, 24]();
+    erg index: u32 = 0u32;
+    loop {
+        if index >= COUNT {
+            break;
+        }
+        bytes[index * (STRIDE as u32) / (STRIDE as u32)] = index as u8;
+        index += 1u32;
+    }
+    return bytes[3u32] as Int + STRIDE as Int;
+}
+"#,
+    )
+    .expect("write feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(27));
+    fs::remove_dir_all(root).expect("remove indexed constant project");
+}
+
+#[test]
 fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
     let source = "import output; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);
