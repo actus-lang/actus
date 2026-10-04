@@ -138,6 +138,27 @@ fn runtime_profile_example_builds_and_executes_with_builtin_std() {
 
 #[cfg(unix)]
 #[test]
+fn monotonic_time_example_builds_runs_and_emits_no_float_ir() {
+    let root = std::env::temp_dir().join(format!("actus-monotonic-example-{}", std::process::id()));
+    let output = root.join("monotonic-time-example");
+    let source =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/monotonic_time");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&source)
+        .output()
+        .expect("build monotonic time example");
+    assert!(build.status.success(), "example build failed: {:?}", build);
+    let execution =
+        std::process::Command::new(&output).output().expect("run monotonic time example");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"monotonic time example passed\n");
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn native_strings_example_builds_and_emits_readable_control_flow_events() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/native_strings");
     let source = root.join("src/main.act");

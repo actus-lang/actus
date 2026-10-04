@@ -193,7 +193,35 @@ continues to own package, build, target, and runtime settings; source
 configuration is for typed compile-time policy values only. The formatter,
 LSP, semantic checker, and test runner use the same facade boundary.
 
-## 5. Check, build, run, test, format, and watch
+## 5. Monotonic time
+
+Hosted projects can opt into the typed `std::time` facade with
+`[build] runtime = "std"` and `import std::time;`. The facade provides
+`Instant`, `Duration`, `Deadline`, checked integer conversions and arithmetic,
+`delay`, `sleep`, and caller-owned one-shot or periodic timers. It does not
+provide wall-clock, calendar, timezone, or platform clock APIs.
+
+```act
+import std::time;
+
+verb main() -> Int {
+    erg started: Instant = now();
+    erg budget: Duration = duration_nanos(nanos: erg 1000000u64);
+    erg deadline = deadline_after(start: abs started, duration: abs budget);
+    return case dat deadline {
+        Result.Ok(value) => if expired(deadline: abs value) { 1 } else { 0 },
+        Result.Err(_) => 2,
+    };
+}
+```
+
+All provider conversions and arithmetic are checked and integer-only. A
+freestanding target must provide an explicit compatible provider contract;
+the hosted provider is never linked implicitly. See
+`docs/runtime/monotonic-time.md`, `docs/library/std-api-index.md`, and
+`examples/monotonic_time/` for the complete surface and executable evidence.
+
+## 6. Check, build, run, test, format, and watch
 
 After installing an Actus Alpha release, the user-facing workflow is:
 
@@ -239,7 +267,7 @@ Alpha users. Release installation and platform-specific binary artifacts are
 Gate 19.6 deliverables and are not claimed by this guide until their checks
 pass.
 
-## 6. Supported Alpha boundary
+## 7. Supported Alpha boundary
 
 The hosted Alpha target is selected with `target = "host"`. The compiler
 derives the host-native executable format, path conventions, and linker
@@ -255,7 +283,7 @@ logical, equality, remainder, bitwise, and shift operators. Unsupported or
 experimental behavior must not be inferred from this list; consult the
 corresponding ADR and tests.
 
-## 7. Accepted and rejected evidence
+## 8. Accepted and rejected evidence
 
 Accepted native examples live under `examples/`. Positive and negative
 compiler behavior is covered by the organized suites under `tests/semantic/`,

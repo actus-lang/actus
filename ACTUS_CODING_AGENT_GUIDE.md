@@ -1268,7 +1268,34 @@ handling for failures. Do not pass a `String` to `printb` or a `Buffer` to
 `Result.Ok(count)` is the number of bytes processed, not merely a boolean
 success flag. EOF is a typed result condition where the API defines it.
 
-### 20.2 `std::fs`
+### 20.2 `std::time`
+
+Use `std::time` for elapsed-time measurement and explicit monotonic deadlines:
+
+```act
+import std::time;
+
+verb measure() -> u64 {
+    erg started: Instant = now();
+    erg finished: Instant = now();
+    erg elapsed = duration_since(later: abs finished, earlier: abs started);
+    return case dat elapsed {
+        Result.Ok(value) => duration_as_nanos(abs value),
+        Result.Err(_) => 0u64,
+    };
+}
+```
+
+`Instant` is not a wall-clock timestamp. Use `Duration` for checked integer
+units and arithmetic, `Deadline` for expiration, `delay` for explicit
+busy-waiting, `sleep` for provider-backed scheduler cooperation, and `Timer`
+for caller-owned one-shot or periodic state machines. Handle every
+`Result[_, TimeError]`; do not use a raw runtime symbol or assume nanosecond
+hardware precision. A fixed-workload benchmark must document target, runtime,
+optimization, workload, and scheduling conditions. The general executable
+example is `examples/monotonic_time/`.
+
+### 20.3 `std::fs`
 
 The filesystem facade includes:
 
@@ -1287,7 +1314,7 @@ All public operations return typed `Result` contracts. Files and buffers are
 owned resources and must be passed with the correct role. A failed operation
 must preserve the documented owner and cleanup behavior.
 
-### 20.3 `std::path`
+### 20.4 `std::path`
 
 The path facade includes:
 

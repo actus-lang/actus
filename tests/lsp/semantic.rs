@@ -14,6 +14,31 @@ fn lsp_covers_current_ownership_surface_and_diagnostics() {
 }
 
 #[test]
+fn lsp_supports_the_public_monotonic_time_declarations() {
+    let uri = "file:///tmp/actus-lsp-monotonic-time.act";
+    let source = concat!(
+        "open struct Duration { erg nanos: u64, }\n",
+        "open struct Deadline { erg expires_at: u64, }\n",
+        "open verb monotonic_nanos() -> u64 { return 0u64; }\n",
+        "open verb duration_nanos(erg nanos: u64) -> Duration { return Duration { nanos: nanos, }; }\n",
+        "open verb deadline_after(abs start: u64, abs duration: Duration) -> Deadline { return Deadline { expires_at: start + duration.nanos, }; }\n",
+        "verb main() -> Int { return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"monotonic_nanos")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(stdout.contains("verb monotonic_nanos() -> u64"), "hover missing: {stdout}");
+    assert!(stdout.contains("\"newText\""), "formatting response missing: {stdout}");
+}
+
+#[test]
 fn lsp_filters_target_declarations_and_marks_inactive_code() {
     let uri = "file:///tmp/actus-lsp-targets.act";
     let source = "meta target(\"unix\") verb platform_value() -> Int { return 41; } meta target(\"windows\") verb platform_value() -> Int { return 99; } verb main() -> Int { return platform_value(); }";

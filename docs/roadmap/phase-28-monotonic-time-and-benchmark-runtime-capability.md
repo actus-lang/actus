@@ -240,30 +240,54 @@ provide direct source, native, and execution evidence.
 
 ## Gate 28.5: Tooling and cross-profile behavior
 
-- [ ] Add formatter coverage for `import std::time` and timer calls.
-- [ ] Add LSP completion, hover, definition, and diagnostics for the public
+- [x] Add formatter coverage for `import std::time` and timer calls.
+- [x] Add LSP completion, hover, definition, and diagnostics for the public
       facade and verb.
-- [ ] Add strict-check and test-runner coverage using the same module contract.
-- [ ] Add hosted object and executable acceptance tests.
-- [ ] Add freestanding/core rejected tests, unless an explicit target provider
+- [x] Add strict-check and test-runner coverage using the same module contract.
+- [x] Add hosted object and executable acceptance tests.
+- [x] Add freestanding/core rejected tests, unless an explicit target provider
       contract is implemented first.
-- [ ] Verify the standard-library facade, compiler, linker, and LSP agree on
+- [x] Verify the standard-library facade, compiler, linker, and LSP agree on
       visibility and unsupported-target behavior.
 
 ## Gate 28.6: Benchmark consumer contract and documentation
 
-- [ ] Add a small general Actus timing example that reports elapsed nanoseconds
+- [x] Add a small general Actus timing example that reports elapsed nanoseconds
       without depending on a separate commercial or domain-specific project.
-- [ ] Document a reproducible fixed-workload benchmark pattern using two timer
+- [x] Document a reproducible fixed-workload benchmark pattern using two timer
       reads and checked `u64` subtraction.
-- [ ] Document that measurements are machine-, OS-, scheduler-, and
+- [x] Document that measurements are machine-, OS-, scheduler-, and
       resolution-dependent and must be compared under the same environment.
-- [ ] Record object, executable, monotonic-ordering, zero-float, and target
+- [x] Record object, executable, monotonic-ordering, zero-float, and target
       rejection evidence.
-- [ ] Update `ACTUS_CODING_AGENT_GUIDE.md` and the relevant language/runtime
+- [x] Update `ACTUS_CODING_AGENT_GUIDE.md` and the relevant language/runtime
       documentation.
-- [ ] Pass formatting, check, clippy, tests, source limits, architecture,
+- [x] Pass formatting, check, clippy, tests, source limits, architecture,
       documentation, LSP, and diff checks.
+
+### Gates 28.5, 28.6, and 28.13 evidence
+
+- `tests/formatter/suite.rs` proves the public time import, duration,
+  deadline, delay, and timer calls format idempotently. The formatter uses the
+  same AST contract as other Actus declarations; no time-specific text rewrite
+  exists.
+- `tests/lsp/semantic.rs` proves diagnostics, hover, and formatting responses
+  for the public monotonic declarations. Existing facade navigation and
+  visibility tests cover definition resolution and private-symbol filtering.
+- `examples/monotonic_time/` is a general hosted project. Its executable
+  captures `Instant`, converts a `Duration`, checks a `Deadline`, observes a
+  typed overflow failure, prints a deterministic success line, and enables the
+  zero-float IR audit. `tests/examples_cli.rs` builds and executes it.
+- `tests/std_time_native.rs` covers the public duration, instant, deadline,
+  delay, timer, object, executable, zero-float, underflow, overflow, and
+  freestanding rejection contracts. `tests/std_time_semantic.rs` verifies the
+  facade exports and rejects private raw bridges.
+- The public facade exposes only typed Actus declarations. Raw C symbols,
+  platform clock types, and private helpers remain outside `std::time`.
+- Benchmark readings are documented as environment-dependent. Reproducible
+  comparisons require the same target, runtime, workload, optimization, and
+  scheduling conditions; the API does not promise nanosecond hardware
+  precision.
 
 ## Expanded `std::time` library contract
 
@@ -545,20 +569,20 @@ following semantic rules are fixed:
 
 ### Gate 28.13: Tooling, examples, and complete library acceptance
 
-- [ ] Add formatter and LSP support for every public time declaration,
+- [x] Add formatter and LSP support for every public time declaration,
       constructor, unit, deadline, delay, and timer operation.
-- [ ] Add a general executable example that demonstrates instant, duration,
+- [x] Add a general executable example that demonstrates instant, duration,
       conversion, deadline, and failure handling without any domain-specific
       engine.
-- [ ] Add accepted and rejected tests for every public API and every provider
+- [x] Add accepted and rejected tests for every public API and every provider
       profile.
-- [ ] Require the same module/facade/visibility contract in `check`, `test`,
+- [x] Require the same module/facade/visibility contract in `check`, `test`,
       object emission, executable emission, and LSP analysis.
-- [ ] Verify no raw bridge symbol, platform type, or private helper is exposed
+- [x] Verify no raw bridge symbol, platform type, or private helper is exposed
       through `std::time`.
-- [ ] Update the coding guide, language guide, runtime documentation, ADR, and
+- [x] Update the coding guide, language guide, runtime documentation, ADR, and
       standard-library API index with the final declarations and guarantees.
-- [ ] Pass all repository quality checks plus native, zero-float, allocation,
+- [x] Pass all repository quality checks plus native, zero-float, allocation,
       fake-provider, hosted-provider, and target-rejection evidence.
 
 ## Non-goals
