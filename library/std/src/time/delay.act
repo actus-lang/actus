@@ -1,0 +1,37 @@
+"""
+Busy-wait delay implemented entirely in Actus over the monotonic provider.
+
+Unlike `sleep`, `delay` does not yield to a scheduler and may consume the
+current core until the deadline expires. It is intended for short firmware
+delays and must not be used where a blocking scheduler-aware sleep is
+available. It allocates no storage and has no callback or hidden thread.
+"""
+"""
+Private busy-wait helper for one already-created monotonic deadline.
+
+The helper owns no timer resource; it repeatedly reads the provider until the
+deadline is reached. It is kept private so the public API remains `delay`.
+"""
+verb wait_until(abs deadline: Deadline) -> Result[Int, TimeError] {
+    loop {
+        if expired(deadline: abs deadline) {
+            return Result[Int, TimeError].Ok(0);
+        }
+    }
+    return Result[Int, TimeError].Err(TimeError.ProviderUnavailable);
+}
+
+"""
+Busy-wait until the requested monotonic duration has elapsed.
+
+Returns `Ok(0)` after the deadline is reached or propagates a typed provider
+or overflow error. This operation may monopolize the current execution core;
+callers needing scheduler cooperation must use `sleep` instead.
+"""
+open verb delay(abs duration: Duration) -> Result[Int, TimeError] {
+    erg deadline_result = deadline_from_now(duration: abs duration);
+    return case dat deadline_result {
+        Result.Err(error) => Result[Int, TimeError].Err(error),
+        Result.Ok(deadline) => wait_until(deadline: abs deadline),
+    };
+}

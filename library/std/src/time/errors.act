@@ -1,0 +1,20 @@
+"""
+Typed failures for monotonic time construction, conversion, and arithmetic.
+
+Public time operations return these variants instead of sentinel integers.
+`NegativeDuration`, `Overflow`, `ZeroDivisor`, and `PrecisionLoss` describe
+deterministic source-level failures. `ProviderUnavailable` describes a target
+whose selected runtime does not provide the requested operation.
+"""
+open enum TimeError {
+    """The later instant precedes the earlier instant in one clock domain."""
+    NegativeDuration,
+    """A conversion or arithmetic operation exceeds the `u64` range."""
+    Overflow,
+    """A duration division operation received a zero divisor."""
+    ZeroDivisor,
+    """A conversion would silently discard non-zero lower-order units."""
+    PrecisionLoss,
+    """The selected runtime has no compatible provider for the operation."""
+    ProviderUnavailable,
+}

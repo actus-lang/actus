@@ -68,6 +68,120 @@ fn hosted_std_time_bridge_builds_and_runs() {
 }
 
 #[test]
+fn typed_instant_and_duration_api_builds_and_runs() {
+    let root = std::env::temp_dir().join(format!("actus-std-time-types-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("time-types-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_types\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb main() -> Int { erg started: Instant = now(); erg finished: Instant = now(); erg raw_nanos: u64 = 42u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start_ticks: u64 = instant_ticks(abs started); erg finish_ticks: u64 = instant_ticks(abs finished); erg span_nanos: u64 = duration_as_nanos(abs span); erg sleep_result = sleep(duration: abs span); return case dat sleep_result { Result.Ok(_) => if finish_ticks >= start_ticks && span_nanos == 42u64 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "typed time build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("typed time executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn monotonic_deadline_api_builds_and_runs() {
+    let root = std::env::temp_dir().join(format!("actus-std-time-deadline-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("deadline-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_deadline\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb main() -> Int { erg raw_nanos: u64 = 1000000000u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start: Instant = now(); erg candidate = deadline_after(start: abs start, duration: abs span); return case dat candidate { Result.Ok(deadline) => if expired(deadline: abs deadline) { 1 } else { 0 }, Result.Err(_) => 2, }; }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "deadline build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("deadline executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn checked_duration_units_and_arithmetic_run_natively() {
+    let root = std::env::temp_dir().join(format!("actus-std-time-duration-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("duration-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_time_duration\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::time; verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration { return case dat candidate { Result.Ok(value) => value, Result.Err(_) => Duration { nanos: 0u64, }, }; } verb main() -> Int { erg one: u64 = 1u64; erg two: u64 = 2u64; erg second_result = duration_seconds(seconds: erg one); erg millisecond_result = duration_milliseconds(milliseconds: erg one); erg microsecond_result = duration_microseconds(microseconds: erg one); erg one_second: Duration = unwrap_duration(candidate: erg second_result); erg one_millisecond: Duration = unwrap_duration(candidate: erg millisecond_result); erg one_microsecond: Duration = unwrap_duration(candidate: erg microsecond_result); erg sum_result = duration_add(left: abs one_second, right: abs one_millisecond); erg scaled_result = duration_mul(duration: abs one_microsecond, multiplier: two); erg sum: Duration = unwrap_duration(candidate: erg sum_result); erg scaled: Duration = unwrap_duration(candidate: erg scaled_result); erg nanos: u64 = duration_as_nanos(abs sum); erg scaled_nanos: u64 = duration_as_nanos(abs scaled); if nanos == 1001000000u64 && scaled_nanos == 2000u64 { return 0; } return 1; }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "duration arithmetic build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("duration executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn freestanding_std_time_is_rejected_before_native_emission() {
     let root =
         std::env::temp_dir().join(format!("actus-std-time-freestanding-{}", std::process::id()));

@@ -17,6 +17,16 @@ pub extern "C" fn actus_monotonic_nanos() -> u64 {
     }
 }
 
+/// Sleeps the current hosted execution context for a monotonic duration.
+///
+/// The zero status is success; `-1` means the selected runtime cannot provide
+/// scheduler-aware sleeping. Hosted `std` currently always provides it.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_sleep_nanos(nanos: u64) -> i32 {
+    std::thread::sleep(Duration::from_nanos(nanos));
+    0
+}
+
 fn checked_nanoseconds(duration: Duration) -> Option<u64> {
     u64::try_from(duration.as_nanos()).ok()
 }

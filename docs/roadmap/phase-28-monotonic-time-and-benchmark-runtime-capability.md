@@ -265,13 +265,213 @@ provide direct source, native, and execution evidence.
 - [ ] Pass formatting, check, clippy, tests, source limits, architecture,
       documentation, LSP, and diff checks.
 
+## Expanded `std::time` library contract
+
+The initial `monotonic_nanos()` capability is only the lowest-level clock
+primitive. It is not the complete Actus time library. The remaining work in
+this phase expands `std::time` into a typed, integer-only timing surface that
+is usable by hosted applications, embedded firmware, and future scheduler
+implementations without exposing host-specific clock structures.
+
+The library is divided into these public responsibilities:
+
+| Area | Public responsibility |
+| --- | --- |
+| `Instant` | An opaque monotonic point suitable for ordering and elapsed-time calculations. |
+| `Duration` | A bounded unsigned span with checked construction and arithmetic. |
+| Units | Explicit nanosecond, microsecond, millisecond, and second conversions. |
+| Deadlines | Expiration and remaining-time calculations without wall-clock semantics. |
+| Delays | Explicit blocking delay contracts for hosted and freestanding providers. |
+| Timers | One-shot and periodic timer contracts with deterministic state transitions. |
+| Providers | Manifest-selected clock, delay, and timer capabilities for each target. |
+| Safety | Overflow, underflow, resolution, interrupt, and allocation guarantees. |
+
+The public API must remain integer-only and must not expose `Instant` as a raw
+platform timestamp. A provider may use a hardware counter, an OS clock, or a
+host monotonic source internally, but the Actus-facing types and behavior are
+the same.
+
+### Required public model
+
+The canonical Actus surface will be built incrementally around these types:
+
+```act
+import std::time;
+
+erg started: Instant = now();
+erg budget: Duration = milliseconds(10u64);
+erg deadline: Deadline = deadline_after(budget: abs budget);
+
+if expired(deadline: abs deadline) {
+    return;
+}
+
+erg elapsed: Duration = elapsed_since(end: abs started);
+```
+
+The exact declaration names may be refined during implementation, but the
+following semantic rules are fixed:
+
+- `Instant` is monotonic and can only be created by the selected provider or
+  by a documented test provider; users cannot construct an arbitrary instant
+  from a wall-clock integer.
+- `Duration` represents a non-negative bounded span. Its storage width and
+  conversion behavior are explicit and stable; no signed wraparound is
+  allowed.
+- `Deadline` is an immutable monotonic expiration point derived from an
+  `Instant` and a `Duration`. It is not a calendar timestamp.
+- elapsed and remaining-time operations return typed results where overflow,
+  underflow, or an unavailable provider is possible. They must not silently
+  clamp or wrap values.
+- constructors and arithmetic must preserve ownership roles and must not
+  allocate.
+- unit names must be explicit. No API may infer whether an integer means
+  seconds, milliseconds, microseconds, or nanoseconds.
+
+### Gate 28.7: Typed instant and duration model
+
+- [x] Add the public `Instant`, `Duration`, and `TimeError` declarations to
+      `library/std/src/time/` with complete ownership and error documentation.
+- [x] Add a canonical `now()` operation that returns `Result[Instant,
+      TimeError]` or another explicitly approved typed provider result; do not
+      hide provider failure in a sentinel integer.
+- [x] Add `elapsed_since` and `duration_since` operations with explicit
+      earlier/later ordering behavior.
+- [x] Define whether `Instant` and `Duration` are opaque structs, packs, or
+      another stable Actus representation before native lowering is added.
+- [x] Keep the raw counter and platform bridge private to the standard-library
+      module.
+- [x] Add accepted and rejected semantic tests for construction, ownership,
+      ordering, invalid source types, and unavailable providers.
+
+### Gate 28.7 evidence
+
+- `library/std/src/time/instant.act` now defines the public `Instant` value,
+  `now()`, `instant_ticks()`, `duration_since()`, and `elapsed_since()` verbs.
+- `library/std/src/time/duration.act` defines the public nanosecond-backed
+  `Duration`, its exact constructor, and its read-only accessors.
+- `library/std/src/time/errors.act` defines typed negative-duration,
+  overflow, and zero-divisor errors for the expanded API.
+- The raw hosted bridge remains private and is reachable only through the
+  public `std::time` facade.
+- Semantic facade/import tests and hosted native tests pass; the native fixture
+  captures two typed instants, reads their ticks, constructs a duration, and
+  verifies the result with zero-float IR enabled.
+
+### Gate 28.8: Duration units and checked arithmetic
+
+- [ ] Add explicit constructors for seconds, milliseconds, microseconds, and
+      nanoseconds.
+- [ ] Add checked conversion operations between all supported units.
+- [ ] Add checked addition, subtraction, multiplication by an unsigned scalar,
+      and division by a non-zero unsigned scalar.
+- [ ] Define and test overflow, underflow, zero divisor, and precision-loss
+      behavior with typed diagnostics or typed errors.
+- [ ] Do not silently round, truncate, wrap, or promote a duration across a
+      unit boundary.
+- [ ] Add native tests for boundary values and verify integer-only IR.
+
+### Gate 28.9: Deadlines and remaining-time calculations
+
+- [x] Add immutable deadline construction from an instant and duration.
+- [x] Add `expired`, `remaining`, and deadline comparison operations.
+- [x] Define behavior for an already expired deadline, zero duration, and
+      duration addition overflow.
+- [x] Ensure deadline calculations use the same provider and monotonic domain
+      as the originating instant.
+- [ ] Reject mixing values from incompatible provider domains or target clock
+      epochs if the implementation exposes multiple domains.
+- [x] Add deterministic native acceptance tests.
+- [ ] Add explicit native rejection coverage for deadline overflow and
+      incompatible provider domains.
+
+### Gate 28.9 evidence
+
+- `library/std/src/time/deadline.act` defines `Deadline`, checked construction
+  from an `Instant` and `Duration`, relative construction, expiration, and
+  remaining-time operations.
+- Deadline addition rejects `u64` overflow and expiration returns zero
+  remaining duration after the current monotonic point reaches the deadline.
+- Native acceptance captures a one-second deadline in the active provider
+  domain, verifies it has not already expired, and passes the zero-float IR
+  audit. Explicit overflow and provider-domain rejection tests remain open.
+
+### Gate 28.10: Delay and sleep provider contracts
+
+- [ ] Define separate contracts for a busy-wait delay and a scheduler-aware
+      sleep; they must not be represented by one ambiguous verb.
+- [ ] Add hosted implementations only where the selected runtime guarantees a
+      monotonic delay provider.
+- [ ] Define freestanding provider requirements for early boot, interrupt
+      context, power state, and maximum blocking duration.
+- [ ] Reject blocking sleep from interrupt/critical-section contexts when the
+      target contract does not permit it.
+- [ ] Specify whether a delay is best-effort, minimum-duration, or exact; the
+      API must not promise stronger timing than the target can provide.
+- [ ] Add tests proving no allocation, no floating-point operations, and
+      deterministic unavailable-provider diagnostics.
+
+### Gate 28.11: One-shot and periodic timers
+
+- [ ] Define an explicit timer state model: created, armed, expired, canceled,
+      and completed where applicable.
+- [ ] Add one-shot timer creation and cancellation with ownership-safe handles.
+- [ ] Add periodic timer creation with an explicit missed-tick policy:
+      coalesce, catch-up, or skip; no implicit policy is allowed.
+- [ ] Define timer callback/notification boundaries without requiring hidden
+      heap allocation or dynamic dispatch in the core API.
+- [ ] Define behavior for cancellation races, deadline overflow, provider
+      resolution, and timer reuse.
+- [ ] Keep scheduler integration separate from the core clock and duration
+      types; `std::time` must not silently become an operating-system scheduler.
+- [ ] Add deterministic fake-provider tests before hosted or hardware timing
+      tests.
+
+### Gate 28.12: Target provider and embedded contracts
+
+- [ ] Define a manifest-driven provider contract without hardcoding CPU names
+      into the language grammar or AST.
+- [ ] A provider declaration must identify clock unit, counter width, wrap
+      behavior, frequency conversion, read atomicity, interrupt safety, and
+      initialization requirements.
+- [ ] Define counter-wrap extension rules for bounded hardware counters and
+      reject ambiguous wrap configurations.
+- [ ] Define behavior on clock calibration changes, sleep/resume, reset, and
+      tick discontinuity.
+- [ ] Specify the minimum guarantees for ARM Cortex-M, ARM Cortex-A embedded,
+      RISC-V MCU, and hosted profiles through target manifests/providers rather
+      than compiler-specific CPU branches.
+- [ ] Add provider conformance tests that run against a deterministic fake
+      provider and a hosted provider; hardware tests remain target-specific.
+
+### Gate 28.13: Tooling, examples, and complete library acceptance
+
+- [ ] Add formatter and LSP support for every public time declaration,
+      constructor, unit, deadline, delay, and timer operation.
+- [ ] Add a general executable example that demonstrates instant, duration,
+      conversion, deadline, and failure handling without any domain-specific
+      engine.
+- [ ] Add accepted and rejected tests for every public API and every provider
+      profile.
+- [ ] Require the same module/facade/visibility contract in `check`, `test`,
+      object emission, executable emission, and LSP analysis.
+- [ ] Verify no raw bridge symbol, platform type, or private helper is exposed
+      through `std::time`.
+- [ ] Update the coding guide, language guide, runtime documentation, ADR, and
+      standard-library API index with the final declarations and guarantees.
+- [ ] Pass all repository quality checks plus native, zero-float, allocation,
+      fake-provider, hosted-provider, and target-rejection evidence.
+
 ## Non-goals
 
 This phase does not:
 
 - implement an AIE or any other application engine;
 - define a global benchmark methodology for a separate project;
-- provide wall-clock, calendar, timezone, sleep, alarm, or scheduler APIs;
+- provide wall-clock, calendar, or timezone APIs; those belong to a separate
+  civil-time capability;
+- turn the core clock into an implicit operating-system scheduler; delay,
+  sleep, and timer APIs are explicit provider-backed contracts;
 - promise nanosecond precision or real-time scheduling guarantees;
 - expose raw platform clock structures to Actus code;
 - add floating-point timing or formatting requirements;

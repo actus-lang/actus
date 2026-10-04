@@ -13,6 +13,14 @@ fn std_time_facade_exports_documented_monotonic_api() {
     let resolver = ModuleResolver::new(std_root());
     let exports = exports_module(&resolver, "time").expect("std time facade should resolve");
     assert!(exports.contains("verb", "monotonic_nanos"));
+    assert!(exports.contains("struct", "Instant"));
+    assert!(exports.contains("struct", "Duration"));
+    assert!(exports.contains("struct", "Deadline"));
+    assert!(exports.contains("enum", "TimeError"));
+    assert!(exports.contains("verb", "now"));
+    assert!(exports.contains("verb", "duration_since"));
+    assert!(exports.contains("verb", "deadline_from_now"));
+    assert!(exports.contains("verb", "sleep"));
     analyze_module(&resolver, "time").expect("std time declarations should be semantically valid");
 }
 
