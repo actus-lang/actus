@@ -5,7 +5,6 @@ use crate::ast::{
 };
 use crate::lexer::SourceSpan;
 use std::collections::HashMap;
-
 /// Rewrites contextual `Ok` and `Err` calls into the existing enum-constructor
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
@@ -15,6 +14,7 @@ pub(crate) fn normalize_program(program: &Program) -> Program {
     append_generated_serialization_validators(&mut normalized);
     super::serialization_generation::append_generated_serialization_encoders(&mut normalized);
     super::serialization_generation::append_generated_serialization_decoders(&mut normalized);
+    super::serialization_migration::append_generated_serialization_migrations(&mut normalized);
     let signatures = collect_signatures(&normalized);
     for declaration in &mut normalized.declarations {
         match declaration {

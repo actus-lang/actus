@@ -24,6 +24,7 @@ mod native_runtime;
 mod performance;
 mod result_constructors;
 mod serialization_generation;
+mod serialization_migration;
 mod structs;
 mod symbols;
 mod target;

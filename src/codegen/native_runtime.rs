@@ -15,6 +15,19 @@ use crate::runtime::{
 use super::native::{FunctionMeta, NativeEmitError};
 use super::types::NativeType;
 
+const SERIALIZATION_I64: NativeType = NativeType::Integer { signed: true, width: 64 };
+const VALIDATE_FIXED_FRAME_PARAMS: &[&str] = &[
+    "buffer",
+    "little",
+    "version_offset",
+    "expected_version",
+    "payload_offset",
+    "payload_length",
+    "checksum_start",
+    "checksum_end",
+    "checksum_offset",
+];
+
 pub(super) fn declare_runtime_functions(
     module: &mut ObjectModule,
     has_print_definition: bool,
@@ -83,28 +96,18 @@ fn runtime_metadata(
             append_spec.name.to_owned(),
             intrinsic_meta(ids.append, append_spec.parameters, NativeType::Int),
         ),
-        ("crc32".to_owned(), named_meta(ids.crc32, &["buffer", "start", "end"], NativeType::Int)),
+        ("crc32".to_owned(), named_meta(ids.crc32, &["buffer", "start", "end"], SERIALIZATION_I64)),
         (
             "crc32_matches".to_owned(),
-            named_meta(ids.crc32_matches, &["buffer", "start", "end", "expected"], NativeType::Int),
+            named_meta(
+                ids.crc32_matches,
+                &["buffer", "start", "end", "expected"],
+                SERIALIZATION_I64,
+            ),
         ),
         (
             "validate_fixed_frame".to_owned(),
-            named_meta(
-                ids.validate_fixed_frame,
-                &[
-                    "buffer",
-                    "little",
-                    "version_offset",
-                    "expected_version",
-                    "payload_offset",
-                    "payload_length",
-                    "checksum_start",
-                    "checksum_end",
-                    "checksum_offset",
-                ],
-                NativeType::Int,
-            ),
+            named_meta(ids.validate_fixed_frame, VALIDATE_FIXED_FRAME_PARAMS, SERIALIZATION_I64),
         ),
         (
             print_spec.name.to_owned(),
@@ -207,7 +210,7 @@ fn declare_buffer_length(
 ) -> Result<cranelift_module::FuncId, NativeEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
-    signature.returns.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(BUFFER_LENGTH_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
