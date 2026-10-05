@@ -8,6 +8,7 @@ use super::types::{GenericParam, ReturnType, Role, TypeName};
 pub struct ExternalVerbDecl {
     pub is_open: bool,
     pub doc: Option<String>,
+    pub contract: Option<VerbContract>,
     pub unsafe_boundary: bool,
     pub module_import: bool,
     pub abi: ForeignAbi,
@@ -23,6 +24,7 @@ pub struct ExternalVerbDecl {
 pub struct VerbDecl {
     pub is_open: bool,
     pub doc: Option<String>,
+    pub contract: Option<VerbContract>,
     pub metadata: Vec<MetaAttribute>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
@@ -30,6 +32,31 @@ pub struct VerbDecl {
     pub return_type: Option<ReturnType>,
     pub body: Block,
     pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerbContract {
+    pub sections: Vec<VerbContractSection>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerbContractSection {
+    pub kind: VerbContractSectionKind,
+    pub text: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VerbContractSectionKind {
+    Purpose,
+    Inputs,
+    Outputs,
+    Ownership,
+    Invariants,
+    Errors,
+    SideEffects,
+    Abi,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

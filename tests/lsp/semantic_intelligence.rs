@@ -61,7 +61,8 @@ fn semantic_model_exposes_serialization_contract_sections() {
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
         json!({"jsonrpc":"2.0","method":"exit","params":null}),
     ];
-    let model = response_with_id(&run_lsp(messages.to_vec()), 2);
+    let stdout = run_lsp(messages.to_vec());
+    let model = response_with_id(&stdout, 2);
     let contract = &model["result"]["serializations"][0];
     assert_eq!(contract["name"], "Frame");
     assert_eq!(contract["sourceType"], "FramePack");
@@ -72,6 +73,45 @@ fn semantic_model_exposes_serialization_contract_sections() {
     assert_eq!(contract["sections"][1]["length"], 1);
     assert_eq!(contract["sections"][2]["kind"], "checksum");
     assert_eq!(contract["sections"][2]["offset"], 3);
+}
+
+#[test]
+fn semantic_model_exposes_structured_verb_contract_sections() {
+    let uri = "file:///tmp/actus-lsp-verb-contract.act";
+    let source = concat!(
+        "\"\"\"\n",
+        "contract:\n",
+        "purpose:\n",
+        "    Read one frame.\n",
+        "ownership:\n",
+        "    The caller keeps ownership.\n",
+        "errors:\n",
+        "    Returns a typed error.\n",
+        "\"\"\"\n",
+        "open verb read_frame(abs source: Buffer) -> Int { return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"read_frame")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let model = response_with_id(&stdout, 2);
+    let declaration = model["result"]["declarations"]
+        .as_array()
+        .expect("declarations")
+        .iter()
+        .find(|declaration| declaration["name"] == "read_frame")
+        .expect("read_frame declaration");
+    assert_eq!(declaration["contract"]["sections"][0]["kind"], "purpose");
+    assert_eq!(declaration["contract"]["sections"][0]["text"], "Read one frame.");
+    assert_eq!(declaration["contract"]["sections"][1]["kind"], "ownership");
+    assert_eq!(declaration["contract"]["sections"][2]["kind"], "errors");
+    assert!(stdout.contains("**Contract**"));
+    assert!(stdout.contains("Read one frame."));
 }
 
 #[test]
@@ -101,6 +141,30 @@ fn semantic_model_and_hover_expose_inferred_argument_roles() {
         && fact["role"] == "ins"
         && fact["source"] == "inferred"));
     assert!(stdout.contains("argument role: abs (inferred)"), "hover missing: {stdout}");
+}
+
+#[test]
+fn semantic_model_hides_generated_scalar_locals() {
+    let uri = "file:///tmp/actus-lsp-generated-scalar-local.act";
+    let source = concat!(
+        "verb read(abs value: u32) -> Int { return value as Int; }\n",
+        "verb main() -> Int { erg index: u32 = 41u32; ",
+        "return read(value: abs (index + 1u32)); }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let model = response_with_id(&run_lsp(messages.to_vec()), 2);
+    assert_eq!(model["result"]["state"], "available");
+    let bindings = model["result"]["bindings"].as_array().expect("bindings");
+    assert!(bindings.iter().all(|binding| {
+        !binding["name"].as_str().is_some_and(|name| name.starts_with("__actus_generated_"))
+    }));
+    assert!(bindings.iter().any(|binding| binding["name"] == "index"));
 }
 
 fn active_declaration(model: &Value, name: &str) -> bool {

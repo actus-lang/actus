@@ -305,6 +305,26 @@ fn preserves_docstrings_before_declarations() {
 }
 
 #[test]
+fn round_trips_structured_verb_contracts() {
+    let source = r###"
+"""
+contract:
+ownership:
+    The caller keeps ownership.
+purpose:
+    Read one frame.
+"""
+verb read_frame(abs source: Buffer) -> Int { return 0; }
+"###;
+    let formatted = format_source(source);
+    assert!(formatted.contains("contract:"));
+    assert!(formatted.contains("purpose:"));
+    assert!(formatted.contains("The caller keeps ownership."));
+    assert!(formatted.find("purpose:") < formatted.find("ownership:"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_roles_in_wrapped_external_parameters() {
     let source = r#"unsafe extern "C" verb append_range(
         ins target: Buffer,

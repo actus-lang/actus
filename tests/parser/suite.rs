@@ -1,6 +1,7 @@
 use actus::ast::{
     EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, PrimitiveType,
-    ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl, primitive_type,
+    ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl, VerbContractSectionKind,
+    primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -239,6 +240,77 @@ fn attaches_block_docstrings_to_external_verbs() {
         panic!("expected external verb")
     };
     assert_eq!(external.doc.as_deref(), Some("Reads a raw path without transcoding."));
+}
+
+#[test]
+fn parses_structured_verb_contract_sections_without_changing_the_docstring() {
+    let program = parse_source(
+        r#"
+        """
+        contract:
+        purpose:
+            Read one frame.
+        inputs:
+            source: immutable bytes.
+        ownership:
+            The caller keeps ownership.
+        errors:
+            Returns a typed error.
+        """
+        open verb read_frame(abs source: Buffer) -> Int { return 0; }
+        "#,
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let contract = verb.contract.as_ref().expect("contract should be parsed");
+    assert_eq!(contract.sections.len(), 4);
+    assert_eq!(contract.sections[0].kind, VerbContractSectionKind::Purpose);
+    assert_eq!(contract.sections[0].text, "Read one frame.");
+    assert_eq!(contract.sections[1].kind, VerbContractSectionKind::Inputs);
+    assert_eq!(contract.sections[2].kind, VerbContractSectionKind::Ownership);
+    assert_eq!(contract.sections[3].kind, VerbContractSectionKind::Errors);
+    assert!(verb.doc.as_deref().is_some_and(|doc| doc.starts_with("contract:")));
+    assert_eq!(contract.span, verb.span);
+}
+
+#[test]
+fn ordinary_verb_documentation_is_not_interpreted_as_a_contract() {
+    let program = parse_source("\"\"\"Purpose: read one frame.\"\"\" verb main() { return 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.contract.is_none());
+}
+
+#[test]
+fn rejects_unknown_structured_verb_contract_sections() {
+    let (tokens, errors) = scan(
+        "\"\"\"contract:\npurpose:\n    Read.\nlatency:\n    Fast.\n\"\"\" verb main() { return 0; }",
+    );
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("unknown contract section should be rejected");
+    assert_eq!(error.code, ParseErrorCode::MalformedVerbContract);
+    assert!(matches!(error.kind, ParseErrorKind::MalformedVerbContract { .. }));
+}
+
+#[test]
+fn rejects_duplicate_structured_verb_contract_sections() {
+    let (tokens, errors) = scan(
+        "\"\"\"contract:\npurpose:\n    Read.\npurpose:\n    Read again.\n\"\"\" verb main() { return 0; }",
+    );
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("duplicate contract section should be rejected");
+    assert_eq!(error.code, ParseErrorCode::MalformedVerbContract);
+}
+
+#[test]
+fn rejects_empty_structured_verb_contracts() {
+    let (tokens, errors) = scan("\"\"\"contract:\n\"\"\" verb main() { return 0; }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("empty structured contracts should be rejected");
+    assert_eq!(error.code, ParseErrorCode::MalformedVerbContract);
+    assert!(matches!(
+        error.kind,
+        ParseErrorKind::MalformedVerbContract { reason }
+            if reason.contains("at least one named section")
+    ));
 }
 
 #[test]

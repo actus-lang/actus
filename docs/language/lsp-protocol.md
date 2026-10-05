@@ -52,6 +52,12 @@ and compiler-internal fields must not appear in completion, hover, definition,
 semantic-token, or semantic-model responses. This boundary is verified by
 the module visibility and LSP semantic regression suites.
 
+Compiler-generated scalar locals used to normalize explicit `abs` call
+expressions are compiler metadata. They may participate in internal semantic
+ownership and cleanup analysis, but their generated names are omitted from
+semantic-model bindings and source declarations. Hover, completion, formatter,
+and definition results continue to describe the user's source expression.
+
 ## Verification
 
 Run the same checks locally and in CI:

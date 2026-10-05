@@ -45,6 +45,7 @@ fn generated_migration(contract: &SerializeDecl, capacity: u64, span: SourceSpan
     VerbDecl {
         is_open: false,
         doc: Some(GENERATED_DOC.to_owned()),
+        contract: None,
         metadata: Vec::new(),
         name: format!("{}_migrate", contract.name.to_ascii_lowercase()),
         generic_parameters: Vec::new(),

@@ -48,6 +48,35 @@ The compiler ignores ordinary `#` comments while preserving documentation
 blocks as structured `DocString` tokens. Formatter, LSP, and documentation
 tools must preserve their source spans and text.
 
+### 1.1 Structured verb contracts
+
+Phase 33.6 defines an optional structured form for a verb's leading
+documentation block. The first non-empty line must be exactly `contract:`. The
+accepted sections are `purpose`, `inputs`, `outputs`, `ownership`,
+`invariants`, `errors`, `side_effects`, and `abi`:
+
+```act
+"""
+contract:
+purpose:
+    Read one frame.
+inputs:
+    source: immutable frame bytes.
+outputs:
+    Returns a frame or a typed error.
+ownership:
+    The input remains caller-owned.
+"""
+open verb read_frame(abs source: Buffer) -> Result[Frame, DecodeError] {
+    ...
+}
+```
+
+These sections are documentation metadata. They do not create runtime
+preconditions, alter ownership, or change native code generation. The full
+contract and rejection rules are defined in ADR-0065. This syntax is accepted
+design while Gate 33.6 implementation is in progress.
+
 ## 2. Return Types
 
 Return types use the existing arrow syntax:
@@ -241,6 +270,13 @@ ambiguous expressions. Write `abs value` or `ins value` when source-level
 clarity is preferred; an explicit role remains the opt-out form. Unsafe or
 ambiguous omissions continue to produce `E1016` at the argument expression.
 
+For a direct call, an explicit `abs` may qualify a pure scalar expression such
+as `abs (index + 1u32)` or `abs values[index]`. The compiler materializes the
+short-lived scalar owner required by the call. Keep aggregates, buffers,
+borrows, mutation, and ownership transfers in named bindings so their lifetime
+and ownership remain visible. The formatter preserves the source expression;
+it never prints the compiler-owned temporary.
+
 ## 7. Canonical Formatting
 
 The canonical formatter must enforce:
@@ -251,6 +287,8 @@ The canonical formatter must enforce:
 - one space after type-annotation colons;
 - no trailing whitespace;
 - K&R / 1TBS braces.
+- compiler-owned scalar temporaries are never emitted as source declarations;
+  their source expression remains the canonical formatted form;
 
 ```act
 verb loop_example() -> Int {

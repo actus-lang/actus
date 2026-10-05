@@ -286,9 +286,12 @@ impl Parser {
         let (start, abi) = self.parse_external_prefix(unsafe_boundary)?;
         self.expect_keyword(TokenKind::Verb, "`verb`")?;
         let signature = self.parse_external_signature()?;
+        let span = SourceSpan::new(start, signature.end);
+        let contract = self.parse_contract(doc.as_deref(), span)?;
         Ok(ExternalVerbDecl {
             is_open,
             doc,
+            contract,
             unsafe_boundary,
             module_import: false,
             abi,
@@ -297,7 +300,7 @@ impl Parser {
             generic_parameters: signature.generic_parameters,
             params: signature.params,
             return_type: signature.return_type,
-            span: SourceSpan::new(start, signature.end),
+            span,
         })
     }
 

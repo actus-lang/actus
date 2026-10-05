@@ -14,6 +14,7 @@ use super::uri::{file_uri_to_path, path_to_file_uri};
 pub struct DefinitionLocation {
     pub uri: String,
     pub range: LspRange,
+    pub documentation: Option<String>,
 }
 
 pub fn find_definition(
@@ -28,7 +29,12 @@ pub fn find_definition(
     let program = parse(tokens).ok()?;
     let current_path = file_uri_to_path(uri)?;
     if let Some(span) = local_definition(source, &program, &name, offset) {
-        return Some(location(uri, source, span));
+        return Some(location(
+            uri,
+            source,
+            span,
+            super::hover::contract_documentation_for_name(&program, &name),
+        ));
     }
     imported_definition(&current_path, &program, &name, overlays)
 }
@@ -237,8 +243,17 @@ fn imported_definition(
             if !exports.symbols.iter().any(|symbol| symbol.name == name && symbol.source == path) {
                 continue;
             }
+            let documentation_program =
+                crate::parser::parse(crate::lexer::scan(&module_source).0).ok();
             if let Some(span) = top_level_span(&module_source, module_program, name) {
-                return Some(location(&path_to_file_uri(path), &module_source, span));
+                return Some(location(
+                    &path_to_file_uri(path),
+                    &module_source,
+                    span,
+                    documentation_program.as_ref().and_then(|program| {
+                        super::hover::contract_documentation_for_name(program, name)
+                    }),
+                ));
             }
         }
     }
@@ -283,7 +298,12 @@ fn identifier_span(source: &str, span: SourceSpan, name: &str) -> Option<SourceS
     })
 }
 
-fn location(uri: &str, source: &str, span: SourceSpan) -> DefinitionLocation {
+fn location(
+    uri: &str,
+    source: &str,
+    span: SourceSpan,
+    documentation: Option<String>,
+) -> DefinitionLocation {
     let index = LineIndex::new(source);
     DefinitionLocation {
         uri: uri.to_owned(),
@@ -291,5 +311,6 @@ fn location(uri: &str, source: &str, span: SourceSpan) -> DefinitionLocation {
             start: index.position(source, span.start),
             end: index.position(source, span.end),
         },
+        documentation,
     }
 }

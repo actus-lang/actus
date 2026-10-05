@@ -289,6 +289,7 @@ fn caller_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
         TopLevelDecl::Verb(verb) => TopLevelDecl::ExternalVerb(ExternalVerbDecl {
             is_open: verb.is_open,
             doc: verb.doc.clone(),
+            contract: verb.contract.clone(),
             unsafe_boundary: false,
             module_import: true,
             abi: ForeignAbi::C,

@@ -64,7 +64,13 @@ fn definition_like(method: &str, params: Value, store: &DocumentStore) -> Value 
     let Some(document) = store.get(&uri) else { return Value::Null };
     let overlays = store.source_overlays();
     let result = super::definition::find_definition(&uri, &document.text, &position, &overlays)
-        .map(|location| json!({"uri": location.uri, "range": location.range}));
+        .map(|location| {
+            let mut value = json!({"uri": location.uri, "range": location.range});
+            if let Some(documentation) = location.documentation {
+                value["documentation"] = Value::String(documentation);
+            }
+            value
+        });
     if method == "textDocument/implementation" {
         return result.map_or(Value::Array(Vec::new()), |location| Value::Array(vec![location]));
     }

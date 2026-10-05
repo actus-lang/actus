@@ -5,6 +5,7 @@ Program {
             VerbDecl {
                 is_open: false,
                 doc: None,
+                contract: None,
                 metadata: [],
                 name: "transfer",
                 generic_parameters: [],

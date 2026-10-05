@@ -131,6 +131,42 @@ Actus uses `#` for ordinary source comments. Comment-only lines and inline
 remain part of the measured source and must be preserved for documentation
 validation. Rust source keeps its normal `//` and `/* ... */` comment rules.
 
+#### Structured verb contracts
+
+When a verb needs a readable multi-line contract, its leading documentation
+string may begin with the exact marker `contract:`. The compiler stores the
+following named sections as documentation metadata and exposes them to the
+formatter, semantic model, hover, completion, and signature-help tools:
+
+```act
+"""
+contract:
+purpose:
+    Read one bounded frame.
+inputs:
+    source: an immutable input buffer.
+outputs:
+    Returns the decoded frame or a typed error.
+ownership:
+    The input view does not escape.
+errors:
+    Reports short or corrupt input.
+"""
+open verb read_frame(abs source: Buffer) -> Result[Frame, DecodeError] {
+    ...
+}
+```
+
+The supported section names are `purpose`, `inputs`, `outputs`, `ownership`,
+`invariants`, `errors`, `side_effects`, and `abi`. This syntax documents the
+existing behavior only: it does not add runtime checks, change ownership
+analysis, or alter native lowering. Unknown, duplicate, empty contracts, or
+otherwise malformed structured contracts produce parser diagnostic `E0014`.
+Ordinary documentation
+strings without `contract:` keep their existing meaning. See
+`docs/decisions/ADR-0065-structured-verb-contracts.md` for the complete
+contract and compatibility rules.
+
 ### 4.3 Whitespace and punctuation
 
 Use semicolons after statements. Braces delimit blocks. Commas separate
@@ -1194,11 +1230,10 @@ the imported object program; private constants and facade-bypass declarations
 remain unavailable. Constants must be materialized before native identifier
 lowering and must never become runtime storage or native ABI symbols.
 
-This contract also applies through nested module facades. For example,
-`src/aie/persistence/serialization.act` may import `config` and use a
-constant exported by `src/config/config.act` even when the final native
-object is emitted for the parent `aie` module. The compiler must carry the
-constant into the corresponding module object before native semantic
+This contract also applies through nested module facades. A child module may
+import the package configuration facade and use its public constants when the
+final native object is emitted for the parent module. The compiler must carry
+the constant into the corresponding module object before native semantic
 analysis and lowering.
 
 Package constants may be used in all supported compile-time expression
@@ -1638,8 +1673,8 @@ installation model.
 ### Current systems-language capability status
 
 The current systems-language capability set is compiler-owned and
-target-neutral; it is not an AIE-specific lowering path and does not embed
-ARM, RISC-V, STM32, RP, or other CPU identities into Actus syntax.
+target-neutral; CPU identities belong in target and runtime configuration,
+not in Actus syntax.
 
 #### Const generics
 
@@ -1987,6 +2022,39 @@ resources, or ambiguous expressions. Explicit `abs value` and `ins value`
 remain valid and are the source-level opt-out when the ownership intent should
 be visible. An unsafe omission uses the stable `E1016` argument-role diagnostic.
 
+For a direct static call argument, the compiler may materialize a hidden
+`erg` local when the source expression is a pure scalar expression and the
+argument explicitly uses `abs`. This keeps small arithmetic and bounded index
+expressions readable without changing ownership or evaluation order:
+
+```act
+verb read(abs value: u32) -> Int {
+    return value as Int;
+}
+
+verb main() -> Int {
+    erg values: Array[u32, 2] = Array[u32, 2]();
+    values[1] = 41u32;
+    erg index: u32 = 1u32;
+    return read(value: abs values[index]);
+}
+```
+
+The compiler-owned local is equivalent to an explicit scalar binding for the
+duration of that call. It is generated in deterministic source order, receives
+`erg`, and is passed to the callee as `abs`. Generated names are reserved
+internally and avoid collisions with source bindings. Formatter and LSP
+semantic declarations do not display the hidden local. The initializer may
+contain scalar literals, arithmetic, bitwise operations, comparisons, casts,
+grouping, and bounded scalar indexing. Calls, method calls, buffers,
+aggregates, resources, mutation, borrows, conditional expressions, and
+ownership transfers remain explicit source forms.
+
+The generated form has the same native text as its equivalent explicit local,
+and its object relocations contain no allocation reference. A prior move or
+borrow rule is still diagnosed by ordinary semantic analysis; normalization
+does not repair invalid ownership.
+
 When an imported generic verb named `copy` is visible, dispatch is determined
 by call shape and declaration provenance. A local module-scoped `copy`
 declaration has precedence. The one-argument scalar form
@@ -2011,10 +2079,10 @@ source spans, including invalid storage (`E1070`), out-of-range fields
 (`E1072`), overlap (`E1073`), constant index bounds (`E1085`), and ownership
 violations (`E1051`).
 
-The canonical end-to-end evidence is:
+The canonical end-to-end evidence is maintained in:
 
 ```text
-the readiness package acceptance test in `tests/examples_cli.rs`
+the repository's strict package and executable acceptance tests
 ```
 
 That acceptance runs strict check/test/format validation, host-native build and
@@ -2093,9 +2161,9 @@ generic parameters, Boolean literals, nested fields/places, diagnostics,
 hover, definitions, semantic tokens, formatting, versioned overlays, and
 malformed nested documents without process termination.
 
-#### Acceptance boundary
+#### Verification boundary
 
-The readiness package proves the combined systems-language workflow:
+The verification workflow covers the combined systems-language contract:
 
 - strict package checking succeeds;
 - accepted and rejected ownership cases are tested;
@@ -2104,12 +2172,9 @@ The readiness package proves the combined systems-language workflow:
 - LSP analysis remains synchronized with the workspace source;
 - source limits, public documentation, and native IR verification checks pass.
 
-This status means the implemented capability set is working and verified. It
-does not claim that deferred features such as const expressions,
-arbitrary compile-time evaluation, a full target matrix, AIE, Wire, Ustari,
-closures, async execution, or a complete enterprise compiler platform already
-exist. Those require separate designs, implementations, and acceptance
-evidence.
+This status describes the implemented compiler capabilities and their required
+verification evidence. Deferred language features require separate designs,
+implementations, and tests before they may be used.
 
 ## LSP and editor behavior
 
@@ -2203,9 +2268,8 @@ The following require separate evidence and must not be invented in examples:
 - every target-specific runtime profile;
 - WASM, DWARF, incremental compilation, or parallel compilation;
 - a complete `Map` standard-library API;
-- Wire or Ustari protocol implementation merely because ADR-0051 exists;
-- a production-ready neural or endocrine runtime merely because Actus can
-  express packs, arrays, buffers, and fixed-width arithmetic.
+- a protocol or domain runtime merely because Actus can express packs, arrays,
+  buffers, and fixed-width arithmetic.
 
 If a requested feature falls into this list, report it as a language/toolchain
 gap and propose the parser, AST, semantic, codegen, tooling, and test work
@@ -2317,7 +2381,7 @@ from another project directory can locate the source of truth directly:
 - `/home/magradze/Projects/actus_project/actus/docs/decisions/ADR-0052-core-control-flow-constants-and-type-directed-ergonomics.md`:
   current ergonomic/core direction.
 - `/home/magradze/Projects/actus_project/actus/docs/decisions/ADR-0053-production-language-capability-and-wire-readiness.md`:
-  production readiness boundary.
+  production capability boundary.
 - `/home/magradze/Projects/actus_project/actus/examples/`: executable language examples.
 - `/home/magradze/Projects/actus_project/actus/library/std/src/`: public standard-library facades and sibling modules.
 - `/home/magradze/Projects/actus_project/actus/tests/`: compiler, native, runtime, LSP, and standard-library evidence.

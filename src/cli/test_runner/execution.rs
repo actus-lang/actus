@@ -216,6 +216,7 @@ fn test_main(name: &str) -> TopLevelDecl {
     TopLevelDecl::Verb(VerbDecl {
         is_open: false,
         doc: None,
+        contract: None,
         metadata: Vec::new(),
         name: "main".to_owned(),
         generic_parameters: Vec::new(),

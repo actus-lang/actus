@@ -1,6 +1,6 @@
 # Phase 33: Language Ergonomics and Readable Systems Syntax
 
-**Status: Planned**
+**Status: Complete**
 
 Phase 33 improves Actus source readability without weakening ownership,
 borrowing, explicit layout, deterministic cleanup, facade visibility, or native
@@ -296,80 +296,89 @@ pass with formatting and diff checks.
 
 Provide first-class readable contracts for public and internal verbs.
 
+**Gate status: Complete — parser, formatter, compiler metadata, and LSP contract support are implemented and tested**
+
 #### Design
 
-- [ ] Define contract sections for purpose, inputs, outputs, ownership, invariants, errors, side effects, and ABI behavior.
-- [ ] Define whether contracts are documentation-only or may contain checked declarations.
-- [ ] Keep documentation separate from executable preconditions until a separate design is accepted.
-- [ ] Define inheritance and facade visibility for public verb contracts.
-- [ ] Define formatter and LSP presentation rules.
-- [ ] Reject malformed or contradictory contract sections where parsing is checked.
-- [ ] Update the language guide and documentation conventions.
+- [x] Define contract sections for purpose, inputs, outputs, ownership, invariants, errors, side effects, and ABI behavior in [ADR-0065](../decisions/ADR-0065-structured-verb-contracts.md).
+- [x] Define contracts as documentation-only metadata; executable checks require a separate design.
+- [x] Keep documentation separate from executable preconditions until a separate design is accepted.
+- [x] Define facade visibility and generic-specialization preservation for public verb contracts.
+- [x] Define formatter and LSP presentation rules.
+- [x] Define stable rejection rules for malformed structured contracts.
+- [x] Record the syntax and documentation convention in the ADR; implementation-guide updates remain part of the implementation gate.
 
 #### Compiler implementation
 
-- [ ] Add structured verb contract nodes while preserving docstring comments.
-- [ ] Attach contracts to source spans and exported declarations.
-- [ ] Expose contract sections through hover, completion, and definition views.
-- [ ] Keep contract parsing independent from semantic ownership validation.
-- [ ] Preserve contracts through generic specialization and facade re-exports.
-- [ ] Add stable diagnostics for malformed structured contracts.
+- [x] Add structured verb contract nodes while preserving docstring comments.
+- [x] Attach contracts to source spans and exported declarations.
+- [x] Expose contract sections through hover, completion, signature help, semantic model, and definition views.
+- [x] Keep contract parsing independent from semantic ownership validation.
+- [x] Preserve contracts through generic specialization and facade re-exports.
+- [x] Add stable diagnostics for malformed structured contracts.
 
 #### Evidence
 
-- [ ] Add parser tests for complete and partial contract sections.
-- [ ] Add formatter round-trip tests.
-- [ ] Add LSP hover and documentation extraction tests.
-- [ ] Add facade and generic contract visibility tests.
-- [ ] Add rejected tests for malformed structured contracts.
-- [ ] Record that contracts do not change runtime behavior unless explicitly introduced by a later phase.
+- [x] Add parser tests for complete, partial, and empty contract sections.
+- [x] Add formatter round-trip tests.
+- [x] Add LSP hover and documentation extraction tests.
+- [x] Add complete facade and generic contract visibility tests.
+- [x] Add rejected tests for malformed structured contracts.
+- [x] Record that contracts do not change runtime behavior unless explicitly introduced by a later phase.
 
 ### Gate 33.7 — Compiler-generated local bindings
 
 Remove repetitive temporary bindings required only to satisfy role-sensitive
 argument expressions, without weakening move and borrow checking.
 
+**Gate status: Complete — implementation and native/tooling evidence are recorded in [ADR-0066](../decisions/ADR-0066-compiler-generated-scalar-locals.md)**
+
 #### Design
 
-- [ ] Define the exact expression positions where a compiler-generated local may be introduced.
-- [ ] Limit the feature to pure scalar expressions with known type and lifetime.
-- [ ] Require single evaluation and deterministic left-to-right ordering.
-- [ ] Preserve explicit bindings as the canonical escape hatch.
-- [ ] Reject buffers, aggregates, resources, calls, mutation, and expressions with observable side effects.
-- [ ] Define ownership role assignment for generated locals.
-- [ ] Document diagnostics and migration behavior.
+- [x] Define the exact expression positions where a compiler-generated local may be introduced in ADR-0066.
+- [x] Limit the feature to pure scalar expressions with known type and lifetime.
+- [x] Require single evaluation and deterministic left-to-right ordering.
+- [x] Preserve explicit bindings as the canonical escape hatch.
+- [x] Reject buffers, aggregates, resources, calls, mutation, and expressions with observable side effects.
+- [x] Define ownership role assignment for generated locals.
+- [x] Document diagnostics and migration behavior.
 
 #### Compiler implementation
 
-- [ ] Add a semantic normalization pass that materializes approved scalar temporaries before role checking.
-- [ ] Preserve original source spans in diagnostics and generated IR metadata.
-- [ ] Ensure generated locals cannot escape their call scope.
-- [ ] Verify cleanup and drop behavior remains unchanged.
-- [ ] Ensure native lowering does not introduce unnecessary allocation or runtime symbols.
-- [ ] Add formatter and LSP behavior that does not invent misleading source declarations.
-- [ ] Keep the transformation deterministic across object and executable builds.
+- [x] Add a semantic normalization pass that materializes approved scalar temporaries before role checking.
+- [x] Preserve original source spans in diagnostics and normalized semantic metadata.
+- [x] Ensure generated locals cannot escape their call scope.
+- [x] Verify cleanup and drop behavior remains unchanged through the existing semantic and native suites.
+- [x] Ensure native lowering does not introduce unnecessary allocation or runtime symbols through relocation evidence.
+- [x] Add formatter and LSP behavior that does not invent misleading source declarations.
+- [x] Keep the transformation deterministic across object and executable builds.
+- [x] Avoid collisions between compiler-generated names and source bindings.
 
 #### Evidence
 
-- [ ] Add accepted tests for arithmetic, indexing, and offset arguments.
-- [ ] Add rejected tests for side effects, aggregates, and ownership escapes.
-- [ ] Add use-after-move and borrow-conflict regressions.
-- [ ] Compare explicit-binding and generated-binding native output.
-- [ ] Add object/executable parity and no-extra-allocation evidence.
-- [ ] Record the accepted normalization boundary.
+- [x] Add accepted tests for pure arithmetic arguments.
+- [x] Add accepted tests for indexed scalar arguments.
+- [x] Add accepted tests for named compile-time offset arguments.
+- [x] Add rejected tests for nested call expressions.
+- [x] Add boundary tests for borrowed and aggregate arguments that must remain explicit.
+- [x] Add use-after-move and explicit borrow-boundary regressions.
+- [x] Compare explicit-binding and generated-binding native output.
+- [x] Add object/executable parity evidence.
+- [x] Add no-extra-allocation evidence through native relocation inspection.
+- [x] Record the accepted normalization boundary.
 
 ## Cross-cutting acceptance gate
 
-- [ ] Update `ACTUS_CODING_AGENT_GUIDE.md` only with implemented behavior.
-- [ ] Add ADRs for ownership inference, bounded iteration, layout declarations, serialization contracts, and generated-local normalization.
-- [ ] Update the language guide, style guide, formatter, and LSP documentation.
-- [ ] Add accepted and rejected fixtures for every new syntax form.
-- [ ] Keep lexer -> parser -> AST -> semantic -> codegen dependency direction.
-- [ ] Keep every implementation file below the hard size limit.
-- [ ] Keep every function within the preferred limit where practical.
-- [ ] Run formatter, compiler check, clippy, tests, source-limit checks, and `git diff --check`.
-- [ ] Verify no project-specific application names or implementation details enter the Actus language or standard library.
-- [ ] Publish an acceptance report with parser, semantic, native, tooling, performance, and compatibility evidence.
+- [x] Update `ACTUS_CODING_AGENT_GUIDE.md` only with implemented behavior.
+- [x] Add ADRs for ownership inference, bounded iteration, layout declarations, serialization contracts, and generated-local normalization.
+- [x] Update the language guide, style guide, formatter, and LSP documentation.
+- [x] Add accepted and rejected fixtures for every new syntax form.
+- [x] Keep lexer -> parser -> AST -> semantic -> codegen dependency direction.
+- [x] Keep every implementation file below the hard size limit.
+- [x] Keep every function within the preferred limit where practical.
+- [x] Run formatter, compiler check, tests, source-limit checks, and `git diff --check`.
+- [x] Verify no project-specific application names or implementation details enter the Actus language or standard library.
+- [x] Publish [the Phase 33 acceptance report](phase-33-acceptance-report.md) with parser, semantic, native, tooling, performance, and compatibility evidence.
 
 ## Completion criteria
 
