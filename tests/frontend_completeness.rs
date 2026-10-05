@@ -159,6 +159,24 @@ fn conditional_expression_branches_have_one_value_type() {
 }
 
 #[test]
+fn statement_guards_may_omit_else_when_they_do_not_produce_a_value() {
+    analyze_source("verb main() { if true { return; } }")
+        .expect("statement-form guards should not require an else branch");
+}
+
+#[test]
+fn value_producing_conditionals_still_require_matching_branches() {
+    let mismatch = expect_semantic_error(
+        "verb choose(erg ready: Bool) -> Int { erg selected: Int = if ready { 1 }; return selected; }",
+    );
+    assert!(matches!(
+        mismatch.kind,
+        SemanticErrorKind::TypeMismatch { ref callee, ref parameter, .. }
+            if callee == "if" && parameter == "branches"
+    ));
+}
+
+#[test]
 fn conditional_branches_must_join_ownership_state() {
     let mismatch = expect_semantic_error(
         "verb main() { erg bytes = Buffer[1]; if 1 < 2 { drop(bytes); } else { append(bytes, 1); }; }",
