@@ -220,6 +220,13 @@ owning-role call sites. Do not use identity arithmetic such as `value + 0u32`
 to express a copy. Unsupported types and calls without an explicit `abs` role
 are rejected during semantic analysis.
 
+If an imported generic verb named `copy` is also visible, the compiler resolves
+calls by shape and provenance. A local module-scoped `copy` declaration wins;
+the one-argument scalar form resolves to the scalar reuse intrinsic when no
+local declaration shadows it; and the two-argument `reader`/`writer` form
+resolves to the imported generic verb. This decision occurs before generic
+specialization and native reanalysis.
+
 ## 7. Canonical Formatting
 
 The canonical formatter must enforce:

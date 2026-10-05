@@ -4,6 +4,16 @@ use super::super::analyzer::Analyzer;
 use super::super::calls::VerbSignature;
 use super::super::errors::{SemanticError, SemanticErrorKind};
 
+struct SignatureRegistration<'a> {
+    name: &'a str,
+    params: &'a [Param],
+    return_type: Option<&'a ReturnType>,
+    generic_parameters: &'a [GenericParam],
+    span: crate::lexer::SourceSpan,
+    signature: VerbSignature,
+    imported: bool,
+}
+
 impl Analyzer {
     pub(super) fn register_declarations(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
@@ -14,54 +24,54 @@ impl Analyzer {
 
     fn register_declaration(&mut self, declaration: &TopLevelDecl) -> Result<(), SemanticError> {
         match declaration {
-            TopLevelDecl::Verb(verb) => self.register_signature(
-                &verb.name,
-                &verb.params,
-                verb.return_type.as_ref(),
-                &verb.generic_parameters,
-                verb.span,
-                verb.signature(),
-                false,
-            ),
-            TopLevelDecl::ExternalVerb(verb) => self.register_signature(
-                &verb.name,
-                &verb.params,
-                verb.return_type.as_ref(),
-                &verb.generic_parameters,
-                verb.span,
-                verb.signature(),
-                verb.module_import,
-            ),
+            TopLevelDecl::Verb(verb) => self.register_signature(SignatureRegistration {
+                name: &verb.name,
+                params: &verb.params,
+                return_type: verb.return_type.as_ref(),
+                generic_parameters: &verb.generic_parameters,
+                span: verb.span,
+                signature: verb.signature(),
+                imported: false,
+            }),
+            TopLevelDecl::ExternalVerb(verb) => self.register_signature(SignatureRegistration {
+                name: &verb.name,
+                params: &verb.params,
+                return_type: verb.return_type.as_ref(),
+                generic_parameters: &verb.generic_parameters,
+                span: verb.span,
+                signature: verb.signature(),
+                imported: verb.module_import,
+            }),
             _ => Ok(()),
         }
     }
 
     fn register_signature(
         &mut self,
-        name: &str,
-        params: &[Param],
-        return_type: Option<&ReturnType>,
-        generic_parameters: &[GenericParam],
-        span: crate::lexer::SourceSpan,
-        signature: VerbSignature,
-        imported: bool,
+        registration: SignatureRegistration<'_>,
     ) -> Result<(), SemanticError> {
-        self.validate_signature_types(params, return_type, generic_parameters)?;
-        if super::super::intrinsics::is_reserved_name(name) {
+        self.validate_signature_types(
+            registration.params,
+            registration.return_type,
+            registration.generic_parameters,
+        )?;
+        if super::super::intrinsics::is_reserved_name(registration.name) {
             return Err(SemanticError {
-                kind: SemanticErrorKind::ReservedIntrinsicName { name: name.to_owned() },
-                span,
+                kind: SemanticErrorKind::ReservedIntrinsicName {
+                    name: registration.name.to_owned(),
+                },
+                span: registration.span,
             });
         }
-        if self.signatures.contains_key(name) {
+        if self.signatures.contains_key(registration.name) {
             return Err(SemanticError {
-                kind: SemanticErrorKind::DuplicateVerbName { name: name.to_owned() },
-                span,
+                kind: SemanticErrorKind::DuplicateVerbName { name: registration.name.to_owned() },
+                span: registration.span,
             });
         }
-        self.signatures.insert(name.to_owned(), signature);
-        if !imported {
-            self.local_signatures.insert(name.to_owned());
+        self.signatures.insert(registration.name.to_owned(), registration.signature);
+        if !registration.imported {
+            self.local_signatures.insert(registration.name.to_owned());
         }
         Ok(())
     }

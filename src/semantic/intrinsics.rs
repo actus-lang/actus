@@ -75,7 +75,7 @@ impl Analyzer {
         let eligible = type_name.as_deref().is_some_and(|name| {
             name == "Int"
                 || name == "Bool"
-                || primitive_type(&name)
+                || primitive_type(name)
                     .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { .. }))
         });
         if !eligible {

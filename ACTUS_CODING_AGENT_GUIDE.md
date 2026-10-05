@@ -1845,6 +1845,16 @@ reuse. Buffers, strings, resources, cleanup-bearing aggregates, and
 unsupported user-defined values are rejected with `E1021`; a missing explicit
 `abs` role is rejected with `E1016`.
 
+When an imported generic verb named `copy` is visible, dispatch is determined
+by call shape and declaration provenance. A local module-scoped `copy`
+declaration has precedence. The one-argument scalar form
+`copy(value: abs scalar)` uses the compiler-checked scalar reuse intrinsic when
+no local declaration shadows it. The two-argument `reader`/`writer` form uses
+the imported generic standard-library verb. Generic specialization must occur
+only after this dispatch decision so unresolved parameters cannot reach native
+semantic reanalysis. This rule does not relax the explicit `abs` requirement
+or the supported scalar type set.
+
 Indexed selection remains bounded through `values[index]`. Constant indexes
 outside `0 <= index < N` produce `E1085`; computed indexes retain the native
 bounds check. Indexed views preserve the source ownership role, so an

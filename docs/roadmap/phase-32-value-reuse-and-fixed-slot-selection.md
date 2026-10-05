@@ -1,6 +1,6 @@
 # Phase 32: Value Reuse and Fixed-Slot Selection
 
-**Status:** In progress — Gates 32.6–32.9
+**Status:** Complete
 
 This phase implements [ADR-0059](../decisions/ADR-0059-value-reuse-and-fixed-slot-selection.md).
 It improves source clarity for repeated read-only scalar use and bounded
@@ -123,9 +123,9 @@ passes object emission, executable emission, and execution.
 - [x] Pass strict check, object emission, executable emission, and execution
       for the regression fixture.
 - [x] Pass the existing standard-library `io::copy` tests and value reuse tests.
-- [ ] Record the diagnostic and dispatch rule in the language and coding
+- [x] Record the diagnostic and dispatch rule in the language and coding
       guides.
-- [ ] Close the phase only after the full compiler and twin-e evidence passes.
+- [x] Close the phase only after the full compiler and twin-e evidence passes.
 
 Gate 32.8 evidence so far: full `cargo test` passes, including 22 application
 tests, 25 standard-IO tests, 73 native array tests, 192 semantic tests, and
@@ -137,14 +137,20 @@ with unresolved generic parameter `W`.
 
 - [x] Reproduce the post-specialization mismatch where an imported aggregate
       field typed as `u32` is observed as `Result[Int, IoError]`.
-- [ ] Preserve field and member types across the second semantic analysis.
-- [ ] Add a nested-facade regression using an imported aggregate and a generic
+- [x] Preserve field and member types across the second semantic analysis.
+- [x] Add a nested-facade regression using an imported aggregate and a generic
       call graph.
-- [ ] Pass twin-e context and generation native acceptance after the fix.
+- [x] Pass twin-e context and generation native acceptance after the fix.
+
+Gate 32.9 evidence: native reanalysis preserves imported aggregate field types;
+the nested-facade generic regression passes; `twin-e` strict tests pass 16/16;
+the context ambiguity benchmark reports `contexts=2 successors=2 isolated=1`;
+the generation benchmark reports EOS completion and loop-guard behavior; and
+all generated native IR reports no floating-point instructions.
 
 ## Completion criteria
 
-Phase 32 closes when explicit value reuse is visible in source, unsupported
+Phase 32 is complete. Explicit value reuse is visible in source, unsupported
 copying remains rejected, fixed-slot selection is bounded and layout-safe, the
-intrinsic/imported-generic collision is resolved, and all semantic, native,
-ownership, and tooling gates pass.
+intrinsic/imported-generic collision is resolved, imported aggregate field
+types survive native reanalysis, and the compiler plus twin-e evidence passes.
