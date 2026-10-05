@@ -32,7 +32,10 @@ impl Analyzer {
                     else_branch: else_branch.clone(),
                     span: *span,
                 };
-                self.visit_if_expression(&expression)
+                let expected = self.expected_expression_type.take();
+                let result = self.visit_if_expression(&expression);
+                self.expected_expression_type = expected;
+                result
             }
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => self.visit_loop(block),
