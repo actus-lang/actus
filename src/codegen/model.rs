@@ -266,6 +266,7 @@ mod tests {
             borrows: Vec::new(),
             exclusive_loans: Vec::new(),
             expression_origins: Vec::new(),
+            argument_roles: Vec::new(),
             cleanup_plans: vec![ScopeCleanup {
                 depth: 1,
                 span: SourceSpan::new(0, 1),
@@ -308,6 +309,7 @@ mod tests {
             borrows: Vec::new(),
             exclusive_loans: Vec::new(),
             expression_origins: Vec::new(),
+            argument_roles: Vec::new(),
             cleanup_plans: vec![ScopeCleanup {
                 depth: 1,
                 span: SourceSpan::new(0, 1),

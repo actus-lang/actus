@@ -43,6 +43,35 @@ fn semantic_model_exposes_compiler_owned_resource_and_target_facts() {
     assert!(!active_declaration(&model, "windows_only"));
 }
 
+#[test]
+fn semantic_model_and_hover_expose_inferred_argument_roles() {
+    let uri = "file:///tmp/actus-lsp-inferred-roles.act";
+    let source = concat!(
+        "verb read(abs value: Int) -> Int { return 0; }\n",
+        "verb update(ins value: Int) { value += 1; }\n",
+        "verb main() -> Int { erg source = 1; abs view = ref source; ",
+        "read(value: view); ins mutable = 0; update(value: mutable); return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"read(value: view")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let model = response_with_id(&stdout, 2);
+    let roles = model["result"]["argumentRoles"].as_array().expect("argument roles");
+    assert!(roles.iter().any(|fact| fact["callee"] == "read"
+        && fact["role"] == "abs"
+        && fact["source"] == "inferred"));
+    assert!(roles.iter().any(|fact| fact["callee"] == "update"
+        && fact["role"] == "ins"
+        && fact["source"] == "inferred"));
+    assert!(stdout.contains("argument role: abs (inferred)"), "hover missing: {stdout}");
+}
+
 fn active_declaration(model: &Value, name: &str) -> bool {
     model["result"]["declarations"]
         .as_array()

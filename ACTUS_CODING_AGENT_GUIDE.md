@@ -1839,11 +1839,20 @@ contract.
 
 Use `copy(value: abs value)` when an eligible scalar must be reused at an
 owning call boundary. The compiler accepts `Int`, `Bool`, and fixed-width
-integer values. The `abs` role is mandatory and the operation does not consume
-the caller. Do not use identity arithmetic such as `value + 0u32` to express
+integer values. The `abs` role is explicit for this intrinsic and the operation
+does not consume the caller. Do not use identity arithmetic such as `value + 0u32` to express
 reuse. Buffers, strings, resources, cleanup-bearing aggregates, and
 unsupported user-defined values are rejected with `E1021`; a missing explicit
-`abs` role is rejected with `E1016`.
+`abs` role or a missing safe inferred role is rejected with `E1016`.
+
+Static local calls support a narrow ownership inference profile. When a call
+argument omits its role, the compiler may infer `abs` only from an `abs`
+binding and `ins` only from an `ins` binding that is active and mutable. The
+inference is resolved before ownership validation and native lowering. It does
+not apply to `erg` or `dat`, dynamic or external calls, aggregates, buffers,
+resources, or ambiguous expressions. Explicit `abs value` and `ins value`
+remain valid and are the source-level opt-out when the ownership intent should
+be visible. An unsafe omission uses the stable `E1016` argument-role diagnostic.
 
 When an imported generic verb named `copy` is visible, dispatch is determined
 by call shape and declaration provenance. A local module-scoped `copy`

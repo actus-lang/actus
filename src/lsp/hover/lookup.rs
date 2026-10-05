@@ -59,6 +59,9 @@ pub(crate) fn find_hover(
             range: range(source, name_span),
         });
     }
+    if let Some(info) = semantic_argument_role_info(&program, offset) {
+        return Some(super::HoverInfo { contents: info.0, range: range(source, info.1) });
+    }
     if let Some(info) = semantic_binding_info(source, &program, &name, offset) {
         return Some(super::HoverInfo {
             contents: format_markdown(&info, source, info.span.start),
@@ -73,6 +76,31 @@ pub(crate) fn find_hover(
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
     })
+}
+
+fn semantic_argument_role_info(program: &Program, offset: usize) -> Option<(String, SourceSpan)> {
+    let model = crate::semantic::analyze(program).ok()?;
+    let fact = model
+        .argument_roles
+        .iter()
+        .find(|fact| fact.argument_span.start <= offset && offset <= fact.argument_span.end)?;
+    let source_name = match fact.source {
+        crate::semantic::ArgumentRoleSource::Explicit => "explicit",
+        crate::semantic::ArgumentRoleSource::Inferred => "inferred",
+    };
+    let role = match fact.role {
+        crate::ast::Role::Abs => "abs",
+        crate::ast::Role::Ins => "ins",
+        crate::ast::Role::Erg => "erg",
+        crate::ast::Role::Dat => "dat",
+    };
+    Some((
+        format!(
+            "```actus\nargument role: {role} ({source_name})\n```\n\nParameter `{}` of `{}`.",
+            fact.parameter, fact.callee
+        ),
+        fact.argument_span,
+    ))
 }
 
 fn append_target_details(info: &mut SymbolInfo, target: &TargetSpec) {

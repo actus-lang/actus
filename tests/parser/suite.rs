@@ -278,6 +278,26 @@ fn parses_instrumental_parameters_and_call_site_roles() {
 }
 
 #[test]
+fn preserves_explicit_and_omitted_argument_role_sources() {
+    let program = parse_source(
+        "verb update(ins value: Int) { } verb main(erg value: Int) { update(value: ins value); update(value: value); }",
+    );
+    let TopLevelDecl::Verb(main) = &program.declarations[1] else { panic!("expected main") };
+    let Stmt::Expression { expression: Expr::Call { arguments: explicit, .. }, .. } =
+        &main.body.statements[0]
+    else {
+        panic!("expected explicit call")
+    };
+    assert_eq!(explicit[0].role_resolution, actus::ast::ArgumentRoleResolution::Explicit);
+    let Stmt::Expression { expression: Expr::Call { arguments: omitted, .. }, .. } =
+        &main.body.statements[1]
+    else {
+        panic!("expected omitted call")
+    };
+    assert_eq!(omitted[0].role_resolution, actus::ast::ArgumentRoleResolution::Unspecified);
+}
+
+#[test]
 fn parses_buffer_literal_construction() {
     let program = parse_source("verb main() { erg buffer = Buffer[16]; }");
     let TopLevelDecl::Verb(main) = &program.declarations[0] else { panic!("expected verb") };

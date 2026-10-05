@@ -13,6 +13,7 @@ pub(crate) struct VerbSignature {
     pub(crate) return_type_name: Option<crate::ast::TypeName>,
     pub(crate) return_access: Option<ReturnAccess>,
     pub(crate) generic_parameters: Vec<GenericParam>,
+    pub(crate) external: bool,
 }
 
 impl VerbDecl {
@@ -37,6 +38,7 @@ impl VerbDecl {
             return_type_name: self.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
             generic_parameters: self.generic_parameters.clone(),
+            external: false,
         }
     }
 }
@@ -63,6 +65,7 @@ impl ExternalVerbDecl {
             return_type_name: self.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
             generic_parameters: self.generic_parameters.clone(),
+            external: true,
         }
     }
 }

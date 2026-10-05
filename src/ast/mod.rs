@@ -16,7 +16,8 @@ pub use decl::{
     TypeName, VerbDecl, builtin_enum_definitions,
 };
 pub use expr::{
-    Argument, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, IfBranch, StructFieldInit, UnaryOp,
+    Argument, ArgumentRoleResolution, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, IfBranch,
+    StructFieldInit, UnaryOp,
 };
 pub use intrinsic::{IntrinsicKind, IntrinsicSpec, lookup_call_intrinsic, lookup_intrinsic};
 pub use pattern::{LiteralPattern, NamedPattern, Pattern, PatternBinding, VariantPayload};

@@ -143,6 +143,7 @@ impl Analyzer {
                 .map(|return_type| substitute_type(return_type, &bindings)),
             return_access: signature.return_access,
             generic_parameters: Vec::new(),
+            external: signature.external,
         })
     }
 }

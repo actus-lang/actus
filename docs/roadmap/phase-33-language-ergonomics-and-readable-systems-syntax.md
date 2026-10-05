@@ -38,32 +38,42 @@ before implementation.
 Make common read-only and call-scoped ownership patterns readable when the
 compiler can prove the result uniquely and locally.
 
+**Gate status: Complete**
+
 #### Design
 
-- [ ] Define the exact contexts where a missing role may be inferred.
-- [ ] Limit inference to unambiguous `abs` and `ins` cases initially.
-- [ ] Keep `erg` and `dat` explicit whenever mutation, cleanup, or ownership transfer is possible.
-- [ ] Define a diagnostic when more than one role is valid or when inference would change the caller binding state.
-- [ ] Define an opt-out or explicit-role form for code that requires maximum source-level clarity.
-- [ ] Document the inference algorithm and its safety boundary in an ADR.
+- [x] Define the exact contexts where a missing role may be inferred.
+- [x] Limit inference to unambiguous `abs` and `ins` cases initially.
+- [x] Keep `erg` and `dat` explicit whenever mutation, cleanup, or ownership transfer is possible.
+- [x] Define a diagnostic when more than one role is valid or when inference would change the caller binding state.
+- [x] Define an opt-out or explicit-role form for code that requires maximum source-level clarity.
+- [x] Document the inference algorithm and its safety boundary in an ADR.
 
 #### Compiler implementation
 
-- [ ] Add the role-inference representation to the AST without erasing source spans or explicit roles.
-- [ ] Resolve inferred roles in semantic analysis before borrow and cleanup validation.
-- [ ] Preserve inferred and explicit roles in semantic diagnostics, formatter output, and LSP hover.
-- [ ] Reject inference across dynamic dispatch, external ABI calls, and ambiguous overload-like resolution.
-- [ ] Ensure native lowering consumes the resolved role and never performs its own inference.
-- [ ] Verify deterministic results across repeated compilation.
+- [x] Add the role-inference representation to the AST without erasing source spans or explicit roles.
+- [x] Resolve inferred roles in semantic analysis before borrow and cleanup validation.
+- [x] Preserve inferred and explicit roles in semantic diagnostics, formatter output, and LSP hover.
+- [x] Reject inference across dynamic dispatch, external ABI calls, and ambiguous overload-like resolution.
+- [x] Ensure native lowering consumes the resolved role and never performs its own inference.
+- [x] Verify deterministic results across repeated compilation.
 
 #### Evidence
 
-- [ ] Add accepted tests for scalar `abs` calls and exclusive `ins` loans.
-- [ ] Add rejected tests for buffers, aggregates, resources, `erg`, and `dat`.
-- [ ] Add branch-join, early-return, loop, and cleanup regression tests.
-- [ ] Add diagnostics tests for ambiguous and unsafe inference.
-- [ ] Add formatter and LSP coverage for inferred roles.
-- [ ] Record compiler, native, and diagnostic evidence.
+- [x] Add accepted tests for scalar `abs` calls and exclusive `ins` loans.
+- [x] Add rejected tests for buffers, aggregates, resources, `erg`, and `dat`.
+- [x] Add branch-join, early-return, loop, and cleanup regression tests.
+- [x] Add diagnostics tests for ambiguous and unsafe inference.
+- [x] Add formatter and LSP coverage for inferred roles.
+- [x] Record compiler, native, and diagnostic evidence.
+
+Gate 33.1 evidence: semantic tests cover inferred scalar `abs` and `ins`,
+explicit-role preservation, mutable/owned/aggregate/buffer/dat rejection,
+external ABI rejection, and branch/loop cleanup. Parser and formatter tests
+preserve omitted versus explicit source roles. LSP semantic-model and hover
+tests expose the resolved role and its explicit/inferred source. Native
+execution confirms both inferred call forms. The complete compiler suite,
+format check, clippy, source limits, and diff checks pass.
 
 ### Gate 33.2 — Bounded `for` loops and iterator contracts
 

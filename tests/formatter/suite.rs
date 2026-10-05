@@ -28,6 +28,16 @@ fn formats_scalar_reuse_and_indexed_selection_idempotently() {
 }
 
 #[test]
+fn preserves_omitted_inferred_roles_without_inventing_source_text() {
+    let formatted = format_source(
+        "verb read(abs value: Int) -> Int { return 0; } verb main() -> Int { erg source = 1; abs view = ref source; return read(value: view); }",
+    );
+    assert!(formatted.contains("read(value: view)"));
+    assert!(!formatted.contains("read(value: abs view)"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formatting_is_idempotent() {
     let source = "verb process() { erg buffer = Buffer[10]; return buffer; }";
     let formatted = format_source(source);

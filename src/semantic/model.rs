@@ -53,6 +53,22 @@ pub struct OriginRecord {
     pub origin: Origin,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArgumentRoleSource {
+    Explicit,
+    Inferred,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArgumentRoleFact {
+    pub callee: String,
+    pub parameter: String,
+    pub role: Role,
+    pub source: ArgumentRoleSource,
+    pub call_span: SourceSpan,
+    pub argument_span: SourceSpan,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LiteralFact {
     pub span: SourceSpan,
@@ -134,6 +150,7 @@ pub struct SemanticModel {
     pub borrows: Vec<BorrowRecord>,
     pub exclusive_loans: Vec<ExclusiveLoan>,
     pub expression_origins: Vec<OriginRecord>,
+    pub argument_roles: Vec<ArgumentRoleFact>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,

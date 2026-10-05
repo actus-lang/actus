@@ -16,6 +16,16 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_inferred_abs_and_ins_roles_natively() {
+    let status = run_array_fixture(
+        "inferred-ownership-roles",
+        "verb read(abs value: Int) -> Int { return 41; } verb update(ins value: Int) -> Int { value += 1; return 1; } verb main() -> Int { erg source = 1; abs view = ref source; erg first = read(value: view); ins mutable = 0; erg updated = update(value: mutable); return first + updated; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_indexed_array_backed_pack_storage_natively() {
     let status = run_array_fixture(
         "array-backed-pack-storage",

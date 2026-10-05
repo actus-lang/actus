@@ -45,6 +45,7 @@ pub(super) fn query(
         "document": {"uri": uri, "version": store.get(uri).map(|document| document.version)},
         "target": target_capabilities(target),
         "bindings": bindings(source, &index, &model),
+        "argumentRoles": argument_roles(source, &index, &model),
         "borrows": borrows(source, &index, &model),
         "loans": loans(source, &index, &model),
         "cleanup": cleanup(source, &index, &model),
@@ -55,6 +56,26 @@ pub(super) fn query(
     });
     store.cache_semantic(uri, &target_name, version, result.clone());
     result
+}
+
+fn argument_roles(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {
+    model
+        .argument_roles
+        .iter()
+        .map(|fact| {
+            json!({
+                "callee": fact.callee,
+                "parameter": fact.parameter,
+                "role": role_name(&fact.role),
+                "source": match fact.source {
+                    crate::semantic::ArgumentRoleSource::Explicit => "explicit",
+                    crate::semantic::ArgumentRoleSource::Inferred => "inferred",
+                },
+                "callRange": span_range(source, index, fact.call_span),
+                "argumentRange": span_range(source, index, fact.argument_span),
+            })
+        })
+        .collect()
 }
 
 fn literals(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value> {

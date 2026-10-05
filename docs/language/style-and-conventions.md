@@ -218,7 +218,7 @@ the call boundary; an owning call still moves its `erg` or `dat` argument.
 Use this operation when the same eligible scalar must be passed to multiple
 owning-role call sites. Do not use identity arithmetic such as `value + 0u32`
 to express a copy. Unsupported types and calls without an explicit `abs` role
-are rejected during semantic analysis.
+or a provably safe inferred role are rejected during semantic analysis.
 
 If an imported generic verb named `copy` is also visible, the compiler resolves
 calls by shape and provenance. A local module-scoped `copy` declaration wins;
@@ -226,6 +226,15 @@ the one-argument scalar form resolves to the scalar reuse intrinsic when no
 local declaration shadows it; and the two-argument `reader`/`writer` form
 resolves to the imported generic verb. This decision occurs before generic
 specialization and native reanalysis.
+
+At a static local call, an omitted call-site role may be inferred only for an
+`abs` parameter receiving an `abs` binding or an `ins` parameter receiving an
+`ins` binding. The compiler records the resolved role and whether it was
+explicit or inferred. It never infers `erg` or `dat`, and it does not infer
+through dynamic or external calls, aggregates, buffers, resources, or
+ambiguous expressions. Write `abs value` or `ins value` when source-level
+clarity is preferred; an explicit role remains the opt-out form. Unsafe or
+ambiguous omissions continue to produce `E1016` at the argument expression.
 
 ## 7. Canonical Formatting
 

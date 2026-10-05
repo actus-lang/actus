@@ -146,6 +146,7 @@ impl Analyzer {
             name: named.then(|| receiver_name.to_owned()),
             role: matches!(role, Role::Ins).then_some(Role::Ins),
             role_span: None,
+            role_resolution: crate::ast::ArgumentRoleResolution::Explicit,
             expression: receiver.clone(),
         });
         combined.extend(arguments.iter().cloned());
