@@ -43,7 +43,8 @@ pub(super) fn lower_array_index(
     {
         return Ok(address);
     }
-    Ok(function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0))
+    let value = function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0);
+    Ok(swap_indexed_pack_element_if_needed(function, target, value, element, local_types, layouts))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -89,6 +90,14 @@ pub(super) fn lower_array_assignment(
         copy_bytes(function, value, address, size);
     } else {
         let value = coerce_to_ir_type(function, value, layouts.ir_type(element)?);
+        let value = swap_indexed_pack_element_if_needed(
+            function,
+            target,
+            value,
+            element,
+            local_types,
+            layouts,
+        );
         function.ins().store(MemFlagsData::new(), value, address, 0);
     }
     Ok(())
@@ -126,7 +135,48 @@ pub(super) fn lower_array_compound_assignment(
             "compound assignment requires a scalar array element".to_owned(),
         ));
     }
+    let updated = lower_array_compound_value(
+        function,
+        target,
+        operator,
+        address,
+        value,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        element,
+        layouts,
+    )?;
+    function.ins().store(MemFlagsData::new(), updated, address, 0);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_array_compound_value(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    operator: BinaryOp,
+    address: Value,
+    value: &Expr,
+    locals: &HashMap<&String, Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    element: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
     let current = function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0);
+    let current = swap_indexed_pack_element_if_needed(
+        function,
+        target,
+        current,
+        element,
+        local_types,
+        layouts,
+    );
     let right = lower_expression(
         function,
         value,
@@ -141,8 +191,33 @@ pub(super) fn lower_array_compound_assignment(
     let updated = super::expressions::lower_compound_integer_operation(
         function, current, operator, right, element,
     )?;
-    function.ins().store(MemFlagsData::new(), updated, address, 0);
-    Ok(())
+    Ok(swap_indexed_pack_element_if_needed(
+        function,
+        target,
+        updated,
+        element,
+        local_types,
+        layouts,
+    ))
+}
+
+fn swap_indexed_pack_element_if_needed(
+    function: &mut FunctionBuilder<'_>,
+    target: &Expr,
+    value: Value,
+    element: NativeType,
+    local_types: &HashMap<&String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Value {
+    if super::structs::indexed_pack_endianness(target, local_types, layouts)
+        != Some(crate::ast::LayoutEndianness::Big)
+    {
+        return value;
+    }
+    match element {
+        NativeType::Integer { width, .. } if width > 8 => function.ins().bswap(value),
+        _ => value,
+    }
 }
 
 pub(super) fn lower_array_constructor(

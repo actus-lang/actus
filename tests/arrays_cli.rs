@@ -26,10 +26,30 @@ fn executes_indexed_pack_field_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_nested_indexed_pack_field_access_natively() {
+    let status = run_array_fixture(
+        "nested-indexed-pack-field",
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } struct Fabric { erg cells: Array[Example, 2], } verb main() -> Int { erg fabric: Fabric = Fabric { cells: Array[Example, 2](), }; fabric.cells[1u32].links[0u32] = 41u32; return fabric.cells[1u32].links[0u32] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_compound_indexed_pack_field_updates_natively() {
     let status = run_array_fixture(
         "compound-indexed-pack-field-update",
         "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; erg index: u32 = 1u32; example.links[index] = 40u32; example.links[index] += 1u32; return example.links[index] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_big_endian_indexed_pack_field_bytes_natively() {
+    let status = run_array_fixture(
+        "big-endian-indexed-pack-field",
+        "pack Example { erg storage: Array[u8, 8]; layout big; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; example.links[0u32] = 16909060u32; erg result: Int = if example.links[0u32] == 16909060u32 && example.storage[0] == 1u8 { 42 } else { 0 }; return result; }",
     );
     assert_eq!(status.code(), Some(42));
 }

@@ -105,6 +105,14 @@ fn accepts_indexed_pack_field_reads_and_writes() {
 }
 
 #[test]
+fn accepts_nested_indexed_pack_field_access() {
+    analyze_source(
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } struct Fabric { erg cells: Array[Example, 2], } verb main() -> Int { erg fabric: Fabric = Fabric { cells: Array[Example, 2](), }; fabric.cells[1u32].links[0u32] = 41u32; return fabric.cells[1u32].links[0u32] as Int; }",
+    )
+    .expect("indexed pack fields should compose with arrays of pack values");
+}
+
+#[test]
 fn records_indexed_pack_field_width_without_truncation() {
     let model = analyze_source(
         "pack Example { erg storage: Array[u8, 32]; layout little; fields { erg links: Array[u32, 8] at 0; } }",

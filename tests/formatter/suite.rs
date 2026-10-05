@@ -45,6 +45,15 @@ fn formats_named_pack_offsets_idempotently() {
 }
 
 #[test]
+fn formats_indexed_pack_fields_idempotently() {
+    let formatted = format_source(
+        "pack Example{erg storage:Array[u8,32];layout little;fields{erg links:Array[u32,8] at 192;}}",
+    );
+    assert!(formatted.contains("links: Array[u32, 8] at 192;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_serialization_contracts_idempotently() {
     let formatted = format_source(
         "serialize Frame from FramePack{layout little;version u16 at 0;payload bytes at 2 length 16;checksum crc32 over 0..18 at 18;}",

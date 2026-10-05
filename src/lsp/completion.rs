@@ -110,23 +110,19 @@ fn pack_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
                 "data": {"kind": "pack-storage", "pack": pack.name, "symbol": pack.storage_name},
             }));
             let fields = pack.fields.iter().map(|field| {
-                let width =
-                    crate::ast::primitive_type(&field.ty.name).and_then(
-                        |primitive| match primitive {
-                            crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
-                            _ => None,
-                        },
-                    );
-                let width_detail = width.map_or_else(
-                    || "non-integer width".to_owned(),
-                    |value| format!("{value} bits"),
-                );
+                let width_detail = if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
+                    let element = field.ty.arguments[0].canonical_key();
+                    let count = &field.ty.arguments[1].name;
+                    format!("{element} x {count}")
+                } else {
+                    field.ty.canonical_key()
+                };
                 json!({
                     "label": field.name,
                     "kind": 5,
                     "detail": format!(
                         "pack {} field: {} {}: {} [offset: {}, width: {}]",
-                        pack.name, role_name(&field.role), field.name, field.ty.name,
+                        pack.name, role_name(&field.role), field.name, field.ty.canonical_key(),
                         field.offset, width_detail,
                     ),
                     "data": {"kind": "pack-field", "pack": pack.name, "symbol": field.name},

@@ -5,25 +5,49 @@ use super::tokens::identifier_span;
 
 pub(super) fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Option<SymbolInfo> {
     let field = pack.fields.iter().find(|field| field.name == name)?;
-    let width =
-        crate::ast::primitive_type(&field.ty.name).and_then(|primitive| match primitive {
-            crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
-            _ => None,
-        })?;
+    let (width, element_type, count) = pack_field_facts(field)?;
     let offset = field.offset_name.clone().unwrap_or_else(|| field.offset.to_string());
+    let details = match (element_type, count) {
+        (Some(element), Some(count)) => format!(", element: {element}, count: {count}"),
+        _ => String::new(),
+    };
+    let mask =
+        if width <= 128 { format!(", mask: {}", format_mask(width as u8)) } else { String::new() };
     Some(SymbolInfo {
         signature: format!(
-            "{} {}: {} (offset: {}, width: {} bits, mask: {})",
+            "{} {}: {} (offset: {}, width: {} bits{}{})",
             role_name(&field.role),
             field.name,
             type_name(&field.ty),
             offset,
             width,
-            format_mask(width),
+            details,
+            mask,
         ),
         span: identifier_span(source, field.span, name).unwrap_or(field.span),
         documentation: Some(pack_storage_details(pack)),
     })
+}
+
+fn pack_field_facts(field: &crate::ast::PackField) -> Option<(u16, Option<String>, Option<u32>)> {
+    if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
+        let element = &field.ty.arguments[0];
+        let count = field.ty.arguments[1].name.parse::<u32>().ok()?;
+        let width =
+            crate::ast::primitive_type(&element.name).and_then(|primitive| match primitive {
+                crate::ast::PrimitiveType::Integer { width, .. } => {
+                    u16::from(width).checked_mul(u16::try_from(count).ok()?)
+                }
+                _ => None,
+            })?;
+        return Some((width, Some(type_name(element)), Some(count)));
+    }
+    let width =
+        crate::ast::primitive_type(&field.ty.name).and_then(|primitive| match primitive {
+            crate::ast::PrimitiveType::Integer { width, .. } => Some(u16::from(width)),
+            _ => None,
+        })?;
+    Some((width, None, None))
 }
 
 fn format_mask(width: u8) -> String {
