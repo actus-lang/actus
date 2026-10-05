@@ -548,6 +548,16 @@ fn specializes_multiple_const_generic_instances_in_one_call_graph() {
 
 #[cfg(unix)]
 #[test]
+fn preserves_same_const_generic_instance_at_multiple_call_sites() {
+    let status = run_array_fixture(
+        "repeated-const-generic-call-sites",
+        "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read_capacity[4]() as Int + read_capacity[4]() as Int - 8; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn returns_transitive_aggregate_values_through_native_slots() {
     let status = run_array_fixture(
         "transitive-aggregate-return-slots",

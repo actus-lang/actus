@@ -195,7 +195,7 @@ fn discovers_sorted_concrete_generic_instances_with_canonical_keys() {
         .iter()
         .map(|instance| instance.canonical_key.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(keys, ["Box[Int]", "Pair[Box[Int]]"]);
+    assert_eq!(keys, ["Box[Int]", "Box[Int]", "Pair[Box[Int]]"]);
 }
 
 #[test]

@@ -178,6 +178,24 @@ not depend on an application package. Named scalar fields remain source
 compatible, indexed fields do not generate aliases, and the ADR documents the
 explicit migration and byte-layout compatibility policy.
 
+### Gate 34.8 — Generic call-site preservation in native emission
+
+- [x] Preserve distinct source call sites when they share one canonical
+      generic specialization.
+- [x] Add a native regression test with the same const-generic instance used
+      at multiple call sites.
+- [x] Verify nested facade object-plan and native test-runner coverage remains
+      green after the cache-key correction.
+- [x] Record the compiler behavior in the language guide so future cache
+      changes do not reintroduce unresolved native dependencies.
+
+Evidence: the generic-instance cache key now includes the caller identity and
+call-site span. The native regression
+`tests/arrays_cli.rs::preserves_same_const_generic_instance_at_multiple_call_sites`
+passes, as do the nested-facade plan and test-runner regressions. Twin-e's
+strict test run passes with 18 tests and 0 failures using the compiler built
+from this branch.
+
 ## Exit criteria
 
 Phase 34 is complete: every gate is checked, the ADR and compiler

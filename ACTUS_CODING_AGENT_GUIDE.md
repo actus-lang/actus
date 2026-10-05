@@ -1737,6 +1737,14 @@ reachable `inner[4]` instance before native declaration and lowering. This
 propagation is deterministic and deduplicated; do not add duplicate helper
 verbs or handwritten concrete wrappers.
 
+Each concrete generic call site remains part of the specialization record even
+when several call sites use the same canonical instance. The compiler may
+reuse one native specialization for those calls, but it must retain every
+source span needed to rewrite each call before native dependency collection.
+Consequently, two calls such as `read_capacity[4]()` in one native call graph
+must both lower to the specialized symbol. A generic-instance cache must not
+deduplicate distinct call sites solely by canonical type arguments and caller.
+
 Const generic parameters are also valid read-only compile-time values inside
 case guards. They may be used directly or through a cast and are resolved
 before native lowering:

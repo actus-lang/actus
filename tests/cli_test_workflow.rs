@@ -174,6 +174,38 @@ fn test_discovers_meta_tests_inside_a_child_facade_tree() {
 
 #[cfg(unix)]
 #[test]
+fn test_native_runner_keeps_transitive_sibling_facade_dependencies() {
+    let root = create_test_project(
+        "runner-transitive-sibling-facade",
+        "transitive.act",
+        "import aie; meta test\nverb smoke() -> Int { return allocate_column_index() as Int - 1; }\n",
+    );
+    fs::create_dir_all(root.join("src/aie/runtime")).expect("create runtime directory");
+    fs::write(root.join("src/aie/aie.act"), "open runtime; open resident;\n")
+        .expect("write parent facade");
+    fs::write(root.join("src/aie/runtime/runtime.act"), "open api;\n")
+        .expect("write runtime facade");
+    fs::write(
+        root.join("src/aie/runtime/api.act"),
+        "open verb allocate_column_index() -> u32 { return 1u32; }\n",
+    )
+    .expect("write runtime implementation");
+    fs::write(
+        root.join("src/aie/resident.act"),
+        "open runtime; open verb resident_step() -> u32 { return allocate_column_index(); }\n",
+    )
+    .expect("write sibling facade implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("smoke ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn file_limitless_metadata_does_not_change_nested_native_dependency_roots() {
     let root = create_test_project(
         "runner-limitless-roots",
