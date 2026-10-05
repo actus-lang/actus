@@ -51,17 +51,17 @@ API names `frame_encode`, `frame_decode`, `frame_validate`, and `frame_migrate`.
 These names are checked for collisions before native lowering. The current
 implementation exposes `frame_validate` as an allocation-free wrapper and
 `frame_encode` as a generated typed byte writer, and `frame_decode` as a
-fixed byte reader. The validator accepts a
+fixed, version-aware byte reader. The validator accepts a
 caller-owned `Buffer` and an expected version, then passes the declared
 offsets, lengths, endianness, and checksum range to the runtime validator. The
 encoder copies the source pack's complete byte storage into the caller-owned
 output buffer and returns the encoded byte count. The decoder first checks the
-input length through the compiler-provided `buffer_length` primitive, returns
-`InvalidLayout` for a short input, and copies the fixed bytes into a new pack
-value. Version and checksum validation remain an explicit validation step
-until the decoder receives the contract's expected-version policy. Migration
-remains a later implementation gate. Alignment and padding are declarations,
-never inferred from the host ABI.
+input length through the compiler-provided `buffer_length` primitive, compares
+the encoded version with the caller's expected version, validates the checksum,
+and returns typed `InvalidLayout`, `InvalidVersion`, or `InvalidChecksum`
+failures before copying bytes into a new pack value. Migration remains a later
+implementation gate. Alignment and padding are declarations, never inferred
+from the host ABI.
 
 The initial profile supports `little` and `big` endian integer fields, explicit
 padding, a fixed payload range, `u16` version fields, and `crc32`. Additional
@@ -74,15 +74,16 @@ canonical module facade:
 
 ```text
 frame_encode(abs value: Frame, ins output: Buffer) -> Result[u32, SerializationError]
-frame_decode(abs input: Buffer) -> Result[Frame, SerializationError]
-frame_validate(abs input: Buffer) -> Result[Bool, SerializationError]
+frame_decode(abs input: Buffer, abs expected_version: u16) -> Result[Frame, SerializationError]
+frame_validate(abs input: Buffer, abs expected_version: u16) -> Result[Bool, SerializationError]
 frame_migrate(erg old_version: u16, abs input: Buffer, ins output: Buffer) -> Result[u32, SerializationError]
 ```
 
 Every operation returns typed success/failure information. Encode uses
 caller-owned `ins Buffer` and returns `Result[u32, SerializationError]` after
-copying the fixed source storage. Decode accepts caller-owned input without
-consuming it and returns an owned pack. No generated operation opens a path.
+copying the fixed source storage. Decode accepts caller-owned input and an
+expected version, validates the frame, and returns an owned pack. No generated
+operation opens a path.
 Filesystem persistence remains an explicit hand-written facade operation.
 
 ## Validation and atomic persistence

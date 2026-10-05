@@ -49,7 +49,7 @@ fn executes_fixed_frame_validation_intrinsic_through_the_native_runtime() {
 fn executes_generated_serialization_validator_natively() {
     let status = run_array_fixture(
         "generated-serialization-validator",
-        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; } verb main() -> Int { erg buffer: Buffer = Buffer[32]; erg version: u16 = 1u16; erg valid: Int = frame_validate(frame: abs buffer, expected_version: erg version); drop(buffer); return valid; }",
+        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; } verb main() -> Int { erg buffer: Buffer = Buffer[32]; erg version: u16 = 1u16; erg valid: Int = frame_validate(frame: abs buffer, expected_version: abs version); drop(buffer); return valid; }",
     );
     assert_eq!(status.code(), Some(0));
 }
@@ -69,9 +69,9 @@ fn executes_generated_serialization_encoder_natively() {
 fn executes_generated_serialization_decoder_natively() {
     let status = run_array_fixture(
         "generated-serialization-decoder",
-        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 41u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 43u8); erg result = frame_decode(input: abs input); return case dat result { Result.Ok(value) => value.storage[0] as Int + value.storage[7] as Int, Result.Err(_) => 99, }; }",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg version: u16 = 1u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(value) => value.storage[0] as Int + value.storage[7] as Int, Result.Err(_) => 99, }; }",
     );
-    assert_eq!(status.code(), Some(84));
+    assert_eq!(status.code(), Some(44));
 }
 
 #[cfg(unix)]
@@ -79,7 +79,27 @@ fn executes_generated_serialization_decoder_natively() {
 fn rejects_short_input_in_generated_serialization_decoder() {
     let status = run_array_fixture(
         "generated-serialization-decoder-short-input",
-        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; erg result = frame_decode(input: abs input); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; erg version: u16 = 1u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_invalid_version_in_generated_serialization_decoder() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder-invalid-version",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg version: u16 = 2u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_invalid_checksum_in_generated_serialization_decoder() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder-invalid-checksum",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 97u8); append(input, 43u8); erg version: u16 = 1u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
     );
     assert_eq!(status.code(), Some(0));
 }

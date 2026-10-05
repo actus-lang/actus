@@ -1046,12 +1046,13 @@ do not allocate. Generated serialization operations use the compiler-provided
 expected version, and `<contract>_encode`, which accepts an `abs` source pack
 and an `ins` output `Buffer`, copies the fixed storage bytes, and returns a
 typed `Result[u32, SerializationError]`. It also generates
-`<contract>_decode`, which checks the input length through the compiler-provided
-`buffer_length` primitive and returns an owned pack or `InvalidLayout` for a
-short input. Both operations derive their fixed storage bounds from the
-declaration. Version/checksum policy, migration, dynamic payloads, implicit
-allocation, and automatic filesystem commits remain outside this profile until
-their contracts are implemented and tested.
+`<contract>_decode`, which accepts an `abs expected_version: u16`, checks the
+input length through the compiler-provided `buffer_length` primitive, validates
+the encoded version and checksum, and returns an owned pack or a typed
+`InvalidLayout`, `InvalidVersion`, or `InvalidChecksum` error. Both operations
+derive their fixed storage bounds from the declaration. Migration, dynamic
+payloads, implicit allocation, and automatic filesystem commits remain outside
+this profile until their contracts are implemented and tested.
 
 ### 15.5 `Arena[N]`
 

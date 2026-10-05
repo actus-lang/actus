@@ -142,6 +142,8 @@ fn generated_decoder(
     span: SourceSpan,
 ) -> VerbDecl {
     let mut statements = decoder_prefix(source_type, capacity, span);
+    statements.push(version_guard(contract, span));
+    statements.push(checksum_guard(contract, span));
     append_decoder_assignments(&mut statements, capacity, span);
     statements.push(Stmt::Return {
         value: Some(short_result_constructor("Ok", identifier("decoded", span), span)),
@@ -153,13 +155,22 @@ fn generated_decoder(
         metadata: Vec::new(),
         name: format!("{}_decode", contract.name.to_ascii_lowercase()),
         generic_parameters: Vec::new(),
-        params: vec![Param {
-            role: Role::Abs,
-            name: "input".to_owned(),
-            dispatch: crate::ast::DispatchMode::Static,
-            ty: type_name("Buffer", span),
-            span,
-        }],
+        params: vec![
+            Param {
+                role: Role::Abs,
+                name: "input".to_owned(),
+                dispatch: crate::ast::DispatchMode::Static,
+                ty: type_name("Buffer", span),
+                span,
+            },
+            Param {
+                role: Role::Abs,
+                name: "expected_version".to_owned(),
+                dispatch: crate::ast::DispatchMode::Static,
+                ty: type_name("u16", span),
+                span,
+            },
+        ],
         return_type: Some(ReturnType {
             access: ReturnAccess::Owned,
             ty: result_type(source_type, span),
@@ -191,7 +202,7 @@ fn decoder_prefix(source_type: &str, capacity: u64, span: SourceSpan) -> Vec<Stm
         },
         then_branch: Block {
             statements: vec![Stmt::Return {
-                value: Some(result_err(source_type, "InvalidLayout", span)),
+                value: Some(result_err(source_type, "InvalidLayout", synthetic_span(span, 2))),
                 span,
             }],
             span,
@@ -207,6 +218,94 @@ fn decoder_prefix(source_type: &str, capacity: u64, span: SourceSpan) -> Vec<Stm
         span,
     });
     statements
+}
+
+fn version_guard(contract: &SerializeDecl, span: SourceSpan) -> Stmt {
+    let offset = contract
+        .sections
+        .iter()
+        .find_map(|section| match section {
+            crate::ast::SerializeSection::Version { offset, .. } => Some(*offset),
+            _ => None,
+        })
+        .unwrap_or(0);
+    Stmt::If {
+        condition: Expr::Binary {
+            left: Box::new(version_value(contract, offset, span)),
+            operator: BinaryOp::NotEquals,
+            right: Box::new(identifier("expected_version", span)),
+            span,
+        },
+        then_branch: Block {
+            statements: vec![Stmt::Return {
+                value: Some(result_err(
+                    contract.source_type.name.as_str(),
+                    "InvalidVersion",
+                    synthetic_span(span, 3),
+                )),
+                span,
+            }],
+            span,
+        },
+        else_branch: None,
+        span,
+    }
+}
+
+fn checksum_guard(contract: &SerializeDecl, span: SourceSpan) -> Stmt {
+    let call = Expr::Call {
+        callee: format!("{}_validate", contract.name.to_ascii_lowercase()),
+        arguments: vec![
+            argument(Some("frame"), Role::Abs, identifier("input", span)),
+            argument(Some("expected_version"), Role::Abs, identifier("expected_version", span)),
+        ],
+        span,
+    };
+    Stmt::If {
+        condition: Expr::Binary {
+            left: Box::new(call),
+            operator: BinaryOp::Equals,
+            right: Box::new(integer(0, Some("i64"), span)),
+            span,
+        },
+        then_branch: Block {
+            statements: vec![Stmt::Return {
+                value: Some(result_err(
+                    contract.source_type.name.as_str(),
+                    "InvalidChecksum",
+                    synthetic_span(span, 4),
+                )),
+                span,
+            }],
+            span,
+        },
+        else_branch: None,
+        span,
+    }
+}
+
+fn version_value(contract: &SerializeDecl, offset: u16, span: SourceSpan) -> Expr {
+    let first = cast_u16(input_byte(u64::from(offset), span), span);
+    let second = cast_u16(input_byte(u64::from(offset.saturating_add(1)), span), span);
+    let (high, low) = match contract.endianness {
+        crate::ast::LayoutEndianness::Little => (second, first),
+        crate::ast::LayoutEndianness::Big => (first, second),
+    };
+    Expr::Binary {
+        left: Box::new(Expr::Binary {
+            left: Box::new(high),
+            operator: BinaryOp::ShiftLeft,
+            right: Box::new(integer(8, Some("u16"), span)),
+            span,
+        }),
+        operator: BinaryOp::BitwiseOr,
+        right: Box::new(low),
+        span,
+    }
+}
+
+fn cast_u16(expression: Expr, span: SourceSpan) -> Expr {
+    Expr::Cast { expression: Box::new(expression), target: type_name("u16", span), span }
 }
 
 fn append_decoder_assignments(statements: &mut Vec<Stmt>, capacity: u64, span: SourceSpan) {

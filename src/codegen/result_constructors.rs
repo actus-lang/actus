@@ -69,7 +69,7 @@ fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
                 span,
             },
             Param {
-                role: Role::Erg,
+                role: Role::Abs,
                 name: "expected_version".to_owned(),
                 dispatch: DispatchMode::Static,
                 ty: version,
