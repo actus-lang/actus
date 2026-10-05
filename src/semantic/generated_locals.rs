@@ -336,4 +336,19 @@ mod tests {
         );
         assert!(crate::semantic::analyze(&program).is_err());
     }
+
+    #[test]
+    fn leaves_borrowed_and_aggregate_arguments_outside_the_generated_boundary() {
+        let borrowed = parse_source(
+            "verb read(abs value: u32) { return; } verb main() { erg source: u32 = 1u32; read(value: abs ref source); }",
+        );
+        assert_eq!(normalize_program(&borrowed), borrowed);
+        assert!(crate::semantic::analyze(&borrowed).is_ok());
+
+        let aggregate = parse_source(
+            "verb read(abs value: Array[u32, 2]) { return; } verb main() { erg values: Array[u32, 2] = Array[u32, 2](); read(value: abs values); }",
+        );
+        assert_eq!(normalize_program(&aggregate), aggregate);
+        assert!(crate::semantic::analyze(&aggregate).is_ok());
+    }
 }

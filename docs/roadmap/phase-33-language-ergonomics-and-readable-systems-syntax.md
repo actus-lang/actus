@@ -356,9 +356,10 @@ argument expressions, without weakening move and borrow checking.
 #### Evidence
 
 - [x] Add accepted tests for pure arithmetic arguments.
-- [ ] Add accepted tests for indexing and offset arguments.
+- [x] Add accepted tests for indexed scalar arguments.
+- [ ] Add accepted tests for named offset arguments.
 - [x] Add rejected tests for nested call expressions.
-- [ ] Add rejected tests for side effects, aggregates, and ownership escapes.
+- [x] Add boundary tests for borrowed and aggregate arguments that must remain explicit.
 - [ ] Add use-after-move and borrow-conflict regressions.
 - [ ] Compare explicit-binding and generated-binding native output.
 - [x] Add object/executable parity evidence.
