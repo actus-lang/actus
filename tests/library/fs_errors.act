@@ -88,7 +88,7 @@ verb prepare_file(abs path: Path) -> Int {
 }
 
 verb verify_owned_buffer(dat output: Buffer) -> Int {
-    erg measured = buffer_length(buffer: abs output);
+    erg measured = buffer_size(buffer: abs output);
     drop(output);
     return case dat measured {
         Result.Ok(length) => case length {

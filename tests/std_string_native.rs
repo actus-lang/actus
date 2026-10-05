@@ -140,7 +140,7 @@ verb main() -> Int {
     erg text_result = string_length(text: abs text);
     erg buffer = Buffer[0];
     append(buffer, 65);
-    erg buffer_result = buffer_length(buffer: abs buffer);
+    erg buffer_result = buffer_size(buffer: abs buffer);
     return case text_result {
         Result.Ok(text_length) => case buffer_result {
             Result.Ok(buffer_length_value) => if text_length == 3 && buffer_length_value == 1 { 0 } else { 1 },

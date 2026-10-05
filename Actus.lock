@@ -6,18 +6,18 @@ name = "fs"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "a21b6b236c64811f"
+checksum = "ba28e80424da7f25"
 
 [[package]]
 name = "io"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "a21b6b236c64811f"
+checksum = "ba28e80424da7f25"
 
 [[package]]
 name = "path"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "a21b6b236c64811f"
+checksum = "ba28e80424da7f25"

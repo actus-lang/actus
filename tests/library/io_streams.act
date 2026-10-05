@@ -92,7 +92,7 @@ verb append_one_byte(ins storage: Buffer, abs source: Buffer) -> Int {
 }
 
 verb buffer_has_one_byte(abs storage: Buffer) -> Int {
-    erg measured = buffer_length(buffer: abs storage);
+    erg measured = buffer_size(buffer: abs storage);
     return case dat measured {
         Result.Ok(length) => case length {
             1 => 0,
