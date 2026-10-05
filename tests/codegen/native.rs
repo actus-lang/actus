@@ -6,7 +6,7 @@ use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::analyze;
 use actus::target::TargetSpec;
-use object::{Object, ObjectSection, ObjectSymbol};
+use object::{Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 #[test]
 fn emits_a_native_object_without_c_intermediate_code() {
@@ -63,6 +63,58 @@ fn test_zero_float_verification_inspects_generated_integer_ir() {
 
     emit_program_object_with_configuration(&program, "main", &configuration)
         .expect("integer-only generated IR should pass the float audit");
+}
+
+#[test]
+fn generated_scalar_locals_have_no_allocation_relocations() {
+    let source = "verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg index: u32 = 41u32; return read(value: abs (index + 1u32)); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("generated scalar source should parse");
+    let bytes = emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("generated scalar local should emit natively");
+    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+    let relocation_names = file
+        .sections()
+        .flat_map(|section| section.relocations())
+        .filter_map(|(_, relocation)| match relocation.target() {
+            RelocationTarget::Symbol(index) => file.symbol_by_index(index).ok(),
+            _ => None,
+        })
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
+    assert!(!relocation_names.iter().any(|name| name.contains("allocate")));
+}
+
+#[test]
+fn generated_and_explicit_scalar_locals_emit_identical_text() {
+    let sources = [
+        "verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg index: u32 = 41u32; return read(value: abs (index + 1u32)); }",
+        "verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg index: u32 = 41u32; erg next: u32 = index + 1u32; return read(value: abs next); }",
+    ];
+    let text_sections = sources.map(|source| {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("scalar parity source should parse");
+        let bytes = emit_program_object_with_configuration(
+            &program,
+            "main",
+            &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+        )
+        .expect("scalar parity source should emit");
+        let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+        file.sections()
+            .find(|section| section.kind() == object::SectionKind::Text)
+            .expect("text section should exist")
+            .data()
+            .expect("text section should have data")
+            .to_vec()
+    });
+    assert_eq!(text_sections[0], text_sections[1]);
 }
 
 #[test]

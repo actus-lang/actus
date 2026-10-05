@@ -470,4 +470,12 @@ mod tests {
         };
         assert_eq!(name, "__actus_generated_1");
     }
+
+    #[test]
+    fn generated_read_does_not_hide_a_prior_move() {
+        let program = parse_source(
+            "verb consume(dat value: u32) { return; } verb read(abs value: u32) { return; } verb main() { erg source: u32 = 1u32; consume(value: dat source); read(value: abs (source + 1u32)); }",
+        );
+        assert!(crate::semantic::analyze(&program).is_err());
+    }
 }

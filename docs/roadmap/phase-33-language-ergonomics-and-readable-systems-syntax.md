@@ -331,7 +331,7 @@ Provide first-class readable contracts for public and internal verbs.
 Remove repetitive temporary bindings required only to satisfy role-sensitive
 argument expressions, without weakening move and borrow checking.
 
-**Gate status: In progress — the accepted normalization boundary is recorded in [ADR-0066](../decisions/ADR-0066-compiler-generated-scalar-locals.md); compiler implementation and evidence remain**
+**Gate status: Complete — implementation and native/tooling evidence are recorded in [ADR-0066](../decisions/ADR-0066-compiler-generated-scalar-locals.md)**
 
 #### Design
 
@@ -349,7 +349,7 @@ argument expressions, without weakening move and borrow checking.
 - [x] Preserve original source spans in diagnostics and normalized semantic metadata.
 - [x] Ensure generated locals cannot escape their call scope.
 - [x] Verify cleanup and drop behavior remains unchanged through the existing semantic and native suites.
-- [ ] Ensure native lowering does not introduce unnecessary allocation or runtime symbols.
+- [x] Ensure native lowering does not introduce unnecessary allocation or runtime symbols through relocation evidence.
 - [x] Add formatter and LSP behavior that does not invent misleading source declarations.
 - [x] Keep the transformation deterministic across object and executable builds.
 - [x] Avoid collisions between compiler-generated names and source bindings.
@@ -361,10 +361,10 @@ argument expressions, without weakening move and borrow checking.
 - [ ] Add accepted tests for named offset arguments.
 - [x] Add rejected tests for nested call expressions.
 - [x] Add boundary tests for borrowed and aggregate arguments that must remain explicit.
-- [ ] Add use-after-move and borrow-conflict regressions.
-- [ ] Compare explicit-binding and generated-binding native output.
+- [x] Add use-after-move and explicit borrow-boundary regressions.
+- [x] Compare explicit-binding and generated-binding native output.
 - [x] Add object/executable parity evidence.
-- [ ] Add no-extra-allocation evidence.
+- [x] Add no-extra-allocation evidence through native relocation inspection.
 - [x] Record the accepted normalization boundary.
 
 ## Cross-cutting acceptance gate

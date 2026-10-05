@@ -2023,6 +2023,39 @@ resources, or ambiguous expressions. Explicit `abs value` and `ins value`
 remain valid and are the source-level opt-out when the ownership intent should
 be visible. An unsafe omission uses the stable `E1016` argument-role diagnostic.
 
+For a direct static call argument, the compiler may materialize a hidden
+`erg` local when the source expression is a pure scalar expression and the
+argument explicitly uses `abs`. This keeps small arithmetic and bounded index
+expressions readable without changing ownership or evaluation order:
+
+```act
+verb read(abs value: u32) -> Int {
+    return value as Int;
+}
+
+verb main() -> Int {
+    erg values: Array[u32, 2] = Array[u32, 2]();
+    values[1] = 41u32;
+    erg index: u32 = 1u32;
+    return read(value: abs values[index]);
+}
+```
+
+The compiler-owned local is equivalent to an explicit scalar binding for the
+duration of that call. It is generated in deterministic source order, receives
+`erg`, and is passed to the callee as `abs`. Generated names are reserved
+internally and avoid collisions with source bindings. Formatter and LSP
+semantic declarations do not display the hidden local. The initializer may
+contain scalar literals, arithmetic, bitwise operations, comparisons, casts,
+grouping, and bounded scalar indexing. Calls, method calls, buffers,
+aggregates, resources, mutation, borrows, conditional expressions, and
+ownership transfers remain explicit source forms.
+
+The generated form has the same native text as its equivalent explicit local,
+and its object relocations contain no allocation reference. A prior move or
+borrow rule is still diagnosed by ordinary semantic analysis; normalization
+does not repair invalid ownership.
+
 When an imported generic verb named `copy` is visible, dispatch is determined
 by call shape and declaration provenance. A local module-scoped `copy`
 declaration has precedence. The one-argument scalar form

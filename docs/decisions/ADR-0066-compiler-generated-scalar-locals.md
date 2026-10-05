@@ -1,6 +1,6 @@
 # ADR-0066: Compiler-generated Scalar Locals for Role-qualified Calls
 
-- Status: Accepted design; implementation in progress
+- Status: Accepted and implemented
 - Date: 2026-10-05
 - Decision owners: Actus language and compiler maintainers
 
@@ -115,5 +115,5 @@ IR metadata may identify generated locals for compiler diagnostics and tests.
 - [x] Add semantic normalization and generated-local metadata.
 - [x] Add accepted and rejected semantic tests.
 - [x] Add native object/executable parity evidence.
-- [ ] Add native no-allocation evidence that distinguishes emitted runtime declarations from executed calls.
-- [ ] Update the implementation guide after behavior is shipped.
+- [x] Add native no-allocation evidence that distinguishes emitted runtime declarations from executed calls.
+- [x] Update the implementation guide after behavior is shipped.
