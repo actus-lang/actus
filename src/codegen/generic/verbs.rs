@@ -404,3 +404,49 @@ fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl
             .iter()
             .all(|argument| !contains_generic_parameter(argument, &verb.generic_parameters))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generic_specialization_preserves_structured_contracts() {
+        let source = r#"
+            """
+            contract:
+            purpose:
+                Preserve this description after specialization.
+            ownership:
+                The caller keeps the input owner.
+            """
+            verb identity[T](abs item: T) -> T { return item; }
+        "#;
+        let (tokens, errors) = crate::lexer::scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let program = crate::parser::parse(tokens).expect("generic contract should parse");
+        let instance = GenericInstance {
+            name: "identity".to_owned(),
+            arguments: vec![TypeName {
+                name: "Int".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span: crate::lexer::SourceSpan::new(0, 0),
+            }],
+            canonical_key: "identity[Int]".to_owned(),
+            caller: None,
+            call_span: crate::lexer::SourceSpan::new(0, 0),
+        };
+        let specialized = specialize_program(&program, &[instance]).expect("specialization");
+        let TopLevelDecl::Verb(verb) = &specialized.declarations[0] else {
+            panic!("expected specialized verb")
+        };
+        assert_eq!(verb.name, "identity__Int");
+        assert_eq!(
+            verb.contract
+                .as_ref()
+                .and_then(|contract| contract.sections.first())
+                .map(|section| section.text.as_str()),
+            Some("Preserve this description after specialization.")
+        );
+    }
+}

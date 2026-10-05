@@ -296,7 +296,7 @@ pass with formatting and diff checks.
 
 Provide first-class readable contracts for public and internal verbs.
 
-**Gate status: In progress — parser, formatter, semantic model, and LSP contract support are implemented; definition-view and final acceptance coverage remain**
+**Gate status: Complete — parser, formatter, compiler metadata, and LSP contract support are implemented and tested**
 
 #### Design
 
@@ -312,7 +312,7 @@ Provide first-class readable contracts for public and internal verbs.
 
 - [x] Add structured verb contract nodes while preserving docstring comments.
 - [x] Attach contracts to source spans and exported declarations.
-- [ ] Expose contract sections through hover, completion, and definition views. Hover, completion, semantic-model, and signature-help support are implemented; definition-view metadata remains open.
+- [x] Expose contract sections through hover, completion, signature help, semantic model, and definition views.
 - [x] Keep contract parsing independent from semantic ownership validation.
 - [x] Preserve contracts through generic specialization and facade re-exports.
 - [x] Add stable diagnostics for malformed structured contracts.
@@ -322,7 +322,7 @@ Provide first-class readable contracts for public and internal verbs.
 - [x] Add parser tests for complete, partial, and empty contract sections.
 - [x] Add formatter round-trip tests.
 - [x] Add LSP hover and documentation extraction tests.
-- [ ] Add complete facade and generic contract visibility tests.
+- [x] Add complete facade and generic contract visibility tests.
 - [x] Add rejected tests for malformed structured contracts.
 - [x] Record that contracts do not change runtime behavior unless explicitly introduced by a later phase.
 

@@ -1,6 +1,6 @@
 # ADR-0065: Structured Multi-line Verb Contracts
 
-- Status: Accepted; implementation in progress
+- Status: Accepted and implemented
 - Date: 2026-10-05
 - Decision owners: Actus language and compiler maintainers
 
@@ -120,10 +120,6 @@ documentation-only and adds no allocation or native symbol.
 - [x] Define visibility and generic-specialization behavior.
 - [x] Define malformed-contract rejection rules.
 - [x] Add AST and parser representation.
-- [x] Add formatter and LSP exposure for semantic model, hover, completion, and signature help.
-- [ ] Add complete facade, generic-specialization, definition-view, and round-trip acceptance coverage.
+- [x] Add formatter and LSP exposure for semantic model, hover, completion, signature help, and definition views.
+- [x] Add complete facade, generic-specialization, definition-view, and round-trip acceptance coverage.
 - [x] Update implementation guide for the shipped syntax and diagnostics.
-
-The implementation is intentionally still open because definition-view
-metadata and an explicit generic-specialization regression test remain before
-the gate can be closed.

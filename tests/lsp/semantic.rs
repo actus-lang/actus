@@ -505,6 +505,10 @@ fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
     );
     assert!(stdout.contains("verb visible() -> Int"), "public hover missing: {stdout}");
     assert!(stdout.contains("Read the public value."), "facade contract missing: {stdout}");
+    assert!(
+        stdout.contains("\"documentation\":\"**Contract**"),
+        "definition contract missing: {stdout}"
+    );
     assert!(stdout.contains(&api_uri), "definition did not use the module source: {stdout}");
     assert!(
         !stdout.contains("private_bridge"),

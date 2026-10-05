@@ -161,7 +161,13 @@ pub(super) fn definition(
         &params.position,
         &store.source_overlays(),
     )
-    .map(|location| json!({ "uri": location.uri, "range": location.range }))
+    .map(|location| {
+        let mut value = json!({ "uri": location.uri, "range": location.range });
+        if let Some(documentation) = location.documentation {
+            value["documentation"] = Value::String(documentation);
+        }
+        value
+    })
     .unwrap_or(Value::Null);
     super::server::respond(output, id, result, metadata, cancellation)
 }
