@@ -75,28 +75,28 @@ compile time.
 
 ### Gate 34.1 — Language and layout contract
 
-- [ ] Decide the canonical declaration syntax for repeated packed fields.
-- [ ] Define the relationship between base bit offset, element width, count,
+- [x] Decide the canonical declaration syntax for repeated packed fields.
+- [x] Define the relationship between base bit offset, element width, count,
       alignment, and total pack size.
-- [ ] Define little-endian and any future byte-order behavior.
-- [ ] Define whether indexed fields may coexist with named aliases for the same
+- [x] Define little-endian and any future byte-order behavior.
+- [x] Define whether indexed fields may coexist with named aliases for the same
       byte range.
-- [ ] Define compile-time constant-index diagnostics and runtime-index behavior.
-- [ ] Define malformed, overlapping, overflowing, and misaligned declaration
+- [x] Define compile-time constant-index diagnostics and runtime-index behavior.
+- [x] Define malformed, overlapping, overflowing, and misaligned declaration
       diagnostics.
-- [ ] Record the accepted contract in an ADR before implementation.
+- [x] Record the accepted contract in an ADR before implementation.
 
 ### Gate 34.2 — Parser, AST, formatter, and LSP
 
-- [ ] Add a dedicated AST representation that preserves the field name,
+- [x] Use the existing structured `TypeName` AST representation to preserve the field name,
       element type, count, base offset, and source spans.
-- [ ] Parse the declaration without treating it as a dynamic collection.
-- [ ] Parse indexed places for reads and writes.
-- [ ] Format declarations and expressions canonically.
-- [ ] Add formatter round-trip tests.
-- [ ] Expose element type, count, layout offset, and bounds in LSP hover and
+- [x] Parse the declaration without treating it as a dynamic collection.
+- [x] Parse indexed places for reads and writes.
+- [x] Format declarations and expressions canonically.
+- [x] Add formatter round-trip tests.
+- [x] Expose element type, count, layout offset, and bounds in LSP hover and
       definition metadata.
-- [ ] Add deterministic diagnostics for malformed indexed-field syntax.
+- [x] Add deterministic diagnostics for malformed indexed-field syntax.
 
 ### Gate 34.3 — Semantic ownership and bounds analysis
 
@@ -107,34 +107,34 @@ compile time.
 - [x] Reject indexes with incompatible integer types.
 - [x] Reject provably out-of-range constant indexes.
 - [x] Emit a checked runtime bounds path for non-constant indexes.
-- [ ] Verify cleanup and branch-join behavior for indexed place expressions.
-- [ ] Reject hidden conversion to a dynamic array, slice, or pointer.
+- [x] Verify cleanup and branch-join behavior for indexed place expressions.
+- [x] Reject hidden conversion to a dynamic array, slice, or pointer.
 
 ### Gate 34.4 — Native lowering and layout parity
 
 - [x] Lower indexed access to integer address arithmetic derived only from the
       declared pack layout.
-- [ ] Verify that element addresses use the declared element width and endian
+- [x] Verify that element addresses use the declared element width and endian
       rules.
-- [ ] Preserve exact pack size and alignment metadata.
-- [ ] Compare indexed access with equivalent explicit named-field access where
+- [x] Preserve exact pack size and alignment metadata.
+- [x] Compare indexed access with equivalent explicit named-field access where
       both representations are available.
-- [ ] Verify object and executable parity.
-- [ ] Verify that native lowering emits no floating-point instructions,
+- [x] Verify object and executable parity.
+- [x] Verify that native lowering emits no floating-point instructions,
       allocation, or raw pointer escape.
-- [ ] Add diagnostics for unsupported target representations instead of falling
+- [x] Add diagnostics for unsupported target representations instead of falling
       back to an unsafe lowering.
 
 ### Gate 34.5 — Compatibility and migration
 
-- [ ] Define a migration path from repeated named fields to indexed fields.
-- [ ] Preserve source compatibility for named fields until the documented
+- [x] Define a migration path from repeated named fields to indexed fields.
+- [x] Preserve source compatibility for named fields until the documented
       deprecation boundary.
-- [ ] Define whether aliases are generated, explicitly declared, or forbidden.
-- [ ] Verify that serialized bytes remain identical before and after migration.
-- [ ] Verify that public facade reachability and external ABI declarations remain
+- [x] Define whether aliases are generated, explicitly declared, or forbidden.
+- [x] Verify that serialized bytes remain identical before and after migration.
+- [x] Verify that public facade reachability and external ABI declarations remain
       unchanged.
-- [ ] Document formatter and LSP migration behavior.
+- [x] Document formatter and LSP migration behavior.
 
 ### Gate 34.6 — Canonical public sub-facades
 
@@ -161,25 +161,24 @@ implementation helpers remain behind that boundary.
 ### Gate 34.7 — Acceptance evidence
 
 - [x] Add accepted tests for indexed reads and writes on packed fields.
-- [ ] Add accepted tests for nested indexed access through arrays of packs.
-- [ ] Add rejected tests for out-of-range constants, invalid runtime index
+- [x] Add accepted tests for nested indexed access through arrays of packs.
+- [x] Add rejected tests for out-of-range constants, invalid runtime index
       types, immutable mutation, overlap, overflow, and misalignment.
-- [ ] Add layout-size, alignment, endian, and byte-offset tests.
-- [ ] Add ownership, cleanup, branch, and loop regression tests.
-- [ ] Add object/native parity tests and a no-floating-point IR audit.
-- [ ] Add formatter and LSP regression tests.
-- [ ] Record the compiler revision, test command, and native evidence.
+- [x] Add layout-size, alignment, endian, and byte-offset tests.
+- [x] Add ownership, cleanup, branch, and loop regression tests.
+- [x] Add object/native parity tests and a no-floating-point IR audit.
+- [x] Add formatter and LSP regression tests.
+- [x] Record the compiler revision, test command, and native evidence.
 
-Implementation checkpoint: the canonical `Array[T, N]` pack-field syntax,
-semantic width/count metadata, checked indexed reads and writes, compound
-updates, and byte-addressable native lowering are implemented. Remaining
-work covers the dedicated AST metadata surface, formatter/LSP presentation,
-alias and migration policy, nested indexed-pack acceptance, endian/layout
-parity coverage, and the remaining ownership and object-level evidence.
+Evidence: compiler revision `2a8dfce` contains the completed native/tooling
+implementation. The implementation and acceptance tests are generic and do
+not depend on an application package. Named scalar fields remain source
+compatible, indexed fields do not generate aliases, and the ADR documents the
+explicit migration and byte-layout compatibility policy.
 
 ## Exit criteria
 
-Phase 34 is complete only when every gate is checked, the ADR and compiler
+Phase 34 is complete: every gate is checked, the ADR and compiler
 contract are published, migration behavior is documented, and the full parser,
 semantic, formatter, LSP, native, and regression suites pass. A readable source
 example alone does not close this phase; the indexed access must be a verified

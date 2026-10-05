@@ -1982,6 +1982,47 @@ Array-backed packs provide:
   heap allocation;
 - native executable and object emission without a C serialization bridge.
 
+#### Indexed fields inside packed values
+
+A packed value may contain one bounded, fixed-width array field when the field
+is fully covered by the declared storage:
+
+```act
+pack Example {
+    erg storage: Array[u8, 32];
+    layout little;
+    fields {
+        erg links: Array[u32, 8] at 0;
+    }
+}
+```
+
+The array field occupies `element_width * count` bits beginning at its
+declared base offset. It is not a dynamic collection, slice, pointer, or
+separate allocation. The compiler records the element type, fixed count,
+total width, offset, and ownership role in semantic and LSP metadata.
+
+Use the ordinary checked indexing syntax for reads, writes, and compound
+updates:
+
+```act
+abs value: u32 = example.links[index];
+example.links[index] = next_value;
+example.links[index] += 1u32;
+```
+
+Constant indexes outside `[0, count)` are rejected during semantic analysis;
+runtime indexes use the normal checked bounds path. Immutable pack views
+cannot be mutated. Indexed fields compose with arrays of pack values, so
+`cells[slot].links[index]` remains an ordinary bounded place expression.
+
+Native indexed pack fields require byte-addressable storage, a byte-aligned
+base offset, and an element width that is a whole number of bytes. Little and
+big endian layouts use the declared byte order for element loads and stores.
+Unsupported representations fail with a compiler diagnostic rather than
+falling back to unchecked pointer arithmetic. Existing scalar bit-packed
+fields keep their masking and shifting lowering.
+
 For dynamic indexed byte loops, use a supported integer index such as `u32`:
 
 ```act
