@@ -1040,7 +1040,9 @@ CRC32 over a validated buffer range, while `crc32_matches` compares that value
 with an expected integer. The `validate_fixed_frame` intrinsic exposes the
 fixed-frame runtime validator, which checks version,
 payload bounds, endianness, and stored CRC without allocation. These operations
-do not allocate. Dynamic payloads,
+do not allocate. The first generated operation is `<contract>_validate`, which
+accepts a caller-owned `Buffer` and an owned expected version, then delegates
+the fixed offsets and lengths from the declaration to the validator. Dynamic payloads,
 implicit allocation, and automatic filesystem commits remain outside this
 profile.
 

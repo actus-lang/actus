@@ -46,6 +46,16 @@ fn executes_fixed_frame_validation_intrinsic_through_the_native_runtime() {
 
 #[cfg(unix)]
 #[test]
+fn executes_generated_serialization_validator_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-validator",
+        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; } verb main() -> Int { erg buffer: Buffer = Buffer[32]; erg version: u16 = 1u16; erg valid: Int = frame_validate(frame: abs buffer, expected_version: erg version); drop(buffer); return valid; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

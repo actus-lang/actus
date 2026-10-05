@@ -231,12 +231,14 @@ The remaining work is split into bounded sub-gates:
 - [x] Add the allocation-free `crc32` intrinsic and prove its native runtime ABI with an executable test.
 - [x] Add the allocation-free fixed-frame validator primitive with version, bounds, endianness, and CRC tests.
 - [x] Expose fixed-frame validation through a checked Actus intrinsic and native regression test.
+- [x] Generate and execute the contract-specific `<name>_validate` wrapper from a fixed serialization declaration.
 
 #### Design
 
 - [x] Define a serialization declaration for fixed-width fields and sections.
 - [ ] Define little-endian, alignment, padding, checksum, and version syntax.
-- [ ] Define read, write, validate, and migration operations generated from the contract.
+- [ ] Define read, write, and migration operations generated from the contract.
+- [x] Define and execute the allocation-free validation operation generated from the contract.
 - [ ] Require explicit ownership roles for buffers and paths.
 - [ ] Define atomic write and torn-write protection hooks.
 - [x] Reject declarations that produce ambiguous or overlapping fields.
