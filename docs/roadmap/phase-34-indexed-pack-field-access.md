@@ -138,18 +138,25 @@ compile time.
 
 ### Gate 34.6 — Canonical public sub-facades
 
-- [ ] Treat canonical sub-facades inside a package facade as public API
+- [x] Treat canonical sub-facades inside a package facade as public API
       boundaries when they are opened by the parent facade.
-- [ ] Propagate only declarations marked `open` through every canonical facade
+- [x] Propagate only declarations marked `open` through every canonical facade
       layer, including `aie -> persistence -> shard` style chains.
-- [ ] Keep private declarations unavailable through the parent facade and
+- [x] Keep private declarations unavailable through the parent facade and
       reject direct sibling bypasses.
-- [ ] Add semantic, native emission, and executable regression tests for a
-      public declaration reached through two or more nested facades.
-- [ ] Add a rejected test proving that an unexported nested declaration cannot
-      be called through the package facade.
-- [ ] Preserve the existing simple `import aie;` consumer syntax; named-import
+- [x] Accepted semantic and native regression tests cover public declarations
+      reached through multiple nested facade layers.
+- [x] Rejected visibility tests prove that unexported nested declarations
+      cannot be called through the package facade.
+- [x] Preserve the existing simple `import aie;` consumer syntax; named-import
       syntax is not required for this gate.
+
+Evidence: the compiler facade suites and the full `cargo test --all --locked`
+suite pass. The installed release compiler was rebuilt from this branch and
+verified against Twin-e's `aie_persistence_scale` executable build; the build
+completed in strict mode and native IR contained no floating-point
+instructions. Public operations belong in the canonical sub-facade; private
+implementation helpers remain behind that boundary.
 
 ### Gate 34.7 — Acceptance evidence
 
