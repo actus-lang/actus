@@ -10,9 +10,22 @@ fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/phase-29/external-text-consumer")
 }
 
+fn writable_fixture_root() -> PathBuf {
+    let source = fixture_root();
+    let root =
+        std::env::temp_dir().join(format!("actus-external-text-consumer-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create writable fixture source directory");
+    fs::create_dir_all(root.join("tests")).expect("create writable fixture test directory");
+    for relative_path in ["Actus.toml", "Actus.lock", "src/main.act", "tests/text_boundary.act"] {
+        fs::copy(source.join(relative_path), root.join(relative_path))
+            .unwrap_or_else(|error| panic!("copy fixture `{relative_path}`: {error}"));
+    }
+    root
+}
+
 #[test]
 fn generic_external_text_consumer_passes_all_native_boundaries() {
-    let root = fixture_root();
+    let root = writable_fixture_root();
     let output = root.join("target/external-text-consumer");
     let object = root.join("target/external-text-consumer.o");
     let repeated_object = root.join("target/external-text-consumer-repeat.o");
@@ -72,5 +85,5 @@ fn generic_external_text_consumer_passes_all_native_boundaries() {
         fs::read(&repeated_object).expect("read repeated object")
     );
 
-    let _ = fs::remove_dir_all(root.join("target"));
+    let _ = fs::remove_dir_all(root);
 }

@@ -125,6 +125,12 @@ must document ownership, return values, errors, side effects, allocation
 behavior, and ABI behavior where applicable. Documentation must describe what
 the implementation does now, not what a future design may promise.
 
+Actus uses `#` for ordinary source comments. Comment-only lines and inline
+`#` comments are ignored by the source-size conformance metric. Triple-quoted
+`""" ... """` blocks are documentation strings, not ordinary comments; they
+remain part of the measured source and must be preserved for documentation
+validation. Rust source keeps its normal `//` and `/* ... */` comment rules.
+
 ### 4.3 Whitespace and punctuation
 
 Use semicolons after statements. Braces delimit blocks. Commas separate
@@ -1348,6 +1354,11 @@ profiles belong to compiler/build/runtime configuration, not to the core
 language syntax. Never embed a list of CPU models into a type or operator.
 
 ### Source-limit exceptions
+
+Source-size limits measure code-bearing lines rather than raw physical lines.
+Blank lines and comments are excluded, while Actus documentation strings are
+counted. The preferred, split-required, and hard thresholds therefore apply to
+the actual source structure and are not increased merely by adding comments.
 
 The recommended default is to keep source files and verbs within the project
 limits. If a carefully justified exception is needed:

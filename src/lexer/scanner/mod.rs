@@ -53,8 +53,19 @@ impl<'source> Scanner<'source> {
     }
 
     fn skip_whitespace(&mut self) {
-        while self.peek().is_some_and(char::is_whitespace) {
-            self.advance();
+        loop {
+            while self.peek().is_some_and(char::is_whitespace) {
+                self.advance();
+            }
+            if self.peek() != Some('#') {
+                return;
+            }
+            while let Some(character) = self.peek() {
+                self.advance();
+                if character == '\n' {
+                    break;
+                }
+            }
         }
     }
 }

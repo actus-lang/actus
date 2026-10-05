@@ -26,6 +26,77 @@ fn preferred_file_limit_reports_decomposition_evidence() {
 }
 
 #[test]
+fn comments_and_blank_lines_do_not_count_toward_file_limit() {
+    let mut source = String::from("verb main() { return; }\n");
+    for index in 0..400 {
+        source.push_str(&format!("// architectural note {index}\n\n"));
+    }
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn actus_documentation_blocks_count_toward_file_limit() {
+    let mut source = String::from("verb main() { return; }\n");
+    for index in 0..400 {
+        source.push_str(&format!("\"\"\"architectural note {index}\"\"\"\n"));
+    }
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert_eq!(diagnostics[0].code(), "E1851");
+}
+
+#[test]
+fn actus_hash_comments_do_not_count_toward_file_limit() {
+    let mut source = String::from("verb main() { return; }\n");
+    for index in 0..400 {
+        source.push_str(&format!("# architectural note {index}\n\n"));
+    }
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn comments_and_blank_lines_do_not_count_toward_function_limit() {
+    let mut source = String::from("verb main() {\n");
+    for index in 0..80 {
+        source.push_str(&format!("// implementation note {index}\n\n"));
+    }
+    source.push_str("return;\n}\n");
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn actus_documentation_blocks_count_toward_function_limit() {
+    let mut source = String::from("verb main() {\n");
+    for index in 0..80 {
+        source.push_str(&format!("\"\"\"implementation note {index}\"\"\"\n"));
+    }
+    source.push_str("return;\n}\n");
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1855"));
+}
+
+#[test]
+fn actus_hash_comments_do_not_count_toward_function_limit() {
+    let mut source = String::from("verb main() {\n");
+    for index in 0..80 {
+        source.push_str(&format!("# implementation note {index}\n\n"));
+    }
+    source.push_str("return;\n}\n");
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn code_lines_still_count_when_comments_are_present() {
+    let mut source = String::new();
+    for index in 0..301 {
+        source.push_str(&format!("line_{index}; // inline explanation\n"));
+        source.push_str("// separate explanation\n\n");
+    }
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert_eq!(diagnostics[0].code(), "E1850");
+    assert!(diagnostics[0].message().contains("301 code lines"));
+}
+
+#[test]
 fn strict_file_thresholds_escalate_and_stop_at_one_violation() {
     let split = source_limit_diagnostics(Path::new("src/example.rs"), &lines(400), policy());
     assert_eq!(split[0].code(), "E1851");
@@ -144,6 +215,13 @@ fn short_sources_have_no_limit_diagnostics() {
 #[test]
 fn source_local_limit_suppression_is_rejected() {
     let source = "// actus: allow(source-limit)\nverb main() { return; }\n";
+    let diagnostics = source_limit_diagnostics(Path::new("main.act"), source, policy());
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1856"));
+}
+
+#[test]
+fn actus_hash_comment_limit_suppression_is_rejected() {
+    let source = "# actus: allow(source-limit)\nverb main() { return; }\n";
     let diagnostics = source_limit_diagnostics(Path::new("main.act"), source, policy());
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1856"));
 }

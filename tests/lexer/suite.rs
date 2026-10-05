@@ -1,6 +1,20 @@
 use actus::lexer::{LexErrorKind, SourceSpan, TokenKind, scan};
 
 #[test]
+fn skips_actus_hash_comments_without_affecting_strings() {
+    let (tokens, errors) =
+        scan("# a regular Actus comment\nverb main() { println(text: \"# stays in a string\"); }");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert!(tokens.iter().any(|token| token.kind == TokenKind::Verb));
+    assert!(
+        tokens.iter().any(|token| {
+            token.kind == TokenKind::StringLiteral("# stays in a string".to_owned())
+        })
+    );
+}
+
+#[test]
 fn scans_keywords_and_punctuation() {
     let (tokens, errors) = scan("verb process(erg value: Buffer) {");
 

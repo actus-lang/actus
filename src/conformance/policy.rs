@@ -1,17 +1,17 @@
 /// The source-size thresholds enforced by strict conformance.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceLimitPolicy {
-    /// The preferred maximum number of physical lines in one source file.
+    /// The preferred maximum number of code-bearing lines in one source file.
     pub preferred_file_lines: usize,
-    /// The line count at which a source file must be split.
+    /// The code-line count at which a source file must be split.
     pub file_split_lines: usize,
-    /// The hard maximum number of physical lines in one source file.
+    /// The hard maximum number of code-bearing lines in one source file.
     pub hard_file_lines: usize,
-    /// The preferred maximum number of physical lines in one function.
+    /// The preferred maximum number of code-bearing lines in one function.
     pub preferred_function_lines: usize,
-    /// The line count at which a function must be split.
+    /// The code-line count at which a function must be split.
     pub function_split_lines: usize,
-    /// The hard maximum number of physical lines in one function.
+    /// The hard maximum number of code-bearing lines in one function.
     pub hard_function_lines: usize,
 }
 

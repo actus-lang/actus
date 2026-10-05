@@ -18,7 +18,7 @@ mod scan;
 
 use diagnostics::{file_diagnostics, function_diagnostics, suppression_diagnostics};
 pub use policy::SourceLimitPolicy;
-use scan::find_functions;
+use scan::{code_line_count, find_functions};
 
 /// Records why a source-limit exception was accepted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,18 +101,25 @@ pub fn inspect_source_report(
     origin: LimitlessApprovalOrigin,
 ) -> SourceLimitReport {
     let exemptions = source_limit_exemptions(source);
+    let hash_comments = path.extension().and_then(|extension| extension.to_str()) == Some("act");
     let mut diagnostics = if exemptions.file {
         Vec::new()
     } else {
-        file_diagnostics(path, source, source.lines().count(), policy)
+        file_diagnostics(path, source, code_line_count(source, hash_comments), policy)
     };
-    for function in find_functions(source) {
+    for function in find_functions(source, hash_comments) {
         if !exemptions.verbs.contains(&function.name) && !exemptions.file {
-            diagnostics.extend(function_diagnostics(path, source, &function, policy));
+            diagnostics.extend(function_diagnostics(
+                path,
+                source,
+                &function,
+                policy,
+                hash_comments,
+            ));
         }
     }
     if !exemptions.file {
-        diagnostics.extend(suppression_diagnostics(path, source));
+        diagnostics.extend(suppression_diagnostics(path, source, hash_comments));
     }
     let canonical_path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let approvals = exemptions
