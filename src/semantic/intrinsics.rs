@@ -47,6 +47,25 @@ impl Analyzer {
                 self.require_append_byte_type(callee, parameters[1], &arguments[1].expression)?;
                 Ok(true)
             }
+            IntrinsicKind::BufferLength => {
+                let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
+                for argument in &arguments {
+                    self.visit_expression(&argument.expression)?;
+                }
+                let buffer = &arguments[0].expression;
+                if self.expression_type(buffer) != Some(crate::ast::BuiltinType::Buffer)
+                    || !self.is_readable_owner(buffer)
+                {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                            callee: callee.to_owned(),
+                            parameter: "buffer".to_owned(),
+                        },
+                        span: expression_span(buffer),
+                    });
+                }
+                Ok(true)
+            }
             IntrinsicKind::Crc32 => self.validate_crc32(arguments, callee, span),
             IntrinsicKind::Crc32Matches => self.validate_crc32_matches(arguments, callee, span),
             IntrinsicKind::ValidateFixedFrame => self.validate_fixed_frame(arguments, callee, span),

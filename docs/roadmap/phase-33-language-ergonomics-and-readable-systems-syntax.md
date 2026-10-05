@@ -212,15 +212,16 @@ sources, and incompatible bounds remain rejected by the shared `for` rules.
 Make binary serialization readable while keeping byte order, offsets, widths,
 checksums, versions, and failure behavior explicit.
 
-**Gate status: In progress — validation and fixed encoding are generated and executable; decode/migration and persistence remain**
+**Gate status: In progress — validation, fixed encoding, and length-checked decoding are generated and executable; version-aware decode, migration, and persistence remain**
 
 The remaining work is split into bounded sub-gates:
 
 - **33.5a — Contract surface:** generated API names, signature registration,
   collision diagnostics, and facade visibility. **Complete.**
-- **33.5b — Native fixed operations:** generated `validate` and `encode` bodies,
-  typed results, fixed storage copying, version/range checks, CRC32 comparison,
-  and native executable evidence. **Complete for the implemented operations.**
+- **33.5b — Native fixed operations:** generated `validate`, `encode`, and
+  length-checked `decode` bodies, typed results, fixed storage copying,
+  version/range checks, CRC32 comparison, and native executable evidence.
+  **Complete for the implemented operations.**
 - **33.5c — Persistence integration:** decode and migration operations, atomic
   staged writes, recovery markers, and byte compatibility evidence. **Open.**
 
@@ -234,6 +235,7 @@ The remaining work is split into bounded sub-gates:
 - [x] Expose fixed-frame validation through a checked Actus intrinsic and native regression test.
 - [x] Generate and execute the contract-specific `<name>_validate` wrapper from a fixed serialization declaration.
 - [x] Generate and execute the contract-specific `<name>_encode` wrapper for byte-array-backed packs.
+- [x] Generate and execute the contract-specific `<name>_decode` wrapper with typed short-input failure.
 
 #### Design
 
@@ -241,6 +243,7 @@ The remaining work is split into bounded sub-gates:
 - [ ] Define little-endian, alignment, padding, checksum, and version syntax.
 - [ ] Define read and migration operations generated from the contract.
 - [x] Define the fixed byte-copy write operation generated from the contract.
+- [x] Define the fixed byte-copy read operation with a typed short-input result.
 - [x] Define and execute the allocation-free validation operation generated from the contract.
 - [x] Define typed `SerializationError` results for generated operations.
 - [ ] Require explicit ownership roles for buffers and paths.
@@ -253,6 +256,7 @@ The remaining work is split into bounded sub-gates:
 - [x] Add serialization declarations to the parser and AST.
 - [x] Validate field order, offsets, widths, alignment, and total size.
 - [x] Generate the fixed typed write operation through the existing buffer ABI boundary.
+- [x] Generate the fixed typed read operation through the existing buffer length and array access paths.
 - [ ] Generate typed read and migration operations through the existing facade and ABI boundaries.
 - [x] Generate checksum and version validation without hidden allocation.
 - [ ] Preserve hand-written escape hatches only through explicit declarations.
@@ -263,6 +267,7 @@ The remaining work is split into bounded sub-gates:
 #### Evidence
 
 - [x] Add native execution coverage for fixed byte-copy encoding.
+- [x] Add native execution coverage for fixed byte-copy decoding and short-input rejection.
 - [ ] Add round-trip tests for fixed and dynamic layouts.
 - [ ] Add corruption, truncation, checksum, version, and overlapping-field tests.
 - [ ] Add atomic commit and staged-file recovery tests.

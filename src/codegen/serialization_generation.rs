@@ -1,7 +1,7 @@
 use crate::ast::{
     Argument, ArgumentRoleResolution, BinaryOp, Block, EnumDef, EnumPayload, EnumVariant, Expr,
-    GenericParam, IfBranch, PackStorage, Param, Program, ReturnAccess, ReturnType, Role,
-    SerializeDecl, Stmt, TopLevelDecl, TypeName, VerbDecl,
+    GenericParam, IfBranch, PackStorage, Param, Place, Program, ReturnAccess, ReturnType, Role,
+    SerializeDecl, Stmt, StructFieldInit, TopLevelDecl, TypeName, VerbDecl,
 };
 use crate::lexer::SourceSpan;
 
@@ -62,6 +62,34 @@ pub(super) fn append_generated_serialization_encoders(program: &mut Program) {
     }
 }
 
+pub(super) fn append_generated_serialization_decoders(program: &mut Program) {
+    let contracts = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Serialize(contract) => Some(contract.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    for contract in contracts {
+        let Some(pack) = program.declarations.iter().find_map(|declaration| match declaration {
+            TopLevelDecl::Pack(pack) if pack.name == contract.source_type.name => Some(pack),
+            _ => None,
+        }) else {
+            continue;
+        };
+        let Some(PackStorage::ByteArray { capacity, .. }) = Some(&pack.storage) else {
+            continue;
+        };
+        program.declarations.push(TopLevelDecl::Verb(generated_decoder(
+            &contract,
+            &pack.name,
+            *capacity,
+            contract.span,
+        )));
+    }
+}
+
 fn generated_encoder(
     contract: &SerializeDecl,
     source_type: &str,
@@ -75,7 +103,10 @@ fn generated_encoder(
     for index in 0..capacity {
         statements.push(append_guard(index, span));
     }
-    statements.push(Stmt::Return { value: Some(result_ok("u32", capacity, span)), span });
+    statements.push(Stmt::Return {
+        value: Some(result_ok("u32", integer(capacity, Some("u32"), span), span)),
+        span,
+    });
     VerbDecl {
         is_open: false,
         doc: Some(GENERATED_DOC.to_owned()),
@@ -101,6 +132,98 @@ fn generated_encoder(
         return_type: Some(ReturnType { access: ReturnAccess::Owned, ty: return_type, span }),
         body: Block { statements, span },
         span,
+    }
+}
+
+fn generated_decoder(
+    contract: &SerializeDecl,
+    source_type: &str,
+    capacity: u64,
+    span: SourceSpan,
+) -> VerbDecl {
+    let mut statements = decoder_prefix(source_type, capacity, span);
+    append_decoder_assignments(&mut statements, capacity, span);
+    statements.push(Stmt::Return {
+        value: Some(short_result_constructor("Ok", identifier("decoded", span), span)),
+        span,
+    });
+    VerbDecl {
+        is_open: false,
+        doc: Some(GENERATED_DOC.to_owned()),
+        metadata: Vec::new(),
+        name: format!("{}_decode", contract.name.to_ascii_lowercase()),
+        generic_parameters: Vec::new(),
+        params: vec![Param {
+            role: Role::Abs,
+            name: "input".to_owned(),
+            dispatch: crate::ast::DispatchMode::Static,
+            ty: type_name("Buffer", span),
+            span,
+        }],
+        return_type: Some(ReturnType {
+            access: ReturnAccess::Owned,
+            ty: result_type(source_type, span),
+            span,
+        }),
+        body: Block { statements, span },
+        span,
+    }
+}
+
+fn decoder_prefix(source_type: &str, capacity: u64, span: SourceSpan) -> Vec<Stmt> {
+    let mut statements = vec![Stmt::OwnerDecl {
+        role: Role::Erg,
+        name: "input_length".to_owned(),
+        ty: Some("Int".to_owned()),
+        initializer: Expr::Call {
+            callee: "buffer_length".to_owned(),
+            arguments: vec![inferred_argument(identifier("input", span))],
+            span,
+        },
+        span,
+    }];
+    statements.push(Stmt::If {
+        condition: Expr::Binary {
+            left: Box::new(identifier("input_length", span)),
+            operator: BinaryOp::LessThan,
+            right: Box::new(integer(capacity, None, span)),
+            span,
+        },
+        then_branch: Block {
+            statements: vec![Stmt::Return {
+                value: Some(result_err(source_type, "InvalidLayout", span)),
+                span,
+            }],
+            span,
+        },
+        else_branch: None,
+        span,
+    });
+    statements.push(Stmt::OwnerDecl {
+        role: Role::Erg,
+        name: "decoded".to_owned(),
+        ty: None,
+        initializer: pack_zero_value(source_type, capacity, span),
+        span,
+    });
+    statements
+}
+
+fn append_decoder_assignments(statements: &mut Vec<Stmt>, capacity: u64, span: SourceSpan) {
+    for index in 0..capacity {
+        statements.push(Stmt::Assignment {
+            target: Place::Index {
+                target: Box::new(Place::Field {
+                    object: Box::new(Place::Binding { name: "decoded".to_owned(), span }),
+                    field: "storage".to_owned(),
+                    span,
+                }),
+                index: integer(index, None, span),
+                span,
+            },
+            value: input_byte(index, span),
+            span,
+        });
     }
 }
 
@@ -157,13 +280,33 @@ fn storage_byte(index: u64, span: SourceSpan) -> Expr {
     }
 }
 
-fn result_ok(value_type: &str, value: u64, span: SourceSpan) -> Expr {
-    result_constructor(
-        value_type,
-        "Ok",
-        Expr::Integer { value: value.to_string(), suffix: Some(value_type.to_owned()), span },
+fn input_byte(index: u64, span: SourceSpan) -> Expr {
+    Expr::Index {
+        target: Box::new(identifier("input", span)),
+        index: Box::new(integer(index, None, span)),
         span,
-    )
+    }
+}
+
+fn pack_zero_value(source_type: &str, capacity: u64, span: SourceSpan) -> Expr {
+    Expr::StructLit {
+        name: source_type.to_owned(),
+        type_arguments: Vec::new(),
+        fields: vec![StructFieldInit {
+            name: "storage".to_owned(),
+            value: Expr::Call {
+                callee: format!("Array[u8,{capacity}]"),
+                arguments: Vec::new(),
+                span,
+            },
+            span,
+        }],
+        span,
+    }
+}
+
+fn result_ok(value_type: &str, value: impl Into<Expr>, span: SourceSpan) -> Expr {
+    result_constructor(value_type, "Ok", value.into(), span)
 }
 
 fn result_err(value_type: &str, variant: &str, span: SourceSpan) -> Expr {
@@ -179,6 +322,14 @@ fn result_err(value_type: &str, variant: &str, span: SourceSpan) -> Expr {
     )
 }
 
+fn short_result_constructor(method: &str, value: Expr, span: SourceSpan) -> Expr {
+    Expr::Call {
+        callee: method.to_owned(),
+        arguments: vec![inferred_argument(value)],
+        span: synthetic_span(span, 1),
+    }
+}
+
 fn result_constructor(value_type: &str, method: &str, value: Expr, span: SourceSpan) -> Expr {
     Expr::MethodCall {
         receiver: Box::new(identifier(&format!("Result[{value_type},SerializationError]"), span)),
@@ -186,6 +337,14 @@ fn result_constructor(value_type: &str, method: &str, value: Expr, span: SourceS
         arguments: vec![argument(None, Role::Erg, value)],
         span,
     }
+}
+
+fn integer(value: u64, suffix: Option<&str>, span: SourceSpan) -> Expr {
+    Expr::Integer { value: value.to_string(), suffix: suffix.map(str::to_owned), span }
+}
+
+fn synthetic_span(span: SourceSpan, offset: usize) -> SourceSpan {
+    SourceSpan::new(span.end.saturating_add(offset), span.end.saturating_add(offset + 1))
 }
 
 fn argument(name: Option<&str>, role: Role, expression: Expr) -> Argument {

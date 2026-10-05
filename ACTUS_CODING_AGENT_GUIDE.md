@@ -1045,10 +1045,13 @@ do not allocate. Generated serialization operations use the compiler-provided
 `<contract>_validate`, which accepts a caller-owned `Buffer` and an owned
 expected version, and `<contract>_encode`, which accepts an `abs` source pack
 and an `ins` output `Buffer`, copies the fixed storage bytes, and returns a
-typed `Result[u32, SerializationError]`. Both operations derive their fixed
-offsets and lengths from the declaration. Decode, migration, dynamic payloads,
-implicit allocation, and automatic filesystem commits remain outside this
-profile until their contracts are implemented and tested.
+typed `Result[u32, SerializationError]`. It also generates
+`<contract>_decode`, which checks the input length through the compiler-provided
+`buffer_length` primitive and returns an owned pack or `InvalidLayout` for a
+short input. Both operations derive their fixed storage bounds from the
+declaration. Version/checksum policy, migration, dynamic payloads, implicit
+allocation, and automatic filesystem commits remain outside this profile until
+their contracts are implemented and tested.
 
 ### 15.5 `Arena[N]`
 

@@ -72,6 +72,7 @@ impl Analyzer {
         match lookup_call_intrinsic(callee) {
             Some(
                 IntrinsicKind::Append
+                | IntrinsicKind::BufferLength
                 | IntrinsicKind::Crc32
                 | IntrinsicKind::Crc32Matches
                 | IntrinsicKind::ValidateFixedFrame

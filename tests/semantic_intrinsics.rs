@@ -63,6 +63,14 @@ fn compiler_provides_serialization_error_domain() {
 }
 
 #[test]
+fn accepts_compiler_provided_buffer_length() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; return buffer_length(buffer: abs buffer); }",
+    )
+    .expect("buffer_length should accept a read-only buffer");
+}
+
+#[test]
 fn accepts_explicit_copy_of_integer_and_boolean_scalars() {
     analyze_source(
         "verb main() -> Int { erg value: u32 = 41u32; erg repeated: u32 = copy(value: abs value); erg flag: Bool = true; erg repeated_flag: Bool = copy(value: abs flag); if repeated_flag { return repeated as Int; } return 0; }",

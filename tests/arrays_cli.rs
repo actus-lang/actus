@@ -66,6 +66,26 @@ fn executes_generated_serialization_encoder_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_generated_serialization_decoder_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 41u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 0u8); append(input, 43u8); erg result = frame_decode(input: abs input); return case dat result { Result.Ok(value) => value.storage[0] as Int + value.storage[7] as Int, Result.Err(_) => 99, }; }",
+    );
+    assert_eq!(status.code(), Some(84));
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_short_input_in_generated_serialization_decoder() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder-short-input",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; erg result = frame_decode(input: abs input); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IntrinsicKind {
     Append,
+    BufferLength,
     Crc32,
     Crc32Matches,
     ValidateFixedFrame,
@@ -22,6 +23,11 @@ impl IntrinsicKind {
             Self::Append => IntrinsicSpec {
                 name: "append",
                 parameters: &["handle", "byte"],
+                status: RegistryStatus::Active,
+            },
+            Self::BufferLength => IntrinsicSpec {
+                name: "buffer_length",
+                parameters: &["buffer"],
                 status: RegistryStatus::Active,
             },
             Self::Crc32 => IntrinsicSpec {
@@ -71,6 +77,7 @@ impl IntrinsicKind {
 pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match name {
         "append" => Some(IntrinsicKind::Append),
+        "buffer_length" => Some(IntrinsicKind::BufferLength),
         "crc32" => Some(IntrinsicKind::Crc32),
         "crc32_matches" => Some(IntrinsicKind::Crc32Matches),
         "validate_fixed_frame" => Some(IntrinsicKind::ValidateFixedFrame),
@@ -85,6 +92,7 @@ pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match lookup_intrinsic(name) {
         Some(
             IntrinsicKind::Append
+            | IntrinsicKind::BufferLength
             | IntrinsicKind::Crc32
             | IntrinsicKind::Crc32Matches
             | IntrinsicKind::ValidateFixedFrame
