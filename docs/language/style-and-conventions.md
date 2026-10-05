@@ -48,6 +48,35 @@ The compiler ignores ordinary `#` comments while preserving documentation
 blocks as structured `DocString` tokens. Formatter, LSP, and documentation
 tools must preserve their source spans and text.
 
+### 1.1 Structured verb contracts
+
+Phase 33.6 defines an optional structured form for a verb's leading
+documentation block. The first non-empty line must be exactly `contract:`. The
+accepted sections are `purpose`, `inputs`, `outputs`, `ownership`,
+`invariants`, `errors`, `side_effects`, and `abi`:
+
+```act
+"""
+contract:
+purpose:
+    Read one frame.
+inputs:
+    source: immutable frame bytes.
+outputs:
+    Returns a frame or a typed error.
+ownership:
+    The input remains caller-owned.
+"""
+open verb read_frame(abs source: Buffer) -> Result[Frame, DecodeError] {
+    ...
+}
+```
+
+These sections are documentation metadata. They do not create runtime
+preconditions, alter ownership, or change native code generation. The full
+contract and rejection rules are defined in ADR-0065. This syntax is accepted
+design while Gate 33.6 implementation is in progress.
+
 ## 2. Return Types
 
 Return types use the existing arrow syntax:

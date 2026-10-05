@@ -261,6 +261,7 @@ fn specialize_external_verb(
     Ok(ExternalVerbDecl {
         is_open: verb.is_open,
         doc: verb.doc.clone(),
+        contract: verb.contract.clone(),
         unsafe_boundary: verb.unsafe_boundary,
         module_import: verb.module_import,
         abi: verb.abi,
@@ -315,6 +316,7 @@ fn specialize_verb(
     Ok(VerbDecl {
         is_open: verb.is_open,
         doc: verb.doc.clone(),
+        contract: verb.contract.clone(),
         metadata: verb.metadata.clone(),
         name: specialized_name(instance),
         generic_parameters: Vec::new(),

@@ -28,6 +28,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::MetadataFileScopeNotAllowed => "E0011",
         ParseErrorCode::UnsupportedLimitlessScope => "E0012",
         ParseErrorCode::DuplicateMetadata => "E0013",
+        ParseErrorCode::MalformedVerbContract => "E0014",
     }
 }
 

@@ -474,8 +474,15 @@ fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
     let main_uri = file_uri(&main_path);
     let api_uri = file_uri(&api_path);
     let main = "import math;\nverb main() -> Int { return visible(); }\n";
-    let api =
-        "open verb visible() -> Int { return 7; }\nverb private_bridge() -> Int { return 9; }\n";
+    let api = concat!(
+        "\"\"\"\n",
+        "contract:\n",
+        "purpose:\n",
+        "    Read the public value.\n",
+        "\"\"\"\n",
+        "open verb visible() -> Int { return 7; }\n",
+        "verb private_bridge() -> Int { return 9; }\n",
+    );
     fs::write(&main_path, main).expect("write main");
     fs::write(&api_path, "verb disk_only() -> Int { return 3; }\n").expect("write api");
     let messages = [
@@ -497,6 +504,7 @@ fn lsp_external_views_use_facade_exports_and_unsaved_definitions() {
         "private completion leaked: {stdout}"
     );
     assert!(stdout.contains("verb visible() -> Int"), "public hover missing: {stdout}");
+    assert!(stdout.contains("Read the public value."), "facade contract missing: {stdout}");
     assert!(stdout.contains(&api_uri), "definition did not use the module source: {stdout}");
     assert!(
         !stdout.contains("private_bridge"),

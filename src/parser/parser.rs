@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 mod case;
 mod conditional;
+mod contracts;
 mod cursor;
 mod declarations;
 mod enums;
@@ -29,6 +30,7 @@ pub enum ParseErrorKind {
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope { name: String },
     DuplicateMetadata { name: String },
+    MalformedVerbContract { reason: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,6 +46,7 @@ pub enum ParseErrorCode {
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope,
     DuplicateMetadata,
+    MalformedVerbContract,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -51,6 +54,26 @@ pub struct ParseError {
     pub code: ParseErrorCode,
     pub kind: ParseErrorKind,
     pub span: SourceSpan,
+}
+
+fn contract_error_message(error: contracts::ContractParseError) -> String {
+    match error {
+        contracts::ContractParseError::ContentBeforePurpose => {
+            "contract content must begin with a named section".to_owned()
+        }
+        contracts::ContractParseError::DuplicateSection(name) => {
+            format!("contract section `{name}` is declared more than once")
+        }
+        contracts::ContractParseError::EmptyContract => {
+            "a structured verb contract must contain at least one named section".to_owned()
+        }
+        contracts::ContractParseError::MissingSectionName => {
+            "contract section name must not be empty".to_owned()
+        }
+        contracts::ContractParseError::UnknownSection(name) => {
+            format!("unknown contract section `{name}`")
+        }
+    }
 }
 
 pub struct Parser {
@@ -70,6 +93,18 @@ struct VerbSignature {
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, cursor: 0, enum_names: HashSet::new(), case_subject: false }
+    }
+
+    pub(super) fn parse_contract(
+        &self,
+        documentation: Option<&str>,
+        span: SourceSpan,
+    ) -> Result<Option<crate::ast::VerbContract>, ParseError> {
+        contracts::parse_contract(documentation, span).map_err(|error| ParseError {
+            code: ParseErrorCode::MalformedVerbContract,
+            kind: ParseErrorKind::MalformedVerbContract { reason: contract_error_message(error) },
+            span,
+        })
     }
 
     fn parse_verb_signature(&mut self) -> Result<VerbSignature, ParseError> {
@@ -174,10 +209,12 @@ impl Parser {
         let signature = self.parse_verb_signature()?;
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
+        let contract = self.parse_contract(doc.as_deref(), span)?;
 
         Ok(VerbDecl {
             is_open,
             doc,
+            contract,
             metadata,
             name: signature.name,
             generic_parameters: signature.generic_parameters,

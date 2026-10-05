@@ -1,7 +1,8 @@
 use serde_json::{Value, json};
 
 use crate::ast::{
-    MetaAttribute, PackStorage, Program, SerializeSection, TopLevelDecl, TypeName, primitive_type,
+    MetaAttribute, PackStorage, Program, SerializeSection, TopLevelDecl, TypeName, VerbContract,
+    VerbContractSectionKind, primitive_type,
 };
 use crate::lexer::SourceSpan;
 use crate::semantic::{
@@ -321,15 +322,16 @@ fn declarations(
         .declarations
         .iter()
         .filter_map(|declaration| {
-            let (name, span, metadata): (&str, SourceSpan, &[MetaAttribute]) = match declaration {
-                TopLevelDecl::Constant(value) => (&value.name, value.span, &[]),
-                TopLevelDecl::Verb(verb) => (&verb.name, verb.span, &verb.metadata),
-                TopLevelDecl::ExternalVerb(verb) => (&verb.name, verb.span, &verb.metadata),
-                TopLevelDecl::Struct(value) => (&value.name, value.span, &[]),
-                TopLevelDecl::Enum(value) => (&value.name, value.span, &[]),
-                TopLevelDecl::Pack(value) => (&value.name, value.span, &[]),
-                TopLevelDecl::Serialize(value) => (&value.name, value.span, &[]),
-                TopLevelDecl::Role(value) => (&value.name, value.span, &[]),
+            let (name, span, metadata, contract):
+                (&str, SourceSpan, &[MetaAttribute], Option<&VerbContract>) = match declaration {
+                TopLevelDecl::Constant(value) => (&value.name, value.span, &[], None),
+                TopLevelDecl::Verb(verb) => (&verb.name, verb.span, &verb.metadata, verb.contract.as_ref()),
+                TopLevelDecl::ExternalVerb(verb) => (&verb.name, verb.span, &verb.metadata, verb.contract.as_ref()),
+                TopLevelDecl::Struct(value) => (&value.name, value.span, &[], None),
+                TopLevelDecl::Enum(value) => (&value.name, value.span, &[], None),
+                TopLevelDecl::Pack(value) => (&value.name, value.span, &[], None),
+                TopLevelDecl::Serialize(value) => (&value.name, value.span, &[], None),
+                TopLevelDecl::Role(value) => (&value.name, value.span, &[], None),
                 TopLevelDecl::Import(_)
                 | TopLevelDecl::Perform(_)
                 | TopLevelDecl::OpenSibling(_) => return None,
@@ -348,9 +350,34 @@ fn declarations(
             } else {
                 None
             };
-            Some(json!({"name":name,"active":active,"limitless":limitless,"range":span_range(source,index,span)}))
+            Some(json!({"name":name,"active":active,"limitless":limitless,"contract":contract_value(contract, source, index),"range":span_range(source,index,span)}))
         })
         .collect()
+}
+
+fn contract_value(contract: Option<&VerbContract>, source: &str, index: &LineIndex) -> Value {
+    let Some(contract) = contract else { return Value::Null };
+    json!({
+        "range": span_range(source, index, contract.span),
+        "sections": contract.sections.iter().map(|section| json!({
+            "kind": contract_section_name(section.kind),
+            "text": section.text,
+            "range": span_range(source, index, section.span),
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn contract_section_name(kind: VerbContractSectionKind) -> &'static str {
+    match kind {
+        VerbContractSectionKind::Purpose => "purpose",
+        VerbContractSectionKind::Inputs => "inputs",
+        VerbContractSectionKind::Outputs => "outputs",
+        VerbContractSectionKind::Ownership => "ownership",
+        VerbContractSectionKind::Invariants => "invariants",
+        VerbContractSectionKind::Errors => "errors",
+        VerbContractSectionKind::SideEffects => "side_effects",
+        VerbContractSectionKind::Abi => "abi",
+    }
 }
 
 fn target_capabilities(target: &TargetSpec) -> Value {

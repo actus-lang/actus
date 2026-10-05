@@ -84,7 +84,7 @@ impl Formatter<'_> {
     }
 
     pub(super) fn verb(&mut self, verb: &crate::ast::VerbDecl) {
-        self.documentation(verb.doc.as_deref());
+        self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
         for metadata in &verb.metadata {
             self.output.push_str("meta ");
             self.output.push_str(&meta_name(metadata));
@@ -103,7 +103,7 @@ impl Formatter<'_> {
     }
 
     pub(super) fn external_verb(&mut self, verb: &crate::ast::ExternalVerbDecl) {
-        self.documentation(verb.doc.as_deref());
+        self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
         if verb.is_open {
             self.output.push_str("open ");
         }
@@ -118,6 +118,42 @@ impl Formatter<'_> {
         self.parameters(&verb.params);
         self.return_type(&verb.return_type);
         self.output.push(';');
+    }
+
+    fn verb_documentation(
+        &mut self,
+        documentation: Option<&str>,
+        contract: Option<&crate::ast::VerbContract>,
+    ) {
+        let Some(contract) = contract else {
+            self.documentation(documentation);
+            return;
+        };
+        let order = [
+            crate::ast::VerbContractSectionKind::Purpose,
+            crate::ast::VerbContractSectionKind::Inputs,
+            crate::ast::VerbContractSectionKind::Outputs,
+            crate::ast::VerbContractSectionKind::Ownership,
+            crate::ast::VerbContractSectionKind::Invariants,
+            crate::ast::VerbContractSectionKind::Errors,
+            crate::ast::VerbContractSectionKind::SideEffects,
+            crate::ast::VerbContractSectionKind::Abi,
+        ];
+        let mut rendered = String::from("contract:");
+        for kind in order {
+            let Some(section) = contract.sections.iter().find(|section| section.kind == kind)
+            else {
+                continue;
+            };
+            rendered.push('\n');
+            rendered.push_str(contract_section_name(kind));
+            rendered.push(':');
+            if !section.text.is_empty() {
+                rendered.push('\n');
+                rendered.push_str(&section.text);
+            }
+        }
+        self.documentation(Some(&rendered));
     }
 
     fn parameters(&mut self, parameters: &[crate::ast::Param]) {
@@ -340,6 +376,19 @@ impl Formatter<'_> {
         self.output.push_str("import ");
         self.output.push_str(&import.path);
         self.output.push(';');
+    }
+}
+
+fn contract_section_name(kind: crate::ast::VerbContractSectionKind) -> &'static str {
+    match kind {
+        crate::ast::VerbContractSectionKind::Purpose => "purpose",
+        crate::ast::VerbContractSectionKind::Inputs => "inputs",
+        crate::ast::VerbContractSectionKind::Outputs => "outputs",
+        crate::ast::VerbContractSectionKind::Ownership => "ownership",
+        crate::ast::VerbContractSectionKind::Invariants => "invariants",
+        crate::ast::VerbContractSectionKind::Errors => "errors",
+        crate::ast::VerbContractSectionKind::SideEffects => "side_effects",
+        crate::ast::VerbContractSectionKind::Abi => "abi",
     }
 }
 

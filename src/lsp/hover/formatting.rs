@@ -1,4 +1,4 @@
-use crate::ast::{GenericParamKind, PackDecl, Param, Role, Stmt, TypeName};
+use crate::ast::{GenericParamKind, PackDecl, Param, Role, Stmt, TypeName, VerbContract};
 
 use super::model::SymbolInfo;
 use super::tokens::identifier_span;
@@ -241,10 +241,44 @@ fn generic_label(parameters: &[crate::ast::GenericParam]) -> String {
 
 pub(super) fn declaration_documentation(declaration: &crate::ast::TopLevelDecl) -> Option<String> {
     match declaration {
-        crate::ast::TopLevelDecl::Verb(verb) => verb.doc.clone(),
+        crate::ast::TopLevelDecl::Verb(verb) => {
+            contract_documentation(verb.doc.as_deref(), verb.contract.as_ref())
+        }
+        crate::ast::TopLevelDecl::ExternalVerb(verb) => {
+            contract_documentation(verb.doc.as_deref(), verb.contract.as_ref())
+        }
         crate::ast::TopLevelDecl::Struct(definition) => definition.doc.clone(),
         crate::ast::TopLevelDecl::Role(role) => role.doc.clone(),
         _ => None,
+    }
+}
+
+pub(crate) fn contract_documentation(
+    documentation: Option<&str>,
+    contract: Option<&VerbContract>,
+) -> Option<String> {
+    let Some(contract) = contract else { return documentation.map(str::to_owned) };
+    let mut rendered = String::from("**Contract**\n");
+    for section in &contract.sections {
+        rendered.push_str("\n### ");
+        rendered.push_str(contract_section_name(section.kind));
+        rendered.push_str("\n\n");
+        rendered.push_str(&section.text);
+        rendered.push('\n');
+    }
+    Some(rendered)
+}
+
+fn contract_section_name(kind: crate::ast::VerbContractSectionKind) -> &'static str {
+    match kind {
+        crate::ast::VerbContractSectionKind::Purpose => "purpose",
+        crate::ast::VerbContractSectionKind::Inputs => "inputs",
+        crate::ast::VerbContractSectionKind::Outputs => "outputs",
+        crate::ast::VerbContractSectionKind::Ownership => "ownership",
+        crate::ast::VerbContractSectionKind::Invariants => "invariants",
+        crate::ast::VerbContractSectionKind::Errors => "errors",
+        crate::ast::VerbContractSectionKind::SideEffects => "side_effects",
+        crate::ast::VerbContractSectionKind::Abi => "abi",
     }
 }
 

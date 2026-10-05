@@ -11,4 +11,5 @@ pub struct HoverInfo {
     pub range: LspRange,
 }
 
+pub(super) use formatting::contract_documentation;
 pub(super) use lookup::find_hover;

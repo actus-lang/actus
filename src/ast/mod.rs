@@ -13,7 +13,8 @@ pub use decl::{
     GenericParam, GenericParamKind, ImportDecl, LayoutEndianness, LimitlessScope, MetaAttribute,
     OpenSiblingDecl, PackDecl, PackField, PackStorage, Param, PerformDecl, Program, ReturnAccess,
     ReturnType, Role, RoleDecl, RoleMethod, SerializeDecl, SerializeSection, StructDef,
-    StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl, builtin_enum_definitions,
+    StructField, StructFieldRole, TopLevelDecl, TypeName, VerbContract, VerbContractSection,
+    VerbContractSectionKind, VerbDecl, builtin_enum_definitions,
 };
 pub use expr::{
     Argument, ArgumentRoleResolution, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, IfBranch,

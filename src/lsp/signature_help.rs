@@ -8,6 +8,7 @@ use crate::parser::parse;
 
 use super::cancellation::CancellationToken;
 use super::documents::DocumentStore;
+use super::hover::contract_documentation;
 use super::position::{LineIndex, LspPosition};
 use super::protocol::ResponseMetadata;
 use crate::target::TargetSpec;
@@ -110,14 +111,14 @@ fn find_signature(source: &str, name: &str, target: &TargetSpec) -> Option<Value
             &verb.generic_parameters,
             &verb.params,
             verb.return_type.as_ref(),
-            verb.doc.as_deref(),
+            contract_documentation(verb.doc.as_deref(), verb.contract.as_ref()).as_deref(),
         )),
         TopLevelDecl::ExternalVerb(verb) if verb.name == name => Some(callable_signature(
             &verb.name,
             &verb.generic_parameters,
             &verb.params,
             verb.return_type.as_ref(),
-            verb.doc.as_deref(),
+            contract_documentation(verb.doc.as_deref(), verb.contract.as_ref()).as_deref(),
         )),
         _ => None,
     })

@@ -5,6 +5,8 @@ use crate::ast::{
 };
 use crate::lexer::SourceSpan;
 use std::collections::HashMap;
+
+use super::result_constructor_spans::initializer_span;
 /// Rewrites contextual `Ok` and `Err` calls into the existing enum-constructor
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
@@ -57,6 +59,7 @@ fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
     VerbDecl {
         is_open: false,
         doc: Some("Compiler-generated fixed-frame serialization wrapper.".to_owned()),
+        contract: None,
         metadata: Vec::new(),
         name: format!("{}_validate", contract.name.to_ascii_lowercase()),
         generic_parameters: Vec::new(),
@@ -473,28 +476,4 @@ fn canonical_type_name(type_name: &TypeName) -> String {
         type_name.name,
         type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )
-}
-
-fn initializer_span(expression: &Expr) -> crate::lexer::SourceSpan {
-    match expression {
-        Expr::Call { span, .. }
-        | Expr::MethodCall { span, .. }
-        | Expr::Grouping { span, .. }
-        | Expr::Borrow { span, .. }
-        | Expr::Unary { span, .. }
-        | Expr::Binary { span, .. }
-        | Expr::Try { span, .. }
-        | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. }
-        | Expr::Index { span, .. }
-        | Expr::Case { span, .. }
-        | Expr::If { span, .. }
-        | Expr::Identifier { span, .. }
-        | Expr::Integer { span, .. }
-        | Expr::BoolLiteral { span, .. }
-        | Expr::BufferLiteral { span, .. }
-        | Expr::FloatLiteral { span, .. }
-        | Expr::StringLiteral { span, .. }
-        | Expr::Cast { span, .. } => *span,
-    }
 }

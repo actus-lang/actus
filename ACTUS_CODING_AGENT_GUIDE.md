@@ -131,6 +131,42 @@ Actus uses `#` for ordinary source comments. Comment-only lines and inline
 remain part of the measured source and must be preserved for documentation
 validation. Rust source keeps its normal `//` and `/* ... */` comment rules.
 
+#### Structured verb contracts
+
+When a verb needs a readable multi-line contract, its leading documentation
+string may begin with the exact marker `contract:`. The compiler stores the
+following named sections as documentation metadata and exposes them to the
+formatter, semantic model, hover, completion, and signature-help tools:
+
+```act
+"""
+contract:
+purpose:
+    Read one bounded frame.
+inputs:
+    source: an immutable input buffer.
+outputs:
+    Returns the decoded frame or a typed error.
+ownership:
+    The input view does not escape.
+errors:
+    Reports short or corrupt input.
+"""
+open verb read_frame(abs source: Buffer) -> Result[Frame, DecodeError] {
+    ...
+}
+```
+
+The supported section names are `purpose`, `inputs`, `outputs`, `ownership`,
+`invariants`, `errors`, `side_effects`, and `abi`. This syntax documents the
+existing behavior only: it does not add runtime checks, change ownership
+analysis, or alter native lowering. Unknown, duplicate, empty contracts, or
+otherwise malformed structured contracts produce parser diagnostic `E0014`.
+Ordinary documentation
+strings without `contract:` keep their existing meaning. See
+`docs/decisions/ADR-0065-structured-verb-contracts.md` for the complete
+contract and compatibility rules.
+
 ### 4.3 Whitespace and punctuation
 
 Use semicolons after statements. Braces delimit blocks. Commas separate

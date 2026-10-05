@@ -110,6 +110,7 @@ fn generated_encoder(
     VerbDecl {
         is_open: false,
         doc: Some(GENERATED_DOC.to_owned()),
+        contract: None,
         metadata: Vec::new(),
         name: format!("{}_encode", contract.name.to_ascii_lowercase()),
         generic_parameters: Vec::new(),
@@ -152,6 +153,7 @@ fn generated_decoder(
     VerbDecl {
         is_open: false,
         doc: Some(GENERATED_DOC.to_owned()),
+        contract: None,
         metadata: Vec::new(),
         name: format!("{}_decode", contract.name.to_ascii_lowercase()),
         generic_parameters: Vec::new(),
