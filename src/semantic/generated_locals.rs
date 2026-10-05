@@ -142,7 +142,7 @@ fn normalize_statement(
             let (prefix, expression) = normalize_expression(value, signatures, counter, used_names);
             generated.extend(prefix);
             *value = expression;
-            normalize_place(target, signatures, counter, used_names, generated);
+            normalize_place(target, signatures, counter, generated);
         }
         Stmt::If { condition, then_branch, else_branch, .. } => normalize_if(
             condition,
@@ -223,16 +223,15 @@ fn normalize_place(
     place: &mut Place,
     signatures: &SignatureMap,
     counter: &mut usize,
-    used_names: &mut HashSet<String>,
     generated: &mut Vec<Stmt>,
 ) {
     if let Place::Index { target, index, .. } = place {
-        normalize_place(target, signatures, counter, used_names, generated);
+        normalize_place(target, signatures, counter, generated);
         let (prefix, expression) = normalize_nested_expression(index, signatures, counter);
         generated.extend(prefix);
         *index = expression;
     } else if let Place::Field { object, .. } = place {
-        normalize_place(object, signatures, counter, used_names, generated);
+        normalize_place(object, signatures, counter, generated);
     }
 }
 
@@ -372,12 +371,7 @@ fn type_name(value: &TypeName) -> String {
         format!(
             "{}[{}]",
             value.name,
-            value
-                .arguments
-                .iter()
-                .map(|argument| type_name(argument))
-                .collect::<Vec<_>>()
-                .join(",")
+            value.arguments.iter().map(type_name).collect::<Vec<_>>().join(",")
         )
     }
 }

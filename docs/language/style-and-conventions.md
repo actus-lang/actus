@@ -270,6 +270,13 @@ ambiguous expressions. Write `abs value` or `ins value` when source-level
 clarity is preferred; an explicit role remains the opt-out form. Unsafe or
 ambiguous omissions continue to produce `E1016` at the argument expression.
 
+For a direct call, an explicit `abs` may qualify a pure scalar expression such
+as `abs (index + 1u32)` or `abs values[index]`. The compiler materializes the
+short-lived scalar owner required by the call. Keep aggregates, buffers,
+borrows, mutation, and ownership transfers in named bindings so their lifetime
+and ownership remain visible. The formatter preserves the source expression;
+it never prints the compiler-owned temporary.
+
 ## 7. Canonical Formatting
 
 The canonical formatter must enforce:
@@ -280,6 +287,8 @@ The canonical formatter must enforce:
 - one space after type-annotation colons;
 - no trailing whitespace;
 - K&R / 1TBS braces.
+- compiler-owned scalar temporaries are never emitted as source declarations;
+  their source expression remains the canonical formatted form;
 
 ```act
 verb loop_example() -> Int {

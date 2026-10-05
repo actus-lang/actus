@@ -80,6 +80,29 @@ terminal ownership. Borrowed views cannot escape their source scope. The
 compiler rejects use-after-move, mutation through a frozen view, aliased
 exclusive loans, and double cleanup before native code generation.
 
+### 2.1 Pure scalar call expressions
+
+When a direct static call uses an explicit `abs` role with a pure scalar
+expression, Actus may create the short-lived owner binding internally:
+
+```act
+verb read(abs value: u32) -> Int {
+    return value as Int;
+}
+
+verb main() -> Int {
+    erg index: u32 = 41u32;
+    return read(value: abs (index + 1u32));
+}
+```
+
+This applies to scalar arithmetic, casts, comparisons, bitwise expressions,
+and bounded scalar indexing. Calls, borrows, mutation, aggregates, buffers,
+resources, and ownership transfers remain explicit. The hidden binding is not
+shown by the formatter or LSP, does not alter the caller's ownership state,
+and uses the same deterministic cleanup and native lowering as an explicit
+`erg` temporary.
+
 ## 3. Standard-library errors and cleanup
 
 Fallible `std::io`, `std::fs`, and `std::path` operations return typed

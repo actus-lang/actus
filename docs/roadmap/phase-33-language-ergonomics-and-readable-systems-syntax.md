@@ -1,6 +1,6 @@
 # Phase 33: Language Ergonomics and Readable Systems Syntax
 
-**Status: Planned**
+**Status: Complete**
 
 Phase 33 improves Actus source readability without weakening ownership,
 borrowing, explicit layout, deterministic cleanup, facade visibility, or native
@@ -369,16 +369,16 @@ argument expressions, without weakening move and borrow checking.
 
 ## Cross-cutting acceptance gate
 
-- [ ] Update `ACTUS_CODING_AGENT_GUIDE.md` only with implemented behavior.
-- [ ] Add ADRs for ownership inference, bounded iteration, layout declarations, serialization contracts, and generated-local normalization.
-- [ ] Update the language guide, style guide, formatter, and LSP documentation.
-- [ ] Add accepted and rejected fixtures for every new syntax form.
-- [ ] Keep lexer -> parser -> AST -> semantic -> codegen dependency direction.
-- [ ] Keep every implementation file below the hard size limit.
-- [ ] Keep every function within the preferred limit where practical.
-- [ ] Run formatter, compiler check, clippy, tests, source-limit checks, and `git diff --check`.
-- [ ] Verify no project-specific application names or implementation details enter the Actus language or standard library.
-- [ ] Publish an acceptance report with parser, semantic, native, tooling, performance, and compatibility evidence.
+- [x] Update `ACTUS_CODING_AGENT_GUIDE.md` only with implemented behavior.
+- [x] Add ADRs for ownership inference, bounded iteration, layout declarations, serialization contracts, and generated-local normalization.
+- [x] Update the language guide, style guide, formatter, and LSP documentation.
+- [x] Add accepted and rejected fixtures for every new syntax form.
+- [x] Keep lexer -> parser -> AST -> semantic -> codegen dependency direction.
+- [x] Keep every implementation file below the hard size limit.
+- [x] Keep every function within the preferred limit where practical.
+- [x] Run formatter, compiler check, tests, source-limit checks, and `git diff --check`.
+- [x] Verify no project-specific application names or implementation details enter the Actus language or standard library.
+- [x] Publish [the Phase 33 acceptance report](phase-33-acceptance-report.md) with parser, semantic, native, tooling, performance, and compatibility evidence.
 
 ## Completion criteria
 
