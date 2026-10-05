@@ -303,6 +303,24 @@ fn std_fs_atomic_write_publishes_after_staging_flush() {
 }
 
 #[test]
+fn std_fs_atomic_write_removes_staging_after_failed_publication() {
+    let root = std::env::temp_dir().join(format!("actus-fs-atomic-failure-{}", std::process::id()));
+    let data_path = root.join("atomic-target");
+    let staging_path = root.join("atomic-target.tmp");
+    fs::create_dir_all(&data_path).expect("create non-file publication target");
+    let data_literal = path_literal_for(&data_path, "data");
+    let staging_literal = path_literal_for(&staging_path, "staging");
+    let source = format!(
+        "import io; import fs; verb main() -> Int {{ erg data_raw = Buffer[0]; {data_literal} erg staging_raw = Buffer[0]; {staging_literal} erg contents = Buffer[0]; append(contents, 65); erg result = write_file_atomic(path: abs data, staging: dat staging, contents: abs contents); return case dat result {{ Result.Ok(_) => 1, Result.Err(_) => 0, }}; }}"
+    );
+    let (input, output) = write_fixture(&root, "main.act", &source);
+    build_and_run(&input, &output);
+    assert!(data_path.is_dir());
+    assert!(!staging_path.exists());
+    fs::remove_dir_all(root).expect("remove failed atomic fixture");
+}
+
+#[test]
 fn std_fs_round_trips_a_large_position_independent_payload() {
     let root = std::env::temp_dir().join(format!("actus-fs-large-payload-{}", std::process::id()));
     let data_path = root.join("large.brain");

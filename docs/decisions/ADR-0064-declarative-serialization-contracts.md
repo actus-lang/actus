@@ -137,10 +137,15 @@ hook.
 - add reference-byte, corruption, truncation, version, and staged-file tests;
 - compare object and executable output against an explicit reference encoder.
 
-The failed-publication recovery case is currently blocked by a compiler bug:
-returning an error after moving an aggregate `dat` value with owned storage can
-emit an invalid second drop. The compiler must make that move/drop path
-deterministic before the recovery test can be accepted.
+The failed-publication recovery case is accepted after closing the compiler
+ownership boundary that it exposed. Regular enum payloads are stored inline in
+their containing result, while the native representation of an owned enum is
+an allocation. When a case extracts such a payload, native lowering now
+materializes an owned enum allocation and copies the inline bytes into it.
+This keeps subsequent `dat` calls and cleanup on valid allocation boundaries.
+The regression verifies that a failed rename removes the staging file,
+preserves the existing destination directory, and exits without an invalid
+free or signal.
 
 The native migration regression uses an independent reference frame: version
 `2`, payload byte `7`, and the little-endian IEEE CRC32 bytes

@@ -462,6 +462,13 @@ type or `Result.Ok(...)`/`Result.Err(...)` where inference has enough context.
 Pattern matching extracts payloads. `?` propagates a compatible `Err` from a
 fallible expression.
 
+When native lowering extracts a regular enum payload from another enum, it
+materializes an owned payload allocation before the binding is used. This keeps
+`dat` transfers and cleanup on valid allocation boundaries; inline struct
+payloads continue to use their containing storage directly. Compiler changes
+must preserve this distinction and cover both accepted execution and cleanup
+regressions.
+
 ## 7. Ownership roles
 
 ### 7.1 `erg`: active owner
