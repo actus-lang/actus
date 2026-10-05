@@ -268,6 +268,8 @@ The implemented vocabulary includes the following groups.
 
 - `return` exits a verb and unwinds owned resources in affected scopes.
 - `loop` creates a loop body.
+- `for` creates a bounded range or fixed-array index iteration.
+- `in` separates a `for` binding from its bounded source.
 - `break` exits the nearest loop.
 - `continue` starts the next iteration of the nearest loop.
 - `case` performs pattern matching.
@@ -779,8 +781,38 @@ loop {
 
 `break` and `continue` target the nearest enclosing loop. They unwind local
 owned values correctly. Loop-carried state must be initialized and updated in
-an ownership-safe way. `for` and `while` are not substitutes; they are not
-currently general loop syntax.
+an ownership-safe way.
+
+Actus also supports two bounded `for` forms:
+
+```act
+for erg index: u32 in 0u32 .. 8u32 {
+    total += index;
+}
+
+for erg index: u32 in values {
+    total += values[index];
+}
+```
+
+The range is half-open: `start` is included and `end` is excluded. Both range
+bounds must have the declared primitive integer type of the `erg` index
+binding. Empty and reversed ranges execute zero times. Values that overflow
+the declared bound type are rejected during semantic analysis.
+
+The collection form is index iteration over a statically known `Array[T, N]`.
+It also supports pack fields backed by fixed arrays. The compiler derives the
+finite bound from the array layout; the loop does not discover a runtime
+length. The binding is an explicit `erg` integer index. `abs`, `ins`, and `dat`
+bindings are parsed but rejected by semantic analysis in the current profile.
+
+Dynamic collections, scalar sources, unbounded iterators, runtime length
+discovery, and hidden collection allocation are not valid `for` sources. Native
+lowering emits integer condition, body, increment, and exit blocks. `continue`
+always targets the increment block, so it cannot skip index advancement. The
+existing cleanup plan applies to `break`, `continue`, nested loops, and early
+return. Formatter, definition lookup, and hover preserve and expose the loop
+binding like other local bindings.
 
 ### 11.4 Assignment
 
@@ -2061,7 +2093,7 @@ runtime profile, and standard-library support outside the language syntax.
 
 The following require separate evidence and must not be invented in examples:
 
-- general `for`, `while`, or iterator syntax;
+- unbounded `for`, `while`, or general iterator syntax;
 - async/await, tasks, actors, closures, lambdas, macros, or REPL;
 - automatic numeric promotion or implicit casts;
 - null values or nullable references;
