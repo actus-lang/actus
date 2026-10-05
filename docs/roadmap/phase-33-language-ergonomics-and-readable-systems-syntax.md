@@ -247,7 +247,7 @@ The remaining work is split into bounded sub-gates:
 - [x] Define and execute the allocation-free validation operation generated from the contract.
 - [x] Define typed `SerializationError` results for generated operations.
 - [ ] Require explicit ownership roles for buffers and paths.
-- [ ] Define atomic write and torn-write protection hooks.
+- [x] Define atomic write and torn-write protection hooks.
 - [x] Reject declarations that produce ambiguous or overlapping fields.
 - [ ] Document generated API names and compatibility rules in an ADR.
 
@@ -271,7 +271,7 @@ The remaining work is split into bounded sub-gates:
 - [x] Add generated migration with explicit source and target versions, checksum rewrite, and native execution evidence.
 - [ ] Add round-trip tests for fixed and dynamic layouts.
 - [ ] Add corruption, truncation, checksum, version, and overlapping-field tests.
-- [ ] Add atomic commit and staged-file recovery tests.
+- [x] Add atomic commit and staged-file recovery tests.
 - [ ] Compare generated serialization with an explicit reference implementation.
 - [ ] Add native object and executable parity tests.
 - [ ] Record byte-level compatibility evidence.

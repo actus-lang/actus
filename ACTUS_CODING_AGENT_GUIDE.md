@@ -1486,13 +1486,16 @@ The filesystem facade includes:
 - `file_open`, `file_create`, `file_read`, `file_write`, `file_flush`,
   `file_close`, and file seek operations;
 - `read_to_bytes` and `read_to_string`;
-- `write_file`;
+- `write_file` and `write_file_atomic`;
 - `remove_file`, `rename`, `copy_file`, `create_dir`, and `remove_dir`;
 - metadata access through paths and file handles.
 
 All public operations return typed `Result` contracts. Files and buffers are
 owned resources and must be passed with the correct role. A failed operation
 must preserve the documented owner and cleanup behavior.
+`write_file_atomic` consumes a caller-selected staging `Path`, flushes the
+staging file, renames it to the final destination, and removes staging on
+failure. Manifest publication and directory durability remain caller policy.
 
 ### 20.4 `std::path`
 

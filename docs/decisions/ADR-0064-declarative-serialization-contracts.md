@@ -107,10 +107,14 @@ declared layout. It preserves source spans for each section and reports errors
 at the declaration that introduced the conflict.
 
 Atomic persistence is a library hook, not an implicit side effect of encode.
-The filesystem facade may write `name.tmp`, flush and validate the complete
-bytes, atomically rename the file, and then publish a manifest update. Recovery
-must ignore uncommitted staged files. The serializer only produces and checks
-bytes; it does not decide when a commit is durable.
+The `std::fs::write_file_atomic` hook accepts the final path as `abs`, a
+caller-selected same-filesystem staging path as `dat`, and serialized bytes as
+`abs`. It writes and flushes the staging file, atomically renames it to the
+final path, and removes the staging path when writing, flushing, or renaming
+fails. Recovery must ignore uncommitted staged files. The serializer only
+produces and checks bytes; it does not decide when a commit is durable. A
+separate manifest update and directory durability policy remain above this
+hook.
 
 ## Rejected alternatives
 
