@@ -6,6 +6,25 @@ use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::packs::{field_mask, mapped_bit_offset_for_storage, sign_extend_field};
 
+pub(super) fn lower_indexed_pack_field_address(
+    function: &mut FunctionBuilder<'_>,
+    storage: Value,
+    storage_type: NativeType,
+    field: &PackFieldLayout,
+) -> Result<Value, NativeEmitError> {
+    if !matches!(storage_type, NativeType::Array(_)) {
+        return Err(NativeEmitError(
+            "indexed packed fields require byte-addressable storage".to_owned(),
+        ));
+    }
+    if field.offset % 8 != 0 || field.width % 8 != 0 {
+        return Err(NativeEmitError(
+            "indexed packed fields require byte-aligned elements".to_owned(),
+        ));
+    }
+    Ok(function.ins().iadd_imm_s(storage, i64::from(u32::from(field.offset / 8))))
+}
+
 pub(super) fn lower_inline_pack_field(
     function: &mut FunctionBuilder<'_>,
     storage: Value,

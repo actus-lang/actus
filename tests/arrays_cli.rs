@@ -16,6 +16,26 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_indexed_pack_field_reads_and_writes_natively() {
+    let status = run_array_fixture(
+        "indexed-pack-field-read-write",
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; erg index: u32 = 1u32; example.links[index] = 41u32; return example.links[index] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_compound_indexed_pack_field_updates_natively() {
+    let status = run_array_fixture(
+        "compound-indexed-pack-field-update",
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; erg index: u32 = 1u32; example.links[index] = 40u32; example.links[index] += 1u32; return example.links[index] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_crc32_intrinsic_through_the_native_runtime() {
     let status = run_array_fixture(
         "crc32-intrinsic",

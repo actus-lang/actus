@@ -31,15 +31,29 @@ impl LayoutRegistry {
         Ok(PackFieldLayout {
             name: field.name.clone(),
             role,
-            ty: self.native_type(&field.ty.name, &mut Vec::new())?,
+            ty: self.type_for_type_name(&field.ty).ok_or_else(|| {
+                NativeEmitError(format!("unknown packed field type `{}`", field.ty.canonical_key()))
+            })?,
             offset: field.offset,
             width,
+            indexed_count: indexed_field_count(field),
         })
     }
 }
 
+fn indexed_field_count(field: &PackField) -> Option<u32> {
+    (field.ty.name == "Array" && field.ty.arguments.len() == 2)
+        .then(|| field.ty.arguments[1].name.parse::<u32>().ok())
+        .flatten()
+}
+
 fn packed_field_width(field: &PackField) -> Result<u8, NativeEmitError> {
-    primitive_type(&field.ty.name)
+    let primitive = if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
+        &field.ty.arguments[0]
+    } else {
+        &field.ty
+    };
+    primitive_type(&primitive.name)
         .and_then(|primitive| match primitive {
             PrimitiveType::Integer { width, .. } => Some(width),
             _ => None,

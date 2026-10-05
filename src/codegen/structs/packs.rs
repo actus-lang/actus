@@ -299,6 +299,14 @@ pub(crate) fn lower_pack_field(
     let pack =
         layouts.pack(pack_id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, field)?;
+    if field_layout.indexed_count.is_some() {
+        return super::inline_pack::lower_indexed_pack_field_address(
+            function,
+            storage,
+            pack.storage,
+            field_layout,
+        );
+    }
     if let NativeType::Array(_) = pack.storage {
         return super::inline_pack::lower_inline_pack_field(
             function,

@@ -114,7 +114,8 @@ pub struct PackFieldContract {
     pub role: String,
     pub ty: String,
     pub offset: u16,
-    pub width: u8,
+    pub width: u16,
+    pub indexed_count: Option<u32>,
     pub has_default: bool,
 }
 

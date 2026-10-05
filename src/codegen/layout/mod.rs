@@ -42,6 +42,7 @@ pub(super) struct PackFieldLayout {
     pub(super) ty: NativeType,
     pub(super) offset: u16,
     pub(super) width: u8,
+    pub(super) indexed_count: Option<u32>,
 }
 
 #[derive(Clone, Debug)]
