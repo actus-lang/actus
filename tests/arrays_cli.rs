@@ -116,6 +116,16 @@ fn executes_generated_serialization_migration_natively() {
 
 #[cfg(unix)]
 #[test]
+fn matches_reference_bytes_after_generated_serialization_migration() {
+    let status = run_array_fixture(
+        "generated-serialization-migration-reference-bytes",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg output = Buffer[0]; erg from_version: u16 = 1u16; erg to_version: u16 = 2u16; erg result = frame_migrate(input: abs input, from_version: abs from_version, to_version: abs to_version, output: ins output); return case dat result { Result.Ok(count) => if count == 8u32 && output[0] == 2u8 && output[1] == 0u8 && output[2] == 7u8 && output[3] == 223u8 && output[4] == 152u8 && output[5] == 161u8 && output[6] == 98u8 && output[7] == 43u8 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

@@ -136,3 +136,8 @@ hook.
 - expose `SerializationError` as a compiler-provided enum;
 - add reference-byte, corruption, truncation, version, and staged-file tests;
 - compare object and executable output against an explicit reference encoder.
+
+The native migration regression uses an independent reference frame: version
+`2`, payload byte `7`, and the little-endian IEEE CRC32 bytes
+`DF 98 A1 62`. The executable must produce those exact eight bytes, including
+the unchanged trailing byte, before the byte-compatibility gate can close.

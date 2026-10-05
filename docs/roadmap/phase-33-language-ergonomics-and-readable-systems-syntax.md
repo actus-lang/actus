@@ -272,9 +272,9 @@ The remaining work is split into bounded sub-gates:
 - [ ] Add round-trip tests for fixed and dynamic layouts.
 - [ ] Add corruption, truncation, checksum, version, and overlapping-field tests.
 - [x] Add atomic commit and staged-file recovery tests.
-- [ ] Compare generated serialization with an explicit reference implementation.
+- [x] Compare generated serialization with an explicit reference implementation.
 - [ ] Add native object and executable parity tests.
-- [ ] Record byte-level compatibility evidence.
+- [x] Record byte-level compatibility evidence.
 
 ### Gate 33.6 — Multi-line verb contracts
 
