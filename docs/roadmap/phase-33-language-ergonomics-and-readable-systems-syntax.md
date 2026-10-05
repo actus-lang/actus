@@ -345,22 +345,25 @@ argument expressions, without weakening move and borrow checking.
 
 #### Compiler implementation
 
-- [ ] Add a semantic normalization pass that materializes approved scalar temporaries before role checking.
-- [ ] Preserve original source spans in diagnostics and generated IR metadata.
-- [ ] Ensure generated locals cannot escape their call scope.
-- [ ] Verify cleanup and drop behavior remains unchanged.
+- [x] Add a semantic normalization pass that materializes approved scalar temporaries before role checking.
+- [x] Preserve original source spans in diagnostics and normalized semantic metadata.
+- [x] Ensure generated locals cannot escape their call scope.
+- [x] Verify cleanup and drop behavior remains unchanged through the existing semantic and native suites.
 - [ ] Ensure native lowering does not introduce unnecessary allocation or runtime symbols.
-- [ ] Add formatter and LSP behavior that does not invent misleading source declarations.
-- [ ] Keep the transformation deterministic across object and executable builds.
+- [x] Add formatter and LSP behavior that does not invent misleading source declarations.
+- [x] Keep the transformation deterministic across object and executable builds.
 
 #### Evidence
 
-- [ ] Add accepted tests for arithmetic, indexing, and offset arguments.
+- [x] Add accepted tests for pure arithmetic arguments.
+- [ ] Add accepted tests for indexing and offset arguments.
+- [x] Add rejected tests for nested call expressions.
 - [ ] Add rejected tests for side effects, aggregates, and ownership escapes.
 - [ ] Add use-after-move and borrow-conflict regressions.
 - [ ] Compare explicit-binding and generated-binding native output.
-- [ ] Add object/executable parity and no-extra-allocation evidence.
-- [ ] Record the accepted normalization boundary.
+- [x] Add object/executable parity evidence.
+- [ ] Add no-extra-allocation evidence.
+- [x] Record the accepted normalization boundary.
 
 ## Cross-cutting acceptance gate
 

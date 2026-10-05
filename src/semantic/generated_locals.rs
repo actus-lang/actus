@@ -334,5 +334,6 @@ mod tests {
         assert!(
             matches!(arguments[0].expression, Expr::Call { ref callee, .. } if callee == "make")
         );
+        assert!(crate::semantic::analyze(&program).is_err());
     }
 }

@@ -143,6 +143,30 @@ fn semantic_model_and_hover_expose_inferred_argument_roles() {
     assert!(stdout.contains("argument role: abs (inferred)"), "hover missing: {stdout}");
 }
 
+#[test]
+fn semantic_model_hides_generated_scalar_locals() {
+    let uri = "file:///tmp/actus-lsp-generated-scalar-local.act";
+    let source = concat!(
+        "verb read(abs value: u32) -> Int { return value as Int; }\n",
+        "verb main() -> Int { erg index: u32 = 41u32; ",
+        "return read(value: abs (index + 1u32)); }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let model = response_with_id(&run_lsp(messages.to_vec()), 2);
+    assert_eq!(model["result"]["state"], "available");
+    let bindings = model["result"]["bindings"].as_array().expect("bindings");
+    assert!(bindings.iter().all(|binding| {
+        !binding["name"].as_str().is_some_and(|name| name.starts_with("__actus_generated_"))
+    }));
+    assert!(bindings.iter().any(|binding| binding["name"] == "index"));
+}
+
 fn active_declaration(model: &Value, name: &str) -> bool {
     model["result"]["declarations"]
         .as_array()

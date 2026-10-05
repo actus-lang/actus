@@ -19,7 +19,6 @@ fn native_object_contains_a_stable_entry_symbol_and_code_section() {
     let bytes = emit_zero_return_object("actus_entry").expect("native object should emit");
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
-
     assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "actus_entry")));
     assert!(file.sections().any(|section| section.kind() == object::SectionKind::Text));
 }

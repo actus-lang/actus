@@ -111,7 +111,8 @@ IR metadata may identify generated locals for compiler diagnostics and tests.
 - [x] Define single evaluation and deterministic ordering.
 - [x] Define generated-local ownership and scope.
 - [x] Preserve explicit bindings as the escape hatch.
-- [ ] Add semantic normalization and generated-local metadata.
-- [ ] Add accepted and rejected semantic tests.
-- [ ] Add native object/executable parity and no-allocation evidence.
+- [x] Add semantic normalization and generated-local metadata.
+- [x] Add accepted and rejected semantic tests.
+- [x] Add native object/executable parity evidence.
+- [ ] Add native no-allocation evidence that distinguishes emitted runtime declarations from executed calls.
 - [ ] Update the implementation guide after behavior is shipped.
