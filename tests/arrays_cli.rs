@@ -183,6 +183,63 @@ fn executes_inferred_abs_and_ins_roles_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_generated_scalar_abs_argument_natively() {
+    let status = run_array_fixture(
+        "generated-scalar-abs-argument",
+        "verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg index: u32 = 41u32; return read(value: abs (index + 1u32)); }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn emits_object_and_executable_for_generated_scalar_abs_argument() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-generated-scalar-abs-parity-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let object = root.with_extension("o");
+    let executable = root.with_extension("bin");
+    let source = "verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg index: u32 = 41u32; return read(value: abs (index + 1u32)); }";
+    fs::write(&input, source).expect("write generated scalar parity fixture");
+
+    let object_result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "obj".to_owned(),
+            "-o".to_owned(),
+            object.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(object_result, 0);
+    assert!(fs::metadata(&object).expect("object should be emitted").len() > 0);
+
+    let executable_result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            executable.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(executable_result, 0);
+    let status = std::process::Command::new(&executable)
+        .status()
+        .expect("generated scalar parity executable should run");
+    assert_eq!(status.code(), Some(42));
+
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(object);
+    let _ = fs::remove_file(executable);
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_indexed_array_backed_pack_storage_natively() {
     let status = run_array_fixture(
         "array-backed-pack-storage",
