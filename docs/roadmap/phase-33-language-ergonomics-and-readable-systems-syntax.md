@@ -273,7 +273,7 @@ The remaining work is split into bounded sub-gates:
 - [ ] Add corruption, truncation, checksum, version, and overlapping-field tests.
 - [x] Add atomic commit and staged-file recovery tests.
 - [x] Compare generated serialization with an explicit reference implementation.
-- [ ] Add native object and executable parity tests.
+- [x] Add native object and executable parity tests.
 - [x] Record byte-level compatibility evidence.
 
 ### Gate 33.6 — Multi-line verb contracts

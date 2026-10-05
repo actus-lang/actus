@@ -126,6 +126,53 @@ fn matches_reference_bytes_after_generated_serialization_migration() {
 
 #[cfg(unix)]
 #[test]
+fn emits_object_and_executable_for_the_same_serialization_contract() {
+    let root =
+        std::env::temp_dir().join(format!("actus-serialization-parity-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let object = root.with_extension("o");
+    let executable = root.with_extension("bin");
+    let source = "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; erg byte_4: u8 at 32; erg byte_5: u8 at 40; erg byte_6: u8 at 48; erg byte_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg source = FramePack { storage: Array[u8, 8](), }; erg output = Buffer[0]; erg result = frame_encode(value: abs source, output: ins output); return case dat result { Result.Ok(count) => if count == 8u32 { 0 } else { 1 }, Result.Err(_) => 2, }; }";
+    fs::write(&input, source).expect("write serialization parity fixture");
+
+    let object_result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "obj".to_owned(),
+            "-o".to_owned(),
+            object.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(object_result, 0);
+    assert!(fs::metadata(&object).expect("object should be emitted").len() > 0);
+
+    let executable_result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            executable.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(executable_result, 0);
+    let status = std::process::Command::new(&executable)
+        .status()
+        .expect("serialization parity executable should run");
+    assert_eq!(status.code(), Some(0));
+
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(object);
+    let _ = fs::remove_file(executable);
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",
