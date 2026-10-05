@@ -63,6 +63,23 @@ fn facade_reexports_open_child_module_symbols() {
 }
 
 #[test]
+fn facade_reexports_open_sibling_facade_symbols() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime;");
+    fixture.write("aie/runtime.act", "open api;");
+    fixture.write(
+        "aie/api.act",
+        "open verb start() -> Int { return 7; } verb private_helper() -> Int { return 0; }",
+    );
+
+    let exports = exports_module(&ModuleResolver::new(&fixture.root), "aie")
+        .expect("nested sibling facade exports should resolve");
+
+    assert!(exports.contains("verb", "start"));
+    assert!(!exports.contains("verb", "private_helper"));
+}
+
+#[test]
 fn closed_child_module_is_not_reexported_by_parent_facade() {
     let fixture = Fixture::new();
     fixture.write("aie/aie.act", "");

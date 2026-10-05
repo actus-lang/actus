@@ -162,7 +162,9 @@ fn append_exports(
 }
 
 fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
-    let facade_open = parsed[0]
+    let mut symbols = Vec::new();
+    let mut visited = HashSet::new();
+    let facade_opens = parsed[0]
         .1
         .declarations
         .iter()
@@ -170,22 +172,39 @@ fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
             TopLevelDecl::OpenSibling(sibling) => Some(sibling.name.as_str()),
             _ => None,
         })
-        .collect::<std::collections::HashSet<_>>();
-    let mut symbols = Vec::new();
-    for (index, (path, program)) in parsed.iter().enumerate() {
-        let sibling_name = path.file_stem().and_then(|stem| stem.to_str());
-        if index > 0 && sibling_name.is_some_and(|name| facade_open.contains(name)) {
-            symbols.extend(program.declarations.iter().filter_map(|declaration| {
-                let (kind, name) = export_identity(declaration)?;
-                declaration_is_open(declaration).then(|| ExportedSymbol {
-                    kind: kind.to_owned(),
-                    name,
-                    source: path.clone(),
-                })
-            }));
-        }
+        .collect::<Vec<_>>();
+    for sibling_name in facade_opens {
+        collect_open_sibling_exports(sibling_name, parsed, &mut visited, &mut symbols);
     }
     ModuleExports { symbols }
+}
+
+fn collect_open_sibling_exports(
+    sibling_name: &str,
+    parsed: &[(PathBuf, Program)],
+    visited: &mut HashSet<String>,
+    symbols: &mut Vec<ExportedSymbol>,
+) {
+    if !visited.insert(sibling_name.to_owned()) {
+        return;
+    }
+    let Some((path, program)) = parsed
+        .iter()
+        .skip(1)
+        .find(|(path, _)| path.file_stem().and_then(|stem| stem.to_str()) == Some(sibling_name))
+    else {
+        return;
+    };
+    for declaration in &program.declarations {
+        if let Some((kind, name)) = export_identity(declaration)
+            && declaration_is_open(declaration)
+        {
+            symbols.push(ExportedSymbol { kind: kind.to_owned(), name, source: path.clone() });
+        }
+        if let TopLevelDecl::OpenSibling(open) = declaration {
+            collect_open_sibling_exports(&open.name, parsed, visited, symbols);
+        }
+    }
 }
 
 fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
