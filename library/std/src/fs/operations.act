@@ -287,6 +287,11 @@ open verb write_and_flush(abs path: Path, abs contents: Buffer) -> Result[Int, I
             return case dat written {
                 Result.Err(error) => Result[Int, IoError].Err(error),
                 Result.Ok(count) => {
+                    erg expected = buffer_length(buffer: abs contents);
+                    case count - expected {
+                        0 => {},
+                        _ => { return Result[Int, IoError].Err(IoError.Failed); },
+                    };
                     erg flushed = file.flush();
                     return case dat flushed {
                         Result.Ok(_) => Result[Int, IoError].Ok(count),
