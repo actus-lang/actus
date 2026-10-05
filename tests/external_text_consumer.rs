@@ -16,10 +16,20 @@ fn writable_fixture_root() -> PathBuf {
         std::env::temp_dir().join(format!("actus-external-text-consumer-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create writable fixture source directory");
     fs::create_dir_all(root.join("tests")).expect("create writable fixture test directory");
-    for relative_path in ["Actus.toml", "Actus.lock", "src/main.act", "tests/text_boundary.act"] {
+    for relative_path in ["Actus.toml", "src/main.act", "tests/text_boundary.act"] {
         fs::copy(source.join(relative_path), root.join(relative_path))
             .unwrap_or_else(|error| panic!("copy fixture `{relative_path}`: {error}"));
     }
+    let lock = Command::new(compiler())
+        .arg("lock")
+        .current_dir(&root)
+        .output()
+        .expect("generate writable fixture lockfile");
+    assert!(
+        lock.status.success(),
+        "lock generation failed: {}",
+        String::from_utf8_lossy(&lock.stderr)
+    );
     root
 }
 
