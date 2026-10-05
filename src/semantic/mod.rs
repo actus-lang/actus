@@ -9,6 +9,7 @@ mod enum_constructors;
 mod enum_registry;
 mod enums;
 mod errors;
+mod generated_locals;
 mod generic_cache;
 mod generic_calls;
 mod generics;
@@ -33,6 +34,7 @@ mod types;
 pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
+pub(crate) use generated_locals::normalize_program as normalize_generated_locals;
 pub use model::{
     ArgumentRoleFact, ArgumentRoleSource, Binding, BorrowRecord, ConditionalFact, DynamicRoleType,
     ExclusiveLoan, FatPointerLayout, GenericInstance, LiteralFact, Origin, OriginRecord,

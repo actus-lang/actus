@@ -121,6 +121,7 @@ fn bindings(source: &str, index: &LineIndex, model: &SemanticModel) -> Vec<Value
         .bindings
         .iter()
         .enumerate()
+        .filter(|(_, binding)| !binding.name.starts_with("__actus_generated_"))
         .map(|(binding_index, binding)| {
             let type_name = model
                 .binding_type_names

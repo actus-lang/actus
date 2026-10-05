@@ -331,15 +331,17 @@ Provide first-class readable contracts for public and internal verbs.
 Remove repetitive temporary bindings required only to satisfy role-sensitive
 argument expressions, without weakening move and borrow checking.
 
+**Gate status: In progress — the accepted normalization boundary is recorded in [ADR-0066](../decisions/ADR-0066-compiler-generated-scalar-locals.md); compiler implementation and evidence remain**
+
 #### Design
 
-- [ ] Define the exact expression positions where a compiler-generated local may be introduced.
-- [ ] Limit the feature to pure scalar expressions with known type and lifetime.
-- [ ] Require single evaluation and deterministic left-to-right ordering.
-- [ ] Preserve explicit bindings as the canonical escape hatch.
-- [ ] Reject buffers, aggregates, resources, calls, mutation, and expressions with observable side effects.
-- [ ] Define ownership role assignment for generated locals.
-- [ ] Document diagnostics and migration behavior.
+- [x] Define the exact expression positions where a compiler-generated local may be introduced in ADR-0066.
+- [x] Limit the feature to pure scalar expressions with known type and lifetime.
+- [x] Require single evaluation and deterministic left-to-right ordering.
+- [x] Preserve explicit bindings as the canonical escape hatch.
+- [x] Reject buffers, aggregates, resources, calls, mutation, and expressions with observable side effects.
+- [x] Define ownership role assignment for generated locals.
+- [x] Document diagnostics and migration behavior.
 
 #### Compiler implementation
 

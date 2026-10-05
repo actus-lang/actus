@@ -11,7 +11,7 @@ use super::result_constructor_spans::initializer_span;
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
 pub(crate) fn normalize_program(program: &Program) -> Program {
-    let mut normalized = program.clone();
+    let mut normalized = crate::semantic::normalize_generated_locals(program);
     super::serialization_generation::append_builtin_serialization_error(&mut normalized);
     append_generated_serialization_validators(&mut normalized);
     super::serialization_generation::append_generated_serialization_encoders(&mut normalized);

@@ -24,5 +24,6 @@ use super::model::SemanticModel;
 use crate::ast::Program;
 
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
-    Analyzer::new().analyze(program)
+    let normalized = super::normalize_generated_locals(program);
+    Analyzer::new().analyze(&normalized)
 }
