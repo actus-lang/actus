@@ -37,8 +37,11 @@ range. `checksum` names an explicit algorithm and coverage interval. Alignment
 For a contract named `Frame`, the compiler reserves deterministic generated
 API names `frame_encode`, `frame_decode`, `frame_validate`, and `frame_migrate`.
 These names are checked for collisions before native lowering. The first
-implementation may expose them incrementally, but their names and compatibility
-rules are fixed by this ADR.
+implementation now exposes `frame_validate` as an allocation-free wrapper. It
+accepts a caller-owned `Buffer` and an expected version, then passes the
+declared offsets, lengths, endianness, and checksum range to the runtime
+validator. Encode, decode, and migration remain later implementation gates;
+their names and compatibility rules are fixed by this ADR.
 and padding are declarations, never inferred from the host ABI.
 
 The initial profile supports `little` and `big` endian integer fields, explicit

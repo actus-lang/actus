@@ -212,7 +212,7 @@ sources, and incompatible bounds remain rejected by the shared `for` rules.
 Make binary serialization readable while keeping byte order, offsets, widths,
 checksums, versions, and failure behavior explicit.
 
-**Gate status: In progress — fixed contract syntax and semantic validation implemented; generated APIs pending**
+**Gate status: In progress — fixed validation is generated and executable; encode/decode/migration and persistence remain**
 
 The remaining work is split into bounded sub-gates:
 
@@ -249,7 +249,7 @@ The remaining work is split into bounded sub-gates:
 - [x] Add serialization declarations to the parser and AST.
 - [x] Validate field order, offsets, widths, alignment, and total size.
 - [ ] Generate typed read/write operations through the existing facade and ABI boundaries.
-- [ ] Generate checksum and version validation without hidden allocation.
+- [x] Generate checksum and version validation without hidden allocation.
 - [ ] Preserve hand-written escape hatches only through explicit declarations.
 - [ ] Emit deterministic native code and stable diagnostics.
 - [x] Add formatter support for serialization contracts.
