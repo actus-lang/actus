@@ -12,13 +12,13 @@ impl Analyzer {
         subject: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let Expr::Identifier { name, span: subject_span } = subject else {
+        let Some((name, subject_span)) = borrow_base(subject) else {
             return Err(invalid_case_role("abs", "non-binding", span));
         };
         let index = self.binding(name, *subject_span)?;
         self.ensure_readable(index, name, *subject_span)?;
         if self.model.bindings[index].role != Role::Abs {
-            self.add_borrow(name, None, index, span);
+            self.add_borrow(name, borrow_field(subject), index, span);
         }
         Ok(())
     }
@@ -179,6 +179,7 @@ fn borrow_base(expression: &Expr) -> Option<(&String, &SourceSpan)> {
     match expression {
         Expr::Identifier { name, span } => Some((name, span)),
         Expr::FieldAccess { object, .. } => borrow_base(object),
+        Expr::Index { target, .. } => borrow_base(target),
         _ => None,
     }
 }

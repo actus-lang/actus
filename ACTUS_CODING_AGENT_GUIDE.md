@@ -1837,6 +1837,27 @@ The left-hand place of a compound assignment is evaluated exactly once; native
 lowering follows address calculation, load, operation, and store through that
 same place.
 
+Case subjects may also be readable aggregate places, including a struct field
+or an indexed element:
+
+```act
+enum State { Ready, Busy, }
+struct Slot { state: State, }
+
+verb inspect(erg slot: Slot) -> Int {
+    return case slot.state {
+        State.Ready => 1,
+        State.Busy => 2,
+    };
+}
+```
+
+The semantic analyzer resolves the root binding of the place and applies the
+case borrow or ownership rule to that binding. `case abs` remains read-only,
+and `case dat` still requires an owned movable subject. A field or indexed
+place does not bypass borrow tracking or turn a temporary expression into an
+owner.
+
 #### Package-aware test execution
 
 `actus test` analyzes test sources through the package module graph. When a

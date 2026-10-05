@@ -166,6 +166,8 @@ implementation helpers remain behind that boundary.
       types, immutable mutation, overlap, overflow, and misalignment.
 - [x] Add layout-size, alignment, endian, and byte-offset tests.
 - [x] Add ownership, cleanup, branch, and loop regression tests.
+- [x] Add semantic regression tests for case deconstruction on aggregate
+      fields.
 - [x] Add object/native parity tests and a no-floating-point IR audit.
 - [x] Add formatter and LSP regression tests.
 - [x] Record the compiler revision, test command, and native evidence.
