@@ -110,15 +110,15 @@ fn generated_name(contract: &SerializeDecl, operation: &str) -> String {
 fn declaration_name_exists(program: &Program, name: &str) -> bool {
     program.declarations.iter().any(|declaration| match declaration {
         TopLevelDecl::Verb(verb) => {
-            verb.name == name && verb.doc.as_deref() != Some(GENERATED_VALIDATOR_DOC)
+            verb.name == name && verb.doc.as_deref() != Some(GENERATED_SERIALIZATION_DOC)
         }
         TopLevelDecl::ExternalVerb(verb) => verb.name == name,
         _ => false,
     })
 }
 
-pub(crate) const GENERATED_VALIDATOR_DOC: &str =
-    "Compiler-generated fixed-frame validation wrapper.";
+pub(crate) const GENERATED_SERIALIZATION_DOC: &str =
+    "Compiler-generated fixed-frame serialization wrapper.";
 
 fn validate_sections(
     contract: &SerializeDecl,

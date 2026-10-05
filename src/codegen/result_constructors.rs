@@ -11,8 +11,11 @@ use crate::lexer::SourceSpan;
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
 pub(crate) fn normalize_program(program: &Program) -> Program {
-    let signatures = collect_signatures(program);
     let mut normalized = program.clone();
+    super::serialization_generation::append_builtin_serialization_error(&mut normalized);
+    append_generated_serialization_validators(&mut normalized);
+    super::serialization_generation::append_generated_serialization_encoders(&mut normalized);
+    let signatures = collect_signatures(&normalized);
     for declaration in &mut normalized.declarations {
         match declaration {
             TopLevelDecl::Verb(verb) => normalize_verb(verb, &signatures),
@@ -24,7 +27,6 @@ pub(crate) fn normalize_program(program: &Program) -> Program {
             _ => {}
         }
     }
-    append_generated_serialization_validators(&mut normalized);
     super::constants::inline_constants(&mut normalized);
     normalized
 }
@@ -54,7 +56,7 @@ fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
     };
     VerbDecl {
         is_open: false,
-        doc: Some("Compiler-generated fixed-frame validation wrapper.".to_owned()),
+        doc: Some("Compiler-generated fixed-frame serialization wrapper.".to_owned()),
         metadata: Vec::new(),
         name: format!("{}_validate", contract.name.to_ascii_lowercase()),
         generic_parameters: Vec::new(),

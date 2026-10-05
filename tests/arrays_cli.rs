@@ -56,6 +56,16 @@ fn executes_generated_serialization_validator_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_generated_serialization_encoder_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-encoder",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg source = FramePack { storage: Array[u8, 8](), }; source.storage[0] = 41u8; source.storage[7] = 43u8; erg output = Buffer[0]; erg result = frame_encode(value: abs source, output: ins output); return case dat result { Result.Ok(_) => output[0] as Int + output[7] as Int, Result.Err(_) => 99, }; }",
+    );
+    assert_eq!(status.code(), Some(84));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

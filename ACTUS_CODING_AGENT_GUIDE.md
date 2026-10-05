@@ -1041,11 +1041,14 @@ with an expected integer. The `validate_fixed_frame` intrinsic exposes the
 fixed-frame runtime validator, which checks version,
 payload bounds, endianness, and stored CRC without allocation. These operations
 do not allocate. Generated serialization operations use the compiler-provided
-`SerializationError` enum. The first generated operation is `<contract>_validate`, which
-accepts a caller-owned `Buffer` and an owned expected version, then delegates
-the fixed offsets and lengths from the declaration to the validator. Dynamic payloads,
+`SerializationError` enum. The compiler currently generates
+`<contract>_validate`, which accepts a caller-owned `Buffer` and an owned
+expected version, and `<contract>_encode`, which accepts an `abs` source pack
+and an `ins` output `Buffer`, copies the fixed storage bytes, and returns a
+typed `Result[u32, SerializationError]`. Both operations derive their fixed
+offsets and lengths from the declaration. Decode, migration, dynamic payloads,
 implicit allocation, and automatic filesystem commits remain outside this
-profile.
+profile until their contracts are implemented and tested.
 
 ### 15.5 `Arena[N]`
 
