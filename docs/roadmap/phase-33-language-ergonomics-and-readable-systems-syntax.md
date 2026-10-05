@@ -352,6 +352,7 @@ argument expressions, without weakening move and borrow checking.
 - [ ] Ensure native lowering does not introduce unnecessary allocation or runtime symbols.
 - [x] Add formatter and LSP behavior that does not invent misleading source declarations.
 - [x] Keep the transformation deterministic across object and executable builds.
+- [x] Avoid collisions between compiler-generated names and source bindings.
 
 #### Evidence
 

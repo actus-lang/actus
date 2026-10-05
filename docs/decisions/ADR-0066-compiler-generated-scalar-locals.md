@@ -73,6 +73,7 @@ named-binding form remains the escape hatch for every rejected case.
 ## Evaluation and ownership contract
 
 - Generated locals are materialized in deterministic left-to-right order.
+- Generated names are checked against source bindings and remain deterministic.
 - Each initializer is evaluated exactly once.
 - The generated local receives `erg` ownership for the duration of the call
   expression and is exposed to the callee only through `abs`.

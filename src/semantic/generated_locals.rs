@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     Argument, Block, Expr, IfBranch, Param, Place, Role, Stmt, TopLevelDecl, TypeName,
@@ -18,20 +18,65 @@ pub(crate) fn normalize_program(program: &crate::ast::Program) -> crate::ast::Pr
     let signatures = signatures(program);
     let mut normalized = program.clone();
     let mut counter = 0usize;
+    let mut used_names = source_names(program);
     for declaration in &mut normalized.declarations {
         match declaration {
             TopLevelDecl::Verb(verb) => {
-                normalize_block(&mut verb.body, &signatures, &mut counter);
+                normalize_block(&mut verb.body, &signatures, &mut counter, &mut used_names);
             }
             TopLevelDecl::Perform(perform) => {
                 for method in &mut perform.methods {
-                    normalize_block(&mut method.body, &signatures, &mut counter);
+                    normalize_block(&mut method.body, &signatures, &mut counter, &mut used_names);
                 }
             }
             _ => {}
         }
     }
     normalized
+}
+
+fn source_names(program: &crate::ast::Program) -> HashSet<String> {
+    let mut names = HashSet::new();
+    for declaration in &program.declarations {
+        match declaration {
+            TopLevelDecl::Verb(verb) => {
+                names.insert(verb.name.clone());
+                names.extend(verb.params.iter().map(|param| param.name.clone()));
+                collect_block_names(&verb.body, &mut names);
+            }
+            TopLevelDecl::Perform(perform) => {
+                for method in &perform.methods {
+                    names.insert(method.name.clone());
+                    names.extend(method.params.iter().map(|param| param.name.clone()));
+                    collect_block_names(&method.body, &mut names);
+                }
+            }
+            _ => {}
+        }
+    }
+    names
+}
+
+fn collect_block_names(block: &Block, names: &mut HashSet<String>) {
+    for statement in &block.statements {
+        match statement {
+            Stmt::OwnerDecl { name, .. } => {
+                names.insert(name.clone());
+            }
+            Stmt::If { then_branch, else_branch, .. } => {
+                collect_block_names(then_branch, names);
+                if let Some(IfBranch::Block(block)) = else_branch {
+                    collect_block_names(block, names);
+                }
+            }
+            Stmt::Loop(block) | Stmt::Block(block) => collect_block_names(block, names),
+            Stmt::ForRange { binding, body, .. } | Stmt::ForArray { binding, body, .. } => {
+                names.insert(binding.name.clone());
+                collect_block_names(body, names);
+            }
+            _ => {}
+        }
+    }
 }
 
 fn signatures(program: &crate::ast::Program) -> SignatureMap {
@@ -56,12 +101,17 @@ fn parameter_specs(params: &[Param]) -> Vec<ParameterSpec> {
         .collect()
 }
 
-fn normalize_block(block: &mut Block, signatures: &SignatureMap, counter: &mut usize) {
+fn normalize_block(
+    block: &mut Block,
+    signatures: &SignatureMap,
+    counter: &mut usize,
+    used_names: &mut HashSet<String>,
+) {
     let statements = std::mem::take(&mut block.statements);
     let mut normalized = Vec::with_capacity(statements.len());
     for mut statement in statements {
         let mut generated = Vec::new();
-        normalize_statement(&mut statement, signatures, counter, &mut generated);
+        normalize_statement(&mut statement, signatures, counter, used_names, &mut generated);
         normalized.extend(generated);
         normalized.push(statement);
     }
@@ -72,49 +122,45 @@ fn normalize_statement(
     statement: &mut Stmt,
     signatures: &SignatureMap,
     counter: &mut usize,
+    used_names: &mut HashSet<String>,
     generated: &mut Vec<Stmt>,
 ) {
     match statement {
         Stmt::OwnerDecl { initializer, .. } | Stmt::Return { value: Some(initializer), .. } => {
-            let (prefix, expression) = normalize_expression(initializer, signatures, counter);
+            let (prefix, expression) =
+                normalize_expression(initializer, signatures, counter, used_names);
             generated.extend(prefix);
             *initializer = expression;
         }
         Stmt::Expression { expression, .. } => {
-            let (prefix, normalized) = normalize_expression(expression, signatures, counter);
+            let (prefix, normalized) =
+                normalize_expression(expression, signatures, counter, used_names);
             generated.extend(prefix);
             *expression = normalized;
         }
         Stmt::Assignment { target, value, .. } | Stmt::CompoundAssignment { target, value, .. } => {
-            let (prefix, expression) = normalize_expression(value, signatures, counter);
+            let (prefix, expression) = normalize_expression(value, signatures, counter, used_names);
             generated.extend(prefix);
             *value = expression;
-            normalize_place(target, signatures, counter, generated);
+            normalize_place(target, signatures, counter, used_names, generated);
         }
-        Stmt::If { condition, then_branch, else_branch, .. } => {
-            let (prefix, expression) = normalize_expression(condition, signatures, counter);
-            generated.extend(prefix);
-            *condition = expression;
-            normalize_block(then_branch, signatures, counter);
-            if let Some(IfBranch::Block(block)) = else_branch {
-                normalize_block(block, signatures, counter);
-            }
+        Stmt::If { condition, then_branch, else_branch, .. } => normalize_if(
+            condition,
+            then_branch,
+            else_branch,
+            signatures,
+            counter,
+            used_names,
+            generated,
+        ),
+        Stmt::Loop(block) | Stmt::Block(block) => {
+            normalize_block(block, signatures, counter, used_names)
         }
-        Stmt::Loop(block) | Stmt::Block(block) => normalize_block(block, signatures, counter),
         Stmt::ForRange { start, end, body, .. } => {
-            let (prefix, expression) = normalize_expression(start, signatures, counter);
-            generated.extend(prefix);
-            *start = expression;
-            let (prefix, expression) = normalize_expression(end, signatures, counter);
-            generated.extend(prefix);
-            *end = expression;
-            normalize_block(body, signatures, counter);
+            normalize_for_range(start, end, body, signatures, counter, used_names, generated)
         }
         Stmt::ForArray { collection, body, .. } => {
-            let (prefix, expression) = normalize_expression(collection, signatures, counter);
-            generated.extend(prefix);
-            *collection = expression;
-            normalize_block(body, signatures, counter);
+            normalize_for_array(collection, body, signatures, counter, used_names, generated)
         }
         Stmt::Return { value: None, .. }
         | Stmt::Break { .. }
@@ -123,19 +169,70 @@ fn normalize_statement(
     }
 }
 
+fn normalize_if(
+    condition: &mut Expr,
+    then_branch: &mut Block,
+    else_branch: &mut Option<IfBranch>,
+    signatures: &SignatureMap,
+    counter: &mut usize,
+    used_names: &mut HashSet<String>,
+    generated: &mut Vec<Stmt>,
+) {
+    let (prefix, expression) = normalize_expression(condition, signatures, counter, used_names);
+    generated.extend(prefix);
+    *condition = expression;
+    normalize_block(then_branch, signatures, counter, used_names);
+    if let Some(IfBranch::Block(block)) = else_branch {
+        normalize_block(block, signatures, counter, used_names);
+    }
+}
+
+fn normalize_for_range(
+    start: &mut Expr,
+    end: &mut Expr,
+    body: &mut Block,
+    signatures: &SignatureMap,
+    counter: &mut usize,
+    used_names: &mut HashSet<String>,
+    generated: &mut Vec<Stmt>,
+) {
+    let (prefix, expression) = normalize_expression(start, signatures, counter, used_names);
+    generated.extend(prefix);
+    *start = expression;
+    let (prefix, expression) = normalize_expression(end, signatures, counter, used_names);
+    generated.extend(prefix);
+    *end = expression;
+    normalize_block(body, signatures, counter, used_names);
+}
+
+fn normalize_for_array(
+    collection: &mut Expr,
+    body: &mut Block,
+    signatures: &SignatureMap,
+    counter: &mut usize,
+    used_names: &mut HashSet<String>,
+    generated: &mut Vec<Stmt>,
+) {
+    let (prefix, expression) = normalize_expression(collection, signatures, counter, used_names);
+    generated.extend(prefix);
+    *collection = expression;
+    normalize_block(body, signatures, counter, used_names);
+}
+
 fn normalize_place(
     place: &mut Place,
     signatures: &SignatureMap,
     counter: &mut usize,
+    used_names: &mut HashSet<String>,
     generated: &mut Vec<Stmt>,
 ) {
     if let Place::Index { target, index, .. } = place {
-        normalize_place(target, signatures, counter, generated);
+        normalize_place(target, signatures, counter, used_names, generated);
         let (prefix, expression) = normalize_nested_expression(index, signatures, counter);
         generated.extend(prefix);
         *index = expression;
     } else if let Place::Field { object, .. } = place {
-        normalize_place(object, signatures, counter, generated);
+        normalize_place(object, signatures, counter, used_names, generated);
     }
 }
 
@@ -143,12 +240,13 @@ fn normalize_expression(
     expression: &mut Expr,
     signatures: &SignatureMap,
     counter: &mut usize,
+    used_names: &mut HashSet<String>,
 ) -> (Vec<Stmt>, Expr) {
     let Expr::Call { callee, arguments, span } = expression else {
         return (Vec::new(), expression.clone());
     };
     let mut prefix = Vec::new();
-    materialize_arguments(callee, arguments, *span, signatures, counter, &mut prefix);
+    materialize_arguments(callee, arguments, *span, signatures, counter, used_names, &mut prefix);
     (prefix, expression.clone())
 }
 
@@ -166,6 +264,7 @@ fn materialize_arguments(
     call_span: SourceSpan,
     signatures: &SignatureMap,
     counter: &mut usize,
+    used_names: &mut HashSet<String>,
     prefix: &mut Vec<Stmt>,
 ) {
     let Some(parameters) = signatures.get(callee) else { return };
@@ -179,8 +278,13 @@ fn materialize_arguments(
         {
             continue;
         }
-        let name = format!("__actus_generated_{counter}");
-        *counter += 1;
+        let name = loop {
+            let candidate = format!("__actus_generated_{counter}");
+            *counter += 1;
+            if used_names.insert(candidate.clone()) {
+                break candidate;
+            }
+        };
         let initializer = argument.expression.clone();
         let span = expression_span(&initializer).unwrap_or(call_span);
         prefix.push(Stmt::OwnerDecl {
@@ -350,5 +454,20 @@ mod tests {
         );
         assert_eq!(normalize_program(&aggregate), aggregate);
         assert!(crate::semantic::analyze(&aggregate).is_ok());
+    }
+
+    #[test]
+    fn avoids_source_name_collisions_for_generated_locals() {
+        let program = parse_source(
+            "verb read(abs value: u32) { return; } verb main() { erg __actus_generated_0: u32 = 1u32; read(value: abs (1u32 + 1u32)); }",
+        );
+        let normalized = normalize_program(&program);
+        let TopLevelDecl::Verb(main) = &normalized.declarations[1] else {
+            panic!("expected main verb")
+        };
+        let Stmt::OwnerDecl { name, .. } = &main.body.statements[1] else {
+            panic!("expected generated owner")
+        };
+        assert_eq!(name, "__actus_generated_1");
     }
 }
