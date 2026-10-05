@@ -52,6 +52,20 @@ impl Formatter<'_> {
                 self.output.push_str("loop ");
                 self.block(block);
             }
+            Stmt::ForRange { binding, start, end, body, .. } => {
+                self.for_header(binding);
+                self.expression(start);
+                self.output.push_str(" .. ");
+                self.expression(end);
+                self.output.push(' ');
+                self.block(body);
+            }
+            Stmt::ForArray { binding, collection, body, .. } => {
+                self.for_header(binding);
+                self.expression(collection);
+                self.output.push(' ');
+                self.block(body);
+            }
             Stmt::Break { .. } => self.output.push_str("break;"),
             Stmt::Continue { .. } => self.output.push_str("continue;"),
             Stmt::Drop { name, .. } => {
@@ -61,6 +75,18 @@ impl Formatter<'_> {
             }
             Stmt::Block(block) => self.block(block),
         }
+    }
+
+    fn for_header(&mut self, binding: &crate::ast::ForBinding) {
+        self.output.push_str("for ");
+        self.output.push_str(role_name(&binding.role));
+        self.output.push(' ');
+        self.output.push_str(&binding.name);
+        if let Some(ty) = &binding.ty {
+            self.output.push_str(": ");
+            self.output.push_str(ty);
+        }
+        self.output.push_str(" in ");
     }
 
     fn compound_assignment(
@@ -146,6 +172,8 @@ fn statement_span(statement: &Stmt) -> crate::lexer::SourceSpan {
         | Stmt::Continue { span }
         | Stmt::Drop { span, .. } => *span,
         Stmt::Loop(block) | Stmt::Block(block) => block.span,
+        Stmt::ForRange { span, .. } => *span,
+        Stmt::ForArray { span, .. } => *span,
     }
 }
 

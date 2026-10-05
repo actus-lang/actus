@@ -96,6 +96,32 @@ pub(super) fn block_info(source: &str, statements: &[Stmt], name: &str) -> Optio
                     return Some(info);
                 }
             }
+            Stmt::ForRange { binding, body, .. } => {
+                if binding.name == name {
+                    let ty = binding.ty.as_deref().unwrap_or("inferred");
+                    return Some(SymbolInfo {
+                        signature: format!("{} {}: {}", role_name(&binding.role), name, ty),
+                        span: identifier_span(source, binding.span, name).unwrap_or(binding.span),
+                        documentation: None,
+                    });
+                }
+                if let Some(info) = block_info(source, &body.statements, name) {
+                    return Some(info);
+                }
+            }
+            Stmt::ForArray { binding, body, .. } => {
+                if binding.name == name {
+                    let ty = binding.ty.as_deref().unwrap_or("inferred");
+                    return Some(SymbolInfo {
+                        signature: format!("{} {}: {}", role_name(&binding.role), name, ty),
+                        span: identifier_span(source, binding.span, name).unwrap_or(binding.span),
+                        documentation: None,
+                    });
+                }
+                if let Some(info) = block_info(source, &body.statements, name) {
+                    return Some(info);
+                }
+            }
             Stmt::If { then_branch, else_branch, .. } => {
                 if let Some(info) = block_info(source, &then_branch.statements, name) {
                     return Some(info);

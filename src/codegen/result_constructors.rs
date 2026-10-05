@@ -107,6 +107,15 @@ fn normalize_statement(
         Stmt::Block(nested) | Stmt::Loop(nested) => {
             normalize_block(nested, return_type, signatures, locals);
         }
+        Stmt::ForRange { start, end, body, .. } => {
+            normalize_expression(start, None, signatures, locals);
+            normalize_expression(end, None, signatures, locals);
+            normalize_block(body, return_type, signatures, locals);
+        }
+        Stmt::ForArray { collection, body, .. } => {
+            normalize_expression(collection, None, signatures, locals);
+            normalize_block(body, return_type, signatures, locals);
+        }
         Stmt::Return { value: None, .. }
         | Stmt::Break { .. }
         | Stmt::Continue { .. }

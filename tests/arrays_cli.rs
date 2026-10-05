@@ -104,6 +104,46 @@ fn executes_typed_integer_literals_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_bounded_for_range_natively() {
+    let status = run_array_fixture(
+        "bounded-for-range",
+        "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 8u32 { total += index; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(28));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_for_range_continue_break_and_reversed_bounds() {
+    let status = run_array_fixture(
+        "bounded-for-control-flow",
+        "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 4u32 .. 1u32 { total += 100u32; } for erg index: u32 in 0u32 .. 8u32 { if index == 2u32 { continue; } if index == 5u32 { break; } total += 1u32; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_fixed_array_index_iteration_natively() {
+    let status = run_array_fixture(
+        "fixed-array-for-index",
+        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[0] = 10u32; values[1] = 20u32; values[2] = 12u32; erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_pack_backed_array_iteration_natively() {
+    let status = run_array_fixture(
+        "pack-array-for-index",
+        "pack Frame { erg storage: Array[u8, 4]; layout little; fields { abs byte_0: u8 at 0; abs byte_1: u8 at 8; abs byte_2: u8 at 16; abs byte_3: u8 at 24; } } verb main() -> Int { erg frame = Frame { storage: Array[u8, 4](), }; frame.storage[0] = 20u8; frame.storage[1] = 22u8; erg total: u8 = 0u8; for erg index: u32 in frame.storage { total += frame.storage[index]; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_explicit_scalar_copy_natively() {
     let status = run_array_fixture(
         "explicit-scalar-copy",

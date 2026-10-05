@@ -143,6 +143,15 @@ fn collect_block_arrays(block: &crate::ast::Block, definitions: &mut Vec<TypeNam
                 collect_expression_arrays(value, definitions);
             }
             Stmt::Loop(nested) | Stmt::Block(nested) => collect_block_arrays(nested, definitions),
+            Stmt::ForRange { start, end, body, .. } => {
+                collect_expression_arrays(start, definitions);
+                collect_expression_arrays(end, definitions);
+                collect_block_arrays(body, definitions);
+            }
+            Stmt::ForArray { collection, body, .. } => {
+                collect_expression_arrays(collection, definitions);
+                collect_block_arrays(body, definitions);
+            }
             Stmt::If { condition, then_branch, else_branch, .. } => {
                 collect_expression_arrays(condition, definitions);
                 collect_block_arrays(then_branch, definitions);

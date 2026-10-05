@@ -19,6 +19,7 @@ mod compound;
 mod control_flow;
 mod dispatch;
 mod owners;
+mod structured_control;
 mod try_lowering;
 
 pub(crate) use compound::lower_compound_assignment;

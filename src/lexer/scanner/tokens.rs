@@ -13,6 +13,7 @@ impl<'source> Scanner<'source> {
             return;
         }
         match character {
+            '.' if self.match_character('.') => self.push_simple(TokenKind::DotDot, start),
             '.' => self.push_simple(TokenKind::Dot, start),
             '?' => self.push_simple(TokenKind::Question, start),
             '0' if matches!(self.peek(), Some('x' | 'X')) => self.scan_hex_integer(start),

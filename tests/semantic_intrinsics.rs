@@ -38,6 +38,28 @@ fn accepts_explicit_copy_of_integer_and_boolean_scalars() {
 }
 
 #[test]
+fn accepts_bounded_for_ranges_and_rejects_non_integer_bindings() {
+    analyze_source(
+        "verb main() { for erg index: u32 in 0u32 .. 4u32 { if index == 2u32 { break; } } }",
+    )
+    .expect("bounded integer range should be valid");
+    let error = analyze_source("verb main() { for abs index: u32 in 0u32 .. 4u32 { } }")
+        .expect_err("range bindings must be erg");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidArgumentRole { callee, .. } if callee == "for")
+    );
+    let unbounded = analyze_source("verb main() { for erg index: u32 in 1u32 { } }")
+        .expect_err("scalar sources must not become unbounded iterators");
+    assert!(
+        matches!(unbounded.kind, SemanticErrorKind::TypeMismatch { callee, parameter, .. } if callee == "for" && parameter == "array source")
+    );
+    analyze_source("verb main() { for erg index: u8 in 0u8 .. 255u8 { } }")
+        .expect("the maximum representable endpoint is a valid half-open bound");
+    analyze_source("verb main() { for erg index: u8 in 0u8 .. 256u16 { } }")
+        .expect_err("range bounds must use the declared integer type");
+}
+
+#[test]
 fn rejects_copy_without_an_explicit_read_only_role() {
     let error = analyze_source(
         "verb main() { erg value: u32 = 41u32; erg repeated: u32 = copy(value: value); }",

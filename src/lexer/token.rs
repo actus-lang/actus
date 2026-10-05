@@ -49,6 +49,7 @@ pub enum TokenKind {
     Open,
     Import,
     For,
+    In,
     Case,
     As,
     If,
@@ -107,6 +108,7 @@ pub enum TokenKind {
     Arrow,
     FatArrow,
     Dot,
+    DotDot,
     Question,
     Eof,
 }

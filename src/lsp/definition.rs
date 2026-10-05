@@ -180,6 +180,22 @@ fn collect_block_definitions(
             Stmt::Loop(nested) | Stmt::Block(nested) => {
                 collect_block_definitions(source, nested, name, definitions)
             }
+            Stmt::ForRange { binding, body, .. } => {
+                if binding.name == name
+                    && let Some(identifier) = identifier_span(source, binding.span, name)
+                {
+                    definitions.push(identifier);
+                }
+                collect_block_definitions(source, body, name, definitions);
+            }
+            Stmt::ForArray { binding, body, .. } => {
+                if binding.name == name
+                    && let Some(identifier) = identifier_span(source, binding.span, name)
+                {
+                    definitions.push(identifier);
+                }
+                collect_block_definitions(source, body, name, definitions);
+            }
             Stmt::If { then_branch, else_branch, .. } => {
                 collect_block_definitions(source, then_branch, name, definitions);
                 if let Some(crate::ast::IfBranch::Block(block)) = else_branch {

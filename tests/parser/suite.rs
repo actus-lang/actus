@@ -28,6 +28,21 @@ fn parses_a_verb_with_roles_and_return_type() {
 }
 
 #[test]
+fn parses_bounded_for_range_with_explicit_binding_span() {
+    let program = parse_source("verb main() { for erg index: u32 in 0u32 .. 4u32 { break; } }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::ForRange { binding, start, end, .. } = &verb.body.statements[0] else {
+        panic!("expected bounded for range")
+    };
+    assert_eq!(binding.role, Role::Erg);
+    assert_eq!(binding.name, "index");
+    assert_eq!(binding.ty.as_deref(), Some("u32"));
+    assert!(matches!(start, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
+    assert!(matches!(end, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
+    assert!(binding.span.start < binding.span.end);
+}
+
+#[test]
 fn parses_typed_named_constants_with_source_spans() {
     let program = parse_source(
         "\"\"\"CRC polynomial.\"\"\" const CRC16_POLYNOMIAL: u16 = 4129u16; verb main() { return 0; }",

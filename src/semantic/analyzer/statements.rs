@@ -36,6 +36,12 @@ impl Analyzer {
             }
             Stmt::Return { value, span } => self.visit_return(value.as_ref(), *span),
             Stmt::Loop(block) => self.visit_loop(block),
+            Stmt::ForRange { binding, start, end, body, span } => {
+                self.visit_for_range(binding, start, end, body, *span)
+            }
+            Stmt::ForArray { binding, collection, body, span } => {
+                self.visit_for_array(binding, collection, body, *span)
+            }
             Stmt::Break { span } => self.visit_loop_control(true, *span),
             Stmt::Continue { span } => self.visit_loop_control(false, *span),
             Stmt::Drop { name, span } => self.drop_binding(name, *span),

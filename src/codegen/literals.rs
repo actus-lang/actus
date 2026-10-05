@@ -98,6 +98,15 @@ fn collect_block(statements: &[Stmt], values: &mut HashSet<String>) {
                 collect_if_branch(else_branch.as_ref(), values);
             }
             Stmt::Loop(block) | Stmt::Block(block) => collect_block(&block.statements, values),
+            Stmt::ForRange { start, end, body, .. } => {
+                collect_expression(start, values);
+                collect_expression(end, values);
+                collect_block(&body.statements, values);
+            }
+            Stmt::ForArray { collection, body, .. } => {
+                collect_expression(collection, values);
+                collect_block(&body.statements, values);
+            }
             Stmt::Return { value: None, .. }
             | Stmt::Break { .. }
             | Stmt::Continue { .. }

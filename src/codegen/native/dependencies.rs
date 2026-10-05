@@ -136,6 +136,15 @@ fn collect_statement_calls(statement: &Stmt, calls: &mut Vec<NativeCall>) {
             }
         }
         Stmt::Loop(block) | Stmt::Block(block) => collect_block_calls(block, calls),
+        Stmt::ForRange { start, end, body, .. } => {
+            collect_expression_calls(start, calls);
+            collect_expression_calls(end, calls);
+            collect_block_calls(body, calls);
+        }
+        Stmt::ForArray { collection, body, .. } => {
+            collect_expression_calls(collection, calls);
+            collect_block_calls(body, calls);
+        }
         Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => {}
     }
 }

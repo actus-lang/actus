@@ -52,6 +52,15 @@ fn inline_block(block: &mut Block, constants: &HashMap<String, Expr>) {
                 inline_expression(expression, constants)
             }
             Stmt::Loop(nested) | Stmt::Block(nested) => inline_block(nested, constants),
+            Stmt::ForRange { start, end, body, .. } => {
+                inline_expression(start, constants);
+                inline_expression(end, constants);
+                inline_block(body, constants);
+            }
+            Stmt::ForArray { collection, body, .. } => {
+                inline_expression(collection, constants);
+                inline_block(body, constants);
+            }
             Stmt::Return { value: None, .. }
             | Stmt::Break { .. }
             | Stmt::Continue { .. }

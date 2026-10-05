@@ -425,12 +425,19 @@ fn lower_control_statement<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     match statement {
-        Stmt::Block(block) => super::super::scopes::lower_scoped_block(
-            function, block, locals, types, functions, targets, cleanup_schedule, string_data, layouts,
-        ),
-        Stmt::Loop(block) => super::super::loops::lower_loop(
-            function, block, locals, types, functions, cleanup_schedule, string_data, layouts,
-        ),
+        Stmt::Block(_) | Stmt::Loop(_) | Stmt::ForRange { .. } | Stmt::ForArray { .. } => {
+            super::structured_control::lower_structured_control_statement(
+                function,
+                statement,
+                locals,
+                types,
+                functions,
+                targets,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+        }
         Stmt::Break { span } | Stmt::Continue { span } => lower_loop_exit(
             function,
             *span,

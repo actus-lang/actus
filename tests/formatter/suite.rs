@@ -19,6 +19,15 @@ fn formats_nested_blocks_and_calls() {
 }
 
 #[test]
+fn formats_bounded_for_ranges_idempotently() {
+    let formatted = format_source(
+        "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",
+    );
+    assert!(formatted.contains("for erg index: u32 in 0u32 .. 4u32"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_scalar_reuse_and_indexed_selection_idempotently() {
     let formatted = format_source(
         "verb main(){erg values:Array[u32,2]=Array[u32,2]();erg value:u32=copy(value:abs values[1]);}",

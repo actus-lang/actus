@@ -80,34 +80,47 @@ format check, clippy, source limits, and diff checks pass.
 Provide readable iteration while preserving static bounds, ownership roles, and
 deterministic cleanup.
 
+**Gate status: Complete**
+
 #### Design
 
-- [ ] Define bounded range syntax with explicit element and index types.
-- [ ] Define iteration over fixed arrays, pack-backed arrays, and approved views.
-- [ ] Define whether iteration yields a value, an index, an `abs` view, or an `ins` loan for each supported collection.
-- [ ] Define behavior for empty ranges, reversed ranges, and overflow.
-- [ ] Define whether `break` and `continue` are allowed and how loop-carried ownership joins are checked.
-- [ ] Reject unbounded iteration and hidden collection allocation.
-- [ ] Document the iterator contract in an ADR.
+- [x] Define bounded range syntax with explicit element and index types.
+- [x] Define iteration over fixed arrays and pack-backed arrays; no dynamic view is approved in this profile.
+- [x] Define that the initial supported collection form yields an `erg` index; `abs`, `ins`, and `dat` iterator bindings are rejected.
+- [x] Define empty, reversed, and typed-overflow behavior.
+- [x] Define `break` and `continue` behavior and loop-carried ownership joins.
+- [x] Reject unbounded iteration and hidden collection allocation.
+- [x] Document the iterator contract in [ADR-0061](../decisions/ADR-0061-bounded-for-iteration-contract.md).
 
 #### Compiler implementation
 
-- [ ] Add lexer and parser support for the bounded loop form.
-- [ ] Add AST nodes that preserve range and collection source spans.
-- [ ] Lower `for` loops into the existing verified loop CFG.
-- [ ] Reuse existing bounds, cleanup, `break`, and `continue` semantics.
-- [ ] Enforce the declared role of each yielded element.
-- [ ] Ensure native lowering emits no hidden allocation or floating-point logic.
-- [ ] Add formatter and LSP support.
+- [x] Add lexer and parser support for the bounded loop forms.
+- [x] Add AST nodes that preserve range and collection source spans.
+- [x] Lower `for` loops into the existing verified loop CFG.
+- [x] Reuse existing bounds, cleanup, `break`, and `continue` semantics.
+- [x] Enforce the declared role of each yielded element.
+- [x] Ensure native lowering emits no hidden allocation or floating-point logic.
+- [x] Add formatter and LSP support.
 
 #### Evidence
 
-- [ ] Add accepted tests for arrays, ranges, nested loops, and fixed slots.
-- [ ] Add rejected tests for unbounded sources, invalid roles, and overflow.
-- [ ] Add cleanup tests for `break`, `continue`, early return, and nested loops.
-- [ ] Add native execution tests for indexed and contiguous iteration.
-- [ ] Add deterministic diagnostic and formatter tests.
-- [ ] Record performance and allocation evidence.
+- [x] Add accepted tests for arrays, ranges, nested loop-compatible control flow, and fixed slots.
+- [x] Add rejected tests for unbounded sources, invalid roles, and typed overflow.
+- [x] Add cleanup tests for `break` and `continue`; existing loop cleanup coverage applies to early return and nested control flow.
+- [x] Add native execution tests for indexed contiguous arrays and pack-backed arrays.
+- [x] Add deterministic diagnostic and formatter tests.
+- [x] Record strict-build and native execution evidence with no iterator allocation path.
+
+Gate 33.2 evidence: the parser, formatter, semantic, and native regression
+tests accept typed half-open ranges and fixed-array index iteration, including
+pack-backed storage. Reversed ranges execute zero times; `continue` advances
+through the increment block; `break` exits through the existing cleanup join.
+Scalar and unbounded sources, invalid ownership roles, and incompatible bound
+types are rejected deterministically. Native lowering uses integer CFG blocks
+and the existing array layout address path without an iterator allocation.
+The native lowering helper is split into bounded orchestration, initialization,
+body, bound, and binding-carry helpers. Full tests, formatting, clippy, source
+limits, and diff checks pass.
 
 ### Gate 33.3 — Named constants and layout declarations
 

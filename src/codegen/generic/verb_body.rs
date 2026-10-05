@@ -55,6 +55,19 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
             Stmt::Return { value: Some(specialize_expression(value, substitution)), span: *span }
         }
         Stmt::Loop(block) => Stmt::Loop(specialize_block(block, substitution)),
+        Stmt::ForRange { binding, start, end, body, span } => Stmt::ForRange {
+            binding: binding.clone(),
+            start: specialize_expression(start, substitution),
+            end: specialize_expression(end, substitution),
+            body: specialize_block(body, substitution),
+            span: *span,
+        },
+        Stmt::ForArray { binding, collection, body, span } => Stmt::ForArray {
+            binding: binding.clone(),
+            collection: specialize_expression(collection, substitution),
+            body: specialize_block(body, substitution),
+            span: *span,
+        },
         Stmt::Block(block) => Stmt::Block(specialize_block(block, substitution)),
         _ => statement.clone(),
     }
