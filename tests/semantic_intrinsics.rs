@@ -55,6 +55,14 @@ fn intrinsic_registry_defines_source_contracts() {
 }
 
 #[test]
+fn compiler_provides_serialization_error_domain() {
+    analyze_source(
+        "verb main() -> Result[Int, SerializationError] { return Result[Int, SerializationError].Err(SerializationError.InvalidChecksum); }",
+    )
+    .expect("SerializationError should be available as a compiler-provided enum");
+}
+
+#[test]
 fn accepts_explicit_copy_of_integer_and_boolean_scalars() {
     analyze_source(
         "verb main() -> Int { erg value: u32 = 41u32; erg repeated: u32 = copy(value: abs value); erg flag: Bool = true; erg repeated_flag: Bool = copy(value: abs flag); if repeated_flag { return repeated as Int; } return 0; }",
