@@ -239,6 +239,7 @@ The remaining work is split into bounded sub-gates:
 - [ ] Define little-endian, alignment, padding, checksum, and version syntax.
 - [ ] Define read, write, and migration operations generated from the contract.
 - [x] Define and execute the allocation-free validation operation generated from the contract.
+- [x] Define typed `SerializationError` results for generated operations.
 - [ ] Require explicit ownership roles for buffers and paths.
 - [ ] Define atomic write and torn-write protection hooks.
 - [x] Reject declarations that produce ambiguous or overlapping fields.

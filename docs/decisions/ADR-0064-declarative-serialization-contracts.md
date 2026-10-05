@@ -29,6 +29,18 @@ serialize Frame from PackFrame {
 }
 ```
 
+The generated operations use the following typed error domain:
+
+```act
+enum SerializationError {
+    BufferTooSmall,
+    InvalidVersion,
+    InvalidChecksum,
+    InvalidLayout,
+    UnsupportedVersion,
+}
+```
+
 The declaration names the source `pack` or fixed aggregate, then states the
 wire sections in byte order. Every section has an explicit offset and width.
 `version` names a typed integer field. `payload bytes` names a bounded byte
@@ -54,17 +66,16 @@ For `Frame`, the compiler generates deterministic typed operations behind the
 canonical module facade:
 
 ```text
-frame_encode(abs value: Frame, ins output: Buffer)
-frame_decode(ins input: Buffer)
-frame_validate(abs input: Buffer)
-frame_migrate(old_version, ins input: Buffer, ins output: Buffer)
+frame_encode(abs value: Frame, ins output: Buffer) -> Result[u32, SerializationError]
+frame_decode(abs input: Buffer) -> Result[Frame, SerializationError]
+frame_validate(abs input: Buffer) -> Result[Bool, SerializationError]
+frame_migrate(erg old_version: u16, abs input: Buffer, ins output: Buffer) -> Result[u32, SerializationError]
 ```
 
-The exact Actus result types and error domain are part of the implementation
-contract. Every operation returns typed success/failure information. Encode
-uses caller-owned `ins Buffer`; decode and validate inspect caller-owned input
-according to their declared role. No generated operation allocates or opens a
-path. Filesystem persistence remains an explicit hand-written facade operation.
+Every operation returns typed success/failure information. Encode uses
+caller-owned `ins Buffer`; decode and validate inspect caller-owned input
+without consuming it. No generated operation allocates or opens a path.
+Filesystem persistence remains an explicit hand-written facade operation.
 
 ## Validation and atomic persistence
 
@@ -97,5 +108,6 @@ bytes; it does not decide when a commit is durable.
 - finalize the accepted keyword and field grammar;
 - add AST, semantic layout validation, formatter, and LSP support;
 - generate allocation-free native encode/decode/validate paths;
+- expose `SerializationError` as a compiler-provided enum;
 - add reference-byte, corruption, truncation, version, and staged-file tests;
 - compare object and executable output against an explicit reference encoder.
