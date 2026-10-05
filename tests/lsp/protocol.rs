@@ -164,6 +164,25 @@ fn lsp_completion_marks_incomplete_source_as_partial_without_hiding_intrinsics()
 }
 
 #[test]
+fn lsp_exposes_scalar_reuse_intrinsic_in_completion_hover_and_tokens() {
+    let uri = "file:///tmp/actus-lsp-copy.act";
+    let source = "verb main() -> Int { erg value: u32 = 41u32; erg repeated: u32 = copy(value: abs value); return repeated as Int; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"copy")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("copy(abs value: scalar) -> scalar"), "hover missing: {stdout}");
+    assert!(stdout.contains("\"label\":\"copy\""), "completion missing: {stdout}");
+    assert!(stdout.contains("\"intrinsic\""), "semantic token legend missing: {stdout}");
+}
+
+#[test]
 fn lsp_rename_uses_definition_identity_and_rejects_invalid_names() {
     let uri = "file:///tmp/actus-lsp-rename.act";
     let source = "verb add() -> Int { return 42; }\nverb main() -> Int { return 0; }\n";

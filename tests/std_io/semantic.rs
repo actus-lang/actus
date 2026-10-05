@@ -36,7 +36,7 @@ fn std_io_declarations_pass_semantic_validation() {
         ("verb", "cursor_write"),
         ("verb", "cursor_flush"),
         ("verb", "seek"),
-        ("verb", "copy"),
+        ("verb", "copy_stream"),
         ("enum", "IoError"),
     ] {
         assert!(exports.contains(kind, name), "missing {kind} {name}");
@@ -77,7 +77,7 @@ fn std_io_cursor_seek_and_copy_contracts_are_semantically_valid() {
     let resolver = ModuleResolver::new(source_root);
     let exports = exports_module(&resolver, "io").expect("std io facade should resolve");
     assert!(exports.contains("verb", "seek"));
-    assert!(exports.contains("verb", "copy"));
+    assert!(exports.contains("verb", "copy_stream"));
     analyze_module(&resolver, "io").expect("cursor utility contracts should be valid");
 }
 

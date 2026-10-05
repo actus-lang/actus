@@ -19,6 +19,15 @@ fn formats_nested_blocks_and_calls() {
 }
 
 #[test]
+fn formats_scalar_reuse_and_indexed_selection_idempotently() {
+    let formatted = format_source(
+        "verb main(){erg values:Array[u32,2]=Array[u32,2]();erg value:u32=copy(value:abs values[1]);}",
+    );
+    assert!(formatted.contains("copy(value: abs values[1])"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formatting_is_idempotent() {
     let source = "verb process() { erg buffer = Buffer[10]; return buffer; }";
     let formatted = format_source(source);

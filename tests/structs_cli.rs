@@ -50,6 +50,16 @@ fn preserves_generic_array_type_when_passing_a_struct_field() {
 
 #[cfg(unix)]
 #[test]
+fn copies_inline_array_struct_fields_across_native_return_and_call_boundaries() {
+    build_and_run(
+        "struct Snapshot { erg magic: u32, erg columns: Array[u8, 4], } verb make() -> Snapshot { erg snapshot: Snapshot = Snapshot { magic: 42u32, columns: Array[u8, 4](), }; snapshot.columns[0] = 41u8; return snapshot; } verb inspect(abs snapshot: Snapshot) -> Int { return snapshot.columns[0] as Int + snapshot.magic as Int; } verb main() -> Int { erg snapshot: Snapshot = make(); return inspect(snapshot: abs snapshot); }",
+        "inline-array-struct-return",
+        83,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn transfers_an_owned_enum_return_without_double_drop() {
     build_and_run(
         "verb produce() -> Option[u32] { erg result: Option[u32] = Option[u32].None; result = Option[u32].Some(1u32); return result; } verb main() -> Int { erg result: Option[u32] = produce(); return 42; }\n",
@@ -231,6 +241,26 @@ fn executes_short_result_constructors_natively() {
         "enum IoError { Failed, } verb produce() -> Result[Int, IoError] { return Ok(42); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }\n",
         "short-result",
         42,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_explicit_result_err_with_user_enum_natively() {
+    build_and_run(
+        "enum Failure { Failed, } verb main() -> Int { erg result = Result[Int, Failure].Err(Failure.Failed); return case dat result { Result.Ok(_) => 1, Result.Err(error) => case dat error { Failure.Failed => 0, }, }; }\n",
+        "explicit-result-err-user-enum",
+        0,
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_result_constructors_inside_nested_case_blocks() {
+    build_and_run(
+        "enum Failure { Failed, } verb outer() -> Result[Int, Failure] { erg result = Result[Int, Failure].Ok(1); case result { Result.Ok(_) => { erg nested = Result[Int, Failure].Ok(0); return case dat nested { Result.Ok(value) => Ok(value), Result.Err(error) => Err(error), }; }, Result.Err(error) => { return Err(error); }, }; return Err(Failure.Failed); } verb main() -> Int { erg result = outer(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 1, }; }\n",
+        "nested-result-constructors",
+        0,
     );
 }
 

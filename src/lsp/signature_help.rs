@@ -138,6 +138,11 @@ fn intrinsic_signature(name: &str) -> Option<Value> {
                 ("abs byte".to_owned(), "u8".to_owned()),
             ],
         ),
+        "copy" => (
+            "copy(abs value: scalar) -> scalar".to_owned(),
+            "Explicitly reuses an eligible integer or boolean scalar.",
+            vec![("abs value".to_owned(), "scalar".to_owned())],
+        ),
         _ => return None,
     };
     Some(signature_value(&label, documentation, &parameters))

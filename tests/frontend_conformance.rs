@@ -41,3 +41,15 @@ fn primitive_width_and_range_validation_have_positive_and_negative_evidence() {
     assert!(matches!(error.kind, SemanticErrorKind::NumericLiteralOutOfRange { .. }));
     assert_eq!(semantic_diagnostic(&error).code(), "E1068");
 }
+
+#[test]
+fn value_reuse_and_fixed_slot_selection_have_positive_and_negative_evidence() {
+    analyze_source(include_str!("fixtures/phase32/value_reuse_and_fixed_slots.act"))
+        .expect("explicit scalar reuse and indexed selection should pass");
+    let error = analyze_source(
+        "verb main() { erg values: Array[u32, 2] = Array[u32, 2](); erg repeated: u32 = copy(value: values[1]); }",
+    )
+    .expect_err("copy without an explicit abs role must fail");
+    assert!(matches!(error.kind, SemanticErrorKind::InvalidArgumentRole { .. }));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1016");
+}

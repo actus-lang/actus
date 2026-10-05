@@ -1,0 +1,6 @@
+verb main() -> Int {
+    erg values: Array[u32, 2] = Array[u32, 2]();
+    values[1] = 41u32;
+    erg repeated: u32 = copy(value: abs values[1]);
+    return repeated as Int + 1;
+}

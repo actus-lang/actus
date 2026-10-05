@@ -207,6 +207,10 @@ fn intrinsic_info(name: &str) -> Option<SymbolInfo> {
             "println(abs text: Buffer) -> Result[Int, IoError]",
             "Writes the Buffer live length and a line ending; output is length-aware and binary-safe.",
         ),
+        "copy" => (
+            "copy(abs value: scalar) -> scalar",
+            "Explicitly reuses an eligible integer or boolean scalar without consuming the caller.",
+        ),
         _ => return None,
     };
     Some(SymbolInfo {

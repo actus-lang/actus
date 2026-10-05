@@ -62,3 +62,4 @@ gated implementation roadmaps:
 - [ ] [Phase 21: Production Language Capability and Wire Readiness](docs/roadmap/phase-21-production-language-capability-and-wire-readiness.md)
 - [ ] [Phase 22: Enterprise Compiler Platform](docs/roadmap/phase-22-enterprise-compiler-platform.md)
 - [ ] [Phase 23: Systems Language Capability Foundation](docs/roadmap/phase-23-systems-language-capability-foundation.md)
+- [ ] [Phase 33: Language Ergonomics and Readable Systems Syntax](docs/roadmap/phase-33-language-ergonomics-and-readable-systems-syntax.md)

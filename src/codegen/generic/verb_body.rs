@@ -183,6 +183,16 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
+    if (callee == "copy" || callee.starts_with("copy__"))
+        && arguments.len() == 1
+        && arguments[0].name.as_deref() == Some("value")
+    {
+        return Expr::Call {
+            callee: "copy".to_owned(),
+            arguments: specialize_arguments(arguments, substitution),
+            span: *span,
+        };
+    }
     let callee = if callee.contains('[') {
         specialize_callee_name(callee, substitution)
     } else {

@@ -52,6 +52,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if self.visit_scalar_copy_call(callee, arguments, span)? {
+            return Ok(());
+        }
         if let Some(result) = self.visit_special_call(callee, arguments, span)? {
             return result;
         }
@@ -88,6 +91,37 @@ impl Analyzer {
             });
         }
         self.visit_call_with_signature(&lookup_name, arguments, span, &signature)
+    }
+
+    fn visit_scalar_copy_call(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let specialized = callee.starts_with("copy__")
+            && arguments.len() == 1
+            && arguments[0].name.as_deref() == Some("value");
+        let intrinsic = specialized || self.should_use_scalar_copy_intrinsic(callee, arguments);
+        if intrinsic {
+            self.visit_intrinsic_call("copy", arguments, span)?;
+        }
+        Ok(intrinsic)
+    }
+
+    fn should_use_scalar_copy_intrinsic(&self, callee: &str, arguments: &[Argument]) -> bool {
+        if callee != "copy" || arguments.len() != 1 {
+            return false;
+        }
+        if arguments[0].name.as_deref() != Some("value") {
+            return false;
+        }
+        if !self.local_signatures.contains(callee) {
+            return true;
+        }
+        self.signatures
+            .get(callee)
+            .is_none_or(|signature| signature.params.len() != 1 || signature.params[0].0 != "value")
     }
 
     fn visit_special_call(

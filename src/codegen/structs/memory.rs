@@ -14,7 +14,7 @@ pub(super) fn store_struct_field(
 ) -> Result<(), NativeEmitError> {
     if field.indirect || matches!(field.ty, NativeType::Enum(id) if layouts.is_niche_option(id)) {
         function.ins().store(MemFlagsData::new(), value, address, field.offset as i32);
-    } else if matches!(field.ty, NativeType::Struct(_) | NativeType::Enum(_))
+    } else if matches!(field.ty, NativeType::Struct(_) | NativeType::Enum(_) | NativeType::Array(_))
         || layouts.is_inline_pack(field.ty)
     {
         let size = layouts

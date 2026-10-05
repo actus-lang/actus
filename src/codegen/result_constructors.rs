@@ -92,7 +92,7 @@ fn normalize_statement(
             normalize_expression(value, None, signatures, locals);
         }
         Stmt::Expression { expression, .. } => {
-            normalize_expression(expression, None, signatures, locals);
+            normalize_expression(expression, return_type, signatures, locals);
         }
         Stmt::If { condition, then_branch, else_branch, .. } => {
             normalize_expression(condition, None, signatures, locals);

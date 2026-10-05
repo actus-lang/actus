@@ -132,7 +132,9 @@ fn append_imported_declarations(
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Import(import) = declaration else { return None };
-            compilation.units().iter().find(|unit| unit.identity().module_path() == import.path)
+            let import_path =
+                super::plan::qualify_import_path(module.identity().module_path(), &import.path);
+            compilation.units().iter().find(|unit| unit.identity().module_path() == import_path)
         })
         .collect::<Vec<_>>();
     for dependency in imports {

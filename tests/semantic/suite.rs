@@ -185,11 +185,11 @@ fn validates_call_roles_and_rejects_ambiguous_positional_calls() {
     );
 
     let ambiguous = analyze_source(
-        "verb copy(erg destination: Buffer, erg source: Buffer) { } verb caller() { erg first = make(); erg second = make(); copy(first, second); }",
+        "verb merge_buffers(erg destination: Buffer, erg source: Buffer) { } verb caller() { erg first = make(); erg second = make(); merge_buffers(first, second); }",
     )
     .expect_err("same-role same-type positional calls must be labeled");
     assert!(
-        matches!(ambiguous.kind, SemanticErrorKind::AmbiguousPositionalCall { callee } if callee == "copy")
+        matches!(ambiguous.kind, SemanticErrorKind::AmbiguousPositionalCall { callee } if callee == "merge_buffers")
     );
 }
 

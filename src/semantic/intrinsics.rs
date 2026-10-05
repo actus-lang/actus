@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    Argument, Expr, IntrinsicKind, PrimitiveType, lookup_call_intrinsic, lookup_intrinsic,
-    primitive_type,
+    Argument, Expr, IntrinsicKind, PrimitiveType, Role, TypeName, lookup_call_intrinsic,
+    lookup_intrinsic, primitive_type,
 };
 use crate::lexer::SourceSpan;
 
@@ -10,7 +10,11 @@ use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 pub(super) fn is_reserved_name(name: &str) -> bool {
-    name == "allocate" || (lookup_intrinsic(name).is_some() && name != "print")
+    // `copy` is also a public standard-library verb name. Intrinsic dispatch
+    // already yields to a locally registered signature, so the name must remain
+    // available to module-scoped declarations without weakening the intrinsic
+    // fallback for scalar reuse.
+    name == "allocate" || (lookup_intrinsic(name).is_some() && !matches!(name, "print" | "copy"))
 }
 
 impl Analyzer {
@@ -43,9 +47,53 @@ impl Analyzer {
                 self.require_append_byte_type(callee, parameters[1], &arguments[1].expression)?;
                 Ok(true)
             }
+            IntrinsicKind::Copy => self.validate_copy(arguments, callee, span),
             IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
         }
+    }
+
+    fn validate_copy(
+        &mut self,
+        arguments: &[Argument],
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
+        let argument = arguments[0];
+        self.visit_expression(&argument.expression)?;
+        if argument.role != Some(Role::Abs) || !self.is_readable_owner(&argument.expression) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidArgumentRole {
+                    callee: callee.to_owned(),
+                    parameter: IntrinsicKind::Copy.spec().parameters[0].to_owned(),
+                },
+                span: expression_span(&argument.expression),
+            });
+        }
+        let type_name = self.expression_type_name(&argument.expression);
+        let eligible = type_name.as_deref().is_some_and(|name| {
+            name == "Int"
+                || name == "Bool"
+                || primitive_type(name)
+                    .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { .. }))
+        });
+        if !eligible {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: IntrinsicKind::Copy.spec().parameters[0].to_owned(),
+                },
+                span: expression_span(&argument.expression),
+            });
+        }
+        if let Some(name) = type_name {
+            self.inferred_expression_types.insert(
+                (span.start, span.end),
+                TypeName { name, arguments: Vec::new(), reference_role: None, span },
+            );
+        }
+        Ok(true)
     }
 
     fn require_append_byte_type(

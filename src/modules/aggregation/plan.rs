@@ -245,9 +245,10 @@ fn collect_unit(
     validate_import_visibility(importer, module_path, &unit)?;
     for declaration in &unit.implementation().declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
-        if imported_paths.insert(import.path.clone()) {
+        let import_path = qualify_import_path(module_path, &import.path);
+        if imported_paths.insert(import_path.clone()) {
             collect_unit(
-                &import.path,
+                &import_path,
                 unit.implementation(),
                 resolver,
                 overlays,
@@ -260,6 +261,14 @@ fn collect_unit(
     append_public_declarations(caller_declarations, &unit);
     units.push(unit);
     Ok(())
+}
+
+pub(super) fn qualify_import_path(importer: &str, imported: &str) -> String {
+    if importer.starts_with("std::") && !imported.contains("::") {
+        format!("std::{imported}")
+    } else {
+        imported.to_owned()
+    }
 }
 
 fn append_public_declarations(target: &mut Vec<TopLevelDecl>, unit: &ModuleUnit) {

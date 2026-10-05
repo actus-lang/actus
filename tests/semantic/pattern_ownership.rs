@@ -58,6 +58,23 @@ fn dat_case_return_unwinds_remaining_payload_once() {
 }
 
 #[test]
+fn ignores_terminal_dat_move_branches_when_joining_case_state() {
+    analyze_source(
+        "enum Failure { Failed, } verb consume(dat payload: Buffer) -> Int { return 0; } verb inspect(erg payload: Buffer, erg result: Result[Int, Failure]) -> Int { return case dat result { Result.Ok(_) => { consume(payload: dat payload); return 0; }, Result.Err(_) => { return 1; }, }; }",
+    )
+    .expect("terminal branches must not require an ownership join");
+}
+
+#[test]
+fn still_rejects_use_after_dat_move_before_case_return() {
+    let error = analyze_source(
+        "enum Failure { Failed, } verb consume(dat payload: Buffer) -> Int { return 0; } verb inspect(erg payload: Buffer, erg result: Result[Int, Failure]) -> Int { return case dat result { Result.Ok(_) => { consume(payload: dat payload); append(payload, 1u8); return 0; }, Result.Err(_) => { return 1; }, }; }",
+    )
+    .expect_err("a moved binding must remain unavailable before return");
+    assert!(matches!(error.kind, SemanticErrorKind::UseAfterMove { name } if name == "payload"));
+}
+
+#[test]
 fn isolates_ownership_transfers_between_abs_case_branches() {
     analyze_source(
         "enum Color { Red, Green, } verb inspect(erg color: Color, erg payload: Buffer) { case abs color { Color.Red => { erg first = payload; }, Color.Green => { erg second = payload; }, }; }",
