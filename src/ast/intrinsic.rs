@@ -3,6 +3,7 @@ pub enum IntrinsicKind {
     Append,
     Crc32,
     Crc32Matches,
+    ValidateFixedFrame,
     Copy,
     Print,
     Drop,
@@ -33,6 +34,21 @@ impl IntrinsicKind {
                 parameters: &["buffer", "start", "end", "expected"],
                 status: RegistryStatus::Active,
             },
+            Self::ValidateFixedFrame => IntrinsicSpec {
+                name: "validate_fixed_frame",
+                parameters: &[
+                    "buffer",
+                    "little",
+                    "version_offset",
+                    "expected_version",
+                    "payload_offset",
+                    "payload_length",
+                    "checksum_start",
+                    "checksum_end",
+                    "checksum_offset",
+                ],
+                status: RegistryStatus::Active,
+            },
             Self::Copy => IntrinsicSpec {
                 name: "copy",
                 parameters: &["value"],
@@ -57,6 +73,7 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
         "append" => Some(IntrinsicKind::Append),
         "crc32" => Some(IntrinsicKind::Crc32),
         "crc32_matches" => Some(IntrinsicKind::Crc32Matches),
+        "validate_fixed_frame" => Some(IntrinsicKind::ValidateFixedFrame),
         "copy" => Some(IntrinsicKind::Copy),
         "print" => Some(IntrinsicKind::Print),
         "drop" => Some(IntrinsicKind::Drop),
@@ -70,6 +87,7 @@ pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
             IntrinsicKind::Append
             | IntrinsicKind::Crc32
             | IntrinsicKind::Crc32Matches
+            | IntrinsicKind::ValidateFixedFrame
             | IntrinsicKind::Copy
             | IntrinsicKind::Print,
         ) => lookup_intrinsic(name),

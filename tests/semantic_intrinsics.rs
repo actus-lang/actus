@@ -24,6 +24,20 @@ fn intrinsic_registry_defines_source_contracts() {
         IntrinsicKind::Crc32Matches.spec().parameters,
         &["buffer", "start", "end", "expected"]
     );
+    assert_eq!(
+        IntrinsicKind::ValidateFixedFrame.spec().parameters,
+        &[
+            "buffer",
+            "little",
+            "version_offset",
+            "expected_version",
+            "payload_offset",
+            "payload_length",
+            "checksum_start",
+            "checksum_end",
+            "checksum_offset"
+        ]
+    );
     assert_eq!(IntrinsicKind::Copy.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
@@ -33,6 +47,10 @@ fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_call_intrinsic("copy"), Some(IntrinsicKind::Copy));
     assert_eq!(lookup_call_intrinsic("crc32"), Some(IntrinsicKind::Crc32));
     assert_eq!(lookup_call_intrinsic("crc32_matches"), Some(IntrinsicKind::Crc32Matches));
+    assert_eq!(
+        lookup_call_intrinsic("validate_fixed_frame"),
+        Some(IntrinsicKind::ValidateFixedFrame)
+    );
     assert!(lookup_intrinsic("user_function").is_none());
 }
 
@@ -540,6 +558,14 @@ fn accepts_crc32_match_validation_over_a_read_only_buffer_range() {
         "verb main() -> Int { erg buffer: Buffer = Buffer[4]; return crc32_matches(buffer: abs buffer, start: 0, end: 0, expected: 0); }",
     )
     .expect("crc32_matches should accept a read-only buffer and integer range");
+}
+
+#[test]
+fn accepts_fixed_frame_validation_over_a_read_only_buffer() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[9]; return validate_fixed_frame(buffer: abs buffer, little: 1, version_offset: 0, expected_version: 1, payload_offset: 2, payload_length: 3, checksum_start: 0, checksum_end: 5, checksum_offset: 5); }",
+    )
+    .expect("validate_fixed_frame should accept a read-only buffer and integer contract values");
 }
 
 #[test]

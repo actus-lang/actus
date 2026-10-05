@@ -36,6 +36,16 @@ fn executes_crc32_match_intrinsic_through_the_native_runtime() {
 
 #[cfg(unix)]
 #[test]
+fn executes_fixed_frame_validation_intrinsic_through_the_native_runtime() {
+    let status = run_array_fixture(
+        "fixed-frame-validation-intrinsic",
+        "verb main() -> Int { erg buffer: Buffer = Buffer[9]; erg valid: Int = validate_fixed_frame(buffer: abs buffer, little: 1, version_offset: 0, expected_version: 1, payload_offset: 2, payload_length: 3, checksum_start: 0, checksum_end: 5, checksum_offset: 5); drop(buffer); return valid; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

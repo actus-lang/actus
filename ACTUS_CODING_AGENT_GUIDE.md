@@ -1037,7 +1037,8 @@ declaration does not allocate memory, open files, or perform I/O. Generated
 read, write, validation, and migration operations must use caller-owned
 buffers and explicit ownership roles. The `crc32` intrinsic computes an IEEE
 CRC32 over a validated buffer range, while `crc32_matches` compares that value
-with an expected integer. The fixed-frame runtime validator checks version,
+with an expected integer. The `validate_fixed_frame` intrinsic exposes the
+fixed-frame runtime validator, which checks version,
 payload bounds, endianness, and stored CRC without allocation. These operations
 do not allocate. Dynamic payloads,
 implicit allocation, and automatic filesystem commits remain outside this
