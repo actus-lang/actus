@@ -21,6 +21,7 @@ pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_BYTE_AT_SYMBOL: &str = "actus_buffer_byte_at";
 /// Stable runtime symbol for allocation-free CRC32 over a validated buffer range.
 pub const BUFFER_CRC32_SYMBOL: &str = "actus_buffer_crc32";
+pub const BUFFER_CRC32_MATCHES_SYMBOL: &str = "actus_buffer_crc32_matches";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";

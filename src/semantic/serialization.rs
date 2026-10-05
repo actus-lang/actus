@@ -11,8 +11,18 @@ impl Analyzer {
         &mut self,
         program: &Program,
     ) -> Result<(), SemanticError> {
+        let mut generated_names = std::collections::HashSet::new();
         for declaration in &program.declarations {
             let TopLevelDecl::Serialize(contract) = declaration else { continue };
+            for name in generated_api_names(contract) {
+                if !generated_names.insert(name.clone()) || declaration_name_exists(program, &name)
+                {
+                    return Err(serialization_error(
+                        contract,
+                        "generated API name collides with an existing declaration",
+                    ));
+                }
+            }
             self.validate_serialization_contract(contract)?;
         }
         Ok(())
@@ -67,6 +77,10 @@ fn semantic_contract(contract: &SerializeDecl) -> Result<SerializationContract, 
     Ok(SerializationContract {
         name: contract.name.clone(),
         source_type: contract.source_type.name.clone(),
+        encode_name: generated_name(contract, "encode"),
+        decode_name: generated_name(contract, "decode"),
+        validate_name: generated_name(contract, "validate"),
+        migrate_name: generated_name(contract, "migrate"),
         endianness: match contract.endianness {
             crate::ast::LayoutEndianness::Little => "little".to_owned(),
             crate::ast::LayoutEndianness::Big => "big".to_owned(),
@@ -77,6 +91,27 @@ fn semantic_contract(contract: &SerializeDecl) -> Result<SerializationContract, 
         checksum_start,
         checksum_end,
         checksum_offset,
+    })
+}
+
+fn generated_api_names(contract: &SerializeDecl) -> [String; 4] {
+    [
+        generated_name(contract, "encode"),
+        generated_name(contract, "decode"),
+        generated_name(contract, "validate"),
+        generated_name(contract, "migrate"),
+    ]
+}
+
+fn generated_name(contract: &SerializeDecl, operation: &str) -> String {
+    format!("{}_{}", contract.name.to_ascii_lowercase(), operation)
+}
+
+fn declaration_name_exists(program: &Program, name: &str) -> bool {
+    program.declarations.iter().any(|declaration| match declaration {
+        TopLevelDecl::Verb(verb) => verb.name == name,
+        TopLevelDecl::ExternalVerb(verb) => verb.name == name,
+        _ => false,
     })
 }
 

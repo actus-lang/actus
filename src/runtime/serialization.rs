@@ -35,6 +35,22 @@ pub unsafe extern "C" fn actus_buffer_crc32(handle: BufferHandle, start: i64, en
     i64::from(crc32(&bytes[start..end]))
 }
 
+/// Compares a validated buffer range with an expected IEEE CRC32 value.
+///
+/// # Safety
+/// `handle` must be null or point to a live `ActusBuffer` whose fields describe
+/// valid storage for the duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_buffer_crc32_matches(
+    handle: BufferHandle,
+    start: i64,
+    end: i64,
+    expected: i64,
+) -> i64 {
+    let actual = unsafe { actus_buffer_crc32(handle, start, end) };
+    i64::from(actual >= 0 && actual == expected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::crc32;

@@ -26,6 +26,16 @@ fn executes_crc32_intrinsic_through_the_native_runtime() {
 
 #[cfg(unix)]
 #[test]
+fn executes_crc32_match_intrinsic_through_the_native_runtime() {
+    let status = run_array_fixture(
+        "crc32-match-intrinsic",
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; erg matched: Int = crc32_matches(buffer: abs buffer, start: 0, end: 0, expected: 0); drop(buffer); return if matched == 1 { 42 } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

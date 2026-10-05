@@ -118,7 +118,10 @@ fn normalize_call_arguments(
             values.pop().ok_or_else(|| NativeEmitError("append requires a byte".to_owned()))?;
         values.push(to_byte(function, byte));
     }
-    if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Crc32) {
+    if matches!(
+        lookup_call_intrinsic(callee),
+        Some(IntrinsicKind::Crc32 | IntrinsicKind::Crc32Matches)
+    ) {
         for value in values.iter_mut().skip(1) {
             *value = to_i64(function, *value);
         }

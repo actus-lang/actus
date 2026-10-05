@@ -214,10 +214,20 @@ checksums, versions, and failure behavior explicit.
 
 **Gate status: In progress — fixed contract syntax and semantic validation implemented; generated APIs pending**
 
+The remaining work is split into bounded sub-gates:
+
+- **33.5a — Contract surface:** generated API names, signature registration,
+  collision diagnostics, and facade visibility.
+- **33.5b — Native validation:** generated `validate` body, version/range checks,
+  CRC32 comparison, and object/executable parity.
+- **33.5c — Persistence integration:** encode/decode operations, atomic staged
+  writes, recovery markers, and byte compatibility evidence.
+
 - [x] Record the initial serialization syntax and generated API proposal in [ADR-0064](../decisions/ADR-0064-declarative-serialization-contracts.md).
 - [x] Parse the fixed serialization contract into AST and preserve it through formatting.
 - [x] Validate source pack capacity, fixed sections, version width, checksum range, and overlap rules.
 - [x] Preserve validated serialization contracts in the semantic model for later native lowering.
+- [x] Reserve deterministic generated API names and reject declaration collisions.
 - [x] Add the allocation-free `crc32` intrinsic and prove its native runtime ABI with an executable test.
 
 #### Design
@@ -232,13 +242,14 @@ checksums, versions, and failure behavior explicit.
 
 #### Compiler implementation
 
-- [ ] Add serialization declarations to the parser and AST.
-- [ ] Validate field order, offsets, widths, alignment, and total size.
+- [x] Add serialization declarations to the parser and AST.
+- [x] Validate field order, offsets, widths, alignment, and total size.
 - [ ] Generate typed read/write operations through the existing facade and ABI boundaries.
 - [ ] Generate checksum and version validation without hidden allocation.
 - [ ] Preserve hand-written escape hatches only through explicit declarations.
 - [ ] Emit deterministic native code and stable diagnostics.
-- [ ] Add formatter and LSP support for serialization fields.
+- [x] Add formatter support for serialization contracts.
+- [ ] Add LSP support for serialization fields.
 
 #### Evidence
 

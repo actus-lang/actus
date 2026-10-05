@@ -48,6 +48,7 @@ impl Analyzer {
                 Ok(true)
             }
             IntrinsicKind::Crc32 => self.validate_crc32(arguments, callee, span),
+            IntrinsicKind::Crc32Matches => self.validate_crc32_matches(arguments, callee, span),
             IntrinsicKind::Copy => self.validate_copy(arguments, callee, span),
             IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
@@ -86,6 +87,40 @@ impl Analyzer {
                     span: expression_span(&argument.expression),
                 });
             }
+        }
+        Ok(true)
+    }
+
+    fn validate_crc32_matches(
+        &mut self,
+        arguments: &[Argument],
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
+        for argument in &arguments {
+            self.visit_expression(&argument.expression)?;
+        }
+        let buffer = &arguments[0].expression;
+        if self.expression_type(buffer) != Some(crate::ast::BuiltinType::Buffer)
+            || !self.is_readable_owner(buffer)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: "buffer".to_owned(),
+                },
+                span: expression_span(buffer),
+            });
+        }
+        if arguments[1..].iter().any(|argument| !self.is_integer_expression(&argument.expression)) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: "range".to_owned(),
+                },
+                span,
+            });
         }
         Ok(true)
     }

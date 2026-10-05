@@ -33,6 +33,12 @@ The declaration names the source `pack` or fixed aggregate, then states the
 wire sections in byte order. Every section has an explicit offset and width.
 `version` names a typed integer field. `payload bytes` names a bounded byte
 range. `checksum` names an explicit algorithm and coverage interval. Alignment
+
+For a contract named `Frame`, the compiler reserves deterministic generated
+API names `frame_encode`, `frame_decode`, `frame_validate`, and `frame_migrate`.
+These names are checked for collisions before native lowering. The first
+implementation may expose them incrementally, but their names and compatibility
+rules are fixed by this ADR.
 and padding are declarations, never inferred from the host ABI.
 
 The initial profile supports `little` and `big` endian integer fields, explicit

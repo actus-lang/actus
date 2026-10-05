@@ -122,6 +122,10 @@ pub struct PackFieldContract {
 pub struct SerializationContract {
     pub name: String,
     pub source_type: String,
+    pub encode_name: String,
+    pub decode_name: String,
+    pub validate_name: String,
+    pub migrate_name: String,
     pub endianness: String,
     pub version_offset: u16,
     pub payload_offset: u16,

@@ -2,6 +2,7 @@
 pub enum IntrinsicKind {
     Append,
     Crc32,
+    Crc32Matches,
     Copy,
     Print,
     Drop,
@@ -27,6 +28,11 @@ impl IntrinsicKind {
                 parameters: &["buffer", "start", "end"],
                 status: RegistryStatus::Active,
             },
+            Self::Crc32Matches => IntrinsicSpec {
+                name: "crc32_matches",
+                parameters: &["buffer", "start", "end", "expected"],
+                status: RegistryStatus::Active,
+            },
             Self::Copy => IntrinsicSpec {
                 name: "copy",
                 parameters: &["value"],
@@ -50,6 +56,7 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
     match name {
         "append" => Some(IntrinsicKind::Append),
         "crc32" => Some(IntrinsicKind::Crc32),
+        "crc32_matches" => Some(IntrinsicKind::Crc32Matches),
         "copy" => Some(IntrinsicKind::Copy),
         "print" => Some(IntrinsicKind::Print),
         "drop" => Some(IntrinsicKind::Drop),
@@ -62,6 +69,7 @@ pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
         Some(
             IntrinsicKind::Append
             | IntrinsicKind::Crc32
+            | IntrinsicKind::Crc32Matches
             | IntrinsicKind::Copy
             | IntrinsicKind::Print,
         ) => lookup_intrinsic(name),
