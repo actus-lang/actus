@@ -1,6 +1,6 @@
 # Phase 34: Indexed Pack-Field Access
 
-**Status: Planned**
+**Status: Implementation in progress**
 
 Phase 34 adds a safe, layout-aware way to access repeated fields inside a
 packed value by index. The motivating form is:
@@ -100,19 +100,19 @@ compile time.
 
 ### Gate 34.3 — Semantic ownership and bounds analysis
 
-- [ ] Resolve indexed reads as immutable or mutable places according to the
+- [x] Resolve indexed reads as immutable or mutable places according to the
       surrounding role contract.
-- [ ] Preserve `abs`, `ins`, `erg`, and `dat` semantics for the containing pack.
-- [ ] Reject indexed mutation through immutable views.
-- [ ] Reject indexes with incompatible integer types.
-- [ ] Reject provably out-of-range constant indexes.
-- [ ] Emit a checked runtime bounds path for non-constant indexes.
+- [x] Preserve `abs`, `ins`, `erg`, and `dat` semantics for the containing pack.
+- [x] Reject indexed mutation through immutable views.
+- [x] Reject indexes with incompatible integer types.
+- [x] Reject provably out-of-range constant indexes.
+- [x] Emit a checked runtime bounds path for non-constant indexes.
 - [ ] Verify cleanup and branch-join behavior for indexed place expressions.
 - [ ] Reject hidden conversion to a dynamic array, slice, or pointer.
 
 ### Gate 34.4 — Native lowering and layout parity
 
-- [ ] Lower indexed access to integer address arithmetic derived only from the
+- [x] Lower indexed access to integer address arithmetic derived only from the
       declared pack layout.
 - [ ] Verify that element addresses use the declared element width and endian
       rules.
@@ -160,7 +160,7 @@ implementation helpers remain behind that boundary.
 
 ### Gate 34.7 — Acceptance evidence
 
-- [ ] Add accepted tests for indexed reads and writes on packed fields.
+- [x] Add accepted tests for indexed reads and writes on packed fields.
 - [ ] Add accepted tests for nested indexed access through arrays of packs.
 - [ ] Add rejected tests for out-of-range constants, invalid runtime index
       types, immutable mutation, overlap, overflow, and misalignment.
@@ -169,6 +169,13 @@ implementation helpers remain behind that boundary.
 - [ ] Add object/native parity tests and a no-floating-point IR audit.
 - [ ] Add formatter and LSP regression tests.
 - [ ] Record the compiler revision, test command, and native evidence.
+
+Implementation checkpoint: the canonical `Array[T, N]` pack-field syntax,
+semantic width/count metadata, checked indexed reads and writes, compound
+updates, and byte-addressable native lowering are implemented. Remaining
+work covers the dedicated AST metadata surface, formatter/LSP presentation,
+alias and migration policy, nested indexed-pack acceptance, endian/layout
+parity coverage, and the remaining ownership and object-level evidence.
 
 ## Exit criteria
 
