@@ -91,6 +91,20 @@ fn generated_scalar_locals_have_no_allocation_relocations() {
 }
 
 #[test]
+fn lowers_constant_abs_scalar_arguments_before_native_inlining() {
+    let source = "const VERSION: u16 = 7u16; verb append_u16(ins output: Buffer, abs value: u16) { append(output, value as u8); } verb main() -> Int { erg output: Buffer = Buffer[0]; append_u16(output: ins output, value: abs VERSION); return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("constant role source should parse");
+    emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("constant-qualified abs scalar argument should emit natively");
+}
+
+#[test]
 fn generated_and_explicit_scalar_locals_emit_identical_text() {
     let sources = [
         "verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg index: u32 = 41u32; return read(value: abs (index + 1u32)); }",

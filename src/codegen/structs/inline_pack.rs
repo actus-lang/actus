@@ -17,7 +17,7 @@ pub(super) fn lower_indexed_pack_field_address(
             "indexed packed fields require byte-addressable storage".to_owned(),
         ));
     }
-    if field.offset % 8 != 0 || field.width % 8 != 0 {
+    if !field.offset.is_multiple_of(8) || !field.width.is_multiple_of(8) {
         return Err(NativeEmitError(
             "indexed packed fields require byte-aligned elements".to_owned(),
         ));
