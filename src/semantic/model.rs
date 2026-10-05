@@ -118,6 +118,19 @@ pub struct PackFieldContract {
     pub has_default: bool,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SerializationContract {
+    pub name: String,
+    pub source_type: String,
+    pub endianness: String,
+    pub version_offset: u16,
+    pub payload_offset: u16,
+    pub payload_length: u16,
+    pub checksum_start: u16,
+    pub checksum_end: u16,
+    pub checksum_offset: u16,
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReachablePerformance {
     pub role_name: String,
@@ -156,6 +169,7 @@ pub struct SemanticModel {
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,
     pub pack_layouts: Vec<PackLayoutContract>,
+    pub serialization_contracts: Vec<SerializationContract>,
     pub reachable_performances: Vec<ReachablePerformance>,
     pub dynamic_roles: Vec<DynamicRoleType>,
     pub drop_types: Vec<String>,

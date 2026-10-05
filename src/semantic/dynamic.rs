@@ -96,6 +96,7 @@ impl Analyzer {
                 TopLevelDecl::Struct(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Pack(_)
+                | TopLevelDecl::Serialize(_)
                 | TopLevelDecl::OpenSibling(_)
                 | TopLevelDecl::Import(_) => {}
             }

@@ -371,4 +371,8 @@ pub enum SemanticErrorKind {
         field: String,
         role: String,
     },
+    InvalidSerializationContract {
+        contract: String,
+        reason: String,
+    },
 }

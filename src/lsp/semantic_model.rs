@@ -288,6 +288,7 @@ fn declarations(
                 TopLevelDecl::Struct(value) => (&value.name, value.span, &[]),
                 TopLevelDecl::Enum(value) => (&value.name, value.span, &[]),
                 TopLevelDecl::Pack(value) => (&value.name, value.span, &[]),
+                TopLevelDecl::Serialize(value) => (&value.name, value.span, &[]),
                 TopLevelDecl::Role(value) => (&value.name, value.span, &[]),
                 TopLevelDecl::Import(_)
                 | TopLevelDecl::Perform(_)

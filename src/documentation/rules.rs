@@ -1,6 +1,6 @@
 use crate::ast::{
     EnumDef, EnumField, ExternalVerbDecl, PackDecl, Param, PerformDecl, Program, ReturnType,
-    RoleDecl, StructDef, TopLevelDecl, VerbDecl,
+    RoleDecl, SerializeDecl, StructDef, TopLevelDecl, VerbDecl,
 };
 use crate::diagnostics::{
     STRICT_DOCUMENTATION_CONTRADICTION, STRICT_DOCUMENTATION_MISREPRESENTATION,
@@ -29,6 +29,9 @@ fn validate_top_level(declaration: &TopLevelDecl, issues: &mut Vec<Documentation
             validate_struct(definition, issues)
         }
         TopLevelDecl::Pack(definition) if definition.is_open => validate_pack(definition, issues),
+        TopLevelDecl::Serialize(definition) if definition.is_open => {
+            validate_serialize(definition, issues)
+        }
         TopLevelDecl::Enum(definition) if definition.is_open => validate_enum(definition, issues),
         TopLevelDecl::Role(role) if role.is_open => validate_role(role, issues),
         TopLevelDecl::Perform(perform) if perform.is_open => validate_perform(perform, issues),
@@ -114,6 +117,16 @@ fn validate_pack(definition: &PackDecl, issues: &mut Vec<DocumentationIssue>) {
             issues,
         );
     }
+}
+
+fn validate_serialize(definition: &SerializeDecl, issues: &mut Vec<DocumentationIssue>) {
+    check_doc(
+        definition.doc.as_deref(),
+        format!("serialization contract {}", definition.name),
+        definition.span,
+        Contract::type_definition(),
+        issues,
+    );
 }
 
 fn validate_enum(definition: &EnumDef, issues: &mut Vec<DocumentationIssue>) {

@@ -40,6 +40,7 @@ pub enum TokenKind {
     Continue,
     Struct,
     Pack,
+    Serialize,
     Enum,
     Role,
     Perform,

@@ -24,6 +24,7 @@ mod pattern_support;
 mod patterns;
 mod roles;
 mod scopes;
+mod serialization;
 mod state;
 mod structs;
 mod type_substitution;
@@ -36,6 +37,7 @@ pub use model::{
     ArgumentRoleFact, ArgumentRoleSource, Binding, BorrowRecord, ConditionalFact, DynamicRoleType,
     ExclusiveLoan, FatPointerLayout, GenericInstance, LiteralFact, Origin, OriginRecord,
     OriginRoot, PackFieldContract, PackLayoutContract, ReachablePerformance, SemanticModel,
+    SerializationContract,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use types::{SemanticType, TypeRegistry};

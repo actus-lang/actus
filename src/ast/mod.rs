@@ -12,8 +12,8 @@ pub use decl::{
     ConstantDecl, DispatchMode, EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl,
     GenericParam, GenericParamKind, ImportDecl, LayoutEndianness, LimitlessScope, MetaAttribute,
     OpenSiblingDecl, PackDecl, PackField, PackStorage, Param, PerformDecl, Program, ReturnAccess,
-    ReturnType, Role, RoleDecl, RoleMethod, StructDef, StructField, StructFieldRole, TopLevelDecl,
-    TypeName, VerbDecl, builtin_enum_definitions,
+    ReturnType, Role, RoleDecl, RoleMethod, SerializeDecl, SerializeSection, StructDef,
+    StructField, StructFieldRole, TopLevelDecl, TypeName, VerbDecl, builtin_enum_definitions,
 };
 pub use expr::{
     Argument, ArgumentRoleResolution, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, IfBranch,

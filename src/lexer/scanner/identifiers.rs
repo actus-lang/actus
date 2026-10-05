@@ -47,6 +47,7 @@ fn keyword_or_identifier(text: &str) -> TokenKind {
         "continue" => TokenKind::Continue,
         "struct" => TokenKind::Struct,
         "pack" => TokenKind::Pack,
+        "serialize" => TokenKind::Serialize,
         "enum" => TokenKind::Enum,
         "role" => TokenKind::Role,
         "perform" => TokenKind::Perform,

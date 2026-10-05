@@ -1015,7 +1015,32 @@ shift/mask lowering, validates field widths and offsets, and preserves the
 declared endianness/layout contract. Do not manually duplicate bit shifts when
 a pack declaration expresses the actual representation.
 
-### 15.4 `Arena[N]`
+### 15.4 Declarative serialization contracts
+
+Fixed-width binary formats may be declared with `serialize` when the byte
+layout is part of the type contract:
+
+```act
+serialize Frame from FramePack {
+    layout little;
+    version u16 at 0;
+    payload bytes at 2 length 16;
+    checksum crc32 over 0 .. 18 at 18;
+}
+```
+
+The first accepted profile requires exactly one `version u16`, one fixed-size
+payload, and one `crc32` section. Offsets, lengths, checksum ranges, and the
+source pack's byte capacity are validated at compile time. Sections may not
+overlap, and the checksum field may not overlap its input range. The
+declaration does not allocate memory, open files, or perform I/O. Generated
+read, write, validation, and migration operations must use caller-owned
+buffers and explicit ownership roles. The `crc32` intrinsic computes an IEEE
+CRC32 over a validated buffer range and returns a typed integer status/value;
+it does not allocate. Dynamic payloads, implicit allocation, and automatic
+filesystem commits remain outside this profile.
+
+### 15.5 `Arena[N]`
 
 The native backend contains bounded arena support used by current aggregate
 and systems examples:

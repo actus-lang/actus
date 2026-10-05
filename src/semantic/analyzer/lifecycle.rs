@@ -15,6 +15,7 @@ impl Analyzer {
         self.register_roles(program)?;
         self.register_constants(program)?;
         self.validate_pack_declarations(program)?;
+        self.validate_serialization_declarations(program)?;
         self.register_structs(program)?;
         self.validate_role_declarations()?;
         self.validate_performances(program)?;

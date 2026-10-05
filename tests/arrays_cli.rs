@@ -16,6 +16,16 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_crc32_intrinsic_through_the_native_runtime() {
+    let status = run_array_fixture(
+        "crc32-intrinsic",
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; erg checksum: Int = crc32(buffer: abs buffer, start: 0, end: 0); drop(buffer); return if checksum == 0 { 42 } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_inferred_abs_and_ins_roles_natively() {
     let status = run_array_fixture(
         "inferred-ownership-roles",

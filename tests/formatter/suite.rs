@@ -45,6 +45,16 @@ fn formats_named_pack_offsets_idempotently() {
 }
 
 #[test]
+fn formats_serialization_contracts_idempotently() {
+    let formatted = format_source(
+        "serialize Frame from FramePack{layout little;version u16 at 0;payload bytes at 2 length 16;checksum crc32 over 0..18 at 18;}",
+    );
+    assert!(formatted.contains("payload bytes at 2 length 16;"));
+    assert!(formatted.contains("checksum crc32 over 0 .. 18 at 18;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_scalar_reuse_and_indexed_selection_idempotently() {
     let formatted = format_source(
         "verb main(){erg values:Array[u32,2]=Array[u32,2]();erg value:u32=copy(value:abs values[1]);}",

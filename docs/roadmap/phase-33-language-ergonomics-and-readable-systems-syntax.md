@@ -212,14 +212,22 @@ sources, and incompatible bounds remain rejected by the shared `for` rules.
 Make binary serialization readable while keeping byte order, offsets, widths,
 checksums, versions, and failure behavior explicit.
 
+**Gate status: In progress — fixed contract syntax and semantic validation implemented; generated APIs pending**
+
+- [x] Record the initial serialization syntax and generated API proposal in [ADR-0064](../decisions/ADR-0064-declarative-serialization-contracts.md).
+- [x] Parse the fixed serialization contract into AST and preserve it through formatting.
+- [x] Validate source pack capacity, fixed sections, version width, checksum range, and overlap rules.
+- [x] Preserve validated serialization contracts in the semantic model for later native lowering.
+- [x] Add the allocation-free `crc32` intrinsic and prove its native runtime ABI with an executable test.
+
 #### Design
 
-- [ ] Define a serialization declaration for fixed-width fields and sections.
+- [x] Define a serialization declaration for fixed-width fields and sections.
 - [ ] Define little-endian, alignment, padding, checksum, and version syntax.
 - [ ] Define read, write, validate, and migration operations generated from the contract.
 - [ ] Require explicit ownership roles for buffers and paths.
 - [ ] Define atomic write and torn-write protection hooks.
-- [ ] Reject declarations that produce ambiguous or overlapping fields.
+- [x] Reject declarations that produce ambiguous or overlapping fields.
 - [ ] Document generated API names and compatibility rules in an ADR.
 
 #### Compiler implementation

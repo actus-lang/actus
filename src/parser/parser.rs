@@ -11,6 +11,7 @@ mod expressions;
 mod generics;
 mod packs;
 mod roles;
+mod serialization;
 mod spans;
 mod statements;
 mod structs;

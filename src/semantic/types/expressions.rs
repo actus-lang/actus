@@ -70,7 +70,9 @@ impl Analyzer {
         span: crate::lexer::SourceSpan,
     ) -> Option<BuiltinType> {
         match lookup_call_intrinsic(callee) {
-            Some(IntrinsicKind::Append | IntrinsicKind::Print) => Some(BuiltinType::Int),
+            Some(IntrinsicKind::Append | IntrinsicKind::Crc32 | IntrinsicKind::Print) => {
+                Some(BuiltinType::Int)
+            }
             Some(IntrinsicKind::Copy) => self
                 .inferred_expression_types
                 .get(&(span.start, span.end))

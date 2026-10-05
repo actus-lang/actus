@@ -55,6 +55,7 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::DuplicateStructName { .. } => "E1029",
         SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
         SemanticErrorKind::DuplicatePackName { .. } => "E1081",
+        SemanticErrorKind::InvalidSerializationContract { .. } => "E1098",
         SemanticErrorKind::EmptyEnum { .. } => "E1810",
         SemanticErrorKind::DuplicateStructField { .. } => "E1030",
         SemanticErrorKind::UnknownStructField { .. } => "E1031",

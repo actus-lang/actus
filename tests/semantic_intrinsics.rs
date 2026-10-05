@@ -19,6 +19,7 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert!(lookup_intrinsic("allocate").is_none());
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert_eq!(IntrinsicKind::Crc32.spec().parameters, &["buffer", "start", "end"]);
     assert_eq!(IntrinsicKind::Copy.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
@@ -26,6 +27,7 @@ fn intrinsic_registry_defines_source_contracts() {
     assert!(lookup_call_intrinsic("drop").is_none());
     assert_eq!(lookup_call_intrinsic("print"), Some(IntrinsicKind::Print));
     assert_eq!(lookup_call_intrinsic("copy"), Some(IntrinsicKind::Copy));
+    assert_eq!(lookup_call_intrinsic("crc32"), Some(IntrinsicKind::Crc32));
     assert!(lookup_intrinsic("user_function").is_none());
 }
 
@@ -517,6 +519,27 @@ fn rejects_duplicate_verbs_in_the_function_namespace() {
 fn accepts_buffer_literal_length() {
     analyze_source("verb main() { erg buffer: Buffer = Buffer[4]; drop(buffer); }")
         .expect("Buffer literal lengths should be accepted");
+}
+
+#[test]
+fn accepts_crc32_over_a_read_only_buffer_range() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; return crc32(buffer: abs buffer, start: 0, end: 4); }",
+    )
+    .expect("crc32 should accept a read-only buffer and integer range");
+}
+
+#[test]
+fn rejects_a_non_buffer_crc32_source() {
+    let error = analyze_source(
+        "verb main() -> Int { erg value: u32 = 1u32; return crc32(buffer: abs value, start: 0, end: 1); }",
+    )
+    .expect_err("crc32 should reject non-buffer sources");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
+            if callee == "crc32" && parameter == "buffer"
+    ));
 }
 
 #[test]

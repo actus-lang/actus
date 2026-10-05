@@ -181,6 +181,24 @@ pub enum LayoutEndianness {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SerializeDecl {
+    pub is_open: bool,
+    pub doc: Option<String>,
+    pub name: String,
+    pub source_type: TypeName,
+    pub endianness: LayoutEndianness,
+    pub sections: Vec<SerializeSection>,
+    pub span: SourceSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SerializeSection {
+    Version { ty: TypeName, offset: u16, span: SourceSpan },
+    Payload { offset: u16, length: u16, span: SourceSpan },
+    Checksum { start: u16, end: u16, offset: u16, span: SourceSpan },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StructFieldRole {
     Value,
     Erg,

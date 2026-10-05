@@ -6,9 +6,9 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::IntrinsicKind;
 use crate::runtime::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
-    ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
-    WRITE_STRING_STDOUT_SYMBOL,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_CRC32_SYMBOL, BUFFER_DROP_SYMBOL,
+    ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL,
+    PRINT_STRING_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
@@ -23,6 +23,7 @@ pub(super) fn declare_runtime_functions(
         allocate: declare_allocate(module, pointer_type)?,
         drop: declare_drop(module, pointer_type)?,
         append: declare_append(module, pointer_type)?,
+        crc32: declare_crc32(module, pointer_type)?,
         print_int: declare_print_int(module)?,
         print_string: declare_print_string(module, pointer_type)?,
         write_string: declare_write_string(module, pointer_type)?,
@@ -43,6 +44,7 @@ struct RuntimeFunctionIds {
     allocate: cranelift_module::FuncId,
     drop: cranelift_module::FuncId,
     append: cranelift_module::FuncId,
+    crc32: cranelift_module::FuncId,
     print_int: cranelift_module::FuncId,
     print_string: cranelift_module::FuncId,
     write_string: cranelift_module::FuncId,
@@ -73,6 +75,7 @@ fn runtime_metadata(
             append_spec.name.to_owned(),
             intrinsic_meta(ids.append, append_spec.parameters, NativeType::Int),
         ),
+        ("crc32".to_owned(), named_meta(ids.crc32, &["buffer", "start", "end"], NativeType::Int)),
         (
             print_spec.name.to_owned(),
             intrinsic_meta(ids.print_int, print_spec.parameters, NativeType::Int),
@@ -165,6 +168,20 @@ fn declare_append(
     signature.returns.push(AbiParam::new(types::I8));
     module
         .declare_function(BUFFER_APPEND_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_crc32(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I64));
+    module
+        .declare_function(BUFFER_CRC32_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 

@@ -1,6 +1,6 @@
 use actus::ast::{
     EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, PrimitiveType,
-    ReturnAccess, Role, Stmt, TopLevelDecl, primitive_type,
+    ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl, primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -367,6 +367,27 @@ fn parses_array_backed_pack_storage_as_a_distinct_frontend_contract() {
     assert_eq!(pack.storage.byte_capacity(), Some(64));
     assert_eq!(pack.storage.bit_capacity(), Some(512));
     assert_eq!(pack.storage.alignment_bytes(), Some(1));
+}
+
+#[test]
+fn parses_fixed_serialization_contract_sections() {
+    let program = parse_source(
+        "serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; }",
+    );
+    let TopLevelDecl::Serialize(contract) = &program.declarations[0] else {
+        panic!("expected serialization contract")
+    };
+    assert_eq!(contract.source_type.name, "FramePack");
+    assert_eq!(contract.sections.len(), 3);
+    assert!(matches!(contract.sections[0], SerializeSection::Version { offset: 0, .. }));
+    assert!(matches!(
+        contract.sections[1],
+        SerializeSection::Payload { offset: 2, length: 16, .. }
+    ));
+    assert!(matches!(
+        contract.sections[2],
+        SerializeSection::Checksum { start: 0, end: 18, offset: 18, .. }
+    ));
 }
 
 #[test]

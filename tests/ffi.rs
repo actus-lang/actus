@@ -17,6 +17,7 @@ fn parse_verb(source: &str) -> actus::ast::VerbDecl {
         }
         actus::ast::TopLevelDecl::Struct(_)
         | actus::ast::TopLevelDecl::Pack(_)
+        | actus::ast::TopLevelDecl::Serialize(_)
         | actus::ast::TopLevelDecl::Enum(_)
         | actus::ast::TopLevelDecl::Role(_)
         | actus::ast::TopLevelDecl::Perform(_)
