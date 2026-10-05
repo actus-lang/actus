@@ -276,6 +276,12 @@ The remaining work is split into bounded sub-gates:
 - [x] Add native object and executable parity tests.
 - [x] Record byte-level compatibility evidence.
 
+Recovery follow-up: a failed rename path currently exposes a compiler cleanup
+bug when an aggregate `dat` value containing owned storage is passed through an
+error-return helper. Native execution aborts with an invalid free, so the
+failed-publication cleanup regression remains open until aggregate move/drop
+lowering is corrected.
+
 ### Gate 33.6 — Multi-line verb contracts
 
 Provide first-class readable contracts for public and internal verbs.

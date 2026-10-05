@@ -137,6 +137,11 @@ hook.
 - add reference-byte, corruption, truncation, version, and staged-file tests;
 - compare object and executable output against an explicit reference encoder.
 
+The failed-publication recovery case is currently blocked by a compiler bug:
+returning an error after moving an aggregate `dat` value with owned storage can
+emit an invalid second drop. The compiler must make that move/drop path
+deterministic before the recovery test can be accepted.
+
 The native migration regression uses an independent reference frame: version
 `2`, payload byte `7`, and the little-endian IEEE CRC32 bytes
 `DF 98 A1 62`. The executable must produce those exact eight bytes, including
