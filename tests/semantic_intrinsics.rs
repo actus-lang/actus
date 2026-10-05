@@ -121,6 +121,21 @@ fn validates_typed_constants_and_resolves_constant_references() {
 }
 
 #[test]
+fn validates_named_pack_offsets_and_rejects_runtime_offsets() {
+    analyze_source(
+        "const OFFSET: u16 = 8u16; pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg prefix: u8 at 0; erg marker: u8 at OFFSET; } } verb main() { return; }",
+    )
+    .expect("named pack offsets should use compile-time constants");
+    let error = analyze_source(
+        "verb runtime_offset() -> u16 { return 8u16; } pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at runtime_offset; } } verb main() { return; }",
+    )
+    .expect_err("runtime offset names must be rejected");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ConstantRuntimeDependency { name } if name == "runtime_offset")
+    );
+}
+
+#[test]
 fn validates_boolean_literals_and_rejects_integer_bindings() {
     analyze_source(
         "const DEFAULT_LINKED: Bool = false; verb main() -> Bool { erg linked: Bool = false; return linked; }",

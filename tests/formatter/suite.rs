@@ -28,6 +28,15 @@ fn formats_bounded_for_ranges_idempotently() {
 }
 
 #[test]
+fn formats_named_pack_offsets_idempotently() {
+    let formatted = format_source(
+        "const OFFSET:u16=8u16;pack Frame{erg storage:Array[u8,2];layout little;fields{erg marker:u8 at OFFSET;}}",
+    );
+    assert!(formatted.contains("marker: u8 at OFFSET;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_scalar_reuse_and_indexed_selection_idempotently() {
     let formatted = format_source(
         "verb main(){erg values:Array[u32,2]=Array[u32,2]();erg value:u32=copy(value:abs values[1]);}",

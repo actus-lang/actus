@@ -10,13 +10,14 @@ pub(super) fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Opti
             crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
             _ => None,
         })?;
+    let offset = field.offset_name.clone().unwrap_or_else(|| field.offset.to_string());
     Some(SymbolInfo {
         signature: format!(
             "{} {}: {} (offset: {}, width: {} bits, mask: {})",
             role_name(&field.role),
             field.name,
             type_name(&field.ty),
-            field.offset,
+            offset,
             width,
             format_mask(width),
         ),

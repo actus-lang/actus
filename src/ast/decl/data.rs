@@ -169,6 +169,7 @@ pub struct PackField {
     pub name: String,
     pub ty: TypeName,
     pub offset: u16,
+    pub offset_name: Option<String>,
     pub default_value: Option<Expr>,
     pub span: SourceSpan,
 }

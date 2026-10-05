@@ -288,10 +288,11 @@ The implemented vocabulary includes the following groups.
 - `meta` attaches compile-time metadata such as `test`, `target`, or
   `limitless`.
 
-`for`, `while`, `in`, `async`, `await`, `yield`, `spawn`, and actor-related
-words are not general implemented control-flow constructs. They must not be
-used in new examples unless the relevant implementation has landed. Some are
-reserved or planned vocabulary only.
+`while`, `async`, `await`, `yield`, `spawn`, and actor-related words are not
+general implemented control-flow constructs. They must not be used in new
+examples unless the relevant implementation has landed. Bounded `for` and its
+`in` separator are implemented only in the restricted form documented in
+Section 11.3. Some other words remain reserved or planned vocabulary only.
 
 ## 6. Types
 
@@ -927,6 +928,27 @@ truly fixed.
 Compile-time constants do not make arbitrary runtime computation compile-time.
 Do not rely on a constant evaluator to read files, call foreign functions,
 inspect hardware, or access mutable state.
+
+Pack field offsets may name a checked integer constant:
+
+```act
+const PAYLOAD_OFFSET: u16 = 8u16;
+
+pack Frame {
+    erg storage: Array[u8, 2];
+    layout little;
+    fields {
+        erg marker: u8 at 0;
+        erg payload: u8 at PAYLOAD_OFFSET;
+    }
+}
+```
+
+Named offsets may chain through integer constants and checked integer
+arithmetic. They must resolve before native lowering and remain within the
+`u16` layout-offset domain. Calls, runtime reads, allocation, mutation,
+buffers, strings, booleans, floating point, and dynamic lengths are invalid in
+layout constants. The numeric `at 0` form remains valid for literal offsets.
 
 ## 15. `Buffer`, `Array`, `pack`, and `Arena`
 

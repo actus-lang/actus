@@ -127,34 +127,43 @@ limits, and diff checks pass.
 Replace repeated byte offsets, widths, sentinels, and masks with named,
 compile-time checked declarations.
 
+**Gate status: Complete**
+
 #### Design
 
-- [ ] Define a compile-time constant declaration form with explicit type rules.
-- [ ] Define named field offsets and layout groups for buffers and packs.
-- [ ] Define compile-time arithmetic and overflow behavior.
-- [ ] Define whether constants may reference other constants and layout fields.
-- [ ] Reject runtime reads, allocation, mutation, and function calls in constants.
-- [ ] Preserve facade visibility and nested-facade export rules.
-- [ ] Document the layout model and migration rules in an ADR.
+- [x] Define a compile-time constant declaration form with explicit type rules.
+- [x] Define named field offsets and layout groups for buffers and packs.
+- [x] Define compile-time arithmetic and overflow behavior.
+- [x] Define whether constants may reference other constants and layout fields.
+- [x] Reject runtime reads, allocation, mutation, and function calls in constants.
+- [x] Preserve facade visibility and nested-facade export rules.
+- [x] Document the layout model and migration rules in an ADR.
 
 #### Compiler implementation
 
-- [ ] Add constant and layout nodes to the AST and formatter.
-- [ ] Implement semantic evaluation with checked integer operations.
-- [ ] Propagate constant environments through generic specialization and nested facades.
-- [ ] Lower constants directly into native values without runtime symbols.
-- [ ] Preserve source spans and names in diagnostics and LSP definition lookup.
-- [ ] Detect duplicate, cyclic, overflowing, and incompatible declarations.
-- [ ] Keep layout declarations consistent with pack size and alignment metadata.
+- [x] Add constant and layout nodes to the AST and formatter.
+- [x] Implement semantic evaluation with checked integer operations.
+- [x] Propagate constant environments through generic specialization and nested facades.
+- [x] Lower constants directly into native values without runtime symbols.
+- [x] Preserve source spans and names in diagnostics and LSP definition lookup.
+- [x] Detect duplicate, cyclic, overflowing, and incompatible declarations.
+- [x] Keep layout declarations consistent with pack size and alignment metadata.
 
 #### Evidence
 
-- [ ] Add tests for scalar constants, masks, offsets, and derived constants.
-- [ ] Add tests for pack and buffer layout declarations.
-- [ ] Add rejected tests for cycles, overflow, runtime expressions, and private facade access.
-- [ ] Add object and executable parity tests with no runtime constant symbols.
-- [ ] Add generic and nested-facade regression tests.
-- [ ] Record layout and native lowering evidence.
+- [x] Add tests for scalar constants, masks, offsets, and derived constants.
+- [x] Add tests for pack and buffer layout declarations.
+- [x] Add rejected tests for cycles, overflow, runtime expressions, and private facade access.
+- [x] Add object and executable parity tests with no runtime constant symbols.
+- [x] Add generic and nested-facade regression tests.
+- [x] Record layout and native lowering evidence.
+
+Gate 33.3 evidence: typed constants and chained integer expressions are
+validated before pack layout construction. Named offsets lower to the same
+native field addresses as literal offsets, while runtime offset names are
+rejected. Existing facade constant, generic specialization, object parity, and
+symbol-free native emission tests remain green. Formatter, LSP metadata, and
+hover preserve the source name and resolved layout value.
 
 ### Gate 33.4 — Readable helper forms for repeated operations
 

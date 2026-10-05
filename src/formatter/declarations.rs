@@ -266,7 +266,10 @@ impl Formatter<'_> {
             self.output.push_str(": ");
             self.type_name(&field.ty);
             self.output.push_str(" at ");
-            self.output.push_str(&field.offset.to_string());
+            self.output.push_str(field.offset_name.as_deref().unwrap_or(""));
+            if field.offset_name.is_none() {
+                self.output.push_str(&field.offset.to_string());
+            }
             if let Some(default_value) = &field.default_value {
                 self.output.push_str(" = ");
                 self.expression(default_value);

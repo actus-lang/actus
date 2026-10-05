@@ -314,6 +314,16 @@ fn inlines_chained_named_constants_natively() {
 
 #[cfg(unix)]
 #[test]
+fn lowers_named_pack_offsets_natively() {
+    let status = run_array_fixture(
+        "named-pack-offset",
+        "const BASE_OFFSET: u16 = 0u16; const MARKER_OFFSET: u16 = BASE_OFFSET + 8u16; pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg prefix: u8 at BASE_OFFSET; erg marker: u8 at MARKER_OFFSET; } } verb main() -> Int { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; return frame.marker as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_value_producing_if_branches_natively() {
     let status = run_array_fixture(
         "conditional-expression",

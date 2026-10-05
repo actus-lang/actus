@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::ast::{Block, CaseBody, Expr, IfBranch, Place, Program, Stmt, TopLevelDecl};
+use crate::ast::{
+    BinaryOp, Block, CaseBody, Expr, IfBranch, Place, Program, Stmt, TopLevelDecl, UnaryOp,
+};
 
 /// Inlines validated constant values before native lowering.
 ///
@@ -20,6 +22,17 @@ pub(super) fn inline_constants(program: &mut Program) {
         .collect::<HashMap<_, _>>();
     for declaration in &mut program.declarations {
         match declaration {
+            TopLevelDecl::Pack(pack) => {
+                for field in &mut pack.fields {
+                    if let Some(name) = field.offset_name.as_deref()
+                        && let Some(value) =
+                            evaluate_constant_name(name, &constants, &mut Vec::new())
+                        && let Ok(offset) = u16::try_from(value)
+                    {
+                        field.offset = offset;
+                    }
+                }
+            }
             TopLevelDecl::Verb(verb) => inline_block(&mut verb.body, &constants),
             TopLevelDecl::Perform(perform) => {
                 for method in &mut perform.methods {
@@ -28,6 +41,61 @@ pub(super) fn inline_constants(program: &mut Program) {
             }
             _ => {}
         }
+    }
+}
+
+fn evaluate_constant_name(
+    name: &str,
+    constants: &HashMap<String, Expr>,
+    path: &mut Vec<String>,
+) -> Option<i128> {
+    if path.iter().any(|entry| entry == name) {
+        return None;
+    }
+    let expression = constants.get(name)?;
+    path.push(name.to_owned());
+    let value = evaluate_constant_expression(expression, constants, path);
+    path.pop();
+    value
+}
+
+fn evaluate_constant_expression(
+    expression: &Expr,
+    constants: &HashMap<String, Expr>,
+    path: &mut Vec<String>,
+) -> Option<i128> {
+    match expression {
+        Expr::Integer { value, .. } => value.parse().ok(),
+        Expr::Identifier { name, .. } => evaluate_constant_name(name, constants, path),
+        Expr::Grouping { expression, .. } => {
+            evaluate_constant_expression(expression, constants, path)
+        }
+        Expr::Unary { operator, expression, .. } => {
+            let value = evaluate_constant_expression(expression, constants, path)?;
+            match operator {
+                UnaryOp::Negate => value.checked_neg(),
+                UnaryOp::BitwiseNot => Some(!value),
+                UnaryOp::LogicalNot => None,
+            }
+        }
+        Expr::Binary { left, operator, right, .. } => {
+            let left = evaluate_constant_expression(left, constants, path)?;
+            let right = evaluate_constant_expression(right, constants, path)?;
+            match operator {
+                BinaryOp::Add => left.checked_add(right),
+                BinaryOp::Subtract => left.checked_sub(right),
+                BinaryOp::Multiply => left.checked_mul(right),
+                BinaryOp::Divide => left.checked_div(right),
+                BinaryOp::Remainder => left.checked_rem(right),
+                BinaryOp::BitwiseAnd => Some(left & right),
+                BinaryOp::BitwiseOr => Some(left | right),
+                BinaryOp::BitwiseXor => Some(left ^ right),
+                BinaryOp::ShiftLeft => left.checked_shl(u32::try_from(right).ok()?),
+                BinaryOp::ShiftRight => left.checked_shr(u32::try_from(right).ok()?),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 

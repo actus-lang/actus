@@ -243,7 +243,7 @@ fn packs(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
                         crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
                         _ => None,
                     });
-                    json!({"name":field.name,"role":role_name(&field.role),"type":format_type(&field.ty),"offset":field.offset,"width":width,"mask":width.map(mask),"range":span_range(source,index,field.span)})
+                    json!({"name":field.name,"role":role_name(&field.role),"type":format_type(&field.ty),"offset":field.offset,"offsetName":field.offset_name,"width":width,"mask":width.map(mask),"range":span_range(source,index,field.span)})
                 }).collect::<Vec<_>>(),
             }))
         })

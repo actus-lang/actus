@@ -88,9 +88,26 @@ impl Parser {
         let ty = self.parse_type_name()?;
         self.expect_named_identifier("at")?;
         let offset_token = self.advance_required("pack field bit offset")?;
-        let offset = parse_offset(&offset_token.kind).ok_or_else(|| {
-            unexpected(offset_token.kind.clone(), offset_token.span, "a non-negative bit offset")
-        })?;
+        let (offset, offset_name) = match offset_token.kind.clone() {
+            TokenKind::Integer { value, suffix: None } => (
+                value.parse::<u16>().map_err(|_| {
+                    unexpected(
+                        offset_token.kind.clone(),
+                        offset_token.span,
+                        "a non-negative bit offset",
+                    )
+                })?,
+                None,
+            ),
+            TokenKind::Identifier(name) => (0u16, Some(name)),
+            found => {
+                return Err(unexpected(
+                    found,
+                    offset_token.span,
+                    "a bit offset or compile-time constant",
+                ));
+            }
+        };
         let default_value =
             self.match_simple(TokenKind::Equals).then(|| self.parse_expression()).transpose()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
@@ -100,6 +117,7 @@ impl Parser {
             name,
             ty,
             offset,
+            offset_name,
             default_value,
             span: SourceSpan::new(role_token.span.start, end),
         })
@@ -128,11 +146,6 @@ fn classify_storage(type_name: TypeName) -> PackStorage {
 
 fn parse_capacity(type_name: &TypeName) -> Option<u64> {
     type_name.name.parse::<u64>().ok()
-}
-
-fn parse_offset(kind: &TokenKind) -> Option<u16> {
-    let TokenKind::Integer { value, suffix: None } = kind else { return None };
-    value.parse::<u16>().ok()
 }
 
 fn unexpected(found: TokenKind, span: SourceSpan, expected: impl Into<String>) -> ParseError {
