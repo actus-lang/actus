@@ -128,14 +128,18 @@ hook.
 - A checksum field without an explicit coverage range is rejected because it is
   ambiguous during migration and corruption recovery.
 
-## Open implementation gates
+## Implementation status
 
-- finalize the accepted keyword and field grammar;
-- add AST, semantic layout validation, formatter, and LSP support;
-- generate allocation-free native encode/decode/validate paths;
-- expose `SerializationError` as a compiler-provided enum;
-- add reference-byte, corruption, truncation, version, and staged-file tests;
-- compare object and executable output against an explicit reference encoder.
+The Phase 33 Gate 33.5 implementation is complete. The accepted grammar,
+AST, semantic validation, formatter, LSP semantic-model exposure, generated
+allocation-free validate/encode/decode/migrate operations, compiler-provided
+`SerializationError`, reference-byte checks, corruption/truncation/version
+tests, staged-file recovery tests, and object/executable parity evidence are
+implemented and covered by the repository test suite.
+
+The initial profile remains intentionally fixed-layout. Dynamic or
+variable-length serialization requires a separate design decision and is not
+silently inferred from a fixed contract.
 
 The failed-publication recovery case is accepted after closing the compiler
 ownership boundary that it exposed. Regular enum payloads are stored inline in

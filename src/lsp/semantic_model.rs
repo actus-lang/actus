@@ -1,6 +1,8 @@
 use serde_json::{Value, json};
 
-use crate::ast::{MetaAttribute, PackStorage, Program, TopLevelDecl, TypeName, primitive_type};
+use crate::ast::{
+    MetaAttribute, PackStorage, Program, SerializeSection, TopLevelDecl, TypeName, primitive_type,
+};
 use crate::lexer::SourceSpan;
 use crate::semantic::{
     AccessState, CleanupAction, OwnershipState, SemanticModel, analyze, filter_program_for_target,
@@ -52,6 +54,7 @@ pub(super) fn query(
         "literals": literals(source, &index, &model),
         "conditionals": conditionals(source, &index, &model),
         "packs": packs(source, &index, &target_program),
+        "serializations": serializations(source, &index, &program),
         "declarations": declarations(source, &index, &program, target),
     });
     store.cache_semantic(uri, &target_name, version, result.clone());
@@ -244,6 +247,43 @@ fn packs(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
                         _ => None,
                     });
                     json!({"name":field.name,"role":role_name(&field.role),"type":format_type(&field.ty),"offset":field.offset,"offsetName":field.offset_name,"width":width,"mask":width.map(mask),"range":span_range(source,index,field.span)})
+                }).collect::<Vec<_>>(),
+            }))
+        })
+        .collect()
+}
+
+fn serializations(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let TopLevelDecl::Serialize(contract) = declaration else { return None };
+            Some(json!({
+                "name": contract.name,
+                "sourceType": format_type(&contract.source_type),
+                "endianness": format!("{:?}", contract.endianness).to_lowercase(),
+                "range": span_range(source, index, contract.span),
+                "sections": contract.sections.iter().map(|section| match section {
+                    SerializeSection::Version { ty, offset, span } => json!({
+                        "kind": "version",
+                        "type": format_type(ty),
+                        "offset": offset,
+                        "range": span_range(source, index, *span),
+                    }),
+                    SerializeSection::Payload { offset, length, span } => json!({
+                        "kind": "payload",
+                        "offset": offset,
+                        "length": length,
+                        "range": span_range(source, index, *span),
+                    }),
+                    SerializeSection::Checksum { start, end, offset, span } => json!({
+                        "kind": "checksum",
+                        "start": start,
+                        "end": end,
+                        "offset": offset,
+                        "range": span_range(source, index, *span),
+                    }),
                 }).collect::<Vec<_>>(),
             }))
         })

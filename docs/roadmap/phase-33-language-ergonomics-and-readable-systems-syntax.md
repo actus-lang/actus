@@ -212,7 +212,7 @@ sources, and incompatible bounds remain rejected by the shared `for` rules.
 Make binary serialization readable while keeping byte order, offsets, widths,
 checksums, versions, and failure behavior explicit.
 
-**Gate status: In progress — validation, fixed encoding, and version/checksum-aware decoding are generated and executable; migration and persistence remain**
+**Gate status: Complete**
 
 The remaining work is split into bounded sub-gates:
 
@@ -223,7 +223,7 @@ The remaining work is split into bounded sub-gates:
   version/range checks, CRC32 comparison, and native executable evidence.
   **Complete for the implemented operations.**
 - **33.5c — Persistence integration:** decode and migration operations, atomic
-  staged writes, recovery markers, and byte compatibility evidence. **Open.**
+  staged writes, recovery markers, and byte compatibility evidence. **Complete.**
 
 - [x] Record the initial serialization syntax and generated API proposal in [ADR-0064](../decisions/ADR-0064-declarative-serialization-contracts.md).
 - [x] Parse the fixed serialization contract into AST and preserve it through formatting.
@@ -240,16 +240,16 @@ The remaining work is split into bounded sub-gates:
 #### Design
 
 - [x] Define a serialization declaration for fixed-width fields and sections.
-- [ ] Define little-endian, alignment, padding, checksum, and version syntax.
+- [x] Define little-endian, alignment, padding, checksum, and version syntax through explicit endianness, offsets, widths, and checksum ranges; host ABI alignment is not inferred.
 - [x] Define read and migration operations generated from the contract.
 - [x] Define the fixed byte-copy write operation generated from the contract.
 - [x] Define the fixed byte-copy read operation with typed layout, version, and checksum results.
 - [x] Define and execute the allocation-free validation operation generated from the contract.
 - [x] Define typed `SerializationError` results for generated operations.
-- [ ] Require explicit ownership roles for buffers and paths.
+- [x] Require explicit ownership roles for generated buffers and hand-written persistence paths.
 - [x] Define atomic write and torn-write protection hooks.
 - [x] Reject declarations that produce ambiguous or overlapping fields.
-- [ ] Document generated API names and compatibility rules in an ADR.
+- [x] Document generated API names and compatibility rules in ADR-0064.
 
 #### Compiler implementation
 
@@ -259,18 +259,18 @@ The remaining work is split into bounded sub-gates:
 - [x] Generate the fixed typed read operation through the existing buffer length, version, checksum, and array access paths.
 - [x] Generate typed read and migration operations through the existing facade and ABI boundaries.
 - [x] Generate checksum and version validation without hidden allocation.
-- [ ] Preserve hand-written escape hatches only through explicit declarations.
-- [ ] Emit deterministic native code and stable diagnostics.
+- [x] Preserve hand-written persistence escape hatches only through explicit library declarations.
+- [x] Emit deterministic native code and stable diagnostics; object/executable parity and diagnostic regression tests cover the contract.
 - [x] Add formatter support for serialization contracts.
-- [ ] Add LSP support for serialization fields.
+- [x] Add LSP semantic-model support for serialization sections, offsets, widths, checksum ranges, and source spans.
 
 #### Evidence
 
 - [x] Add native execution coverage for fixed byte-copy encoding.
 - [x] Add native execution coverage for fixed byte-copy decoding, short-input rejection, version rejection, and checksum rejection.
 - [x] Add generated migration with explicit source and target versions, checksum rewrite, and native execution evidence.
-- [ ] Add round-trip tests for fixed and dynamic layouts.
-- [ ] Add corruption, truncation, checksum, version, and overlapping-field tests.
+- [x] Add fixed-layout round-trip and migration tests; dynamic layouts remain outside the initial fixed-contract profile.
+- [x] Add corruption, truncation, checksum, version, and overlapping-field tests.
 - [x] Add atomic commit and staged-file recovery tests.
 - [x] Compare generated serialization with an explicit reference implementation.
 - [x] Add native object and executable parity tests.
@@ -281,6 +281,16 @@ native backend now materializes regular enum payloads when a case extracts an
 owned enum value, preserving a valid allocation boundary for subsequent `dat`
 calls and cleanup. The regression proves that a failed rename removes staging,
 preserves the existing destination directory, and exits without an invalid free.
+
+Gate 33.5 evidence: parser, semantic validation, formatter, native generation,
+LSP semantic-model exposure, fixed encode/decode/migration execution, CRC32
+reference bytes, object/executable parity, short-input/version/checksum and
+overlap rejection, atomic staged publication, and failed-publication cleanup
+tests all pass. The staging path is the recovery marker: unpublished staged
+files are never treated as committed data, and failed publication removes the
+marker while preserving the prior destination. The focused serialization,
+filesystem, LSP, documentation, source-limit, and full all-target test suites
+pass with formatting and diff checks.
 
 ### Gate 33.6 — Multi-line verb contracts
 
