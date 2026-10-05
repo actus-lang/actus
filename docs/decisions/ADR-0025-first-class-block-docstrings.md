@@ -1,17 +1,17 @@
 # ADR-0025: First-Class Block Docstrings
 
-- Status: Proposed
+- Status: Accepted and implemented
 - Date: 2026-09-26
 - Decision owners: Actus language and compiler maintainers
 
 ## Context
 
-Actus documentation is currently represented by line-oriented `///` comments.
-That form is adequate for short notes, but it makes multi-paragraph API
-documentation cumbersome and gives the lexer no structured representation of
-documentation attached to a declaration. The standard library also needs to
-carry Markdown-shaped explanations of ownership roles, return contracts, and
-runtime boundaries without repeating a comment marker on every line.
+Actus documentation is represented by triple-quoted `""" ... """` blocks.
+The former line-oriented `///` proposal was inadequate for multi-paragraph API
+documentation and gave the lexer no structured representation of documentation
+attached to a declaration. The standard library needs to carry Markdown-shaped
+explanations of ownership roles, return contracts, and runtime boundaries
+without repeating a marker on every line.
 
 Documentation is source-level information. It should remain visible to the
 lexer and parser, be associated with the declaration it documents, and retain
@@ -41,9 +41,9 @@ documentation for a field, variant, or statement. Those nested strings are
 lexically recognized and consumed by the parser; declaration-level AST fields
 are the initial public documentation API.
 
-The legacy `///` spelling remains a line comment during this migration. It is
-not a declaration documentation representation and new public Actus APIs must
-use block docstrings.
+The migration is complete. `///`, `//`, and `/* ... */` are not Actus comment
+syntax. Actus uses `#` for ordinary comments and triple-quoted blocks for
+documentation. New public Actus APIs must use block docstrings.
 
 ## Lexical contract
 
@@ -78,10 +78,9 @@ re-parsing comments or reconstructing paragraph boundaries.
 
 ## Migration policy
 
-The standard library migrates its `///` documentation to `"""` blocks in the
-same change as compiler support. Existing line comments remain valid so that
-older source files continue to parse. New documentation examples, public
-standard-library declarations, and future manuscript code use the block form.
+The standard library and manuscript use `"""` blocks. Existing Actus sources
+must use `#` for ordinary comments; old `///`, `//`, and `/* ... */` spellings
+are not accepted by the Actus lexer.
 
 ## Consequences
 
@@ -96,6 +95,6 @@ need field or statement documentation later.
 
 - [x] Define the block-delimited lexical token and normalization rules.
 - [x] Attach normalized text to verb, struct, and role declarations.
-- [x] Preserve legacy line comments during migration.
+- [x] Define `#` as the ordinary Actus comment syntax.
 - [x] Migrate `library/std/src/io/` documentation.
 - [ ] Expose declaration documentation through LSP hover and generated API docs.

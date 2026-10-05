@@ -13,35 +13,40 @@ compiler yet.
 
 ## 1. Comments and Documentation
 
-The accepted comment syntax is:
+The accepted ordinary comment syntax is:
 
 ```act
-// configure the hardware register base
+# configure the hardware register base
 erg base_addr = 0x40011000;
 ```
 
-Long explanations use an explicitly closed block:
+Documentation uses an explicitly closed triple-quoted block:
 
 ```act
-/*
+"""
 This describes the zero-copy transfer protocol.
-*/
+"""
+open verb transfer(abs payload: Buffer) {
+    ...
+}
 ```
 
-Documentation comments use `///`. A sequence of documentation lines directly
-before an `open` declaration documents that public API declaration:
+The documentation block directly before an `open` declaration documents that
+public API declaration:
 
 ```act
-/// Configure the device interrupt line.
-/// The declaration is visible to importing modules.
+"""
+Configure the device interrupt line.
+The declaration is visible to importing modules.
+"""
 open verb configure_interrupt() {
     ...
 }
 ```
 
-The `///` documentation model and `actus doc` generation are planned tooling
-features. They must preserve source spans and remain separate from ordinary
-compiler diagnostics.
+The compiler ignores ordinary `#` comments while preserving documentation
+blocks as structured `DocString` tokens. Formatter, LSP, and documentation
+tools must preserve their source spans and text.
 
 ## 2. Return Types
 

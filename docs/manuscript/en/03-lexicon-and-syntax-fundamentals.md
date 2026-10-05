@@ -37,19 +37,21 @@ region without copying the source text.
 
 ### Comments
 
-Actus has ordinary and documentation line comments:
+Actus has ordinary hash comments and triple-quoted documentation blocks:
 
 ```actus
-// This comment is ignored by the compiler.
-/// This comment is available to documentation-aware tooling.
+# This comment is ignored by the compiler.
+"""This documentation is attached to the following declaration."""
 verb main() -> Int {
     return 0;
 }
 ```
 
-`//` starts an ordinary comment. `///` starts a documentation comment. Both
-continue to the end of the line and neither changes the grammar of the next
-declaration. The LSP can use documentation comments in hover information.
+`#` starts an ordinary comment and continues to the end of the line. A
+`""" ... """` block is a documentation string and may span multiple lines.
+Documentation strings are attached to the following declaration and are
+available to formatter and LSP tooling. `//`, `///`, and `/* ... */` are not
+Actus comment syntax.
 
 ### Whitespace and semicolons
 

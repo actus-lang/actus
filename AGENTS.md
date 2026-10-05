@@ -303,8 +303,8 @@ library.
 
 ### 5. Public Actus Documentation
 
-- Every public Actus type, enum, external bridge, and verb must have a `///`
-  documentation comment.
+- Every public Actus type, enum, external bridge, and verb must have a `"""`
+  documentation block.
 - Documentation must state the relevant ownership role, return value, error
   variants, side effects, and C ABI relationship where applicable.
 - `Result.Ok(count)` must be documented as the exact number of processed
