@@ -49,6 +49,7 @@ pub enum TokenKind {
     Open,
     Import,
     For,
+    Repeat,
     In,
     Case,
     As,

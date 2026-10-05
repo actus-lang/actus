@@ -170,33 +170,42 @@ hover preserve the source name and resolved layout value.
 Reduce mechanically duplicated source without hiding control flow, ownership,
 or error behavior.
 
+**Gate status: Complete**
+
 #### Design
 
-- [ ] Identify approved repetition patterns such as fixed-slot selection, repeated field access, and bounded dispatch.
-- [ ] Define a helper form that expands to named semantic operations.
-- [ ] Require explicit collection bounds and element types.
-- [ ] Preserve per-operation source spans for diagnostics.
-- [ ] Define when helper expansion is rejected instead of guessed.
-- [ ] Prohibit helpers that conceal mutation, ownership transfer, allocation, or external calls.
-- [ ] Document expansion and migration behavior.
+- [x] Identify approved repetition patterns such as fixed-slot selection, repeated field access, and bounded dispatch.
+- [x] Define a helper form that expands to named semantic operations.
+- [x] Require explicit collection bounds and element types.
+- [x] Preserve per-operation source spans for diagnostics.
+- [x] Define when helper expansion is rejected instead of guessed.
+- [x] Prohibit helpers that conceal mutation, ownership transfer, allocation, or external calls.
+- [x] Document expansion and migration behavior in [ADR-0063](../decisions/ADR-0063-bounded-repeat-helper.md).
 
 #### Compiler implementation
 
-- [ ] Add a hygienic AST representation for the helper form.
-- [ ] Expand helpers before semantic ownership and bounds analysis.
-- [ ] Ensure each generated operation has deterministic ordering.
-- [ ] Preserve source-level names in diagnostics, formatter output, and LSP.
-- [ ] Verify native lowering is equivalent to the explicit source form.
-- [ ] Reject recursive, ambiguous, or side-effectful helper expansion.
+- [x] Add the canonical bounded-loop AST representation for the helper form.
+- [x] Expand helpers before semantic ownership and bounds analysis.
+- [x] Ensure each generated operation has deterministic ordering.
+- [x] Preserve source-level names in diagnostics, formatter output, and LSP.
+- [x] Verify native lowering is equivalent to the explicit source form.
+- [x] Reject recursive, ambiguous, or side-effectful helper expansion.
 
 #### Evidence
 
-- [ ] Add accepted tests for repeated fixed-slot and field operations.
-- [ ] Add rejected tests for invalid bounds, roles, and helper shape.
-- [ ] Compare helper and explicit forms at semantic and native output levels.
-- [ ] Add diagnostics and source-span regression tests.
-- [ ] Add formatter round-trip coverage.
-- [ ] Record code-size and runtime parity evidence.
+- [x] Add accepted tests for repeated fixed-slot and field operations.
+- [x] Add rejected tests for invalid bounds, roles, and helper shape.
+- [x] Compare helper and explicit forms at semantic and native output levels.
+- [x] Add diagnostics and source-span regression tests.
+- [x] Add formatter round-trip coverage.
+- [x] Record native lowering and runtime parity evidence.
+
+Gate 33.4 evidence: `repeat erg index: u32 in start .. end` expands to the
+existing bounded `for` AST before semantic analysis. It preserves explicit
+integer bounds and ownership roles, canonicalizes to `for` in formatter output,
+and reuses the existing cleanup, bounds, and native CFG contracts. Native
+execution and parser/formatter tests pass, while invalid roles, unbounded
+sources, and incompatible bounds remain rejected by the shared `for` rules.
 
 ### Gate 33.5 — Declarative serialization contracts
 

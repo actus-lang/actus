@@ -43,6 +43,17 @@ fn parses_bounded_for_range_with_explicit_binding_span() {
 }
 
 #[test]
+fn expands_repeat_to_the_same_bounded_for_ast_with_source_span() {
+    let program = parse_source("verb main() { repeat erg index: u32 in 0u32 .. 4u32 { break; } }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::ForRange { binding, span, .. } = &verb.body.statements[0] else {
+        panic!("repeat should expand to the bounded for AST")
+    };
+    assert_eq!(binding.name, "index");
+    assert!(span.start < span.end);
+}
+
+#[test]
 fn parses_typed_named_constants_with_source_spans() {
     let program = parse_source(
         "\"\"\"CRC polynomial.\"\"\" const CRC16_POLYNOMIAL: u16 = 4129u16; verb main() { return 0; }",

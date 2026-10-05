@@ -61,6 +61,9 @@ impl Parser {
         if self.match_simple(TokenKind::For) {
             return self.parse_for_range_statement();
         }
+        if self.match_simple(TokenKind::Repeat) {
+            return self.parse_for_range_statement();
+        }
         if allow_statement_conditionals && self.match_simple(TokenKind::If) {
             let statement = self.parse_if_statement(self.previous().span)?;
             self.match_simple(TokenKind::Semicolon);

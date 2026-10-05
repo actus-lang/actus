@@ -28,6 +28,14 @@ fn formats_bounded_for_ranges_idempotently() {
 }
 
 #[test]
+fn canonicalizes_repeat_to_bounded_for_idempotently() {
+    let formatted =
+        format_source("verb main(){repeat erg index:u32 in 0u32..4u32 { total += index; }}");
+    assert!(formatted.contains("for erg index: u32 in 0u32 .. 4u32"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_named_pack_offsets_idempotently() {
     let formatted = format_source(
         "const OFFSET:u16=8u16;pack Frame{erg storage:Array[u8,2];layout little;fields{erg marker:u8 at OFFSET;}}",

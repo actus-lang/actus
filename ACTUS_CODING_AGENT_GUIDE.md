@@ -269,6 +269,8 @@ The implemented vocabulary includes the following groups.
 - `return` exits a verb and unwinds owned resources in affected scopes.
 - `loop` creates a loop body.
 - `for` creates a bounded range or fixed-array index iteration.
+- `repeat` is a bounded readability alias that expands to the same `for`
+  contract.
 - `in` separates a `for` binding from its bounded source.
 - `break` exits the nearest loop.
 - `continue` starts the next iteration of the nearest loop.
@@ -814,6 +816,12 @@ always targets the increment block, so it cannot skip index advancement. The
 existing cleanup plan applies to `break`, `continue`, nested loops, and early
 return. Formatter, definition lookup, and hover preserve and expose the loop
 binding like other local bindings.
+
+`repeat erg index: u32 in start .. end { ... }` is a readability helper for the
+same bounded range contract. The compiler expands it to canonical `for` form
+before semantic analysis; formatter output uses the canonical `for` spelling.
+It does not add callbacks, allocation, dynamic bounds, or a second ownership
+model.
 
 ### 11.4 Assignment
 

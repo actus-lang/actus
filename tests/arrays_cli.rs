@@ -114,6 +114,16 @@ fn executes_bounded_for_range_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_bounded_repeat_as_the_for_equivalent() {
+    let status = run_array_fixture(
+        "bounded-repeat",
+        "verb main() -> Int { erg total: u32 = 0u32; repeat erg index: u32 in 0u32 .. 8u32 { total += index; } return total as Int - 28; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
 fn preserves_for_range_continue_break_and_reversed_bounds() {
     let status = run_array_fixture(
         "bounded-for-control-flow",
