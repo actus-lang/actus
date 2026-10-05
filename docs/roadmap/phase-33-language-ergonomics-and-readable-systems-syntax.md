@@ -358,7 +358,7 @@ argument expressions, without weakening move and borrow checking.
 
 - [x] Add accepted tests for pure arithmetic arguments.
 - [x] Add accepted tests for indexed scalar arguments.
-- [ ] Add accepted tests for named offset arguments.
+- [x] Add accepted tests for named compile-time offset arguments.
 - [x] Add rejected tests for nested call expressions.
 - [x] Add boundary tests for borrowed and aggregate arguments that must remain explicit.
 - [x] Add use-after-move and explicit borrow-boundary regressions.

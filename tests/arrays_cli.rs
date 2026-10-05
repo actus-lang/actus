@@ -203,6 +203,16 @@ fn executes_generated_indexed_scalar_abs_argument_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_generated_named_offset_scalar_abs_argument_natively() {
+    let status = run_array_fixture(
+        "generated-named-offset-scalar-abs-argument",
+        "const OFFSET: u32 = 1u32; verb read(abs value: u32) -> Int { return value as Int; } verb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); values[OFFSET] = 41u32; return read(value: abs values[OFFSET]) + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn emits_object_and_executable_for_generated_scalar_abs_argument() {
     let root = std::env::temp_dir()
         .join(format!("actus-generated-scalar-abs-parity-{}", std::process::id()));
