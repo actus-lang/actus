@@ -76,7 +76,12 @@ canonical module facade:
 frame_encode(abs value: Frame, ins output: Buffer) -> Result[u32, SerializationError]
 frame_decode(abs input: Buffer, abs expected_version: u16) -> Result[Frame, SerializationError]
 frame_validate(abs input: Buffer, abs expected_version: u16) -> Result[Bool, SerializationError]
-frame_migrate(erg old_version: u16, abs input: Buffer, ins output: Buffer) -> Result[u32, SerializationError]
+frame_migrate(
+    abs input: Buffer,
+    abs from_version: u16,
+    abs to_version: u16,
+    ins output: Buffer
+) -> Result[u32, SerializationError]
 ```
 
 Every operation returns typed success/failure information. Encode uses
@@ -85,6 +90,13 @@ copying the fixed source storage. Decode accepts caller-owned input and an
 expected version, validates the frame, and returns an owned pack. No generated
 operation opens a path.
 Filesystem persistence remains an explicit hand-written facade operation.
+
+Migration is explicit about both version endpoints. It validates the input
+against `from_version`, copies the fixed frame into the caller-owned output,
+rewrites the version field to `to_version`, recomputes the declared checksum,
+and returns the encoded byte count. The caller must provide an empty output
+buffer. Migration does not perform filesystem I/O or publish a persistence
+commit.
 
 ## Validation and atomic persistence
 

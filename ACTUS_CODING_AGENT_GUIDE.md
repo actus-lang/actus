@@ -1042,7 +1042,7 @@ fixed-frame runtime validator, which checks version,
 payload bounds, endianness, and stored CRC without allocation. These operations
 do not allocate. Generated serialization operations use the compiler-provided
 `SerializationError` enum. The compiler currently generates
-`<contract>_validate`, which accepts a caller-owned `Buffer` and an owned
+`<contract>_validate`, which accepts a caller-owned `Buffer` and a read-only
 expected version, and `<contract>_encode`, which accepts an `abs` source pack
 and an `ins` output `Buffer`, copies the fixed storage bytes, and returns a
 typed `Result[u32, SerializationError]`. It also generates
@@ -1050,9 +1050,20 @@ typed `Result[u32, SerializationError]`. It also generates
 input length through the compiler-provided `buffer_length` primitive, validates
 the encoded version and checksum, and returns an owned pack or a typed
 `InvalidLayout`, `InvalidVersion`, or `InvalidChecksum` error. Both operations
-derive their fixed storage bounds from the declaration. Migration, dynamic
-payloads, implicit allocation, and automatic filesystem commits remain outside
-this profile until their contracts are implemented and tested.
+derive their fixed storage bounds from the declaration. The compiler also
+generates `<contract>_migrate`, which validates `from_version`, copies the fixed
+frame into an empty caller-owned output, writes `to_version`, recomputes the
+declared checksum, and returns a typed byte count. Dynamic payloads, implicit
+allocation, and automatic filesystem commits remain outside this profile until
+their contracts are implemented and tested.
+
+When generated migration is available, use the explicit form
+`<contract>_migrate(abs input: Buffer, abs from_version: u16,
+abs to_version: u16, ins output: Buffer)`. It validates the source version,
+rewrites the target version, recomputes the declared checksum, and writes into
+the caller-owned output. The output must be empty before migration. Migration
+does not perform filesystem I/O; atomic file replacement belongs to the
+filesystem persistence layer.
 
 ### 15.5 `Arena[N]`
 
