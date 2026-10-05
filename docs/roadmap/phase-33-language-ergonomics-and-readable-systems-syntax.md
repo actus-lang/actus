@@ -229,6 +229,7 @@ The remaining work is split into bounded sub-gates:
 - [x] Preserve validated serialization contracts in the semantic model for later native lowering.
 - [x] Reserve deterministic generated API names and reject declaration collisions.
 - [x] Add the allocation-free `crc32` intrinsic and prove its native runtime ABI with an executable test.
+- [x] Add the allocation-free fixed-frame validator primitive with version, bounds, endianness, and CRC tests.
 
 #### Design
 

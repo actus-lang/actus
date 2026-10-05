@@ -7,8 +7,8 @@ use cranelift_object::ObjectModule;
 use crate::ast::IntrinsicKind;
 use crate::runtime::{
     BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL,
-    BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL,
-    PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
+    BUFFER_DROP_SYMBOL, BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
+    PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
@@ -25,6 +25,7 @@ pub(super) fn declare_runtime_functions(
         append: declare_append(module, pointer_type)?,
         crc32: declare_crc32(module, pointer_type)?,
         crc32_matches: declare_crc32_matches(module, pointer_type)?,
+        validate_fixed_frame: declare_validate_fixed_frame(module, pointer_type)?,
         print_int: declare_print_int(module)?,
         print_string: declare_print_string(module, pointer_type)?,
         write_string: declare_write_string(module, pointer_type)?,
@@ -47,6 +48,7 @@ struct RuntimeFunctionIds {
     append: cranelift_module::FuncId,
     crc32: cranelift_module::FuncId,
     crc32_matches: cranelift_module::FuncId,
+    validate_fixed_frame: cranelift_module::FuncId,
     print_int: cranelift_module::FuncId,
     print_string: cranelift_module::FuncId,
     write_string: cranelift_module::FuncId,
@@ -81,6 +83,24 @@ fn runtime_metadata(
         (
             "crc32_matches".to_owned(),
             named_meta(ids.crc32_matches, &["buffer", "start", "end", "expected"], NativeType::Int),
+        ),
+        (
+            "validate_fixed_frame".to_owned(),
+            named_meta(
+                ids.validate_fixed_frame,
+                &[
+                    "buffer",
+                    "little",
+                    "version_offset",
+                    "expected_version",
+                    "payload_offset",
+                    "payload_length",
+                    "checksum_start",
+                    "checksum_end",
+                    "checksum_offset",
+                ],
+                NativeType::Int,
+            ),
         ),
         (
             print_spec.name.to_owned(),
@@ -203,6 +223,21 @@ fn declare_crc32_matches(
     signature.returns.push(AbiParam::new(types::I64));
     module
         .declare_function(BUFFER_CRC32_MATCHES_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_validate_fixed_frame(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    for _ in 0..8 {
+        signature.params.push(AbiParam::new(types::I64));
+    }
+    signature.returns.push(AbiParam::new(types::I64));
+    module
+        .declare_function(BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 
