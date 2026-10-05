@@ -7,8 +7,43 @@ pub(super) struct FunctionRange {
     pub(super) end_line: usize,
 }
 
-pub(super) fn find_functions(source: &str) -> Vec<FunctionRange> {
-    FunctionScanner::scan(source)
+pub(super) fn find_functions(source: &str, hash_comments: bool) -> Vec<FunctionRange> {
+    FunctionScanner::scan(source, hash_comments)
+}
+
+/// Counts physical source lines that contain code after comments are removed.
+///
+/// Blank lines and comments do not contribute to architectural source-size limits.
+pub(super) fn code_line_count(source: &str, hash_comments: bool) -> usize {
+    code_line_flags(source, hash_comments)
+        .into_iter()
+        .filter(|contains_code| *contains_code)
+        .count()
+}
+
+/// Counts code-bearing lines inside an inclusive one-based source range.
+pub(super) fn code_line_count_between(
+    source: &str,
+    start_line: usize,
+    end_line: usize,
+    hash_comments: bool,
+) -> usize {
+    code_line_flags(source, hash_comments)
+        .into_iter()
+        .enumerate()
+        .filter(|(index, contains_code)| {
+            let line = index + 1;
+            *contains_code && line >= start_line && line <= end_line
+        })
+        .count()
+}
+
+fn code_line_flags(source: &str, hash_comments: bool) -> Vec<bool> {
+    let mut in_block_comment = false;
+    source
+        .lines()
+        .map(|line| !strip_comments(line, &mut in_block_comment, hash_comments).trim().is_empty())
+        .collect()
 }
 
 #[derive(Default)]
@@ -20,19 +55,34 @@ struct FunctionScanner {
 }
 
 impl FunctionScanner {
-    fn scan(source: &str) -> Vec<FunctionRange> {
+    fn scan(source: &str, hash_comments: bool) -> Vec<FunctionRange> {
         let lines = source.lines().collect::<Vec<_>>();
         let mut scanner = Self::default();
         let mut in_block_comment = false;
+        let mut in_doc_string = false;
         for (index, line) in lines.iter().enumerate() {
-            scanner.scan_line(index, line, &mut in_block_comment);
+            scanner.scan_line(
+                index,
+                line,
+                &mut in_block_comment,
+                &mut in_doc_string,
+                hash_comments,
+            );
         }
         scanner.finish(lines.len());
         scanner.functions
     }
 
-    fn scan_line(&mut self, index: usize, line: &str, in_block_comment: &mut bool) {
-        let cleaned = strip_non_code(line, in_block_comment);
+    fn scan_line(
+        &mut self,
+        index: usize,
+        line: &str,
+        in_block_comment: &mut bool,
+        in_doc_string: &mut bool,
+        hash_comments: bool,
+    ) {
+        let cleaned =
+            strip_non_code_with_doc_state(line, in_block_comment, in_doc_string, hash_comments);
         if self.active.is_none()
             && let Some(name) = declaration_name(&cleaned)
         {
@@ -86,7 +136,12 @@ fn brace_counts(line: &str) -> (usize, usize) {
     )
 }
 
-fn strip_non_code(line: &str, in_block_comment: &mut bool) -> String {
+fn strip_non_code_with_doc_state(
+    line: &str,
+    in_block_comment: &mut bool,
+    in_doc_string: &mut bool,
+    hash_comments: bool,
+) -> String {
     let mut output = String::new();
     let mut in_string = false;
     let mut escaped = false;
@@ -95,11 +150,93 @@ fn strip_non_code(line: &str, in_block_comment: &mut bool) -> String {
     while index < characters.len() {
         let character = characters[index];
         let next = characters.get(index + 1).copied();
+        if *in_doc_string {
+            if character == '"'
+                && characters.get(index + 1) == Some(&'"')
+                && characters.get(index + 2) == Some(&'"')
+            {
+                *in_doc_string = false;
+                index += 3;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if !in_string
+            && character == '"'
+            && characters.get(index + 1) == Some(&'"')
+            && characters.get(index + 2) == Some(&'"')
+        {
+            *in_doc_string = true;
+            index += 3;
+            continue;
+        }
         if let Some(next_index) = consume_block_comment(&characters, index, in_block_comment) {
             index = next_index;
             continue;
         }
         if !in_string && character == '/' && next == Some('/') {
+            break;
+        }
+        if hash_comments && !in_string && character == '#' {
+            break;
+        }
+        if !in_string && character == '/' && next == Some('*') {
+            *in_block_comment = true;
+            index += 2;
+            continue;
+        }
+        append_visible_character(character, &mut in_string, &mut escaped, &mut output);
+        index += 1;
+    }
+    output
+}
+
+fn strip_comments(line: &str, in_block_comment: &mut bool, hash_comments: bool) -> String {
+    let mut output = String::new();
+    let mut in_string = false;
+    let mut in_doc_string = false;
+    let mut escaped = false;
+    let characters = line.chars().collect::<Vec<_>>();
+    let mut index = 0;
+    while index < characters.len() {
+        let character = characters[index];
+        let next = characters.get(index + 1).copied();
+        if in_doc_string {
+            output.push(character);
+            if character == '"'
+                && characters.get(index + 1) == Some(&'"')
+                && characters.get(index + 2) == Some(&'"')
+            {
+                output.push('"');
+                output.push('"');
+                in_doc_string = false;
+                index += 3;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if !in_string
+            && character == '"'
+            && characters.get(index + 1) == Some(&'"')
+            && characters.get(index + 2) == Some(&'"')
+        {
+            output.push('"');
+            output.push('"');
+            output.push('"');
+            in_doc_string = true;
+            index += 3;
+            continue;
+        }
+        if let Some(next_index) = consume_block_comment(&characters, index, in_block_comment) {
+            index = next_index;
+            continue;
+        }
+        if !in_string && character == '/' && next == Some('/') {
+            break;
+        }
+        if hash_comments && !in_string && character == '#' {
             break;
         }
         if !in_string && character == '/' && next == Some('*') {

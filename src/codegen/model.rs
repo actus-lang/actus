@@ -266,6 +266,7 @@ mod tests {
             borrows: Vec::new(),
             exclusive_loans: Vec::new(),
             expression_origins: Vec::new(),
+            argument_roles: Vec::new(),
             cleanup_plans: vec![ScopeCleanup {
                 depth: 1,
                 span: SourceSpan::new(0, 1),
@@ -275,6 +276,7 @@ mod tests {
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
             pack_layouts: Vec::new(),
+            serialization_contracts: Vec::new(),
             reachable_performances: Vec::new(),
             dynamic_roles: Vec::new(),
             drop_types: Vec::new(),
@@ -308,6 +310,7 @@ mod tests {
             borrows: Vec::new(),
             exclusive_loans: Vec::new(),
             expression_origins: Vec::new(),
+            argument_roles: Vec::new(),
             cleanup_plans: vec![ScopeCleanup {
                 depth: 1,
                 span: SourceSpan::new(0, 1),
@@ -320,6 +323,7 @@ mod tests {
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
             pack_layouts: Vec::new(),
+            serialization_contracts: Vec::new(),
             reachable_performances: Vec::new(),
             dynamic_roles: Vec::new(),
             drop_types: Vec::new(),

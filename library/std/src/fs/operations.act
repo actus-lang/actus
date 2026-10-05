@@ -241,3 +241,75 @@ open verb write_file(abs path: Path, abs contents: Buffer) -> Result[Int, IoErro
         },
     };
 }
+
+"""
+Write a complete file through a staging path and publish it with one rename.
+
+`path` is the final destination and `staging` is a caller-selected temporary
+path in the same filesystem. The contents are written and the handle is
+flushed before the rename. A write, flush, or rename failure removes the staging file
+and returns the typed error; cleanup is deterministic and the final destination
+is never partially written. The operation performs no hidden allocation.
+"""
+open verb write_file_atomic(
+    abs path: Path,
+    dat staging: Path,
+    abs contents: Buffer
+) -> Result[Int, IoError] {
+    erg written = write_and_flush(path: abs staging, contents: abs contents);
+    return case dat written {
+        Result.Err(error) => {
+            return cleanup_atomic_failure(staging: dat staging, error: dat error);
+        },
+        Result.Ok(count) => {
+            erg published = rename(from: abs staging, to: abs path);
+            return case dat published {
+                Result.Ok(_) => {
+                    drop(staging);
+                    return Result[Int, IoError].Ok(count);
+                },
+                Result.Err(error) => {
+                    return cleanup_atomic_failure(staging: dat staging, error: dat error);
+                },
+            };
+        },
+    };
+}
+
+"""Write bytes to a new file and flush the handle before returning a typed error or count; no hidden allocation occurs."""
+open verb write_and_flush(abs path: Path, abs contents: Buffer) -> Result[Int, IoError] {
+    erg opened = file_create(path: abs path);
+    return case dat opened {
+        Result.Err(error) => Result[Int, IoError].Err(error),
+        Result.Ok(value) => {
+            erg file: File = value;
+            erg written = file.write(buffer: abs contents);
+            return case dat written {
+                Result.Err(error) => Result[Int, IoError].Err(error),
+                Result.Ok(count) => {
+                    erg expected = buffer_length(buffer: abs contents);
+                    case count - expected {
+                        0 => {},
+                        _ => { return Result[Int, IoError].Err(IoError.Failed); },
+                    };
+                    erg flushed = file.flush();
+                    return case dat flushed {
+                        Result.Ok(_) => Result[Int, IoError].Ok(count),
+                        Result.Err(error) => Result[Int, IoError].Err(error),
+                    };
+                },
+            };
+        },
+    };
+}
+
+"""Clean up a failed staging file without allocation and return the original typed atomic-write error.
+
+The `dat staging` owner is explicitly dropped after cleanup, so neither the
+caller nor the filesystem facade retains a failed staging path.
+"""
+open verb cleanup_atomic_failure(dat staging: Path, dat error: IoError) -> Result[Int, IoError] {
+    remove_file(path: abs staging);
+    drop(staging);
+    return Result[Int, IoError].Err(error);
+}

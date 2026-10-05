@@ -10,13 +10,14 @@ pub(super) fn pack_field_info(source: &str, pack: &PackDecl, name: &str) -> Opti
             crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
             _ => None,
         })?;
+    let offset = field.offset_name.clone().unwrap_or_else(|| field.offset.to_string());
     Some(SymbolInfo {
         signature: format!(
             "{} {}: {} (offset: {}, width: {} bits, mask: {})",
             role_name(&field.role),
             field.name,
             type_name(&field.ty),
-            field.offset,
+            offset,
             width,
             format_mask(width),
         ),
@@ -93,6 +94,32 @@ pub(super) fn block_info(source: &str, statements: &[Stmt], name: &str) -> Optio
             }
             Stmt::Loop(block) | Stmt::Block(block) => {
                 if let Some(info) = block_info(source, &block.statements, name) {
+                    return Some(info);
+                }
+            }
+            Stmt::ForRange { binding, body, .. } => {
+                if binding.name == name {
+                    let ty = binding.ty.as_deref().unwrap_or("inferred");
+                    return Some(SymbolInfo {
+                        signature: format!("{} {}: {}", role_name(&binding.role), name, ty),
+                        span: identifier_span(source, binding.span, name).unwrap_or(binding.span),
+                        documentation: None,
+                    });
+                }
+                if let Some(info) = block_info(source, &body.statements, name) {
+                    return Some(info);
+                }
+            }
+            Stmt::ForArray { binding, body, .. } => {
+                if binding.name == name {
+                    let ty = binding.ty.as_deref().unwrap_or("inferred");
+                    return Some(SymbolInfo {
+                        signature: format!("{} {}: {}", role_name(&binding.role), name, ty),
+                        span: identifier_span(source, binding.span, name).unwrap_or(binding.span),
+                        documentation: None,
+                    });
+                }
+                if let Some(info) = block_info(source, &body.statements, name) {
                     return Some(info);
                 }
             }

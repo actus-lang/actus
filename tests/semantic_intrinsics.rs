@@ -19,6 +19,25 @@ fn analyze_source(
 fn intrinsic_registry_defines_source_contracts() {
     assert!(lookup_intrinsic("allocate").is_none());
     assert_eq!(IntrinsicKind::Append.spec().parameters, &["handle", "byte"]);
+    assert_eq!(IntrinsicKind::Crc32.spec().parameters, &["buffer", "start", "end"]);
+    assert_eq!(
+        IntrinsicKind::Crc32Matches.spec().parameters,
+        &["buffer", "start", "end", "expected"]
+    );
+    assert_eq!(
+        IntrinsicKind::ValidateFixedFrame.spec().parameters,
+        &[
+            "buffer",
+            "little",
+            "version_offset",
+            "expected_version",
+            "payload_offset",
+            "payload_length",
+            "checksum_start",
+            "checksum_end",
+            "checksum_offset"
+        ]
+    );
     assert_eq!(IntrinsicKind::Copy.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Print.spec().parameters, &["value"]);
     assert_eq!(IntrinsicKind::Drop.spec().status, RegistryStatus::Active);
@@ -26,7 +45,29 @@ fn intrinsic_registry_defines_source_contracts() {
     assert!(lookup_call_intrinsic("drop").is_none());
     assert_eq!(lookup_call_intrinsic("print"), Some(IntrinsicKind::Print));
     assert_eq!(lookup_call_intrinsic("copy"), Some(IntrinsicKind::Copy));
+    assert_eq!(lookup_call_intrinsic("crc32"), Some(IntrinsicKind::Crc32));
+    assert_eq!(lookup_call_intrinsic("crc32_matches"), Some(IntrinsicKind::Crc32Matches));
+    assert_eq!(
+        lookup_call_intrinsic("validate_fixed_frame"),
+        Some(IntrinsicKind::ValidateFixedFrame)
+    );
     assert!(lookup_intrinsic("user_function").is_none());
+}
+
+#[test]
+fn compiler_provides_serialization_error_domain() {
+    analyze_source(
+        "verb main() -> Result[Int, SerializationError] { return Result[Int, SerializationError].Err(SerializationError.InvalidChecksum); }",
+    )
+    .expect("SerializationError should be available as a compiler-provided enum");
+}
+
+#[test]
+fn accepts_compiler_provided_buffer_length() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; return buffer_length(buffer: abs buffer); }",
+    )
+    .expect("buffer_length should accept a read-only buffer");
 }
 
 #[test]
@@ -35,6 +76,28 @@ fn accepts_explicit_copy_of_integer_and_boolean_scalars() {
         "verb main() -> Int { erg value: u32 = 41u32; erg repeated: u32 = copy(value: abs value); erg flag: Bool = true; erg repeated_flag: Bool = copy(value: abs flag); if repeated_flag { return repeated as Int; } return 0; }",
     )
     .expect("explicit copy should preserve eligible scalar values");
+}
+
+#[test]
+fn accepts_bounded_for_ranges_and_rejects_non_integer_bindings() {
+    analyze_source(
+        "verb main() { for erg index: u32 in 0u32 .. 4u32 { if index == 2u32 { break; } } }",
+    )
+    .expect("bounded integer range should be valid");
+    let error = analyze_source("verb main() { for abs index: u32 in 0u32 .. 4u32 { } }")
+        .expect_err("range bindings must be erg");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidArgumentRole { callee, .. } if callee == "for")
+    );
+    let unbounded = analyze_source("verb main() { for erg index: u32 in 1u32 { } }")
+        .expect_err("scalar sources must not become unbounded iterators");
+    assert!(
+        matches!(unbounded.kind, SemanticErrorKind::TypeMismatch { callee, parameter, .. } if callee == "for" && parameter == "array source")
+    );
+    analyze_source("verb main() { for erg index: u8 in 0u8 .. 255u8 { } }")
+        .expect("the maximum representable endpoint is a valid half-open bound");
+    analyze_source("verb main() { for erg index: u8 in 0u8 .. 256u16 { } }")
+        .expect_err("range bounds must use the declared integer type");
 }
 
 #[test]
@@ -96,6 +159,21 @@ fn validates_print_arguments() {
 fn validates_typed_constants_and_resolves_constant_references() {
     analyze_source("const FRAME_HEADER: u16 = 12u16; verb main() -> u16 { return FRAME_HEADER; }")
         .expect("typed constant reference should be valid");
+}
+
+#[test]
+fn validates_named_pack_offsets_and_rejects_runtime_offsets() {
+    analyze_source(
+        "const OFFSET: u16 = 8u16; pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg prefix: u8 at 0; erg marker: u8 at OFFSET; } } verb main() { return; }",
+    )
+    .expect("named pack offsets should use compile-time constants");
+    let error = analyze_source(
+        "verb runtime_offset() -> u16 { return 8u16; } pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at runtime_offset; } } verb main() { return; }",
+    )
+    .expect_err("runtime offset names must be rejected");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ConstantRuntimeDependency { name } if name == "runtime_offset")
+    );
 }
 
 #[test]
@@ -480,6 +558,43 @@ fn rejects_duplicate_verbs_in_the_function_namespace() {
 fn accepts_buffer_literal_length() {
     analyze_source("verb main() { erg buffer: Buffer = Buffer[4]; drop(buffer); }")
         .expect("Buffer literal lengths should be accepted");
+}
+
+#[test]
+fn accepts_crc32_over_a_read_only_buffer_range() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; return crc32(buffer: abs buffer, start: 0, end: 4); }",
+    )
+    .expect("crc32 should accept a read-only buffer and integer range");
+}
+
+#[test]
+fn accepts_crc32_match_validation_over_a_read_only_buffer_range() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; return crc32_matches(buffer: abs buffer, start: 0, end: 0, expected: 0); }",
+    )
+    .expect("crc32_matches should accept a read-only buffer and integer range");
+}
+
+#[test]
+fn accepts_fixed_frame_validation_over_a_read_only_buffer() {
+    analyze_source(
+        "verb main() -> Int { erg buffer: Buffer = Buffer[9]; return validate_fixed_frame(buffer: abs buffer, little: 1, version_offset: 0, expected_version: 1, payload_offset: 2, payload_length: 3, checksum_start: 0, checksum_end: 5, checksum_offset: 5); }",
+    )
+    .expect("validate_fixed_frame should accept a read-only buffer and integer contract values");
+}
+
+#[test]
+fn rejects_a_non_buffer_crc32_source() {
+    let error = analyze_source(
+        "verb main() -> Int { erg value: u32 = 1u32; return crc32(buffer: abs value, start: 0, end: 1); }",
+    )
+    .expect_err("crc32 should reject non-buffer sources");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidIntrinsicArgument { callee, parameter }
+            if callee == "crc32" && parameter == "buffer"
+    ));
 }
 
 #[test]

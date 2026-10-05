@@ -124,8 +124,9 @@ pub(crate) fn emit_objects(
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, NativeEmitError> {
     let object_plan = plan.object_plan().map_err(|error| NativeEmitError(error.to_string()))?;
-    let targeted_caller =
-        crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
+    let targeted_caller = crate::codegen::normalize_program(
+        &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
+    );
     let generic_instances = crate::semantic::analyze(&targeted_caller)
         .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?
         .generic_instances;

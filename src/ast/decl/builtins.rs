@@ -4,7 +4,32 @@ use super::data::{EnumDef, EnumPayload, EnumVariant};
 use super::types::{GenericParam, GenericParamKind, TypeName};
 
 pub fn builtin_enum_definitions() -> Vec<EnumDef> {
-    vec![option_definition(), result_definition()]
+    vec![option_definition(), result_definition(), serialization_error_definition()]
+}
+
+fn serialization_error_definition() -> EnumDef {
+    EnumDef {
+        is_open: false,
+        doc: Some("Errors returned by generated fixed-frame serialization operations.".to_owned()),
+        name: "SerializationError".to_owned(),
+        generic_parameters: Vec::new(),
+        variants: [
+            "BufferTooSmall",
+            "InvalidVersion",
+            "InvalidChecksum",
+            "InvalidLayout",
+            "UnsupportedVersion",
+        ]
+        .into_iter()
+        .map(|name| EnumVariant {
+            doc: None,
+            name: name.to_owned(),
+            payload: EnumPayload::Unit,
+            span: zero_span(),
+        })
+        .collect(),
+        span: zero_span(),
+    }
 }
 
 fn option_definition() -> EnumDef {

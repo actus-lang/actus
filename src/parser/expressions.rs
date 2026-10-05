@@ -316,10 +316,16 @@ impl Parser {
                 None
             };
             let (role, role_span) = self.parse_argument_role()?;
+            let role_resolution = if role.is_some() {
+                crate::ast::ArgumentRoleResolution::Explicit
+            } else {
+                crate::ast::ArgumentRoleResolution::Unspecified
+            };
             arguments.push(Argument {
                 name,
                 role,
                 role_span,
+                role_resolution,
                 expression: self.parse_expression()?,
             });
             if !self.match_simple(TokenKind::Comma) {

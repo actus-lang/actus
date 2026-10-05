@@ -24,6 +24,7 @@ mod pattern_support;
 mod patterns;
 mod roles;
 mod scopes;
+mod serialization;
 mod state;
 mod structs;
 mod type_substitution;
@@ -33,9 +34,10 @@ pub use analyzer::analyze;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub use model::{
-    Binding, BorrowRecord, ConditionalFact, DynamicRoleType, ExclusiveLoan, FatPointerLayout,
-    GenericInstance, LiteralFact, Origin, OriginRecord, OriginRoot, PackFieldContract,
-    PackLayoutContract, ReachablePerformance, SemanticModel,
+    ArgumentRoleFact, ArgumentRoleSource, Binding, BorrowRecord, ConditionalFact, DynamicRoleType,
+    ExclusiveLoan, FatPointerLayout, GenericInstance, LiteralFact, Origin, OriginRecord,
+    OriginRoot, PackFieldContract, PackLayoutContract, ReachablePerformance, SemanticModel,
+    SerializationContract,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use types::{SemanticType, TypeRegistry};

@@ -7,7 +7,8 @@ use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
 use super::super::enum_layout::{EnumLayout, EnumVariantLayout};
 use super::super::layout::LayoutRegistry;
-use super::super::native::NativeEmitError;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::structs::copy_bytes;
 use super::super::types::NativeType;
 
 pub(super) type BranchLocals<'a> =
@@ -82,6 +83,7 @@ pub(super) fn bind_payload<'a>(
     branch: &'a CaseBranch,
     locals: &HashMap<&'a String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'a String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<BranchLocals<'a>, NativeEmitError> {
     let mut branch_locals = locals.clone();
@@ -93,6 +95,7 @@ pub(super) fn bind_payload<'a>(
         branch,
         &mut branch_locals,
         &mut branch_types,
+        functions,
         layouts,
     )?;
     Ok((branch_locals, branch_types))
@@ -106,6 +109,7 @@ fn bind_variant_case<'a>(
     branch: &'a CaseBranch,
     locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'a String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     let Pattern::Variant { variant, payload, .. } = &branch.pattern else { return Ok(()) };
@@ -125,6 +129,7 @@ fn bind_variant_case<'a>(
         variant_layout,
         locals,
         types,
+        functions,
         layouts,
     )
 }
@@ -152,6 +157,7 @@ fn bind_variant_payload<'a>(
     variant_layout: &EnumVariantLayout,
     locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'a String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     if enum_layout.niche_pointer && branch_variant(branch) == Some("Some") {
@@ -166,6 +172,7 @@ fn bind_variant_payload<'a>(
         variant_layout,
         locals,
         types,
+        functions,
         layouts,
     )
 }
@@ -209,6 +216,7 @@ fn bind_regular_payload<'a>(
     variant_layout: &EnumVariantLayout,
     locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'a String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     for (index, (name, binding)) in bindings.into_iter().enumerate() {
@@ -224,6 +232,7 @@ fn bind_regular_payload<'a>(
                 variant_layout,
                 locals,
                 types,
+                functions,
                 layouts,
             )?;
         }
@@ -243,6 +252,7 @@ fn load_payload_binding<'a>(
     variant_layout: &EnumVariantLayout,
     branch_locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
     branch_types: &mut HashMap<&'a String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     let field = name
@@ -253,7 +263,23 @@ fn load_payload_binding<'a>(
         .ok_or_else(|| NativeEmitError("missing case payload field layout".to_owned()))?;
     let address = function.ins().iadd_imm_s(subject, i64::from(payload_offset + field.offset));
     let value = match field.ty {
-        NativeType::Struct(_) | NativeType::Enum(_) => address,
+        NativeType::Struct(_) => address,
+        NativeType::Enum(id) if !layouts.is_niche_option(id) => {
+            let layout = layouts
+                .enum_layout(id)
+                .ok_or_else(|| NativeEmitError("missing enum payload layout".to_owned()))?;
+            let allocator = functions.get("__actus_enum_allocate").ok_or_else(|| {
+                NativeEmitError("enum payload allocator is unavailable".to_owned())
+            })?;
+            let size = function.ins().iconst(layouts.pointer_type, i64::from(layout.size));
+            let allocation = function.ins().call(allocator.reference, &[size]);
+            let destination =
+                function.inst_results(allocation).first().copied().ok_or_else(|| {
+                    NativeEmitError("enum payload allocation returned no pointer".to_owned())
+                })?;
+            copy_bytes(function, address, destination, layout.size);
+            destination
+        }
         _ => function.ins().load(layouts.ir_type(field.ty)?, MemFlagsData::new(), address, 0),
     };
     let key = branch_binding(branch, binding)

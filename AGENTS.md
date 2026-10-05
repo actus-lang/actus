@@ -80,6 +80,13 @@ Files must be named after their primary responsibility.
 
 File size limits are architectural guardrails and must be treated as mandatory review rules.
 
+The limits measure **code-bearing lines**, not raw physical lines. Blank lines,
+Rust-style `//` and `/* ... */` comments, and Actus `#` comments are ignored.
+Inline comments do not add a line when code is already present on that line.
+Actus triple-quoted `""" ... """` documentation blocks remain counted because
+they are language constructs and part of the documentation contract. The
+diagnostic reports the measured code-line count explicitly.
+
 - Preferred size: 300 lines or fewer.
 - Warning threshold: 400 lines.
 - Hard limit: 500 lines.
@@ -296,8 +303,8 @@ library.
 
 ### 5. Public Actus Documentation
 
-- Every public Actus type, enum, external bridge, and verb must have a `///`
-  documentation comment.
+- Every public Actus type, enum, external bridge, and verb must have a `"""`
+  documentation block.
 - Documentation must state the relevant ownership role, return value, error
   variants, side effects, and C ABI relationship where applicable.
 - `Result.Ok(count)` must be documented as the exact number of processed

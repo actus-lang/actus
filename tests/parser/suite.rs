@@ -1,6 +1,6 @@
 use actus::ast::{
     EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, PrimitiveType,
-    ReturnAccess, Role, Stmt, TopLevelDecl, primitive_type,
+    ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl, primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -25,6 +25,32 @@ fn parses_a_verb_with_roles_and_return_type() {
     assert_eq!(verb.return_type.as_ref().map(|ty| ty.ty.name.as_str()), Some("Int"));
     assert_eq!(verb.return_type.as_ref().map(|ty| ty.access), Some(ReturnAccess::Owned));
     assert!(matches!(verb.body.statements[0], Stmt::Return { .. }));
+}
+
+#[test]
+fn parses_bounded_for_range_with_explicit_binding_span() {
+    let program = parse_source("verb main() { for erg index: u32 in 0u32 .. 4u32 { break; } }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::ForRange { binding, start, end, .. } = &verb.body.statements[0] else {
+        panic!("expected bounded for range")
+    };
+    assert_eq!(binding.role, Role::Erg);
+    assert_eq!(binding.name, "index");
+    assert_eq!(binding.ty.as_deref(), Some("u32"));
+    assert!(matches!(start, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
+    assert!(matches!(end, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
+    assert!(binding.span.start < binding.span.end);
+}
+
+#[test]
+fn expands_repeat_to_the_same_bounded_for_ast_with_source_span() {
+    let program = parse_source("verb main() { repeat erg index: u32 in 0u32 .. 4u32 { break; } }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    let Stmt::ForRange { binding, span, .. } = &verb.body.statements[0] else {
+        panic!("repeat should expand to the bounded for AST")
+    };
+    assert_eq!(binding.name, "index");
+    assert!(span.start < span.end);
 }
 
 #[test]
@@ -278,6 +304,26 @@ fn parses_instrumental_parameters_and_call_site_roles() {
 }
 
 #[test]
+fn preserves_explicit_and_omitted_argument_role_sources() {
+    let program = parse_source(
+        "verb update(ins value: Int) { } verb main(erg value: Int) { update(value: ins value); update(value: value); }",
+    );
+    let TopLevelDecl::Verb(main) = &program.declarations[1] else { panic!("expected main") };
+    let Stmt::Expression { expression: Expr::Call { arguments: explicit, .. }, .. } =
+        &main.body.statements[0]
+    else {
+        panic!("expected explicit call")
+    };
+    assert_eq!(explicit[0].role_resolution, actus::ast::ArgumentRoleResolution::Explicit);
+    let Stmt::Expression { expression: Expr::Call { arguments: omitted, .. }, .. } =
+        &main.body.statements[1]
+    else {
+        panic!("expected omitted call")
+    };
+    assert_eq!(omitted[0].role_resolution, actus::ast::ArgumentRoleResolution::Unspecified);
+}
+
+#[test]
 fn parses_buffer_literal_construction() {
     let program = parse_source("verb main() { erg buffer = Buffer[16]; }");
     let TopLevelDecl::Verb(main) = &program.declarations[0] else { panic!("expected verb") };
@@ -321,6 +367,27 @@ fn parses_array_backed_pack_storage_as_a_distinct_frontend_contract() {
     assert_eq!(pack.storage.byte_capacity(), Some(64));
     assert_eq!(pack.storage.bit_capacity(), Some(512));
     assert_eq!(pack.storage.alignment_bytes(), Some(1));
+}
+
+#[test]
+fn parses_fixed_serialization_contract_sections() {
+    let program = parse_source(
+        "serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; }",
+    );
+    let TopLevelDecl::Serialize(contract) = &program.declarations[0] else {
+        panic!("expected serialization contract")
+    };
+    assert_eq!(contract.source_type.name, "FramePack");
+    assert_eq!(contract.sections.len(), 3);
+    assert!(matches!(contract.sections[0], SerializeSection::Version { offset: 0, .. }));
+    assert!(matches!(
+        contract.sections[1],
+        SerializeSection::Payload { offset: 2, length: 16, .. }
+    ));
+    assert!(matches!(
+        contract.sections[2],
+        SerializeSection::Checksum { start: 0, end: 18, offset: 18, .. }
+    ));
 }
 
 #[test]

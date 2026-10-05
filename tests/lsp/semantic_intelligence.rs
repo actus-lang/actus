@@ -43,6 +43,66 @@ fn semantic_model_exposes_compiler_owned_resource_and_target_facts() {
     assert!(!active_declaration(&model, "windows_only"));
 }
 
+#[test]
+fn semantic_model_exposes_serialization_contract_sections() {
+    let uri = "file:///tmp/actus-lsp-serialization-contract.act";
+    let source = concat!(
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { ",
+        "erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; ",
+        "erg byte_4: u8 at 32; erg byte_5: u8 at 40; erg byte_6: u8 at 48; erg byte_7: u8 at 56; } }\n",
+        "serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; ",
+        "checksum crc32 over 0 .. 3 at 3; }\n",
+        "verb main() -> Int { return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let model = response_with_id(&run_lsp(messages.to_vec()), 2);
+    let contract = &model["result"]["serializations"][0];
+    assert_eq!(contract["name"], "Frame");
+    assert_eq!(contract["sourceType"], "FramePack");
+    assert_eq!(contract["endianness"], "little");
+    assert_eq!(contract["sections"][0]["kind"], "version");
+    assert_eq!(contract["sections"][0]["offset"], 0);
+    assert_eq!(contract["sections"][1]["kind"], "payload");
+    assert_eq!(contract["sections"][1]["length"], 1);
+    assert_eq!(contract["sections"][2]["kind"], "checksum");
+    assert_eq!(contract["sections"][2]["offset"], 3);
+}
+
+#[test]
+fn semantic_model_and_hover_expose_inferred_argument_roles() {
+    let uri = "file:///tmp/actus-lsp-inferred-roles.act";
+    let source = concat!(
+        "verb read(abs value: Int) -> Int { return 0; }\n",
+        "verb update(ins value: Int) { value += 1; }\n",
+        "verb main() -> Int { erg source = 1; abs view = ref source; ",
+        "read(value: view); ins mutable = 0; update(value: mutable); return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"read(value: view")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let model = response_with_id(&stdout, 2);
+    let roles = model["result"]["argumentRoles"].as_array().expect("argument roles");
+    assert!(roles.iter().any(|fact| fact["callee"] == "read"
+        && fact["role"] == "abs"
+        && fact["source"] == "inferred"));
+    assert!(roles.iter().any(|fact| fact["callee"] == "update"
+        && fact["role"] == "ins"
+        && fact["source"] == "inferred"));
+    assert!(stdout.contains("argument role: abs (inferred)"), "hover missing: {stdout}");
+}
+
 fn active_declaration(model: &Value, name: &str) -> bool {
     model["result"]["declarations"]
         .as_array()

@@ -1,6 +1,50 @@
 use super::{Formatter, meta_name, role_name};
 
 impl Formatter<'_> {
+    pub(super) fn serialize_definition(&mut self, definition: &crate::ast::SerializeDecl) {
+        self.documentation(definition.doc.as_deref());
+        if definition.is_open {
+            self.output.push_str("open ");
+        }
+        self.output.push_str("serialize ");
+        self.output.push_str(&definition.name);
+        self.output.push_str(" from ");
+        self.type_name(&definition.source_type);
+        self.output.push_str(" {\n    layout ");
+        self.output.push_str(match definition.endianness {
+            crate::ast::LayoutEndianness::Little => "little",
+            crate::ast::LayoutEndianness::Big => "big",
+        });
+        self.output.push_str(";\n");
+        for section in &definition.sections {
+            self.output.push_str("    ");
+            match section {
+                crate::ast::SerializeSection::Version { ty, offset, .. } => {
+                    self.output.push_str("version ");
+                    self.type_name(ty);
+                    self.output.push_str(" at ");
+                    self.output.push_str(&offset.to_string());
+                }
+                crate::ast::SerializeSection::Payload { offset, length, .. } => {
+                    self.output.push_str("payload bytes at ");
+                    self.output.push_str(&offset.to_string());
+                    self.output.push_str(" length ");
+                    self.output.push_str(&length.to_string());
+                }
+                crate::ast::SerializeSection::Checksum { start, end, offset, .. } => {
+                    self.output.push_str("checksum crc32 over ");
+                    self.output.push_str(&start.to_string());
+                    self.output.push_str(" .. ");
+                    self.output.push_str(&end.to_string());
+                    self.output.push_str(" at ");
+                    self.output.push_str(&offset.to_string());
+                }
+            }
+            self.output.push_str(";\n");
+        }
+        self.output.push('}');
+    }
+
     pub(super) fn role_definition(&mut self, role: &crate::ast::RoleDecl) {
         self.documentation(role.doc.as_deref());
         if role.is_open {
@@ -266,7 +310,10 @@ impl Formatter<'_> {
             self.output.push_str(": ");
             self.type_name(&field.ty);
             self.output.push_str(" at ");
-            self.output.push_str(&field.offset.to_string());
+            self.output.push_str(field.offset_name.as_deref().unwrap_or(""));
+            if field.offset_name.is_none() {
+                self.output.push_str(&field.offset.to_string());
+            }
             if let Some(default_value) = &field.default_value {
                 self.output.push_str(" = ");
                 self.expression(default_value);

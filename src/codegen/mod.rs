@@ -23,6 +23,8 @@ mod native;
 mod native_runtime;
 mod performance;
 mod result_constructors;
+mod serialization_generation;
+mod serialization_migration;
 mod structs;
 mod symbols;
 mod target;
@@ -49,3 +51,4 @@ pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 pub(crate) use generic::expand_generic_instances;
 pub(crate) use generic::specialized_generic_name;
+pub(crate) use result_constructors::normalize_program;

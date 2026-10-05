@@ -10,6 +10,14 @@ pub struct Block {
     pub span: SourceSpan,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ForBinding {
+    pub role: Role,
+    pub name: String,
+    pub ty: Option<String>,
+    pub span: SourceSpan,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CompoundAssignmentOp {
     Add,
@@ -92,6 +100,19 @@ pub enum Stmt {
         span: SourceSpan,
     },
     Loop(Block),
+    ForRange {
+        binding: ForBinding,
+        start: Expr,
+        end: Expr,
+        body: Block,
+        span: SourceSpan,
+    },
+    ForArray {
+        binding: ForBinding,
+        collection: Expr,
+        body: Block,
+        span: SourceSpan,
+    },
     Break {
         span: SourceSpan,
     },

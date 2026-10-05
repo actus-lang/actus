@@ -13,35 +13,40 @@ compiler yet.
 
 ## 1. Comments and Documentation
 
-The accepted comment syntax is:
+The accepted ordinary comment syntax is:
 
 ```act
-// configure the hardware register base
+# configure the hardware register base
 erg base_addr = 0x40011000;
 ```
 
-Long explanations use an explicitly closed block:
+Documentation uses an explicitly closed triple-quoted block:
 
 ```act
-/*
+"""
 This describes the zero-copy transfer protocol.
-*/
+"""
+open verb transfer(abs payload: Buffer) {
+    ...
+}
 ```
 
-Documentation comments use `///`. A sequence of documentation lines directly
-before an `open` declaration documents that public API declaration:
+The documentation block directly before an `open` declaration documents that
+public API declaration:
 
 ```act
-/// Configure the device interrupt line.
-/// The declaration is visible to importing modules.
+"""
+Configure the device interrupt line.
+The declaration is visible to importing modules.
+"""
 open verb configure_interrupt() {
     ...
 }
 ```
 
-The `///` documentation model and `actus doc` generation are planned tooling
-features. They must preserve source spans and remain separate from ordinary
-compiler diagnostics.
+The compiler ignores ordinary `#` comments while preserving documentation
+blocks as structured `DocString` tokens. Formatter, LSP, and documentation
+tools must preserve their source spans and text.
 
 ## 2. Return Types
 
@@ -218,7 +223,7 @@ the call boundary; an owning call still moves its `erg` or `dat` argument.
 Use this operation when the same eligible scalar must be passed to multiple
 owning-role call sites. Do not use identity arithmetic such as `value + 0u32`
 to express a copy. Unsupported types and calls without an explicit `abs` role
-are rejected during semantic analysis.
+or a provably safe inferred role are rejected during semantic analysis.
 
 If an imported generic verb named `copy` is also visible, the compiler resolves
 calls by shape and provenance. A local module-scoped `copy` declaration wins;
@@ -226,6 +231,15 @@ the one-argument scalar form resolves to the scalar reuse intrinsic when no
 local declaration shadows it; and the two-argument `reader`/`writer` form
 resolves to the imported generic verb. This decision occurs before generic
 specialization and native reanalysis.
+
+At a static local call, an omitted call-site role may be inferred only for an
+`abs` parameter receiving an `abs` binding or an `ins` parameter receiving an
+`ins` binding. The compiler records the resolved role and whether it was
+explicit or inferred. It never infers `erg` or `dat`, and it does not infer
+through dynamic or external calls, aggregates, buffers, resources, or
+ambiguous expressions. Write `abs value` or `ins value` when source-level
+clarity is preferred; an explicit role remains the opt-out form. Unsafe or
+ambiguous omissions continue to produce `E1016` at the argument expression.
 
 ## 7. Canonical Formatting
 

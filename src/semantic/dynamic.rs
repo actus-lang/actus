@@ -47,6 +47,7 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
         return_type_name: method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
         return_access: method.return_type.as_ref().map(|return_type| return_type.access),
         generic_parameters: Vec::new(),
+        external: false,
     }
 }
 
@@ -95,6 +96,7 @@ impl Analyzer {
                 TopLevelDecl::Struct(_)
                 | TopLevelDecl::Enum(_)
                 | TopLevelDecl::Pack(_)
+                | TopLevelDecl::Serialize(_)
                 | TopLevelDecl::OpenSibling(_)
                 | TopLevelDecl::Import(_) => {}
             }

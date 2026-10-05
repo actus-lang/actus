@@ -4,6 +4,7 @@ use crate::lexer::SourceSpan;
 use super::analyzer::Analyzer;
 use super::argument_shapes::argument_span;
 use super::errors::{SemanticError, SemanticErrorKind};
+use super::model::{ArgumentRoleFact, ArgumentRoleSource};
 use super::state::OwnershipState;
 
 mod ownership;
@@ -227,25 +228,133 @@ impl Analyzer {
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
         let parameter_indices = self.bind_arguments(callee, signature, arguments, span)?;
-        for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
+        let resolved_arguments =
+            self.resolve_argument_roles(callee, arguments, &parameter_indices, signature, span);
+        for (argument, parameter_index) in resolved_arguments.iter().zip(&parameter_indices) {
             let expected =
                 parse_type_name_key(&signature.params[*parameter_index].2, argument_span(argument));
             self.visit_expression_with_expected(&argument.expression, expected.as_ref())?;
         }
-        for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
+        for (argument, parameter_index) in resolved_arguments.iter().zip(&parameter_indices) {
             self.validate_call_argument(callee, argument, *parameter_index, signature)?;
         }
-        self.validate_exclusive_aliases(arguments, &parameter_indices, signature)?;
-        for (argument, parameter_index) in arguments.iter().zip(&parameter_indices) {
+        self.validate_exclusive_aliases(&resolved_arguments, &parameter_indices, signature)?;
+        for (argument, parameter_index) in resolved_arguments.iter().zip(&parameter_indices) {
             if signature.params[*parameter_index].1 == Role::Dat {
                 self.move_dat_argument(&argument.expression, argument_span(argument))?;
             }
         }
-        self.execute_exclusive_loans(callee, arguments, &parameter_indices, signature)?;
+        self.execute_exclusive_loans(callee, &resolved_arguments, &parameter_indices, signature)?;
         if let Some(return_type) = &signature.return_type_name {
             self.inferred_expression_types.insert((span.start, span.end), return_type.clone());
         }
         Ok(())
+    }
+
+    fn resolve_argument_roles(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        parameter_indices: &[usize],
+        signature: &VerbSignature,
+        call_span: SourceSpan,
+    ) -> Vec<Argument> {
+        arguments
+            .iter()
+            .zip(parameter_indices)
+            .map(|(argument, parameter_index)| {
+                let expected_role = &signature.params[*parameter_index].1;
+                if let Some(role) = &argument.role {
+                    self.record_argument_role(
+                        callee,
+                        &signature.params[*parameter_index].0,
+                        role.clone(),
+                        ArgumentRoleSource::Explicit,
+                        call_span,
+                        argument,
+                    );
+                    return argument.clone();
+                }
+                let inferred = self.infer_argument_role(
+                    callee,
+                    argument,
+                    *parameter_index,
+                    expected_role,
+                    signature,
+                );
+                let Some(role) = inferred else { return argument.clone() };
+                let mut resolved = argument.clone();
+                resolved.role = Some(role.clone());
+                resolved.role_resolution = crate::ast::ArgumentRoleResolution::Inferred;
+                self.record_argument_role(
+                    callee,
+                    &signature.params[*parameter_index].0,
+                    role,
+                    ArgumentRoleSource::Inferred,
+                    call_span,
+                    &resolved,
+                );
+                resolved
+            })
+            .collect()
+    }
+
+    fn infer_argument_role(
+        &self,
+        callee: &str,
+        argument: &Argument,
+        parameter_index: usize,
+        expected_role: &Role,
+        signature: &VerbSignature,
+    ) -> Option<Role> {
+        if !self.local_signatures.contains(callee)
+            || signature.external
+            || signature
+                .dynamic_params
+                .get(parameter_index)
+                .is_some_and(|mode| *mode != crate::ast::DispatchMode::Static)
+        {
+            return None;
+        }
+        match expected_role {
+            Role::Abs if self.infer_abs_argument(argument) => Some(Role::Abs),
+            Role::Ins if self.infer_ins_argument(argument) => Some(Role::Ins),
+            _ => None,
+        }
+    }
+
+    fn infer_abs_argument(&self, argument: &Argument) -> bool {
+        matches!(argument.expression, crate::ast::Expr::Identifier { .. })
+            && self.is_borrow_argument(&argument.expression)
+    }
+
+    fn infer_ins_argument(&self, argument: &Argument) -> bool {
+        let Some(root) = self.root_binding_index(&argument.expression) else { return false };
+        self.model.bindings[root].role == Role::Ins
+            && matches!(argument.expression, crate::ast::Expr::Identifier { .. })
+            && self
+                .expression_type_name(&argument.expression)
+                .is_some_and(|name| super::argument_shapes::is_scalar_name(&name))
+            && self.is_exclusive_owner(&argument.expression)
+    }
+
+    fn record_argument_role(
+        &mut self,
+        callee: &str,
+        parameter: &str,
+        role: Role,
+        source: ArgumentRoleSource,
+        call_span: SourceSpan,
+        argument: &Argument,
+    ) {
+        self.model.argument_roles.push(ArgumentRoleFact {
+            callee: callee.to_owned(),
+            parameter: parameter.to_owned(),
+            role,
+            source,
+            call_span,
+            argument_span: argument_span(argument),
+        });
     }
 
     fn validate_call_argument(

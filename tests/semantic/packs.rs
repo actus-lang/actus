@@ -21,6 +21,37 @@ fn accepts_fully_covered_u8_u16_and_u32_packs() {
 }
 
 #[test]
+fn accepts_a_fixed_serialization_contract() {
+    let model = analyze_source(
+        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; }",
+    )
+    .expect("fixed serialization contract should validate");
+    let contract = &model.serialization_contracts[0];
+    assert_eq!(contract.name, "Frame");
+    assert_eq!(contract.validate_name, "frame_validate");
+    assert_eq!(contract.payload_length, 16);
+    assert_eq!(contract.checksum_offset, 18);
+}
+
+#[test]
+fn rejects_overlapping_serialization_sections() {
+    let error = analyze_source(
+        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 1 length 16; checksum crc32 over 0 .. 17 at 17; }",
+    )
+    .expect_err("overlapping serialization sections must be rejected");
+    assert!(matches!(error, SemanticErrorKind::InvalidSerializationContract { .. }));
+}
+
+#[test]
+fn rejects_generated_serialization_api_name_collisions() {
+    let error = analyze_source(
+        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; } verb frame_validate() { }",
+    )
+    .expect_err("generated serialization API names must not collide");
+    assert!(matches!(error, SemanticErrorKind::InvalidSerializationContract { .. }));
+}
+
+#[test]
 fn accepts_a_bounded_u8_array_as_multi_word_pack_storage() {
     analyze_source(
         "pack CacheLine { erg storage: Array[u8, 64]; layout little; fields { erg word_0: u128 at 0; erg word_1: u128 at 128; erg word_2: u128 at 256; erg word_3: u128 at 384; } }",

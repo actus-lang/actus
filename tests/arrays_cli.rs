@@ -16,6 +16,173 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_crc32_intrinsic_through_the_native_runtime() {
+    let status = run_array_fixture(
+        "crc32-intrinsic",
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; erg checksum: Int = crc32(buffer: abs buffer, start: 0, end: 0); drop(buffer); return if checksum == 0 { 42 } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_crc32_match_intrinsic_through_the_native_runtime() {
+    let status = run_array_fixture(
+        "crc32-match-intrinsic",
+        "verb main() -> Int { erg buffer: Buffer = Buffer[4]; erg matched: Int = crc32_matches(buffer: abs buffer, start: 0, end: 0, expected: 0); drop(buffer); return if matched == 1 { 42 } else { 0 }; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_fixed_frame_validation_intrinsic_through_the_native_runtime() {
+    let status = run_array_fixture(
+        "fixed-frame-validation-intrinsic",
+        "verb main() -> Int { erg buffer: Buffer = Buffer[9]; erg valid: Int = validate_fixed_frame(buffer: abs buffer, little: 1, version_offset: 0, expected_version: 1, payload_offset: 2, payload_length: 3, checksum_start: 0, checksum_end: 5, checksum_offset: 5); drop(buffer); return valid; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_generated_serialization_validator_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-validator",
+        "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 16; checksum crc32 over 0 .. 18 at 18; } verb main() -> Int { erg buffer: Buffer = Buffer[32]; erg version: u16 = 1u16; erg valid: Int = frame_validate(frame: abs buffer, expected_version: abs version); drop(buffer); return valid; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_generated_serialization_encoder_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-encoder",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg source = FramePack { storage: Array[u8, 8](), }; source.storage[0] = 41u8; source.storage[7] = 43u8; erg output = Buffer[0]; erg result = frame_encode(value: abs source, output: ins output); return case dat result { Result.Ok(_) => output[0] as Int + output[7] as Int, Result.Err(_) => 99, }; }",
+    );
+    assert_eq!(status.code(), Some(84));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_generated_serialization_decoder_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg version: u16 = 1u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(value) => value.storage[0] as Int + value.storage[7] as Int, Result.Err(_) => 99, }; }",
+    );
+    assert_eq!(status.code(), Some(44));
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_short_input_in_generated_serialization_decoder() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder-short-input",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; erg version: u16 = 1u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_invalid_version_in_generated_serialization_decoder() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder-invalid-version",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg version: u16 = 2u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_invalid_checksum_in_generated_serialization_decoder() {
+    let status = run_array_fixture(
+        "generated-serialization-decoder-invalid-checksum",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 97u8); append(input, 43u8); erg version: u16 = 1u16; erg result = frame_decode(input: abs input, expected_version: abs version); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_generated_serialization_migration_natively() {
+    let status = run_array_fixture(
+        "generated-serialization-migration",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg output = Buffer[0]; erg from_version: u16 = 1u16; erg to_version: u16 = 2u16; erg result = frame_migrate(input: abs input, from_version: abs from_version, to_version: abs to_version, output: ins output); return case dat result { Result.Ok(_) => output[0] as Int + output[7] as Int, Result.Err(_) => 99, }; }",
+    );
+    assert_eq!(status.code(), Some(45));
+}
+
+#[cfg(unix)]
+#[test]
+fn matches_reference_bytes_after_generated_serialization_migration() {
+    let status = run_array_fixture(
+        "generated-serialization-migration-reference-bytes",
+        "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg word_0: u8 at 0; erg word_1: u8 at 8; erg word_2: u8 at 16; erg word_3: u8 at 24; erg word_4: u8 at 32; erg word_5: u8 at 40; erg word_6: u8 at 48; erg word_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg input = Buffer[0]; append(input, 1u8); append(input, 0u8); append(input, 7u8); append(input, 134u8); append(input, 38u8); append(input, 231u8); append(input, 96u8); append(input, 43u8); erg output = Buffer[0]; erg from_version: u16 = 1u16; erg to_version: u16 = 2u16; erg result = frame_migrate(input: abs input, from_version: abs from_version, to_version: abs to_version, output: ins output); return case dat result { Result.Ok(count) => if count == 8u32 && output[0] == 2u8 && output[1] == 0u8 && output[2] == 7u8 && output[3] == 223u8 && output[4] == 152u8 && output[5] == 161u8 && output[6] == 98u8 && output[7] == 43u8 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn emits_object_and_executable_for_the_same_serialization_contract() {
+    let root =
+        std::env::temp_dir().join(format!("actus-serialization-parity-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let object = root.with_extension("o");
+    let executable = root.with_extension("bin");
+    let source = "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; erg byte_4: u8 at 32; erg byte_5: u8 at 40; erg byte_6: u8 at 48; erg byte_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg source = FramePack { storage: Array[u8, 8](), }; erg output = Buffer[0]; erg result = frame_encode(value: abs source, output: ins output); return case dat result { Result.Ok(count) => if count == 8u32 { 0 } else { 1 }, Result.Err(_) => 2, }; }";
+    fs::write(&input, source).expect("write serialization parity fixture");
+
+    let object_result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "obj".to_owned(),
+            "-o".to_owned(),
+            object.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(object_result, 0);
+    assert!(fs::metadata(&object).expect("object should be emitted").len() > 0);
+
+    let executable_result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            executable.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(executable_result, 0);
+    let status = std::process::Command::new(&executable)
+        .status()
+        .expect("serialization parity executable should run");
+    assert_eq!(status.code(), Some(0));
+
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(object);
+    let _ = fs::remove_file(executable);
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_inferred_abs_and_ins_roles_natively() {
+    let status = run_array_fixture(
+        "inferred-ownership-roles",
+        "verb read(abs value: Int) -> Int { return 41; } verb update(ins value: Int) -> Int { value += 1; return 1; } verb main() -> Int { erg source = 1; abs view = ref source; erg first = read(value: view); ins mutable = 0; erg updated = update(value: mutable); return first + updated; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_indexed_array_backed_pack_storage_natively() {
     let status = run_array_fixture(
         "array-backed-pack-storage",
@@ -90,6 +257,56 @@ fn executes_typed_integer_literals_natively() {
     let status =
         run_array_fixture("typed-integer-literals", "verb main() -> u32 { return 1u32 + 2u32; }");
     assert_eq!(status.code(), Some(3));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_bounded_for_range_natively() {
+    let status = run_array_fixture(
+        "bounded-for-range",
+        "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 8u32 { total += index; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(28));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_bounded_repeat_as_the_for_equivalent() {
+    let status = run_array_fixture(
+        "bounded-repeat",
+        "verb main() -> Int { erg total: u32 = 0u32; repeat erg index: u32 in 0u32 .. 8u32 { total += index; } return total as Int - 28; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_for_range_continue_break_and_reversed_bounds() {
+    let status = run_array_fixture(
+        "bounded-for-control-flow",
+        "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 4u32 .. 1u32 { total += 100u32; } for erg index: u32 in 0u32 .. 8u32 { if index == 2u32 { continue; } if index == 5u32 { break; } total += 1u32; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(4));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_fixed_array_index_iteration_natively() {
+    let status = run_array_fixture(
+        "fixed-array-for-index",
+        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[0] = 10u32; values[1] = 20u32; values[2] = 12u32; erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_pack_backed_array_iteration_natively() {
+    let status = run_array_fixture(
+        "pack-array-for-index",
+        "pack Frame { erg storage: Array[u8, 4]; layout little; fields { abs byte_0: u8 at 0; abs byte_1: u8 at 8; abs byte_2: u8 at 16; abs byte_3: u8 at 24; } } verb main() -> Int { erg frame = Frame { storage: Array[u8, 4](), }; frame.storage[0] = 20u8; frame.storage[1] = 22u8; erg total: u8 = 0u8; for erg index: u32 in frame.storage { total += frame.storage[index]; } return total as Int; }",
+    );
+    assert_eq!(status.code(), Some(42));
 }
 
 #[cfg(unix)]
@@ -258,6 +475,16 @@ fn inlines_chained_named_constants_natively() {
     let status = run_array_fixture(
         "chained-typed-named-constants",
         "const OFFSET: Int = 41; const ANSWER: Int = OFFSET + 1; verb main() -> Int { return ANSWER; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn lowers_named_pack_offsets_natively() {
+    let status = run_array_fixture(
+        "named-pack-offset",
+        "const BASE_OFFSET: u16 = 0u16; const MARKER_OFFSET: u16 = BASE_OFFSET + 8u16; pack Frame { erg storage: Array[u8, 2]; layout little; fields { erg prefix: u8 at BASE_OFFSET; erg marker: u8 at MARKER_OFFSET; } } verb main() -> Int { erg frame = Frame { storage: Array[u8, 2](), }; frame.marker = 41u8; return frame.marker as Int + 1; }",
     );
     assert_eq!(status.code(), Some(42));
 }

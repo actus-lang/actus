@@ -58,6 +58,15 @@ fn check_block_with_context(
             Stmt::Loop(nested) | Stmt::Block(nested) => {
                 check_block_with_context(nested, context)?;
             }
+            Stmt::ForRange { start, end, body, .. } => {
+                check_expr_with_context(start, context)?;
+                check_expr_with_context(end, context)?;
+                check_block_with_context(body, context)?;
+            }
+            Stmt::ForArray { collection, body, .. } => {
+                check_expr_with_context(collection, context)?;
+                check_block_with_context(body, context)?;
+            }
             Stmt::If { condition, then_branch, else_branch, .. } => {
                 check_expr_with_context(condition, context)?;
                 check_block_with_context(then_branch, context)?;

@@ -89,7 +89,7 @@ The `abs buffer` view is read-only and remains owned by the caller. `Ok`
 contains the exact number of initialized bytes; `Err(Failed)` reports an
 invalid runtime handle without exposing the raw C status.
 """
-open verb buffer_length(abs buffer: Buffer) -> Result[Int, IoError] {
+open verb buffer_size(abs buffer: Buffer) -> Result[Int, IoError] {
     erg status = actus_buffer_length(buffer: abs buffer);
     return case status {
         -1 => Result[Int, IoError].Err(IoError.Failed),
@@ -165,7 +165,7 @@ open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target],
     abs input: Buffer
 ) -> Result[Int, IoError] {
-    erg source_length = buffer_length(buffer: abs input)?;
+    erg source_length = buffer_size(buffer: abs input)?;
     erg total = 0;
     loop {
         erg remaining = source_length - total;

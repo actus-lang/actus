@@ -1,13 +1,21 @@
+use crate::ast::{
+    Argument, ArgumentRoleResolution, Block, CaseBody, DispatchMode, Expr, Param, Program,
+    ReturnAccess, ReturnType, Role, SerializeDecl, SerializeSection, Stmt, TopLevelDecl, TypeName,
+    VerbDecl,
+};
+use crate::lexer::SourceSpan;
 use std::collections::HashMap;
-
-use crate::ast::{Argument, Block, CaseBody, Expr, Program, Stmt, TopLevelDecl, TypeName};
-
 /// Rewrites contextual `Ok` and `Err` calls into the existing enum-constructor
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
-pub(super) fn normalize_program(program: &Program) -> Program {
-    let signatures = collect_signatures(program);
+pub(crate) fn normalize_program(program: &Program) -> Program {
     let mut normalized = program.clone();
+    super::serialization_generation::append_builtin_serialization_error(&mut normalized);
+    append_generated_serialization_validators(&mut normalized);
+    super::serialization_generation::append_generated_serialization_encoders(&mut normalized);
+    super::serialization_generation::append_generated_serialization_decoders(&mut normalized);
+    super::serialization_migration::append_generated_serialization_migrations(&mut normalized);
+    let signatures = collect_signatures(&normalized);
     for declaration in &mut normalized.declarations {
         match declaration {
             TopLevelDecl::Verb(verb) => normalize_verb(verb, &signatures),
@@ -21,6 +29,139 @@ pub(super) fn normalize_program(program: &Program) -> Program {
     }
     super::constants::inline_constants(&mut normalized);
     normalized
+}
+fn append_generated_serialization_validators(program: &mut Program) {
+    let contracts = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Serialize(contract) => Some(contract.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    for contract in contracts {
+        program.declarations.push(TopLevelDecl::Verb(generated_validator(&contract)));
+    }
+}
+fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
+    let span = contract.span;
+    let buffer =
+        TypeName { name: "Buffer".to_owned(), arguments: Vec::new(), reference_role: None, span };
+    let version =
+        TypeName { name: "u16".to_owned(), arguments: Vec::new(), reference_role: None, span };
+    let call = Expr::Call {
+        callee: "validate_fixed_frame".to_owned(),
+        arguments: validator_arguments(contract, span),
+        span,
+    };
+    VerbDecl {
+        is_open: false,
+        doc: Some("Compiler-generated fixed-frame serialization wrapper.".to_owned()),
+        metadata: Vec::new(),
+        name: format!("{}_validate", contract.name.to_ascii_lowercase()),
+        generic_parameters: Vec::new(),
+        params: vec![
+            Param {
+                role: Role::Abs,
+                name: "frame".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: buffer,
+                span,
+            },
+            Param {
+                role: Role::Abs,
+                name: "expected_version".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: version,
+                span,
+            },
+        ],
+        return_type: Some(ReturnType {
+            access: ReturnAccess::Owned,
+            ty: TypeName {
+                name: "Int".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span,
+            },
+            span,
+        }),
+        body: Block { statements: vec![Stmt::Return { value: Some(call), span }], span },
+        span,
+    }
+}
+fn validator_arguments(contract: &SerializeDecl, span: SourceSpan) -> Vec<Argument> {
+    let fields =
+        contract.sections.iter().fold((None, None, None), |state, section| match section {
+            SerializeSection::Version { offset, .. } => (Some(*offset), state.1, state.2),
+            SerializeSection::Payload { offset, length, .. } => {
+                (state.0, Some((*offset, *length)), state.2)
+            }
+            SerializeSection::Checksum { start, end, offset, .. } => {
+                (state.0, state.1, Some((*start, *end, *offset)))
+            }
+        });
+    let (
+        Some(version_offset),
+        Some((payload_offset, payload_length)),
+        Some((checksum_start, checksum_end, checksum_offset)),
+    ) = fields
+    else {
+        return Vec::new();
+    };
+    vec![
+        named_argument("buffer", Role::Abs, identifier("frame", span)),
+        integer_argument(
+            "little",
+            u16::from(contract.endianness == crate::ast::LayoutEndianness::Little),
+            span,
+        ),
+        integer_argument("version_offset", version_offset, span),
+        named_argument("expected_version", Role::Abs, identifier("expected_version", span)),
+        integer_argument("payload_offset", payload_offset, span),
+        integer_argument("payload_length", payload_length, span),
+        integer_argument("checksum_start", checksum_start, span),
+        integer_argument("checksum_end", checksum_end, span),
+        integer_argument("checksum_offset", checksum_offset, span),
+    ]
+}
+fn named_argument(name: &str, role: Role, expression: Expr) -> Argument {
+    Argument {
+        name: Some(name.to_owned()),
+        role: Some(role),
+        role_span: Some(expression_span(&expression)),
+        role_resolution: ArgumentRoleResolution::Explicit,
+        expression,
+    }
+}
+fn integer_argument(name: &str, value: u16, span: SourceSpan) -> Argument {
+    named_argument(name, Role::Abs, Expr::Integer { value: value.to_string(), suffix: None, span })
+}
+fn identifier(name: &str, span: SourceSpan) -> Expr {
+    Expr::Identifier { name: name.to_owned(), span }
+}
+fn expression_span(expression: &Expr) -> SourceSpan {
+    match expression {
+        Expr::Identifier { span, .. }
+        | Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
+        | Expr::BufferLiteral { span, .. }
+        | Expr::FloatLiteral { span, .. }
+        | Expr::StringLiteral { span, .. }
+        | Expr::Grouping { span, .. }
+        | Expr::Unary { span, .. }
+        | Expr::Cast { span, .. }
+        | Expr::Binary { span, .. }
+        | Expr::Borrow { span, .. }
+        | Expr::Try { span, .. }
+        | Expr::Call { span, .. }
+        | Expr::MethodCall { span, .. }
+        | Expr::StructLit { span, .. }
+        | Expr::FieldAccess { span, .. }
+        | Expr::Index { span, .. }
+        | Expr::Case { span, .. }
+        | Expr::If { span, .. } => *span,
+    }
 }
 
 fn normalize_verb(
@@ -106,6 +247,15 @@ fn normalize_statement(
         }
         Stmt::Block(nested) | Stmt::Loop(nested) => {
             normalize_block(nested, return_type, signatures, locals);
+        }
+        Stmt::ForRange { start, end, body, .. } => {
+            normalize_expression(start, None, signatures, locals);
+            normalize_expression(end, None, signatures, locals);
+            normalize_block(body, return_type, signatures, locals);
+        }
+        Stmt::ForArray { collection, body, .. } => {
+            normalize_expression(collection, None, signatures, locals);
+            normalize_block(body, return_type, signatures, locals);
         }
         Stmt::Return { value: None, .. }
         | Stmt::Break { .. }

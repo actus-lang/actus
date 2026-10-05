@@ -53,6 +53,22 @@ pub struct OriginRecord {
     pub origin: Origin,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArgumentRoleSource {
+    Explicit,
+    Inferred,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArgumentRoleFact {
+    pub callee: String,
+    pub parameter: String,
+    pub role: Role,
+    pub source: ArgumentRoleSource,
+    pub call_span: SourceSpan,
+    pub argument_span: SourceSpan,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LiteralFact {
     pub span: SourceSpan,
@@ -102,6 +118,23 @@ pub struct PackFieldContract {
     pub has_default: bool,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SerializationContract {
+    pub name: String,
+    pub source_type: String,
+    pub encode_name: String,
+    pub decode_name: String,
+    pub validate_name: String,
+    pub migrate_name: String,
+    pub endianness: String,
+    pub version_offset: u16,
+    pub payload_offset: u16,
+    pub payload_length: u16,
+    pub checksum_start: u16,
+    pub checksum_end: u16,
+    pub checksum_offset: u16,
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReachablePerformance {
     pub role_name: String,
@@ -134,11 +167,13 @@ pub struct SemanticModel {
     pub borrows: Vec<BorrowRecord>,
     pub exclusive_loans: Vec<ExclusiveLoan>,
     pub expression_origins: Vec<OriginRecord>,
+    pub argument_roles: Vec<ArgumentRoleFact>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,
     pub pack_layouts: Vec<PackLayoutContract>,
+    pub serialization_contracts: Vec<SerializationContract>,
     pub reachable_performances: Vec<ReachablePerformance>,
     pub dynamic_roles: Vec<DynamicRoleType>,
     pub drop_types: Vec<String>,

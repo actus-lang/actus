@@ -33,6 +33,14 @@ exceptions. The mechanism must work consistently in the parser, semantic
 validation, conformance scanner, CLI diagnostics, LSP diagnostics, and
 `Actus.toml` configuration.
 
+The source-size metric measures code-bearing lines rather than raw physical
+lines. Blank lines, Rust-style `//` and `/* ... */` comments, and Actus `#`
+comments are excluded. An inline comment does not create an additional measured
+line when code is already present. Actus triple-quoted `""" ... """` blocks
+remain counted because they are language constructs and part of the
+documentation contract. This allows production sources to use concise inline
+notes without weakening the architectural limits on executable code.
+
 ## Decision
 
 Actus introduces one metadata directive with an explicit scope argument:

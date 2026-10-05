@@ -241,7 +241,8 @@ checkbox is marked complete.
 
 The baseline contained 195 public-looking declarations in the `io`, `fs`, and
 `path` trees. Gate 18.7 now performs declaration-level matching through the
-parsed AST and validates the current 349 `"""`/`///` markers with accepted and
+parsed AST and validates the current Actus `"""` documentation markers and
+Rust `///` documentation markers with accepted and
 rejected fixtures. The marker count remains an inventory fact, not a coverage
 substitute: each public declaration and member is checked independently.
 

@@ -127,6 +127,9 @@ impl Parser {
         if self.check_simple(&TokenKind::Pack) {
             return Ok(Some(TopLevelDecl::Pack(self.parse_pack_decl(false, doc)?)));
         }
+        if self.check_simple(&TokenKind::Serialize) {
+            return Ok(Some(TopLevelDecl::Serialize(self.parse_serialize_decl(false, doc)?)));
+        }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(Some(TopLevelDecl::Enum(self.parse_enum_def(false, doc)?)));
         }
@@ -221,6 +224,9 @@ impl Parser {
         }
         if self.check_simple(&TokenKind::Pack) {
             return Ok(TopLevelDecl::Pack(self.parse_pack_decl(true, doc)?));
+        }
+        if self.check_simple(&TokenKind::Serialize) {
+            return Ok(TopLevelDecl::Serialize(self.parse_serialize_decl(true, doc)?));
         }
         if self.check_simple(&TokenKind::Enum) {
             return Ok(TopLevelDecl::Enum(self.parse_enum_def(true, doc)?));

@@ -169,7 +169,15 @@ pub struct Argument {
     pub name: Option<String>,
     pub role: Option<super::decl::Role>,
     pub role_span: Option<SourceSpan>,
+    pub role_resolution: ArgumentRoleResolution,
     pub expression: Expr,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArgumentRoleResolution {
+    Unspecified,
+    Explicit,
+    Inferred,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

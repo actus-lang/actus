@@ -108,7 +108,15 @@ pub fn invalidate_stale_artifact(
     artifact: &Path,
     configuration: &CompilerConfiguration,
 ) -> Result<(), BuildGraphError> {
-    if !artifact.starts_with(configuration.capsula_target_directory()) {
+    invalidate_stale_artifact_at(artifact, configuration, &configuration.capsula_target_directory())
+}
+
+fn invalidate_stale_artifact_at(
+    artifact: &Path,
+    configuration: &CompilerConfiguration,
+    target_directory: &Path,
+) -> Result<(), BuildGraphError> {
+    if !artifact.starts_with(target_directory) {
         return Ok(());
     }
     let metadata = metadata_path(artifact);
@@ -149,7 +157,7 @@ fn remove_if_present(path: &Path) -> Result<(), BuildGraphError> {
 mod tests {
     use std::fs;
 
-    use super::{UnitMetadata, invalidate_stale_artifact, metadata_path};
+    use super::{UnitMetadata, invalidate_stale_artifact_at, metadata_path};
     use crate::configuration::CompilerConfiguration;
 
     #[test]
@@ -167,15 +175,15 @@ mod tests {
     #[test]
     fn writes_round_trippable_metadata_for_a_capsula_artifact() {
         let configuration = CompilerConfiguration::from_environment();
-        let artifact = configuration
-            .capsula_target_directory()
-            .join(format!("metadata-{}.obj", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("actus-build-graph-metadata-{}", std::process::id()));
+        let artifact = root.join("debug/host/metadata.obj");
         fs::create_dir_all(artifact.parent().expect("artifact parent"))
             .expect("create artifact dir");
         fs::write(&artifact, b"object").expect("write artifact");
         super::write_metadata(&artifact, &configuration).expect("write metadata");
         let metadata = UnitMetadata::read(&metadata_path(&artifact)).expect("read metadata");
-        assert_eq!(metadata.unit, format!("metadata-{}", std::process::id()));
+        assert_eq!(metadata.unit, "metadata");
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
         assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
         assert_eq!(metadata.source_limits, "enabled");
@@ -183,22 +191,26 @@ mod tests {
         assert_eq!(metadata.runtime_checksum.as_deref(), configuration.runtime_checksum());
         let _ = fs::remove_file(&artifact);
         let _ = fs::remove_file(metadata_path(&artifact));
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     fn stale_target_metadata_invalidates_generated_artifacts() {
         let configuration = CompilerConfiguration::from_environment();
-        let artifact = configuration
-            .capsula_target_directory()
-            .join(format!("stale-{}.obj", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("actus-build-graph-stale-{}", std::process::id()));
+        let target_directory = root.join("debug/host");
+        let artifact = target_directory.join("stale.obj");
         let metadata = metadata_path(&artifact);
         fs::create_dir_all(artifact.parent().expect("artifact parent"))
             .expect("create artifact dir");
         fs::write(&artifact, b"stale").expect("write artifact");
         fs::write(&metadata, "format_version = 1\ntarget_spec_hash = \"stale\"\n")
             .expect("write stale metadata");
-        invalidate_stale_artifact(&artifact, &configuration).expect("invalidation should succeed");
+        invalidate_stale_artifact_at(&artifact, &configuration, &target_directory)
+            .expect("invalidation should succeed");
         assert!(!artifact.exists());
         assert!(!metadata.exists());
+        let _ = fs::remove_dir_all(root);
     }
 }

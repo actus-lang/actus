@@ -147,6 +147,7 @@ fn bind_branch_payload<'a>(
         branch,
         context.locals,
         context.local_types,
+        context.functions,
         context.layouts,
     )
 }

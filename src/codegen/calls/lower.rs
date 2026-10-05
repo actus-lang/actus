@@ -118,6 +118,15 @@ fn normalize_call_arguments(
             values.pop().ok_or_else(|| NativeEmitError("append requires a byte".to_owned()))?;
         values.push(to_byte(function, byte));
     }
+    if matches!(
+        lookup_call_intrinsic(callee),
+        Some(IntrinsicKind::Crc32 | IntrinsicKind::Crc32Matches)
+            | Some(IntrinsicKind::ValidateFixedFrame)
+    ) {
+        for value in values.iter_mut().skip(1) {
+            *value = to_i64(function, *value);
+        }
+    }
     Ok(())
 }
 
@@ -126,5 +135,13 @@ fn to_byte(function: &mut FunctionBuilder<'_>, value: Value) -> Value {
         value
     } else {
         function.ins().ireduce(types::I8, value)
+    }
+}
+
+fn to_i64(function: &mut FunctionBuilder<'_>, value: Value) -> Value {
+    if function.func.dfg.value_type(value) == types::I64 {
+        value
+    } else {
+        function.ins().sextend(types::I64, value)
     }
 }

@@ -10,7 +10,7 @@ pub use callable::{
 };
 pub use data::{
     EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField,
-    PackStorage, StructDef, StructField, StructFieldRole,
+    PackStorage, SerializeDecl, SerializeSection, StructDef, StructField, StructFieldRole,
 };
 pub use top_level::{
     ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,

@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::{PackFieldContract, PackLayoutContract};
 use crate::ast::{
-    PackDecl, PackField, PackStorage, PrimitiveType, Program, Role, TopLevelDecl, primitive_type,
+    BinaryOp, Expr, PackDecl, PackField, PackStorage, PrimitiveType, Program, Role, TopLevelDecl,
+    UnaryOp, primitive_type,
 };
 
 type PackCoverage = (Vec<bool>, Vec<(u16, u16)>);
@@ -14,8 +17,10 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Pack(pack) = declaration else { continue };
-            let contract = validate_pack(pack)?;
-            if self.pack_types.insert(pack.name.clone(), pack.clone()).is_some() {
+            let mut resolved_pack = pack.clone();
+            resolve_pack_offsets(&mut resolved_pack, &self.constant_initializers)?;
+            let contract = validate_pack(&resolved_pack)?;
+            if self.pack_types.insert(resolved_pack.name.clone(), resolved_pack).is_some() {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::DuplicatePackName { name: pack.name.clone() },
                     span: pack.span,
@@ -80,6 +85,80 @@ impl Analyzer {
 
     pub(super) fn pack_field(&self, pack: &str, field: &str) -> Option<&PackField> {
         self.pack_types.get(pack)?.fields.iter().find(|candidate| candidate.name == field)
+    }
+}
+
+fn resolve_pack_offsets(
+    pack: &mut PackDecl,
+    constants: &HashMap<String, Expr>,
+) -> Result<(), SemanticError> {
+    for field in &mut pack.fields {
+        let Some(name) = field.offset_name.as_deref() else { continue };
+        let Some(value) = evaluate_constant_name(name, constants, &mut Vec::new())
+            .and_then(|value| u16::try_from(value).ok())
+        else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::ConstantRuntimeDependency { name: name.to_owned() },
+                span: field.span,
+            });
+        };
+        field.offset = value;
+    }
+    Ok(())
+}
+
+fn evaluate_constant_name(
+    name: &str,
+    constants: &HashMap<String, Expr>,
+    path: &mut Vec<String>,
+) -> Option<i128> {
+    if path.iter().any(|entry| entry == name) {
+        return None;
+    }
+    let expression = constants.get(name)?;
+    path.push(name.to_owned());
+    let value = evaluate_constant_expression(expression, constants, path);
+    path.pop();
+    value
+}
+
+fn evaluate_constant_expression(
+    expression: &Expr,
+    constants: &HashMap<String, Expr>,
+    path: &mut Vec<String>,
+) -> Option<i128> {
+    match expression {
+        Expr::Integer { value, .. } => value.parse().ok(),
+        Expr::Identifier { name, .. } => evaluate_constant_name(name, constants, path),
+        Expr::Grouping { expression, .. } => {
+            evaluate_constant_expression(expression, constants, path)
+        }
+        Expr::Unary { operator, expression, .. } => {
+            let value = evaluate_constant_expression(expression, constants, path)?;
+            match operator {
+                UnaryOp::Negate => value.checked_neg(),
+                UnaryOp::BitwiseNot => Some(!value),
+                UnaryOp::LogicalNot => None,
+            }
+        }
+        Expr::Binary { left, operator, right, .. } => {
+            let left = evaluate_constant_expression(left, constants, path)?;
+            let right = evaluate_constant_expression(right, constants, path)?;
+            match operator {
+                BinaryOp::Add => left.checked_add(right),
+                BinaryOp::Subtract => left.checked_sub(right),
+                BinaryOp::Multiply => left.checked_mul(right),
+                BinaryOp::Divide => left.checked_div(right),
+                BinaryOp::Remainder => left.checked_rem(right),
+                BinaryOp::BitwiseAnd => Some(left & right),
+                BinaryOp::BitwiseOr => Some(left | right),
+                BinaryOp::BitwiseXor => Some(left ^ right),
+                BinaryOp::ShiftLeft => left.checked_shl(u32::try_from(right).ok()?),
+                BinaryOp::ShiftRight => left.checked_shr(u32::try_from(right).ok()?),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 

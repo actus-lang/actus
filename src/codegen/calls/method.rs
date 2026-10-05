@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::Value;
 use cranelift_frontend::FunctionBuilder;
 
-use crate::ast::{Argument, Expr};
+use crate::ast::{Argument, ArgumentRoleResolution, Expr};
 
 use super::super::dynamic_call::lower_dynamic_call;
 use super::super::expressions::lower_expression;
@@ -34,6 +34,7 @@ fn combine_method_arguments(receiver: &Expr, arguments: &[Argument]) -> Vec<Argu
         name: named.then(|| "self".to_owned()),
         role: None,
         role_span: None,
+        role_resolution: ArgumentRoleResolution::Unspecified,
         expression: receiver.clone(),
     });
     combined.extend(arguments.iter().cloned());

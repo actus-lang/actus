@@ -4,7 +4,7 @@ use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
 
 use crate::ast::{
     EnumDef, LayoutEndianness, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl,
-    TypeName,
+    TypeName, builtin_enum_definitions,
 };
 use crate::semantic::GenericInstance;
 
@@ -292,6 +292,11 @@ fn base_definitions(program: &Program) -> (Vec<StructDef>, Vec<EnumDef>) {
             _ => {}
         }
     }
+    enums.extend(
+        builtin_enum_definitions()
+            .into_iter()
+            .filter(|definition| definition.generic_parameters.is_empty()),
+    );
     (structs, enums)
 }
 

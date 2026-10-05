@@ -19,11 +19,57 @@ fn formats_nested_blocks_and_calls() {
 }
 
 #[test]
+fn formats_bounded_for_ranges_idempotently() {
+    let formatted = format_source(
+        "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",
+    );
+    assert!(formatted.contains("for erg index: u32 in 0u32 .. 4u32"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn canonicalizes_repeat_to_bounded_for_idempotently() {
+    let formatted =
+        format_source("verb main(){repeat erg index:u32 in 0u32..4u32 { total += index; }}");
+    assert!(formatted.contains("for erg index: u32 in 0u32 .. 4u32"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_named_pack_offsets_idempotently() {
+    let formatted = format_source(
+        "const OFFSET:u16=8u16;pack Frame{erg storage:Array[u8,2];layout little;fields{erg marker:u8 at OFFSET;}}",
+    );
+    assert!(formatted.contains("marker: u8 at OFFSET;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn formats_serialization_contracts_idempotently() {
+    let formatted = format_source(
+        "serialize Frame from FramePack{layout little;version u16 at 0;payload bytes at 2 length 16;checksum crc32 over 0..18 at 18;}",
+    );
+    assert!(formatted.contains("payload bytes at 2 length 16;"));
+    assert!(formatted.contains("checksum crc32 over 0 .. 18 at 18;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_scalar_reuse_and_indexed_selection_idempotently() {
     let formatted = format_source(
         "verb main(){erg values:Array[u32,2]=Array[u32,2]();erg value:u32=copy(value:abs values[1]);}",
     );
     assert!(formatted.contains("copy(value: abs values[1])"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_omitted_inferred_roles_without_inventing_source_text() {
+    let formatted = format_source(
+        "verb read(abs value: Int) -> Int { return 0; } verb main() -> Int { erg source = 1; abs view = ref source; return read(value: view); }",
+    );
+    assert!(formatted.contains("read(value: view)"));
+    assert!(!formatted.contains("read(value: abs view)"));
     assert_eq!(format_source(&formatted), formatted);
 }
 

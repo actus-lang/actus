@@ -1,7 +1,7 @@
 use crate::lexer::SourceSpan;
 
 use super::callable::{ExternalVerbDecl, Param, VerbDecl};
-use super::data::{EnumDef, PackDecl, StructDef};
+use super::data::{EnumDef, PackDecl, SerializeDecl, StructDef};
 use super::types::{ReturnType, TypeName};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -17,6 +17,7 @@ pub enum TopLevelDecl {
     ExternalVerb(ExternalVerbDecl),
     Struct(StructDef),
     Pack(PackDecl),
+    Serialize(SerializeDecl),
     Enum(EnumDef),
     Role(RoleDecl),
     Perform(PerformDecl),

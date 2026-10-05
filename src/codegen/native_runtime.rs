@@ -6,13 +6,27 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::IntrinsicKind;
 use crate::runtime::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_DROP_SYMBOL, ENUM_ALLOCATE_SYMBOL,
-    ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL,
-    WRITE_STRING_STDOUT_SYMBOL,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL,
+    BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL, BUFFER_VALIDATE_FIXED_FRAME_SYMBOL,
+    ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL,
+    PRINT_STRING_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
 use super::types::NativeType;
+
+const SERIALIZATION_I64: NativeType = NativeType::Integer { signed: true, width: 64 };
+const VALIDATE_FIXED_FRAME_PARAMS: &[&str] = &[
+    "buffer",
+    "little",
+    "version_offset",
+    "expected_version",
+    "payload_offset",
+    "payload_length",
+    "checksum_start",
+    "checksum_end",
+    "checksum_offset",
+];
 
 pub(super) fn declare_runtime_functions(
     module: &mut ObjectModule,
@@ -23,6 +37,10 @@ pub(super) fn declare_runtime_functions(
         allocate: declare_allocate(module, pointer_type)?,
         drop: declare_drop(module, pointer_type)?,
         append: declare_append(module, pointer_type)?,
+        buffer_length: declare_buffer_length(module, pointer_type)?,
+        crc32: declare_crc32(module, pointer_type)?,
+        crc32_matches: declare_crc32_matches(module, pointer_type)?,
+        validate_fixed_frame: declare_validate_fixed_frame(module, pointer_type)?,
         print_int: declare_print_int(module)?,
         print_string: declare_print_string(module, pointer_type)?,
         write_string: declare_write_string(module, pointer_type)?,
@@ -43,6 +61,10 @@ struct RuntimeFunctionIds {
     allocate: cranelift_module::FuncId,
     drop: cranelift_module::FuncId,
     append: cranelift_module::FuncId,
+    buffer_length: cranelift_module::FuncId,
+    crc32: cranelift_module::FuncId,
+    crc32_matches: cranelift_module::FuncId,
+    validate_fixed_frame: cranelift_module::FuncId,
     print_int: cranelift_module::FuncId,
     print_string: cranelift_module::FuncId,
     write_string: cranelift_module::FuncId,
@@ -61,6 +83,7 @@ fn runtime_metadata(
             named_meta(ids.allocate, &["length"], NativeType::Buffer),
         ),
         (BUFFER_DROP_SYMBOL.to_owned(), named_meta(ids.drop, &["handle"], NativeType::Int)),
+        ("buffer_length".to_owned(), named_meta(ids.buffer_length, &["buffer"], NativeType::Int)),
         (
             format!("__{ENUM_ALLOCATE_SYMBOL}"),
             named_meta(ids.enum_allocate, &["size"], NativeType::Buffer),
@@ -72,6 +95,19 @@ fn runtime_metadata(
         (
             append_spec.name.to_owned(),
             intrinsic_meta(ids.append, append_spec.parameters, NativeType::Int),
+        ),
+        ("crc32".to_owned(), named_meta(ids.crc32, &["buffer", "start", "end"], SERIALIZATION_I64)),
+        (
+            "crc32_matches".to_owned(),
+            named_meta(
+                ids.crc32_matches,
+                &["buffer", "start", "end", "expected"],
+                SERIALIZATION_I64,
+            ),
+        ),
+        (
+            "validate_fixed_frame".to_owned(),
+            named_meta(ids.validate_fixed_frame, VALIDATE_FIXED_FRAME_PARAMS, SERIALIZATION_I64),
         ),
         (
             print_spec.name.to_owned(),
@@ -165,6 +201,62 @@ fn declare_append(
     signature.returns.push(AbiParam::new(types::I8));
     module
         .declare_function(BUFFER_APPEND_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_buffer_length(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function(BUFFER_LENGTH_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_crc32(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I64));
+    module
+        .declare_function(BUFFER_CRC32_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_crc32_matches(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I64));
+    module
+        .declare_function(BUFFER_CRC32_MATCHES_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_validate_fixed_frame(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    for _ in 0..8 {
+        signature.params.push(AbiParam::new(types::I64));
+    }
+    signature.returns.push(AbiParam::new(types::I64));
+    module
+        .declare_function(BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 

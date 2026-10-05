@@ -201,7 +201,7 @@ impl Analyzer {
                 || self.expression_type(expression).is_some())
     }
 
-    fn is_borrow_argument(&self, expression: &Expr) -> bool {
+    pub(super) fn is_borrow_argument(&self, expression: &Expr) -> bool {
         match expression {
             Expr::Identifier { name, span } => {
                 let Ok(index) = self.binding(name, *span) else { return false };

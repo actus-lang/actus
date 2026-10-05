@@ -33,7 +33,7 @@ fn all_diagnostic_adapters_preserve_one_fixture() {
 
 #[test]
 fn all_diagnostic_adapters_preserve_order_for_multiple_errors() {
-    let source = "verb main() -> Int { return @ + #; }\n";
+    let source = "verb main() -> Int { return @ + $; }\n";
     let (tokens, errors) = scan(source);
     assert!(!tokens.is_empty());
     assert_eq!(errors.len(), 2);

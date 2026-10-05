@@ -195,6 +195,7 @@ fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
         TopLevelDecl::ExternalVerb(value) => value.is_open,
         TopLevelDecl::Struct(value) => value.is_open,
         TopLevelDecl::Pack(value) => value.is_open,
+        TopLevelDecl::Serialize(value) => value.is_open,
         TopLevelDecl::Enum(value) => value.is_open,
         TopLevelDecl::Role(value) => value.is_open,
         TopLevelDecl::Perform(value) => value.is_open,

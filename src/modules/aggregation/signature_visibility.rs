@@ -1,5 +1,6 @@
 use crate::ast::{
-    EnumPayload, GenericParam, Param, PerformDecl, ReturnType, RoleDecl, TopLevelDecl, TypeName,
+    EnumPayload, ExternalVerbDecl, GenericParam, Param, PerformDecl, ReturnType, RoleDecl,
+    TopLevelDecl, TypeName, VerbDecl,
 };
 use std::collections::HashSet;
 
@@ -51,20 +52,8 @@ fn validate_declaration(
 ) -> Result<(), ModuleError> {
     match declaration {
         TopLevelDecl::Constant(_) => Ok(()),
-        TopLevelDecl::Verb(value) => validate_callable(
-            &value.generic_parameters,
-            &value.params,
-            value.return_type.as_ref(),
-            private,
-            unit,
-        ),
-        TopLevelDecl::ExternalVerb(value) => validate_callable(
-            &value.generic_parameters,
-            &value.params,
-            value.return_type.as_ref(),
-            private,
-            unit,
-        ),
+        TopLevelDecl::Verb(value) => validate_verb(value, private, unit),
+        TopLevelDecl::ExternalVerb(value) => validate_external_verb(value, private, unit),
         TopLevelDecl::Struct(value) => {
             validate_generics(&value.generic_parameters, private, unit)?;
             for field in &value.fields {
@@ -79,6 +68,7 @@ fn validate_declaration(
             }
             Ok(())
         }
+        TopLevelDecl::Serialize(value) => validate_type(&value.source_type, private, unit),
         TopLevelDecl::Enum(value) => {
             validate_generics(&value.generic_parameters, private, unit)?;
             for variant in &value.variants {
@@ -102,6 +92,34 @@ fn validate_declaration(
         TopLevelDecl::Perform(value) => validate_perform(value, private, unit),
         TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_) => Ok(()),
     }
+}
+
+fn validate_verb(
+    value: &VerbDecl,
+    private: &PrivateNames,
+    unit: &ModuleUnit,
+) -> Result<(), ModuleError> {
+    validate_callable(
+        &value.generic_parameters,
+        &value.params,
+        value.return_type.as_ref(),
+        private,
+        unit,
+    )
+}
+
+fn validate_external_verb(
+    value: &ExternalVerbDecl,
+    private: &PrivateNames,
+    unit: &ModuleUnit,
+) -> Result<(), ModuleError> {
+    validate_callable(
+        &value.generic_parameters,
+        &value.params,
+        value.return_type.as_ref(),
+        private,
+        unit,
+    )
 }
 
 fn validate_callable(

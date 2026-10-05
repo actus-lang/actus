@@ -54,6 +54,7 @@ fn declaration_identity(declaration: &TopLevelDecl) -> Option<(&'static str, &St
         TopLevelDecl::Constant(value) => Some(("const", &value.name, value.span)),
         TopLevelDecl::Struct(value) => Some(("struct", &value.name, value.span)),
         TopLevelDecl::Pack(value) => Some(("pack", &value.name, value.span)),
+        TopLevelDecl::Serialize(value) => Some(("serialize", &value.name, value.span)),
         TopLevelDecl::Enum(value) => Some(("enum", &value.name, value.span)),
         TopLevelDecl::Role(value) => Some(("role", &value.name, value.span)),
         TopLevelDecl::Verb(value) => Some(("verb", &value.name, value.span)),
@@ -136,6 +137,7 @@ fn runtime_declaration(declaration: &TopLevelDecl) -> Option<(&'static str, Sour
         TopLevelDecl::Constant(_)
         | TopLevelDecl::Struct(_)
         | TopLevelDecl::Pack(_)
+        | TopLevelDecl::Serialize(_)
         | TopLevelDecl::Enum(_)
         | TopLevelDecl::OpenSibling(_)
         | TopLevelDecl::Import(_) => None,
