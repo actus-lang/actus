@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use crate::ast::TypeIdentity;
+
 use super::model::GenericInstance;
 
 pub(super) struct GenericInstanceCache {
     toolchain_hash: String,
-    entries: BTreeMap<(String, String, String, usize, usize), GenericInstance>,
+    entries: BTreeMap<(String, TypeIdentity, String, usize, usize), GenericInstance>,
 }
 
 impl Default for GenericInstanceCache {
@@ -27,7 +29,7 @@ impl GenericInstanceCache {
         let caller = instance.caller.clone().unwrap_or_default();
         let key = (
             self.toolchain_hash.clone(),
-            instance.canonical_key.clone(),
+            instance.identity(),
             caller,
             instance.call_span.start,
             instance.call_span.end,
@@ -40,8 +42,8 @@ impl GenericInstanceCache {
     }
 
     #[cfg(test)]
-    fn contains(&self, canonical_key: &str) -> bool {
-        self.entries.keys().any(|(_, key, _, _, _)| key == canonical_key)
+    fn contains(&self, identity: &TypeIdentity) -> bool {
+        self.entries.keys().any(|(_, key, _, _, _)| key == identity)
     }
 }
 
@@ -57,31 +59,42 @@ fn stable_digest(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::GenericInstanceCache;
-    use crate::ast::TypeName;
+    use crate::ast::{TypeIdentity, TypeName};
     use crate::lexer::SourceSpan;
     use crate::semantic::GenericInstance;
 
-    fn instance(key: &str) -> GenericInstance {
+    fn instance(key: &str, argument_span: usize) -> GenericInstance {
         GenericInstance {
             name: "Box".to_owned(),
             arguments: vec![TypeName {
                 name: "Int".to_owned(),
                 arguments: Vec::new(),
                 reference_role: None,
-                span: SourceSpan::new(0, 0),
+                span: SourceSpan::new(argument_span, argument_span + 3),
             }],
             canonical_key: key.to_owned(),
             caller: None,
-            call_span: SourceSpan::new(0, 0),
+            call_span: SourceSpan::new(0, 3),
         }
     }
 
     #[test]
-    fn deduplicates_by_canonical_key_within_a_toolchain() {
+    fn deduplicates_by_structural_identity_within_a_toolchain() {
         let mut cache = GenericInstanceCache::new("toolchain-a");
-        cache.insert(instance("Box[Int]"));
-        cache.insert(instance("Box[Int]"));
-        assert!(cache.contains("Box[Int]"));
+        cache.insert(instance("Box[Int]", 0));
+        cache.insert(instance("Box[Int]", 20));
+        let identity = TypeIdentity::from_type_name(&TypeName {
+            name: "Box".to_owned(),
+            arguments: vec![TypeName {
+                name: "Int".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span: SourceSpan::new(40, 43),
+            }],
+            reference_role: None,
+            span: SourceSpan::new(40, 51),
+        });
+        assert!(cache.contains(&identity));
         assert_eq!(cache.into_instances().len(), 1);
     }
 
@@ -89,8 +102,8 @@ mod tests {
     fn different_toolchain_caches_are_independent() {
         let mut first = GenericInstanceCache::new("toolchain-a");
         let mut second = GenericInstanceCache::new("toolchain-b");
-        first.insert(instance("Box[Int]"));
-        second.insert(instance("Box[Int]"));
+        first.insert(instance("Box[Int]", 0));
+        second.insert(instance("Box[Int]", 0));
         assert_eq!(first.into_instances().len(), 1);
         assert_eq!(second.into_instances().len(), 1);
     }

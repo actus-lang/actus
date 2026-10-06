@@ -21,16 +21,35 @@ pub struct NativeEmitError(pub String);
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NativeSymbolBindings {
-    external: BTreeMap<String, String>,
+    external: BTreeMap<(String, String), String>,
+    unique_source: BTreeMap<String, String>,
 }
 
 impl NativeSymbolBindings {
-    pub fn new(bindings: impl IntoIterator<Item = (String, String)>) -> Self {
-        Self { external: bindings.into_iter().collect() }
+    pub fn new(bindings: impl IntoIterator<Item = (String, String, String)>) -> Self {
+        let mut external = BTreeMap::new();
+        let mut unique_source = BTreeMap::new();
+        for (namespace, source, symbol) in bindings {
+            external.insert((namespace, source.clone()), symbol.clone());
+            match unique_source.get(&source) {
+                None => {
+                    unique_source.insert(source, symbol);
+                }
+                Some(existing) if existing == &symbol => {}
+                Some(_) => {
+                    unique_source.remove(&source);
+                }
+            }
+        }
+        Self { external, unique_source }
     }
 
-    pub(crate) fn external_symbol<'a>(&'a self, source_name: &'a str) -> &'a str {
-        self.external.get(source_name).map(String::as_str).unwrap_or(source_name)
+    pub(crate) fn external_symbol<'a>(&'a self, namespace: &str, source_name: &'a str) -> &'a str {
+        self.external
+            .get(&(namespace.to_owned(), source_name.to_owned()))
+            .map(String::as_str)
+            .or_else(|| self.unique_source.get(source_name).map(String::as_str))
+            .unwrap_or(source_name)
     }
 }
 
@@ -200,4 +219,21 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
         bindings,
         generic_instances,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NativeSymbolBindings;
+
+    #[test]
+    fn keeps_same_source_name_distinct_per_namespace() {
+        let bindings = NativeSymbolBindings::new([
+            ("actus_mod_left".to_owned(), "read__Int".to_owned(), "left_symbol".to_owned()),
+            ("actus_mod_right".to_owned(), "read__Int".to_owned(), "right_symbol".to_owned()),
+        ]);
+
+        assert_eq!(bindings.external_symbol("actus_mod_left", "read__Int"), "left_symbol");
+        assert_eq!(bindings.external_symbol("actus_mod_right", "read__Int"), "right_symbol");
+        assert_eq!(bindings.external_symbol("actus_root", "read__Int"), "read__Int");
+    }
 }

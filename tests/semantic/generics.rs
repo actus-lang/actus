@@ -199,6 +199,17 @@ fn discovers_sorted_concrete_generic_instances_with_canonical_keys() {
 }
 
 #[test]
+fn rejects_different_generic_arguments_as_distinct_types() {
+    let error = analyze_source(
+        "struct Box[T] { item: T, } verb take(abs item: Box[Int]) { } verb main(abs value: Box[u32]) { take(item: abs value); }",
+    )
+    .expect_err("Box[Int] and Box[u32] must not unify");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::TypeMismatch { callee, .. } if callee == "take")
+    );
+}
+
+#[test]
 fn rejects_direct_recursive_generic_layouts() {
     let error = analyze_source("struct Node[T] { next: Node[T], }")
         .expect_err("recursive generic layouts require indirection");

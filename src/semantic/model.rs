@@ -1,4 +1,4 @@
-use crate::ast::{BuiltinType, Role, TypeName};
+use crate::ast::{BuiltinType, Role, TypeIdentity, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::state::{AccessState, OwnershipState};
@@ -94,6 +94,17 @@ pub struct GenericInstance {
     pub canonical_key: String,
     pub caller: Option<String>,
     pub call_span: SourceSpan,
+}
+
+impl GenericInstance {
+    pub fn identity(&self) -> TypeIdentity {
+        TypeIdentity::from_type_name(&TypeName {
+            name: self.name.clone(),
+            arguments: self.arguments.clone(),
+            reference_role: None,
+            span: self.call_span,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
