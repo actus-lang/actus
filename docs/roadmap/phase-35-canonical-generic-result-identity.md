@@ -269,16 +269,36 @@ mistaken for a generic identity failure.
 
 ### Gate 35.6 — Native and executable acceptance evidence
 
-- [ ] Add semantic, object, and executable regression tests for the minimal
+- [x] Add semantic, object, and executable regression tests for the minimal
       reproducer.
-- [ ] Add a nested-facade regression with at least two call sites sharing one
+- [x] Add a nested-facade regression with at least two call sites sharing one
       generic specialization.
-- [ ] Verify strict object and executable builds both succeed.
-- [ ] Verify the emitted native representation contains no duplicate generic
+- [x] Verify strict object and executable builds both succeed.
+- [x] Verify the emitted native representation contains no duplicate generic
       type definitions or incompatible result layouts.
-- [ ] Preserve zero-floating-point evidence for integer-only fixtures where the
+- [x] Preserve zero-floating-point evidence for integer-only fixtures where the
       fixture requires it.
-- [ ] Record exact compiler revision, commands, target profile, and outputs.
+- [x] Record exact compiler revision, commands, target profile, and outputs.
+
+#### Evidence — 2026-10-06
+
+- Compiler revision: `c7227bda1e91af6c68c810e44126039573869b7c`.
+- Fixture: `tests/fixtures/phase-29/nested-generic-facade`, hosted on the
+  compiler's native host target with strict mode and package zero-float policy.
+  Its nested facade `root[N]` is called at two call sites with `Storage[4]`
+  and `Storage[8]`.
+- Commands:
+  `target/debug/actus check --strict tests/fixtures/phase-29/nested-generic-facade/src/main.act`
+  succeeded;
+  `target/debug/actus build --strict --emit obj ... -o /tmp/actus-phase35-generic.obj`
+  succeeded;
+  `target/debug/actus build --strict --emit exe ... -o /tmp/actus-phase35-generic.exe`
+  succeeded; running the executable returned the expected exit code `24`.
+- Both native builds reported `verified generated native IR: no floating-point
+  instructions`.
+- `phase29_nested_generic_facade_baseline_passes_all_native_stages`, the
+  generic Result object/executable parity test, deterministic generic object
+  tests, and duplicate symbol tests pass. Gate 35.6 is closed.
 
 ### Gate 35.7 — Tooling, diagnostics, and documentation
 
