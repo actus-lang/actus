@@ -396,3 +396,39 @@ fn nested_facade_result_case_with_aggregate_payload_preserves_native_identity() 
     assert_eq!(execution.status.code(), Some(41));
     fs::remove_dir_all(root).expect("remove nested facade result aggregate case project");
 }
+
+#[test]
+fn result_case_binding_preserves_const_generic_array_payload() {
+    let source = r#"
+enum Failure {
+    Invalid,
+}
+
+verb produce() -> Result[Array[u8, 20], Failure] {
+    erg bytes: Array[u8,20] = Array[u8,20]();
+    bytes[0u32] = 41u8;
+    return Result[Array[u8, 20], Failure].Ok(bytes);
+}
+
+verb forward() -> Result[Array[u8, 20], Failure] {
+    erg result = produce();
+    return case dat result {
+        Result.Ok(bytes) => Result[Array[u8, 20], Failure].Ok(bytes),
+        Result.Err(error) => Result[Array[u8, 20], Failure].Err(error),
+    };
+}
+
+verb main() -> Int {
+    erg result = forward();
+    return case dat result {
+        Result.Ok(bytes) => bytes[0u32] as Int,
+        Result.Err(_) => 0,
+    };
+}
+"#;
+    let (root, input, output) = project("result-case-array-payload", source);
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(41));
+    fs::remove_dir_all(root).expect("remove result case array payload project");
+}

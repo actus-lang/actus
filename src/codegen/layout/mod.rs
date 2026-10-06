@@ -94,7 +94,8 @@ impl LayoutRegistry {
     ) -> Result<Self, NativeEmitError> {
         let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
         let pack_definitions = pack_definitions(program);
-        let array_definitions = array_definitions(program, &definitions, &enum_definitions);
+        let array_definitions =
+            array_definitions(program, &definitions, &enum_definitions, instances);
         let mut registry = Self::new(
             pointer_type,
             definitions,
@@ -171,6 +172,14 @@ impl LayoutRegistry {
 
     pub(super) fn array(&self, id: usize) -> Option<&ArrayLayout> {
         self.array_layouts.get(id)
+    }
+
+    pub(super) fn array_layout_value(&self, id: usize) -> Option<ArrayLayout> {
+        self.array_layouts.get(id).cloned().or_else(|| {
+            self.array_definitions
+                .get(id)
+                .and_then(|definition| self.array_layout_for(definition).ok())
+        })
     }
 
     pub(super) fn array_id(&self, canonical: &str) -> Option<usize> {

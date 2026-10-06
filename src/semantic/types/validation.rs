@@ -22,22 +22,6 @@ impl Analyzer {
         })
     }
 
-    pub(crate) fn validate_type_name(
-        &self,
-        name: &str,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        if name == "Arena"
-            || self.type_registry.is_known(name)
-            || self.struct_types.contains_key(name)
-            || self.pack_types.contains_key(name)
-            || self.enum_types.contains_key(name)
-        {
-            return Ok(());
-        }
-        Err(SemanticError { kind: SemanticErrorKind::UnknownType { name: name.to_owned() }, span })
-    }
-
     pub(crate) fn resolve_binding_type(
         &mut self,
         declared_type: Option<&TypeName>,

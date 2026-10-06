@@ -70,7 +70,7 @@ impl LayoutRegistry {
             NativeType::String | NativeType::Buffer => Some(self.pointer_size),
             NativeType::FatPointer => Some(self.pointer_size * 2),
             NativeType::Pack(id) => self.pack_size(id),
-            NativeType::Array(id) => self.array(id).map(|array| array.size),
+            NativeType::Array(id) => self.array_layout_value(id).map(|array| array.size),
             NativeType::Arena(capacity) => Some(capacity + self.pointer_size),
         }
     }
@@ -89,9 +89,9 @@ impl LayoutRegistry {
             | NativeType::Void
             | NativeType::Pack(_) => true,
             NativeType::Struct(id) => self.is_trivially_copyable_struct(id),
-            NativeType::Array(id) => {
-                self.array(id).is_some_and(|layout| self.is_trivially_copyable(layout.element))
-            }
+            NativeType::Array(id) => self
+                .array_layout_value(id)
+                .is_some_and(|layout| self.is_trivially_copyable(layout.element)),
             NativeType::String
             | NativeType::Buffer
             | NativeType::Arena(_)

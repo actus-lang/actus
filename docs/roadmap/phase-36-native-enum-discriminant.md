@@ -152,6 +152,44 @@ Current evidence:
   separate type and lowering paths, so ordinary statement branches do not
   require a value.
 
+### Gate 36.7 — Const-generic aggregate payloads in enum cases
+
+This gate extends native enum support to the composition already required by
+the language: a bounded const-generic array used as the payload of
+`Result[T, E]` or `Option[T]`, including case binding and native return paths.
+
+- [x] Reproduce `Result[Array[u8, 20], Failure]` failing at a case payload
+      binding with `E1023 unknown type Array[u8,20]`.
+- [x] Preserve the complete nested `TypeName` when binding enum payload
+      patterns instead of reducing it to a plain name string.
+- [x] Validate nested payload type applications through the normal semantic
+      type resolver.
+- [x] Resolve array size and alignment while specialized enum layouts are
+      being constructed.
+- [x] Add a native executable regression that constructs, forwards, matches,
+      and indexes a const-generic array payload.
+- [x] Run the complete Actus quality suite and reinstall the compiler before
+      retesting Twin-e.
+- [ ] Record the installed compiler evidence and close the gate only after
+      Twin-e strict validation remains green.
+
+The implementation and contract are recorded in ADR-0070.
+
+Gate 36.7 compiler evidence:
+
+- `cargo test --all-targets --all-features`: passed, including 34 application
+  tests and the new const-generic enum payload regression.
+- `cargo clippy --all-targets --all-features -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+- `scripts/check_source_limits.sh`: passed.
+- `git diff --check`: passed.
+- `cargo install --path . --force --locked`: installed the corrected compiler.
+- Installed binary SHA-256: `f33ea7dba571b8704a377d832d4d690a4a621f6802a90b1760f9b2688a284ead`.
+- Downstream Twin-e validation is still open because its current uncommitted
+  observation serialization work reports `E1027` at
+  `tests/aie_observation.act:121` (`ObservationSnapshot` passed where
+  `Array[u8,20]` is expected). No workaround was added in either repository.
+
 ## Definition of done
 
 Phase 36.6 is complete: the new nested `Result` reproducer and the existing

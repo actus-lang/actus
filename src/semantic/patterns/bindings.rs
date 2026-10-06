@@ -129,11 +129,16 @@ impl Analyzer {
         if binding.name == "_" {
             return Ok(());
         }
+        let parsed_type = super::super::calls::parse_type_name_key(type_name, binding.span)
+            .ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::MalformedTypeName { name: type_name.to_owned() },
+                span: binding.span,
+            })?;
         let is_generic_payload = self.enum_types.values().any(|definition| {
             definition.generic_parameters.iter().any(|parameter| parameter.name == type_name)
         });
         if !self.is_generic_parameter(type_name) && !is_generic_payload {
-            self.validate_type_name(type_name, binding.span)?;
+            self.validate_type_reference(&parsed_type)?;
         }
         self.bind(
             match mode {
@@ -146,20 +151,12 @@ impl Analyzer {
             binding.span,
         )?;
         let index = self.binding(&binding.name, binding.span)?;
-        self.binding_type_names.insert(
-            index,
-            crate::ast::TypeName {
-                name: type_name.to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span: binding.span,
-            },
-        );
-        if self.struct_types.contains_key(type_name) {
-            self.binding_struct_types.insert(index, type_name.to_owned());
+        self.binding_type_names.insert(index, parsed_type.clone());
+        if self.struct_types.contains_key(&parsed_type.name) {
+            self.binding_struct_types.insert(index, parsed_type.name.clone());
         }
-        if self.enum_types.contains_key(type_name) {
-            self.binding_enum_types.insert(index, type_name.to_owned());
+        if self.enum_types.contains_key(&parsed_type.name) {
+            self.binding_enum_types.insert(index, parsed_type.name.clone());
         }
         Ok(())
     }
