@@ -42,6 +42,21 @@ private verbs are omitted. Generic verbs are specialized before declaration and
 lowering, so each concrete instance has a deterministic symbol identity that
 is preserved across root-to-module linker bindings.
 
+## Canonical generic identity
+
+The semantic, facade, cache, layout, and native dependency stages share the
+structured `TypeIdentity` contract defined by ADR-0068. Its structural key is
+the nominal declaration name plus ordered type arguments; source spans, facade
+paths, call-site locations, and display strings remain metadata. This prevents
+one generic application from becoming multiple compiler types merely because
+it crossed a facade or was discovered at another source location.
+
+Native definitions retain the ABI-aware canonical name when ownership roles or
+other representation details affect the native contract. Structural identity
+selects the specialization; the ABI-aware name and signature validate the
+emitted representation. Object and executable emission therefore consume the
+same resolved identity and cannot silently merge incompatible layouts.
+
 The closure walk includes nested blocks, conditional expressions, indexed
 places, method/performance calls, aggregate return dependencies, and external
 bridge declarations. Built-in constructors and runtime intrinsics are not

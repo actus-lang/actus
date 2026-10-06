@@ -302,16 +302,30 @@ mistaken for a generic identity failure.
 
 ### Gate 35.7 — Tooling, diagnostics, and documentation
 
-- [ ] Keep formatter and LSP type display based on the same canonical identity
+- [x] Keep formatter and LSP type display based on the same canonical identity
       used by native emission.
-- [ ] Add a deterministic diagnostic for genuine generic identity or ABI
+- [x] Add a deterministic diagnostic for genuine generic identity or ABI
       incompatibility.
-- [ ] Prevent the diagnostic renderer from collapsing distinct internal types
+- [x] Prevent the diagnostic renderer from collapsing distinct internal types
       into misleading identical display names without identity context.
-- [ ] Update the language guide with the canonical generic identity contract.
-- [ ] Update the relevant architecture documentation and acceptance report.
-- [ ] Add a migration note if any internal cache key or native symbol naming
+- [x] Update the language guide with the canonical generic identity contract.
+- [x] Update the relevant architecture documentation and acceptance report.
+- [x] Add a migration note if any internal cache key or native symbol naming
       changes.
+
+#### Evidence — 2026-10-06
+
+- `docs/language/alpha-user-guide.md` now defines structural generic identity,
+  ordered arguments, and the separation between structural and ABI-aware names.
+- `docs/architecture/compiler-pipeline.md` records the shared identity contract
+  across semantic, facade, cache, layout, dependency, and native stages.
+- `docs/language/diagnostics.md` documents `E1110` as the deterministic native
+  symbol or ABI collision diagnostic and explains its namespace context.
+- `docs/decisions/ADR-0068-canonical-generic-type-identity.md` contains the
+  migration note for internal cache keys and native symbol planning.
+- `lsp_signature_help_exposes_generics_and_result_contract`, generic formatter
+  tests, and `rejects_incompatible_external_symbols_across_modules` pass.
+  Gate 35.7 is closed.
 
 ### Gate 35.8 — Full quality and compatibility gate
 

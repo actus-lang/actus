@@ -18,7 +18,7 @@ edition.
 | `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
 | `E1109` | Private module declaration or public-signature visibility violation |
-| `E1110` | Deterministic native symbol collision across module implementations |
+| `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |
 | `E1105` | Module source read failure or defensive module-source fallback |
 | `E1106` | Duplicate declaration aggregated across module sources |
@@ -34,6 +34,13 @@ edition.
 Diagnostics are represented independently from terminal rendering. Every
 diagnostic carries a source span, and the CLI renderer converts it to a
 deterministic line-and-column message.
+
+`E1110` is emitted when two module implementations claim one native symbol
+with incompatible ABI contracts, such as different ownership roles. The
+diagnostic includes the native symbol and both module namespaces. A generic
+type that renders with the same display text at two compiler boundaries is not
+reported as an ABI collision unless the resolved native contracts actually
+differ.
 
 New diagnostics must use a new stable code, include a focused positive or
 negative test, and document the code's category here. Strict-conformance codes

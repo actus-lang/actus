@@ -118,3 +118,12 @@ locations remain available for diagnostics and cache discovery without
 creating phantom types. Future const-generic or ABI identity extensions must
 extend the structured identity contract and its tests rather than introduce a
 second string-based identity scheme.
+
+## Migration note
+
+Compiler-internal generic cache keys now use `TypeIdentity` instead of a
+display or source-location-derived string. Native specialized definitions keep
+their ABI-aware canonical names, and external symbol bindings are scoped by
+module namespace. This changes internal cache and symbol-planning behavior
+only; Actus source syntax, public facade imports, ownership annotations,
+serialized formats, and native ABI contracts remain source-compatible.

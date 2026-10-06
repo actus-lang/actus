@@ -306,6 +306,24 @@ logical, equality, remainder, bitwise, and shift operators. Unsupported or
 experimental behavior must not be inferred from this list; consult the
 corresponding ADR and tests.
 
+### Generic type identity
+
+Actus treats a nominal generic application as one structural type identity
+defined by its declaration name and ordered type arguments. Source locations,
+facade paths, and display formatting do not create additional types. The same
+`Result[Int, IoError]` remains one type when it crosses a parent facade, a
+nested facade, or multiple call sites.
+
+Different ordered arguments remain different types. `Result[Int, IoError]`
+does not unify with `Result[u32, IoError]`, even when their rendered names are
+similar in diagnostics.
+
+Ownership roles remain part of the call and ABI contract. The compiler may use
+the structural identity `Option[PathComponent]` for semantic reuse while the
+native backend retains an ABI-aware name such as `Option[abs PathComponent]`.
+Source code continues to use ordinary generic syntax and explicit `erg`, `abs`,
+`dat`, and `ins` roles.
+
 ## 8. Accepted and rejected evidence
 
 Accepted native examples live under `examples/`. Positive and negative
