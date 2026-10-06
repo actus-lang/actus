@@ -30,6 +30,50 @@ impl TypeName {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{Role, TypeName};
+    use crate::lexer::SourceSpan;
+
+    fn type_name(name: &str, arguments: Vec<TypeName>, span: usize) -> TypeName {
+        TypeName {
+            name: name.to_owned(),
+            arguments,
+            reference_role: None,
+            span: SourceSpan::new(span, span + name.len()),
+        }
+    }
+
+    #[test]
+    fn canonical_key_excludes_source_span_and_reference_role() {
+        let mut first = type_name("Result", vec![type_name("Int", Vec::new(), 0)], 10);
+        let mut second = type_name("Result", vec![type_name("Int", Vec::new(), 200)], 500);
+        first.reference_role = Some(Role::Dat);
+        second.reference_role = Some(Role::Abs);
+
+        assert_eq!(first.canonical_key(), "Result[Int]");
+        assert_eq!(first.canonical_key(), second.canonical_key());
+    }
+
+    #[test]
+    fn canonical_key_preserves_ordered_generic_arguments() {
+        let first = type_name(
+            "Pair",
+            vec![type_name("Int", Vec::new(), 0), type_name("Bool", Vec::new(), 10)],
+            20,
+        );
+        let second = type_name(
+            "Pair",
+            vec![type_name("Bool", Vec::new(), 30), type_name("Int", Vec::new(), 40)],
+            50,
+        );
+
+        assert_eq!(first.canonical_key(), "Pair[Int,Bool]");
+        assert_eq!(second.canonical_key(), "Pair[Bool,Int]");
+        assert_ne!(first.canonical_key(), second.canonical_key());
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReturnAccess {
     Owned,
