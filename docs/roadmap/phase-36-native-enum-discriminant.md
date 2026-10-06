@@ -190,6 +190,46 @@ Gate 36.7 compiler evidence:
   `tests/aie_observation.act:121` (`ObservationSnapshot` passed where
   `Array[u8,20]` is expected). No workaround was added in either repository.
 
+### Gate 36.8 — Classify the downstream native trap before changing lowering
+
+This gate records the native failure first reported by Twin-e's hardware-neutral
+action routing. The initial assumption was an enum-valued `Result` lowering
+defect. A strict disposable Twin-e executable reproduced the failure, but the
+native backtrace and disassembly localized it to the application expression
+`observation_key(...) as u32` inside `observation_token_id`. The `u64` hash is
+not bounded to `u32`; Actus's checked cast intentionally emits `ud2` when the
+value does not fit. The compiler must not be changed to suppress that valid
+overflow trap.
+
+- [x] Reproduce the failure in a disposable Twin-e copy without modifying
+      either repository.
+- [x] Confirm strict native build and zero-float verification before execution.
+- [x] Capture the native result: exit status `132` (`SIGILL`) and backtrace in
+      `verb_observation_token_id`/`verb_observation_key`.
+- [x] Inspect the generated instruction and identify the checked `u64` to
+      `u32` narrowing guard immediately before `ud2`.
+- [x] Rule out a compiler enum-discriminant defect with direct
+      `Result[Enum, Enum]`, nested-facade, and enum-field compiler fixtures.
+- [x] Record that no Actus compiler implementation change is justified by this
+      reproduction; the required fix belongs to Twin-e's token identity design.
+- [ ] Update Twin-e so observation token identity remains bounded without an
+      unchecked cast, then rerun its strict action-routing tests.
+- [ ] Reinstall this compiler only after the downstream fix and record the
+      compiler digest and complete validation results.
+
+Gate 36.8 evidence:
+
+- Disposable Twin-e direct mapping probe: exit `41`.
+- Disposable Twin-e ActionEvent validation probe: exit `2`.
+- Disposable Twin-e full route probe: strict build passed with zero-float
+  verification, then exited `132`.
+- GDB backtrace stopped in `verb_observation_token_id` after calling
+  `verb_observation_key`.
+- Object disassembly showed the checked narrowing branch and `ud2`; the hash
+  value was not a valid `u32`.
+- Compiler-only enum and nested-facade fixtures passed, so no compiler source
+  change was made for this report.
+
 ## Definition of done
 
 Phase 36.6 is complete: the new nested `Result` reproducer and the existing
