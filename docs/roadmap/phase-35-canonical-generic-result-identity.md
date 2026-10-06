@@ -89,7 +89,7 @@ mistaken for a generic identity failure.
   separate producer/flush/save modules, `dat` result deconstruction, and a
   mutable state parameter passes strict semantic checking and reaches native
   emission without an earlier semantic diagnostic.
-- The Actus application test baseline passes: 23 tests, 0 failures.
+- The Actus application test baseline passes: 24 tests, 0 failures.
 
 ### Gate 35.1 — Reproduce and localize the identity split
 
