@@ -89,13 +89,13 @@ mistaken for a generic identity failure.
   separate producer/flush/save modules, `dat` result deconstruction, and a
   mutable state parameter passes strict semantic checking and reaches native
   emission without an earlier semantic diagnostic.
-- The Actus application test baseline passes: 24 tests, 0 failures.
+- The Actus application test baseline passes: 25 tests, 0 failures.
 
 ### Gate 35.1 — Reproduce and localize the identity split
 
 - [ ] Add a minimal generic `Result[T, E]` source fixture that passes semantic
       checking and fails native emission with the identical-name mismatch.
-- [ ] Add the same fixture through one nested public facade and through a
+- [x] Add the same fixture through one nested public facade and through a
       direct module import for comparison.
 - [ ] Record the compiler revision, command, complete diagnostic, and source
       span for each failure.
@@ -109,6 +109,10 @@ mistaken for a generic identity failure.
 - The corrected compiler-only fixture
   `generic_result_nested_facade_baseline_builds_natively` passes strict
   checking and native executable emission.
+- The same fixture also passes through
+  `generic_result_direct_child_facade_baseline_builds_natively`, using the
+  direct `feature::runtime` public facade path. Both paths produce native
+  executables with the same `Result[Int,IoError]` contract.
 - An earlier draft produced `E1026` because a value-producing `case` block
   ended with `Ok(bytes);` instead of `return Ok(bytes);`. The diagnostic span
   identified a fixture contract error, so that draft is not accepted as a

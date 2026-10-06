@@ -153,10 +153,10 @@ fn module_application_executes_public_wrapper_with_private_implementation() {
     fs::remove_dir_all(root).expect("remove module project");
 }
 
-#[test]
-fn generic_result_nested_facade_baseline_builds_natively() {
-    let source = "import feature; verb main() -> Int { return 0; }\n";
-    let (root, input, output) = project("generic-result-baseline", source);
+fn generic_result_facade_project(import_path: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let source = format!("import {import_path}; verb main() -> Int {{ return 0; }}\n");
+    let name = format!("generic-result-{}", import_path.replace("::", "-"));
+    let (root, input, output) = project(&name, &source);
     fs::write(
         root.join("Actus.toml"),
         "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\n",
@@ -183,8 +183,21 @@ fn generic_result_nested_facade_baseline_builds_natively() {
     )
     .expect("write result forwarder");
 
+    (root, input, output)
+}
+
+#[test]
+fn generic_result_nested_facade_baseline_builds_natively() {
+    let (root, input, output) = generic_result_facade_project("feature");
     build(&root, &input, &output);
     fs::remove_dir_all(root).expect("remove generic result baseline project");
+}
+
+#[test]
+fn generic_result_direct_child_facade_baseline_builds_natively() {
+    let (root, input, output) = generic_result_facade_project("feature::runtime");
+    build(&root, &input, &output);
+    fs::remove_dir_all(root).expect("remove generic result direct facade project");
 }
 
 #[test]
