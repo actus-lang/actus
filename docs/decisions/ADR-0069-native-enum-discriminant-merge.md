@@ -46,6 +46,13 @@ isolation while still allowing branch-local state needed to produce the case
 result. Statement-level case expressions use the mutable statement local map,
 so assignments made in a case block are represented by the merge parameters.
 
+The native lowering context now distinguishes statement cases from
+value-producing case expressions. Statement cases do not require a final value,
+while expression cases preserve the final expression as the branch result.
+Nested short-circuit expressions retain the enclosing loop targets, and cleanup
+plan lookup tolerates the compiler's normalized one-byte source-span boundary
+without weakening ownership or return matching.
+
 Semantic Result-return validation now accepts either the final expression or an
 explicit returned expression in a case block. Native case typing and lowering
 use the final expression statement as the branch value without relying on
@@ -100,8 +107,12 @@ behavior for invalid enum states.
 - The focused `result_case_block_tail_preserves_native_identity` regression
   passed.
 - The Actus application suite passed with 33 tests.
-- Twin-e `actus test --strict` passed with 27 tests using the rebuilt compiler.
-- The full Actus suite still has one unrelated pre-existing failure in
-  `arrays_cli::preserves_nested_case_loop_control_after_short_circuit_evaluation`:
-  `break has no native loop target`. Phase 36.6 remains open until that
-  failure is explained and the full compiler suite is green.
+- The nested short-circuit loop regression passed after loop targets were
+  propagated through recursive operation lowering.
+- The generic standard-I/O regression passed after statement and
+  value-producing case lowering were separated.
+- The full Actus suite passed, including 33 application tests, 101 array/native
+  tests, 24 source-limit tests, and 25 standard-I/O tests.
+- The fixed compiler was installed and Twin-e `actus test --strict` passed with
+  27 tests; a strict Twin-e executable also passed native zero-float
+  verification.

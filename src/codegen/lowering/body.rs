@@ -61,41 +61,34 @@ pub(crate) fn lower_case_block<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     targets: Option<super::LoopTargets>,
+    value_producing: bool,
 ) -> Result<CaseBlockState<'source>, NativeEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
-    let (prefix, tail) = match block.statements.split_last() {
-        Some((Stmt::Expression { expression, .. }, prefix)) => (prefix, Some(expression)),
-        _ => (block.statements.as_slice(), None),
-    };
+    let (prefix, tail) = case_block_parts(block, value_producing);
     let flow = super::statements::lower_statements(
         function,
         prefix,
         &mut branch_locals,
         &mut branch_types,
         functions,
-        targets,
+        targets.clone(),
         cleanup_schedule,
         string_data,
         layouts,
     )?;
-    let tail_value = if matches!(flow, Flow::Fallthrough) {
-        match tail {
-            Some(expression) => Some(super::super::expressions::lower_expression(
-                function,
-                expression,
-                &branch_locals,
-                &branch_types,
-                functions,
-                cleanup_schedule,
-                string_data,
-                layouts,
-            )?),
-            None => None,
-        }
-    } else {
-        None
-    };
+    let tail_value = lower_case_tail(
+        function,
+        flow,
+        tail,
+        &branch_locals,
+        &branch_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+        targets,
+    )?;
     let flow = finish_case_block(
         function,
         flow,
@@ -107,6 +100,51 @@ pub(crate) fn lower_case_block<'source>(
         layouts,
     )?;
     Ok((flow, branch_locals, branch_types, tail_value))
+}
+
+fn case_block_parts(
+    block: &crate::ast::Block,
+    value_producing: bool,
+) -> (&[Stmt], Option<&crate::ast::Expr>) {
+    if !value_producing {
+        return (block.statements.as_slice(), None);
+    }
+    match block.statements.split_last() {
+        Some((Stmt::Expression { expression, .. }, prefix)) => (prefix, Some(expression)),
+        _ => (block.statements.as_slice(), None),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_case_tail(
+    function: &mut FunctionBuilder<'_>,
+    flow: Flow,
+    tail: Option<&crate::ast::Expr>,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &NativeCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+    targets: Option<super::LoopTargets>,
+) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+    if !matches!(flow, Flow::Fallthrough) {
+        return Ok(None);
+    }
+    tail.map(|expression| {
+        super::super::expressions::lower_expression_with_targets(
+            function,
+            expression,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+            targets,
+        )
+    })
+    .transpose()
 }
 
 #[allow(clippy::too_many_arguments)]

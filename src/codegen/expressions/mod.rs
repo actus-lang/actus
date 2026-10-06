@@ -238,5 +238,6 @@ fn lower_case_expression(
         context.string_data,
         context.layouts,
         context.loop_targets.clone(),
+        true,
     )
 }

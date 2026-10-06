@@ -131,26 +131,30 @@ layout and ABI.
       for a valid nested `Option`/`Result` chain.
 - [x] Verify that the fix preserves discriminant width, payload address,
       ownership cleanup, and the existing invalid-discriminant trap path.
-- [ ] Run the full compiler quality suite and the Twin-e strict regression
+- [x] Run the full compiler quality suite and the Twin-e strict regression
       suite with the repaired compiler.
 - [x] Update ADR-0069 and this roadmap with exact commands, diagnostics, and
-      current commit evidence. Keep the gate open until the unrelated full
-      compiler suite failure is explained and repaired.
+      current commit evidence.
 
 Current evidence:
 
 - Compiler `cargo check --all-targets --all-features`: passed.
 - Compiler application suite: 33 passed.
 - Twin-e strict suite with rebuilt compiler: 27 passed.
-- Full Actus suite: one failure remains in
-  `arrays_cli::preserves_nested_case_loop_control_after_short_circuit_evaluation`
-  with `break has no native loop target`; this is tracked separately and is not
-  claimed as resolved by Gate 36.6.
+- Full Actus suite: passed across all targets and features.
+- Clippy with `-D warnings`: passed.
+- Source-limit script and `git diff --check`: passed.
+- Installed compiler strict Twin-e executable: passed with no floating-point
+  instructions in generated native IR.
+- The loop-target failure was repaired by preserving loop targets through
+  nested short-circuit operation lowering and case branch tails.
+- Generic statement cases and value-producing case expressions now use
+  separate type and lowering paths, so ordinary statement branches do not
+  require a value.
 
 ## Definition of done
 
-Phase 36.6 is complete when the new nested `Result` reproducer and the
-existing generic fixtures execute natively with one stable enum identity,
-all required compiler checks pass, the invalid-state path remains fail-closed,
-and the implementation and evidence are documented in a focused reviewable
-set of commits.
+Phase 36.6 is complete: the new nested `Result` reproducer and the existing
+generic fixtures execute natively with one stable enum identity, all required
+compiler checks pass, the invalid-state path remains fail-closed, and the
+implementation and evidence are documented in focused reviewable commits.

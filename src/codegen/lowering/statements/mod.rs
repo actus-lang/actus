@@ -170,6 +170,7 @@ fn lower_plain_expression_statement(
             string_data,
             layouts,
             targets,
+            false,
         )?;
         return Ok(Flow::Fallthrough);
     }

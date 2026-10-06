@@ -24,6 +24,7 @@ pub(super) fn emit_case_branches(
     merge: cranelift_codegen::ir::Block,
     bindings: &[&String],
     context: &CaseLoweringContext<'_, '_>,
+    value_producing: bool,
 ) -> Result<(), NativeEmitError> {
     let next_blocks =
         (0..branches.len().saturating_sub(1)).map(|_| function.create_block()).collect::<Vec<_>>();
@@ -38,6 +39,7 @@ pub(super) fn emit_case_branches(
             subject_type,
             result_type,
             context,
+            value_producing,
             bindings,
         )?;
         if following != merge {
@@ -58,6 +60,7 @@ fn emit_case_branch(
     subject_type: NativeType,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, '_>,
+    value_producing: bool,
     bindings: &[&String],
 ) -> Result<(), NativeEmitError> {
     let matched = function.create_block();
@@ -74,6 +77,7 @@ fn emit_case_branch(
         merge,
         result_type,
         context,
+        value_producing,
     )?;
     finish_case_branch(function, branch_value, branch, matched, merge, bindings, context);
     Ok(())
@@ -137,6 +141,7 @@ fn lower_case_branch<'a>(
     merge: cranelift_codegen::ir::Block,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
 ) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let branch_locals = bind_branch_payload(function, subject, subject_type, branch, context)?;
     if let Some(guard) = &branch.guard {
@@ -149,9 +154,10 @@ fn lower_case_branch<'a>(
             merge,
             result_type,
             context,
+            value_producing,
         );
     }
-    lower_case_body(function, branch, &branch_locals, result_type, context)
+    lower_case_body(function, branch, &branch_locals, result_type, context, value_producing)
 }
 
 fn bind_branch_payload<'a>(
@@ -183,6 +189,7 @@ fn lower_guarded_case_branch<'a>(
     merge: cranelift_codegen::ir::Block,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
 ) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let guard_block = function
         .current_block()
@@ -201,7 +208,8 @@ fn lower_guarded_case_branch<'a>(
     emit_guard_branch(function, condition, body, following, merge)?;
     function.seal_block(guard_block);
     function.switch_to_block(body);
-    let branch_value = lower_case_body(function, branch, branch_locals, result_type, context)?;
+    let branch_value =
+        lower_case_body(function, branch, branch_locals, result_type, context, value_producing)?;
     function.seal_block(body);
     Ok(branch_value)
 }
@@ -238,15 +246,22 @@ fn lower_case_body<'a>(
     branch_locals: &BranchLocals<'a>,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
 ) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let branch_value = match &branch.body {
         CaseBody::Expression(expression) => Some((
             lower_case_expression(function, expression, branch_locals, context)?,
             branch_locals.clone(),
         )),
-        CaseBody::Block(block) => {
-            lower_case_block_body(function, block, branch, branch_locals, result_type, context)?
-        }
+        CaseBody::Block(block) => lower_case_block_body(
+            function,
+            block,
+            branch,
+            branch_locals,
+            result_type,
+            context,
+            value_producing,
+        )?,
     };
     Ok(branch_value)
 }
@@ -276,6 +291,7 @@ fn lower_case_block_body<'a>(
     branch_locals: &BranchLocals<'a>,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
 ) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let (flow, locals, types, tail_value) = lower_case_block(
         function,
@@ -288,6 +304,7 @@ fn lower_case_block_body<'a>(
         context.string_data,
         context.layouts,
         context.loop_targets.clone(),
+        value_producing,
     )?;
     finish_case_flow(function, flow, tail_value, result_type)
         .map(|value| value.map(|value| (value, (locals, types))))

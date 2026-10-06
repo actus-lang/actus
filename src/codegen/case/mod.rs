@@ -32,6 +32,7 @@ pub(super) fn lower_case(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     loop_targets: Option<super::lowering::LoopTargets>,
+    value_producing: bool,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let context = case_context(
         locals,
@@ -59,7 +60,8 @@ pub(super) fn lower_case(
         function.append_block_param(merge, layouts.ir_type(ty)?);
     }
     let subject_type = initializer_type(subject, local_types, functions, layouts)?;
-    let result_type = branch_type(branches, subject_type, local_types, functions, layouts)?;
+    let result_type =
+        branch_type(branches, subject_type, local_types, functions, layouts, value_producing)?;
     function.append_block_param(merge, layouts.ir_type(result_type)?);
     branches::emit_case_branches(
         function,
@@ -70,6 +72,7 @@ pub(super) fn lower_case(
         merge,
         &bindings,
         &context,
+        value_producing,
     )?;
     finish_case_merge(function, merge, locals, &bindings);
     Ok(*function.block_params(merge).last().expect("case merge result"))
