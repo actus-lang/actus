@@ -68,6 +68,27 @@ A different generic argument list remains a different type. For example,
 
 ## Gates
 
+### Production implementation policy
+
+The implementation must establish one compiler-owned identity contract before
+any semantic, facade, cache, or native lowering change is accepted.
+
+- [ ] Define one structured `TypeIdentity` representation for nominal generic
+      types, ordered type arguments, const arguments, ABI details, and layout
+      details.
+- [ ] Route semantic analysis, facade export propagation, generic caching,
+      specialization, dependency planning, and native lowering through that
+      representation.
+- [ ] Keep source spans, facade paths, call-site locations, display strings,
+      and diagnostics metadata outside structural identity.
+- [ ] Add permanent test-only identity snapshots and invariant assertions at
+      each pipeline boundary. Do not add unconditional debug printing or an
+      environment-only production behavior.
+- [ ] Preserve public visibility, ownership roles, native ABI, symbol
+      stability, and serialized compatibility while changing identity logic.
+- [ ] Do not close a gate with duplicated application code, source rewrites,
+      `meta limitless`, weakened validation, or a facade bypass.
+
 ### Gate 35.0 — Reproducer admission and compiler baseline
 
 This prerequisite prevents a consumer ownership or syntax error from being
