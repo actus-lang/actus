@@ -53,23 +53,6 @@ impl NativeSymbolBindings {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::NativeSymbolBindings;
-
-    #[test]
-    fn keeps_same_source_name_distinct_per_namespace() {
-        let bindings = NativeSymbolBindings::new([
-            ("actus_mod_left".to_owned(), "read__Int".to_owned(), "left_symbol".to_owned()),
-            ("actus_mod_right".to_owned(), "read__Int".to_owned(), "right_symbol".to_owned()),
-        ]);
-
-        assert_eq!(bindings.external_symbol("actus_mod_left", "read__Int"), "left_symbol");
-        assert_eq!(bindings.external_symbol("actus_mod_right", "read__Int"), "right_symbol");
-        assert_eq!(bindings.external_symbol("actus_root", "read__Int"), "read__Int");
-    }
-}
-
 pub(super) struct FunctionMeta {
     pub(super) id: FuncId,
     pub(super) parameter_names: Vec<String>,
@@ -236,4 +219,21 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
         bindings,
         generic_instances,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NativeSymbolBindings;
+
+    #[test]
+    fn keeps_same_source_name_distinct_per_namespace() {
+        let bindings = NativeSymbolBindings::new([
+            ("actus_mod_left".to_owned(), "read__Int".to_owned(), "left_symbol".to_owned()),
+            ("actus_mod_right".to_owned(), "read__Int".to_owned(), "right_symbol".to_owned()),
+        ]);
+
+        assert_eq!(bindings.external_symbol("actus_mod_left", "read__Int"), "left_symbol");
+        assert_eq!(bindings.external_symbol("actus_mod_right", "read__Int"), "right_symbol");
+        assert_eq!(bindings.external_symbol("actus_root", "read__Int"), "read__Int");
+    }
 }

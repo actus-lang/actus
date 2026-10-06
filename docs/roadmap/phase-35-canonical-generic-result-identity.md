@@ -1,6 +1,6 @@
 # Phase 35: Canonical Generic Result Identity in Native Emission
 
-**Status: Planned**
+**Status: Complete**
 
 ## Purpose
 
@@ -73,20 +73,20 @@ A different generic argument list remains a different type. For example,
 The implementation must establish one compiler-owned identity contract before
 any semantic, facade, cache, or native lowering change is accepted.
 
-- [ ] Define one structured `TypeIdentity` representation for nominal generic
+- [x] Define one structured `TypeIdentity` representation for nominal generic
       types, ordered type arguments, const arguments, ABI details, and layout
       details.
-- [ ] Route semantic analysis, facade export propagation, generic caching,
+- [x] Route semantic analysis, facade export propagation, generic caching,
       specialization, dependency planning, and native lowering through that
       representation.
-- [ ] Keep source spans, facade paths, call-site locations, display strings,
+- [x] Keep source spans, facade paths, call-site locations, display strings,
       and diagnostics metadata outside structural identity.
-- [ ] Add permanent test-only identity snapshots and invariant assertions at
+- [x] Add permanent test-only identity snapshots and invariant assertions at
       each pipeline boundary. Do not add unconditional debug printing or an
       environment-only production behavior.
-- [ ] Preserve public visibility, ownership roles, native ABI, symbol
+- [x] Preserve public visibility, ownership roles, native ABI, symbol
       stability, and serialized compatibility while changing identity logic.
-- [ ] Do not close a gate with duplicated application code, source rewrites,
+- [x] Do not close a gate with duplicated application code, source rewrites,
       `meta limitless`, weakened validation, or a facade bypass.
 
 ### Gate 35.0 — Reproducer admission and compiler baseline
@@ -329,15 +329,35 @@ mistaken for a generic identity failure.
 
 ### Gate 35.8 — Full quality and compatibility gate
 
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo check --all-targets --all-features` passes.
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` passes.
-- [ ] `cargo test --all-targets --all-features` passes.
-- [ ] Existing generic call-site, nested-facade, ownership, and native tests
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo check --all-targets --all-features` passes.
+- [x] `cargo clippy --all-targets --all-features -- -D warnings` passes.
+- [x] `cargo test --all-targets --all-features` passes.
+- [x] Existing generic call-site, nested-facade, ownership, and native tests
       remain green.
-- [ ] No application-specific vocabulary or workaround enters compiler code.
-- [ ] The final acceptance report records known limits and unresolved follow-up
+- [x] No application-specific vocabulary or workaround enters compiler code.
+- [x] The final acceptance report records known limits and unresolved follow-up
       work.
+
+#### Evidence — 2026-10-06
+
+- Acceptance baseline revision: `655d442640cd8c836132f5b23032fe367d7e04fa`.
+- `cargo fmt --all -- --check` passed.
+- `cargo check --all-targets --all-features` passed.
+- `cargo clippy --all-targets --all-features -- -D warnings` passed after
+  moving the native module's test-only module below production declarations.
+  No lint suppression or production behavior change was added.
+- `cargo test --all-targets --all-features` passed: 71 unit tests, 26
+  application tests, 210 semantic tests, 101 array/native tests, and all
+  remaining integration suites completed with 0 failures.
+- The focused generic Result, nested-facade, ownership, native object, and
+  executable tests remain green within the full suite.
+- The repository guide also requests `cargo lock --check`, but the installed
+  Cargo reports `no such command: lock`. This environment limitation is
+  recorded explicitly; it is not treated as a passing lockfile check.
+- Known limits: this phase proves compiler identity consistency, native
+  emission, ownership behavior, and repository compatibility. It does not
+  prove hardware performance or large-scale application behavior.
 
 ## Evidence policy
 
