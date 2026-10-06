@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::{
-    BuiltinType, EnumDef, PackDecl, Program, StructDef, TopLevelDecl, TypeName,
+    BuiltinType, EnumDef, PackDecl, Program, StructDef, TopLevelDecl, TypeIdentity, TypeName,
     builtin_enum_definitions, lookup_builtin_type, primitive_type,
 };
 use crate::semantic::GenericInstance;
@@ -53,8 +53,8 @@ pub(crate) struct GenericLayoutRegistry {
     pub(super) enums: HashMap<String, EnumDef>,
     pub(super) packs: HashMap<String, PackDecl>,
     pub(super) pointer_size: u32,
-    struct_layouts: BTreeMap<String, GenericStructLayout>,
-    enum_layouts: BTreeMap<String, GenericEnumLayout>,
+    struct_layouts: BTreeMap<TypeIdentity, GenericStructLayout>,
+    enum_layouts: BTreeMap<TypeIdentity, GenericEnumLayout>,
 }
 
 impl GenericLayoutRegistry {
@@ -79,12 +79,12 @@ impl GenericLayoutRegistry {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn struct_layout(&self, key: &str) -> Option<&GenericStructLayout> {
+    pub(crate) fn struct_layout(&self, key: &TypeIdentity) -> Option<&GenericStructLayout> {
         self.struct_layouts.get(key)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn enum_layout(&self, key: &str) -> Option<&GenericEnumLayout> {
+    pub(crate) fn enum_layout(&self, key: &TypeIdentity) -> Option<&GenericEnumLayout> {
         self.enum_layouts.get(key)
     }
 
@@ -94,13 +94,13 @@ impl GenericLayoutRegistry {
                 NativeEmitError(format!("missing generic struct `{}`", instance.name))
             })?;
             let layout = self.layout_struct(&definition, &instance.arguments, &mut Vec::new())?;
-            self.struct_layouts.insert(layout.canonical_key.clone(), layout);
+            self.struct_layouts.insert(instance.identity(), layout);
         } else if self.enums.contains_key(&instance.name) {
             let definition = self.enums.get(&instance.name).cloned().ok_or_else(|| {
                 NativeEmitError(format!("missing generic enum `{}`", instance.name))
             })?;
             let layout = self.layout_enum(&definition, &instance.arguments, &mut Vec::new())?;
-            self.enum_layouts.insert(layout.canonical_key.clone(), layout);
+            self.enum_layouts.insert(instance.identity(), layout);
         }
         Ok(())
     }
@@ -248,9 +248,19 @@ pub(super) fn align_up(offset: u32, alignment: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::GenericLayoutRegistry;
+    use crate::ast::{TypeIdentity, TypeName};
     use crate::lexer::scan;
     use crate::parser::parse;
     use crate::semantic::analyze;
+
+    fn type_name(name: &str) -> TypeName {
+        TypeName {
+            name: name.to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: crate::lexer::SourceSpan::new(0, 0),
+        }
+    }
 
     #[test]
     fn calculates_substituted_struct_offsets() {
@@ -261,7 +271,8 @@ mod tests {
         let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
-        let layout = layouts.struct_layout("Box[Int]").expect("Box[Int] should be laid out");
+        let key = TypeIdentity::from_application("Box", &[type_name("Int")]);
+        let layout = layouts.struct_layout(&key).expect("Box[Int] should be laid out");
         assert_eq!(layout.size, 4);
         assert_eq!(layout.alignment, 4);
         assert_eq!(layout.fields[0].offset, 0);
@@ -278,8 +289,14 @@ mod tests {
         let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
-        let layout =
-            layouts.enum_layout("Result[Box[Int]]").expect("Result[Box[Int]] should be laid out");
+        let box_type = TypeName {
+            name: "Box".to_owned(),
+            arguments: vec![type_name("Int")],
+            reference_role: None,
+            span: crate::lexer::SourceSpan::new(0, 0),
+        };
+        let key = TypeIdentity::from_application("Result", &[box_type]);
+        let layout = layouts.enum_layout(&key).expect("Result[Box[Int]] should be laid out");
         assert_eq!(layout.payload_offset, 4);
         assert_eq!(layout.max_payload_size, 4);
         assert_eq!(layout.size, 8);
@@ -296,7 +313,8 @@ mod tests {
         let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
-        let layout = layouts.struct_layout("Fabric[8]").expect("Fabric[8] should be laid out");
+        let key = TypeIdentity::from_application("Fabric", &[type_name("8")]);
+        let layout = layouts.struct_layout(&key).expect("Fabric[8] should be laid out");
         assert_eq!(layout.size, 8);
         assert_eq!(layout.fields[0].size, 8);
     }
@@ -311,7 +329,8 @@ mod tests {
         let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic pack-array layout should pass");
-        let layout = layouts.struct_layout("Fabric[2]").expect("Fabric[2] should be laid out");
+        let key = TypeIdentity::from_application("Fabric", &[type_name("2")]);
+        let layout = layouts.struct_layout(&key).expect("Fabric[2] should be laid out");
         assert_eq!(layout.size, 8);
         assert_eq!(layout.fields[0].size, 8);
     }
