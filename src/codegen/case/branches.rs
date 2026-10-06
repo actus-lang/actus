@@ -277,7 +277,7 @@ fn lower_case_block_body<'a>(
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
 ) -> Result<CaseBranchResult<'a>, NativeEmitError> {
-    let (flow, locals, types) = lower_case_block(
+    let (flow, locals, types, tail_value) = lower_case_block(
         function,
         block,
         branch.span,
@@ -289,13 +289,14 @@ fn lower_case_block_body<'a>(
         context.layouts,
         context.loop_targets.clone(),
     )?;
-    finish_case_flow(function, flow, result_type)
+    finish_case_flow(function, flow, tail_value, result_type)
         .map(|value| value.map(|value| (value, (locals, types))))
 }
 
 fn finish_case_flow(
     function: &mut FunctionBuilder<'_>,
     flow: Flow,
+    tail_value: Option<cranelift_codegen::ir::Value>,
     result_type: NativeType,
 ) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
     match flow {
@@ -303,6 +304,7 @@ fn finish_case_flow(
             function.ins().return_(&[value]);
             Ok(None)
         }
+        Flow::Fallthrough if let Some(value) = tail_value => Ok(Some(value)),
         Flow::Fallthrough if matches!(result_type, NativeType::Void) => {
             Ok(Some(function.ins().iconst(types::I8, 0)))
         }

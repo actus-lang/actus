@@ -15,6 +15,7 @@ type CaseBlockState<'source> = (
     Flow,
     HashMap<&'source String, cranelift_codegen::ir::Value>,
     HashMap<&'source String, NativeType>,
+    Option<cranelift_codegen::ir::Value>,
 );
 
 #[allow(clippy::too_many_arguments)]
@@ -63,9 +64,13 @@ pub(crate) fn lower_case_block<'source>(
 ) -> Result<CaseBlockState<'source>, NativeEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
+    let (prefix, tail) = match block.statements.split_last() {
+        Some((Stmt::Expression { expression, .. }, prefix)) => (prefix, Some(expression)),
+        _ => (block.statements.as_slice(), None),
+    };
     let flow = super::statements::lower_statements(
         function,
-        &block.statements,
+        prefix,
         &mut branch_locals,
         &mut branch_types,
         functions,
@@ -74,7 +79,24 @@ pub(crate) fn lower_case_block<'source>(
         string_data,
         layouts,
     )?;
-    finish_case_block(
+    let tail_value = if matches!(flow, Flow::Fallthrough) {
+        match tail {
+            Some(expression) => Some(super::super::expressions::lower_expression(
+                function,
+                expression,
+                &branch_locals,
+                &branch_types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )?),
+            None => None,
+        }
+    } else {
+        None
+    };
+    let flow = finish_case_block(
         function,
         flow,
         cleanup_span,
@@ -83,8 +105,8 @@ pub(crate) fn lower_case_block<'source>(
         functions,
         cleanup_schedule,
         layouts,
-    )
-    .map(|flow| (flow, branch_locals, branch_types))
+    )?;
+    Ok((flow, branch_locals, branch_types, tail_value))
 }
 
 #[allow(clippy::too_many_arguments)]

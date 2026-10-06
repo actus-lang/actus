@@ -170,14 +170,13 @@ impl Analyzer {
                 self.expression_type_name(expression).as_deref() == Some(expected.as_str())
             }
             crate::ast::CaseBody::Block(block) => {
-                block.statements.iter().rev().find_map(|statement| {
-                    let crate::ast::Stmt::Return { value: Some(expression), .. } = statement else {
-                        return None;
-                    };
-                    Some(
-                        self.expression_type_name(expression).as_deref() == Some(expected.as_str()),
-                    )
-                }) == Some(true)
+                let Some(statement) = block.statements.last() else { return false };
+                let expression = match statement {
+                    crate::ast::Stmt::Expression { expression, .. }
+                    | crate::ast::Stmt::Return { value: Some(expression), .. } => expression,
+                    _ => return false,
+                };
+                self.expression_type_name(expression).as_deref() == Some(expected.as_str())
             }
         }
     }

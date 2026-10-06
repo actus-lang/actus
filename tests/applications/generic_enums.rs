@@ -336,6 +336,44 @@ verb main() -> Int {
 }
 
 #[test]
+fn result_case_block_tail_preserves_native_identity() {
+    let source = r#"
+struct TokenCode {
+    erg mask_low: u64,
+}
+
+enum Failure {
+    Invalid,
+}
+
+verb encode() -> Result[TokenCode, Failure] {
+    erg admission: Result[u64, Failure] = Result[u64, Failure].Ok(41u64);
+    return case dat admission {
+        Result.Err(error) => {
+            Result[TokenCode, Failure].Err(error);
+        },
+        Result.Ok(value) => {
+            Result[TokenCode, Failure].Ok(TokenCode { mask_low: value, });
+        },
+    };
+}
+
+verb main() -> Int {
+    erg result = encode();
+    return case dat result {
+        Result.Ok(code) => code.mask_low as Int,
+        Result.Err(_) => 0,
+    };
+}
+"#;
+    let (root, input, output) = project("result-case-block-tail", source);
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(41));
+    fs::remove_dir_all(root).expect("remove result case block tail project");
+}
+
+#[test]
 fn nested_facade_result_case_with_aggregate_payload_preserves_native_identity() {
     let source = "import feature; verb main() -> Int { return run(); }\n";
     let (root, input, output) = project("nested-facade-result-aggregate-case", source);

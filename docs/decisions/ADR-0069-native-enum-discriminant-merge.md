@@ -9,7 +9,8 @@ Accepted for implementation in Phase 36.
 Native `Option[T]` and `Result[T, E]` values are represented by compiler-owned
 heap objects with an explicit discriminant and payload storage. A `case`
 expression can inspect that discriminant and return a value. A `case` block can
-also assign to an outer binding before control reaches the next statement.
+also assign to an outer binding before control reaches the next statement, or
+produce its value as the final expression in the block.
 
 The native lowering previously cloned the local binding map for each case
 branch, but discarded those branch-local updates at the merge block. A branch
@@ -21,6 +22,15 @@ value was a valid `Some`, `Ok`, or `Err` state.
 
 This was reproduced with a compiler-only Actus fixture that uses no Twin-e
 module, persistence code, or filesystem API.
+
+The follow-up reproducer exposed a second failure at the semantic and native
+boundaries. A value-producing `case` branch written as a block was accepted by
+the language parser, but semantic return validation only recognized an explicit
+`return` statement. Native case typing and lowering also used a source-span
+heuristic that treated a semicolon as part of the statement span and therefore
+discarded the final expression. The same `Result[T, E]` type was then reported
+as both expected and found even though the branch had been classified as having
+no value.
 
 ## Decision
 
@@ -35,6 +45,12 @@ Case expression lowering uses a cloned local map. This preserves expression
 isolation while still allowing branch-local state needed to produce the case
 result. Statement-level case expressions use the mutable statement local map,
 so assignments made in a case block are represented by the merge parameters.
+
+Semantic Result-return validation now accepts either the final expression or an
+explicit returned expression in a case block. Native case typing and lowering
+use the final expression statement as the branch value without relying on
+source-span equality. The expression is lowered once after the preceding block
+statements, then passed through the existing case merge value.
 
 The enum representation, discriminant width, payload layout, ownership roles,
 return convention, and invalid-discriminant trap are unchanged. The change
@@ -57,6 +73,8 @@ only makes the existing control-flow state explicit at the merge boundary.
   block parameters for functions with many live locals.
 - The implementation must continue to use bounded source constructs and the
   established ownership cleanup schedule.
+- A value-producing block must have a final expression or an explicit return;
+  statements that do not produce a value remain fallthrough statements.
 - Any future change to enum representation or return ABI requires a separate
   ADR and ABI regression coverage.
 
@@ -75,3 +93,15 @@ compiler checks, aggregate payload coverage, nested facade coverage, and
 Twin-e retest are recorded in the Phase 36 roadmap evidence. Existing semantic
 exhaustiveness validation and native trap regressions preserve fail-closed
 behavior for invalid enum states.
+
+## Follow-up verification
+
+- `cargo check --all-targets --all-features` passed after the fix.
+- The focused `result_case_block_tail_preserves_native_identity` regression
+  passed.
+- The Actus application suite passed with 33 tests.
+- Twin-e `actus test --strict` passed with 27 tests using the rebuilt compiler.
+- The full Actus suite still has one unrelated pre-existing failure in
+  `arrays_cli::preserves_nested_case_loop_control_after_short_circuit_evaluation`:
+  `break has no native loop target`. Phase 36.6 remains open until that
+  failure is explained and the full compiler suite is green.

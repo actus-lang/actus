@@ -118,24 +118,34 @@ identity failure.
 
 This follow-up gate covers a valid native program that validates one
 `Result[u64, E]`, then returns `Result[Aggregate, E]` from a value-producing
-`case` branch. The source-level types are identical, but native lowering must
-also resolve one canonical enum layout identity and ABI for every branch.
+`case` branch. The source-level types are identical, and both semantic analysis
+and native lowering must preserve the branch value through the canonical enum
+layout and ABI.
 
-- [ ] Add a minimal compiler-only reproducer for the nested `Result` return
+- [x] Add a minimal compiler-only reproducer for the nested `Result` return
       mismatch with a non-primitive success payload.
-- [ ] Add a semantic/codegen diagnostic assertion that records the conflicting
-      native enum identities instead of printing identical type names.
-- [ ] Trace and repair canonical enum identity reuse across the `case` result
-      type, enum constructor, function return declaration, and nested generic
-      call site.
-- [ ] Add native executable regressions for both `Ok` and `Err` branches and
+- [x] Trace and repair semantic result validation and native case lowering for
+      final expressions in block branches; the original identical-type
+      diagnostic was caused by a branch value being classified as absent.
+- [x] Add native executable regressions for both `Ok` and `Err` branches and
       for a valid nested `Option`/`Result` chain.
-- [ ] Verify that the fix preserves discriminant width, payload address,
+- [x] Verify that the fix preserves discriminant width, payload address,
       ownership cleanup, and the existing invalid-discriminant trap path.
 - [ ] Run the full compiler quality suite and the Twin-e strict regression
       suite with the repaired compiler.
-- [ ] Update ADR-0069 and this roadmap with exact commands, diagnostics, and
-      commit evidence, then close Phase 36.6 only after all checks are green.
+- [x] Update ADR-0069 and this roadmap with exact commands, diagnostics, and
+      current commit evidence. Keep the gate open until the unrelated full
+      compiler suite failure is explained and repaired.
+
+Current evidence:
+
+- Compiler `cargo check --all-targets --all-features`: passed.
+- Compiler application suite: 33 passed.
+- Twin-e strict suite with rebuilt compiler: 27 passed.
+- Full Actus suite: one failure remains in
+  `arrays_cli::preserves_nested_case_loop_control_after_short_circuit_evaluation`
+  with `break has no native loop target`; this is tracked separately and is not
+  claimed as resolved by Gate 36.6.
 
 ## Definition of done
 
