@@ -28,9 +28,13 @@ pub struct TypeIdentity {
 
 impl TypeIdentity {
     pub fn from_type_name(type_name: &TypeName) -> Self {
+        Self::from_application(&type_name.name, &type_name.arguments)
+    }
+
+    pub fn from_application(name: &str, arguments: &[TypeName]) -> Self {
         Self {
-            name: type_name.name.clone(),
-            arguments: type_name.arguments.iter().map(Self::from_type_name).collect(),
+            name: name.to_owned(),
+            arguments: arguments.iter().map(Self::from_type_name).collect(),
         }
     }
 

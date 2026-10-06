@@ -135,14 +135,12 @@ fn append_generic_instances(
         .collect::<std::collections::HashSet<_>>();
     for addition in additions {
         let relevant = generic_declarations.contains(addition.name.as_str())
-            || local_instances
-                .iter()
-                .any(|instance| instance.canonical_key == addition.canonical_key);
+            || local_instances.iter().any(|instance| instance.identity() == addition.identity());
         if !relevant {
             continue;
         }
         if !target.iter().any(|instance| {
-            instance.canonical_key == addition.canonical_key && instance.caller == addition.caller
+            instance.identity() == addition.identity() && instance.caller == addition.caller
         }) {
             target.push(addition.clone());
         }

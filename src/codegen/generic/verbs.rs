@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeIdentity, TypeName, VerbDecl};
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
 use super::super::native::NativeEmitError;
@@ -177,14 +177,10 @@ fn append_specialized_nested_instance(
     if arguments.iter().any(|argument| contains_generic_parameter(argument, caller_parameters)) {
         return false;
     }
-    let canonical_key = format!(
-        "{}[{}]",
-        nested_template.name,
-        arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
-    );
+    let identity = TypeIdentity::from_application(&nested_template.name, &arguments);
+    let canonical_key = identity.key();
     if expanded.iter().any(|instance| {
-        instance.canonical_key == canonical_key
-            && instance.caller == Some(caller_instance.name.clone())
+        instance.identity() == identity && instance.caller == Some(caller_instance.name.clone())
     }) {
         return false;
     }
@@ -354,14 +350,8 @@ fn nested_call_bindings(
             .iter()
             .map(|argument| substitution.apply(argument))
             .collect::<Vec<_>>();
-        let canonical_key = format!(
-            "{}[{}]",
-            template.name,
-            arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
-        );
-        if let Some(concrete) =
-            instances.iter().find(|instance| instance.canonical_key == canonical_key)
-        {
+        let identity = TypeIdentity::from_application(&template.name, &arguments);
+        if let Some(concrete) = instances.iter().find(|instance| instance.identity() == identity) {
             bindings.insert(template.name.clone(), specialized_name(concrete));
         }
     }
