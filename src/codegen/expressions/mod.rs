@@ -226,11 +226,12 @@ fn lower_case_expression(
     branches: &[crate::ast::CaseBranch],
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
+    let mut locals = context.locals.clone();
     lower_case(
         function,
         subject,
         branches,
-        context.locals,
+        &mut locals,
         context.local_types,
         context.functions,
         context.cleanup_schedule,

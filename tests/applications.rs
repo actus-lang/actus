@@ -233,6 +233,161 @@ fn generic_result_facade_keeps_object_and_executable_identity_in_sync() {
 }
 
 #[test]
+fn nested_generic_option_and_result_returns_preserve_native_discriminants() {
+    let source = r#"
+struct Storage[N: Usize] {
+    erg value: u32,
+}
+
+enum Failure {
+    Failed,
+}
+
+verb make_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
+    return Option[u32].Some(storage.value);
+}
+
+verb forward_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
+    erg produced = make_option(storage: ins storage);
+    return case dat produced {
+        Option.Some(value) => Option[u32].Some(value),
+        Option.None => Option[u32].None,
+    };
+}
+
+verb make_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
+    if storage.value == 41u32 {
+        return Result[u32, Failure].Ok(storage.value);
+    }
+    return Result[u32, Failure].Err(Failure.Failed);
+}
+
+verb plain_option() -> Option[u32] {
+    return Option[u32].Some(41u32);
+}
+
+verb plain_result() -> Result[u32, Failure] {
+    return Result[u32, Failure].Ok(41u32);
+}
+
+verb forward_plain_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
+    erg produced = plain_option();
+    return case dat produced {
+        Option.Some(value) => Option[u32].Some(value + storage.value - 41u32),
+        Option.None => Option[u32].None,
+    };
+}
+
+verb forward_plain_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
+    erg produced = plain_result();
+    return case dat produced {
+        Result.Ok(value) => Result[u32, Failure].Ok(value + storage.value - 41u32),
+        Result.Err(error) => Result[u32, Failure].Err(error),
+    };
+}
+
+verb forward_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
+    erg produced = make_result(storage: ins storage);
+    return case dat produced {
+        Result.Ok(value) => Result[u32, Failure].Ok(value),
+        Result.Err(error) => Result[u32, Failure].Err(error),
+    };
+}
+
+verb main() -> Int {
+    erg storage: Storage[4] = Storage[4] { value: 41u32, };
+    erg option = forward_option(storage: ins storage);
+    erg option_value: u32 = case dat option {
+        Option.Some(value) => value,
+        Option.None => 0u32,
+    };
+    erg result = forward_result(storage: ins storage);
+    erg result_value: u32 = case dat result {
+        Result.Ok(value) => value,
+        Result.Err(_) => 0u32,
+    };
+    erg plain_option_result = forward_plain_option(storage: ins storage);
+    erg plain_option_value: u32 = case dat plain_option_result {
+        Option.Some(value) => value,
+        Option.None => 0u32,
+    };
+    erg plain_result_result = forward_plain_result(storage: ins storage);
+    erg plain_result_value: u32 = case dat plain_result_result {
+        Result.Ok(value) => value,
+        Result.Err(_) => 0u32,
+    };
+    return option_value as Int + result_value as Int + plain_option_value as Int + plain_result_value as Int;
+}
+"#;
+    let (root, input, output) = project("nested-generic-enum-discriminants", source);
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(164));
+    fs::remove_dir_all(root).expect("remove nested generic enum project");
+}
+
+#[test]
+fn nested_generic_option_result_chain_preserves_discriminants_natively() {
+    let source = r#"
+struct Storage {
+    erg value: u32,
+}
+
+struct Cache {
+    erg slot: u8,
+}
+
+enum Failure {
+    Failed,
+}
+
+verb reserve() -> Result[u8, Failure] {
+    return Result[u8, Failure].Ok(0u8);
+}
+
+verb create_column() -> Option[u32] {
+    return Option[u32].Some(7u32);
+}
+
+verb finish[N: Usize](ins storage: Storage, ins cache: Cache, erg slot: u8) -> Result[u32, Failure] {
+    erg created = create_column();
+    erg result: Result[u32, Failure] = Result[u32, Failure].Err(Failure.Failed);
+    case dat created {
+        Option.None => {},
+        Option.Some(index) => {
+            cache.slot = slot;
+            result = Result[u32, Failure].Ok(index + storage.value);
+        },
+    };
+    return result;
+}
+
+verb complete[N: Usize](ins storage: Storage, ins cache: Cache) -> Result[u32, Failure] {
+    erg prepared = reserve();
+    return case dat prepared {
+        Result.Err(error) => Result[u32, Failure].Err(error),
+        Result.Ok(slot) => finish[N](storage: ins storage, cache: ins cache, slot: erg slot),
+    };
+}
+
+verb main() -> Int {
+    erg storage: Storage = Storage { value: 41u32, };
+    erg cache: Cache = Cache { slot: 0u8, };
+    erg result = complete[4](storage: ins storage, cache: ins cache);
+    return case dat result {
+        Result.Ok(value) => value as Int,
+        Result.Err(_) => 0,
+    };
+}
+"#;
+    let (root, input, output) = project("nested-generic-option-result-chain", source);
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(48));
+    fs::remove_dir_all(root).expect("remove nested generic chain project");
+}
+
+#[test]
 fn package_configuration_module_emits_without_an_anchor_verb() {
     let source = "import config; verb main() -> Int { return LIMIT as Int; }\n";
     let (root, input, output) = project("const-only-config", source);

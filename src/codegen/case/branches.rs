@@ -12,7 +12,9 @@ use super::matching::match_pattern;
 use super::payload::{BranchLocals, bind_payload};
 
 const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
+type CaseBranchResult<'a> = Option<(cranelift_codegen::ir::Value, BranchLocals<'a>)>;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_case_branches(
     function: &mut FunctionBuilder<'_>,
     branches: &[crate::ast::CaseBranch],
@@ -20,6 +22,7 @@ pub(super) fn emit_case_branches(
     subject_type: NativeType,
     result_type: NativeType,
     merge: cranelift_codegen::ir::Block,
+    bindings: &[&String],
     context: &CaseLoweringContext<'_, '_>,
 ) -> Result<(), NativeEmitError> {
     let next_blocks =
@@ -35,6 +38,7 @@ pub(super) fn emit_case_branches(
             subject_type,
             result_type,
             context,
+            bindings,
         )?;
         if following != merge {
             function.switch_to_block(following);
@@ -54,6 +58,7 @@ fn emit_case_branch(
     subject_type: NativeType,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, '_>,
+    bindings: &[&String],
 ) -> Result<(), NativeEmitError> {
     let matched = function.create_block();
     let condition =
@@ -70,20 +75,36 @@ fn emit_case_branch(
         result_type,
         context,
     )?;
-    finish_case_branch(function, branch_value, branch, matched, merge);
+    finish_case_branch(function, branch_value, branch, matched, merge, bindings, context);
     Ok(())
 }
 
 fn finish_case_branch(
     function: &mut FunctionBuilder<'_>,
-    branch_value: Option<cranelift_codegen::ir::Value>,
+    branch_value: CaseBranchResult<'_>,
     branch: &crate::ast::CaseBranch,
     matched: cranelift_codegen::ir::Block,
     merge: cranelift_codegen::ir::Block,
+    bindings: &[&String],
+    context: &CaseLoweringContext<'_, '_>,
 ) {
-    if let Some(branch_value) = branch_value {
-        let argument = cranelift_codegen::ir::BlockArg::Value(branch_value);
-        function.ins().jump(merge, [&argument]);
+    if let Some((branch_value, branch_locals)) = branch_value {
+        let mut arguments = bindings
+            .iter()
+            .map(|binding| {
+                let branch_type = branch_locals.1.get(binding);
+                let outer_type = context.local_types.get(binding);
+                if branch_type == outer_type {
+                    branch_locals.0.get(binding).copied()
+                } else {
+                    context.locals.get(binding).copied()
+                }
+                .expect("case merge binding")
+            })
+            .map(cranelift_codegen::ir::BlockArg::Value)
+            .collect::<Vec<_>>();
+        arguments.push(cranelift_codegen::ir::BlockArg::Value(branch_value));
+        function.ins().jump(merge, &arguments);
     }
     if branch.guard.is_none() {
         function.seal_block(matched);
@@ -116,7 +137,7 @@ fn lower_case_branch<'a>(
     merge: cranelift_codegen::ir::Block,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let branch_locals = bind_branch_payload(function, subject, subject_type, branch, context)?;
     if let Some(guard) = &branch.guard {
         return lower_guarded_case_branch(
@@ -162,7 +183,7 @@ fn lower_guarded_case_branch<'a>(
     merge: cranelift_codegen::ir::Block,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let guard_block = function
         .current_block()
         .ok_or_else(|| NativeEmitError("guard lowering has no active block".to_owned()))?;
@@ -217,11 +238,12 @@ fn lower_case_body<'a>(
     branch_locals: &BranchLocals<'a>,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, NativeEmitError> {
     let branch_value = match &branch.body {
-        CaseBody::Expression(expression) => {
-            Some(lower_case_expression(function, expression, branch_locals, context)?)
-        }
+        CaseBody::Expression(expression) => Some((
+            lower_case_expression(function, expression, branch_locals, context)?,
+            branch_locals.clone(),
+        )),
         CaseBody::Block(block) => {
             lower_case_block_body(function, block, branch, branch_locals, result_type, context)?
         }
@@ -249,13 +271,13 @@ fn lower_case_expression<'a>(
 
 fn lower_case_block_body<'a>(
     function: &mut FunctionBuilder<'_>,
-    block: &crate::ast::Block,
+    block: &'a crate::ast::Block,
     branch: &'a crate::ast::CaseBranch,
     branch_locals: &BranchLocals<'a>,
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
-    let flow = lower_case_block(
+) -> Result<CaseBranchResult<'a>, NativeEmitError> {
+    let (flow, locals, types) = lower_case_block(
         function,
         block,
         branch.span,
@@ -268,6 +290,7 @@ fn lower_case_block_body<'a>(
         context.loop_targets.clone(),
     )?;
     finish_case_flow(function, flow, result_type)
+        .map(|value| value.map(|value| (value, (locals, types))))
 }
 
 fn finish_case_flow(

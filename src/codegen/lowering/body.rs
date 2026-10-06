@@ -11,6 +11,12 @@ use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
 
+type CaseBlockState<'source> = (
+    Flow,
+    HashMap<&'source String, cranelift_codegen::ir::Value>,
+    HashMap<&'source String, NativeType>,
+);
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_body(
     function: &mut FunctionBuilder<'_>,
@@ -54,7 +60,7 @@ pub(crate) fn lower_case_block<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     targets: Option<super::LoopTargets>,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<CaseBlockState<'source>, NativeEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
     let flow = super::statements::lower_statements(
@@ -78,6 +84,7 @@ pub(crate) fn lower_case_block<'source>(
         cleanup_schedule,
         layouts,
     )
+    .map(|flow| (flow, branch_locals, branch_types))
 }
 
 #[allow(clippy::too_many_arguments)]
