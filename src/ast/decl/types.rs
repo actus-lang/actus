@@ -16,23 +16,49 @@ pub struct TypeName {
     pub span: SourceSpan,
 }
 
+/// Structural identity for a nominal type application.
+///
+/// Source spans, ownership roles, facade paths, and call-site metadata are
+/// intentionally excluded from this value.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TypeIdentity {
+    name: String,
+    arguments: Vec<TypeIdentity>,
+}
+
+impl TypeIdentity {
+    pub fn from_type_name(type_name: &TypeName) -> Self {
+        Self {
+            name: type_name.name.clone(),
+            arguments: type_name.arguments.iter().map(Self::from_type_name).collect(),
+        }
+    }
+
+    pub fn key(&self) -> String {
+        if self.arguments.is_empty() {
+            return self.name.clone();
+        }
+        format!(
+            "{}[{}]",
+            self.name,
+            self.arguments.iter().map(Self::key).collect::<Vec<_>>().join(",")
+        )
+    }
+}
+
 impl TypeName {
     pub fn canonical_key(&self) -> String {
-        if self.arguments.is_empty() {
-            self.name.clone()
-        } else {
-            format!(
-                "{}[{}]",
-                self.name,
-                self.arguments.iter().map(Self::canonical_key).collect::<Vec<_>>().join(",")
-            )
-        }
+        self.identity().key()
+    }
+
+    pub fn identity(&self) -> TypeIdentity {
+        TypeIdentity::from_type_name(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Role, TypeName};
+    use super::{Role, TypeIdentity, TypeName};
     use crate::lexer::SourceSpan;
 
     fn type_name(name: &str, arguments: Vec<TypeName>, span: usize) -> TypeName {
@@ -71,6 +97,15 @@ mod tests {
         assert_eq!(first.canonical_key(), "Pair[Int,Bool]");
         assert_eq!(second.canonical_key(), "Pair[Bool,Int]");
         assert_ne!(first.canonical_key(), second.canonical_key());
+    }
+
+    #[test]
+    fn identity_is_a_structural_value_object() {
+        let type_name = type_name("Result", vec![type_name("Int", Vec::new(), 0)], 10);
+        let identity = TypeIdentity::from_type_name(&type_name);
+
+        assert_eq!(identity.key(), "Result[Int]");
+        assert_eq!(identity, type_name.identity());
     }
 }
 
