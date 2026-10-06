@@ -110,12 +110,37 @@ Twin-e-specific names or layouts.
   confirm that invalid enum states remain fail-closed while valid states use
   the merge path.
 
-Phase 36 acceptance gates are complete.
+The original Phase 36 acceptance gates are complete. Gate 36.6 is an active
+follow-up acceptance extension for a newly reproduced nested `Result` lowering
+identity failure.
+
+### Gate 36.6 — Nested `Result` identity through value-producing case branches
+
+This follow-up gate covers a valid native program that validates one
+`Result[u64, E]`, then returns `Result[Aggregate, E]` from a value-producing
+`case` branch. The source-level types are identical, but native lowering must
+also resolve one canonical enum layout identity and ABI for every branch.
+
+- [ ] Add a minimal compiler-only reproducer for the nested `Result` return
+      mismatch with a non-primitive success payload.
+- [ ] Add a semantic/codegen diagnostic assertion that records the conflicting
+      native enum identities instead of printing identical type names.
+- [ ] Trace and repair canonical enum identity reuse across the `case` result
+      type, enum constructor, function return declaration, and nested generic
+      call site.
+- [ ] Add native executable regressions for both `Ok` and `Err` branches and
+      for a valid nested `Option`/`Result` chain.
+- [ ] Verify that the fix preserves discriminant width, payload address,
+      ownership cleanup, and the existing invalid-discriminant trap path.
+- [ ] Run the full compiler quality suite and the Twin-e strict regression
+      suite with the repaired compiler.
+- [ ] Update ADR-0069 and this roadmap with exact commands, diagnostics, and
+      commit evidence, then close Phase 36.6 only after all checks are green.
 
 ## Definition of done
 
-Phase 36 is complete when the minimal generic fixtures and the Twin-e resident
-path both execute natively with stable `Option` and `Result` discriminants,
+Phase 36.6 is complete when the new nested `Result` reproducer and the
+existing generic fixtures execute natively with one stable enum identity,
 all required compiler checks pass, the invalid-state path remains fail-closed,
 and the implementation and evidence are documented in a focused reviewable
 set of commits.
