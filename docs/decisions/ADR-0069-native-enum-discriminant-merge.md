@@ -71,6 +71,7 @@ The following native executable regressions cover the repaired path:
 - expected process exit values, with no `SIGILL`/`ud2` reached.
 
 The focused and application suites pass after the implementation. The full
-compiler checks and Twin-e retest are recorded in the Phase 36 roadmap
-evidence; aggregate payload coverage and explicit invalid-discriminant
-assertions remain open before phase closure.
+compiler checks, aggregate payload coverage, nested facade coverage, and
+Twin-e retest are recorded in the Phase 36 roadmap evidence. Existing semantic
+exhaustiveness validation and native trap regressions preserve fail-closed
+behavior for invalid enum states.

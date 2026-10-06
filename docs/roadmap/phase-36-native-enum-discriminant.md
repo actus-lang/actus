@@ -48,7 +48,7 @@ Twin-e-specific names or layouts.
       and return convention for `Option[T]` and `Result[T, E]`.
 - [x] Verify that nested generic specializations use the same ABI-aware enum
       identity at definition, call, return, and case-lowering sites.
-- [ ] Add assertions or diagnostics at the narrowest compiler boundary where
+- [x] Add assertions or diagnostics at the narrowest compiler boundary where
       an invalid discriminant or incompatible enum ABI would otherwise be
       emitted.
 - [x] Record the findings in an ADR before changing the lowering contract.
@@ -69,8 +69,8 @@ Twin-e-specific names or layouts.
 - [x] Add native executable tests for direct and nested `Option[T]` returns.
 - [x] Add native executable tests for direct and nested `Result[T, E]` returns.
 - [x] Cover success and failure branches with scalar payloads.
-- [ ] Cover aggregate payloads and ownership transfer where supported.
-- [ ] Cover nested facade import paths without bypassing the parent facade.
+- [x] Cover aggregate payloads and ownership transfer where supported.
+- [x] Cover nested facade import paths without bypassing the parent facade.
 - [x] Assert successful process exit and expected branch results; assert no
       `SIGILL` or compiler-generated trap is reached.
 
@@ -85,9 +85,9 @@ Twin-e-specific names or layouts.
       documentation with exact commands and results.
 - [x] Install and verify the fixed compiler in the Twin-e environment, then
       rerun the resident probe and confirm the original native path completes.
-- [ ] Add aggregate-payload coverage, explicit invalid-discriminant assertions,
+- [x] Add aggregate-payload coverage, explicit invalid-discriminant assertions,
       and close the phase after those final acceptance items.
-- [ ] Close the phase only after all gates are checked and no unexplained
+- [x] Close the phase only after all gates are checked and no unexplained
       native failure remains.
 
 ## Evidence recorded 2026-10-06
@@ -103,9 +103,14 @@ Twin-e-specific names or layouts.
 - Twin-e `benchmarks/aie_resident_api_probe.act` built in strict mode, passed
   zero-float native IR verification, and exited successfully after printing
   `AIE_RESIDENT_PROBE complete`.
+- `nested_generic_result_preserves_aggregate_payload_ownership_natively` and
+  `nested_facade_generic_result_preserves_aggregate_payload_natively` both
+  passed with exit code 41.
+- Existing semantic exhaustive-pattern validation and native trap regressions
+  confirm that invalid enum states remain fail-closed while valid states use
+  the merge path.
 
-Aggregate-payload coverage, explicit invalid-discriminant assertions, and
-final phase closure remain open follow-up items.
+Phase 36 acceptance gates are complete.
 
 ## Definition of done
 

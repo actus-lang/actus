@@ -388,6 +388,61 @@ verb main() -> Int {
 }
 
 #[test]
+fn nested_generic_result_preserves_aggregate_payload_ownership_natively() {
+    let source = r#"
+struct Payload {
+    erg value: u32,
+}
+
+enum Failure {
+    Failed,
+}
+
+verb produce[N: Usize]() -> Result[Payload, Failure] {
+    return Result[Payload, Failure].Ok(Payload { value: 41u32, });
+}
+
+verb forward[N: Usize]() -> Result[Payload, Failure] {
+    erg result = produce[N]();
+    return case dat result {
+        Result.Ok(payload) => Result[Payload, Failure].Ok(payload),
+        Result.Err(error) => Result[Payload, Failure].Err(error),
+    };
+}
+
+verb main() -> Int {
+    erg result = forward[4]();
+    return case dat result {
+        Result.Ok(payload) => payload.value as Int,
+        Result.Err(_) => 0,
+    };
+}
+"#;
+    let (root, input, output) = project("nested-generic-aggregate-enum", source);
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(41));
+    fs::remove_dir_all(root).expect("remove nested aggregate enum project");
+}
+
+#[test]
+fn nested_facade_generic_result_preserves_aggregate_payload_natively() {
+    let source = "import feature; verb main() -> Int { erg result = forward[4](); return case dat result { Result.Ok(payload) => payload.value as Int, Result.Err(_) => 0, }; }\n";
+    let (root, input, output) = project("nested-facade-aggregate-enum", source);
+    fs::create_dir_all(root.join("src/feature")).expect("create feature facade");
+    fs::write(root.join("src/feature/feature.act"), "open api;\n").expect("write feature facade");
+    fs::write(
+        root.join("src/feature/api.act"),
+        "open struct Payload { erg value: u32, } open enum Failure { Failed, } open verb produce[N: Usize]() -> Result[Payload, Failure] { return Result[Payload, Failure].Ok(Payload { value: 41u32, }); } open verb forward[N: Usize]() -> Result[Payload, Failure] { erg result = produce[N](); return case dat result { Result.Ok(payload) => Result[Payload, Failure].Ok(payload), Result.Err(error) => Result[Payload, Failure].Err(error), }; }\n",
+    )
+    .expect("write nested facade implementation");
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(41));
+    fs::remove_dir_all(root).expect("remove nested facade aggregate project");
+}
+
+#[test]
 fn package_configuration_module_emits_without_an_anchor_verb() {
     let source = "import config; verb main() -> Int { return LIMIT as Int; }\n";
     let (root, input, output) = project("const-only-config", source);
