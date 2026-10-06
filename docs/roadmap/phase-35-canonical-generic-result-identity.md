@@ -180,6 +180,22 @@ mistaken for a generic identity failure.
 - [ ] Verify that native emission does not introduce duplicate symbols,
       duplicate enum layouts, or unsafe casts.
 
+#### Implementation note — 2026-10-06
+
+- Structural `TypeIdentity` selects and reuses generic instances across
+  semantic, cache, layout, specialization, and dependency boundaries.
+- ABI-aware canonical names remain the native definition names. They retain
+  ownership-role information such as `Option[abs PathComponent]`, because
+  native layout and ABI contracts must not collapse that information into the
+  role-free structural cache identity.
+- External native symbol bindings are scoped by module namespace and source
+  declaration. A unique-source fallback preserves compatibility for the
+  existing single-module import path without merging distinct declarations.
+- The focused direct and nested facade native tests pass, and the complete
+  applications suite passes with 25 tests and 0 failures. The gate remains
+  open until object-level identity assertions, duplicate-definition checks,
+  and the remaining acceptance evidence are complete.
+
 ### Gate 35.5 — Ownership, aggregate, and case-deconstruction coverage
 
 - [ ] Accept `case dat result` when the result is returned from a generic verb

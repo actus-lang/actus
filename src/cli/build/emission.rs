@@ -224,7 +224,7 @@ fn declared_symbols(
                 names.push(symbol);
             }
             crate::ast::TopLevelDecl::ExternalVerb(verb) => {
-                names.push(bindings.external_symbol(&verb.name).to_owned());
+                names.push(bindings.external_symbol(namespace, &verb.name).to_owned());
             }
             _ => {}
         }
@@ -245,7 +245,11 @@ fn module_bindings(
                 name,
             )
             .map_err(|error| NativeEmitError(error.to_string()))?;
-            bindings.push((name.clone(), identity.as_str().to_owned()));
+            bindings.push((
+                unit.namespace().symbol_prefix().to_owned(),
+                name.clone(),
+                identity.as_str().to_owned(),
+            ));
             for instance in generic_instances.iter().filter(|instance| instance.name == *name) {
                 let specialized_name = crate::codegen::specialized_generic_name(instance);
                 let specialized_identity = crate::codegen::SymbolIdentity::new(
@@ -254,7 +258,11 @@ fn module_bindings(
                     &specialized_name,
                 )
                 .map_err(|error| NativeEmitError(error.to_string()))?;
-                bindings.push((specialized_name, specialized_identity.as_str().to_owned()));
+                bindings.push((
+                    unit.namespace().symbol_prefix().to_owned(),
+                    specialized_name,
+                    specialized_identity.as_str().to_owned(),
+                ));
             }
         }
     }

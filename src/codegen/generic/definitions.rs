@@ -33,7 +33,7 @@ pub(in crate::codegen) fn specialized_structs(
             Ok(StructDef {
                 is_open: false,
                 doc: definition.doc.clone(),
-                name: instance.identity().key(),
+                name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
                 fields,
                 span: definition.span,
@@ -64,7 +64,7 @@ pub(in crate::codegen) fn specialized_enums(
             Ok(EnumDef {
                 is_open: false,
                 doc: definition.doc.clone(),
-                name: instance.identity().key(),
+                name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
                 variants,
                 span: definition.span,

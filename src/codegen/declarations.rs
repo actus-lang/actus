@@ -31,6 +31,7 @@ pub(super) fn declare_functions(
         module,
         external_verbs,
         context.layouts,
+        context.namespace_prefix,
         context.bindings,
         &mut metadata,
     )?;
@@ -67,13 +68,18 @@ fn declare_external_functions(
     module: &mut ObjectModule,
     verbs: &[&ExternalVerbDecl],
     layouts: &LayoutRegistry,
+    namespace_prefix: &str,
     bindings: &NativeSymbolBindings,
     metadata: &mut HashMap<String, FunctionMeta>,
 ) -> Result<(), NativeEmitError> {
     for verb in verbs {
         let signature = external_native_signature(module, verb, layouts)?;
         let id = module
-            .declare_function(bindings.external_symbol(&verb.name), Linkage::Import, &signature)
+            .declare_function(
+                bindings.external_symbol(namespace_prefix, &verb.name),
+                Linkage::Import,
+                &signature,
+            )
             .map_err(|error| NativeEmitError(error.to_string()))?;
         let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
         metadata.insert(verb.name.clone(), function_meta(id, &verb.params, return_type, layouts)?);
