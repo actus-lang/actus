@@ -247,14 +247,25 @@ mistaken for a generic identity failure.
 
 ### Gate 35.5 — Ownership, aggregate, and case-deconstruction coverage
 
-- [ ] Accept `case dat result` when the result is returned from a generic verb
+- [x] Accept `case dat result` when the result is returned from a generic verb
       through a nested facade.
-- [ ] Cover `Result.Ok` and `Result.Err` paths with owned aggregate payloads.
-- [ ] Cover borrowed and exclusive arguments that produce a generic result.
-- [ ] Reject use-after-move and invalid ownership roles after deconstruction.
-- [ ] Verify branch joins and cleanup remain deterministic for both variants.
-- [ ] Cover repeated call sites using one canonical specialization without
+- [x] Cover `Result.Ok` and `Result.Err` paths with owned aggregate payloads.
+- [x] Cover borrowed and exclusive arguments that produce a generic result.
+- [x] Reject use-after-move and invalid ownership roles after deconstruction.
+- [x] Verify branch joins and cleanup remain deterministic for both variants.
+- [x] Cover repeated call sites using one canonical specialization without
       losing source-specific rewrite spans.
+
+#### Evidence — 2026-10-06
+
+- The nested facade Result fixture exercises `case dat` through public
+  forwarding verbs with owned `Buffer` payloads and explicit ownership roles.
+- `lowers_owned_generic_result_cases_with_borrowed_and_exclusive_arguments`
+  covers `Result[Buffer, Failure]`, both constructors, owned payload cleanup,
+  `abs` and `ins` parameters, and two calls sharing the same specialization.
+- The semantic pattern-ownership suite covers use-after-move rejection,
+  invalid role access, branch joins, and deterministic cleanup for both case
+  variants. Gate 35.5 is closed.
 
 ### Gate 35.6 — Native and executable acceptance evidence
 

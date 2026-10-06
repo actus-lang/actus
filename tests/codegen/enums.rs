@@ -129,3 +129,14 @@ fn emits_deterministic_generic_result_objects() {
     assert_eq!(first, second);
     object::File::parse(first.as_slice()).expect("generic Result should emit a native object");
 }
+
+#[test]
+fn lowers_owned_generic_result_cases_with_borrowed_and_exclusive_arguments() {
+    let source = "enum Failure { Failed, } verb produce(erg ready: Bool) -> Result[Buffer, Failure] { if ready { return Result[Buffer, Failure].Ok(Buffer[4]); } return Result[Buffer, Failure].Err(Failure.Failed); } verb dispose(dat result: Result[Buffer, Failure]) -> Int { return case dat result { Result.Ok(payload) => { drop(payload); return 1; }, Result.Err(_) => { return 0; }, }; } verb consume(abs input: Buffer, ins state: Buffer, erg ready: Bool) -> Int { erg first = produce(ready: erg ready); erg second = produce(ready: erg ready); erg first_code = dispose(result: dat first); erg second_code = dispose(result: dat second); return buffer_length(buffer: abs input) + buffer_length(buffer: abs state) as Int + first_code + second_code; } verb main() -> Int { erg input = Buffer[4]; erg state = Buffer[4]; erg ready = true; return consume(input: abs input, state: ins state, ready: erg ready); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("owned generic Result program should parse");
+    let object =
+        emit_program_object(&program, "main").expect("owned generic Result cases should emit");
+    object::File::parse(object.as_slice()).expect("owned generic Result object should parse");
+}
