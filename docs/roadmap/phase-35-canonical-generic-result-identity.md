@@ -178,15 +178,27 @@ mistaken for a generic identity failure.
 
 ### Gate 35.3 — Repair semantic and facade propagation
 
-- [ ] Make nested facade export resolution reuse the canonical generic type
+- [x] Make nested facade export resolution reuse the canonical generic type
       identity rather than reconstructing a display-equivalent type.
-- [ ] Preserve private declarations and facade visibility rules.
-- [ ] Preserve explicit `erg`, `abs`, `dat`, and `ins` validation at every call
+- [x] Preserve private declarations and facade visibility rules.
+- [x] Preserve explicit `erg`, `abs`, `dat`, and `ins` validation at every call
       site.
-- [ ] Add accepted tests for direct and nested-facade generic return values.
-- [ ] Add rejected tests proving different generic arguments remain distinct.
-- [ ] Verify that generic cache entries cannot overwrite one another when the
+- [x] Add accepted tests for direct and nested-facade generic return values.
+- [x] Add rejected tests proving different generic arguments remain distinct.
+- [x] Verify that generic cache entries cannot overwrite one another when the
       same specialization is reached through different facade paths.
+
+#### Evidence — 2026-10-06
+
+- `generic_result_nested_facade_baseline_builds_natively` and
+  `generic_result_direct_child_facade_baseline_builds_natively` both pass.
+- `generics::rejects_different_generic_arguments_as_distinct_types` rejects
+  `Box[u32]` at a `Box[Int]` call boundary.
+- The facade and module visibility suite passes 27 tests with 0 failures,
+  including private declaration rejection and generic nested call resolution.
+- `generic_specializations_are_scoped_by_module_namespace` confirms that one
+  specialization reached through separate module namespaces cannot overwrite
+  the other namespace's native symbols.
 
 ### Gate 35.4 — Repair native dependency planning and lowering
 
