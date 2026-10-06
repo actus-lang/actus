@@ -202,16 +202,16 @@ mistaken for a generic identity failure.
 
 ### Gate 35.4 — Repair native dependency planning and lowering
 
-- [ ] Use the canonical generic identity as the native dependency key.
-- [ ] Ensure one generic specialization produces one stable native type and
+- [x] Use the canonical generic identity as the native dependency key.
+- [x] Ensure one generic specialization produces one stable native type and
       one compatible dependency node per ABI contract.
-- [ ] Preserve all transitive dependencies when the specialization is reached
+- [x] Preserve all transitive dependencies when the specialization is reached
       through a nested facade.
-- [ ] Make object emission and executable emission use the same resolved type
+- [x] Make object emission and executable emission use the same resolved type
       identity.
-- [ ] Add diagnostics for an actual ABI mismatch instead of reporting a false
+- [x] Add diagnostics for an actual ABI mismatch instead of reporting a false
       same-name return mismatch.
-- [ ] Verify that native emission does not introduce duplicate symbols,
+- [x] Verify that native emission does not introduce duplicate symbols,
       duplicate enum layouts, or unsafe casts.
 
 #### Implementation note — 2026-10-06
@@ -226,9 +226,24 @@ mistaken for a generic identity failure.
   declaration. A unique-source fallback preserves compatibility for the
   existing single-module import path without merging distinct declarations.
 - The focused direct and nested facade native tests pass, and the complete
-  applications suite passes with 25 tests and 0 failures. The gate remains
-  open until object-level identity assertions, duplicate-definition checks,
-  and the remaining acceptance evidence are complete.
+  applications suite passes with 25 tests and 0 failures. Object-level parity,
+  duplicate-definition, and ABI mismatch evidence is recorded below.
+
+#### Evidence — 2026-10-06
+
+- Generic Result object and executable emission now share one acceptance test:
+  `generic_result_facade_keeps_object_and_executable_identity_in_sync`.
+- Direct and nested facade dependency closure remains green through the
+  generic Result regressions and the nested generic module workflow tests.
+- `rejects_incompatible_external_symbols_across_modules` verifies the real
+  ABI mismatch path and its fail-closed `E1110` diagnostic for incompatible
+  ownership contracts. The compiler does not convert that failure into a
+  misleading same-name return-type mismatch.
+- `emits_each_reachable_generic_instance_once_in_its_namespace` and the
+  deterministic object symbol checks reject duplicate native definitions.
+- `TypeIdentity` remains the dependency/layout key while ABI-aware names are
+  retained for native definitions. No unsafe cast or duplicate enum layout
+  path was introduced. Gate 35.4 is closed.
 
 ### Gate 35.5 — Ownership, aggregate, and case-deconstruction coverage
 

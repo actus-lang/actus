@@ -154,9 +154,16 @@ fn module_application_executes_public_wrapper_with_private_implementation() {
 }
 
 fn generic_result_facade_project(import_path: &str) -> (PathBuf, PathBuf, PathBuf) {
-    let source = format!("import {import_path}; verb main() -> Int {{ return 0; }}\n");
     let name = format!("generic-result-{}", import_path.replace("::", "-"));
-    let (root, input, output) = project(&name, &source);
+    generic_result_facade_project_named(import_path, &name)
+}
+
+fn generic_result_facade_project_named(
+    import_path: &str,
+    name: &str,
+) -> (PathBuf, PathBuf, PathBuf) {
+    let source = format!("import {import_path}; verb main() -> Int {{ return 0; }}\n");
+    let (root, input, output) = project(name, &source);
     fs::write(
         root.join("Actus.toml"),
         "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\n",
@@ -198,6 +205,31 @@ fn generic_result_direct_child_facade_baseline_builds_natively() {
     let (root, input, output) = generic_result_facade_project("feature::runtime");
     build(&root, &input, &output);
     fs::remove_dir_all(root).expect("remove generic result direct facade project");
+}
+
+#[test]
+fn generic_result_facade_keeps_object_and_executable_identity_in_sync() {
+    let (root, input, output) =
+        generic_result_facade_project_named("feature", "generic-result-object-parity");
+    build(&root, &input, &output);
+
+    let object = output.with_extension("obj");
+    let object_build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build generic result object");
+    assert!(
+        object_build.status.success(),
+        "object build stderr: {}",
+        String::from_utf8_lossy(&object_build.stderr)
+    );
+    let bytes = fs::read(&object).expect("read generic result object");
+    object::File::parse(bytes.as_slice()).expect("generic result object should be valid");
+    assert!(output.is_file(), "executable build should remain available");
+
+    fs::remove_dir_all(root).expect("remove generic result parity project");
 }
 
 #[test]
