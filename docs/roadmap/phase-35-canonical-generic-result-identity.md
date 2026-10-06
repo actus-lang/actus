@@ -157,15 +157,24 @@ mistaken for a generic identity failure.
 
 ### Gate 35.2 — Define the canonical generic identity contract
 
-- [ ] Document the canonical key for nominal generic types, including the
+- [x] Document the canonical key for nominal generic types, including the
       declaration identity, ordered type arguments, const arguments, and
       relevant ABI or layout parameters.
-- [ ] Define which identity data is structural and which data is source-site
+- [x] Define which identity data is structural and which data is source-site
       metadata only.
-- [ ] Ensure source spans, facade paths, and call-site locations never create a
+- [x] Ensure source spans, facade paths, and call-site locations never create a
       second semantic type identity.
-- [ ] Define cache ownership and invalidation rules for generic instances.
-- [ ] Record the accepted design in an ADR under `docs/decisions/`.
+- [x] Define cache ownership and invalidation rules for generic instances.
+- [x] Record the accepted design in an ADR under `docs/decisions/`.
+
+#### Evidence — 2026-10-06
+
+- Accepted ADR: `docs/decisions/ADR-0068-canonical-generic-type-identity.md`.
+- Structural reuse is owned by `TypeIdentity`; ABI-aware native names retain
+  ownership-role information required by native representation.
+- Cache context, source spans, facade paths, and diagnostics remain outside
+  structural identity while still being available for discovery and reporting.
+- The specialization identity trace and the 25-test applications suite pass.
 
 ### Gate 35.3 — Repair semantic and facade propagation
 
