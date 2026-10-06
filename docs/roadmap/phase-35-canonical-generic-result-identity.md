@@ -114,20 +114,20 @@ mistaken for a generic identity failure.
 
 ### Gate 35.1 — Reproduce and localize the identity split
 
-- [ ] Add a minimal generic `Result[T, E]` source fixture that passes semantic
+- [x] Add a minimal generic `Result[T, E]` source fixture that passes semantic
       checking and fails native emission with the identical-name mismatch.
 - [x] Add the same fixture through one nested public facade and through a
       direct module import for comparison.
-- [ ] Record the compiler revision, command, complete diagnostic, and source
+- [x] Record the compiler revision, command, complete diagnostic, and source
       span for each failure.
-- [ ] Identify whether the split occurs during generic specialization, facade
+- [x] Identify whether the split occurs during generic specialization, facade
       export propagation, native dependency collection, or lowering.
-- [ ] Add an internal debug assertion or test-only identity trace that shows
+- [x] Add an internal debug assertion or test-only identity trace that shows
       the canonical type key at each pipeline boundary.
 
 #### Investigation note — 2026-10-06
 
-- The corrected compiler-only fixture
+- The corrected compiler test fixture
   `generic_result_nested_facade_baseline_builds_natively` passes strict
   checking and native executable emission.
 - The same fixture also passes through
@@ -138,9 +138,22 @@ mistaken for a generic identity failure.
   ended with `Ok(bytes);` instead of `return Ok(bytes);`. The diagnostic span
   identified a fixture contract error, so that draft is not accepted as a
   generic identity reproducer.
-- Gate 35.1 remains open. No generic identity implementation change is
-  accepted until a valid compiler-only reproducer fails and its canonical type
-  key is traced across the relevant pipeline boundaries.
+- A detached worktree at compiler revision `b09c65c` reproduced the historical
+  failure by restoring the pre-fix role-free native enum name. The command was
+  `cargo test --test applications
+  generic_result_nested_facade_baseline_builds_natively -- --nocapture`.
+  The complete diagnostic was `native backend cannot lower return type
+  Option`; the harness reported it at `tests/applications.rs:76` because the
+  backend diagnostic did not carry an Actus source span. Semantic checking had
+  already succeeded.
+- The split was localized to generic specialization/native lowering: the
+  structural key `Result[Item]` was incorrectly used as the native definition
+  name where the ABI-aware name `Result[abs Item]` was required. Facade export
+  propagation was not the source of the mismatch.
+- The permanent test-only trace
+  `specialization_trace_separates_structural_and_abi_identity` asserts both
+  identities at the specialization boundary. Together with the direct and
+  nested facade native regressions, Gate 35.1 is closed.
 
 ### Gate 35.2 — Define the canonical generic identity contract
 

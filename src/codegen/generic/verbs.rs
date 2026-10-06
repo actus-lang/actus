@@ -398,6 +398,7 @@ fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codegen::generic::definitions::specialized_enums;
 
     #[test]
     fn generic_specialization_preserves_structured_contracts() {
@@ -438,5 +439,33 @@ mod tests {
                 .map(|section| section.text.as_str()),
             Some("Preserve this description after specialization.")
         );
+    }
+
+    #[test]
+    fn specialization_trace_separates_structural_and_abi_identity() {
+        let source =
+            "enum Result[T] { Ok(T), Err(Int), } verb main(erg value: Result[abs Item]) { }";
+        let (tokens, errors) = crate::lexer::scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let program = crate::parser::parse(tokens).expect("generic result should parse");
+        let instance = GenericInstance {
+            name: "Result".to_owned(),
+            arguments: vec![TypeName {
+                name: "Item".to_owned(),
+                arguments: Vec::new(),
+                reference_role: Some(crate::ast::Role::Abs),
+                span: crate::lexer::SourceSpan::new(0, 4),
+            }],
+            canonical_key: "Result[abs Item]".to_owned(),
+            caller: None,
+            call_span: crate::lexer::SourceSpan::new(0, 4),
+        };
+
+        assert_eq!(instance.identity().key(), "Result[Item]");
+        assert_eq!(instance.canonical_key, "Result[abs Item]");
+
+        let specialized = specialized_enums(&program, &[instance]).expect("specialization");
+        let definition = specialized.first().expect("specialized enum");
+        assert_eq!(definition.name, "Result[abs Item]");
     }
 }
