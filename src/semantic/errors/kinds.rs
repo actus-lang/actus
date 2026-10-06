@@ -351,7 +351,7 @@ pub enum SemanticErrorKind {
         pack: String,
         field: String,
         offset: u16,
-        width: u8,
+        width: u16,
         capacity: u16,
     },
     PackFieldOverlap {

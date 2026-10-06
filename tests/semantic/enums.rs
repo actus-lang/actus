@@ -176,6 +176,19 @@ fn accepts_plain_scalar_case_without_ownership_annotation() {
 }
 
 #[test]
+fn accepts_case_subjects_on_aggregate_fields() {
+    analyze_source(
+        "enum State { Ready, Busy, } struct Slot { state: State, } verb inspect(erg slot: Slot) -> Int { return case slot.state { State.Ready => 1, State.Busy => 2, }; }",
+    )
+    .expect("case subjects may be enum fields of an aggregate");
+
+    analyze_source(
+        "enum State { Ready, Busy, } struct Slot { state: State, } verb inspect(erg slot: Slot) -> Int { return case abs slot.state { State.Ready => 1, State.Busy => 2, }; }",
+    )
+    .expect("abs case subjects may be enum fields of an aggregate");
+}
+
+#[test]
 fn rejects_duplicate_and_unreachable_patterns() {
     let duplicate = analyze_source(
         "enum Color { Red, Green, } verb choose(erg color: Color) -> Int { return case color { Color.Red => 1, Color.Red => 2, _ => 0, }; }",

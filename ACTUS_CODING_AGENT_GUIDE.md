@@ -1737,6 +1737,14 @@ reachable `inner[4]` instance before native declaration and lowering. This
 propagation is deterministic and deduplicated; do not add duplicate helper
 verbs or handwritten concrete wrappers.
 
+Each concrete generic call site remains part of the specialization record even
+when several call sites use the same canonical instance. The compiler may
+reuse one native specialization for those calls, but it must retain every
+source span needed to rewrite each call before native dependency collection.
+Consequently, two calls such as `read_capacity[4]()` in one native call graph
+must both lower to the specialized symbol. A generic-instance cache must not
+deduplicate distinct call sites solely by canonical type arguments and caller.
+
 Const generic parameters are also valid read-only compile-time values inside
 case guards. They may be used directly or through a cast and are resolved
 before native lowering:
@@ -1836,6 +1844,27 @@ joins, and diverging branches such as `return`, `break`, and `continue`.
 The left-hand place of a compound assignment is evaluated exactly once; native
 lowering follows address calculation, load, operation, and store through that
 same place.
+
+Case subjects may also be readable aggregate places, including a struct field
+or an indexed element:
+
+```act
+enum State { Ready, Busy, }
+struct Slot { state: State, }
+
+verb inspect(erg slot: Slot) -> Int {
+    return case slot.state {
+        State.Ready => 1,
+        State.Busy => 2,
+    };
+}
+```
+
+The semantic analyzer resolves the root binding of the place and applies the
+case borrow or ownership rule to that binding. `case abs` remains read-only,
+and `case dat` still requires an owned movable subject. A field or indexed
+place does not bypass borrow tracking or turn a temporary expression into an
+owner.
 
 #### Package-aware test execution
 
@@ -1982,6 +2011,47 @@ Array-backed packs provide:
   heap allocation;
 - native executable and object emission without a C serialization bridge.
 
+#### Indexed fields inside packed values
+
+A packed value may contain one bounded, fixed-width array field when the field
+is fully covered by the declared storage:
+
+```act
+pack Example {
+    erg storage: Array[u8, 32];
+    layout little;
+    fields {
+        erg links: Array[u32, 8] at 0;
+    }
+}
+```
+
+The array field occupies `element_width * count` bits beginning at its
+declared base offset. It is not a dynamic collection, slice, pointer, or
+separate allocation. The compiler records the element type, fixed count,
+total width, offset, and ownership role in semantic and LSP metadata.
+
+Use the ordinary checked indexing syntax for reads, writes, and compound
+updates:
+
+```act
+abs value: u32 = example.links[index];
+example.links[index] = next_value;
+example.links[index] += 1u32;
+```
+
+Constant indexes outside `[0, count)` are rejected during semantic analysis;
+runtime indexes use the normal checked bounds path. Immutable pack views
+cannot be mutated. Indexed fields compose with arrays of pack values, so
+`cells[slot].links[index]` remains an ordinary bounded place expression.
+
+Native indexed pack fields require byte-addressable storage, a byte-aligned
+base offset, and an element width that is a whole number of bytes. Little and
+big endian layouts use the declared byte order for element loads and stores.
+Unsupported representations fail with a compiler diagnostic rather than
+falling back to unchecked pointer arithmetic. Existing scalar bit-packed
+fields keep their masking and shifting lowering.
+
 For dynamic indexed byte loops, use a supported integer index such as `u32`:
 
 ```act
@@ -2049,6 +2119,14 @@ contain scalar literals, arithmetic, bitwise operations, comparisons, casts,
 grouping, and bounded scalar indexing. Calls, method calls, buffers,
 aggregates, resources, mutation, borrows, conditional expressions, and
 ownership transfers remain explicit source forms.
+
+Validated scalar constants are handled by the same normalization boundary when
+they are passed with an explicit `abs` role. The compiler materializes the
+constant as a hidden scalar `erg` local before native constant inlining, then
+passes that local as `abs`. This preserves the source ownership contract and
+prevents native preparation from turning `abs CONSTANT` into an invalid
+borrow of a literal (`E1016`). Constants are not generalized into runtime
+storage, and non-scalar or resource constants remain outside this rule.
 
 The generated form has the same native text as its equivalent explicit local,
 and its object relocations contain no allocation reference. A prior move or

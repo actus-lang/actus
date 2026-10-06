@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expr, TypeName};
+use crate::ast::{Expr, LayoutEndianness, TypeName};
 
 use super::super::layout::LayoutRegistry;
 use super::super::types::NativeType;
@@ -70,4 +70,20 @@ pub(crate) fn field_type(
             }),
         _ => None,
     }
+}
+
+pub(crate) fn indexed_pack_endianness(
+    expression: &Expr,
+    local_types: &HashMap<&String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Option<LayoutEndianness> {
+    let Expr::FieldAccess { object, field, .. } = expression else { return None };
+    let NativeType::Pack(id) = expression_native_type(object, local_types, layouts)? else {
+        return None;
+    };
+    let pack = layouts.pack(id)?;
+    pack.fields
+        .iter()
+        .find(|candidate| candidate.name == *field && candidate.indexed_count.is_some())
+        .map(|_| pack.endianness)
 }

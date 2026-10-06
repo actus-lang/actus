@@ -16,6 +16,46 @@ fn executes_contiguous_array_reads_and_writes_natively() {
 
 #[cfg(unix)]
 #[test]
+fn executes_indexed_pack_field_reads_and_writes_natively() {
+    let status = run_array_fixture(
+        "indexed-pack-field-read-write",
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; erg index: u32 = 1u32; example.links[index] = 41u32; return example.links[index] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_nested_indexed_pack_field_access_natively() {
+    let status = run_array_fixture(
+        "nested-indexed-pack-field",
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } struct Fabric { erg cells: Array[Example, 2], } verb main() -> Int { erg fabric: Fabric = Fabric { cells: Array[Example, 2](), }; fabric.cells[1u32].links[0u32] = 41u32; return fabric.cells[1u32].links[0u32] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_compound_indexed_pack_field_updates_natively() {
+    let status = run_array_fixture(
+        "compound-indexed-pack-field-update",
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; erg index: u32 = 1u32; example.links[index] = 40u32; example.links[index] += 1u32; return example.links[index] as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_big_endian_indexed_pack_field_bytes_natively() {
+    let status = run_array_fixture(
+        "big-endian-indexed-pack-field",
+        "pack Example { erg storage: Array[u8, 8]; layout big; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; example.links[0u32] = 16909060u32; erg result: Int = if example.links[0u32] == 16909060u32 && example.storage[0] == 1u8 { 42 } else { 0 }; return result; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_crc32_intrinsic_through_the_native_runtime() {
     let status = run_array_fixture(
         "crc32-intrinsic",
@@ -504,6 +544,16 @@ fn specializes_multiple_const_generic_instances_in_one_call_graph() {
         "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read_capacity[4]() as Int + read_capacity[8]() as Int; }",
     );
     assert_eq!(status.code(), Some(12));
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_same_const_generic_instance_at_multiple_call_sites() {
+    let status = run_array_fixture(
+        "repeated-const-generic-call-sites",
+        "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> Int { return read_capacity[4]() as Int + read_capacity[4]() as Int - 8; }",
+    );
+    assert_eq!(status.code(), Some(0));
 }
 
 #[cfg(unix)]

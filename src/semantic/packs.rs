@@ -183,7 +183,8 @@ fn validate_pack(pack: &PackDecl) -> Result<PackLayoutContract, SemanticError> {
                 role: role_name(&field.role).to_owned(),
                 ty: field.ty.canonical_key(),
                 offset: field.offset,
-                width: width as u8,
+                width,
+                indexed_count: indexed_field_count(field),
                 has_default: field.default_value.is_some(),
             })
         })
@@ -316,16 +317,39 @@ fn field_width(pack: &PackDecl, field: &PackField) -> Result<u16, SemanticError>
             });
         }
     }
-    match primitive_type(&field.ty.name) {
-        Some(PrimitiveType::Integer { width, .. }) => Ok(width as u16),
-        _ => Err(SemanticError {
-            kind: SemanticErrorKind::InvalidPackFieldType {
-                pack: pack.name.clone(),
-                field: field.name.clone(),
-                ty: field.ty.name.clone(),
-            },
-            span: field.ty.span,
-        }),
+    if let Some(PrimitiveType::Integer { width, .. }) = primitive_type(&field.ty.name) {
+        return Ok(width as u16);
+    }
+    if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
+        let Some(PrimitiveType::Integer { width, .. }) =
+            primitive_type(&field.ty.arguments[0].name)
+        else {
+            return Err(invalid_pack_field_type(pack, field));
+        };
+        let Ok(count) = field.ty.arguments[1].name.parse::<u16>() else {
+            return Err(invalid_pack_field_type(pack, field));
+        };
+        return (width as u16)
+            .checked_mul(count)
+            .ok_or_else(|| invalid_pack_field_type(pack, field));
+    }
+    Err(invalid_pack_field_type(pack, field))
+}
+
+fn indexed_field_count(field: &PackField) -> Option<u32> {
+    (field.ty.name == "Array" && field.ty.arguments.len() == 2)
+        .then(|| field.ty.arguments[1].name.parse::<u32>().ok())
+        .flatten()
+}
+
+fn invalid_pack_field_type(pack: &PackDecl, field: &PackField) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::InvalidPackFieldType {
+            pack: pack.name.clone(),
+            field: field.name.clone(),
+            ty: field.ty.name.clone(),
+        },
+        span: field.ty.span,
     }
 }
 
@@ -335,7 +359,7 @@ fn out_of_bounds(pack: &PackDecl, field: &PackField, width: u16, capacity: u16) 
             pack: pack.name.clone(),
             field: field.name.clone(),
             offset: field.offset,
-            width: width as u8,
+            width,
             capacity,
         },
         span: field.span,

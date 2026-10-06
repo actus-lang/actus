@@ -244,15 +244,32 @@ fn packs(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {
                 "layout": format!("{:?}", pack.endianness).to_lowercase(),
                 "range": span_range(source, index, pack.span),
                 "fields": pack.fields.iter().map(|field| {
-                    let width = primitive_type(&field.ty.name).and_then(|primitive| match primitive {
-                        crate::ast::PrimitiveType::Integer { width, .. } => Some(width),
-                        _ => None,
-                    });
-                    json!({"name":field.name,"role":role_name(&field.role),"type":format_type(&field.ty),"offset":field.offset,"offsetName":field.offset_name,"width":width,"mask":width.map(mask),"range":span_range(source,index,field.span)})
+                    let (width, element_type, count) = pack_field_facts(field);
+                    let mask_value = width.and_then(|value| (value <= 128).then(|| mask(value as u8)));
+                    json!({"name":field.name,"role":role_name(&field.role),"type":format_type(&field.ty),"elementType":element_type,"count":count,"offset":field.offset,"offsetName":field.offset_name,"width":width,"mask":mask_value,"range":span_range(source,index,field.span)})
                 }).collect::<Vec<_>>(),
             }))
         })
         .collect()
+}
+
+fn pack_field_facts(field: &crate::ast::PackField) -> (Option<u16>, Option<String>, Option<u32>) {
+    if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
+        let element = &field.ty.arguments[0];
+        let count = field.ty.arguments[1].name.parse::<u32>().ok();
+        let width = primitive_type(&element.name).and_then(|primitive| match primitive {
+            crate::ast::PrimitiveType::Integer { width, .. } => {
+                count.and_then(|value| u16::from(width).checked_mul(u16::try_from(value).ok()?))
+            }
+            _ => None,
+        });
+        return (width, Some(format_type(element)), count);
+    }
+    let width = primitive_type(&field.ty.name).and_then(|primitive| match primitive {
+        crate::ast::PrimitiveType::Integer { width, .. } => Some(u16::from(width)),
+        _ => None,
+    });
+    (width, None, None)
 }
 
 fn serializations(source: &str, index: &LineIndex, program: &Program) -> Vec<Value> {

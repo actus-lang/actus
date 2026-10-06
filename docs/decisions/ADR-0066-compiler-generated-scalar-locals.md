@@ -34,6 +34,8 @@ value, or control-flow condition. The argument must be pure and scalar:
 ```act
 read(value: abs (index + 1u32));
 read(value: abs samples[position]);
+const VERSION: u16 = 7u16;
+read(value: abs VERSION);
 ```
 
 The normalized form is semantically equivalent to:
@@ -64,6 +66,12 @@ An expression is eligible only when all of these conditions hold:
 - no expression can allocate, mutate, move, borrow, call, perform I/O, or
   depend on an aggregate or resource lifetime.
 
+A validated scalar constant identifier is eligible even though an ordinary
+identifier remains explicit. Constant inlining runs after this normalization;
+the compiler therefore materializes `abs VERSION` first so native semantic
+reanalysis sees a scalar owner rather than an `abs` literal. This preserves the
+source role without creating runtime constant storage.
+
 `ins`, `dat`, and `erg` arguments remain place-based and require their current
 explicit ownership rules. Buffers, arrays, structs, packs, enums, strings as
 owned resources, calls, method calls, `try`, conditionals, case expressions,
@@ -83,6 +91,7 @@ named-binding form remains the escape hatch for every rejected case.
 - Native lowering emits scalar computation and the existing call ABI; it must
   not allocate a buffer or introduce a runtime helper symbol.
 - Object and executable emission must produce equivalent normalized behavior.
+- Native constant inlining must preserve valid `abs` calls for scalar constants.
 
 ## Diagnostics and tooling
 
@@ -116,4 +125,5 @@ IR metadata may identify generated locals for compiler diagnostics and tests.
 - [x] Add accepted and rejected semantic tests.
 - [x] Add native object/executable parity evidence.
 - [x] Add native no-allocation evidence that distinguishes emitted runtime declarations from executed calls.
+- [x] Preserve constant-qualified scalar `abs` arguments across native constant inlining.
 - [x] Update the implementation guide after behavior is shipped.

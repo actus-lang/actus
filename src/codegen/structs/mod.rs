@@ -17,4 +17,4 @@ pub(crate) use cleanup::{emit_binding_drop, emit_partial_binding_drop, emit_stru
 pub(super) use construct::lower_struct_literal;
 pub(super) use memory::copy_bytes;
 pub(super) use packs::lower_pack_literal;
-pub(super) use types::{expression_native_type, field_type};
+pub(super) use types::{expression_native_type, field_type, indexed_pack_endianness};

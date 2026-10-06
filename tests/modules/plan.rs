@@ -81,6 +81,32 @@ fn compilation_plan_deduplicates_repeated_module_imports() {
 }
 
 #[test]
+fn nested_sibling_facade_preserves_transitive_public_verbs_in_object_plan() {
+    let fixture = Fixture::new();
+    fixture.write("aie/aie.act", "open runtime; open resident;");
+    fixture.write("aie/runtime/runtime.act", "open api;");
+    fixture
+        .write("aie/runtime/api.act", "open verb allocate_column_index() -> u32 { return 1u32; }");
+    fixture.write(
+        "aie/resident.act",
+        "open runtime; open verb resident_step() -> u32 { return allocate_column_index(); }",
+    );
+    let (tokens, errors) =
+        scan("import aie; verb main() -> Int { return allocate_column_index() as Int; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    assert!(plan.caller().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "allocate_column_index")
+    }));
+    let object_plan = plan.object_plan().unwrap();
+    assert!(
+        object_plan.units()[1].exported_verbs().iter().any(|name| name == "allocate_column_index")
+    );
+}
+
+#[test]
 fn rejects_ambiguous_native_symbols_before_codegen() {
     let fixture = Fixture::new();
     fixture.write("left/left.act", "open api;");

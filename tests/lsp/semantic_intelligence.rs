@@ -242,6 +242,32 @@ fn lsp_exposes_array_pack_layout_facts_and_reindexes_overlay_changes() {
 }
 
 #[test]
+fn lsp_exposes_indexed_pack_field_facts_and_hover() {
+    let uri = "file:///tmp/actus-lsp-indexed-pack-field.act";
+    let source = concat!(
+        "pack Example { erg storage: Array[u8, 32]; layout little; fields { ",
+        "erg links: Array[u32, 8] at 0; } }\n",
+        "verb main() -> Int { return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"actus/semanticModel","params":{"textDocument":{"uri":uri,"version":1}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source, "links")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let model = response_with_id(&stdout, 2);
+    let field = &model["result"]["packs"][0]["fields"][0];
+    assert_eq!(field["type"], "Array[u32, 8]");
+    assert_eq!(field["elementType"], "u32");
+    assert_eq!(field["count"], 8);
+    assert_eq!(field["width"], 256);
+    assert!(stdout.contains("element: u32, count: 8"), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_accepts_pack_types_as_array_element_types() {
     let uri = "file:///tmp/actus-lsp-pack-array.act";
     let source = concat!(

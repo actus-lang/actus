@@ -1,0 +1,187 @@
+# Phase 35: Canonical Generic Result Identity in Native Emission
+
+**Status: Planned**
+
+## Purpose
+
+This phase makes generic result types retain one canonical compiler identity
+across semantic analysis, nested facade propagation, native dependency planning,
+and native emission.
+
+The motivating failure has this shape:
+
+```text
+error[E1026]: return type mismatch
+expected `Result[Int, IoError]`, found `Result[Int, IoError]`
+```
+
+The rendered type names are identical, but the native emitter treats the two
+values as different types. The failure is especially visible when a public verb
+returns `Result[T, E]`, calls another public verb through a nested facade, and
+returns or pattern-matches that result at an executable call site. Strict
+semantic checking can therefore succeed while native executable emission fails.
+
+This is a compiler correctness issue. It must be solved in the compiler's type
+identity and native planning layers, not by duplicating implementations,
+weakening ownership roles, adding facade bypasses, or changing application
+source to avoid `Result`.
+
+## Scope
+
+- Generic type identity for `Result[T, E]` and the same identity rule for all
+  parameterized nominal types.
+- Identity propagation through parent and nested public facades.
+- Native lowering, dependency collection, and executable emission.
+- Ownership and `case dat` paths that consume a generic result.
+- Diagnostics that distinguish a real mismatch from an internal identity split.
+- Regression coverage at semantic, object, executable, and nested-facade levels.
+
+## Non-goals
+
+- No change to Actus ownership roles or call-site syntax.
+- No change to `Result` layout, enum representation, ABI, or standard-library
+  API.
+- No implicit coercion between different generic instantiations.
+- No application-specific compiler special case for `Result[Int, IoError]`.
+- No facade bypass or duplicated native symbol as a workaround.
+- No change to serialized formats or runtime filesystem behavior.
+
+## Failure contract
+
+For a canonical generic instantiation, all of the following must identify the
+same type:
+
+```text
+Result[Int, IoError]
+```
+
+- the semantic model's declared return type;
+- the return type inferred for a nested facade call;
+- the type of a local binding receiving that call;
+- the type consumed by `case dat` deconstruction;
+- the native dependency graph node;
+- the object-level ABI signature;
+- the executable lowering signature.
+
+A different generic argument list remains a different type. For example,
+`Result[Int, IoError]` and `Result[u32, IoError]` must not unify silently.
+
+## Gates
+
+### Gate 35.1 — Reproduce and localize the identity split
+
+- [ ] Add a minimal generic `Result[T, E]` source fixture that passes semantic
+      checking and fails native emission with the identical-name mismatch.
+- [ ] Add the same fixture through one nested public facade and through a
+      direct module import for comparison.
+- [ ] Record the compiler revision, command, complete diagnostic, and source
+      span for each failure.
+- [ ] Identify whether the split occurs during generic specialization, facade
+      export propagation, native dependency collection, or lowering.
+- [ ] Add an internal debug assertion or test-only identity trace that shows
+      the canonical type key at each pipeline boundary.
+
+### Gate 35.2 — Define the canonical generic identity contract
+
+- [ ] Document the canonical key for nominal generic types, including the
+      declaration identity, ordered type arguments, const arguments, and
+      relevant ABI or layout parameters.
+- [ ] Define which identity data is structural and which data is source-site
+      metadata only.
+- [ ] Ensure source spans, facade paths, and call-site locations never create a
+      second semantic type identity.
+- [ ] Define cache ownership and invalidation rules for generic instances.
+- [ ] Record the accepted design in an ADR under `docs/decisions/`.
+
+### Gate 35.3 — Repair semantic and facade propagation
+
+- [ ] Make nested facade export resolution reuse the canonical generic type
+      identity rather than reconstructing a display-equivalent type.
+- [ ] Preserve private declarations and facade visibility rules.
+- [ ] Preserve explicit `erg`, `abs`, `dat`, and `ins` validation at every call
+      site.
+- [ ] Add accepted tests for direct and nested-facade generic return values.
+- [ ] Add rejected tests proving different generic arguments remain distinct.
+- [ ] Verify that generic cache entries cannot overwrite one another when the
+      same specialization is reached through different facade paths.
+
+### Gate 35.4 — Repair native dependency planning and lowering
+
+- [ ] Use the canonical generic identity as the native dependency key.
+- [ ] Ensure one generic specialization produces one stable native type and
+      one compatible dependency node per ABI contract.
+- [ ] Preserve all transitive dependencies when the specialization is reached
+      through a nested facade.
+- [ ] Make object emission and executable emission use the same resolved type
+      identity.
+- [ ] Add diagnostics for an actual ABI mismatch instead of reporting a false
+      same-name return mismatch.
+- [ ] Verify that native emission does not introduce duplicate symbols,
+      duplicate enum layouts, or unsafe casts.
+
+### Gate 35.5 — Ownership, aggregate, and case-deconstruction coverage
+
+- [ ] Accept `case dat result` when the result is returned from a generic verb
+      through a nested facade.
+- [ ] Cover `Result.Ok` and `Result.Err` paths with owned aggregate payloads.
+- [ ] Cover borrowed and exclusive arguments that produce a generic result.
+- [ ] Reject use-after-move and invalid ownership roles after deconstruction.
+- [ ] Verify branch joins and cleanup remain deterministic for both variants.
+- [ ] Cover repeated call sites using one canonical specialization without
+      losing source-specific rewrite spans.
+
+### Gate 35.6 — Native and executable acceptance evidence
+
+- [ ] Add semantic, object, and executable regression tests for the minimal
+      reproducer.
+- [ ] Add a nested-facade regression with at least two call sites sharing one
+      generic specialization.
+- [ ] Verify strict object and executable builds both succeed.
+- [ ] Verify the emitted native representation contains no duplicate generic
+      type definitions or incompatible result layouts.
+- [ ] Preserve zero-floating-point evidence for integer-only fixtures where the
+      fixture requires it.
+- [ ] Record exact compiler revision, commands, target profile, and outputs.
+
+### Gate 35.7 — Tooling, diagnostics, and documentation
+
+- [ ] Keep formatter and LSP type display based on the same canonical identity
+      used by native emission.
+- [ ] Add a deterministic diagnostic for genuine generic identity or ABI
+      incompatibility.
+- [ ] Prevent the diagnostic renderer from collapsing distinct internal types
+      into misleading identical display names without identity context.
+- [ ] Update the language guide with the canonical generic identity contract.
+- [ ] Update the relevant architecture documentation and acceptance report.
+- [ ] Add a migration note if any internal cache key or native symbol naming
+      changes.
+
+### Gate 35.8 — Full quality and compatibility gate
+
+- [ ] `cargo fmt --all -- --check` passes.
+- [ ] `cargo check --all-targets --all-features` passes.
+- [ ] `cargo clippy --all-targets --all-features -- -D warnings` passes.
+- [ ] `cargo test --all-targets --all-features` passes.
+- [ ] Existing generic call-site, nested-facade, ownership, and native tests
+      remain green.
+- [ ] No application-specific vocabulary or workaround enters compiler code.
+- [ ] The final acceptance report records known limits and unresolved follow-up
+      work.
+
+## Evidence policy
+
+A passing semantic check alone does not close this phase. The failure under
+investigation occurs after semantic analysis, so acceptance requires native
+object and executable evidence. Each closed gate must name the test, command,
+compiler revision, and relevant output.
+
+A workaround that changes the application source, duplicates a generic
+implementation, bypasses a facade, weakens a role, or adds an undocumented
+exception does not count as evidence and must not be used to close a gate.
+
+## Exit criteria
+
+Phase 35 is complete only when all gates are checked, the canonical identity
+ADR and language documentation are published, the minimal reproducer passes
+semantic and native emission, nested facade regressions pass, and the complete
+quality suite is green.

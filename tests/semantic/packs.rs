@@ -97,6 +97,54 @@ fn accepts_indexed_pack_storage_reads_writes_and_nested_control_flow() {
 }
 
 #[test]
+fn accepts_indexed_pack_field_reads_and_writes() {
+    analyze_source(
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main() -> Int { erg example = Example { storage: Array[u8, 8](), }; erg index: u32 = 1u32; example.links[index] = 41u32; return example.links[index] as Int; }",
+    )
+    .expect("array-valued pack fields should support indexed reads and writes");
+}
+
+#[test]
+fn accepts_nested_indexed_pack_field_access() {
+    analyze_source(
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } struct Fabric { erg cells: Array[Example, 2], } verb main() -> Int { erg fabric: Fabric = Fabric { cells: Array[Example, 2](), }; fabric.cells[1u32].links[0u32] = 41u32; return fabric.cells[1u32].links[0u32] as Int; }",
+    )
+    .expect("indexed pack fields should compose with arrays of pack values");
+}
+
+#[test]
+fn records_indexed_pack_field_width_without_truncation() {
+    let model = analyze_source(
+        "pack Example { erg storage: Array[u8, 32]; layout little; fields { erg links: Array[u32, 8] at 0; } }",
+    )
+    .expect("a 32-byte indexed field should validate");
+    let field = &model.pack_layouts[0].fields[0];
+    assert_eq!(field.width, 256);
+    assert_eq!(field.indexed_count, Some(8));
+}
+
+#[test]
+fn rejects_constant_index_outside_pack_field_capacity() {
+    let error = analyze_source(
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { erg links: Array[u32, 2] at 0; } } verb main(abs example: Example) -> u32 { return example.links[2u32]; }",
+    )
+    .expect_err("pack field indexing must use the declared array capacity");
+    assert!(matches!(error, SemanticErrorKind::IndexOutOfBounds { .. }));
+}
+
+#[test]
+fn rejects_indexed_writes_to_read_only_pack_fields() {
+    let error = analyze_source(
+        "pack Example { erg storage: Array[u8, 8]; layout little; fields { abs links: Array[u32, 2] at 0; } } verb main(erg example: Example) { example.links[0u32] = 41u32; }",
+    )
+    .expect_err("read-only indexed pack fields must reject writes");
+    assert!(matches!(
+        error,
+        SemanticErrorKind::InvalidFieldAssignmentTarget { field } if field == "links"
+    ));
+}
+
+#[test]
 fn accepts_pack_types_as_bounded_array_elements() {
     analyze_source(
         "pack Cell { erg storage: Array[u8, 2]; layout little; fields { erg marker: u8 at 0; erg tail: u8 at 8; } } struct Fabric { erg cells: Array[Cell, 64], }",
