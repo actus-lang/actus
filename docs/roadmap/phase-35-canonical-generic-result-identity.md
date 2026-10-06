@@ -81,6 +81,19 @@ A different generic argument list remains a different type. For example,
 - [ ] Add an internal debug assertion or test-only identity trace that shows
       the canonical type key at each pipeline boundary.
 
+#### Initial investigation — 2026-10-06
+
+- The compiler was synchronized to `main` at merge commit `c72c9d5`.
+- A generic `Result[Int, IoError]` fixture with nested public facades,
+  separate producer/flush/save modules, `dat` result deconstruction, and a
+  mutable state parameter passes both strict semantic checking and native
+  executable emission.
+- The original identical-name `Result[Int, IoError]` mismatch is therefore not
+  reproduced by the current minimal generic fixture.
+- Gate 35.1 remains open. No generic identity implementation change is
+  accepted until a compiler-only reproducer fails at native emission and its
+  canonical type key is traced across the relevant pipeline boundaries.
+
 ### Gate 35.2 — Define the canonical generic identity contract
 
 - [ ] Document the canonical key for nominal generic types, including the
