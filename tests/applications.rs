@@ -154,6 +154,40 @@ fn module_application_executes_public_wrapper_with_private_implementation() {
 }
 
 #[test]
+fn generic_result_nested_facade_baseline_builds_natively() {
+    let source = "import feature; verb main() -> Int { return 0; }\n";
+    let (root, input, output) = project("generic-result-baseline", source);
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("enable hosted standard library");
+    fs::create_dir_all(root.join("src/feature/runtime")).expect("create nested facade");
+    fs::write(root.join("src/feature/feature.act"), "open runtime;\n")
+        .expect("write feature facade");
+    fs::write(root.join("src/feature/runtime/runtime.act"), "open api; open save;\n")
+        .expect("write runtime facade");
+    fs::write(
+        root.join("src/feature/runtime/api.act"),
+        "import std::io; import std::fs; import std::path; open io; open fs; open path; open verb write_stage(abs staged: Path, abs payload: Buffer) -> Result[Int, IoError] { return write_file(path: abs staged, contents: abs payload); } open verb publish_stage(abs staged: Path, abs active: Path) -> Result[Int, IoError] { erg loaded = read_to_bytes(path: abs staged); return case dat loaded { Result.Err(error) => Err(error), Result.Ok(bytes) => { drop(bytes); return rename(from: abs staged, to: abs active); }, }; }\n",
+    )
+    .expect("write result producer");
+    fs::write(
+        root.join("src/feature/runtime/flush.act"),
+        "import std::io; import std::path; open io; open path; open api; open verb flush_stage(abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg written = write_stage(staged: abs staged, payload: abs payload); return case dat written { Result.Err(error) => Err(error), Result.Ok(_) => publish_stage(staged: abs staged, active: abs active), }; }\n",
+    )
+    .expect("write result flusher");
+    fs::write(
+        root.join("src/feature/runtime/save.act"),
+        "import std::io; import std::path; open io; open path; open flush; open struct State { erg value: Int, } verb complete(ins state: State, dat flushed: Result[Int, IoError]) -> Result[Int, IoError] { return case dat flushed { Result.Err(error) => Err(error), Result.Ok(bytes) => { state.value = bytes; return Ok(bytes); }, }; } open verb forward(ins state: State, abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg flushed = flush_stage(staged: abs staged, active: abs active, payload: abs payload); return complete(state: ins state, flushed: dat flushed); }\n",
+    )
+    .expect("write result forwarder");
+
+    build(&root, &input, &output);
+    fs::remove_dir_all(root).expect("remove generic result baseline project");
+}
+
+#[test]
 fn package_configuration_module_emits_without_an_anchor_verb() {
     let source = "import config; verb main() -> Int { return LIMIT as Int; }\n";
     let (root, input, output) = project("const-only-config", source);

@@ -68,6 +68,29 @@ A different generic argument list remains a different type. For example,
 
 ## Gates
 
+### Gate 35.0 — Reproducer admission and compiler baseline
+
+This prerequisite prevents a consumer ownership or syntax error from being
+mistaken for a generic identity failure.
+
+- [x] Start from the synchronized compiler `main` revision used for the
+      investigation.
+- [x] Confirm the compiler-only fixture has valid ownership roles and reaches
+      native emission without an earlier semantic diagnostic.
+- [x] Run the focused application baseline and record its result before
+      changing semantic or native identity code.
+- [x] Keep the fixture generic and independent of any application repository,
+      domain vocabulary, or external filesystem layout.
+
+#### Evidence — 2026-10-06
+
+- Compiler baseline: merge commit `c72c9d5`.
+- A generic `Result[Int, IoError]` fixture with nested public facades,
+  separate producer/flush/save modules, `dat` result deconstruction, and a
+  mutable state parameter passes strict semantic checking and reaches native
+  emission without an earlier semantic diagnostic.
+- The Actus application test baseline passes: 23 tests, 0 failures.
+
 ### Gate 35.1 — Reproduce and localize the identity split
 
 - [ ] Add a minimal generic `Result[T, E]` source fixture that passes semantic
@@ -81,18 +104,18 @@ A different generic argument list remains a different type. For example,
 - [ ] Add an internal debug assertion or test-only identity trace that shows
       the canonical type key at each pipeline boundary.
 
-#### Initial investigation — 2026-10-06
+#### Investigation note — 2026-10-06
 
-- The compiler was synchronized to `main` at merge commit `c72c9d5`.
-- A generic `Result[Int, IoError]` fixture with nested public facades,
-  separate producer/flush/save modules, `dat` result deconstruction, and a
-  mutable state parameter passes both strict semantic checking and native
-  executable emission.
-- The original identical-name `Result[Int, IoError]` mismatch is therefore not
-  reproduced by the current minimal generic fixture.
+- The corrected compiler-only fixture
+  `generic_result_nested_facade_baseline_builds_natively` passes strict
+  checking and native executable emission.
+- An earlier draft produced `E1026` because a value-producing `case` block
+  ended with `Ok(bytes);` instead of `return Ok(bytes);`. The diagnostic span
+  identified a fixture contract error, so that draft is not accepted as a
+  generic identity reproducer.
 - Gate 35.1 remains open. No generic identity implementation change is
-  accepted until a compiler-only reproducer fails at native emission and its
-  canonical type key is traced across the relevant pipeline boundaries.
+  accepted until a valid compiler-only reproducer fails and its canonical type
+  key is traced across the relevant pipeline boundaries.
 
 ### Gate 35.2 — Define the canonical generic identity contract
 
