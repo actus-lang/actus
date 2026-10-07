@@ -148,7 +148,7 @@ impl LayoutRegistry {
             NativeType::Float { width } => float_layout(width),
             NativeType::Void => (0, 1),
             NativeType::String | NativeType::Buffer => (self.pointer_size, self.pointer_size),
-            NativeType::Region => (56, 8),
+            NativeType::Region => (self.pointer_size, self.pointer_size),
             NativeType::FatPointer => (
                 self.pointer_size.checked_mul(2).ok_or_else(|| {
                     NativeEmitError("fat pointer layout size overflow".to_owned())

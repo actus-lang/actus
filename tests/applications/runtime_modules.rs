@@ -128,6 +128,10 @@ verb write_publish_cancel(ins region: Region[Minicolumn]) -> Int {
     };
 }
 
+verb forward_packed_region(dat region: Region[Minicolumn]) -> Region[Minicolumn] {
+    return region;
+}
+
 verb main() -> Int {
     erg backing: Buffer = Buffer[64];
     erg logical_length: u64 = 1048576u64;
@@ -137,18 +141,19 @@ verb main() -> Int {
     return case dat opened {
         Result.Err(_) => 6,
         Result.Ok(region) => {
-            erg write_status: Int = write_publish_cancel(region: ins region);
+            erg forwarded: Region[Minicolumn] = forward_packed_region(region: dat region);
+            erg write_status: Int = write_publish_cancel(region: ins forwarded);
             if write_status != 0 {
                 return write_status;
             }
             erg destination: Buffer = Buffer[64];
             erg index: u64 = 0u64;
-            erg read_result = region_read(region: abs region, index: erg index, destination: ins destination);
+            erg read_result = region_read(region: abs forwarded, index: erg index, destination: ins destination);
             erg read_ok: Bool = case dat read_result {
                 Result.Err(_) => false,
                 Result.Ok(_) => true,
             };
-            erg closed = region_close(region: ins region);
+            erg closed = region_close(region: ins forwarded);
             return case dat closed {
                 Result.Err(_) => 5,
                 Result.Ok(_) => if read_ok { 0 } else { 4 },
