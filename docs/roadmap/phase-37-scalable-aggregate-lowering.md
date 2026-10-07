@@ -450,6 +450,38 @@ Gate 37.7 hosted logical-region evidence, 2026-10-07:
   23,830,616-byte executable. This is a bounded observation for the current
   compiler profile, not a promise that larger inline aggregates are safe.
 
+### Gate 37.7-F — Freestanding Region profile
+
+The hosted evidence cannot be promoted to freestanding support by changing
+only the standard-library registry. The current `std::region` facade resolves
+only for hosted targets because its private bridges use the hosted runtime
+resident store. A freestanding target must receive a separate no-host backend
+contract before the facade becomes available there.
+
+- [ ] Define the freestanding Region backend contract with no libc, filesystem,
+      allocator, or hosted runtime dependency.
+- [ ] Define the bounded resident-window provider and capability lifecycle for
+      freestanding targets, including startup, failure, and cleanup ownership.
+- [ ] Add a target-aware Region bridge implementation whose symbols are valid
+      for freestanding object emission and do not import hosted runtime symbols.
+- [ ] Expose the canonical `std::region` facade to freestanding targets only
+      after the bridge and ownership contracts are implemented.
+- [ ] Add freestanding semantic and object tests for 1 MiB, 1 GiB, and 1 TiB
+      logical capacity with a bounded resident window.
+- [ ] Prove the freestanding object has no hosted Region, filesystem, or libc
+      imports and retains bounded symbols, relocations, and sections.
+- [ ] Add a target-specific evidence section before claiming embedded support.
+
+Gate 37.7-F boundary evidence, 2026-10-07:
+
+- A freestanding fixture with `target = "x86_64-unknown-none"` and
+  `import std::region` is rejected before native emission with:
+  `error[E1112]: builtin module \`std::region\` is incompatible with the
+  configured target; facade \`library/std/src/region/region.act\` is unavailable`.
+- The registry remains hosted-only intentionally. Adding freestanding
+  availability without a no-host bridge would create an invalid object-level
+  contract, so this gate remains open.
+
 ### Gate 37.8 — Compatibility and quality acceptance
 
 - [ ] Existing const-generic aggregate tests pass unchanged.
