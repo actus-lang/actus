@@ -555,7 +555,53 @@ defined by ADR-0077.
 ADR-0077 records why the public one-buffer `region_open` API remains stable
 while the provider owns the second published mirror internally.
 
+### Gate 37.7-A — Actus ARM freestanding native emission
+
+The provider core and target-support objects now build and link for the
+STM32F411 profile. The remaining boundary is the compiler itself: an Actus
+source program importing `std::region` must emit an ARM freestanding object
+before the complete Actus-to-hardware path can be claimed.
+
+- [x] Reproduce and record the exact compiler rejection for
+      `thumbv7em-none-eabihf`: `Support for this target has not been implemented
+      yet`.
+- [ ] Add Cranelift/native lowering support for the selected ARM Thumb target
+      without mapping it to an unrelated hosted target.
+- [ ] Preserve the freestanding entry contract and prevent implicit hosted
+      runtime or libc linkage.
+- [ ] Add a strict Actus source regression that imports `std::region`, emits an
+      ARM object, and retains only the reviewed provider ABI imports.
+- [ ] Link the Actus-generated ARM object with the provider and separate
+      target-support objects using the reviewed startup/linker contract.
+- [ ] Flash the complete Actus-generated image to STM32F411 and verify the
+      Region lifecycle through target SRAM evidence.
+- [ ] Record target compiler version, object symbols, linker inputs, flash
+      command, SRAM output, and evidence limits in a dated benchmark document.
+- [ ] Update the language guide and ADR evidence after the compiler support is
+      implemented; do not close this gate with a Rust-only probe.
+
+The current Rust F411 probe and provider object evidence do not close these
+checks. They prove the runtime boundary only. The compiler limitation is
+recorded here so it is fixed at the Actus boundary rather than hidden by a
+project-level workaround.
+
+Gate 37.7-A disposition, 2026-10-07:
+
+- **Deferred by decision.** Hosted Actus target development and target-neutral
+  provider evidence remain accepted while the ARM backend is deferred.
+- ARM32/Thumb native emission is intentionally postponed until the project
+  selects an implementation path: a Cranelift ARM32 backend or another reviewed
+  native backend such as LLVM.
+- No target mapping, wrapper, or alternate firmware path may be used to mark
+  this gate complete.
+
 ### Gate 37.8 — Compatibility and quality acceptance
+
+Gate 37.8 remains open. Its existing hosted, freestanding-object, provider,
+and documentation checks may be completed independently, but the final phase
+acceptance cannot close while Gate 37.7-A is deferred and the compiler has an
+unresolved ARM native-emission boundary. Other hosted and target-neutral
+Actus work does not need to wait for that compiler backend decision.
 
 - [ ] Existing const-generic aggregate tests pass unchanged.
 - [ ] Existing ownership, cleanup, layout, ABI, and invalid-bound tests pass.
