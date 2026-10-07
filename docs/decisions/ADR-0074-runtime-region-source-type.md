@@ -107,6 +107,32 @@ limited to type recognition, descriptor ABI layout, and owner cleanup. A
 private runtime bridge or an undocumented intrinsic would create an unstable
 language surface and is therefore not an acceptable substitute.
 
+### Accepted first facade contract
+
+The first public facade is `std::region`. It exposes `Region[T]` and the
+following bounded operations:
+
+- `region_open[T](dat backing: Buffer, logical_length: u64,
+  window_start: u64, window_count: u64) -> Result[Region[T], RegionError]`;
+- `region_read[T](abs region: Region[T], index: u64,
+  ins destination: Buffer) -> Result[Int, RegionError]`;
+- `region_write[T](ins region: Region[T], index: u64,
+  abs source: Buffer) -> Result[Int, RegionError]`;
+- `region_publish[T](ins region: Region[T]) -> Result[u64, RegionError]`;
+- `region_cancel[T](ins region: Region[T]) -> Result[Int, RegionError]`;
+- `region_close[T](ins region: Region[T]) -> Result[Int, RegionError]`.
+
+`region_open` consumes the caller's backing `Buffer`; the runtime capability
+owns it after a successful result. Read and write require an exact element
+byte width and return a typed `BufferSize` failure when the caller's buffer is
+wrong. `region_close` is an exclusive operation that marks the owner closed;
+lexical cleanup then observes the closed state and cannot release the same
+capability twice. No operation performs filesystem access, allocation, or
+window replacement on the inference path. The initial `RegionError` domain
+contains invalid descriptor, invalid handle, stale generation, out-of-window,
+offset overflow, buffer-size, capability exhaustion, generation exhaustion,
+and backend failure variants.
+
 ### Lowering boundary
 
 The compiler implementation proceeds in this order:

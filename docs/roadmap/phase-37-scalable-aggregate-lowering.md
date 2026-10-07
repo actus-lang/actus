@@ -326,10 +326,19 @@ Gate 37.5 evidence, 2026-10-07:
       length, relocation count, and executable size at large logical extents.
 - [ ] Verify that the runtime-backed descriptor ABI cannot be confused with an
       inline aggregate ABI at a call boundary.
-- [ ] Approve the Actus source contract for region operations: canonical
-      facade, view type, typed error enum, operation names, and `erg`/`abs`/
-      `ins`/`dat` transitions. Do not add compiler intrinsics before this
-      contract is accepted.
+- [x] Approve the Actus source contract for region operations: the
+      `std::region` facade, `Region[T]`, `RegionError`, operation names, and
+      `erg`/`abs`/`ins`/`dat` transitions. Do not add compiler intrinsics before
+      this contract is accepted.
+- [ ] Implement the `std::region` facade and keep raw runtime bridges private.
+- [ ] Implement `region_open` with `dat Buffer` transfer and capability
+      registration.
+- [ ] Implement checked `region_read` and `region_write` with exact element
+      byte-width validation.
+- [ ] Implement `region_publish`, `region_cancel`, and idempotent
+      `region_close` without synchronous filesystem I/O.
+- [ ] Add semantic, native executable, and double-release regression tests for
+      the complete facade.
 
 Gate 37.6 progress, 2026-10-07:
 
@@ -370,11 +379,10 @@ Gate 37.6 progress, 2026-10-07:
   capacity does not enter native symbol names. Full explicit operation
   coverage, target-specific aggregate classification, and large-object
   evidence remain open.
-- The next implementation step is blocked by a language-surface decision, not
-  by a hidden compiler workaround: Actus has not yet approved the public
-  names and ownership contract for region operations. Until that contract is
-  accepted, only type recognition, descriptor ABI layout, and cleanup are
-  implemented.
+- The public operation contract is now accepted in ADR-0074. The next
+  implementation step is the `std::region` facade plus private runtime
+  bridges. Until those bridges and executable tests exist, Gate 37.6 remains
+  open and no operation is claimed as implemented.
 
 ### Gate 37.7 — Scale evidence
 
