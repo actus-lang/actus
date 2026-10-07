@@ -147,26 +147,38 @@ Gate 37.1 evidence, 2026-10-07:
 
 ### Gate 37.2 — Define the scalable representation contract
 
-- [ ] Write an ADR defining the difference between an inline bounded aggregate
+- [x] Write an ADR defining the difference between an inline bounded aggregate
       and a runtime-backed logical region.
-- [ ] Define the metadata required for a region: element layout identity,
+- [x] Define the metadata required for a region: element layout identity,
       element stride, logical length, resident window, page size, and bounds.
-- [ ] Define whether the first implementation uses pages, windows, handles, or
+- [x] Define whether the first implementation uses pages, windows, handles, or
       another explicit representation, and document the trade-offs.
-- [ ] Define ownership transitions for opening, borrowing, mutating, flushing,
+- [x] Define ownership transitions for opening, borrowing, mutating, flushing,
       closing, and invalidating a region.
-- [ ] Define failure behavior for unavailable pages, stale generations,
+- [x] Define failure behavior for unavailable pages, stale generations,
       arithmetic overflow, invalid handles, and capacity exhaustion.
-- [ ] Reject implicit allocation, implicit I/O, and raw pointer escape from the
+- [x] Reject implicit allocation, implicit I/O, and raw pointer escape from the
       public Actus model.
-- [ ] Decide and document the separate public representation for inline
+- [x] Decide and document the separate public representation for inline
       aggregates and runtime-backed logical regions.
-- [ ] Define whether a region descriptor is an owned resource, a borrowed
+- [x] Define whether a region descriptor is an owned resource, a borrowed
       view, or a capability-bearing value, including its cleanup contract.
-- [ ] Define page/window pinning, dirty publication, flush, eviction, and
+- [x] Define page/window pinning, dirty publication, flush, eviction, and
       cancellation rules for `ins` and `abs` views.
-- [ ] Define the single-owner, serialized, or atomic concurrency profile for
+- [x] Define the single-owner, serialized, or atomic concurrency profile for
       hosted, multi-core, and interrupt-driven targets.
+
+Gate 37.2 evidence, 2026-10-07:
+
+- ADR-0073 accepts a separate runtime-backed region resource and preserves
+  `Array[T, N]` as contiguous inline storage.
+- The first region profile uses a bounded descriptor, fixed-width capability,
+  explicit window operations, typed failures, and single-owner serialization.
+- `ins` and `abs` views are call-scoped; live views block incompatible flush,
+  eviction, and reuse. Concurrent access is rejected until a separate
+  synchronization decision is accepted.
+- Hidden allocation, implicit I/O, raw pointers, transparent array conversion,
+  and implicit page faults are explicitly rejected.
 
 ### Gate 37.3 — Make aggregate layout planning scale independently
 
