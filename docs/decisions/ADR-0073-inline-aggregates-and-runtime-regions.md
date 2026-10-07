@@ -58,6 +58,27 @@ only after a checked conversion, and that internal representation must never
 leak into the public or serialized ABI. The descriptor has bounded size
 independent of logical element count.
 
+### Target address profiles
+
+Every runtime-backed region selects an explicit address profile. The profile
+declares two independent widths: the logical index width and the byte-offset
+width. The first implementation accepts 32-bit or 64-bit widths for each
+field. The hosted default is a 64-bit logical index and 64-bit byte offset; an
+embedded or constrained target may select a 32-bit profile when both its
+logical indexes and representable byte offsets fit that contract.
+
+Region construction rejects unsupported widths, a logical element count whose
+last index exceeds the selected index width, and a logical byte size whose
+last byte exceeds the selected offset width. Index-to-byte multiplication,
+window-end addition, element-end addition, and resident-storage sizing are
+checked before conversion or access. A large logical capacity therefore does
+not imply a large allocation: only the validated resident window is allocated
+by the hosted test backend.
+
+The address-width fields are fixed-width metadata in the `repr(C)` descriptor.
+They are values, never pointers or target addresses, so the descriptor remains
+position-independent when serialized by a later persistence implementation.
+
 The capability table owns the association between the handle and the selected
 storage backend. A handle is not sufficient to bypass lifecycle, bounds, or
 generation validation, and a recycled slot must receive a new generation
@@ -179,6 +200,9 @@ for target-specific synchronization and concurrent access.
 
 - Semantic tests distinguish inline aggregate and runtime-backed region types.
 - Layout tests verify stride, checked total size, descriptor size, and overflow.
+- Address-profile tests verify 32-bit and 64-bit logical-index boundaries,
+  checked byte-offset arithmetic, page crossing, last-element access, and
+  fixed-width position-independent descriptor metadata.
 - Native tests verify bounded symbols, sections, relocations, and zero
   initialization behavior.
 - Runtime tests cover window bounds, dirty publication, stale generations,

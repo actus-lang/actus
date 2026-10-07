@@ -281,15 +281,35 @@ Gate 37.4 progress, 2026-10-07:
 
 ### Gate 37.5 — Addressing and overflow safety
 
-- [ ] Define the logical index width and byte-offset width per target profile.
-- [ ] Check every index-to-offset conversion before multiplication.
-- [ ] Reject a region whose logical byte size cannot be represented by the
+- [x] Define the logical index width and byte-offset width per target profile.
+- [x] Check every index-to-offset conversion before multiplication.
+- [x] Reject a region whose logical byte size cannot be represented by the
       selected target profile.
-- [ ] Test capacities that fit in 32-bit indexes and capacities that require
+- [x] Test capacities that fit in 32-bit indexes and capacities that require
       64-bit logical addressing.
-- [ ] Test page crossing, last-element access, empty windows, and boundary
+- [x] Test page crossing, last-element access, empty windows, and boundary
       rejection.
-- [ ] Ensure serialized metadata uses fixed-width, position-independent fields.
+- [x] Ensure serialized metadata uses fixed-width, position-independent fields.
+
+Gate 37.5 evidence, 2026-10-07:
+
+- `RegionAddressProfile` defines independent 32-bit or 64-bit logical-index
+  and byte-offset widths. The hosted default is 64/64; a constrained target
+  can explicitly select 32/32 without changing the inline aggregate ABI.
+- Region validation checks logical-length bounds, total logical byte size,
+  window-end addition, index-to-offset multiplication, element-end addition,
+  and resident-window allocation before access or conversion. Saturating
+  arithmetic is not used for access authorization.
+- Runtime tests accept the largest representable 32-bit logical length for a
+  one-byte element, reject the next length and an overflowing two-byte layout,
+  and accept a greater-than-32-bit logical capacity with a one-element 64/64
+  resident window. They also cover a window crossing the 4 KiB boundary,
+  last-element access, rejection after the window, invalid empty windows, and
+  unsupported widths.
+- `RegionDescriptor` remains `#[repr(C)]` with fixed-width scalar fields and
+  no pointers; the regression asserts a 56-byte size and 8-byte alignment.
+- Focused evidence: `cargo test --lib runtime::region` passed 9 tests and
+  `cargo test --doc runtime::region` passed the compile-fail ownership test.
 
 ### Gate 37.6 — Native ABI and code-generation efficiency
 
