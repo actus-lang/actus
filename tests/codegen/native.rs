@@ -229,6 +229,23 @@ fn lowers_region_owner_cleanup_to_the_runtime_release_bridge() {
 }
 
 #[test]
+fn keeps_region_symbols_bounded_by_logical_capacity() {
+    let source = "verb inspect(abs region: Region[Array[u8, 1048576]]) -> Int { return 0; } verb main() -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("large logical region source should parse");
+    let bytes = actus::codegen::emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("large logical capacity must not specialize native symbols");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(!symbols.iter().any(|symbol| symbol.contains("1048576")));
+}
+
+#[test]
 fn rejects_ins_aliasing_before_native_lowering() {
     let source = "verb merge(ins left: Buffer, abs view: Buffer) -> Int { return 0; } verb main() -> Int { erg buffer = Buffer[1]; return merge(left: ins buffer, view: abs buffer); }";
     let (tokens, errors) = scan(source);

@@ -361,9 +361,11 @@ Gate 37.6 progress, 2026-10-07:
   table with monotonic generation checks, and lexical `erg` cleanup emits the
   runtime release bridge. `cargo check --all-targets --all-features` passed,
   the capability tests passed 4/4, the region runtime tests passed 10/10, and
-  `lowers_region_owner_cleanup_to_the_runtime_release_bridge` passed. Full
-  explicit operation coverage, target-specific aggregate classification, and
-  large-object evidence remain open.
+  `lowers_region_owner_cleanup_to_the_runtime_release_bridge` passed. A
+  `Region[Array[u8, 1048576]]` codegen regression also confirms that logical
+  capacity does not enter native symbol names. Full explicit operation
+  coverage, target-specific aggregate classification, and large-object
+  evidence remain open.
 
 ### Gate 37.7 — Scale evidence
 
