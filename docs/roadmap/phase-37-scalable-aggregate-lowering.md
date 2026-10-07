@@ -519,8 +519,8 @@ defined by ADR-0077.
       filesystem access, or general allocation.
 - [x] Implement open, read, write, publish, cancel, close, and idempotent drop.
 - [ ] Add the target adapter and statically bounded storage-pool contract.
-- [ ] Define the target pool's maximum window size and resident/published
-      alignment policy, with measured `publish`/`cancel` copy cost.
+- [x] Define the target pool's maximum window size and resident/published
+      alignment policy, with policy validation in the provider core.
 - [ ] Link a freestanding object against all nine provider symbols.
 - [x] Add unit evidence for capacity, stale handles, publication, cancellation,
       and repeated idempotent cleanup.

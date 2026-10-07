@@ -46,6 +46,10 @@ pub enum ProviderError {
     OffsetOverflow,
     /// No fixed capability slot is available.
     CapabilityExhausted,
+    /// The requested window exceeds the target pool policy.
+    WindowLimitExceeded,
+    /// The target pool alignment policy is invalid or not satisfied.
+    InvalidAlignment,
     /// A slot generation cannot be advanced safely.
     GenerationExhausted,
     /// The address profile is not representable by this provider.
@@ -60,16 +64,43 @@ struct Slot<'a> {
     publication_generation: u64,
 }
 
+/// Target-owned bounds for resident and published windows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WindowPolicy {
+    /// Maximum bytes copied by one publish or cancel operation.
+    pub max_window_bytes: u64,
+    /// Required power-of-two alignment for both window bases and element stride.
+    pub required_alignment: usize,
+}
+
+impl WindowPolicy {
+    /// Creates an explicit bounded policy.
+    pub const fn new(max_window_bytes: u64, required_alignment: usize) -> Self {
+        Self { max_window_bytes, required_alignment }
+    }
+
+    /// Creates the compatibility policy used by the target-neutral core tests.
+    pub const fn unbounded() -> Self {
+        Self { max_window_bytes: u64::MAX, required_alignment: 1usize }
+    }
+}
+
 /// Fixed-capacity provider with caller-owned resident and published windows.
 pub struct Provider<'a, const SLOTS: usize> {
     slots: [Option<Slot<'a>>; SLOTS],
     generations: [u32; SLOTS],
+    policy: WindowPolicy,
 }
 
 impl<'a, const SLOTS: usize> Provider<'a, SLOTS> {
     /// Creates an empty provider without allocating storage.
     pub fn new() -> Self {
-        Self { slots: array::from_fn(|_| None), generations: [0u32; SLOTS] }
+        Self::with_policy(WindowPolicy::unbounded())
+    }
+
+    /// Creates a provider with a target-specific maximum window and alignment.
+    pub fn with_policy(policy: WindowPolicy) -> Self {
+        Self { slots: array::from_fn(|_| None), generations: [0u32; SLOTS], policy }
     }
 
     /// Opens one bounded resident window and its caller-provided published mirror.
@@ -93,6 +124,7 @@ impl<'a, const SLOTS: usize> Provider<'a, SLOTS> {
         }
         let expected_bytes =
             window_count.checked_mul(element_stride).ok_or(ProviderError::OffsetOverflow)?;
+        self.validate_window_policy(resident, published, expected_bytes, element_stride)?;
         if expected_bytes != resident.len() as u64 {
             return Err(ProviderError::BufferSize);
         }
@@ -278,6 +310,31 @@ impl<'a, const SLOTS: usize> Provider<'a, SLOTS> {
         Ok(())
     }
 
+    fn validate_window_policy(
+        &self,
+        resident: &[u8],
+        published: &[u8],
+        expected_bytes: u64,
+        element_stride: u64,
+    ) -> Result<(), ProviderError> {
+        if expected_bytes > self.policy.max_window_bytes {
+            return Err(ProviderError::WindowLimitExceeded);
+        }
+        let alignment = self.policy.required_alignment;
+        if alignment == 0usize || !alignment.is_power_of_two() {
+            return Err(ProviderError::InvalidAlignment);
+        }
+        if element_stride % alignment as u64 != 0u64 {
+            return Err(ProviderError::InvalidAlignment);
+        }
+        if (resident.as_ptr() as usize) % alignment != 0usize
+            || (published.as_ptr() as usize) % alignment != 0usize
+        {
+            return Err(ProviderError::InvalidAlignment);
+        }
+        Ok(())
+    }
+
     fn encode_handle(slot_index: usize, generation: u32) -> Result<RegionHandle, ProviderError> {
         let slot = u32::try_from(slot_index)
             .map_err(|_| ProviderError::CapabilityExhausted)?
@@ -400,5 +457,21 @@ mod tests {
         assert_eq!(provider.drop_handle(descriptor.handle), Ok(()));
         assert_eq!(provider.drop_handle(descriptor.handle), Ok(()));
         assert_eq!(provider.read(descriptor, 0u64, &mut [0u8]), Err(ProviderError::StaleHandle));
+    }
+
+    #[test]
+    fn window_policy_rejects_oversized_and_invalid_alignment() {
+        let mut resident = [0u8; 4];
+        let mut published = [0u8; 4];
+        let mut bounded = Provider::<1>::with_policy(WindowPolicy::new(3u64, 1usize));
+        assert_eq!(
+            bounded.open(&mut resident, &mut published, 1u64, 4u64, 0u64, 4u64, 32u8, 32u8),
+            Err(ProviderError::WindowLimitExceeded)
+        );
+        let mut invalid = Provider::<1>::with_policy(WindowPolicy::new(4u64, 3usize));
+        assert_eq!(
+            invalid.open(&mut resident, &mut published, 1u64, 4u64, 0u64, 4u64, 32u8, 32u8),
+            Err(ProviderError::InvalidAlignment)
+        );
     }
 }
