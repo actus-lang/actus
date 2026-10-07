@@ -75,7 +75,7 @@ model, device model, product terminology, or downstream project integration.
 
 - [x] Check and build Region sources with logical lengths of 1 MiB, 1 GiB, and
       1 TiB without materializing one object per logical element.
-- [ ] Record compiler RSS, object size, symbol size, and build time for the
+- [x] Record compiler RSS, object size, symbol size, and build time for the
       supported large logical-capacity cases.
 - [x] Execute checked reads and writes within a bounded resident window.
 - [x] Prove that out-of-window and overflowed access fails deterministically.
@@ -124,15 +124,15 @@ model, device model, product terminology, or downstream project integration.
 
 ### Gate 38.9 — Complete Region scale evidence
 
-- [ ] Record compiler peak RSS, object size, symbol size, build time, and
+- [x] Record compiler peak RSS, object size, symbol size, build time, and
       execution status for primitive and packed Region element profiles.
-- [ ] Run logical capacities from MiB through TiB with a bounded resident
+- [x] Run logical capacities from MiB through TiB with a bounded resident
       window for both supported element categories.
-- [ ] Verify that logical capacity does not change resident allocation,
+- [x] Verify that logical capacity does not change resident allocation,
       executable layout, or descriptor stride.
-- [ ] Record exact compiler revision, commands, host profile, and evidence
+- [x] Record exact compiler revision, commands, host profile, and evidence
       boundaries for every scale result.
-- [ ] Keep unsupported aggregate forms and incomplete element types as explicit
+- [x] Keep unsupported aggregate forms and incomplete element types as explicit
       negative tests; do not silently convert them to inline arrays.
 
 ## Evidence — 2026-10-07
@@ -156,10 +156,10 @@ model, device model, product terminology, or downstream project integration.
 - The large-capacity evidence does not claim that arbitrary inline aggregates
   scale without compiler materialization. That remains outside the completed
   Region contract and requires separate compiler work.
-- Gate 38.5 remains open only for an independently reproducible compiler RSS,
-  object-size, symbol-size, and build-time record. The logical-capacity and
-  bounded-resident-window behavior itself is covered by the current test
-  output above.
+- Gate 38.5 is closed by the independently reproducible RSS, object-size,
+  symbol-size, and build-time record in the Phase 38 benchmark document. The
+  logical-capacity and bounded-resident-window behavior is covered by the
+  current test output above.
 - The current implementation boundary is explicit: primitive Region elements
   and packed aggregate elements are covered by native evidence; descriptor ABI
   and complete scale evidence remain in Gate 38.9.
@@ -172,6 +172,11 @@ model, device model, product terminology, or downstream project integration.
   preserves descriptor identity across returns; the runtime's 56-byte
   `RegionDescriptor` remains an internal runtime layout and is not copied as
   an Actus value.
+- Gate 38.9 evidence is recorded in
+  `docs/benchmarks/phase-38-region-scale-2026-10-07.md`. It includes primitive
+  and packed profiles at 1 MiB, 1 GiB, and 1 TiB, peak compiler RSS, build
+  time, executable size, object size, defined-symbol count and size, and the
+  exact host measurement boundary.
 
 ## Definition of done
 
