@@ -1,0 +1,28 @@
+"""
+Typed failures for the bounded `std::wire` frame contract.
+
+The error set distinguishes malformed framing, unsupported protocol policy,
+capacity failure, and accidental corruption. CRC validation is integrity
+detection only; these variants do not authenticate a sender or authorize a
+message.
+"""
+open enum WireError {
+    """The supplied bytes do not contain the required magic sequence."""
+    InvalidMagic,
+    """The frame version is not supported by this implementation."""
+    UnsupportedVersion,
+    """The frame contains a reserved or unknown flag bit."""
+    UnknownFlags,
+    """The encoded payload length exceeds the bounded protocol maximum."""
+    PayloadTooLarge,
+    """The supplied buffer is shorter than the requested frame operation."""
+    Truncated,
+    """The caller-provided output storage cannot hold the complete frame."""
+    InsufficientCapacity,
+    """The frame checksum does not match its encoded contents."""
+    ChecksumMismatch,
+    """A bounded range has an invalid start or end position."""
+    InvalidRange,
+    """A reserved protocol operation is not enabled in version one."""
+    PolicyRejected,
+}

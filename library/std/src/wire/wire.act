@@ -1,0 +1,16 @@
+"""
+The public `std::wire` facade for bounded binary communication.
+
+The facade contains no operating-system, filesystem, transport, application,
+or cryptographic dependency. It exports only fixed-width frame metadata,
+typed protocol failures, and the deterministic checksum operation. Callers
+own all input and output buffers; this module performs no hidden allocation.
+"""
+"""Re-export typed failures for malformed or unsupported wire frames."""
+open error;
+
+"""Re-export the versioned fixed-width frame layout and protocol constants."""
+open frame;
+
+"""Re-export the allocation-free CRC16-CCITT integrity calculation."""
+open checksum;

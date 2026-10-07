@@ -1,8 +1,14 @@
 """Re-export console and stream I/O contracts."""
 open io;
+
 """Re-export raw, platform-aware path representation."""
 open path;
+
 """Re-export hosted file-system I/O."""
 open fs;
+
 """Re-export bounded runtime-backed logical regions."""
 open region;
+
+"""Re-export target-neutral bounded binary wire framing contracts."""
+open wire;

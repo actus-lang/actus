@@ -37,3 +37,8 @@ targets = ["hosted"]
 name = "region"
 path = "src/region"
 targets = ["hosted", "freestanding"]
+
+[[runtime.modules]]
+name = "wire"
+path = "src/wire"
+targets = ["hosted", "freestanding"]

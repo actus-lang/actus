@@ -32,17 +32,17 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 
 ## Gate 39.1 — Canonical module and public facade
 
-- [ ] Add the canonical `library/std/src/wire/wire.act` facade.
+- [x] Add the canonical `library/std/src/wire/wire.act` facade.
 - [ ] Add responsibility-specific siblings for frame, codec, parser, checksum,
       sequence, fragmentation, and errors.
-- [ ] Export only intentional public declarations through the facade.
-- [ ] Add positive and negative facade-import tests.
-- [ ] Keep every source file below the Actus hard limit and document all public
+- [x] Export only intentional public declarations through the facade.
+- [x] Add positive and negative facade-import tests.
+- [x] Keep every source file below the Actus hard limit and document all public
       types, constants, enums, and verbs.
 
 ## Gate 39.2 — Frame model and deterministic serialization
 
-- [ ] Implement named protocol constants for magic, version, lengths, flags,
+- [x] Implement named protocol constants for magic, version, lengths, flags,
       payload bound, and CRC parameters.
 - [ ] Implement fixed-width little-endian header encoding and decoding.
 - [ ] Validate payload length before payload access.
@@ -53,7 +53,7 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 
 ## Gate 39.3 — CRC and typed failure paths
 
-- [ ] Implement CRC16-CCITT with the ADR-0078 parameters.
+- [x] Implement CRC16-CCITT with the ADR-0078 parameters.
 - [ ] Reject bad magic, version, reserved flags, impossible lengths, and CRC.
 - [ ] Distinguish framing, capacity, integrity, version, and policy failures.
 - [ ] Prove rejected frames do not mutate caller-owned protocol state.
@@ -97,8 +97,8 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 
 ## Gate 39.8 — Standard-library and compiler integration
 
-- [ ] Register `std::wire` as a target-neutral standard-library module.
-- [ ] Verify hosted and freestanding resolution without host-only imports.
+- [x] Register `std::wire` as a target-neutral standard-library module.
+- [x] Verify hosted and freestanding resolution without host-only imports.
 - [ ] Verify unused Wire modules are not compiled or linked unnecessarily.
 - [ ] Add formatter, semantic-model, hover, completion, and diagnostics
       evidence for public declarations.

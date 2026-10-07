@@ -1,0 +1,55 @@
+"""
+Allocation-free CRC16-CCITT for `std::wire`.
+
+The operation reads the caller-owned byte range `[start, end)`, uses the
+version-one polynomial `0x1021`, initial value `0xFFFF`, no reflection, and
+zero final XOR. It never mutates the input, allocates storage, performs I/O,
+or treats the checksum as authentication. It returns a typed `WireError`
+failure, specifically `Err(InvalidRange)` for an inverted range and
+`Err(Truncated)` when the end exceeds input storage.
+"""
+verb wire_crc16_update(erg checksum: u16, erg byte: u8) -> u16 {
+    checksum ^= (byte as u16) << 8u16;
+    erg bit: u8 = 0u8;
+    loop {
+        if bit >= 8u8 {
+            break;
+        }
+        if (checksum & 32768u16) != 0u16 {
+            checksum = (checksum << 1u16) ^ WIRE_CRC16_POLYNOMIAL;
+        } else {
+            checksum <<= 1u16;
+        }
+        bit += 1u8;
+    }
+    return checksum;
+}
+
+"""
+Compute the version-one CRC16 over a bounded caller-owned byte range.
+
+The `abs` input is borrowed and neither it nor its ownership changes. The
+operation allocates no storage and returns a deterministic `Ok` checksum or a
+typed `WireError` failure. `Err(InvalidRange)` reports an inverted range and
+`Err(Truncated)` reports an end beyond the input buffer.
+"""
+open verb wire_crc16_ccitt(abs input: Buffer, erg start: u32, erg end: u32) -> Result[u16, WireError] {
+    erg input_length: Int = buffer_length(buffer: abs input);
+    if start > end {
+        return Result[u16, WireError].Err(WireError.InvalidRange);
+    }
+    if end > (input_length as u32) {
+        return Result[u16, WireError].Err(WireError.Truncated);
+    }
+    erg checksum: u16 = WIRE_CRC16_INITIAL;
+    erg index: u32 = start;
+    loop {
+        if index >= end {
+            break;
+        }
+        erg current_byte: u8 = input[index];
+        checksum = wire_crc16_update(checksum: erg checksum, byte: erg current_byte);
+        index += 1u32;
+    }
+    return Result[u16, WireError].Ok(checksum);
+}
