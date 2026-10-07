@@ -154,20 +154,20 @@ analysis.
 
 ### Descriptor call ABI
 
-The descriptor is a small fixed aggregate, but its six `u64` words plus
-metadata must not be assumed to occupy the same registers on every target.
-The compiler uses the target ABI's aggregate classification and selects
-indirect descriptor passing when the target cannot pass the complete value
-directly. Role-qualified calls receive the appropriate generated address:
-`abs` is read-only, `ins` is exclusive mutable, and ownership cleanup remains
-attached to the owner rather than to the temporary call representation.
+The descriptor is a small fixed aggregate, but it is an internal runtime
+object, not the source-level call representation. `Region[T]` crosses an
+Actus call boundary as one opaque pointer-sized capability on every target.
+This lets the target ABI classify one pointer consistently; the compiler does
+not manually split the six `u64` descriptor words into assumed registers and
+does not expose a descriptor pointer in serialized state or the public source
+model. The `RegionDescriptor` `#[repr(C)]` layout is used only by the private
+runtime bridge.
 
-The indirect address exists only at the native call boundary. It is not stored
-in the Actus `Region[T]` value, serialized metadata, capability handle, or
-public source model. Cranelift lowering must therefore use the target layout
-registry and ABI classification instead of manually splitting the descriptor
-into assumed registers. Tests must cover both direct and indirect aggregate
-classification where the configured target profiles differ.
+Role-qualified calls receive the appropriate capability address: `abs` is
+read-only, `ins` is exclusive mutable, and ownership cleanup remains attached
+to the owner rather than to a temporary call representation. Target-specific
+aggregate classification remains relevant to inline aggregates and any future
+descriptor-by-value API, but is outside the current `Region[T]` ABI contract.
 
 The runtime bridge remains private to the standard library/runtime facade.
 Application modules cannot import raw bridge symbols or bypass the canonical
@@ -203,8 +203,10 @@ once even when close is called before scope teardown.
 Gate 37.6 now has hosted object and executable evidence for the descriptor
 boundary: object sections, initialized data, symbol names, relocations, large
 logical extent, Region-versus-inline representation, read/write, typed bounds
-failure, publication, and cleanup are covered. Target-specific aggregate
-classification and the full scale and compatibility gates remain open. The
+failure, closed-state rejection, publication, and cleanup are covered. The
+current Region ABI is pointer-sized and target-neutral; target-specific inline
+aggregate classification and the full scale and compatibility gates remain
+open. The
 current native evidence proves hosted Actus source execution on the configured
 host; it does not prove embedded target behavior.
 
@@ -216,11 +218,12 @@ host; it does not prove embedded target behavior.
 - Cleanup tests prove that lexical teardown emits one capability-release bridge
   call and that move/explicit-close paths do not double-release.
 - Layout tests assert one bounded descriptor ABI independent of logical length.
-- ABI tests cover target aggregate classification and indirect descriptor
-  passing without exposing a pointer in the public representation.
+- ABI tests cover the target-neutral pointer-sized Region capability and its
+  separation from inline aggregate classification without exposing a raw
+  pointer in the public or serialized representation.
 - Native tests execute explicit read, write, publication, close, and lexical
   cleanup paths; the runtime bridge test rejects a repeated drop.
 - Object tests verify bounded symbols, relocations, sections, initialized data,
   output size, large logical extents, and separation from inline aggregates.
-- Invalid descriptor and stale-generation paths return typed failures without
-  compiler-generated traps.
+- Invalid descriptor, closed-state, and stale-generation paths return typed
+  failures without compiler-generated traps.

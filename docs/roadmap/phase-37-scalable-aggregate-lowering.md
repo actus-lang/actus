@@ -320,7 +320,7 @@ Gate 37.5 evidence, 2026-10-07:
 - [x] Keep descriptor passing compatible with ownership roles and cleanup.
 - [x] Verify native symbol names and metadata remain bounded for large extents.
 - [x] Add executable tests for read, write, bounds rejection, and cleanup.
-- [ ] Verify that invalid descriptor states fail safely without compiler-generated
+- [x] Verify that invalid descriptor states fail safely without compiler-generated
       traps on valid inputs.
 - [x] Add object-level checks for section selection, initializer size, symbol
       length, relocation count, and executable size at large logical extents.
@@ -380,7 +380,9 @@ Gate 37.6 progress, 2026-10-07:
   write/publish/read/close paths, and the compiler reports no floating-point
   instructions. A bounds-failure executable returns a typed error result and
   exits normally without a compiler-generated trap. Runtime bridge unit
-  evidence covers one-time descriptor drop.
+  evidence covers one-time descriptor drop. A second executable regression
+  closes a Region and then attempts a read; the operation returns a typed
+  invalid-state result and exits normally.
 - The `hosted_region_object_has_bounded_abi_sections_and_relocations` regression
   parses objects emitted for one-element and 4 GiB logical regions. It checks
   the text section, initialized data bound, symbol-name bound, relocation
@@ -388,7 +390,9 @@ Gate 37.6 progress, 2026-10-07:
   The same test compares the Region object with an inline `Array[u32, 2]`
   object: the Region object carries the Region operation wrapper ABI while the
   inline object does not, proving the representations remain distinct at the
-  object boundary. Target-specific aggregate classification remains open.
+  object boundary. The current Region ABI is one opaque pointer-sized
+  capability on every target; target-specific classification of inline
+  aggregates remains a separate later target gate.
 - ADR-0074 resolves the next compiler contract: `Region[T]` is a distinct
   opaque owned resource with explicit window operations and the reviewed
   descriptor ABI. Its semantic registration, role rules, native layout, and
