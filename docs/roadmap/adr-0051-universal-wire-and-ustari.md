@@ -1,5 +1,11 @@
 # Roadmap: Universal `std::wire` and `std::ustari`
 
+> **Superseded.** This historical roadmap is retained for traceability. Use
+> [Phase 39](phase-39-standard-wire.md) and
+> [ADR-0078](../decisions/ADR-0078-std-wire-protocol.md) for the current
+> Actus-only `std::wire` plan. `std::ustari` is no longer a public library in
+> the active plan.
+
 This roadmap implements
 [ADR-0051](../decisions/ADR-0051-universal-wire-and-ustari-protocol-libraries.md).
 The work is intentionally split between a reusable binary codec and the

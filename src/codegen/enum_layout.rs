@@ -68,7 +68,7 @@ impl LayoutRegistry {
             NativeType::Float { width } => Some(u32::from(width / 8)),
             NativeType::Void => Some(0),
             NativeType::String | NativeType::Buffer => Some(self.pointer_size),
-            NativeType::Region => Some(56),
+            NativeType::Region => Some(self.pointer_size),
             NativeType::FatPointer => Some(self.pointer_size * 2),
             NativeType::Pack(id) => self.pack_size(id),
             NativeType::Array(id) => self.array_layout_value(id).map(|array| array.size),
