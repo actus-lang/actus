@@ -367,3 +367,14 @@ fn align_up(offset: u32, alignment: u32) -> Option<u32> {
         .map(|rounded| rounded / alignment)
         .and_then(|rounded| rounded.checked_mul(alignment))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::align_up;
+
+    #[test]
+    fn rejects_impossible_alignment_values() {
+        assert_eq!(align_up(0, 0), None);
+        assert_eq!(align_up(u32::MAX, 2), None);
+    }
+}
