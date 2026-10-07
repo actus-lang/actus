@@ -14,12 +14,49 @@ pub const UNINITIALIZED_REGION_GENERATION: RegionGeneration = 0;
 pub enum RegionError {
     InvalidHandle,
     StaleGeneration,
+    UnsupportedAddressWidth,
     InvalidDescriptor,
     InvalidWindow,
     LogicalIndexOutOfBounds,
     OffsetOverflow,
     BufferTooSmall,
     GenerationExhausted,
+}
+
+/// Checked logical-index and byte-offset widths for one target profile.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RegionAddressProfile {
+    pub logical_index_bits: u8,
+    pub byte_offset_bits: u8,
+}
+
+impl RegionAddressProfile {
+    /// Creates a profile supported by the bounded region boundary.
+    pub const fn new(logical_index_bits: u8, byte_offset_bits: u8) -> Result<Self, RegionError> {
+        if !supported_width(logical_index_bits) || !supported_width(byte_offset_bits) {
+            return Err(RegionError::UnsupportedAddressWidth);
+        }
+        Ok(Self { logical_index_bits, byte_offset_bits })
+    }
+
+    const fn maximum(bits: u8) -> u64 {
+        if bits == 64 { u64::MAX } else { u32::MAX as u64 }
+    }
+
+    const fn maximum_index(self) -> u64 {
+        Self::maximum(self.logical_index_bits)
+    }
+
+    const fn maximum_offset(self) -> u64 {
+        Self::maximum(self.byte_offset_bits)
+    }
+}
+
+const HOST_ADDRESS_PROFILE: RegionAddressProfile =
+    RegionAddressProfile { logical_index_bits: 64, byte_offset_bits: 64 };
+
+const fn supported_width(bits: u8) -> bool {
+    bits == 32 || bits == 64
 }
 
 /// Fixed-width metadata for a logical region and its resident window.
@@ -33,16 +70,29 @@ pub struct RegionDescriptor {
     pub window_count: u64,
     pub generation: RegionGeneration,
     pub dirty: u8,
+    pub logical_index_bits: u8,
+    pub byte_offset_bits: u8,
 }
 
 impl RegionDescriptor {
     fn validate(&self) -> Result<(), RegionError> {
+        let profile = RegionAddressProfile::new(self.logical_index_bits, self.byte_offset_bits)?;
         if self.handle == 0
             || self.element_stride == 0
             || self.logical_length == 0
             || self.generation == UNINITIALIZED_REGION_GENERATION
         {
             return Err(RegionError::InvalidDescriptor);
+        }
+        if self.logical_length - 1 > profile.maximum_index() {
+            return Err(RegionError::OffsetOverflow);
+        }
+        let logical_bytes = self
+            .logical_length
+            .checked_mul(self.element_stride)
+            .ok_or(RegionError::OffsetOverflow)?;
+        if logical_bytes == 0 || logical_bytes - 1 > profile.maximum_offset() {
+            return Err(RegionError::OffsetOverflow);
         }
         let window_end =
             self.window_start.checked_add(self.window_count).ok_or(RegionError::OffsetOverflow)?;
@@ -53,7 +103,11 @@ impl RegionDescriptor {
     }
 
     fn contains(&self, index: u64) -> bool {
-        index >= self.window_start && index < self.window_start.saturating_add(self.window_count)
+        index >= self.window_start
+            && self
+                .window_start
+                .checked_add(self.window_count)
+                .is_some_and(|window_end| index < window_end)
     }
 
     fn byte_range(&self, index: u64) -> Result<std::ops::Range<usize>, RegionError> {
@@ -64,6 +118,10 @@ impl RegionDescriptor {
         let start =
             relative_index.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
         let end = start.checked_add(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
+        let profile = RegionAddressProfile::new(self.logical_index_bits, self.byte_offset_bits)?;
+        if end == 0 || end - 1 > profile.maximum_offset() {
+            return Err(RegionError::OffsetOverflow);
+        }
         let start = usize::try_from(start).map_err(|_| RegionError::OffsetOverflow)?;
         let end = usize::try_from(end).map_err(|_| RegionError::OffsetOverflow)?;
         Ok(start..end)
@@ -86,6 +144,26 @@ impl InMemoryRegion {
         window_start: u64,
         window_count: u64,
     ) -> Result<Self, RegionError> {
+        Self::new_with_profile(
+            HOST_ADDRESS_PROFILE,
+            handle,
+            element_stride,
+            logical_length,
+            window_start,
+            window_count,
+        )
+    }
+
+    /// Creates a bounded resident window under an explicit target address profile.
+    pub fn new_with_profile(
+        profile: RegionAddressProfile,
+        handle: RegionHandle,
+        element_stride: u64,
+        logical_length: u64,
+        window_start: u64,
+        window_count: u64,
+    ) -> Result<Self, RegionError> {
+        RegionAddressProfile::new(profile.logical_index_bits, profile.byte_offset_bits)?;
         let descriptor = RegionDescriptor {
             handle,
             element_stride,
@@ -94,6 +172,8 @@ impl InMemoryRegion {
             window_count,
             generation: 1,
             dirty: 0,
+            logical_index_bits: profile.logical_index_bits,
+            byte_offset_bits: profile.byte_offset_bits,
         };
         descriptor.validate()?;
         let storage_length =
@@ -217,7 +297,9 @@ impl MutableRegionView<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{InMemoryRegion, RegionError};
+    use std::mem::{align_of, size_of};
+
+    use super::{InMemoryRegion, RegionAddressProfile, RegionDescriptor, RegionError};
 
     #[test]
     fn bounded_views_read_write_and_publish() {
@@ -277,5 +359,56 @@ mod tests {
         let generation = region.descriptor().generation;
         assert_eq!(region.publish(generation + 1), Err(RegionError::StaleGeneration));
         assert_eq!(region.descriptor().generation, generation);
+    }
+
+    #[test]
+    fn address_profiles_reject_unsupported_widths_and_large_32_bit_regions() {
+        assert_eq!(RegionAddressProfile::new(16, 32), Err(RegionError::UnsupportedAddressWidth));
+        let profile = RegionAddressProfile::new(32, 32).expect("32-bit profile should be valid");
+        let maximum_length = u64::from(u32::MAX) + 1;
+        assert!(InMemoryRegion::new_with_profile(profile, 7, 1, maximum_length, 0, 1).is_ok());
+        assert!(matches!(
+            InMemoryRegion::new_with_profile(profile, 7, 1, maximum_length + 1, 0, 1),
+            Err(RegionError::OffsetOverflow)
+        ));
+        assert!(matches!(
+            InMemoryRegion::new_with_profile(profile, 7, 2, maximum_length, 0, 1),
+            Err(RegionError::OffsetOverflow)
+        ));
+    }
+
+    #[test]
+    fn wide_logical_capacity_allocates_only_the_resident_window() {
+        let profile = RegionAddressProfile::new(64, 64).expect("64-bit profile should be valid");
+        let logical_length = u64::from(u32::MAX) + 2;
+        let mut region = InMemoryRegion::new_with_profile(profile, 7, 4, logical_length, 99, 1)
+            .expect("large logical capacity should fit a small resident window");
+        let generation = region.descriptor().generation;
+        let view = region.borrow_abs(7, generation).expect("resident window should open");
+        let mut value = [0u8; 4];
+        view.read(99, &mut value).expect("resident element should be readable");
+        assert_eq!(value, [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn page_crossing_last_element_and_window_boundary_are_checked() {
+        let mut region =
+            InMemoryRegion::new(7, 2, 8194, 4095, 2).expect("cross-page window should be valid");
+        let generation = region.descriptor().generation;
+        {
+            let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+            view.write(4096, &[41, 42]).expect("last resident element should be writable");
+        }
+        let view = region.borrow_abs(7, generation).expect("read view should open");
+        let mut value = [0u8; 2];
+        view.read(4096, &mut value).expect("last resident element should be readable");
+        assert_eq!(value, [41, 42]);
+        assert_eq!(view.read(4097, &mut value), Err(RegionError::LogicalIndexOutOfBounds));
+    }
+
+    #[test]
+    fn descriptor_uses_fixed_width_c_layout() {
+        assert_eq!(size_of::<RegionDescriptor>(), 56);
+        assert_eq!(align_of::<RegionDescriptor>(), 8);
     }
 }

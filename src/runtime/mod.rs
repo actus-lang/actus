@@ -66,8 +66,8 @@ pub use path::{
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
 };
 pub use region::{
-    InMemoryRegion, MutableRegionView, RegionDescriptor, RegionError, RegionGeneration,
-    RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
+    InMemoryRegion, MutableRegionView, RegionAddressProfile, RegionDescriptor, RegionError,
+    RegionGeneration, RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
 };
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
