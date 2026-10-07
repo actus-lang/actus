@@ -250,7 +250,7 @@ Gate 37.3 evidence, 2026-10-07:
       ownership semantics.
 - [x] Reject eviction, flush, or reuse while an incompatible `ins` or `abs`
       view remains live.
-- [ ] Add race and cancellation tests for dirty windows, generation changes,
+- [x] Add race and cancellation tests for dirty windows, generation changes,
       failed publication, and rejected concurrent ownership.
 
 Gate 37.4 progress, 2026-10-07:
@@ -266,14 +266,18 @@ Gate 37.4 progress, 2026-10-07:
   checked byte offsets, and destination/source lengths before accessing bytes.
   Publication advances the generation and rejects exhaustion without replacing
   the previous generation.
-- Five runtime unit tests cover read/write/publish, stale and out-of-window
+- Five runtime unit tests plus a compile-fail documentation test cover
+  read/write/publish, stale and out-of-window
   access, invalid handles, buffer-size errors, invalid windows, generation
   exhaustion, cancellation rollback, and failed publication. Full concurrent
-  race acceptance remains open for this gate; cancellation semantics are now
-  explicit and tested.
+  access is rejected by the exclusive borrow contract before runtime entry;
+  cancellation semantics are explicit and tested.
 - Implementation commits: `0b5fb89` (`feat(runtime): add bounded logical
   region boundary`) and `ca53904` (`fix(runtime): preserve published region
   generation`).
+- The compile-fail ownership regression is attached to `borrow_abs`; it proves
+  that a live read view prevents `publish` or another mutable access until the
+  view scope ends. `cargo test --doc runtime::region` passes.
 
 ### Gate 37.5 — Addressing and overflow safety
 
