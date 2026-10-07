@@ -431,8 +431,9 @@ Gate 37.6 progress, 2026-10-07:
       access latency, and failure status.
 - [ ] Repeat the hosted evidence on at least one freestanding or embedded target
       profile before making target-specific claims.
-- [ ] Keep host, target, and simulated logical-capacity results in separate
-      dated evidence sections.
+- [x] Keep host, target, and simulated logical-capacity results in separate
+      dated evidence sections: `phase-37-region-scale`,
+      `phase-37-freestanding-provider`, and `phase-37-f411-hardware`.
 
 Gate 37.7 hosted logical-region evidence, 2026-10-07:
 
@@ -457,10 +458,12 @@ only the standard-library registry. The `std::region` facade now resolves for
 freestanding source through a provider ABI, but its private bridges still need
 a separate no-host backend before a freestanding executable can link or run.
 
-- [ ] Define the freestanding Region backend contract with no libc, filesystem,
-      allocator, or hosted runtime dependency.
-- [ ] Define the bounded resident-window provider and capability lifecycle for
-      freestanding targets, including startup, failure, and cleanup ownership.
+- [x] Define the freestanding Region backend contract with no libc, filesystem,
+      allocator, or hosted runtime dependency in ADR-0077 and the separate
+      provider/support packages.
+- [x] Define the bounded resident-window provider and capability lifecycle for
+      freestanding targets, including startup, failure, and cleanup ownership;
+      provider unit tests and F411 execution evidence cover the lifecycle.
 - [x] Add the target-provider Region bridge ABI whose symbols are valid for
       freestanding object emission and do not import hosted runtime symbols.
 - [x] Allow freestanding native lowering to declare the Region cleanup provider
@@ -471,7 +474,8 @@ a separate no-host backend before a freestanding executable can link or run.
       logical capacity with a bounded resident window.
 - [x] Prove the freestanding Region object has no hosted Region, filesystem, or
       libc imports and retains only the target-provider bridge imports.
-- [ ] Add a target-specific evidence section before claiming embedded support.
+- [x] Add a target-specific evidence section before claiming embedded support;
+      see `docs/benchmarks/phase-37-f411-hardware-2026-10-07.md`.
 
 ADR-0077 defines the provider core and the paired resident/published window
 requirement needed to preserve `region_cancel` without hidden allocation.
@@ -533,10 +537,12 @@ defined by ADR-0077.
       evidence in `docs/benchmarks/`.
 - [x] Link the ARM object against the fixed no-heap target support fixture and
       verify that no `actus_*` symbols remain unresolved.
-- [ ] Link the shim with target-provided Buffer/result allocation symbols.
+- [x] Link the shim with separate target-provided Buffer/result allocation
+      symbols; see `phase-37-target-support-link-2026-10-07.md`.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.
-- [ ] Link a freestanding object against all nine provider symbols.
+- [x] Link a freestanding object against all seven Region symbols plus the
+      three target support symbols, with no unresolved `actus_*` imports.
 - [x] Add unit evidence for capacity, stale handles, publication, cancellation,
       and repeated idempotent cleanup.
 - [x] Add explicit evidence for generation exhaustion.
