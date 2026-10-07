@@ -498,6 +498,26 @@ fn executes_const_generic_array_argument_in_a_generic_verb() {
 
 #[cfg(unix)]
 #[test]
+fn executes_pack_backed_const_generic_aggregate_parameters_natively() {
+    let status = run_array_fixture(
+        "pack-backed-const-generic-aggregate-parameter",
+        "pack Minicolumn { erg storage: Array[u8, 64]; layout little; fields { erg marker: u8 at 0; erg threshold: u8 at 8; erg myelination: u8 at 16; erg idle_ticks: u8 at 24; erg flags: u8 at 32; erg payload: u8 at 40; erg layer_depth: u16 at 48; erg coincidence_low: u64 at 64; erg coincidence_high: u64 at 128; erg axons: Array[u32, 8] at 192; erg free_list_link: u32 at 448; erg inhibitory_link: u32 at 480; } } struct Fabric[N: Usize] { erg columns: Array[Minicolumn, N], } verb configure[N: Usize](ins fabric: Fabric[N]) { fabric.columns[0u32].marker = 41u8; } verb measure[N: Usize]() -> u8 { erg fabric: Fabric[N] = Fabric[N] { columns: Array[Minicolumn, N](), }; configure[N](fabric: ins fabric); return fabric.columns[0u32].marker; } verb direct(ins fabric: Fabric[256]) -> u8 { return fabric.columns[0u32].marker; } verb main() -> Int { erg fabric: Fabric[256] = Fabric[256] { columns: Array[Minicolumn, 256](), }; fabric.columns[0u32].marker = 1u8; return measure[64]() as Int + measure[256]() as Int + measure[1024]() as Int + direct(fabric: ins fabric) as Int - 124; }",
+    );
+    assert_eq!(status.code(), Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn executes_abs_pack_backed_const_generic_aggregate_parameters_natively() {
+    let status = run_array_fixture(
+        "abs-pack-backed-const-generic-aggregate-parameter",
+        "pack Minicolumn { erg storage: Array[u8, 64]; layout little; fields { erg marker: u8 at 0; erg threshold: u8 at 8; erg myelination: u8 at 16; erg idle_ticks: u8 at 24; erg flags: u8 at 32; erg payload: u8 at 40; erg layer_depth: u16 at 48; erg coincidence_low: u64 at 64; erg coincidence_high: u64 at 128; erg axons: Array[u32, 8] at 192; erg free_list_link: u32 at 448; erg inhibitory_link: u32 at 480; } } struct Fabric[N: Usize] { erg columns: Array[Minicolumn, N], } verb read_marker[N: Usize](abs fabric: Fabric[N]) -> u8 { return fabric.columns[0u32].marker; } verb main() -> Int { erg fabric: Fabric[256] = Fabric[256] { columns: Array[Minicolumn, 256](), }; fabric.columns[0u32].marker = 41u8; return read_marker[256](fabric: abs fabric) as Int + 1; }",
+    );
+    assert_eq!(status.code(), Some(42));
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_const_generic_parameter_as_a_compile_time_expression_value() {
     let status = run_array_fixture(
         "const-generic-expression-value",

@@ -4,6 +4,7 @@ use cranelift_codegen::ir::{InstBuilder, Value, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, IntrinsicKind, lookup_call_intrinsic};
+use crate::lexer::SourceSpan;
 
 use super::super::layout::LayoutRegistry;
 use super::super::native::{FunctionRef, NativeEmitError};
@@ -19,6 +20,9 @@ pub(crate) fn lower_call(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
     let callee_name = callee.split_once('[').map_or(callee, |(name, _)| name);
+    if lookup_call_intrinsic(callee) == Some(IntrinsicKind::SizeOf) {
+        return lower_size_of(function, callee, context.layouts);
+    }
     let target = call_target(context.functions, callee_name)?;
     let mut values = lower_call_arguments(
         function,
@@ -37,6 +41,23 @@ pub(crate) fn lower_call(
     }
     let call = function.ins().call(target.reference, &values);
     finish_call(function, call, result_address, target.return_type, callee_name, context.layouts)
+}
+
+fn lower_size_of(
+    function: &mut FunctionBuilder<'_>,
+    callee: &str,
+    layouts: &LayoutRegistry,
+) -> Result<Value, NativeEmitError> {
+    let type_name = callee
+        .strip_prefix("size_of[")
+        .and_then(|name| name.strip_suffix(']'))
+        .and_then(|name| crate::semantic::parse_type_name_key(name, SourceSpan::new(0, 0)))
+        .ok_or_else(|| NativeEmitError(format!("invalid size_of type application `{callee}`")))?;
+    let native_type = NativeType::from_type_name_with_layout(Some(&type_name), layouts)?;
+    let size = layouts
+        .type_size(native_type)
+        .ok_or_else(|| NativeEmitError(format!("type `{}` has no native size", type_name.name)))?;
+    Ok(function.ins().iconst(types::I64, i64::from(size)))
 }
 
 fn call_target<'a>(

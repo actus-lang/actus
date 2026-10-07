@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::Expr;
+use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 
 use super::super::enums::enum_expression_type;
 use super::super::layout::LayoutRegistry;
@@ -49,6 +49,9 @@ fn infer_complex_initializer_type(
     match expression {
         Expr::Try { expression, .. } => infer_try_type(expression, types, functions, layouts),
         Expr::Call { callee, arguments, .. } => {
+            if lookup_call_intrinsic(callee) == Some(IntrinsicKind::SizeOf) {
+                return Ok(NativeType::Integer { signed: false, width: 64 });
+            }
             infer_call_type(callee, arguments, types, functions, layouts)
         }
         Expr::MethodCall { .. } => infer_method_type(expression, types, functions, layouts),

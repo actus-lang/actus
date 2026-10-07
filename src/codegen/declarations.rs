@@ -76,7 +76,10 @@ fn declare_external_functions(
         let signature = external_native_signature(module, verb, layouts)?;
         let id = module
             .declare_function(
-                bindings.external_symbol(namespace_prefix, &verb.name),
+                bindings.external_symbol(
+                    namespace_prefix,
+                    verb.native_symbol.as_deref().unwrap_or(&verb.name),
+                ),
                 Linkage::Import,
                 &signature,
             )

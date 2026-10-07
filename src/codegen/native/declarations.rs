@@ -12,7 +12,10 @@ use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataIds;
 use super::super::model::NativeCleanupSchedule;
-use super::super::native_runtime::declare_runtime_functions;
+use super::super::native_runtime::{
+    declare_buffer_cleanup_function, declare_enum_cleanup_function,
+    declare_region_cleanup_function, declare_runtime_functions,
+};
 use super::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 
 pub(super) fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
@@ -73,8 +76,66 @@ pub(super) fn declare_all_functions(
         || external_verbs.iter().any(|verb| verb.name == "print");
     if target_requires_host_runtime(context.target) {
         metadata.extend(declare_runtime_functions(module, has_print_definition)?);
+    } else {
+        if verbs.iter().any(verb_uses_region)
+            || external_verbs.iter().any(external_verb_uses_region)
+        {
+            metadata.extend(declare_region_cleanup_function(module)?);
+        }
+        if verbs.iter().any(verb_uses_buffer)
+            || external_verbs.iter().any(external_verb_uses_buffer)
+        {
+            metadata.extend(declare_buffer_cleanup_function(module)?);
+        }
+        if (verbs.iter().any(verb_uses_region)
+            || external_verbs.iter().any(external_verb_uses_region))
+            && (verbs.iter().any(verb_uses_buffer)
+                || external_verbs.iter().any(external_verb_uses_buffer))
+        {
+            metadata.extend(declare_enum_cleanup_function(module)?);
+        }
     }
     Ok(metadata)
+}
+
+fn verb_uses_region(verb: &&VerbDecl) -> bool {
+    verb.params.iter().any(|parameter| type_name_uses_region(&parameter.ty))
+        || verb
+            .return_type
+            .as_ref()
+            .is_some_and(|return_type| type_name_uses_region(&return_type.ty))
+}
+
+fn external_verb_uses_region(verb: &&ExternalVerbDecl) -> bool {
+    verb.params.iter().any(|parameter| type_name_uses_region(&parameter.ty))
+        || verb
+            .return_type
+            .as_ref()
+            .is_some_and(|return_type| type_name_uses_region(&return_type.ty))
+}
+
+fn verb_uses_buffer(verb: &&VerbDecl) -> bool {
+    verb.params.iter().any(|parameter| type_name_uses_buffer(&parameter.ty))
+        || verb
+            .return_type
+            .as_ref()
+            .is_some_and(|return_type| type_name_uses_buffer(&return_type.ty))
+}
+
+fn external_verb_uses_buffer(verb: &&ExternalVerbDecl) -> bool {
+    verb.params.iter().any(|parameter| type_name_uses_buffer(&parameter.ty))
+        || verb
+            .return_type
+            .as_ref()
+            .is_some_and(|return_type| type_name_uses_buffer(&return_type.ty))
+}
+
+fn type_name_uses_region(type_name: &crate::ast::TypeName) -> bool {
+    type_name.name == "Region" || type_name.arguments.iter().any(type_name_uses_region)
+}
+
+fn type_name_uses_buffer(type_name: &crate::ast::TypeName) -> bool {
+    type_name.name == "Buffer" || type_name.arguments.iter().any(type_name_uses_buffer)
 }
 
 pub(super) fn target_requires_host_runtime(target: &TargetSpec) -> bool {

@@ -167,6 +167,7 @@ fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
         SemanticErrorKind::InvalidMutation { .. } => "E1051",
         SemanticErrorKind::InvalidArrayCapacity { .. } => "E1083",
+        SemanticErrorKind::InvalidRegionElementType { .. } => "E1088",
         SemanticErrorKind::InvalidIndexType { .. } => "E1084",
         SemanticErrorKind::IndexOutOfBounds { .. } => "E1085",
         SemanticErrorKind::NonIndexableTarget { .. } => "E1086",

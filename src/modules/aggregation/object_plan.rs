@@ -200,6 +200,7 @@ fn dependency_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
             abi: ForeignAbi::C,
             metadata: verb.metadata.clone(),
             name: verb.name.clone(),
+            native_symbol: None,
             generic_parameters: verb.generic_parameters.clone(),
             params: verb.params.clone(),
             return_type: verb.return_type.clone(),

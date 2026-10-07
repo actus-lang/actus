@@ -263,6 +263,8 @@ fn specialize_external_verb(
         abi: verb.abi,
         metadata: verb.metadata.clone(),
         name: specialized_name(instance),
+        native_symbol: (!verb.module_import)
+            .then(|| verb.native_symbol.clone().unwrap_or_else(|| verb.name.clone())),
         generic_parameters: Vec::new(),
         params: verb.params.iter().map(|param| specialize_param(param, &substitution)).collect(),
         return_type: verb

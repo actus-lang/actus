@@ -116,6 +116,9 @@ impl GenericLayoutRegistry {
         if type_name.name == "Array" {
             return self.layout_array(type_name, visiting);
         }
+        if type_name.name == "Region" {
+            return Ok(ValueLayout { size: 56, alignment: 8 });
+        }
         if let Some(builtin) = lookup_builtin_type(&type_name.name) {
             return builtin_layout(builtin, self.pointer_size);
         }

@@ -12,7 +12,7 @@ mod parsing;
 mod paths;
 mod signatures;
 
-pub(super) use parsing::parse_type_name_key;
+pub(crate) use parsing::parse_type_name_key;
 use paths::{format_field_path, paths_overlap, root_binding};
 pub(super) use signatures::VerbSignature;
 

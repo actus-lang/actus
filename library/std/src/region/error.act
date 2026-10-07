@@ -1,0 +1,27 @@
+"""
+Typed failures for bounded runtime-backed logical regions.
+
+The public facade exposes these variants instead of leaking signed native
+status values. The domain is deliberately finite so callers can handle
+descriptor, bounds, generation, capability, and backend failures explicitly.
+"""
+open enum RegionError {
+    """The descriptor does not satisfy the region layout contract."""
+    InvalidDescriptor,
+    """The capability handle is unknown or has already been released."""
+    InvalidHandle,
+    """The caller supplied a descriptor generation that is no longer live."""
+    StaleGeneration,
+    """The requested logical element is outside the resident window."""
+    OutOfWindow,
+    """The logical index or byte offset cannot be represented by the target."""
+    OffsetOverflow,
+    """The source or destination buffer is not one exact element wide."""
+    BufferSize,
+    """The bounded capability table has no free slot."""
+    CapabilityExhausted,
+    """The monotonic capability generation cannot advance safely."""
+    GenerationExhausted,
+    """The selected runtime backend rejected the operation."""
+    BackendFailure,
+}

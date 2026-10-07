@@ -212,6 +212,75 @@ fn lowers_ins_parameters_without_a_wrapper_or_extra_allocation() {
 }
 
 #[test]
+fn lowers_region_owner_cleanup_to_the_runtime_release_bridge() {
+    let source = "verb main(erg region: Region[u32]) -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("region source should parse");
+    let bytes = actus::codegen::emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("region owner cleanup should lower natively");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "actus_region_drop")));
+}
+
+#[test]
+fn lowers_size_of_to_a_compile_time_integer_constant() {
+    let source = "verb main() -> u64 { return size_of[u32](); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("size_of source should parse");
+    let bytes = actus::codegen::emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("size_of should lower without a runtime dependency");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(!symbols.iter().any(|symbol| symbol.contains("size_of")));
+}
+
+#[test]
+fn generic_external_abi_uses_the_canonical_native_symbol() {
+    let source = "unsafe extern \"C\" verb bridge[N: Usize]() -> Int; verb main() -> Int { return bridge[4](); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("generic external source should parse");
+    let bytes = emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("generic external bridge should emit");
+    let file = object::File::parse(bytes.as_slice()).expect("generic external object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(symbols.iter().any(|symbol| symbol_matches(symbol, "bridge")));
+    assert!(!symbols.iter().any(|symbol| symbol.contains("bridge__u32")));
+}
+
+#[test]
+fn keeps_region_symbols_bounded_by_logical_capacity() {
+    let source = "verb inspect(abs region: Region[Array[u8, 1048576]]) -> Int { return 0; } verb main() -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("large logical region source should parse");
+    let bytes = actus::codegen::emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("large logical capacity must not specialize native symbols");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(!symbols.iter().any(|symbol| symbol.contains("1048576")));
+}
+
+#[test]
 fn rejects_ins_aliasing_before_native_lowering() {
     let source = "verb merge(ins left: Buffer, abs view: Buffer) -> Int { return 0; } verb main() -> Int { erg buffer = Buffer[1]; return merge(left: ins buffer, view: abs buffer); }";
     let (tokens, errors) = scan(source);
@@ -282,6 +351,31 @@ fn array_and_pack_lowering_is_freestanding_and_has_no_host_runtime_imports() {
         .filter_map(|symbol| symbol.name().ok())
         .collect::<Vec<_>>();
     assert!(undefined.is_empty(), "freestanding array object imports host symbols: {undefined:?}");
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn region_cleanup_uses_only_the_freestanding_provider_symbol() {
+    let source = "verb main(erg region: Region[u8]) -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("freestanding Region source should parse");
+    let target =
+        TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
+    let bytes = emit_program_object_for_target(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+        &target,
+    )
+    .expect("freestanding Region cleanup should emit an object");
+    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+    let undefined = file
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
+    assert_eq!(undefined, ["actus_region_drop"]);
 }
 
 #[cfg(target_os = "macos")]

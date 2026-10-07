@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use cranelift_codegen::ir::{StackSlotData, StackSlotKind, Type};
+use cranelift_codegen::isa::TargetFrontendConfig;
 
 use crate::ast::{
     EnumDef, LayoutEndianness, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl,
@@ -63,6 +64,7 @@ pub(super) struct ArrayLayout {
 pub struct LayoutRegistry {
     pub(super) pointer_type: Type,
     pub(super) pointer_size: u32,
+    frontend_config: Option<TargetFrontendConfig>,
     definitions: Vec<StructDef>,
     layouts: Vec<StructLayout>,
     ids: HashMap<String, usize>,
@@ -94,7 +96,8 @@ impl LayoutRegistry {
     ) -> Result<Self, NativeEmitError> {
         let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
         let pack_definitions = pack_definitions(program);
-        let array_definitions = array_definitions(program, &definitions, &enum_definitions);
+        let array_definitions =
+            array_definitions(program, &definitions, &enum_definitions, instances);
         let mut registry = Self::new(
             pointer_type,
             definitions,
@@ -119,6 +122,7 @@ impl LayoutRegistry {
         Self {
             pointer_type,
             pointer_size: pointer_type.bytes(),
+            frontend_config: None,
             layouts: Vec::with_capacity(definitions.len()),
             enum_layouts: Vec::with_capacity(enum_definitions.len()),
             definitions,
@@ -132,6 +136,18 @@ impl LayoutRegistry {
             array_definitions,
             array_layouts: Vec::new(),
         }
+    }
+
+    pub(super) fn set_frontend_config(&mut self, frontend_config: TargetFrontendConfig) {
+        self.frontend_config = Some(frontend_config);
+    }
+
+    pub(super) fn frontend_config(&self) -> Result<TargetFrontendConfig, NativeEmitError> {
+        self.frontend_config.ok_or_else(|| {
+            NativeEmitError(
+                "native layout registry is missing target frontend configuration".to_owned(),
+            )
+        })
     }
 
     fn populate_layouts(&mut self) -> Result<(), NativeEmitError> {
@@ -173,6 +189,14 @@ impl LayoutRegistry {
         self.array_layouts.get(id)
     }
 
+    pub(super) fn array_layout_value(&self, id: usize) -> Option<ArrayLayout> {
+        self.array_layouts.get(id).cloned().or_else(|| {
+            self.array_definitions
+                .get(id)
+                .and_then(|definition| self.array_layout_for(definition).ok())
+        })
+    }
+
     pub(super) fn array_id(&self, canonical: &str) -> Option<usize> {
         self.array_ids.get(canonical).copied().or_else(|| {
             let normalized = canonical
@@ -191,6 +215,7 @@ impl LayoutRegistry {
                 .and_then(|pack| self.ir_type(pack.storage)),
             NativeType::Array(_) => Ok(self.pointer_type),
             NativeType::Arena(_) => Ok(self.pointer_type),
+            NativeType::Region => Ok(self.pointer_type),
             _ => ty.ir_type(self.pointer_type),
         }
     }
@@ -334,6 +359,23 @@ fn named_ids<T>(definitions: &[T], name: impl Fn(&T) -> &String) -> HashMap<Stri
     definitions.iter().enumerate().map(|(id, definition)| (name(definition).clone(), id)).collect()
 }
 
-fn align_up(offset: u32, alignment: u32) -> u32 {
-    offset.div_ceil(alignment) * alignment
+fn align_up(offset: u32, alignment: u32) -> Option<u32> {
+    if alignment == 0 {
+        return None;
+    }
+    offset
+        .checked_add(alignment - 1)
+        .map(|rounded| rounded / alignment)
+        .and_then(|rounded| rounded.checked_mul(alignment))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::align_up;
+
+    #[test]
+    fn rejects_impossible_alignment_values() {
+        assert_eq!(align_up(0, 0), None);
+        assert_eq!(align_up(u32::MAX, 2), None);
+    }
 }

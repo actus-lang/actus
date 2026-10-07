@@ -16,6 +16,7 @@ pub(super) enum NativeType {
     Pack(usize),
     Array(usize),
     Arena(u32),
+    Region,
     Enum(usize),
     FatPointer,
 }
@@ -24,12 +25,19 @@ impl NativeType {
     pub(super) fn uses_indirect_ins(self) -> bool {
         matches!(
             self,
-            Self::Int | Self::Integer { width: 1..=64, .. } | Self::Float { .. } | Self::Pack(_)
+            Self::Int
+                | Self::Integer { width: 1..=64, .. }
+                | Self::Float { .. }
+                | Self::Pack(_)
+                | Self::Region
         )
     }
 
     pub(super) fn uses_sret(self) -> bool {
-        matches!(self, Self::Struct(_) | Self::Array(_) | Self::Integer { width: 65..=128, .. })
+        matches!(
+            self,
+            Self::Struct(_) | Self::Array(_) | Self::Region | Self::Integer { width: 65..=128, .. }
+        )
     }
 
     pub(super) fn is_wide_integer(self) -> bool {
@@ -40,6 +48,9 @@ impl NativeType {
         if let Some(capacity) = name.strip_prefix("Arena[").and_then(|name| name.strip_suffix(']'))
         {
             return capacity.parse::<u32>().ok().map(Self::Arena);
+        }
+        if name == "Region" {
+            return Some(Self::Region);
         }
         if let Some(primitive) = primitive_type(name) {
             return Some(Self::from_primitive(primitive));
@@ -115,6 +126,7 @@ impl NativeType {
             | Self::Pack(_)
             | Self::Array(_)
             | Self::Arena(_)
+            | Self::Region
             | Self::FatPointer => Ok(pointer_type),
         }
     }

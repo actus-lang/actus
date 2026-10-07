@@ -72,7 +72,42 @@ impl Analyzer {
             IntrinsicKind::Copy => self.validate_copy(arguments, callee, span),
             IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
+            IntrinsicKind::SizeOf => self.validate_size_of(callee, arguments, span),
         }
+    }
+
+    fn validate_size_of(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        if !arguments.is_empty() {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
+                span,
+            });
+        }
+        let Some(type_name) = callee
+            .strip_prefix("size_of[")
+            .and_then(|name| name.strip_suffix(']'))
+            .and_then(|name| super::calls::parse_type_name_key(name, span))
+        else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: "type".to_owned(),
+                },
+                span,
+            });
+        };
+        self.validate_fixed_size_type(&type_name, &mut Vec::new())?;
+        self.validate_type_reference(&type_name)?;
+        self.inferred_expression_types.insert(
+            (span.start, span.end),
+            TypeName { name: "u64".to_owned(), arguments: Vec::new(), reference_role: None, span },
+        );
+        Ok(true)
     }
 
     fn validate_crc32(

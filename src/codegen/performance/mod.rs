@@ -240,6 +240,7 @@ fn native_type_key(target: NativeType) -> String {
         NativeType::Pack(id) => format!("pack_{id}"),
         NativeType::Array(id) => format!("array_{id}"),
         NativeType::Arena(capacity) => format!("arena_{capacity}"),
+        NativeType::Region => "region".to_owned(),
     }
 }
 

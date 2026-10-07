@@ -1737,6 +1737,15 @@ reachable `inner[4]` instance before native declaration and lowering. This
 propagation is deterministic and deduplicated; do not add duplicate helper
 verbs or handwritten concrete wrappers.
 
+When a specialized generic verb has an aggregate parameter such as
+`Storage[256]`, the complete concrete aggregate identity is retained through
+native layout and ABI planning. This includes aggregates containing bounded
+arrays of packed elements. The same contract applies to `ins` and `abs`
+parameters, direct concrete calls, facade imports, and nested generic calls.
+Typed aggregate locals inside the specialized verb receive the caller's const
+substitution before native lowering; source-level concrete wrapper functions
+are not required.
+
 Each concrete generic call site remains part of the specialization record even
 when several call sites use the same canonical instance. The compiler may
 reuse one native specialization for those calls, but it must retain every

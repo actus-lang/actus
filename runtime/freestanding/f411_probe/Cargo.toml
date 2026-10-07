@@ -1,0 +1,17 @@
+[package]
+name = "actus-f411-provider-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+actus-freestanding-region-provider = { path = "../provider_core" }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[profile.dev.package."*"]
+opt-level = 2

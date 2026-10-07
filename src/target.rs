@@ -296,4 +296,12 @@ mod tests {
             "lld-link.exe"
         );
     }
+
+    #[test]
+    fn rejects_targets_without_a_supported_address_width() {
+        let triple = "unknown-unknown-unknown"
+            .parse()
+            .expect("unknown target triple should parse structurally");
+        assert!(TargetSpec::from_triple(triple).is_err());
+    }
 }

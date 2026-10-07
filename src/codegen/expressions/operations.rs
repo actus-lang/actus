@@ -11,7 +11,6 @@ use super::super::calls::CallLoweringContext;
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::initializer_type;
-use super::lower_expression;
 
 pub(in crate::codegen) fn lower_operation(
     function: &mut FunctionBuilder<'_>,
@@ -320,7 +319,7 @@ pub(super) fn lower_expression_with_context(
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    lower_expression(
+    super::lower_expression_with_targets(
         function,
         expression,
         context.locals,
@@ -329,5 +328,6 @@ pub(super) fn lower_expression_with_context(
         context.cleanup_schedule,
         context.string_data,
         context.layouts,
+        context.loop_targets.clone(),
     )
 }

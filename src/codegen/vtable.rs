@@ -111,6 +111,7 @@ pub(super) fn vtable_symbol_for_native_in_namespace(
         NativeType::Pack(id) => format!("pack_{id}"),
         NativeType::Array(id) => format!("array_{id}"),
         NativeType::Arena(capacity) => format!("arena_{capacity}"),
+        NativeType::Region => "region".to_owned(),
     };
     SymbolIdentity::specialized(namespace_prefix, SymbolKind::Vtable, role, &[&target])
         .expect("vtable names are validated by semantic analysis")

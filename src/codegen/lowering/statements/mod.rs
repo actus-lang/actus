@@ -112,7 +112,7 @@ fn lower_expression_statement(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     span: crate::lexer::SourceSpan,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
@@ -125,7 +125,7 @@ fn lower_expression_statement(
             function,
             expression,
             span,
-            locals,
+            &*locals,
             types,
             functions,
             cleanup_schedule,
@@ -150,7 +150,7 @@ fn lower_expression_statement(
 fn lower_plain_expression_statement(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
-    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
@@ -158,6 +158,22 @@ fn lower_plain_expression_statement(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
+    if let Expr::Case { subject, branches, .. } = expression {
+        super::super::case::lower_case(
+            function,
+            subject,
+            branches,
+            locals,
+            types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+            targets,
+            false,
+        )?;
+        return Ok(Flow::Fallthrough);
+    }
     super::super::expressions::lower_expression_with_targets(
         function,
         expression,

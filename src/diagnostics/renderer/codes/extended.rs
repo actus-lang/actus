@@ -61,6 +61,9 @@ fn array_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidArrayCapacity { capacity } => {
             format!("array capacity `{capacity}` must be a positive compile-time integer")
         }
+        SemanticErrorKind::InvalidRegionElementType { element } => {
+            format!("region element type `{element}` must have a fixed native size")
+        }
         SemanticErrorKind::InvalidIndexType { found } => {
             format!("array index must be an integer, found `{found}`")
         }

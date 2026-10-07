@@ -16,6 +16,20 @@ pub const ABI_HANDLE_FAILURE: i64 = -1;
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
+/// Stable runtime symbol used by compiler-generated Region cleanup.
+pub const REGION_DROP_SYMBOL: &str = "actus_region_drop";
+/// Stable runtime symbol for opening a bounded logical region.
+pub const REGION_OPEN_SYMBOL: &str = "actus_region_open";
+/// Stable runtime symbol for reading one resident region element.
+pub const REGION_READ_SYMBOL: &str = "actus_region_read";
+/// Stable runtime symbol for writing one resident region element.
+pub const REGION_WRITE_SYMBOL: &str = "actus_region_write";
+/// Stable runtime symbol for publishing a dirty resident region window.
+pub const REGION_PUBLISH_SYMBOL: &str = "actus_region_publish";
+/// Stable runtime symbol for cancelling dirty resident region bytes.
+pub const REGION_CANCEL_SYMBOL: &str = "actus_region_cancel";
+/// Stable runtime symbol for closing a region capability.
+pub const REGION_CLOSE_SYMBOL: &str = "actus_region_close";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.

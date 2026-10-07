@@ -97,6 +97,11 @@ fn prepare_program(
     );
     let specialized_program =
         super::super::generic::specialize_program(&normalized_program, &generic_instances)?;
+    for instance in super::super::generic::collect_concrete_type_instances(&specialized_program) {
+        if !generic_instances.iter().any(|known| known.identity() == instance.identity()) {
+            generic_instances.push(instance);
+        }
+    }
     let mut semantic = semantic;
     semantic.generic_instances = generic_instances;
     validate_cleanup_plans(&semantic)
@@ -342,9 +347,11 @@ fn build_layouts(
         generic_instances,
         module.isa().pointer_type().bytes(),
     )?;
-    LayoutRegistry::from_program_with_instances(
+    let mut layouts = LayoutRegistry::from_program_with_instances(
         program,
         module.isa().pointer_type(),
         generic_instances,
-    )
+    )?;
+    layouts.set_frontend_config(module.isa().frontend_config());
+    Ok(layouts)
 }

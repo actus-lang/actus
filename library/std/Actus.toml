@@ -32,3 +32,8 @@ targets = ["hosted"]
 name = "string"
 path = "src/string"
 targets = ["hosted"]
+
+[[runtime.modules]]
+name = "region"
+path = "src/region"
+targets = ["hosted", "freestanding"]

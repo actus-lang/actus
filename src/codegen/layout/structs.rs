@@ -25,14 +25,19 @@ impl LayoutRegistry {
         let mut alignment = 1;
         for field in &definition.fields {
             let (mut field_layout, size, field_alignment) = self.field_layout(field, visiting)?;
-            offset = align_up(offset, field_alignment);
+            offset = align_up(offset, field_alignment)
+                .ok_or_else(|| NativeEmitError("struct layout alignment overflow".to_owned()))?;
             field_layout.offset = offset;
             fields.push(field_layout);
-            offset += size;
+            offset = offset
+                .checked_add(size)
+                .ok_or_else(|| NativeEmitError("struct layout size overflow".to_owned()))?;
             alignment = alignment.max(field_alignment);
         }
         visiting.pop();
-        Ok(StructLayout { size: align_up(offset, alignment), alignment, fields })
+        let size = align_up(offset, alignment)
+            .ok_or_else(|| NativeEmitError("struct layout alignment overflow".to_owned()))?;
+        Ok(StructLayout { size, alignment, fields })
     }
 
     fn field_layout(
@@ -143,16 +148,26 @@ impl LayoutRegistry {
             NativeType::Float { width } => float_layout(width),
             NativeType::Void => (0, 1),
             NativeType::String | NativeType::Buffer => (self.pointer_size, self.pointer_size),
-            NativeType::FatPointer => (self.pointer_size * 2, self.pointer_size),
+            NativeType::Region => (56, 8),
+            NativeType::FatPointer => (
+                self.pointer_size.checked_mul(2).ok_or_else(|| {
+                    NativeEmitError("fat pointer layout size overflow".to_owned())
+                })?,
+                self.pointer_size,
+            ),
             NativeType::Struct(id) => self.struct_type_layout(id)?,
             NativeType::Enum(id) => self.enum_type_layout(id)?,
             NativeType::Pack(id) => self.pack_type_layout(id)?,
-            NativeType::Array(id) => {
-                self.array(id)
-                    .map(|layout| (layout.size, layout.alignment))
-                    .ok_or_else(|| NativeEmitError("missing array layout".to_owned()))?
-            }
-            NativeType::Arena(capacity) => (capacity + self.pointer_size, self.pointer_size),
+            NativeType::Array(id) => self
+                .array_layout_value(id)
+                .map(|layout| (layout.size, layout.alignment))
+                .ok_or_else(|| NativeEmitError("missing array layout".to_owned()))?,
+            NativeType::Arena(capacity) => (
+                capacity
+                    .checked_add(self.pointer_size)
+                    .ok_or_else(|| NativeEmitError("arena layout size overflow".to_owned()))?,
+                self.pointer_size,
+            ),
         })
     }
 
@@ -211,6 +226,7 @@ impl LayoutRegistry {
             NativeType::Float { width } => u32::from(width / 8),
             NativeType::Int => 4,
             NativeType::String | NativeType::Buffer | NativeType::Arena(_) => self.pointer_size,
+            NativeType::Region => 8,
             NativeType::FatPointer => self.pointer_size,
             NativeType::Void => 1,
             NativeType::Pack(id) => self
@@ -229,7 +245,7 @@ impl LayoutRegistry {
                     Ok,
                 )?,
             NativeType::Array(id) => self
-                .array(id)
+                .array_layout_value(id)
                 .map(|layout| layout.alignment)
                 .ok_or_else(|| NativeEmitError("missing array alignment".to_owned()))?,
         })

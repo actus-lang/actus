@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     EnumDef, EnumPayload, EnumVariant, GenericParam, Program, StructDef, StructField, TopLevelDecl,
-    TypeName, builtin_enum_definitions,
+    TypeIdentity, TypeName, builtin_enum_definitions,
 };
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
@@ -71,6 +71,140 @@ pub(in crate::codegen) fn specialized_enums(
             })
         })
         .collect()
+}
+
+pub(crate) fn collect_concrete_type_instances(program: &Program) -> Vec<GenericInstance> {
+    let (generic_names, generic_parameter_names) = generic_type_metadata(program);
+    let mut instances = Vec::new();
+    for declaration in &program.declarations {
+        collect_declaration_type_instances(
+            declaration,
+            &generic_names,
+            &generic_parameter_names,
+            &mut instances,
+        );
+    }
+    instances
+}
+
+fn generic_type_metadata(program: &Program) -> (HashSet<String>, HashSet<String>) {
+    let mut generic_names = HashSet::new();
+    let mut parameter_names = HashSet::new();
+    for definition in builtin_enum_definitions()
+        .into_iter()
+        .filter(|definition| !definition.generic_parameters.is_empty())
+    {
+        generic_names.insert(definition.name);
+        parameter_names
+            .extend(definition.generic_parameters.into_iter().map(|parameter| parameter.name));
+    }
+    for declaration in &program.declarations {
+        let (name, parameters) = match declaration {
+            TopLevelDecl::Struct(definition) => (&definition.name, &definition.generic_parameters),
+            TopLevelDecl::Enum(definition) => (&definition.name, &definition.generic_parameters),
+            _ => continue,
+        };
+        if parameters.is_empty() {
+            continue;
+        }
+        generic_names.insert(name.clone());
+        parameter_names.extend(parameters.iter().map(|parameter| parameter.name.clone()));
+    }
+    (generic_names, parameter_names)
+}
+
+fn collect_declaration_type_instances(
+    declaration: &TopLevelDecl,
+    generic_names: &HashSet<String>,
+    parameter_names: &HashSet<String>,
+    instances: &mut Vec<GenericInstance>,
+) {
+    match declaration {
+        TopLevelDecl::Verb(verb) => {
+            verb.params.iter().for_each(|parameter| {
+                collect_type_instances(&parameter.ty, generic_names, parameter_names, instances)
+            });
+            verb.return_type.as_ref().iter().for_each(|return_type| {
+                collect_type_instances(&return_type.ty, generic_names, parameter_names, instances)
+            });
+        }
+        TopLevelDecl::ExternalVerb(verb) => {
+            verb.params.iter().for_each(|parameter| {
+                collect_type_instances(&parameter.ty, generic_names, parameter_names, instances)
+            });
+            verb.return_type.as_ref().iter().for_each(|return_type| {
+                collect_type_instances(&return_type.ty, generic_names, parameter_names, instances)
+            });
+        }
+        TopLevelDecl::Struct(definition) => definition.fields.iter().for_each(|field| {
+            collect_type_instances(&field.ty, generic_names, parameter_names, instances)
+        }),
+        TopLevelDecl::Enum(definition) => {
+            collect_enum_type_instances(definition, generic_names, parameter_names, instances)
+        }
+        _ => {}
+    }
+}
+
+fn collect_enum_type_instances(
+    definition: &EnumDef,
+    generic_names: &HashSet<String>,
+    parameter_names: &HashSet<String>,
+    instances: &mut Vec<GenericInstance>,
+) {
+    for variant in &definition.variants {
+        match &variant.payload {
+            EnumPayload::Tuple(fields) => fields.iter().for_each(|field| {
+                collect_type_instances(field, generic_names, parameter_names, instances)
+            }),
+            EnumPayload::Struct(fields) => fields.iter().for_each(|field| {
+                collect_type_instances(&field.ty, generic_names, parameter_names, instances)
+            }),
+            EnumPayload::Unit => {}
+        }
+    }
+}
+
+fn collect_type_instances(
+    type_name: &TypeName,
+    generic_names: &HashSet<String>,
+    generic_parameter_names: &HashSet<String>,
+    instances: &mut Vec<GenericInstance>,
+) {
+    type_name.arguments.iter().for_each(|argument| {
+        collect_type_instances(argument, generic_names, generic_parameter_names, instances)
+    });
+    if !generic_names.contains(&type_name.name)
+        || type_name.arguments.is_empty()
+        || type_name
+            .arguments
+            .iter()
+            .any(|argument| contains_generic_parameter(argument, generic_parameter_names))
+    {
+        return;
+    }
+    let identity = TypeIdentity::from_type_name(type_name);
+    if instances.iter().any(|instance| instance.identity() == identity) {
+        return;
+    }
+    instances.push(GenericInstance {
+        name: type_name.name.clone(),
+        arguments: type_name.arguments.clone(),
+        canonical_key: canonical_type_name(type_name),
+        caller: None,
+        call_span: type_name.span,
+    });
+}
+
+fn contains_generic_parameter(
+    type_name: &TypeName,
+    generic_parameter_names: &HashSet<String>,
+) -> bool {
+    generic_parameter_names.contains(&type_name.name)
+        || type_name
+            .arguments
+            .iter()
+            .any(|argument| contains_generic_parameter(argument, generic_parameter_names))
 }
 
 fn struct_definitions(program: &Program) -> HashMap<String, StructDef> {

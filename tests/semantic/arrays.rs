@@ -111,6 +111,23 @@ fn rejects_invalid_array_capacity() {
 }
 
 #[test]
+fn rejects_negative_array_capacity_during_parsing() {
+    let (tokens, errors) = scan("verb main(abs values: Array[Int, -1]) { }");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    assert!(parse(tokens).is_err(), "negative array capacities must be rejected");
+}
+
+#[test]
+fn rejects_array_capacity_that_exceeds_native_extent() {
+    let error = analyze_source("verb main(abs values: Array[Int, 4294967296]) { }")
+        .expect_err("array capacities outside the native extent must be rejected");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidArrayCapacity { capacity } if capacity == "4294967296"
+    ));
+}
+
+#[test]
 fn rejects_non_const_generic_array_capacity() {
     let error = analyze_source(
         "struct Table[N: Reader] { cells: Array[Int, N], } role Reader { verb read(); } verb main() { }",

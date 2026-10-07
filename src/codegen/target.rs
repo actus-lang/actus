@@ -16,6 +16,14 @@ pub(super) fn build_isa_with_optimization(
     shared_flags
         .set("opt_level", optimization_level_name(optimization_level))
         .map_err(|error| TargetSpecError::from(error.to_string()))?;
+    if target.matches_platform("windows") {
+        shared_flags
+            .set("enable_probestack", "true")
+            .map_err(|error| TargetSpecError::from(error.to_string()))?;
+        shared_flags
+            .set("probestack_strategy", "inline")
+            .map_err(|error| TargetSpecError::from(error.to_string()))?;
+    }
     let shared_flags = settings::Flags::new(shared_flags);
     let isa_builder = isa::lookup(target.triple().clone())
         .map_err(|error| TargetSpecError::from(error.to_string()))?;
@@ -56,5 +64,16 @@ mod tests {
             .expect("release ISA should build");
         assert_eq!(debug.flags().opt_level(), settings::OptLevel::None);
         assert_eq!(release.flags().opt_level(), settings::OptLevel::Speed);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn enables_inline_stack_probes_for_windows_targets() {
+        let spec =
+            TargetSpec::parse("x86_64-pc-windows-msvc").expect("Windows target should parse");
+        let isa = build_isa_with_optimization(&spec, true, OptimizationLevel::None)
+            .expect("Windows ISA should build");
+        assert!(isa.flags().enable_probestack());
+        assert_eq!(isa.flags().probestack_strategy(), settings::ProbestackStrategy::Inline);
     }
 }

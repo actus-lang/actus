@@ -1,6 +1,6 @@
 use crate::lexer::SourceSpan;
 
-pub(crate) fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
+pub fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
     let (reference_role, key) = reference_role_prefix(key);
     if key.is_empty() || key.contains(']') && !key.contains('[') {
         return None;

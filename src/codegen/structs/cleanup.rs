@@ -50,6 +50,7 @@ fn emit_owned_field_drop(
     let field_address = function.ins().iadd_imm_s(address, i64::from(field.offset));
     match field.ty {
         NativeType::Buffer => emit_buffer_field_drop(function, field_address, functions, layouts),
+        NativeType::Region => emit_region_field_drop(function, field_address, functions, layouts),
         NativeType::Struct(nested_id) => emit_struct_drop_except(
             function,
             field_address,
@@ -80,6 +81,20 @@ fn emit_buffer_field_drop(
     let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
     let target = functions.get("actus_buffer_drop").ok_or_else(|| {
         NativeEmitError("native runtime function `actus_buffer_drop` is unavailable".to_owned())
+    })?;
+    function.ins().call(target.reference, &[handle]);
+    Ok(())
+}
+
+fn emit_region_field_drop(
+    function: &mut FunctionBuilder<'_>,
+    field_address: cranelift_codegen::ir::Value,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
+    let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
+        NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
     })?;
     function.ins().call(target.reference, &[handle]);
     Ok(())
@@ -140,6 +155,14 @@ pub(crate) fn emit_binding_drop(
         return Ok(());
     };
     let address = binding_address(name, locals)?;
+    if binding_type == NativeType::Region {
+        let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), address, 0);
+        let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
+            NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
+        })?;
+        function.ins().call(target.reference, &[handle]);
+        return Ok(());
+    }
     emit_typed_binding_drop(function, address, binding_type, functions, layouts)
 }
 

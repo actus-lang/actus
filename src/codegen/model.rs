@@ -69,7 +69,10 @@ impl NativeCleanupSchedule {
     }
 
     pub(super) fn return_plan(&self, span: SourceSpan) -> Option<&NativeUnwindPlan> {
-        self.returns.iter().find(|plan| plan.span == span)
+        self.returns
+            .iter()
+            .find(|plan| plan.span == span)
+            .or_else(|| self.returns.iter().find(|plan| plan.span.start == span.start))
     }
 
     pub(super) fn loop_plan(

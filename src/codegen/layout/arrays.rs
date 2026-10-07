@@ -5,11 +5,13 @@ use crate::ast::{
 use super::super::generic::canonical_type_name;
 use super::{ArrayLayout, LayoutRegistry};
 use crate::codegen::native::NativeEmitError;
+use crate::semantic::GenericInstance;
 
 pub(crate) fn array_definitions(
     program: &Program,
     specialized_structs: &[StructDef],
     specialized_enums: &[EnumDef],
+    instances: &[GenericInstance],
 ) -> Vec<TypeName> {
     let mut definitions = Vec::new();
     for declaration in &program.declarations {
@@ -58,8 +60,15 @@ pub(crate) fn array_definitions(
             }
         }
     }
+    collect_instance_arrays(instances, &mut definitions);
     sort_array_definitions(&mut definitions, program);
     definitions
+}
+
+fn collect_instance_arrays(instances: &[GenericInstance], definitions: &mut Vec<TypeName>) {
+    instances.iter().flat_map(|instance| &instance.arguments).for_each(|argument| {
+        collect_type_arrays(argument, definitions);
+    });
 }
 
 fn sort_array_definitions(definitions: &mut [TypeName], program: &Program) {
@@ -266,6 +275,7 @@ impl LayoutRegistry {
             .arguments
             .get(1)
             .and_then(|capacity| capacity.name.parse::<u32>().ok())
+            .filter(|capacity| *capacity > 0)
             .ok_or_else(|| NativeEmitError("array type has no numeric capacity".to_owned()))?;
         let element = self.type_for_type_name(element_name).ok_or_else(|| {
             NativeEmitError(format!(
