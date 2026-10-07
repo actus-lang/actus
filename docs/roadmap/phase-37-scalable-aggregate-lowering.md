@@ -521,6 +521,8 @@ defined by ADR-0077.
 - [x] Add the target-neutral statically bounded storage-pool contract.
 - [x] Define the freestanding Buffer, Result, descriptor, and error-code ABI
       contract.
+- [ ] Define the `dat Buffer` ownership handoff, release-on-success, and
+      restore-on-failure adapter contract.
 - [ ] Bind the provider ABI to a target adapter.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.

@@ -106,6 +106,21 @@ The provider returns the existing typed `RegionError` domain through the Actus
 Result ABI. It must not introduce a second error encoding or expose a target
 pointer in the `Region[T]` value.
 
+### Adapter ownership handoff
+
+The global C ABI adapter is a separate layer above this core. On
+`actus_region_open`, it must validate the incoming `ActusBuffer`, copy or
+adopt its bytes into a reserved bounded resident window, reserve the paired
+published mirror, and complete the `dat` ownership handoff before returning a
+successful Result. The adapter must call the target's buffer release bridge
+exactly once after the handoff succeeds, and must release or restore ownership
+on every failure path.
+
+The adapter must retain enough target-owned state to keep both windows live
+until close or drop. A wrapper that merely forwards a borrowed byte slice while
+leaving the consumed Buffer handle unmanaged is rejected because it leaks the
+ownership contract and cannot provide deterministic cleanup.
+
 ## Implementation gates
 
 - Define the provider core as a separate no-host package with no standard
@@ -113,6 +128,8 @@ pointer in the `Region[T]` value.
 - Implement fixed capability slots, generation checks, paired window storage,
   dirty tracking, publication, cancellation, and cleanup.
 - Add a target adapter that binds the core to a statically bounded storage pool.
+- Define and test the `Buffer` ownership handoff and failure cleanup before
+  exporting global `actus_region_*` symbols.
 - Add object-link tests proving all nine provider symbols resolve without the
   hosted runtime archive.
 - Add provider unit tests for stale handles, generation exhaustion, capacity
