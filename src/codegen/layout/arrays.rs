@@ -275,6 +275,7 @@ impl LayoutRegistry {
             .arguments
             .get(1)
             .and_then(|capacity| capacity.name.parse::<u32>().ok())
+            .filter(|capacity| *capacity > 0)
             .ok_or_else(|| NativeEmitError("array type has no numeric capacity".to_owned()))?;
         let element = self.type_for_type_name(element_name).ok_or_else(|| {
             NativeEmitError(format!(

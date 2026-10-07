@@ -233,10 +233,14 @@ pub(super) fn lower_array_constructor(
         layout.alignment.trailing_zeros() as u8,
     ));
     let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
-    let zero = function.ins().iconst(cranelift_codegen::ir::types::I8, 0);
-    for offset in 0..layout.size {
-        function.ins().store(MemFlagsData::new(), zero, address, offset as i32);
-    }
+    function.emit_small_memset(
+        layouts.frontend_config()?,
+        address,
+        0u8,
+        u64::from(layout.size),
+        layout.alignment.trailing_zeros() as u8,
+        MemFlagsData::new(),
+    );
     Ok(address)
 }
 

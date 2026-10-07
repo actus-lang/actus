@@ -111,6 +111,18 @@ mod tests {
         assert_eq!(identity.key(), "Result[Int]");
         assert_eq!(identity, type_name.identity());
     }
+
+    #[test]
+    fn canonical_key_for_large_extent_is_bounded() {
+        let type_name = type_name(
+            "Array",
+            vec![type_name("u8", Vec::new(), 0), type_name("1048576", Vec::new(), 3)],
+            0,
+        );
+
+        assert_eq!(type_name.canonical_key(), "Array[u8,1048576]");
+        assert!(type_name.canonical_key().len() < 32);
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

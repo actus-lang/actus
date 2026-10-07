@@ -153,7 +153,7 @@ impl Analyzer {
         }
         let element = &type_name.arguments[0];
         let capacity = &type_name.arguments[1];
-        let parsed_capacity = capacity.name.parse::<usize>().ok();
+        let parsed_capacity = capacity.name.parse::<u32>().ok();
         let const_parameter = self.is_const_generic_parameter(&capacity.name);
         if capacity.reference_role.is_some()
             || !capacity.arguments.is_empty()

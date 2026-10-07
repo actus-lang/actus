@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use object::{Object, ObjectSymbol};
+
 const CASES: &[(&str, &str)] =
     &[("64", "aggregate_64.act"), ("1024", "aggregate_1024.act"), ("65536", "aggregate_65536.act")];
 
@@ -69,4 +71,54 @@ fn compiles_and_runs_small_scalable_aggregate_fixtures() {
     for (size, file) in CASES.iter() {
         run_case(size, file);
     }
+}
+
+#[test]
+fn large_zero_initialized_aggregate_uses_bounded_memset_lowering() {
+    let input = fixture("aggregate_65536.act");
+    let root = std::env::temp_dir().join(format!("actus-scale-object-{}", std::process::id()));
+    let output = root.with_extension("o");
+    let build = run_cli(&[
+        "build".to_owned(),
+        input.display().to_string(),
+        "--strict".to_owned(),
+        "--emit".to_owned(),
+        "obj".to_owned(),
+        "-o".to_owned(),
+        output.display().to_string(),
+    ]);
+    assert!(build.status.success(), "object build failed: {:?}", build.stderr);
+
+    let bytes = fs::read(&output).expect("read generated object");
+    let object = object::File::parse(bytes.as_slice()).expect("parse generated object");
+    let has_memset_symbol =
+        object.symbols().any(|symbol| symbol.name().is_ok_and(|name| name.contains("memset")));
+    assert!(has_memset_symbol, "large aggregate initialization must lower through memset");
+    let _ = fs::remove_file(output);
+}
+
+#[test]
+fn rejects_inline_array_size_overflow_during_native_layout() {
+    let root = std::env::temp_dir().join(format!("actus-scale-overflow-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("o");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg values: Array[u64, 4294967295] = Array[u64, 4294967295](); return values[0u32] as Int; }",
+    )
+    .expect("write overflow fixture");
+    let build = run_cli(&[
+        "build".to_owned(),
+        input.display().to_string(),
+        "--strict".to_owned(),
+        "--emit".to_owned(),
+        "obj".to_owned(),
+        "-o".to_owned(),
+        output.display().to_string(),
+    ]);
+    let stderr = String::from_utf8_lossy(&build.stderr);
+    assert!(!build.status.success());
+    assert!(stderr.contains("array layout size overflow"), "unexpected diagnostic: {stderr}");
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
 }

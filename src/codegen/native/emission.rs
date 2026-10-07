@@ -347,9 +347,11 @@ fn build_layouts(
         generic_instances,
         module.isa().pointer_type().bytes(),
     )?;
-    LayoutRegistry::from_program_with_instances(
+    let mut layouts = LayoutRegistry::from_program_with_instances(
         program,
         module.isa().pointer_type(),
         generic_instances,
-    )
+    )?;
+    layouts.set_frontend_config(module.isa().frontend_config());
+    Ok(layouts)
 }
