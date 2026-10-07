@@ -181,12 +181,12 @@ impl Analyzer {
         }
         let element = &type_name.arguments[0];
         let mut visiting = Vec::new();
-        self.validate_region_element_type(element, &mut visiting)?;
+        self.validate_fixed_size_type(element, &mut visiting)?;
         let resolved_element = self.resolve_type_reference(element)?;
         Ok(ResolvedType::Applied { name: "Region".to_owned(), arguments: vec![resolved_element] })
     }
 
-    fn validate_region_element_type(
+    pub(super) fn validate_fixed_size_type(
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
@@ -214,13 +214,13 @@ impl Analyzer {
             {
                 return Err(invalid());
             }
-            return self.validate_region_element_type(element, visiting);
+            return self.validate_fixed_size_type(element, visiting);
         }
         if matches!(type_name.name.as_str(), "String" | "Buffer" | "Map" | "Region") {
             return Err(invalid());
         }
         if let Some(pack) = self.pack_types.get(&type_name.name) {
-            return self.validate_region_element_type(pack.storage.type_name(), visiting);
+            return self.validate_fixed_size_type(pack.storage.type_name(), visiting);
         }
         if let Some(structure) = self.struct_types.get(&type_name.name) {
             if visiting.iter().any(|name| name == &type_name.name) {
@@ -230,7 +230,7 @@ impl Analyzer {
             let result = structure
                 .fields
                 .iter()
-                .try_for_each(|field| self.validate_region_element_type(&field.ty, visiting));
+                .try_for_each(|field| self.validate_fixed_size_type(&field.ty, visiting));
             visiting.pop();
             return result;
         }

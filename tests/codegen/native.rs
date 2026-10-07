@@ -229,6 +229,23 @@ fn lowers_region_owner_cleanup_to_the_runtime_release_bridge() {
 }
 
 #[test]
+fn lowers_size_of_to_a_compile_time_integer_constant() {
+    let source = "verb main() -> u64 { return size_of[u32](); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("size_of source should parse");
+    let bytes = actus::codegen::emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("size_of should lower without a runtime dependency");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(!symbols.iter().any(|symbol| symbol.contains("size_of")));
+}
+
+#[test]
 fn keeps_region_symbols_bounded_by_logical_capacity() {
     let source = "verb inspect(abs region: Region[Array[u8, 1048576]]) -> Int { return 0; } verb main() -> Int { return 0; }";
     let (tokens, errors) = scan(source);

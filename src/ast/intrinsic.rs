@@ -8,6 +8,7 @@ pub enum IntrinsicKind {
     Copy,
     Print,
     Drop,
+    SizeOf,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -70,6 +71,9 @@ impl IntrinsicKind {
                 parameters: &["binding"],
                 status: RegistryStatus::Active,
             },
+            Self::SizeOf => {
+                IntrinsicSpec { name: "size_of", parameters: &[], status: RegistryStatus::Active }
+            }
         }
     }
 }
@@ -84,12 +88,14 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
         "copy" => Some(IntrinsicKind::Copy),
         "print" => Some(IntrinsicKind::Print),
         "drop" => Some(IntrinsicKind::Drop),
+        "size_of" => Some(IntrinsicKind::SizeOf),
         _ => None,
     }
 }
 
 pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
-    match lookup_intrinsic(name) {
+    let base_name = name.split_once('[').map_or(name, |(base, _)| base);
+    match lookup_intrinsic(base_name) {
         Some(
             IntrinsicKind::Append
             | IntrinsicKind::BufferLength
@@ -97,8 +103,9 @@ pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
             | IntrinsicKind::Crc32Matches
             | IntrinsicKind::ValidateFixedFrame
             | IntrinsicKind::Copy
-            | IntrinsicKind::Print,
-        ) => lookup_intrinsic(name),
+            | IntrinsicKind::Print
+            | IntrinsicKind::SizeOf,
+        ) => lookup_intrinsic(base_name),
         Some(IntrinsicKind::Drop) | None => None,
     }
 }

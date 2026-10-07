@@ -45,6 +45,8 @@ fn intrinsic_registry_defines_source_contracts() {
     assert!(lookup_call_intrinsic("drop").is_none());
     assert_eq!(lookup_call_intrinsic("print"), Some(IntrinsicKind::Print));
     assert_eq!(lookup_call_intrinsic("copy"), Some(IntrinsicKind::Copy));
+    assert_eq!(lookup_intrinsic("size_of"), Some(IntrinsicKind::SizeOf));
+    assert_eq!(lookup_call_intrinsic("size_of[u32]"), Some(IntrinsicKind::SizeOf));
     assert_eq!(lookup_call_intrinsic("crc32"), Some(IntrinsicKind::Crc32));
     assert_eq!(lookup_call_intrinsic("crc32_matches"), Some(IntrinsicKind::Crc32Matches));
     assert_eq!(
@@ -52,6 +54,26 @@ fn intrinsic_registry_defines_source_contracts() {
         Some(IntrinsicKind::ValidateFixedFrame)
     );
     assert!(lookup_intrinsic("user_function").is_none());
+}
+
+#[test]
+fn accepts_compile_time_size_of_for_fixed_types() {
+    analyze_source("verb main() -> u64 { return size_of[u32](); }")
+        .expect("size_of should accept a fixed-width primitive");
+    analyze_source("verb main() -> u64 { return size_of[Array[u8, 4]](); }")
+        .expect("size_of should accept a fixed-size array");
+}
+
+#[test]
+fn rejects_size_of_without_a_fixed_type_argument() {
+    for source in [
+        "verb main() -> u64 { return size_of(); }",
+        "verb main() -> u64 { erg buffer: Buffer = Buffer[4]; return size_of[Buffer](); }",
+        "verb main() -> u64 { erg text: String = \"x\"; return size_of[String](); }",
+        "verb main() -> u64 { return size_of[Region[u32]](); }",
+    ] {
+        analyze_source(source).expect_err("size_of must reject non-fixed or missing types");
+    }
 }
 
 #[test]

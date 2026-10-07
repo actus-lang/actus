@@ -145,6 +145,13 @@ The compiler implementation proceeds in this order:
 6. add native executable tests for read, write, bounds failure, publication,
    cleanup, symbol boundedness, and inline-array ABI separation.
 
+The facade may obtain an element stride only through the compiler-provided
+`size_of[T]()` intrinsic. This intrinsic is compile-time only, returns a `u64`,
+accepts only fully sized primitive, array, pack, or struct types, and emits no
+runtime call or user-controlled stride field. Dynamic storage types such as
+`Buffer`, `String`, `Map`, and nested `Region` are rejected during semantic
+analysis.
+
 ### Descriptor call ABI
 
 The descriptor is a small fixed aggregate, but its six `u64` words plus

@@ -213,6 +213,9 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
+    if callee.starts_with("size_of[") {
+        return Expr::Call { callee: callee.clone(), arguments: Vec::new(), span: *span };
+    }
     if (callee == "copy" || callee.starts_with("copy__"))
         && arguments.len() == 1
         && arguments[0].name.as_deref() == Some("value")

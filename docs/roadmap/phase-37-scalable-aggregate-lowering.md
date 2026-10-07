@@ -330,6 +330,9 @@ Gate 37.5 evidence, 2026-10-07:
       `std::region` facade, `Region[T]`, `RegionError`, operation names, and
       `erg`/`abs`/`ins`/`dat` transitions. Do not add compiler intrinsics before
       this contract is accepted.
+- [x] Add the compiler-only `size_of[T]()` prerequisite for facade stride
+      derivation. It returns `u64`, accepts only fixed-size source types, and
+      lowers to an immediate with no runtime dependency.
 - [ ] Implement the `std::region` facade and keep raw runtime bridges private.
 - [ ] Implement `region_open` with `dat Buffer` transfer and capability
       registration.
