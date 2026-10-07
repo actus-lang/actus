@@ -12,7 +12,7 @@ use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataIds;
 use super::super::model::NativeCleanupSchedule;
-use super::super::native_runtime::declare_runtime_functions;
+use super::super::native_runtime::{declare_region_cleanup_function, declare_runtime_functions};
 use super::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 
 pub(super) fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
@@ -73,6 +73,8 @@ pub(super) fn declare_all_functions(
         || external_verbs.iter().any(|verb| verb.name == "print");
     if target_requires_host_runtime(context.target) {
         metadata.extend(declare_runtime_functions(module, has_print_definition)?);
+    } else {
+        metadata.extend(declare_region_cleanup_function(module)?);
     }
     Ok(metadata)
 }

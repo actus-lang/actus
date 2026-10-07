@@ -353,6 +353,31 @@ fn array_and_pack_lowering_is_freestanding_and_has_no_host_runtime_imports() {
     assert!(undefined.is_empty(), "freestanding array object imports host symbols: {undefined:?}");
 }
 
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn region_cleanup_uses_only_the_freestanding_provider_symbol() {
+    let source = "verb main(erg region: Region[u8]) -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("freestanding Region source should parse");
+    let target =
+        TargetSpec::parse("x86_64-unknown-uefi").expect("freestanding target should parse");
+    let bytes = emit_program_object_for_target(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+        &target,
+    )
+    .expect("freestanding Region cleanup should emit an object");
+    let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
+    let undefined = file
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
+    assert_eq!(undefined, ["actus_region_drop"]);
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn arena_freestanding_contract_is_valid_on_macos() {

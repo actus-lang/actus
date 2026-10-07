@@ -36,6 +36,12 @@ after the freestanding bridge and object tests pass. Registry-only enablement is
 rejected because it would make source resolution succeed while leaving hosted
 runtime symbols or unsupported cleanup behavior at the object boundary.
 
+The compiler may nevertheless lower a freestanding `Region[T]` owner cleanup
+boundary before the facade is enabled. That object may import only the
+target-provided `actus_region_drop` symbol; it must not acquire the hosted
+runtime archive. This staged compiler boundary does not make Region operations
+available on freestanding targets.
+
 ## Required implementation gates
 
 1. Specify the no-host resident-window provider and its bounded storage budget.

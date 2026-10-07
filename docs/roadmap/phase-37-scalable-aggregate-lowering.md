@@ -464,6 +464,8 @@ contract before the facade becomes available there.
       freestanding targets, including startup, failure, and cleanup ownership.
 - [ ] Add a target-aware Region bridge implementation whose symbols are valid
       for freestanding object emission and do not import hosted runtime symbols.
+- [x] Allow freestanding native lowering to declare the Region cleanup provider
+      symbol without importing the hosted runtime archive.
 - [ ] Expose the canonical `std::region` facade to freestanding targets only
       after the bridge and ownership contracts are implemented.
 - [ ] Add freestanding semantic and object tests for 1 MiB, 1 GiB, and 1 TiB
@@ -481,6 +483,11 @@ Gate 37.7-F boundary evidence, 2026-10-07:
 - The registry remains hosted-only intentionally. Adding freestanding
   availability without a no-host bridge would create an invalid object-level
   contract, so this gate remains open.
+- The compiler now emits a freestanding Region owner-cleanup object whose only
+  undefined provider is `actus_region_drop`; the regression
+  `region_cleanup_uses_only_the_freestanding_provider_symbol` passes. This is
+  only the cleanup ABI boundary. Region operations remain unavailable until a
+  no-host resident-window backend and buffer provider exist.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 

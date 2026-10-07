@@ -58,6 +58,16 @@ pub(super) fn declare_runtime_functions(
     Ok(functions)
 }
 
+pub(super) fn declare_region_cleanup_function(
+    module: &mut ObjectModule,
+) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let region_drop = declare_region_drop(module)?;
+    Ok(HashMap::from([(
+        super::performance::dispatch_key(NativeType::Region, "drop"),
+        named_meta(region_drop, &["handle"], NativeType::Int),
+    )]))
+}
+
 struct RuntimeFunctionIds {
     allocate: cranelift_module::FuncId,
     drop: cranelift_module::FuncId,
