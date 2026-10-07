@@ -288,3 +288,70 @@ fn hosted_region_object_has_bounded_abi_sections_and_relocations() {
     let _ = fs::remove_dir_all(large_root);
     let _ = fs::remove_dir_all(inline_root);
 }
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn freestanding_region_object_imports_only_target_provider_bridges() {
+    let root =
+        std::env::temp_dir().join(format!("actus-freestanding-region-{}", std::process::id()));
+    let source_root = root.join("src");
+    fs::create_dir_all(&source_root)
+        .expect("freestanding fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"freestanding_region_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nsource_root = \"src\"\nentry = \"boot\"\n\n[build]\nruntime = \"std\"\ntarget = \"x86_64-unknown-uefi\"\nentry_contract = \"freestanding\"\nverify_no_float_ir = true\n",
+    )
+    .expect("freestanding fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::region; verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1099511627776u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n",
+    )
+    .expect("freestanding fixture source should be written");
+
+    let output = root.join("main.o");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "obj",
+            "-o",
+            output.to_str().expect("object path should be valid UTF-8"),
+        ])
+        .output()
+        .expect("freestanding Region object build should start");
+    assert!(
+        build.status.success(),
+        "freestanding Region object build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let mut defined = Vec::new();
+    let mut undefined = Vec::new();
+    for entry in fs::read_dir(&root).expect("read freestanding fixture directory") {
+        let path = entry.expect("read fixture entry").path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("o") {
+            continue;
+        }
+        let bytes = fs::read(&path).expect("read generated freestanding object");
+        let file =
+            object::File::parse(bytes.as_slice()).expect("parse generated freestanding object");
+        for symbol in file.symbols() {
+            let Some(name) = symbol.name().ok().map(str::to_owned) else {
+                continue;
+            };
+            if symbol.is_undefined() {
+                undefined.push(name);
+            } else {
+                defined.push(name);
+            }
+        }
+    }
+    undefined.retain(|symbol| !defined.iter().any(|defined_symbol| defined_symbol == symbol));
+    undefined.sort();
+    undefined.dedup();
+    assert_eq!(undefined, ["actus_region_drop", "actus_region_open"]);
+
+    let _ = fs::remove_dir_all(root);
+}

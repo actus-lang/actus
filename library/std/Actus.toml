@@ -36,4 +36,4 @@ targets = ["hosted"]
 [[runtime.modules]]
 name = "region"
 path = "src/region"
-targets = ["hosted"]
+targets = ["hosted", "freestanding"]

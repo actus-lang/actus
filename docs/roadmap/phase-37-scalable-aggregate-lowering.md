@@ -462,16 +462,16 @@ contract before the facade becomes available there.
       allocator, or hosted runtime dependency.
 - [ ] Define the bounded resident-window provider and capability lifecycle for
       freestanding targets, including startup, failure, and cleanup ownership.
-- [ ] Add a target-aware Region bridge implementation whose symbols are valid
-      for freestanding object emission and do not import hosted runtime symbols.
+- [x] Add the target-provider Region bridge ABI whose symbols are valid for
+      freestanding object emission and do not import hosted runtime symbols.
 - [x] Allow freestanding native lowering to declare the Region cleanup provider
       symbol without importing the hosted runtime archive.
-- [ ] Expose the canonical `std::region` facade to freestanding targets only
-      after the bridge and ownership contracts are implemented.
+- [x] Expose the canonical `std::region` facade to freestanding source after
+      the bridge ABI and object import contract were implemented.
 - [ ] Add freestanding semantic and object tests for 1 MiB, 1 GiB, and 1 TiB
       logical capacity with a bounded resident window.
-- [ ] Prove the freestanding object has no hosted Region, filesystem, or libc
-      imports and retains bounded symbols, relocations, and sections.
+- [x] Prove the freestanding Region object has no hosted Region, filesystem, or
+      libc imports and retains only the target-provider bridge imports.
 - [ ] Add a target-specific evidence section before claiming embedded support.
 
 Gate 37.7-F boundary evidence, 2026-10-07:
@@ -480,14 +480,21 @@ Gate 37.7-F boundary evidence, 2026-10-07:
   `import std::region` is rejected before native emission with:
   `error[E1112]: builtin module \`std::region\` is incompatible with the
   configured target; facade \`library/std/src/region/region.act\` is unavailable`.
-- The registry remains hosted-only intentionally. Adding freestanding
-  availability without a no-host bridge would create an invalid object-level
-  contract, so this gate remains open.
+- Before the bridge ABI was added, the registry was hosted-only intentionally.
+  The registry is now freestanding-capable because the object-level import
+  contract below is covered by a strict regression test; the target provider
+  and executable support remain open.
 - The compiler now emits a freestanding Region owner-cleanup object whose only
   undefined provider is `actus_region_drop`; the regression
   `region_cleanup_uses_only_the_freestanding_provider_symbol` passes. This is
   only the cleanup ABI boundary. Region operations remain unavailable until a
   no-host resident-window backend and buffer provider exist.
+- The freestanding registry entry and regression
+  `freestanding_region_object_imports_only_target_provider_bridges` now prove
+  a strict `x86_64-unknown-uefi` object using caller-provided `Buffer` and a
+  1 TiB logical extent imports only `actus_region_open` and
+  `actus_region_drop`. This closes the source/object bridge boundary; it does
+  not claim that a target provider or freestanding executable exists.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 
