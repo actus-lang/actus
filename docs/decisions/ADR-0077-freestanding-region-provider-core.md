@@ -137,8 +137,9 @@ freestanding import contract.
 
 The standalone provider core currently builds as a `no_std` library and has
 unit coverage for resident/published lifecycle behavior, publication and
-cancellation, stale generation rejection, exact window sizing, and bounded
-slot capacity. A freestanding `x86_64-unknown-none` build was attempted but
+cancellation, stale generation rejection, exact window sizing, bounded slot
+capacity, and the eight-byte-aligned fixed window pool. A freestanding
+`x86_64-unknown-none` build was attempted but
 the target is not installed in the current toolchain (`can't find crate for
 core`); this is environment evidence, not target execution evidence. Target
 adapter implementation, ABI linking, generation-exhaustion evidence, and

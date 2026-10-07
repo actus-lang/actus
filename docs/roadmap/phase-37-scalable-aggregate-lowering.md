@@ -518,7 +518,8 @@ defined by ADR-0077.
 - [x] Implement bounded paired resident/published windows without libc,
       filesystem access, or general allocation.
 - [x] Implement open, read, write, publish, cancel, close, and idempotent drop.
-- [ ] Add the target adapter and statically bounded storage-pool contract.
+- [x] Add the target-neutral statically bounded storage-pool contract.
+- [ ] Bind the provider ABI to a target adapter.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.
 - [ ] Link a freestanding object against all nine provider symbols.

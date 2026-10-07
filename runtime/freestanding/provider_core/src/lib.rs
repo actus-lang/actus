@@ -4,6 +4,10 @@
 
 use core::array;
 
+mod pool;
+
+pub use pool::{PoolError, StaticWindowPool, WindowLease};
+
 /// Stable capability identifier: low 32 bits are slot plus one, high 32 bits are generation.
 pub type RegionHandle = u64;
 
