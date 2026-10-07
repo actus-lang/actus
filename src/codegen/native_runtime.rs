@@ -68,6 +68,26 @@ pub(super) fn declare_region_cleanup_function(
     )]))
 }
 
+pub(super) fn declare_enum_cleanup_function(
+    module: &mut ObjectModule,
+) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let enum_drop = declare_enum_drop(module, module.isa().pointer_type())?;
+    Ok(HashMap::from([(
+        ENUM_DROP_SYMBOL.to_owned(),
+        named_meta(enum_drop, &["pointer", "size"], NativeType::Int),
+    )]))
+}
+
+pub(super) fn declare_buffer_cleanup_function(
+    module: &mut ObjectModule,
+) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+    let buffer_drop = declare_drop(module, module.isa().pointer_type())?;
+    Ok(HashMap::from([(
+        BUFFER_DROP_SYMBOL.to_owned(),
+        named_meta(buffer_drop, &["handle"], NativeType::Int),
+    )]))
+}
+
 struct RuntimeFunctionIds {
     allocate: cranelift_module::FuncId,
     drop: cranelift_module::FuncId,

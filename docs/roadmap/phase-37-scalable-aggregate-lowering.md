@@ -492,9 +492,10 @@ Gate 37.7-F boundary evidence, 2026-10-07:
 - The freestanding registry entry and regression
   `freestanding_region_object_imports_only_target_provider_bridges` now prove
   a strict `x86_64-unknown-uefi` object using caller-provided `Buffer` and a
-  1 TiB logical extent imports only `actus_region_open` and
-  `actus_region_drop`. This closes the source/object bridge boundary; it does
-  not claim that a target provider or freestanding executable exists.
+  1 TiB logical extent imports only the nine target-provider symbols: the seven
+  `actus_region_*` lifecycle operations plus `actus_buffer_drop` and
+  `actus_enum_drop`. This closes the source/object bridge boundary; it does not
+  claim that a target provider or freestanding executable exists.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 

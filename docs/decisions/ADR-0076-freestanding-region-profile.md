@@ -44,10 +44,11 @@ target-provided `actus_region_drop` symbol. This staged compiler boundary does
 not by itself provide a resident-window implementation.
 
 The current compiler-level stage closes only the bridge/object boundary: a
-strict `x86_64-unknown-uefi` object using a caller-provided `Buffer` and a
-1 TiB logical length imports only `actus_region_open` and
-`actus_region_drop`. The target-provider implementation, executable link, and
-resident-window execution remain open acceptance work.
+strict `x86_64-unknown-uefi` object using caller-provided buffers, the complete
+Region lifecycle, and a 1 TiB logical length imports only the nine target
+provider symbols: the seven `actus_region_*` operations plus
+`actus_buffer_drop` and `actus_enum_drop`. The target-provider implementation,
+executable link, and resident-window execution remain open acceptance work.
 
 ## Required implementation gates
 

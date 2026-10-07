@@ -304,7 +304,54 @@ fn freestanding_region_object_imports_only_target_provider_bridges() {
     .expect("freestanding fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1099511627776u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n",
+        r#"import std::region;
+verb after_write(ins region: Region[u8], ins destination: Buffer) -> Int {
+    erg published = region_publish(region: ins region);
+    return case dat published {
+        Result.Err(_) => 3,
+        Result.Ok(_) => {
+            erg cancelled = region_cancel(region: ins region);
+            return case dat cancelled {
+                Result.Err(_) => 4,
+                Result.Ok(_) => {
+                    erg index: u64 = 0u64;
+                    erg read = region_read(region: abs region, index: erg index, destination: ins destination);
+                    return case dat read {
+                        Result.Err(_) => 5,
+                        Result.Ok(_) => {
+                            erg closed = region_close(region: ins region);
+                            drop(closed);
+                            return 0;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+verb write_and_continue(ins region: Region[u8], abs source: Buffer, ins destination: Buffer) -> Int {
+    erg index: u64 = 0u64;
+    erg written = region_write(region: ins region, index: erg index, source: abs source);
+    return case dat written {
+        Result.Err(_) => 2,
+        Result.Ok(_) => {
+            return after_write(region: ins region, destination: ins destination);
+        },
+    };
+}
+verb boot(erg backing: Buffer, erg destination: Buffer, erg source: Buffer) -> Int {
+    erg logical_length: u64 = 1099511627776u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(region) => {
+            return write_and_continue(region: ins region, source: abs source, destination: ins destination);
+        },
+    };
+}
+"#,
     )
     .expect("freestanding fixture source should be written");
 
@@ -351,7 +398,20 @@ fn freestanding_region_object_imports_only_target_provider_bridges() {
     undefined.retain(|symbol| !defined.iter().any(|defined_symbol| defined_symbol == symbol));
     undefined.sort();
     undefined.dedup();
-    assert_eq!(undefined, ["actus_region_drop", "actus_region_open"]);
+    assert_eq!(
+        undefined,
+        [
+            "actus_buffer_drop",
+            "actus_enum_drop",
+            "actus_region_cancel",
+            "actus_region_close",
+            "actus_region_drop",
+            "actus_region_open",
+            "actus_region_publish",
+            "actus_region_read",
+            "actus_region_write",
+        ]
+    );
 
     let _ = fs::remove_dir_all(root);
 }
