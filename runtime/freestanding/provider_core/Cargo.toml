@@ -7,3 +7,6 @@ description = "No-std bounded provider core for Actus logical regions"
 
 [lib]
 path = "src/lib.rs"
+
+[features]
+target-abi = []

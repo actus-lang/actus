@@ -523,7 +523,9 @@ defined by ADR-0077.
       contract.
 - [x] Define and test the `dat Buffer` ownership handoff,
       release-on-success, and restore-on-failure adapter contract.
-- [ ] Bind the provider ABI to a target adapter.
+- [x] Implement a feature-gated fixed-storage target ABI shim for the seven
+      Region symbols.
+- [ ] Link the shim with target-provided Buffer/result allocation symbols.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.
 - [ ] Link a freestanding object against all nine provider symbols.

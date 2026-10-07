@@ -171,3 +171,9 @@ The adapter boundary now has a target-neutral ownership handoff helper. Its
 tests prove that a valid open calls the release callback once after provider
 acceptance, while validation or provider failure leaves the incoming Buffer
 owned by its caller.
+
+A feature-gated fixed-storage target ABI shim now exposes the seven
+`actus_region_*` symbols with eight capability slots and 1024-byte resident
+windows. `cargo check --features target-abi` proves that the shim compiles as
+`no_std`; linking it requires target-provided `actus_buffer_drop` and
+`actus_enum_allocate` symbols and remains a separate target gate.

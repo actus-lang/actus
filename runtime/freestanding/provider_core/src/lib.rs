@@ -7,6 +7,8 @@ use core::array;
 mod abi;
 mod adapter;
 mod pool;
+#[cfg(feature = "target-abi")]
+mod target_abi;
 
 pub use abi::{ActusBuffer, RegionAbiLayout};
 pub use adapter::{BufferHandoffError, open_from_buffer};
