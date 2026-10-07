@@ -66,6 +66,7 @@ mod tests {
         assert_eq!(release.flags().opt_level(), settings::OptLevel::Speed);
     }
 
+    #[cfg(windows)]
     #[test]
     fn enables_inline_stack_probes_for_windows_targets() {
         let spec =
