@@ -76,6 +76,109 @@ fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
 }
 
 #[test]
+fn generic_region_lowers_an_imported_packed_element_type() {
+    let source = "import feature; import std::region; verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
+    let (root, input, output) = project("generic-region-imported-pack", source);
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "open pack Minicolumn { erg storage: Array[u8, 64]; layout little; fields { erg marker: u8 at 0; erg threshold: u8 at 8; erg myelination: u8 at 16; erg idle_ticks: u8 at 24; erg flags: u8 at 32; erg payload: u8 at 40; erg layer_depth: u16 at 48; erg coincidence_low: u64 at 64; erg coincidence_high: u64 at 128; erg axons: Array[u32, 8] at 192; erg free_list_link: u32 at 448; erg inhibitory_link: u32 at 480; } }\n",
+    )
+    .expect("write imported packed type");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("enable standard runtime");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(0));
+    fs::remove_dir_all(root).expect("remove imported packed Region project");
+}
+
+#[test]
+fn generic_region_lowers_all_packed_element_operations() {
+    let source = r#"import feature;
+import std::region;
+
+verb write_publish_cancel(ins region: Region[Minicolumn]) -> Int {
+    erg source: Buffer = Buffer[64];
+    erg index: u64 = 0u64;
+    erg written = region_write(region: ins region, index: erg index, source: abs source);
+    return case dat written {
+        Result.Err(_) => 1,
+        Result.Ok(_) => {
+            erg published = region_publish(region: ins region);
+            return case dat published {
+                Result.Err(_) => 2,
+                Result.Ok(_) => {
+                    erg canceled = region_cancel(region: ins region);
+                    return case dat canceled {
+                        Result.Err(_) => 3,
+                        Result.Ok(_) => {
+                            return 0;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb main() -> Int {
+    erg backing: Buffer = Buffer[64];
+    erg logical_length: u64 = 1048576u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened {
+        Result.Err(_) => 6,
+        Result.Ok(region) => {
+            erg write_status: Int = write_publish_cancel(region: ins region);
+            if write_status != 0 {
+                return write_status;
+            }
+            erg destination: Buffer = Buffer[64];
+            erg index: u64 = 0u64;
+            erg read_result = region_read(region: abs region, index: erg index, destination: ins destination);
+            erg read_ok: Bool = case dat read_result {
+                Result.Err(_) => false,
+                Result.Ok(_) => true,
+            };
+            erg closed = region_close(region: ins region);
+            return case dat closed {
+                Result.Err(_) => 5,
+                Result.Ok(_) => if read_ok { 0 } else { 4 },
+            };
+        },
+    };
+}
+"#;
+    let (root, input, output) = project("generic-region-packed-operations", source);
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "open pack Minicolumn { erg storage: Array[u8, 64]; layout little; fields { erg marker: u8 at 0; erg threshold: u8 at 8; erg myelination: u8 at 16; erg idle_ticks: u8 at 24; erg flags: u8 at 32; erg payload: u8 at 40; erg layer_depth: u16 at 48; erg coincidence_low: u64 at 64; erg coincidence_high: u64 at 128; erg axons: Array[u32, 8] at 192; erg free_list_link: u32 at 448; erg inhibitory_link: u32 at 480; } }\n",
+    )
+    .expect("write imported packed type");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("enable standard runtime");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(0));
+    fs::remove_dir_all(root).expect("remove packed Region operations project");
+}
+
+#[test]
 fn nested_facade_lowers_pack_backed_const_generic_parameters() {
     let source = "import feature; verb main() -> Int { return inspect[256]() as Int; }\n";
     let (root, input, output) = project("pack-backed-generic-facade", source);

@@ -123,7 +123,6 @@ pub(crate) fn emit_objects(
     symbol: &str,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, NativeEmitError> {
-    let object_plan = plan.object_plan().map_err(|error| NativeEmitError(error.to_string()))?;
     let targeted_caller = crate::codegen::normalize_program(
         &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
     );
@@ -132,6 +131,24 @@ pub(crate) fn emit_objects(
         .generic_instances;
     let generic_instances =
         crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
+    let generic_types = generic_instances
+        .iter()
+        .filter(|instance| {
+            matches!(
+                instance.name.as_str(),
+                "region_open"
+                    | "region_read"
+                    | "region_write"
+                    | "region_publish"
+                    | "region_cancel"
+                    | "region_close"
+            )
+        })
+        .flat_map(|instance| instance.arguments.iter().cloned())
+        .collect::<Vec<_>>();
+    let object_plan = plan
+        .object_plan_with_generic_types(&generic_types)
+        .map_err(|error| NativeEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(

@@ -52,6 +52,7 @@ impl ModuleObjectPlan {
 
 pub(super) fn build_object_plan(
     compilation: &ModuleCompilationPlan,
+    generic_types: &[crate::ast::TypeName],
 ) -> Result<ModuleObjectPlan, ModuleError> {
     let mut owners = HashSet::new();
     owners.insert(String::new());
@@ -72,7 +73,7 @@ pub(super) fn build_object_plan(
         units.push(ModuleObjectUnit {
             owner: ModuleObjectOwner::Imported { module_path },
             namespace: module.identity().namespace().clone(),
-            program: implementation_declarations(module, compilation),
+            program: implementation_declarations(module, compilation, generic_types),
             exported_verbs: exported_implementation_names(module),
         });
     }
@@ -94,6 +95,7 @@ fn exported_implementation_names(module: &super::unit::ModuleUnit) -> Vec<String
 fn implementation_declarations(
     module: &super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
+    generic_types: &[crate::ast::TypeName],
 ) -> Program {
     let local_declarations = module
         .implementation()
@@ -115,7 +117,7 @@ fn implementation_declarations(
         &mut declarations,
     );
     declarations.extend(local_declarations);
-    append_root_generic_support(&mut declarations, module, compilation);
+    append_root_generic_support(&mut declarations, module, compilation, generic_types);
     Program { file_metadata: Vec::new(), declarations }
 }
 
@@ -165,6 +167,7 @@ fn append_root_generic_support(
     declarations: &mut Vec<TopLevelDecl>,
     module: &super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
+    generic_types: &[crate::ast::TypeName],
 ) {
     let existing = declarations.iter().filter_map(export_identity).collect::<HashSet<_>>();
     for declaration in &compilation.local().declarations {
@@ -177,6 +180,37 @@ fn append_root_generic_support(
         }
         if module.identity().module_path() != "<root>" {
             declarations.push(declaration.clone());
+        }
+    }
+    let current = declarations.iter().filter_map(export_identity).collect::<HashSet<_>>();
+    append_imported_type_support(declarations, compilation, &current, generic_types);
+}
+
+fn append_imported_type_support(
+    declarations: &mut Vec<TopLevelDecl>,
+    compilation: &ModuleCompilationPlan,
+    existing: &HashSet<(&str, String)>,
+    generic_types: &[crate::ast::TypeName],
+) {
+    let mut identities = existing.clone();
+    let required_names =
+        generic_types.iter().map(|type_name| type_name.name.as_str()).collect::<HashSet<_>>();
+    for unit in compilation.units() {
+        for declaration in &unit.implementation().declarations {
+            let is_layout_type = matches!(
+                declaration,
+                TopLevelDecl::Struct(_) | TopLevelDecl::Pack(_) | TopLevelDecl::Enum(_)
+            );
+            if !is_layout_type {
+                continue;
+            }
+            let Some((kind, name)) = export_identity(declaration) else { continue };
+            if !unit.exports().contains(kind, &name) || !required_names.contains(name.as_str()) {
+                continue;
+            }
+            if identities.insert((kind, name)) {
+                declarations.push(declaration.clone());
+            }
         }
     }
 }

@@ -33,7 +33,14 @@ impl ModuleCompilationPlan {
     }
 
     pub fn object_plan(&self) -> Result<ModuleObjectPlan, ModuleError> {
-        build_object_plan(self)
+        build_object_plan(self, &[])
+    }
+
+    pub fn object_plan_with_generic_types(
+        &self,
+        generic_types: &[crate::ast::TypeName],
+    ) -> Result<ModuleObjectPlan, ModuleError> {
+        build_object_plan(self, generic_types)
     }
 
     pub fn implementation(&self) -> Program {
