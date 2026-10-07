@@ -16,6 +16,8 @@ pub const ABI_HANDLE_FAILURE: i64 = -1;
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
+/// Stable runtime symbol used by compiler-generated Region cleanup.
+pub const REGION_DROP_SYMBOL: &str = "actus_region_drop";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.

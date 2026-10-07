@@ -14,6 +14,8 @@ pub const UNINITIALIZED_REGION_GENERATION: RegionGeneration = 0;
 pub enum RegionError {
     InvalidHandle,
     StaleGeneration,
+    CapabilityExhausted,
+    CapabilityGenerationExhausted,
     UnsupportedAddressWidth,
     InvalidDescriptor,
     InvalidWindow,
