@@ -20,6 +20,10 @@ native executable. The compiler profile is the Cargo test profile. The host is
 the configured Linux x86-64 development machine. Compiler source revision:
 `8e36e73` (`test: reject invalid region states natively`).
 
+Peak compiler RSS was measured separately by polling the child compiler's
+`/proc/<pid>/status` `VmHWM` field while running the same strict build shape.
+This is a Linux host-process measurement and is not an embedded memory bound.
+
 ## Captured output
 
 ```text
@@ -28,9 +32,17 @@ REGION_SCALE logical_label=1GiB logical_bytes=1073741824 resident_bytes=1 build_
 REGION_SCALE logical_label=1TiB logical_bytes=1099511627776 resident_bytes=1 build_ms=64 executable_bytes=5775568 run_us=671 status=0
 ```
 
-The measurements show constant resident capacity and executable size across
-the three logical extents. Build and run timings are one host observation, not
-a portable performance claim.
+The corresponding compiler-process measurements were:
+
+```text
+RSS_EVIDENCE label=1MiB peak_rss_kb=21760 build_ms=62 executable_bytes=5775568 exit=0
+RSS_EVIDENCE label=1GiB peak_rss_kb=21608 build_ms=69 executable_bytes=5775568 exit=0
+RSS_EVIDENCE label=1TiB peak_rss_kb=21640 build_ms=77 executable_bytes=5775568 exit=0
+```
+
+The measurements show constant resident capacity, peak compiler RSS, and
+executable size across the three logical extents. Build and run timings are
+one host observation, not a portable performance claim.
 
 ## Evidence boundary
 
@@ -39,5 +51,5 @@ a portable performance claim.
 - Storage mode: bounded in-memory resident window through the hosted Region
   bridge; no filesystem or mapped-file backend is involved.
 - Native output: strict executable with the compiler's zero-float verification.
-- Not measured here: peak compiler RSS, release optimization behavior,
-  freestanding output, embedded hardware latency, and persistent storage.
+- Not measured here: release optimization behavior, freestanding output,
+  embedded hardware latency, and persistent storage.
