@@ -109,9 +109,19 @@ impl InMemoryRegion {
         self.descriptor
     }
 
-    /// Creates a read-only view whose lifetime cannot outlive this borrow.
+    /// Creates an exclusive read-only view whose lifetime cannot outlive this borrow.
+    ///
+    /// ```compile_fail
+    /// use actus::runtime::InMemoryRegion;
+    /// let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).unwrap();
+    /// let generation = region.descriptor().generation;
+    /// let view = region.borrow_abs(7, generation).unwrap();
+    /// let _keep_view_live = &view;
+    /// region.publish(generation).unwrap();
+    /// let _ = view;
+    /// ```
     pub fn borrow_abs(
-        &self,
+        &mut self,
         handle: RegionHandle,
         generation: RegionGeneration,
     ) -> Result<RegionView<'_>, RegionError> {
@@ -227,7 +237,7 @@ mod tests {
 
     #[test]
     fn stale_and_out_of_window_accesses_are_rejected() {
-        let region = InMemoryRegion::new(7, 2, 8, 2, 3).expect("region should be valid");
+        let mut region = InMemoryRegion::new(7, 2, 8, 2, 3).expect("region should be valid");
         let generation = region.descriptor().generation;
         assert!(matches!(region.borrow_abs(8, generation), Err(RegionError::InvalidHandle)));
         assert_eq!(region.borrow_abs(7, generation + 1).unwrap_err(), RegionError::StaleGeneration);
