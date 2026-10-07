@@ -1,0 +1,287 @@
+# Phase 37: Scalable Aggregate Lowering and Large Logical Storage
+
+## Purpose
+
+Extend Actus so a native executable can describe and operate on very large
+logical data regions without requiring the compiler to materialize every
+element as a compile-time or code-generation object.
+
+The phase addresses a compiler scalability boundary observed with a bounded
+const-generic aggregate. Small specializations compile and execute, while a
+specialization with approximately one million packed records causes the build
+process to terminate with operating-system status 137 before an executable is
+produced. The failure must be treated as a compiler and representation
+boundary, not hidden by changing the application workload.
+
+This phase is independent of any downstream application, domain model, or
+project-specific data structure.
+
+## Scope and non-goals
+
+### In scope
+
+- Memory-bounded representation of large const-generic aggregate types.
+- Native layout and ABI planning that remain proportional to type complexity,
+  not element count.
+- Explicit runtime-backed storage for large logical regions.
+- Paged or windowed access with checked bounds and ownership-aware APIs.
+- Logical capacities larger than available resident memory.
+- Deterministic behavior across hosted and freestanding targets.
+- Compiler diagnostics when a requested representation cannot be lowered.
+
+### Out of scope
+
+- Hidden heap allocation.
+- Raw operating-system pointers in Actus values or serialized formats.
+- Implicit memory mapping or implicit filesystem access.
+- An unbounded collection type disguised as a fixed array.
+- Promising that a target can physically hold or process a complete
+  terabyte-sized region in RAM.
+- Application-specific optimizations or domain terminology.
+
+## Invariants
+
+- A const argument remains part of semantic type identity and layout identity.
+- Aggregate layout computation is constant-time with respect to the number of
+  repeated elements after the element layout is known.
+- Native code size does not grow linearly with the logical element count.
+- Element stride, total byte size, alignment, and overflow are checked before
+  native emission.
+- Ownership roles remain explicit across storage views, page loading, and
+  write-back.
+- Large logical capacity does not imply resident allocation.
+- Access outside a logical region is rejected deterministically.
+- Existing small aggregate behavior and ABI contracts remain unchanged.
+- No floating-point operations are introduced by this phase.
+
+## Required design resolutions before implementation
+
+The following questions are architectural gates, not implementation details.
+They must be resolved in the ADR before compiler or runtime code is changed.
+
+### Inline aggregate versus runtime-backed region
+
+The existing bounded aggregate remains an inline value with a contiguous
+layout and its established ABI. Its const extent describes physical storage
+that is present in the value; the compiler must preserve that contract.
+
+A runtime-backed logical region is a separate reviewed abstraction. Its
+descriptor represents logical length, element layout, resident window, and
+the selected storage capability. It must not silently change the meaning of
+an existing array or make an inline aggregate non-contiguous. Conversions
+between the two representations require explicit APIs and checked bounds.
+
+The ADR must select the first public spelling, define whether the descriptor
+is a value or an owned resource, and state which operations are available for
+each representation. No compiler lowering may infer a runtime-backed region
+from a large inline array as an undocumented optimization.
+
+### Symbol and initialization boundedness
+
+Large extents must not cause mangled names, object metadata, relocation lists,
+or initializer payloads to grow with the number of elements. Zero-filled
+storage must use the target's declared zero-initialization mechanism where the
+ABI permits it; non-zero initialization must be rejected or represented by an
+explicit bounded initialization operation.
+
+The ADR and native tests must distinguish BSS-like zero storage, read-only
+constant data, writable initialized data, and runtime-backed storage. The
+compiler must report the selected section and estimated output size in a
+diagnostic or inspectable artifact for large-extent tests.
+
+### Window lifecycle and concurrency
+
+A resident window is an owned resource with an explicit lifecycle. A page or
+window cannot be evicted, flushed, or reused while an `ins` or `abs` view is
+live. Mutation through `ins` completes before publication, eviction, or
+handoff to another execution context. Any concurrent implementation must use
+an explicit synchronization capability; ordinary ownership roles must not be
+treated as implicit locks.
+
+Interrupt and multi-core profiles must define whether access is single-owner,
+serialized, or atomic at the descriptor and element boundaries. Dirty state,
+generation, flush failure, cancellation, and eviction races must have
+deterministic outcomes. The first implementation may reject concurrent window
+ownership, but it must reject it explicitly rather than permit a data race.
+
+## Gates
+
+### Gate 37.1 — Reproduce and classify the scalability boundary
+
+- [x] Add a compiler-only generic aggregate fixture with a small packed element
+      and specializations at 64, 1,024, 65,536, and 1,048,576 elements.
+- [x] Record semantic-check, native-build, executable-size, and process-result
+      evidence for every specialization.
+- [x] Distinguish compiler memory exhaustion, compiler time exhaustion,
+      linker failure, runtime allocation failure, and runtime execution failure.
+- [x] Preserve the exact diagnostic or operating-system termination status when
+      a build cannot produce an executable.
+- [x] Confirm the fixture contains no filesystem, device, or application-specific
+      dependency.
+- [x] Record the baseline compiler revision and host resource profile.
+
+Gate 37.1 evidence, 2026-10-07:
+
+- Fixture: `tests/fixtures/scalable_aggregate/aggregate_<N>.act`, using a
+  one-byte packed element and a generic `Storage[N]` aggregate.
+- Compiler: installed Actus compiler from commit `a85ca18`;
+  SHA-256 `f8f3a659e3b8a589018a833559ead567b2ad5dd0742192b656c1bf5d69dc0430`.
+- Host: Linux x86-64, Intel Core i7-14700KF, 28 logical CPUs.
+- `cargo test --test scalable_aggregate -- --nocapture`: 1 passed, with
+  semantic check, native build, and executable run passing at 64, 1,024,
+  and 65,536 elements. The 1,048,576-element case is kept as a separate
+  manual CLI measurement so a resource-heavy child cannot terminate the test
+  runner under a constrained test process.
+- Manual commands for the 1,048,576-element case were:
+  `actus check tests/fixtures/scalable_aggregate/aggregate_1048576.act
+  --strict` and `actus build tests/fixtures/scalable_aggregate/aggregate_1048576.act
+  --strict --emit exe -o /tmp/actus-scale-1048576.aie`.
+- Executable sizes were 5,586,296 bytes at 64, 5,606,776 bytes at 1,024,
+  7,171,448 bytes at 65,536, and 30,981,496 bytes at 1,048,576 elements.
+- The 1,048,576-element executable ran with exit code 42.
+- The fixture uses no filesystem, device, or downstream application module.
+- A separate heavier packed-element experiment previously reached operating
+  system status 137 during native build. That result is recorded as a
+  representation-pressure observation and is not treated as a failure of this
+  small-element Gate 37.1 fixture.
+
+### Gate 37.2 — Define the scalable representation contract
+
+- [ ] Write an ADR defining the difference between an inline bounded aggregate
+      and a runtime-backed logical region.
+- [ ] Define the metadata required for a region: element layout identity,
+      element stride, logical length, resident window, page size, and bounds.
+- [ ] Define whether the first implementation uses pages, windows, handles, or
+      another explicit representation, and document the trade-offs.
+- [ ] Define ownership transitions for opening, borrowing, mutating, flushing,
+      closing, and invalidating a region.
+- [ ] Define failure behavior for unavailable pages, stale generations,
+      arithmetic overflow, invalid handles, and capacity exhaustion.
+- [ ] Reject implicit allocation, implicit I/O, and raw pointer escape from the
+      public Actus model.
+- [ ] Decide and document the separate public representation for inline
+      aggregates and runtime-backed logical regions.
+- [ ] Define whether a region descriptor is an owned resource, a borrowed
+      view, or a capability-bearing value, including its cleanup contract.
+- [ ] Define page/window pinning, dirty publication, flush, eviction, and
+      cancellation rules for `ins` and `abs` views.
+- [ ] Define the single-owner, serialized, or atomic concurrency profile for
+      hosted, multi-core, and interrupt-driven targets.
+
+### Gate 37.3 — Make aggregate layout planning scale independently
+
+- [ ] Store one canonical element layout and a checked symbolic extent instead
+      of constructing one compiler layout object per logical element.
+- [ ] Compute total size with checked multiplication and addition.
+- [ ] Keep alignment and stride calculation independent from extent size.
+- [ ] Ensure type identity, ABI identity, and mangling remain deterministic for
+      large extents without embedding enormous generated names.
+- [ ] Add native layout regressions for large logical extents that do not
+      allocate or emit one field per element.
+- [ ] Add negative tests for extent overflow, invalid zero or negative bounds,
+      impossible alignment, and unsupported target address width.
+- [ ] Verify that large zero-filled storage uses a bounded object-section
+      representation and does not emit a materialized zero-byte initializer.
+- [ ] Verify that mangled names, relocation metadata, and symbol records remain
+      bounded as the logical extent grows.
+- [ ] Keep inline contiguous ABI layout separate from runtime-backed region
+      descriptor layout in semantic identity and native lowering.
+
+### Gate 37.4 — Add an explicit runtime storage boundary
+
+- [ ] Introduce the smallest reviewed runtime abstraction for a logical region.
+- [ ] Keep the abstraction independent from filesystem and operating-system
+      implementations.
+- [ ] Support bounded read and write operations through explicit owned or
+      borrowed views.
+- [ ] Validate page/window bounds before calculating byte offsets.
+- [ ] Prevent a borrowed view from escaping its `ins` call scope.
+- [ ] Make persistence, mapping, caching, and eviction separate implementations
+      behind the reviewed boundary.
+- [ ] Add hosted in-memory and bounded test backends without changing language
+      ownership semantics.
+- [ ] Reject eviction, flush, or reuse while an incompatible `ins` or `abs`
+      view remains live.
+- [ ] Add race and cancellation tests for dirty windows, generation changes,
+      failed publication, and rejected concurrent ownership.
+
+### Gate 37.5 — Addressing and overflow safety
+
+- [ ] Define the logical index width and byte-offset width per target profile.
+- [ ] Check every index-to-offset conversion before multiplication.
+- [ ] Reject a region whose logical byte size cannot be represented by the
+      selected target profile.
+- [ ] Test capacities that fit in 32-bit indexes and capacities that require
+      64-bit logical addressing.
+- [ ] Test page crossing, last-element access, empty windows, and boundary
+      rejection.
+- [ ] Ensure serialized metadata uses fixed-width, position-independent fields.
+
+### Gate 37.6 — Native ABI and code-generation efficiency
+
+- [ ] Lower a runtime-backed region through a compact descriptor or equivalent
+      reviewed ABI representation.
+- [ ] Ensure generated code contains access logic, not one specialized function
+      per logical element.
+- [ ] Keep descriptor passing compatible with ownership roles and cleanup.
+- [ ] Verify native symbol names and metadata remain bounded for large extents.
+- [ ] Add executable tests for read, write, bounds rejection, and cleanup.
+- [ ] Verify that invalid descriptor states fail safely without compiler-generated
+      traps on valid inputs.
+- [ ] Add object-level checks for section selection, initializer size, symbol
+      length, relocation count, and executable size at large logical extents.
+- [ ] Verify that the runtime-backed descriptor ABI cannot be confused with an
+      inline aggregate ABI at a call boundary.
+
+### Gate 37.7 — Scale evidence
+
+- [ ] Compile and run inline aggregate fixtures through the largest supported
+      practical extent for the current compiler profile.
+- [ ] Run logical-region fixtures at 1 MiB, 1 GiB, and a terabyte-class logical
+      capacity using bounded resident windows rather than full allocation.
+- [ ] Record resident memory, peak compiler memory, executable size, build time,
+      access latency, and failure status.
+- [ ] Repeat the hosted evidence on at least one freestanding or embedded target
+      profile before making target-specific claims.
+- [ ] Keep host, target, and simulated logical-capacity results in separate
+      dated evidence sections.
+
+### Gate 37.8 — Compatibility and quality acceptance
+
+- [ ] Existing const-generic aggregate tests pass unchanged.
+- [ ] Existing ownership, cleanup, layout, ABI, and invalid-bound tests pass.
+- [ ] Add accepted and rejected tests for every new public representation.
+- [ ] Run formatter, source-limit, compiler, native, and documentation checks.
+- [ ] Confirm no reverse pipeline dependency or backend type leaks into the
+      frontend.
+- [ ] Update the language guide, ADR, roadmap evidence, and release notes.
+- [ ] Close the phase only after all claims have reproducible evidence and no
+      unresolved compiler or runtime boundary remains.
+
+## Evidence policy
+
+A successful semantic check does not prove that native lowering scales. A
+successful native build does not prove that a target has enough resident
+memory. A large logical capacity backed by pages or windows does not prove
+that all logical data is simultaneously resident.
+
+Every scale result must identify:
+
+- compiler revision and digest;
+- target and ABI profile;
+- optimization mode;
+- host or device resource limits;
+- logical capacity;
+- resident capacity;
+- page or window size;
+- build and execution commands;
+- complete output;
+- whether storage was inline, in-memory, mapped, or simulated.
+
+## Exit criteria
+
+Phase 37 is complete when Actus can compile a compact representation for large
+logical regions, execute checked windowed access through an explicit ABI, keep
+native output bounded, and provide reproducible evidence for both resident and
+non-resident scale profiles without hidden allocation or application-specific
+compiler behavior.

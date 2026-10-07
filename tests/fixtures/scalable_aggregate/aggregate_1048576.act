@@ -1,0 +1,21 @@
+pack Cell {
+    erg storage: Array[u8, 1];
+    layout little;
+    fields {
+        erg marker: u8 at 0;
+    }
+}
+
+struct Storage[N: Usize] {
+    erg values: Array[Cell, N],
+}
+
+verb write[N: Usize](ins storage: Storage[N]) {
+    storage.values[0u32].marker = 41u8;
+}
+
+verb main() -> Int {
+    erg storage: Storage[1048576] = Storage[1048576] {values: Array[Cell, 1048576]()};
+    write[1048576](storage: ins storage);
+    return storage.values[0u32].marker as Int + 1;
+}
