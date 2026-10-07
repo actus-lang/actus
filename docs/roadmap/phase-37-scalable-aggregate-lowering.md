@@ -313,18 +313,18 @@ Gate 37.5 evidence, 2026-10-07:
 
 ### Gate 37.6 — Native ABI and code-generation efficiency
 
-- [ ] Lower a runtime-backed region through a compact descriptor or equivalent
+- [x] Lower a runtime-backed region through a compact descriptor or equivalent
       reviewed ABI representation.
-- [ ] Ensure generated code contains access logic, not one specialized function
+- [x] Ensure generated code contains access logic, not one specialized function
       per logical element.
-- [ ] Keep descriptor passing compatible with ownership roles and cleanup.
-- [ ] Verify native symbol names and metadata remain bounded for large extents.
-- [ ] Add executable tests for read, write, bounds rejection, and cleanup.
+- [x] Keep descriptor passing compatible with ownership roles and cleanup.
+- [x] Verify native symbol names and metadata remain bounded for large extents.
+- [x] Add executable tests for read, write, bounds rejection, and cleanup.
 - [ ] Verify that invalid descriptor states fail safely without compiler-generated
       traps on valid inputs.
-- [ ] Add object-level checks for section selection, initializer size, symbol
+- [x] Add object-level checks for section selection, initializer size, symbol
       length, relocation count, and executable size at large logical extents.
-- [ ] Verify that the runtime-backed descriptor ABI cannot be confused with an
+- [x] Verify that the runtime-backed descriptor ABI cannot be confused with an
       inline aggregate ABI at a call boundary.
 - [x] Approve the Actus source contract for region operations: the
       `std::region` facade, `Region[T]`, `RegionError`, operation names, and
@@ -378,9 +378,17 @@ Gate 37.6 progress, 2026-10-07:
 - Native executable evidence is covered by
   `tests/std_region_native.rs`: strict host builds execute open/read/cleanup and
   write/publish/read/close paths, and the compiler reports no floating-point
-  instructions. Runtime bridge unit evidence covers one-time descriptor drop.
-  Object section, relocation, large extent, and target-specific ABI checks
-  remain open for the later gates.
+  instructions. A bounds-failure executable returns a typed error result and
+  exits normally without a compiler-generated trap. Runtime bridge unit
+  evidence covers one-time descriptor drop.
+- The `hosted_region_object_has_bounded_abi_sections_and_relocations` regression
+  parses objects emitted for one-element and 4 GiB logical regions. It checks
+  the text section, initialized data bound, symbol-name bound, relocation
+  bound, absence of logical extent in symbols, and bounded object-size growth.
+  The same test compares the Region object with an inline `Array[u32, 2]`
+  object: the Region object carries the Region operation wrapper ABI while the
+  inline object does not, proving the representations remain distinct at the
+  object boundary. Target-specific aggregate classification remains open.
 - ADR-0074 resolves the next compiler contract: `Region[T]` is a distinct
   opaque owned resource with explicit window operations and the reviewed
   descriptor ABI. Its semantic registration, role rules, native layout, and

@@ -200,10 +200,13 @@ and performs no filesystem I/O. Explicit close releases the backend slot while
 leaving the descriptor for lexical cleanup, so the owner is released exactly
 once even when close is called before scope teardown.
 
-Gate 37.6 remains open for target-specific aggregate classification, object
-size and relocation evidence, and the full scale and compatibility gates.
-The current native evidence proves hosted Actus source execution on the
-configured host; it does not prove embedded target behavior.
+Gate 37.6 now has hosted object and executable evidence for the descriptor
+boundary: object sections, initialized data, symbol names, relocations, large
+logical extent, Region-versus-inline representation, read/write, typed bounds
+failure, publication, and cleanup are covered. Target-specific aggregate
+classification and the full scale and compatibility gates remain open. The
+current native evidence proves hosted Actus source execution on the configured
+host; it does not prove embedded target behavior.
 
 ## Verification contract
 
@@ -217,6 +220,7 @@ configured host; it does not prove embedded target behavior.
   passing without exposing a pointer in the public representation.
 - Native tests execute explicit read, write, publication, close, and lexical
   cleanup paths; the runtime bridge test rejects a repeated drop.
-- Object tests verify bounded symbols, relocations, sections, and output size.
+- Object tests verify bounded symbols, relocations, sections, initialized data,
+  output size, large logical extents, and separation from inline aggregates.
 - Invalid descriptor and stale-generation paths return typed failures without
   compiler-generated traps.
