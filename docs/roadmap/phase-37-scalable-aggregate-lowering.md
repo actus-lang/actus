@@ -529,6 +529,8 @@ defined by ADR-0077.
       the complete host lifecycle integration test.
 - [x] Build the shim for `thumbv7em-none-eabihf` and verify the seven exported
       Region symbols in an ARM EABI relocatable object.
+- [x] Record the target build commands, toolchain, object profile, and symbol
+      evidence in `docs/benchmarks/`.
 - [ ] Link the shim with target-provided Buffer/result allocation symbols.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.
