@@ -266,11 +266,14 @@ Gate 37.4 progress, 2026-10-07:
   checked byte offsets, and destination/source lengths before accessing bytes.
   Publication advances the generation and rejects exhaustion without replacing
   the previous generation.
-- Three runtime unit tests cover read/write/publish, stale and out-of-window
-  access, invalid handles, buffer-size errors, invalid windows, and generation
-  exhaustion. Full race and cancellation acceptance remains open for this gate.
-- Implementation commit: `0b5fb89` (`feat(runtime): add bounded logical region
-  boundary`).
+- Five runtime unit tests cover read/write/publish, stale and out-of-window
+  access, invalid handles, buffer-size errors, invalid windows, generation
+  exhaustion, cancellation rollback, and failed publication. Full concurrent
+  race acceptance remains open for this gate; cancellation semantics are now
+  explicit and tested.
+- Implementation commits: `0b5fb89` (`feat(runtime): add bounded logical
+  region boundary`) and `ca53904` (`fix(runtime): preserve published region
+  generation`).
 
 ### Gate 37.5 — Addressing and overflow safety
 
