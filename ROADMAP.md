@@ -63,3 +63,4 @@ gated implementation roadmaps:
 - [ ] [Phase 22: Enterprise Compiler Platform](docs/roadmap/phase-22-enterprise-compiler-platform.md)
 - [ ] [Phase 23: Systems Language Capability Foundation](docs/roadmap/phase-23-systems-language-capability-foundation.md)
 - [ ] [Phase 33: Language Ergonomics and Readable Systems Syntax](docs/roadmap/phase-33-language-ergonomics-and-readable-systems-syntax.md)
+- [ ] [Phase 39: Actus `std::wire` Standard Library](docs/roadmap/phase-39-standard-wire.md)

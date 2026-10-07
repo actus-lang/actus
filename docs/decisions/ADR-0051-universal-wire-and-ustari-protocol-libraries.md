@@ -1,5 +1,10 @@
 # ADR-0051: Universal Wire Codec and Ustari Communication Libraries
 
+> **Superseded.** This proposal is retained for historical traceability. The
+> current Actus decision is [ADR-0078](ADR-0078-std-wire-protocol.md), which
+> consolidates the public design under `std::wire` and removes `std::ustari`
+> from the active plan.
+
 - Status: Proposed
 - Date: 2026-10-01
 - Scope: Actus target-neutral communication libraries
