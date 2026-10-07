@@ -1,5 +1,7 @@
 # Rust build output
 /target/
+/runtime/**/target/
+/runtime/**/Cargo.lock
 
 # Actus generated build artifacts
 /capsula/
