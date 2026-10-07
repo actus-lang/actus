@@ -407,17 +407,17 @@ from a type parameter and represents a compile-time bounded numeric value, not
 mutable runtime storage:
 
 ```act
-struct Minicolumn {
-    erg charge: u8,
+struct Record {
+    erg marker: u8,
 }
 
-struct CorticalFabric[N: Usize] {
-    erg columns: Array[Minicolumn, N],
+struct Fabric[N: Usize] {
+    erg records: Array[Record, N],
 }
 
-verb make_fabric() -> CorticalFabric[8] {
-    return CorticalFabric[8] {
-        columns: Array[Minicolumn, 8](),
+verb make_fabric() -> Fabric[8] {
+    return Fabric[8] {
+        records: Array[Record, 8](),
     };
 }
 ```
@@ -1772,6 +1772,53 @@ a mutable runtime binding and cannot be assigned, borrowed, or transferred.
 Case-guard access must remain deterministic across direct and transitively
 specialized generic verbs.
 
+#### Runtime-backed logical regions
+
+Use `Array[T, N]` when all bounded storage is part of the value. Use
+`Region[T]` when the logical length is larger than the resident window and
+access must remain explicit and checked. A region is a distinct owned resource;
+it is not an implicit array conversion, an unbounded heap, or a filesystem
+handle.
+
+```act
+import std::region;
+
+verb read_first(dat backing: Buffer) -> Result[Int, RegionError] {
+    erg opened = region_open[u32](
+        backing: dat backing,
+        logical_length: 1048576u64,
+        window_start: 0u64,
+        window_count: 16u64
+    );
+    return case dat opened {
+        Err(error) => Err(error),
+        Ok(region) => {
+            erg destination: Buffer = Buffer[4];
+            erg result = region_read[u32](
+                region: abs region,
+                index: 0u64,
+                destination: ins destination
+            );
+            region_close[u32](region: ins region);
+            result
+        },
+    };
+}
+```
+
+`region_open` consumes the backing buffer with `dat`. The element type must be
+fully sized so `size_of[T]()` produces a deterministic stride. `region_read`
+uses an `abs` region and an `ins` destination; `region_write` uses an `ins`
+region and an `abs` source. Logical bounds, resident-window bounds, byte
+offsets, exact buffer sizes, capability handles, and generations are checked
+before access and return `RegionError` on failure.
+
+`region_publish` advances the published generation. `region_cancel` restores
+the last published resident bytes. `region_close` releases the capability
+exactly once, while lexical cleanup releases an owned region that leaves scope.
+These operations do not perform implicit filesystem I/O or allocate an
+unbounded collection.
+
 #### Array return ABI
 
 Returning `Array[T, N]` uses the same caller-owned return-slot ABI as other
@@ -1892,7 +1939,7 @@ When adding or moving tests:
 - verify both test discovery and package-visible type resolution.
 
 This is required for tests that refer to declarations such as
-`CorticalFabric` or `Array[Minicolumn, 64]` from sibling modules.
+`Fabric` or `Array[Record, 64]` from sibling modules.
 
 #### Typed native control-flow joins
 
@@ -1985,26 +2032,24 @@ the storage is inline, and the pack's total width is `N * 8` bits.
 The following 64-byte/512-bit shape is accepted and natively lowered:
 
 ```act
-pack Minicolumn {
+pack Record {
     erg storage: Array[u8, 64];
     layout little;
     fields {
-        erg charge: u8 at 0;
-        erg threshold: u8 at 8;
-        erg coincidence_low: u64 at 64;
-        erg coincidence_high: u64 at 128;
-        erg axon_0: u32 at 192;
-        erg axon_7: u32 at 416;
-        erg inhibitory_link: u32 at 480;
+        erg marker: u8 at 0;
+        erg limit: u8 at 8;
+        erg low_word: u64 at 64;
+        erg high_word: u64 at 128;
+        erg link_0: u32 at 192;
+        erg link_7: u32 at 416;
+        erg back_link: u32 at 480;
     }
 }
 ```
 
-The complete readiness fixture contains the full 512-bit field map:
-`charge`, `threshold`, `myelination`, `idle_ticks`, `flags`, `payload`,
-`layer_depth`, both coincidence words, eight axon targets,
-`free_list_link`, and `inhibitory_link`. Field offsets remain explicit and
-must cover the storage contract without overlap or uncovered bits.
+The complete readiness fixture contains a full 512-bit field map with explicit
+fixed-width values, words, and links. Field offsets remain explicit and must
+cover the storage contract without overlap or uncovered bits.
 
 Array-backed packs provide:
 
@@ -2064,13 +2109,13 @@ fields keep their masking and shifting lowering.
 For dynamic indexed byte loops, use a supported integer index such as `u32`:
 
 ```act
-verb snapshot(ins output: Buffer, abs column: Minicolumn) -> Int {
+verb snapshot(ins output: Buffer, abs record: Record) -> Int {
     erg index: u32 = 0;
     loop {
         if index >= 64 {
             break;
         }
-        append(output, column.storage[index]);
+        append(output, record.storage[index]);
         index += 1;
     }
     return index as Int;
@@ -2209,7 +2254,7 @@ The compiler registers pack declarations before validating struct and array
 references. Array layout resolution preserves pack identity, field metadata,
 alignment, size, and the complete inline element stride. Dependent storage
 arrays are laid out before arrays containing those packs, so an
-`Array[Minicolumn, 64]` layout can use a 64-byte array-backed `Minicolumn`
+`Array[Record, 64]` layout can use a 64-byte array-backed `Record`
 without a runtime descriptor.
 
 Pack-array places support:

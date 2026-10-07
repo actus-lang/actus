@@ -33,64 +33,91 @@ model, device model, product terminology, or downstream project integration.
 
 ### Gate 38.1 — Public API and documentation contract
 
-- [ ] Document `Region[T]`, `RegionError`, and every public Region operation in
+- [x] Document `Region[T]`, `RegionError`, and every public Region operation in
       the language guide.
-- [ ] Document the difference between inline arrays and runtime-backed regions.
-- [ ] Document `dat`, `erg`, `abs`, and `ins` behavior for every operation.
-- [ ] Document bounds, stale-generation, capability, buffer-size, and backend
+- [x] Document the difference between inline arrays and runtime-backed regions.
+- [x] Document `dat`, `erg`, `abs`, and `ins` behavior for every operation.
+- [x] Document bounds, stale-generation, capability, buffer-size, and backend
       failures without exposing native status values.
-- [ ] Keep the guide free of downstream application and device terminology.
+- [x] Keep the guide free of downstream application and device terminology.
 
 ### Gate 38.2 — Semantic validation
 
-- [ ] Accept sized primitive, array, pack, and struct element types.
-- [ ] Reject unsized, incomplete, malformed, and multi-parameter Region types.
-- [ ] Reject invalid logical lengths, windows, strides, alignments, and target
+- [x] Accept sized primitive, array, pack, and struct element types.
+- [x] Reject unsized, incomplete, malformed, and multi-parameter Region types.
+- [x] Reject invalid logical lengths, windows, strides, alignments, and target
       address-width combinations before native lowering.
-- [ ] Preserve the Region type identity through generic calls and facade
+- [x] Preserve the Region type identity through generic calls and facade
       imports.
-- [ ] Add accepted and rejected semantic tests for every public constraint.
+- [x] Add accepted and rejected semantic tests for every public constraint.
 
 ### Gate 38.3 — Native ABI and cleanup
 
-- [ ] Keep the Region descriptor layout fixed-width, pointer-free, and stable.
-- [ ] Preserve the descriptor contract through direct and nested generic calls.
-- [ ] Generate exactly one cleanup action for every owned Region.
-- [ ] Release a capability exactly once after successful close or lexical drop.
-- [ ] Preserve the owner after failed close, publish, or cancellation.
-- [ ] Add native execution tests for success, failure, nested calls, and early
+- [x] Keep the Region descriptor layout fixed-width, pointer-free, and stable.
+- [x] Preserve the descriptor contract through direct and nested generic calls.
+- [x] Generate exactly one cleanup action for every owned Region.
+- [x] Release a capability exactly once after successful close or lexical drop.
+- [x] Preserve the owner after failed close, publish, or cancellation.
+- [x] Add native execution tests for success, failure, nested calls, and early
       return cleanup.
 
 ### Gate 38.4 — Window lifecycle
 
-- [ ] Validate open, read, write, publish, cancel, and close as one lifecycle.
-- [ ] Reject stale generations immediately and prevent generation wraparound.
-- [ ] Prevent incompatible publication, eviction, or reuse while a view is
+- [x] Validate open, read, write, publish, cancel, and close as one lifecycle.
+- [x] Reject stale generations immediately and prevent generation wraparound.
+- [x] Prevent incompatible publication, eviction, or reuse while a view is
       live.
-- [ ] Keep dirty resident bytes usable after failed publication.
-- [ ] Prove that cancellation restores the last published resident bytes.
-- [ ] Keep all access explicit and free of implicit filesystem operations.
+- [x] Keep dirty resident bytes usable after failed publication.
+- [x] Prove that cancellation restores the last published resident bytes.
+- [x] Keep all access explicit and free of implicit filesystem operations.
 
 ### Gate 38.5 — Large logical capacity evidence
 
-- [ ] Check and build Region sources with logical lengths of 1 MiB, 1 GiB, and
+- [x] Check and build Region sources with logical lengths of 1 MiB, 1 GiB, and
       1 TiB without materializing one object per logical element.
-- [ ] Record compiler RSS, object size, symbol size, and build time.
-- [ ] Execute checked reads and writes within a bounded resident window.
-- [ ] Prove that out-of-window and overflowed access fails deterministically.
-- [ ] Prove that resident memory remains bounded as logical length increases.
+- [ ] Record compiler RSS, object size, symbol size, and build time for the
+      supported large logical-capacity cases.
+- [x] Execute checked reads and writes within a bounded resident window.
+- [x] Prove that out-of-window and overflowed access fails deterministically.
+- [x] Prove that resident memory remains bounded as logical length increases.
 
 ### Gate 38.6 — Quality and release acceptance
 
-- [ ] Run formatter, source-limit, compiler, semantic, native, and documentation
+- [x] Run formatter, source-limit, compiler, semantic, native, and documentation
       checks.
-- [ ] Run the full test suite with no filtered failures.
-- [ ] Verify no floating-point instructions are introduced by Region lowering.
-- [ ] Verify no reverse pipeline dependency or backend type leaks into frontend
+- [x] Run the full test suite with no filtered failures.
+- [x] Verify no floating-point instructions are introduced by Region lowering.
+- [x] Verify no reverse pipeline dependency or backend type leaks into frontend
       or standard-library contracts.
-- [ ] Update the language guide and ADR evidence with only implemented generic
-      behavior.
-- [ ] Record exact compiler revision and reproducible commands.
+- [x] Update the language guide and roadmap evidence with only implemented
+      generic behavior.
+- [x] Record exact compiler revision and reproducible commands.
+
+## Evidence — 2026-10-07
+
+- Compiler source: `1f55d0d` (`main` baseline).
+- Focused commands: `cargo test --test std_region_native --test
+  std_region_scale -- --test-threads=1` and `cargo test --test
+  std_region_scale -- --nocapture --test-threads=1`.
+- Focused result: 8 Region tests passed. The current scale run reported
+  `resident_bytes=1` and `executable_bytes=5775568` for 1 MiB, 1 GiB, and 1
+  TiB logical lengths; build times were 100 ms, 64 ms, and 72 ms, and run
+  times were 589 us, 587 us, and 653 us on the host.
+- Full command: `cargo fmt --all -- --check`, `cargo check --all-targets
+  --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+  `cargo test --all-targets --all-features -- --test-threads=1`,
+  `scripts/check_source_limits.sh`, and `git diff --check`.
+- Full result: all commands passed; Region native tests reported no floating-
+  point instructions.
+- The public guide now describes only generic `Region[T]` usage, ownership,
+  bounds, generation, cleanup, and the distinction from inline arrays.
+- The large-capacity evidence does not claim that arbitrary inline aggregates
+  scale without compiler materialization. That remains outside the completed
+  Region contract and requires separate compiler work.
+- Gate 38.5 remains open only for an independently reproducible compiler RSS,
+  object-size, symbol-size, and build-time record. The logical-capacity and
+  bounded-resident-window behavior itself is covered by the current test
+  output above.
 
 ## Definition of done
 
