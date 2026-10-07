@@ -79,6 +79,13 @@ The address-width fields are fixed-width metadata in the `repr(C)` descriptor.
 They are values, never pointers or target addresses, so the descriptor remains
 position-independent when serialized by a later persistence implementation.
 
+The runtime boundary exposes descriptor validation as a typed operation before
+native access. Its ABI size and alignment are derived from the `repr(C)` type,
+and the descriptor is passed as a bounded value rather than as an operating
+system pointer. A public Actus `Region[T]` spelling and generated native
+bridge remain a separate compiler gate; the hosted Rust boundary must not be
+presented as if it were already an Actus source-level representation.
+
 The capability table owns the association between the handle and the selected
 storage backend. A handle is not sufficient to bypass lifecycle, bounds, or
 generation validation, and a recycled slot must receive a new generation

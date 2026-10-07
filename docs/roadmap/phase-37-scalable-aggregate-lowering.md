@@ -327,6 +327,22 @@ Gate 37.5 evidence, 2026-10-07:
 - [ ] Verify that the runtime-backed descriptor ABI cannot be confused with an
       inline aggregate ABI at a call boundary.
 
+Gate 37.6 progress, 2026-10-07:
+
+- The hosted runtime side now exposes a compact `#[repr(C)]` descriptor with
+  fixed-width fields, explicit ABI size/alignment accessors, typed validation,
+  and no pointer fields. Invalid handle, width, generation, length, stride,
+  and window states are rejected before storage access.
+- The bounded read/write/publish tests exercise the descriptor boundary and
+  the compile-fail documentation test preserves the ownership contract for
+  live views. The runtime test suite reports 10 passing region tests.
+- Full Actus source-level lowering is intentionally still open. Actus does
+  not yet expose a public runtime-backed `Region[T]` type or a native bridge
+  for this descriptor. Adding a wrapper or duplicating the descriptor in
+  application syntax would bypass the reviewed ABI boundary, so the
+  executable lowering, symbol, relocation, and call-boundary checkboxes stay
+  open until the compiler/API gate defines that representation.
+
 ### Gate 37.7 — Scale evidence
 
 - [ ] Compile and run inline aggregate fixtures through the largest supported
