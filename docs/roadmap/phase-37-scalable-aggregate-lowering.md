@@ -333,6 +333,8 @@ Gate 37.5 evidence, 2026-10-07:
 - [x] Add the compiler-only `size_of[T]()` prerequisite for facade stride
       derivation. It returns `u64`, accepts only fixed-size source types, and
       lowers to an immediate with no runtime dependency.
+- [x] Add the canonical `std::region` source facade, typed `RegionError`, and
+      private bridge declarations with semantic export and ownership tests.
 - [ ] Implement the `std::region` facade and keep raw runtime bridges private.
 - [ ] Implement `region_open` with `dat Buffer` transfer and capability
       registration.

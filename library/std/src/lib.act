@@ -4,3 +4,5 @@ open io;
 open path;
 """Re-export hosted file-system I/O."""
 open fs;
+"""Re-export bounded runtime-backed logical regions."""
+open region;

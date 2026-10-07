@@ -29,15 +29,17 @@ fn accepts_region_with_fixed_size_elements() {
 
 #[test]
 fn rejects_region_with_dynamic_or_unsized_elements() {
-    for element in ["Buffer", "String", "Map", "Region[u32]", "T"] {
-        let source = if element == "T" {
-            "verb inspect[T](abs values: Region[T]) { }".to_owned()
-        } else {
-            format!("verb inspect(abs values: Region[{element}]) {{ }}")
-        };
+    for element in ["Buffer", "String", "Map", "Region[u32]"] {
+        let source = format!("verb inspect(abs values: Region[{element}]) {{ }}");
         let error = analyze_source(&source).expect_err("invalid Region element must fail");
         assert!(matches!(error.kind, SemanticErrorKind::InvalidRegionElementType { .. }));
     }
+}
+
+#[test]
+fn accepts_generic_region_declarations_for_fixed_size_specializations() {
+    analyze_source("verb inspect[T](abs values: Region[T]) { }")
+        .expect("generic Region declarations must defer element validation");
 }
 
 #[test]

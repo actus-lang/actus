@@ -197,6 +197,9 @@ impl Analyzer {
             },
             span: type_name.span,
         };
+        if self.is_generic_parameter(&type_name.name) {
+            return Ok(());
+        }
         if let Some(primitive) = primitive_type(&type_name.name) {
             return if matches!(primitive, crate::ast::PrimitiveType::Void) {
                 Err(invalid())

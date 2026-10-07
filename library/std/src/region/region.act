@@ -1,0 +1,4 @@
+"""The canonical `std::region` facade for bounded logical-region operations."""
+open error;
+"""Re-export checked region operations and lifecycle verbs."""
+open api;
