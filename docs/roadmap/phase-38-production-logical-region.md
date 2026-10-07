@@ -162,7 +162,7 @@ model, device model, product terminology, or downstream project integration.
   current test output above.
 - The current implementation boundary is explicit: primitive Region elements
   and packed aggregate elements are covered by native evidence; descriptor ABI
-  and complete scale evidence remain in Gate 38.9.
+  and complete scale evidence are covered by Gates 38.8 and 38.9.
 - Gate 38.8 evidence: `cargo test --test applications runtime_modules:: --
   --test-threads=1` passed 8 tests, including packed Region write, publish,
   cancel, read, close, and pass-by-value return. `cargo test --test codegen
