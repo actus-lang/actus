@@ -53,3 +53,20 @@ one host observation, not a portable performance claim.
 - Native output: strict executable with the compiler's zero-float verification.
 - Not measured here: release optimization behavior, freestanding output,
   embedded hardware latency, and persistent storage.
+
+## Inline aggregate comparison
+
+The current largest checked inline fixture is
+`tests/fixtures/scalable_aggregate/aggregate_1048576.act`. It was validated
+and built with:
+
+```text
+target/debug/actus check tests/fixtures/scalable_aggregate/aggregate_1048576.act --strict
+target/debug/actus build tests/fixtures/scalable_aggregate/aggregate_1048576.act --strict --emit exe -o /tmp/actus-scale-1048576.aie
+INLINE_SCALE executable_bytes=23830616
+```
+
+This fixture is a real inline aggregate and therefore has materially different
+storage behavior from the Region cases above. Its successful build is recorded
+as the current hosted practical inline extent; it must not be interpreted as a
+claim that arbitrary larger inline aggregates are safe or memory-bounded.

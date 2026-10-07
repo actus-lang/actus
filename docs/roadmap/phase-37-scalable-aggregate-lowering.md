@@ -423,7 +423,7 @@ Gate 37.6 progress, 2026-10-07:
 
 ### Gate 37.7 — Scale evidence
 
-- [ ] Compile and run inline aggregate fixtures through the largest supported
+- [x] Compile and run inline aggregate fixtures through the largest supported
       practical extent for the current compiler profile.
 - [x] Run logical-region fixtures at 1 MiB, 1 GiB, and a terabyte-class logical
       capacity using bounded resident windows rather than full allocation.
@@ -445,6 +445,10 @@ Gate 37.7 hosted logical-region evidence, 2026-10-07:
   `docs/benchmarks/phase-37-region-scale-2026-10-07.md`.
 - Inline aggregate maximum extent, freestanding target output, and embedded
   hardware evidence remain open.
+- The current hosted inline ceiling evidence is
+  `aggregate_1048576.act`: strict check and executable build succeeded with a
+  23,830,616-byte executable. This is a bounded observation for the current
+  compiler profile, not a promise that larger inline aggregates are safe.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 
