@@ -172,6 +172,10 @@ tests prove that a valid open calls the release callback once after provider
 acceptance, while validation or provider failure leaves the incoming Buffer
 owned by its caller.
 
+The provider unit suite also forces a slot generation to `u32::MAX` in a
+test-only path and verifies that reuse returns `GenerationExhausted` without
+publishing a capability.
+
 A feature-gated fixed-storage target ABI shim now exposes the seven
 `actus_region_*` symbols with eight capability slots and 1024-byte resident
 windows. `cargo check --features target-abi` proves that the shim compiles as

@@ -373,6 +373,11 @@ impl<'a, const SLOTS: usize> Provider<'a, SLOTS> {
         }
         usize::try_from(slot - 1u32).ok()
     }
+
+    #[cfg(test)]
+    fn set_generation_for_test(&mut self, slot_index: usize, generation: u32) {
+        self.generations[slot_index] = generation;
+    }
 }
 
 impl<'a, const SLOTS: usize> Default for Provider<'a, SLOTS> {
@@ -499,6 +504,33 @@ mod tests {
         assert_eq!(
             invalid.open(&mut resident, &mut published, 1u64, 4u64, 0u64, 4u64, 32u8, 32u8),
             Err(ProviderError::InvalidAlignment)
+        );
+    }
+
+    #[test]
+    fn generation_exhaustion_rejects_slot_reuse() {
+        let mut resident = [0u8; 1];
+        let mut published = [0u8; 1];
+        let mut second_resident = [0u8; 1];
+        let mut second_published = [0u8; 1];
+        let mut provider = Provider::<1>::new();
+        let descriptor = provider
+            .open(&mut resident, &mut published, 1u64, 1u64, 0u64, 1u64, 32u8, 32u8)
+            .expect("initial open");
+        provider.close(descriptor).expect("close");
+        provider.set_generation_for_test(0usize, u32::MAX);
+        assert_eq!(
+            provider.open(
+                &mut second_resident,
+                &mut second_published,
+                1u64,
+                1u64,
+                0u64,
+                1u64,
+                32u8,
+                32u8
+            ),
+            Err(ProviderError::GenerationExhausted)
         );
     }
 }
