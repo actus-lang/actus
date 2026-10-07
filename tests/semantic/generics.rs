@@ -20,6 +20,41 @@ fn resolves_generic_parameters_and_applied_types_in_declarations() {
 }
 
 #[test]
+fn accepts_region_with_fixed_size_elements() {
+    analyze_source("struct Point { x: u32, y: u32, } verb inspect(abs values: Region[Point]) { }")
+        .expect("Region should accept a fully sized struct element");
+    analyze_source("verb inspect(abs values: Region[Array[u64, 4]]) { }")
+        .expect("Region should accept a fully sized array element");
+}
+
+#[test]
+fn rejects_region_with_dynamic_or_unsized_elements() {
+    for element in ["Buffer", "String", "Map", "Region[u32]", "T"] {
+        let source = if element == "T" {
+            "verb inspect[T](abs values: Region[T]) { }".to_owned()
+        } else {
+            format!("verb inspect(abs values: Region[{element}]) {{ }}")
+        };
+        let error = analyze_source(&source).expect_err("invalid Region element must fail");
+        assert!(matches!(error.kind, SemanticErrorKind::InvalidRegionElementType { .. }));
+    }
+}
+
+#[test]
+fn rejects_region_arity_errors_before_element_validation() {
+    for source in
+        ["verb inspect(abs values: Region) { }", "verb inspect(abs values: Region[u32, u64]) { }"]
+    {
+        let error = analyze_source(source).expect_err("Region arity must be checked");
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::GenericArityMismatch { name, expected: 1, .. }
+                if name == "Region"
+        ));
+    }
+}
+
+#[test]
 fn resolves_generic_enum_payloads_and_verb_return_types() {
     analyze_source(
         "struct Box[T] { item: T, } enum Result[T, E] { Ok(T), Err(E), } verb wrap[T, E](erg item: T) -> Result[Box[T], E] { }",

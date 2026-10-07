@@ -1,4 +1,4 @@
-use crate::ast::{GenericParam, GenericParamKind, TypeName};
+use crate::ast::{GenericParam, GenericParamKind, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -109,6 +109,9 @@ impl Analyzer {
         if name == "Array" {
             return self.resolve_array_type(type_name);
         }
+        if name == "Region" {
+            return self.resolve_region_type(type_name);
+        }
         if let Some(generic) = self.resolve_generic_parameter(type_name)? {
             return Ok(generic);
         }
@@ -170,6 +173,68 @@ impl Analyzer {
             name: "Array".to_owned(),
             arguments: vec![resolved_element, ResolvedType::Concrete(capacity.name.clone())],
         })
+    }
+
+    fn resolve_region_type(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
+        if type_name.arguments.len() != 1 {
+            return Err(arity_error("Region", 1, type_name.arguments.len(), type_name.span));
+        }
+        let element = &type_name.arguments[0];
+        let mut visiting = Vec::new();
+        self.validate_region_element_type(element, &mut visiting)?;
+        let resolved_element = self.resolve_type_reference(element)?;
+        Ok(ResolvedType::Applied { name: "Region".to_owned(), arguments: vec![resolved_element] })
+    }
+
+    fn validate_region_element_type(
+        &self,
+        type_name: &TypeName,
+        visiting: &mut Vec<String>,
+    ) -> Result<(), SemanticError> {
+        let invalid = || SemanticError {
+            kind: SemanticErrorKind::InvalidRegionElementType {
+                element: canonical_type_name(type_name),
+            },
+            span: type_name.span,
+        };
+        if let Some(primitive) = primitive_type(&type_name.name) {
+            return if matches!(primitive, crate::ast::PrimitiveType::Void) {
+                Err(invalid())
+            } else {
+                Ok(())
+            };
+        }
+        if type_name.name == "Array" {
+            let [element, capacity] = type_name.arguments.as_slice() else {
+                return Err(invalid());
+            };
+            if capacity.name.parse::<u32>().ok().is_none_or(|value| value == 0)
+                || !capacity.arguments.is_empty()
+                || capacity.reference_role.is_some()
+            {
+                return Err(invalid());
+            }
+            return self.validate_region_element_type(element, visiting);
+        }
+        if matches!(type_name.name.as_str(), "String" | "Buffer" | "Map" | "Region") {
+            return Err(invalid());
+        }
+        if let Some(pack) = self.pack_types.get(&type_name.name) {
+            return self.validate_region_element_type(pack.storage.type_name(), visiting);
+        }
+        if let Some(structure) = self.struct_types.get(&type_name.name) {
+            if visiting.iter().any(|name| name == &type_name.name) {
+                return Err(invalid());
+            }
+            visiting.push(type_name.name.clone());
+            let result = structure
+                .fields
+                .iter()
+                .try_for_each(|field| self.validate_region_element_type(&field.ty, visiting));
+            visiting.pop();
+            return result;
+        }
+        Err(invalid())
     }
 
     fn resolve_generic_parameter(

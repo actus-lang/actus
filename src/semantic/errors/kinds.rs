@@ -233,6 +233,9 @@ pub enum SemanticErrorKind {
     InvalidArrayCapacity {
         capacity: String,
     },
+    InvalidRegionElementType {
+        element: String,
+    },
     InvalidIndexType {
         found: String,
     },
