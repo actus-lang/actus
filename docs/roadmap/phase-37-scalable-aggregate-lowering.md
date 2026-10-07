@@ -540,6 +540,8 @@ defined by ADR-0077.
 - [x] Add unit evidence for capacity, stale handles, publication, cancellation,
       and repeated idempotent cleanup.
 - [x] Add explicit evidence for generation exhaustion.
+- [x] Capture read-only STM32F411-class SWD identity evidence through ST-LINK
+      V3 without altering target flash.
 - [ ] Publish target-specific memory and execution evidence.
 
 ADR-0077 records why the public one-buffer `region_open` API remains stable
