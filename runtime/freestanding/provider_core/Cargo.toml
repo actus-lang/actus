@@ -1,0 +1,9 @@
+[package]
+name = "actus-freestanding-region-provider"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "No-std bounded provider core for Actus logical regions"
+
+[lib]
+path = "src/lib.rs"

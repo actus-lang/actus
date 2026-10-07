@@ -50,6 +50,9 @@ provider symbols: the seven `actus_region_*` operations plus
 `actus_buffer_drop` and `actus_enum_drop`. The target-provider implementation,
 executable link, and resident-window execution remain open acceptance work.
 
+ADR-0077 defines the separate no-host provider core, capability lifecycle, and
+paired resident/published storage contract required to complete this profile.
+
 ## Required implementation gates
 
 1. Specify the no-host resident-window provider and its bounded storage budget.

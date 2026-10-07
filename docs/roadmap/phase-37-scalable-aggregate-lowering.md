@@ -452,11 +452,10 @@ Gate 37.7 hosted logical-region evidence, 2026-10-07:
 
 ### Gate 37.7-F — Freestanding Region profile
 
-The hosted evidence cannot be promoted to freestanding support by changing
-only the standard-library registry. The current `std::region` facade resolves
-only for hosted targets because its private bridges use the hosted runtime
-resident store. A freestanding target must receive a separate no-host backend
-contract before the facade becomes available there.
+The hosted evidence cannot be promoted to freestanding execution by changing
+only the standard-library registry. The `std::region` facade now resolves for
+freestanding source through a provider ABI, but its private bridges still need
+a separate no-host backend before a freestanding executable can link or run.
 
 - [ ] Define the freestanding Region backend contract with no libc, filesystem,
       allocator, or hosted runtime dependency.
@@ -473,6 +472,9 @@ contract before the facade becomes available there.
 - [x] Prove the freestanding Region object has no hosted Region, filesystem, or
       libc imports and retains only the target-provider bridge imports.
 - [ ] Add a target-specific evidence section before claiming embedded support.
+
+ADR-0077 defines the provider core and the paired resident/published window
+requirement needed to preserve `region_cancel` without hidden allocation.
 
 Gate 37.7-F boundary evidence, 2026-10-07:
 
@@ -502,6 +504,31 @@ Gate 37.7-F boundary evidence, 2026-10-07:
   and keep the largest object at no more than twice the smallest object. This
   is object evidence only; resident-window execution remains target-provider
   work.
+
+### Gate 37.7-P — Freestanding provider core
+
+The compiler/object boundary is complete, but the imported provider symbols
+still need a target-neutral no-host implementation. This gate is separate from
+compiler lowering and owns the resident-window storage and capability lifecycle
+defined by ADR-0077.
+
+- [x] Add the separate no-host provider core package.
+- [x] Implement target-agnostic `u64` capability handles with slot and
+      generation validation.
+- [x] Implement bounded paired resident/published windows without libc,
+      filesystem access, or general allocation.
+- [x] Implement open, read, write, publish, cancel, close, and idempotent drop.
+- [ ] Add the target adapter and statically bounded storage-pool contract.
+- [ ] Define the target pool's maximum window size and resident/published
+      alignment policy, with measured `publish`/`cancel` copy cost.
+- [ ] Link a freestanding object against all nine provider symbols.
+- [x] Add unit evidence for capacity, stale handles, publication, and
+      cancellation.
+- [ ] Add explicit evidence for generation exhaustion and repeated cleanup.
+- [ ] Publish target-specific memory and execution evidence.
+
+ADR-0077 records why the public one-buffer `region_open` API remains stable
+while the provider owns the second published mirror internally.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 
