@@ -468,7 +468,7 @@ contract before the facade becomes available there.
       symbol without importing the hosted runtime archive.
 - [x] Expose the canonical `std::region` facade to freestanding source after
       the bridge ABI and object import contract were implemented.
-- [ ] Add freestanding semantic and object tests for 1 MiB, 1 GiB, and 1 TiB
+- [x] Add freestanding semantic and object tests for 1 MiB, 1 GiB, and 1 TiB
       logical capacity with a bounded resident window.
 - [x] Prove the freestanding Region object has no hosted Region, filesystem, or
       libc imports and retains only the target-provider bridge imports.
@@ -496,6 +496,12 @@ Gate 37.7-F boundary evidence, 2026-10-07:
   `actus_region_*` lifecycle operations plus `actus_buffer_drop` and
   `actus_enum_drop`. This closes the source/object bridge boundary; it does not
   claim that a target provider or freestanding executable exists.
+- The regression `freestanding_region_object_scales_logical_capacity_with_bounded_output`
+  builds strict `x86_64-unknown-uefi` objects at 1 MiB, 1 GiB, and 1 TiB with
+  one resident element. All three builds retain the same bounded provider ABI
+  and keep the largest object at no more than twice the smallest object. This
+  is object evidence only; resident-window execution remains target-provider
+  work.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 
