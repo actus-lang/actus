@@ -214,7 +214,8 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
     if callee.starts_with("size_of[") {
-        return Expr::Call { callee: callee.clone(), arguments: Vec::new(), span: *span };
+        let specialized = specialize_size_of_callee(callee, substitution);
+        return Expr::Call { callee: specialized, arguments: Vec::new(), span: *span };
     }
     if (callee == "copy" || callee.starts_with("copy__"))
         && arguments.len() == 1
@@ -237,6 +238,16 @@ fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     Expr::Call { callee, arguments: specialize_arguments(arguments, substitution), span: *span }
 }
 
+fn specialize_size_of_callee(callee: &str, substitution: &TypeSubstitution) -> String {
+    let Some((name, arguments)) = callee.split_once('[') else { return callee.to_owned() };
+    let arguments = arguments.strip_suffix(']').unwrap_or(arguments);
+    let arguments = split_type_arguments(arguments)
+        .into_iter()
+        .map(|argument| specialize_type_argument(argument.trim(), substitution))
+        .collect::<Vec<_>>();
+    format!("{name}[{}]", arguments.join(","))
+}
+
 fn specialize_callee_name(callee: &str, substitution: &TypeSubstitution) -> String {
     let Some((name, arguments)) = callee.split_once('[') else { return callee.to_owned() };
     let arguments = arguments.strip_suffix(']').unwrap_or(arguments);
@@ -256,13 +267,9 @@ fn specialize_callee_name(callee: &str, substitution: &TypeSubstitution) -> Stri
 }
 
 fn specialize_type_argument(argument: &str, substitution: &TypeSubstitution) -> String {
-    if let Some(value) = substitution.apply_const(argument) {
-        return value.to_owned();
-    }
-    if argument.contains('[') {
-        return specialize_callee_name(argument, substitution);
-    }
-    argument.to_owned()
+    crate::semantic::parse_type_name_key(argument, crate::lexer::SourceSpan::new(0, 0))
+        .map(|type_name| canonical_type_name(&substitution.apply(&type_name)))
+        .unwrap_or_else(|| argument.to_owned())
 }
 
 fn split_type_arguments(arguments: &str) -> Vec<&str> {

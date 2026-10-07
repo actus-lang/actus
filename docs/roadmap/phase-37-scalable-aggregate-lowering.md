@@ -344,9 +344,17 @@ Gate 37.5 evidence, 2026-10-07:
       `region_close` without synchronous filesystem I/O.
 - [ ] Add semantic, native executable, and double-release regression tests for
       the complete facade.
+- [x] Ensure builtin generic enum payloads such as `Result[Region[T], E]` are
+      materialized in native layout collection for external facade bridges.
 
 Gate 37.6 progress, 2026-10-07:
 
+- Generic facade specialization now substitutes type arguments inside intrinsic
+  calls, so `size_of[T]()` lowers as `size_of[u32]()` in a concrete
+  `region_open[u32]` body. The native object regression
+  `generic_region_facade_object_emits_size_of_with_concrete_element_type`
+  passes and confirms the strict object build completes with no floating-point
+  instructions.
 - The hosted runtime side now exposes a compact `#[repr(C)]` descriptor with
   fixed-width fields, explicit ABI size/alignment accessors, typed validation,
   and no pointer fields. Invalid handle, width, generation, length, stride,

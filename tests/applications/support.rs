@@ -35,6 +35,9 @@ pub(crate) fn copy_standard_library(root: &Path) {
         "path/predicates.act",
         "path/normalize.act",
         "path/builders.act",
+        "region/region.act",
+        "region/error.act",
+        "region/api.act",
     ];
     for relative in files {
         let destination = root.join("src").join(relative);

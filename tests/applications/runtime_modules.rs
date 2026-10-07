@@ -51,6 +51,33 @@ fn generic_nested_module_lowers_facade_constant_without_native_binding() {
 }
 
 #[test]
+fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
+    let source = "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
+    let (root, input, output) = project("generic-region-object", source);
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("enable standard runtime");
+    let object = output.with_extension("obj");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", input.to_str().expect("source path"), "--strict", "--emit", "obj", "-o"])
+        .arg(&object)
+        .current_dir(&root)
+        .output()
+        .expect("build generic region object");
+    assert!(
+        build.status.success(),
+        "generic region object build stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    object::File::parse(fs::read(&object).expect("read generic region object").as_slice())
+        .expect("generic region object should be valid");
+    assert!(!output.exists(), "object-only build should not create an executable");
+    fs::remove_dir_all(root).expect("remove generic region project");
+}
+
+#[test]
 fn nested_facade_lowers_pack_backed_const_generic_parameters() {
     let source = "import feature; verb main() -> Int { return inspect[256]() as Int; }\n";
     let (root, input, output) = project("pack-backed-generic-facade", source);

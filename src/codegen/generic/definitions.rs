@@ -90,6 +90,14 @@ pub(crate) fn collect_concrete_type_instances(program: &Program) -> Vec<GenericI
 fn generic_type_metadata(program: &Program) -> (HashSet<String>, HashSet<String>) {
     let mut generic_names = HashSet::new();
     let mut parameter_names = HashSet::new();
+    for definition in builtin_enum_definitions()
+        .into_iter()
+        .filter(|definition| !definition.generic_parameters.is_empty())
+    {
+        generic_names.insert(definition.name);
+        parameter_names
+            .extend(definition.generic_parameters.into_iter().map(|parameter| parameter.name));
+    }
     for declaration in &program.declarations {
         let (name, parameters) = match declaration {
             TopLevelDecl::Struct(definition) => (&definition.name, &definition.generic_parameters),
