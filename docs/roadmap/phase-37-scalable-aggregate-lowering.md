@@ -346,6 +346,11 @@ Gate 37.6 progress, 2026-10-07:
   opaque owned resource with explicit window operations and the reviewed
   descriptor ABI. Its semantic registration, role rules, native layout, and
   private runtime bridges are the remaining implementation gates.
+- The implementation must reject unsized or dynamic `T` during semantic
+  analysis, lower lexical `erg` teardown to exactly one capability-release
+  bridge call, and use target ABI aggregate classification for descriptor
+  passing. Manual multi-register assumptions and pointer-valued public state
+  are prohibited.
 
 ### Gate 37.7 — Scale evidence
 

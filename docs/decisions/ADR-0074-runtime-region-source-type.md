@@ -32,6 +32,13 @@ for `Array[T, N]`.
 filesystem access, page fault, or allocation. All access uses explicit region
 operations that return typed success or failure results.
 
+`T` must be a fully resolved sized type with a checked, fixed native layout.
+The semantic analyzer rejects incomplete, unsized, dynamically sized, or
+opaque element types before generic registration or native lowering. A region
+may contain a fixed-size struct or array only when every nested field and
+element is itself sized. Dynamic `String`, `Buffer`, `Map`, and another
+runtime-backed region are not valid direct element types in the first profile.
+
 ### Native representation
 
 The first native representation is a compact value equivalent to the reviewed
@@ -64,6 +71,14 @@ aliasing, use after move, publication while a view is live, and an owned region
 stored inside a borrowed view. The runtime still validates handle and
 generation because type checking alone cannot validate stale external state.
 
+An owned `erg Region[T]` registers a cleanup action at initialization. The
+normal LIFO teardown path lowers that action to the private runtime close/drop
+bridge, which releases the capability slot exactly once. Moves remove the
+source cleanup action; failed initialization does not register one; and
+explicit close transfers or consumes the cleanup responsibility according to
+the operation contract. A region must never leave a live capability slot
+behind merely because its lexical scope ended.
+
 ### Initial operation surface
 
 The first language integration exposes only explicit operations:
@@ -90,6 +105,23 @@ The compiler implementation proceeds in this order:
 5. expose only facade-approved public verbs;
 6. add native executable tests for read, write, bounds failure, publication,
    cleanup, symbol boundedness, and inline-array ABI separation.
+
+### Descriptor call ABI
+
+The descriptor is a small fixed aggregate, but its six `u64` words plus
+metadata must not be assumed to occupy the same registers on every target.
+The compiler uses the target ABI's aggregate classification and selects
+indirect descriptor passing when the target cannot pass the complete value
+directly. Role-qualified calls receive the appropriate generated address:
+`abs` is read-only, `ins` is exclusive mutable, and ownership cleanup remains
+attached to the owner rather than to the temporary call representation.
+
+The indirect address exists only at the native call boundary. It is not stored
+in the Actus `Region[T]` value, serialized metadata, capability handle, or
+public source model. Cranelift lowering must therefore use the target layout
+registry and ABI classification instead of manually splitting the descriptor
+into assumed registers. Tests must cover both direct and indirect aggregate
+classification where the configured target profiles differ.
 
 The runtime bridge remains private to the standard library/runtime facade.
 Application modules cannot import raw bridge symbols or bypass the canonical
@@ -121,8 +153,13 @@ or execute `Region[T]`.
 ## Verification contract
 
 - Semantic tests distinguish `Region[T]` from `Array[T, N]`.
+- Semantic tests reject unsized or dynamically sized region element types.
 - Role tests cover `erg`, `abs`, `ins`, and `dat` lifecycle rules.
+- Cleanup tests prove that lexical teardown emits one capability-release bridge
+  call and that move/explicit-close paths do not double-release.
 - Layout tests assert one bounded descriptor ABI independent of logical length.
+- ABI tests cover target aggregate classification and indirect descriptor
+  passing without exposing a pointer in the public representation.
 - Native tests execute explicit read, write, bounds rejection, publication, and
   cleanup paths.
 - Object tests verify bounded symbols, relocations, sections, and output size.
