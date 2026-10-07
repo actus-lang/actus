@@ -525,6 +525,8 @@ defined by ADR-0077.
       release-on-success, and restore-on-failure adapter contract.
 - [x] Implement a feature-gated fixed-storage target ABI shim for the seven
       Region symbols.
+- [x] Link the shim against test-provided allocator/release symbols and run
+      the complete host lifecycle integration test.
 - [ ] Link the shim with target-provided Buffer/result allocation symbols.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.

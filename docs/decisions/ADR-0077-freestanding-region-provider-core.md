@@ -177,3 +177,8 @@ A feature-gated fixed-storage target ABI shim now exposes the seven
 windows. `cargo check --features target-abi` proves that the shim compiles as
 `no_std`; linking it requires target-provided `actus_buffer_drop` and
 `actus_enum_allocate` symbols and remains a separate target gate.
+
+A host integration fixture supplies those two symbols as test doubles and
+executes open, write, publish, read, cancel, close, and drop successfully. The
+fixture proves the ABI link and lifecycle contract only; it is not evidence of
+MCU memory placement, interrupt safety, or target timing.

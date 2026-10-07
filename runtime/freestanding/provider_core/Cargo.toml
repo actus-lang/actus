@@ -10,3 +10,8 @@ path = "src/lib.rs"
 
 [features]
 target-abi = []
+
+[[test]]
+name = "target_abi"
+path = "tests/target_abi.rs"
+required-features = ["target-abi"]
