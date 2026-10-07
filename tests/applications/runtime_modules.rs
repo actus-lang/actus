@@ -51,6 +51,25 @@ fn generic_nested_module_lowers_facade_constant_without_native_binding() {
 }
 
 #[test]
+fn nested_facade_lowers_pack_backed_const_generic_parameters() {
+    let source = "import feature; verb main() -> Int { return inspect[256]() as Int; }\n";
+    let (root, input, output) = project("pack-backed-generic-facade", source);
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        "open pack Minicolumn { erg storage: Array[u8, 64]; layout little; fields { erg marker: u8 at 0; erg threshold: u8 at 8; erg myelination: u8 at 16; erg idle_ticks: u8 at 24; erg flags: u8 at 32; erg payload: u8 at 40; erg layer_depth: u16 at 48; erg coincidence_low: u64 at 64; erg coincidence_high: u64 at 128; erg axons: Array[u32, 8] at 192; erg free_list_link: u32 at 448; erg inhibitory_link: u32 at 480; } } open struct Fabric[N: Usize] { erg columns: Array[Minicolumn, N], } open verb write[N: Usize](ins fabric: Fabric[N]) { fabric.columns[0u32].marker = 41u8; } open verb inspect[N: Usize]() -> u8 { erg fabric: Fabric[N] = Fabric[N] { columns: Array[Minicolumn, N](), }; write[N](fabric: ins fabric); return fabric.columns[0u32].marker; }\n",
+    )
+    .expect("write pack-backed generic implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(41));
+    fs::remove_dir_all(root).expect("remove pack-backed generic project");
+}
+
+#[test]
 fn generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization() {
     let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-uses", source);

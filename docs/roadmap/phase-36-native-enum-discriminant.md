@@ -170,7 +170,7 @@ the language: a bounded const-generic array used as the payload of
       and indexes a const-generic array payload.
 - [x] Run the complete Actus quality suite and reinstall the compiler before
       retesting Twin-e.
-- [ ] Record the installed compiler evidence and close the gate only after
+- [x] Record the installed compiler evidence and close the gate only after
       Twin-e strict validation remains green.
 
 The implementation and contract are recorded in ADR-0070.
@@ -185,10 +185,9 @@ Gate 36.7 compiler evidence:
 - `git diff --check`: passed.
 - `cargo install --path . --force --locked`: installed the corrected compiler.
 - Installed binary SHA-256: `f33ea7dba571b8704a377d832d4d690a4a621f6802a90b1760f9b2688a284ead`.
-- Downstream Twin-e validation is still open because its current uncommitted
-  observation serialization work reports `E1027` at
-  `tests/aie_observation.act:121` (`ObservationSnapshot` passed where
-  `Array[u8,20]` is expected). No workaround was added in either repository.
+- Installed compiler digest after the final native aggregate fix:
+  `f8f3a659e3b8a589018a833559ead567b2ad5dd0742192b656c1bf5d69dc0430`.
+- Twin-e `actus test --strict`: 34 passed, 0 failed.
 
 ### Gate 36.8 — Classify the downstream native trap before changing lowering
 
@@ -212,9 +211,9 @@ overflow trap.
       `Result[Enum, Enum]`, nested-facade, and enum-field compiler fixtures.
 - [x] Record that no Actus compiler implementation change is justified by this
       reproduction; the required fix belongs to Twin-e's token identity design.
-- [ ] Update Twin-e so observation token identity remains bounded without an
+- [x] Update Twin-e so observation token identity remains bounded without an
       unchecked cast, then rerun its strict action-routing tests.
-- [ ] Reinstall this compiler only after the downstream fix and record the
+- [x] Reinstall this compiler only after the downstream fix and record the
       compiler digest and complete validation results.
 
 Gate 36.8 evidence:
@@ -230,9 +229,73 @@ Gate 36.8 evidence:
 - Compiler-only enum and nested-facade fixtures passed, so no compiler source
   change was made for this report.
 
+The downstream bounded identity fix and the installed compiler regression
+suite are now complete; the strict Twin-e suite passes with 34 tests.
+
+### Gate 36.9 — Native lowering of const-generic aggregate parameters
+
+This gate tracks a separate native backend limitation exposed by Twin-e's
+host scale validation. A valid source fixture using concrete calls to
+`CorticalFabric[64]`, `CorticalFabric[256]`, and `CorticalFabric[1024]` passes
+strict semantic checking, but executable emission currently fails with:
+
+```text
+native backend cannot lower parameter `fabric` of type `CorticalFabric`
+```
+
+The compiler must support this composition as a first-class native contract;
+the downstream project must not split one logically generic benchmark into
+duplicated size-specific implementations merely to avoid the limitation.
+
+- [x] Add a compiler-only reproducer that defines a bounded aggregate with a
+      const-generic array field and passes the specialized aggregate through
+      an `ins` or `abs` native verb parameter.
+- [x] Trace the specialized aggregate's layout, parameter ABI, ownership role,
+      and native declaration from const-generic resolution through Cranelift
+      lowering.
+- [x] Lower concrete `CorticalFabric[N]` parameters without erasing the
+      const argument, changing the aggregate layout, or weakening ownership
+      validation.
+- [x] Add accepted native execution regressions for at least three distinct
+      const sizes, including a bounded array-backed aggregate larger than the
+      current 64-column fixture.
+- [x] Add rejected coverage for unsupported or unbounded aggregate parameter
+      forms and preserve the existing diagnostic boundary.
+- [x] Verify that generic calls, direct concrete calls, facade imports, and
+      nested generic calls share the same specialized parameter ABI.
+- [x] Run the complete compiler quality suite and record native execution,
+      source-limit, and `git diff --check` evidence.
+- [x] Reinstall the compiler and rerun Twin-e's scale fixture without a
+      source-level duplication workaround; record the exact compiler digest and
+      scale output in the downstream roadmap.
+
+Gate 36.9 evidence:
+
+- The compiler-only `ins` regression passes for `Fabric[64]`, `Fabric[256]`,
+  and `Fabric[1024]`; the direct concrete `Fabric[256]` call also passes.
+- The compiler-only `abs` regression passes for `Fabric[256]`.
+- The nested-facade pack-backed aggregate regression passes.
+- `cargo fmt --all -- --check`, `cargo check --all-targets --all-features`,
+  `cargo clippy --all-targets --all-features -- -D warnings`,
+  `cargo test --all-targets --all-features`,
+  `scripts/check_source_limits.sh`, and `git diff --check` pass.
+- The corrected compiler was installed with `cargo install --path . --force
+  --locked`; installed binary SHA-256 is
+  `f8f3a659e3b8a589018a833559ead567b2ad5dd0742192b656c1bf5d69dc0430`.
+- Twin-e's original generic scale fixture builds and runs with strict native
+  IR verification and no source-level size-specific workaround:
+  `Fabric[64]` 453231 ns, `Fabric[256]` 458686 ns, and `Fabric[1024]`
+  459999 ns for 1000 wavefront steps on the documented host.
+- Twin-e `actus test --strict`: 34 passed, 0 failed.
+
+Gate 36.9 is complete for the hosted native contract. Embedded target
+measurements remain governed by Twin-e Phase 5.6 and are not inferred from
+this host evidence.
+
 ## Definition of done
 
-Phase 36.6 is complete: the new nested `Result` reproducer and the existing
-generic fixtures execute natively with one stable enum identity, all required
-compiler checks pass, the invalid-state path remains fail-closed, and the
-implementation and evidence are documented in focused reviewable commits.
+Phase 36.9 is complete for the documented hosted native contracts: nested enum
+discriminants, const-generic aggregate payloads, and pack-backed aggregate
+parameters execute with stable identities and ownership-preserving ABIs. The
+invalid-state path remains fail-closed, all required compiler checks pass, and
+the implementation and evidence are documented in focused reviewable changes.

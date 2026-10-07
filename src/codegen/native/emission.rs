@@ -97,6 +97,11 @@ fn prepare_program(
     );
     let specialized_program =
         super::super::generic::specialize_program(&normalized_program, &generic_instances)?;
+    for instance in super::super::generic::collect_concrete_type_instances(&specialized_program) {
+        if !generic_instances.iter().any(|known| known.identity() == instance.identity()) {
+            generic_instances.push(instance);
+        }
+    }
     let mut semantic = semantic;
     semantic.generic_instances = generic_instances;
     validate_cleanup_plans(&semantic)

@@ -99,10 +99,27 @@ fn specialize_owner_declaration(statement: &Stmt, substitution: &TypeSubstitutio
     Stmt::OwnerDecl {
         role: role.clone(),
         name: name.clone(),
-        ty: ty.clone(),
+        ty: ty.as_ref().map(|type_name| specialize_type_annotation(type_name, substitution)),
         initializer: specialize_expression(initializer, substitution),
         span: *span,
     }
+}
+
+fn specialize_type_annotation(type_name: &str, substitution: &TypeSubstitution) -> String {
+    let Some((name, arguments)) = type_name.split_once('[') else {
+        return substitution
+            .apply_const(type_name)
+            .map_or_else(|| type_name.to_owned(), str::to_owned);
+    };
+    let arguments = arguments.strip_suffix(']').unwrap_or(arguments);
+    format!(
+        "{name}[{}]",
+        split_type_arguments(arguments)
+            .into_iter()
+            .map(|argument| specialize_type_argument(argument.trim(), substitution))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 fn specialize_if_branch(

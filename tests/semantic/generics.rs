@@ -61,6 +61,21 @@ fn accepts_usize_const_generic_arguments_and_rejects_invalid_values() {
 }
 
 #[test]
+fn rejects_invalid_const_generic_aggregate_parameters() {
+    for argument in ["0", "runtime_size"] {
+        let source = format!(
+            "struct Fabric[N: Usize] {{ cells: Array[Int, N], }} verb main(abs fabric: Fabric[{argument}]) {{ }}"
+        );
+        let error = analyze_source(&source).expect_err("invalid aggregate parameter must fail");
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::GenericConstraintMismatch { parameter, constraint, .. }
+                if parameter == "N" && constraint == "Usize"
+        ));
+    }
+}
+
+#[test]
 fn resolves_const_generic_identifiers_in_generic_verb_expressions() {
     analyze_source(
         "verb capacity[N: Usize]() -> u32 { if 0u32 < (N as u32) { return N as u32; } return 0u32; } verb main() -> Int { return capacity[4]() as Int; }",
