@@ -73,10 +73,32 @@ pub(super) fn declare_all_functions(
         || external_verbs.iter().any(|verb| verb.name == "print");
     if target_requires_host_runtime(context.target) {
         metadata.extend(declare_runtime_functions(module, has_print_definition)?);
-    } else {
+    } else if verbs.iter().any(verb_uses_region)
+        || external_verbs.iter().any(external_verb_uses_region)
+    {
         metadata.extend(declare_region_cleanup_function(module)?);
     }
     Ok(metadata)
+}
+
+fn verb_uses_region(verb: &&VerbDecl) -> bool {
+    verb.params.iter().any(|parameter| type_name_uses_region(&parameter.ty))
+        || verb
+            .return_type
+            .as_ref()
+            .is_some_and(|return_type| type_name_uses_region(&return_type.ty))
+}
+
+fn external_verb_uses_region(verb: &&ExternalVerbDecl) -> bool {
+    verb.params.iter().any(|parameter| type_name_uses_region(&parameter.ty))
+        || verb
+            .return_type
+            .as_ref()
+            .is_some_and(|return_type| type_name_uses_region(&return_type.ty))
+}
+
+fn type_name_uses_region(type_name: &crate::ast::TypeName) -> bool {
+    type_name.name == "Region" || type_name.arguments.iter().any(type_name_uses_region)
 }
 
 pub(super) fn target_requires_host_runtime(target: &TargetSpec) -> bool {
