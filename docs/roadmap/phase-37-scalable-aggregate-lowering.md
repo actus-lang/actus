@@ -351,6 +351,11 @@ Gate 37.6 progress, 2026-10-07:
   bridge call, and use target ABI aggregate classification for descriptor
   passing. Manual multi-register assumptions and pointer-valued public state
   are prohibited.
+- Semantic registration has started with `Region[T]`: fixed primitive, array,
+  pack, and struct element layouts are accepted; dynamic `Buffer`, `String`,
+  `Map`, nested `Region`, unresolved generic, and recursive element types are
+  rejected with the dedicated `E1088` diagnostic. The native lowering and
+  cleanup portions of this gate remain open.
 
 ### Gate 37.7 — Scale evidence
 
