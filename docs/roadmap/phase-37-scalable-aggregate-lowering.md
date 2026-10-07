@@ -542,7 +542,9 @@ defined by ADR-0077.
 - [x] Add explicit evidence for generation exhaustion.
 - [x] Capture read-only STM32F411-class SWD identity evidence through ST-LINK
       V3 without altering target flash.
-- [ ] Publish target-specific memory and execution evidence.
+- [x] Publish target-specific execution evidence from the connected STM32F411; the
+      fixed-window provider loop was flashed, reset, and observed through SRAM
+      counters. Cycle and power measurements remain separate follow-up work.
 
 ADR-0077 records why the public one-buffer `region_open` API remains stable
 while the provider owns the second published mirror internally.
