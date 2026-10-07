@@ -297,6 +297,7 @@ impl Parser {
             abi,
             metadata,
             name: signature.name,
+            native_symbol: None,
             generic_parameters: signature.generic_parameters,
             params: signature.params,
             return_type: signature.return_type,

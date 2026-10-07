@@ -14,6 +14,8 @@ pub struct ExternalVerbDecl {
     pub abi: ForeignAbi,
     pub metadata: Vec<MetaAttribute>,
     pub name: String,
+    /// Native ABI symbol used when generic specialization changes the Actus name.
+    pub native_symbol: Option<String>,
     pub generic_parameters: Vec<GenericParam>,
     pub params: Vec<Param>,
     pub return_type: Option<ReturnType>,

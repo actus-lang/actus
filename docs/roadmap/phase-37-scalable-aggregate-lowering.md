@@ -346,6 +346,9 @@ Gate 37.5 evidence, 2026-10-07:
       the complete facade.
 - [x] Ensure builtin generic enum payloads such as `Result[Region[T], E]` are
       materialized in native layout collection for external facade bridges.
+- [x] Preserve the canonical native symbol for generic `extern "C"` bridges;
+      Actus specialization names remain internal lookup names and do not leak
+      into the runtime ABI. Imported Actus wrappers retain namespace binding.
 
 Gate 37.6 progress, 2026-10-07:
 
@@ -355,6 +358,10 @@ Gate 37.6 progress, 2026-10-07:
   `generic_region_facade_object_emits_size_of_with_concrete_element_type`
   passes and confirms the strict object build completes with no floating-point
   instructions.
+- Generic `extern "C"` declarations now carry canonical native symbol metadata
+  through specialization. The regression
+  `generic_external_abi_uses_the_canonical_native_symbol` confirms that a
+  `bridge[u32]` call imports `bridge`, never `bridge__u32`.
 - The hosted runtime side now exposes a compact `#[repr(C)]` descriptor with
   fixed-width fields, explicit ABI size/alignment accessors, typed validation,
   and no pointer fields. Invalid handle, width, generation, length, stride,

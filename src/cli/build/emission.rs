@@ -224,7 +224,14 @@ fn declared_symbols(
                 names.push(symbol);
             }
             crate::ast::TopLevelDecl::ExternalVerb(verb) => {
-                names.push(bindings.external_symbol(namespace, &verb.name).to_owned());
+                names.push(
+                    bindings
+                        .external_symbol(
+                            namespace,
+                            verb.native_symbol.as_deref().unwrap_or(&verb.name),
+                        )
+                        .to_owned(),
+                );
             }
             _ => {}
         }

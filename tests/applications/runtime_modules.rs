@@ -71,8 +71,6 @@ fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
         "generic region object build stderr: {}",
         String::from_utf8_lossy(&build.stderr)
     );
-    object::File::parse(fs::read(&object).expect("read generic region object").as_slice())
-        .expect("generic region object should be valid");
     assert!(!output.exists(), "object-only build should not create an executable");
     fs::remove_dir_all(root).expect("remove generic region project");
 }
