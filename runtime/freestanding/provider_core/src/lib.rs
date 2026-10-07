@@ -29,8 +29,12 @@ pub struct RegionDescriptor {
     pub generation: u64,
     /// Whether resident bytes differ from the published mirror.
     pub dirty: u8,
-    /// Reserved for the ABI and kept zero by this core.
-    pub reserved: [u8; 7],
+    /// Logical index width selected by the target profile.
+    pub logical_index_bits: u8,
+    /// Byte offset width selected by the target profile.
+    pub byte_offset_bits: u8,
+    /// Reserved for ABI alignment and kept zero by this core.
+    pub reserved: [u8; 5],
 }
 
 /// Bounded provider failures. No allocation or operating-system error is hidden here.
@@ -156,7 +160,9 @@ impl<'a, const SLOTS: usize> Provider<'a, SLOTS> {
             window_count,
             generation: generation as u64,
             dirty: 0u8,
-            reserved: [0u8; 7],
+            logical_index_bits,
+            byte_offset_bits,
+            reserved: [0u8; 5],
         };
         self.slots[slot_index] =
             Some(Slot { handle, descriptor, resident, published, publication_generation: 1u64 });
@@ -278,7 +284,9 @@ impl<'a, const SLOTS: usize> Provider<'a, SLOTS> {
             || descriptor.window_start != slot.descriptor.window_start
             || descriptor.window_count != slot.descriptor.window_count
             || descriptor.generation != slot.descriptor.generation
-            || descriptor.reserved != [0u8; 7]
+            || descriptor.logical_index_bits != slot.descriptor.logical_index_bits
+            || descriptor.byte_offset_bits != slot.descriptor.byte_offset_bits
+            || descriptor.reserved != [0u8; 5]
         {
             return Err(ProviderError::InvalidDescriptor);
         }
@@ -374,6 +382,10 @@ mod tests {
         let descriptor = provider
             .open(&mut resident, &mut published, 1u64, 4u64, 0u64, 4u64, 32u8, 32u8)
             .expect("open");
+        assert_eq!(core::mem::size_of::<RegionDescriptor>(), 56usize);
+        assert_eq!(core::mem::align_of::<RegionDescriptor>(), 8usize);
+        assert_eq!(descriptor.logical_index_bits, 32u8);
+        assert_eq!(descriptor.byte_offset_bits, 32u8);
         let mut element = [0u8; 1];
         provider.read(descriptor, 0u64, &mut element).expect("read");
         assert_eq!(element, [1u8]);
