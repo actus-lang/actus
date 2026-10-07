@@ -326,6 +326,10 @@ Gate 37.5 evidence, 2026-10-07:
       length, relocation count, and executable size at large logical extents.
 - [ ] Verify that the runtime-backed descriptor ABI cannot be confused with an
       inline aggregate ABI at a call boundary.
+- [ ] Approve the Actus source contract for region operations: canonical
+      facade, view type, typed error enum, operation names, and `erg`/`abs`/
+      `ins`/`dat` transitions. Do not add compiler intrinsics before this
+      contract is accepted.
 
 Gate 37.6 progress, 2026-10-07:
 
@@ -366,6 +370,11 @@ Gate 37.6 progress, 2026-10-07:
   capacity does not enter native symbol names. Full explicit operation
   coverage, target-specific aggregate classification, and large-object
   evidence remain open.
+- The next implementation step is blocked by a language-surface decision, not
+  by a hidden compiler workaround: Actus has not yet approved the public
+  names and ownership contract for region operations. Until that contract is
+  accepted, only type recognition, descriptor ABI layout, and cleanup are
+  implemented.
 
 ### Gate 37.7 — Scale evidence
 

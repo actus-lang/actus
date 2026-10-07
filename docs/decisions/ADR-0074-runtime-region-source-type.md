@@ -94,6 +94,19 @@ stale generations, unavailable windows, bounds errors, arithmetic overflow,
 buffer-size mismatch, and publication failure. No valid input may reach a
 compiler-generated trap.
 
+### Source contract prerequisite
+
+The compiler must not invent source syntax for these operations. Before the
+operation surface is lowered, the standard library contract must approve the
+canonical public facade, operation names, generic view type, typed error enum,
+and ownership transitions for create/open, borrow, read, write, publish,
+cancel, close, and transfer. The contract must state which values are `erg`,
+`abs`, `ins`, or `dat`, and must define whether a borrowed window is a value
+or a scoped view. Until that contract exists, compiler support is intentionally
+limited to type recognition, descriptor ABI layout, and owner cleanup. A
+private runtime bridge or an undocumented intrinsic would create an unstable
+language surface and is therefore not an acceptable substitute.
+
 ### Lowering boundary
 
 The compiler implementation proceeds in this order:
