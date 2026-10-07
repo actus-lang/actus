@@ -12,8 +12,8 @@ fn run_case(
     resident_bytes: u64,
     declaration: &str,
 ) {
-    let root =
-        std::env::temp_dir().join(format!("actus-region-scale-{label}-{}", std::process::id()));
+    let root = std::env::temp_dir()
+        .join(format!("actus-region-scale-{element_type}-{label}-{}", std::process::id()));
     let source_root = root.join("src");
     let output = root.join("region-scale-example");
     fs::create_dir_all(&source_root).expect("scale fixture source directory should be created");
