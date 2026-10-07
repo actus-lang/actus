@@ -6,6 +6,7 @@ mod contract;
 mod fs;
 mod input;
 mod path;
+mod region;
 mod serialization;
 mod stream;
 mod time;
@@ -63,6 +64,10 @@ pub use path::{
     actus_posix_is_separator, actus_posix_root_kind, actus_windows_is_separator,
     actus_windows_root_kind, components, extension, file_name, file_stem, posix_is_separator,
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
+};
+pub use region::{
+    InMemoryRegion, MutableRegionView, RegionDescriptor, RegionError, RegionGeneration,
+    RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
 };
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
