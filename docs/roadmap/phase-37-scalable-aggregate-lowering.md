@@ -524,7 +524,7 @@ defined by ADR-0077.
 - [ ] Link a freestanding object against all nine provider symbols.
 - [x] Add unit evidence for capacity, stale handles, publication, cancellation,
       and repeated idempotent cleanup.
-- [ ] Add explicit evidence for generation exhaustion and repeated cleanup.
+- [ ] Add explicit evidence for generation exhaustion.
 - [ ] Publish target-specific memory and execution evidence.
 
 ADR-0077 records why the public one-buffer `region_open` API remains stable
