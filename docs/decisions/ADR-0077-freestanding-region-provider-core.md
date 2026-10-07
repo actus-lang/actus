@@ -166,3 +166,8 @@ The provider also now exposes a checked ABI contract module for the existing
 Actus buffer layout, result sizes and payload offsets, descriptor size, and
 public error-code mapping. This module defines the contract only; it does not
 allocate result objects or claim to provide a target adapter.
+
+The adapter boundary now has a target-neutral ownership handoff helper. Its
+tests prove that a valid open calls the release callback once after provider
+acceptance, while validation or provider failure leaves the incoming Buffer
+owned by its caller.

@@ -5,9 +5,11 @@
 use core::array;
 
 mod abi;
+mod adapter;
 mod pool;
 
 pub use abi::{ActusBuffer, RegionAbiLayout};
+pub use adapter::{BufferHandoffError, open_from_buffer};
 pub use pool::{PoolError, StaticWindowPool, WindowLease};
 
 /// Stable capability identifier: low 32 bits are slot plus one, high 32 bits are generation.
