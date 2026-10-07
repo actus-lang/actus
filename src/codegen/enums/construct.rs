@@ -178,10 +178,12 @@ fn store_payload(
         && layouts.is_niche_option(id)
     {
         function.ins().store(MemFlagsData::new(), value, destination, 0);
-    } else if let NativeType::Struct(id) | NativeType::Enum(id) = ty {
+    } else if matches!(ty, NativeType::Struct(_) | NativeType::Enum(_) | NativeType::Array(_))
+        || layouts.is_inline_pack(ty)
+    {
         let size = layouts
             .type_size(ty)
-            .ok_or_else(|| NativeEmitError(format!("missing payload layout `{id}`")))?;
+            .ok_or_else(|| NativeEmitError("missing enum payload layout".to_owned()))?;
         copy_bytes(function, value, destination, size);
     } else {
         function.ins().store(MemFlagsData::new(), value, destination, 0);

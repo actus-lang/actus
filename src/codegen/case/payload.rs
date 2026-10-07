@@ -263,7 +263,8 @@ fn load_payload_binding<'a>(
         .ok_or_else(|| NativeEmitError("missing case payload field layout".to_owned()))?;
     let address = function.ins().iadd_imm_s(subject, i64::from(payload_offset + field.offset));
     let value = match field.ty {
-        NativeType::Struct(_) => address,
+        NativeType::Struct(_) | NativeType::Array(_) => address,
+        NativeType::Pack(_) if layouts.is_inline_pack(field.ty) => address,
         NativeType::Enum(id) if !layouts.is_niche_option(id) => {
             let layout = layouts
                 .enum_layout(id)
