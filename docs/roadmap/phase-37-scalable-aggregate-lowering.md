@@ -163,6 +163,11 @@ Gate 37.1 evidence, 2026-10-07:
       aggregates and runtime-backed logical regions.
 - [x] Define whether a region descriptor is an owned resource, a borrowed
       view, or a capability-bearing value, including its cleanup contract.
+- [x] Define the capability as a target-agnostic fixed-width handle or index;
+      public and serialized state uses `u64`, while narrower internal indexes
+      require checked conversion.
+- [x] Define a monotonic generation counter with an uninitialized value,
+      immediate stale-generation rejection, and no-wrap exhaustion behavior.
 - [x] Define page/window pinning, dirty publication, flush, eviction, and
       cancellation rules for `ins` and `abs` views.
 - [x] Define the single-owner, serialized, or atomic concurrency profile for
@@ -177,6 +182,9 @@ Gate 37.2 evidence, 2026-10-07:
 - `ins` and `abs` views are call-scoped; live views block incompatible flush,
   eviction, and reuse. Concurrent access is rejected until a separate
   synchronization decision is accepted.
+- Capability handles use fixed-width `u64` public/serialized state, and
+  generation values are monotonic `u64` counters with checked exhaustion and
+  no wraparound.
 - Hidden allocation, implicit I/O, raw pointers, transparent array conversion,
   and implicit page faults are explicitly rejected.
 

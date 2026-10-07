@@ -50,9 +50,18 @@ record:
 - lifecycle and dirty state;
 - an opaque fixed-width storage capability.
 
-The capability is an Actus-managed handle or index. It is not an operating
-system pointer, an address cast, or an implicit allocation reference. The
-descriptor has bounded size independent of logical element count.
+The public and serialized capability representation is a fixed-width `u64`
+handle. It identifies a slot in an Actus-managed capability table and is
+target-agnostic; it is not an operating-system pointer, an address cast, or an
+implicit allocation reference. A target may use a narrower internal slot index
+only after a checked conversion, and that internal representation must never
+leak into the public or serialized ABI. The descriptor has bounded size
+independent of logical element count.
+
+The capability table owns the association between the handle and the selected
+storage backend. A handle is not sufficient to bypass lifecycle, bounds, or
+generation validation, and a recycled slot must receive a new generation
+before it can be observed by a later operation.
 
 All region access is explicit. Opening, reading, mutating, publishing,
 flushing, closing, and invalidating a region are separate operations with
@@ -90,6 +99,14 @@ generation dirty. Flush validates the descriptor and generation before
 publishing data. Eviction or reuse is rejected while an incompatible `ins` or
 `abs` view is live. Failed flush, cancellation, or stale generation leaves the
 previous published generation available and reports the failure.
+
+Generation is a fixed-width monotonic `u64` counter. Generation `0` means
+uninitialized and cannot authorize access. A successful publication or
+replacement advances the counter before the new descriptor becomes visible.
+Every view and operation carries the generation it observed; a mismatch is
+rejected immediately with `StaleGeneration`. The counter never wraps. If the
+next value cannot be represented, publication stops with a typed exhaustion
+failure and the existing published generation remains valid.
 
 ### Concurrency profile
 
@@ -168,3 +185,5 @@ for target-specific synchronization and concurrent access.
   live-view eviction rejection, cancellation, and failed publication.
 - Hosted and freestanding profiles report resident capacity separately from
   logical capacity.
+- Capability reuse tests verify fixed-width handle validation and generation
+  mismatch rejection, including generation exhaustion without wraparound.
