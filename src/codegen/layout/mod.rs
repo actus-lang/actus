@@ -215,6 +215,7 @@ impl LayoutRegistry {
                 .and_then(|pack| self.ir_type(pack.storage)),
             NativeType::Array(_) => Ok(self.pointer_type),
             NativeType::Arena(_) => Ok(self.pointer_type),
+            NativeType::Region => Ok(self.pointer_type),
             _ => ty.ir_type(self.pointer_type),
         }
     }

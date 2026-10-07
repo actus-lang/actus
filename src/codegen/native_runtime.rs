@@ -9,7 +9,7 @@ use crate::runtime::{
     BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL,
     BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL, BUFFER_VALIDATE_FIXED_FRAME_SYMBOL,
     ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL,
-    PRINT_STRING_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
+    PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
 use super::native::{FunctionMeta, NativeEmitError};
@@ -36,6 +36,7 @@ pub(super) fn declare_runtime_functions(
     let ids = RuntimeFunctionIds {
         allocate: declare_allocate(module, pointer_type)?,
         drop: declare_drop(module, pointer_type)?,
+        region_drop: declare_region_drop(module)?,
         append: declare_append(module, pointer_type)?,
         buffer_length: declare_buffer_length(module, pointer_type)?,
         crc32: declare_crc32(module, pointer_type)?,
@@ -60,6 +61,7 @@ pub(super) fn declare_runtime_functions(
 struct RuntimeFunctionIds {
     allocate: cranelift_module::FuncId,
     drop: cranelift_module::FuncId,
+    region_drop: cranelift_module::FuncId,
     append: cranelift_module::FuncId,
     buffer_length: cranelift_module::FuncId,
     crc32: cranelift_module::FuncId,
@@ -83,6 +85,10 @@ fn runtime_metadata(
             named_meta(ids.allocate, &["length"], NativeType::Buffer),
         ),
         (BUFFER_DROP_SYMBOL.to_owned(), named_meta(ids.drop, &["handle"], NativeType::Int)),
+        (
+            super::performance::dispatch_key(NativeType::Region, "drop"),
+            named_meta(ids.region_drop, &["handle"], NativeType::Int),
+        ),
         ("buffer_length".to_owned(), named_meta(ids.buffer_length, &["buffer"], NativeType::Int)),
         (
             format!("__{ENUM_ALLOCATE_SYMBOL}"),
@@ -188,6 +194,17 @@ fn declare_drop(
     signature.params.push(AbiParam::new(pointer_type));
     module
         .declare_function(BUFFER_DROP_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| NativeEmitError(error.to_string()))
+}
+
+fn declare_region_drop(
+    module: &mut ObjectModule,
+) -> Result<cranelift_module::FuncId, NativeEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function(REGION_DROP_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))
 }
 

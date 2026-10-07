@@ -6,6 +6,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
 use super::super::layout::LayoutRegistry;
 use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::performance::dispatch_key;
 use super::super::structs::emit_struct_drop;
 use super::super::types::NativeType;
 
@@ -79,6 +80,7 @@ fn drop_enum_payload_field(
 ) -> Result<(), NativeEmitError> {
     match field_type {
         NativeType::Buffer => drop_buffer_field(function, field_address, functions, layouts)?,
+        NativeType::Region => drop_region_field(function, field_address, functions, layouts)?,
         NativeType::Struct(nested_id) => {
             emit_struct_drop(function, field_address, nested_id, functions, layouts)?
         }
@@ -93,6 +95,20 @@ fn drop_enum_payload_field(
         | NativeType::Arena(_)
         | NativeType::FatPointer => {}
     }
+    Ok(())
+}
+
+fn drop_region_field(
+    function: &mut FunctionBuilder<'_>,
+    field_address: cranelift_codegen::ir::Value,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
+    let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
+        NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
+    })?;
+    function.ins().call(target.reference, &[handle]);
     Ok(())
 }
 

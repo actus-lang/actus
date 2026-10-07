@@ -145,10 +145,12 @@ implementation is intentionally explicit and serialized. Convenience
 iteration, concurrent views, mapped storage, and target-specific acceleration
 remain later decisions.
 
-Until the semantic type, ABI mapping, and private bridges are implemented,
-Gate 37.6 must remain open. The hosted Rust runtime descriptor is valid
-runtime evidence, but it is not evidence that Actus source can already declare
-or execute `Region[T]`.
+The semantic type, descriptor layout mapping, capability table, and private
+cleanup bridge are now implemented as the first compiler boundary. Gate 37.6
+must remain open until explicit create/read/write/publish operations and
+target-specific aggregate classification are implemented and tested. The
+current native evidence proves declaration and owned cleanup lowering only;
+it does not prove that Actus source can already execute region operations.
 
 ## Verification contract
 

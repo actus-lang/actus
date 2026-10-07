@@ -336,12 +336,13 @@ Gate 37.6 progress, 2026-10-07:
 - The bounded read/write/publish tests exercise the descriptor boundary and
   the compile-fail documentation test preserves the ownership contract for
   live views. The runtime test suite reports 10 passing region tests.
-- Full Actus source-level lowering is intentionally still open. Actus does
-  not yet expose a public runtime-backed `Region[T]` type or a native bridge
-  for this descriptor. Adding a wrapper or duplicating the descriptor in
-  application syntax would bypass the reviewed ABI boundary, so the
-  executable lowering, symbol, relocation, and call-boundary checkboxes stay
-  open until the compiler/API gate defines that representation.
+- Full Actus source-level operations are intentionally still open. The
+  compiler now recognizes `Region[T]` as a distinct source type, lowers its
+  fixed descriptor layout through the native type registry, and declares the
+  private `actus_region_drop(u64) -> i32` bridge. Adding a wrapper or
+  duplicating the descriptor in application syntax would bypass the reviewed
+  ABI boundary, so the executable operation, symbol, relocation, and
+  call-boundary checkboxes stay open until explicit region operations exist.
 - ADR-0074 resolves the next compiler contract: `Region[T]` is a distinct
   opaque owned resource with explicit window operations and the reviewed
   descriptor ABI. Its semantic registration, role rules, native layout, and
@@ -355,7 +356,14 @@ Gate 37.6 progress, 2026-10-07:
   pack, and struct element layouts are accepted; dynamic `Buffer`, `String`,
   `Map`, nested `Region`, unresolved generic, and recursive element types are
   rejected with the dedicated `E1088` diagnostic. The native lowering and
-  cleanup portions of this gate remain open.
+  cleanup portions now have initial evidence: `NativeType::Region` uses the
+  bounded 56-byte descriptor layout, capability handles use a fixed 1024-slot
+  table with monotonic generation checks, and lexical `erg` cleanup emits the
+  runtime release bridge. `cargo check --all-targets --all-features` passed,
+  the capability tests passed 4/4, the region runtime tests passed 10/10, and
+  `lowers_region_owner_cleanup_to_the_runtime_release_bridge` passed. Full
+  explicit operation coverage, target-specific aggregate classification, and
+  large-object evidence remain open.
 
 ### Gate 37.7 — Scale evidence
 

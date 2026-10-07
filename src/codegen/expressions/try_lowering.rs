@@ -157,7 +157,8 @@ fn load_try_payload(
         NativeType::Struct(_)
         | NativeType::Enum(_)
         | NativeType::Array(_)
-        | NativeType::Arena(_) => Ok(payload_address),
+        | NativeType::Arena(_)
+        | NativeType::Region => Ok(payload_address),
         NativeType::Int => Ok(load_payload(function, payload_address, types::I32)),
         NativeType::Integer { width, .. } => {
             let ty = layouts.ir_type(NativeType::Integer { signed: false, width })?;
