@@ -190,22 +190,50 @@ Gate 37.2 evidence, 2026-10-07:
 
 ### Gate 37.3 — Make aggregate layout planning scale independently
 
-- [ ] Store one canonical element layout and a checked symbolic extent instead
+- [x] Store one canonical element layout and a checked symbolic extent instead
       of constructing one compiler layout object per logical element.
-- [ ] Compute total size with checked multiplication and addition.
-- [ ] Keep alignment and stride calculation independent from extent size.
-- [ ] Ensure type identity, ABI identity, and mangling remain deterministic for
+- [x] Compute total size with checked multiplication and addition.
+- [x] Keep alignment and stride calculation independent from extent size.
+- [x] Ensure type identity, ABI identity, and mangling remain deterministic for
       large extents without embedding enormous generated names.
-- [ ] Add native layout regressions for large logical extents that do not
+- [x] Add native layout regressions for large logical extents that do not
       allocate or emit one field per element.
-- [ ] Add negative tests for extent overflow, invalid zero or negative bounds,
+- [x] Add negative tests for extent overflow, invalid zero or negative bounds,
       impossible alignment, and unsupported target address width.
-- [ ] Verify that large zero-filled storage uses a bounded object-section
+- [x] Verify that large zero-filled storage uses a bounded object-section
       representation and does not emit a materialized zero-byte initializer.
-- [ ] Verify that mangled names, relocation metadata, and symbol records remain
+- [x] Verify that mangled names, relocation metadata, and symbol records remain
       bounded as the logical extent grows.
-- [ ] Keep inline contiguous ABI layout separate from runtime-backed region
+- [x] Keep inline contiguous ABI layout separate from runtime-backed region
       descriptor layout in semantic identity and native lowering.
+
+Gate 37.3 evidence, 2026-10-07:
+
+- `LayoutRegistry` keeps one canonical `ArrayLayout` per canonical array type;
+  the layout stores element type, checked `u32` extent, total size, and
+  alignment. Native layout now rejects zero capacity, rejects multiplication,
+  addition, and alignment overflow, and rejects targets without a supported
+  address width.
+- Array construction uses Cranelift's target-aware bounded `memset` lowering.
+  The compiler no longer emits one native store per byte for zero-filled
+  aggregate initialization. The object regression for `Array[Cell, 65536]`
+  contains a `memset` symbol and remains a bounded object (`1,129,928` bytes
+  on the recorded Linux x86-64 host).
+- Native execution passed for 64, 1,024, and 65,536 element fixtures, each
+  returning exit code 42. The object regression and the deliberate
+  `Array[u64, 4294967295]` overflow build both passed their expected checks.
+- Semantic regressions reject zero capacity, negative capacity at parse time,
+  and capacities above the native `u32` extent. Layout regressions reject zero
+  and overflowing alignment values, and target validation rejects an unknown
+  address width.
+- `TypeIdentity` preserves the canonical key `Array[u8,1048576]` with bounded
+  textual length. Existing native type lowering keeps inline arrays as the
+  contiguous aggregate ABI; the runtime-backed region remains a separate
+  reviewed contract from ADR-0073 and is not implicitly substituted.
+- Commits: `d7c8f1e` (`perf: bound large aggregate native initialization`) and
+  `9902cd1` (`test: cover aggregate layout boundaries`). Full `cargo fmt
+  --check`, `cargo check`, `cargo clippy --all-targets --all-features
+  -- -D warnings`, and `cargo test` passed before closure.
 
 ### Gate 37.4 — Add an explicit runtime storage boundary
 
