@@ -335,14 +335,14 @@ Gate 37.5 evidence, 2026-10-07:
       lowers to an immediate with no runtime dependency.
 - [x] Add the canonical `std::region` source facade, typed `RegionError`, and
       private bridge declarations with semantic export and ownership tests.
-- [ ] Implement the `std::region` facade and keep raw runtime bridges private.
-- [ ] Implement `region_open` with `dat Buffer` transfer and capability
+- [x] Implement the `std::region` facade and keep raw runtime bridges private.
+- [x] Implement `region_open` with `dat Buffer` transfer and capability
       registration.
-- [ ] Implement checked `region_read` and `region_write` with exact element
+- [x] Implement checked `region_read` and `region_write` with exact element
       byte-width validation.
-- [ ] Implement `region_publish`, `region_cancel`, and idempotent
+- [x] Implement `region_publish`, `region_cancel`, and idempotent
       `region_close` without synchronous filesystem I/O.
-- [ ] Add semantic, native executable, and double-release regression tests for
+- [x] Add semantic, native executable, and double-release regression tests for
       the complete facade.
 - [x] Ensure builtin generic enum payloads such as `Result[Region[T], E]` are
       materialized in native layout collection for external facade bridges.
@@ -369,13 +369,18 @@ Gate 37.6 progress, 2026-10-07:
 - The bounded read/write/publish tests exercise the descriptor boundary and
   the compile-fail documentation test preserves the ownership contract for
   live views. The runtime test suite reports 10 passing region tests.
-- Full Actus source-level operations are intentionally still open. The
-  compiler now recognizes `Region[T]` as a distinct source type, lowers its
-  fixed descriptor layout through the native type registry, and declares the
-  private `actus_region_drop(u64) -> i32` bridge. Adding a wrapper or
-  duplicating the descriptor in application syntax would bypass the reviewed
-  ABI boundary, so the executable operation, symbol, relocation, and
-  call-boundary checkboxes stay open until explicit region operations exist.
+- Full hosted Actus source-level operations are now implemented through the
+  canonical facade. The runtime owns a bounded resident store, transfers the
+  opening buffer, validates descriptor and generation state, returns typed
+  result objects, and keeps filesystem I/O out of all operations. `region_close`
+  releases the backend while lexical cleanup releases the descriptor and
+  rejects repeated capability drops.
+- Native executable evidence is covered by
+  `tests/std_region_native.rs`: strict host builds execute open/read/cleanup and
+  write/publish/read/close paths, and the compiler reports no floating-point
+  instructions. Runtime bridge unit evidence covers one-time descriptor drop.
+  Object section, relocation, large extent, and target-specific ABI checks
+  remain open for the later gates.
 - ADR-0074 resolves the next compiler contract: `Region[T]` is a distinct
   opaque owned resource with explicit window operations and the reviewed
   descriptor ABI. Its semantic registration, role rules, native layout, and

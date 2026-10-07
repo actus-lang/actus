@@ -41,6 +41,18 @@ pub extern "C" fn actus_buffer_allocate(length: usize) -> BufferHandle {
     }))
 }
 
+pub(crate) unsafe fn take_buffer(handle: BufferHandle) -> Option<Vec<u8>> {
+    if handle.is_null() {
+        return None;
+    }
+    let buffer = unsafe { Box::from_raw(handle) };
+    if buffer.length > buffer.capacity || (buffer.length > 0 && buffer.data.is_null()) {
+        return None;
+    }
+    let data = unsafe { Vec::from_raw_parts(buffer.data, buffer.length, buffer.capacity) };
+    Some(data)
+}
+
 /// Reserves reusable storage without changing the buffer length.
 ///
 /// # Safety

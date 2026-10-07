@@ -191,12 +191,19 @@ implementation is intentionally explicit and serialized. Convenience
 iteration, concurrent views, mapped storage, and target-specific acceleration
 remain later decisions.
 
-The semantic type, descriptor layout mapping, capability table, and private
-cleanup bridge are now implemented as the first compiler boundary. Gate 37.6
-must remain open until explicit create/read/write/publish operations and
-target-specific aggregate classification are implemented and tested. The
-current native evidence proves declaration and owned cleanup lowering only;
-it does not prove that Actus source can already execute region operations.
+The semantic type, descriptor layout mapping, capability table, private
+cleanup bridge, and hosted `std::region` operation bridges are implemented as
+the first compiler boundary. The hosted bridge keeps resident bytes in a
+bounded in-memory store, transfers the opening buffer into that store, returns
+typed native `Result` objects, validates exact element widths and generations,
+and performs no filesystem I/O. Explicit close releases the backend slot while
+leaving the descriptor for lexical cleanup, so the owner is released exactly
+once even when close is called before scope teardown.
+
+Gate 37.6 remains open for target-specific aggregate classification, object
+size and relocation evidence, and the full scale and compatibility gates.
+The current native evidence proves hosted Actus source execution on the
+configured host; it does not prove embedded target behavior.
 
 ## Verification contract
 
@@ -208,8 +215,8 @@ it does not prove that Actus source can already execute region operations.
 - Layout tests assert one bounded descriptor ABI independent of logical length.
 - ABI tests cover target aggregate classification and indirect descriptor
   passing without exposing a pointer in the public representation.
-- Native tests execute explicit read, write, bounds rejection, publication, and
-  cleanup paths.
+- Native tests execute explicit read, write, publication, close, and lexical
+  cleanup paths; the runtime bridge test rejects a repeated drop.
 - Object tests verify bounded symbols, relocations, sections, and output size.
 - Invalid descriptor and stale-generation paths return typed failures without
   compiler-generated traps.

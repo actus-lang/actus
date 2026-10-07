@@ -22,6 +22,7 @@ pub enum RegionError {
     LogicalIndexOutOfBounds,
     OffsetOverflow,
     BufferTooSmall,
+    BackendFailure,
     GenerationExhausted,
 }
 
@@ -195,6 +196,35 @@ impl InMemoryRegion {
             usize::try_from(storage_length).map_err(|_| RegionError::OffsetOverflow)?;
         let storage = vec![0u8; storage_length];
         Ok(Self { descriptor, published_storage: storage.clone(), storage })
+    }
+
+    pub(crate) fn from_backing(
+        handle: RegionHandle,
+        backing: Vec<u8>,
+        element_stride: u64,
+        logical_length: u64,
+        window_start: u64,
+        window_count: u64,
+    ) -> Result<Self, RegionError> {
+        let expected =
+            window_count.checked_mul(element_stride).ok_or(RegionError::OffsetOverflow)?;
+        let expected = usize::try_from(expected).map_err(|_| RegionError::OffsetOverflow)?;
+        if backing.len() != expected {
+            return Err(RegionError::BufferTooSmall);
+        }
+        let descriptor = RegionDescriptor {
+            handle,
+            element_stride,
+            logical_length,
+            window_start,
+            window_count,
+            generation: 1,
+            dirty: 0,
+            logical_index_bits: 64,
+            byte_offset_bits: 64,
+        };
+        descriptor.validate()?;
+        Ok(Self { descriptor, published_storage: backing.clone(), storage: backing })
     }
 
     /// Returns the current descriptor for explicit lifecycle operations.

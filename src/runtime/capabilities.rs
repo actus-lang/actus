@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use super::{RegionError, RegionHandle};
 
 /// Fixed number of hosted capability slots reserved for runtime regions.
@@ -71,15 +69,6 @@ impl<const CAPACITY: usize> Default for RegionCapabilityTable<CAPACITY> {
     }
 }
 
-static REGION_CAPABILITIES: Mutex<RegionCapabilityTable<REGION_CAPABILITY_CAPACITY>> =
-    Mutex::new(RegionCapabilityTable::new());
-
-/// Releases a native region capability during compiler-generated cleanup.
-pub extern "C" fn actus_region_drop(handle: RegionHandle) -> i32 {
-    let Ok(mut table) = REGION_CAPABILITIES.lock() else { return -1 };
-    table.release(handle).map_or(-1, |_| 0)
-}
-
 fn encode_handle(index: usize, generation: u32) -> RegionHandle {
     (u64::from(generation) << SLOT_BITS) | (index as u64 + 1)
 }
@@ -98,7 +87,8 @@ fn decode_handle(handle: RegionHandle) -> Result<(usize, u32), RegionError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{RegionCapabilityTable, actus_region_drop};
+    use super::RegionCapabilityTable;
+    use crate::runtime::actus_region_drop;
     use crate::runtime::{REGION_CAPABILITY_CAPACITY, RegionError};
 
     #[test]
@@ -129,7 +119,7 @@ mod tests {
 
     #[test]
     fn native_drop_bridge_rejects_unknown_handles() {
-        assert_eq!(actus_region_drop(0), -1);
-        assert_eq!(actus_region_drop(u64::MAX), -1);
+        assert_eq!(unsafe { actus_region_drop(0) }, -1);
+        assert_eq!(unsafe { actus_region_drop(u64::MAX) }, -1);
     }
 }

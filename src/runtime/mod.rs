@@ -8,6 +8,7 @@ mod fs;
 mod input;
 mod path;
 mod region;
+mod region_bridge;
 mod serialization;
 mod stream;
 mod time;
@@ -18,7 +19,7 @@ pub use allocation::{
     actus_buffer_append_range, actus_buffer_capacity, actus_buffer_clear, actus_buffer_drop,
     actus_buffer_reserve, actus_copy_buffer_reserve, actus_enum_allocate, actus_enum_drop,
 };
-pub use capabilities::{REGION_CAPABILITY_CAPACITY, RegionCapabilityTable, actus_region_drop};
+pub use capabilities::{REGION_CAPABILITY_CAPACITY, RegionCapabilityTable};
 pub use console::{
     actus_flush_stderr, actus_flush_stdout, actus_print_buffer_stderr, actus_print_buffer_stdout,
     actus_print_int, actus_print_int_stderr, actus_print_line_buffer_stderr,
@@ -35,13 +36,14 @@ pub use contract::{
     FLUSH_STDOUT_SYMBOL, MONOTONIC_NANOS_SYMBOL, PRINT_BUFFER_STDERR_SYMBOL,
     PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL, PRINT_INT_SYMBOL,
     PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL, PRINT_STRING_STDERR_SYMBOL,
-    PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL, REGION_DROP_SYMBOL,
-    RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_CONTEXT_CRITICAL_SECTION,
-    SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL, SLEEP_CONTEXT_INTERRUPT,
-    SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL, STRING_COPY_STATUS_CAPACITY,
-    STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL, STRING_STATUS_INVALID_UTF8,
-    STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS, WRITE_BUFFER_STDOUT_SYMBOL,
-    WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
+    PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL, REGION_CANCEL_SYMBOL,
+    REGION_CLOSE_SYMBOL, REGION_DROP_SYMBOL, REGION_OPEN_SYMBOL, REGION_PUBLISH_SYMBOL,
+    REGION_READ_SYMBOL, REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
+    SLEEP_CONTEXT_CRITICAL_SECTION, SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL,
+    SLEEP_CONTEXT_INTERRUPT, SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL,
+    STRING_COPY_STATUS_CAPACITY, STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL,
+    STRING_STATUS_INVALID_UTF8, STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS,
+    WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
 };
 pub use fs::{
     actus_file_close, actus_file_close_buffer, actus_file_copy_buffer, actus_file_copy_path,
@@ -72,6 +74,7 @@ pub use region::{
     InMemoryRegion, MutableRegionView, RegionAddressProfile, RegionDescriptor, RegionError,
     RegionGeneration, RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
 };
+pub use region_bridge::actus_region_drop;
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
     validate_fixed_frame,
