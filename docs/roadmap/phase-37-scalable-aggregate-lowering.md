@@ -522,8 +522,8 @@ defined by ADR-0077.
 - [ ] Define the target pool's maximum window size and resident/published
       alignment policy, with measured `publish`/`cancel` copy cost.
 - [ ] Link a freestanding object against all nine provider symbols.
-- [x] Add unit evidence for capacity, stale handles, publication, and
-      cancellation.
+- [x] Add unit evidence for capacity, stale handles, publication, cancellation,
+      and repeated idempotent cleanup.
 - [ ] Add explicit evidence for generation exhaustion and repeated cleanup.
 - [ ] Publish target-specific memory and execution evidence.
 

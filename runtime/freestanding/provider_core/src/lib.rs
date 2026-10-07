@@ -388,4 +388,17 @@ mod tests {
         );
         assert_eq!(provider.read(descriptor, 2u64, &mut [0u8]), Err(ProviderError::InvalidWindow));
     }
+
+    #[test]
+    fn drop_is_idempotent_for_live_and_stale_handles() {
+        let mut resident = [7u8];
+        let mut published = [0u8];
+        let mut provider = Provider::<1>::new();
+        let descriptor = provider
+            .open(&mut resident, &mut published, 1u64, 1u64, 0u64, 1u64, 32u8, 32u8)
+            .expect("open");
+        assert_eq!(provider.drop_handle(descriptor.handle), Ok(()));
+        assert_eq!(provider.drop_handle(descriptor.handle), Ok(()));
+        assert_eq!(provider.read(descriptor, 0u64, &mut [0u8]), Err(ProviderError::StaleHandle));
+    }
 }
