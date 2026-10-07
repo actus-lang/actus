@@ -112,15 +112,15 @@ model, device model, product terminology, or downstream project integration.
 
 ### Gate 38.8 — Aggregate descriptor and cleanup ABI
 
-- [ ] Define the stable native ABI for a Region descriptor whose element type
+- [x] Define the stable native ABI for a Region descriptor whose element type
       is a packed aggregate.
-- [ ] Verify pass-by-value, pass-by-reference, and return lowering for packed
+- [x] Verify pass-by-value, pass-by-reference, and return lowering for packed
       Region descriptors without changing the public ownership contract.
-- [ ] Generate exactly one cleanup bridge call for an owned packed Region on
+- [x] Generate exactly one cleanup bridge call for an owned packed Region on
       lexical drop, explicit close, failed publish, and failed cancellation.
-- [ ] Verify that successful close prevents duplicate capability release and
+- [x] Verify that successful close prevents duplicate capability release and
       that failed operations preserve the owner.
-- [ ] Add direct and nested generic execution tests for all cleanup paths.
+- [x] Add direct and nested generic execution tests for all cleanup paths.
 
 ### Gate 38.9 — Complete Region scale evidence
 
@@ -137,7 +137,7 @@ model, device model, product terminology, or downstream project integration.
 
 ## Evidence — 2026-10-07
 
-- Compiler source: `1f55d0d` (`main` baseline).
+- Compiler source: `1f86a42` (`phase-38-production-logical-region`).
 - Focused commands: `cargo test --test std_region_native --test
   std_region_scale -- --test-threads=1` and `cargo test --test
   std_region_scale -- --nocapture --test-threads=1`.
@@ -162,7 +162,16 @@ model, device model, product terminology, or downstream project integration.
   output above.
 - The current implementation boundary is explicit: primitive Region elements
   and packed aggregate elements are covered by native evidence; descriptor ABI
-  and complete scale evidence remain in Gates 38.8–38.9.
+  and complete scale evidence remain in Gate 38.9.
+- Gate 38.8 evidence: `cargo test --test applications runtime_modules:: --
+  --test-threads=1` passed 8 tests, including packed Region write, publish,
+  cancel, read, close, and pass-by-value return. `cargo test --test codegen
+  native:: -- --test-threads=1` passed 23 tests, and
+  `cargo test --test std_region_native -- --test-threads=1` passed 7 native
+  lifecycle and freestanding ABI tests. The pointer-sized Region value ABI
+  preserves descriptor identity across returns; the runtime's 56-byte
+  `RegionDescriptor` remains an internal runtime layout and is not copied as
+  an Actus value.
 
 ## Definition of done
 
