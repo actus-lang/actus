@@ -531,6 +531,8 @@ defined by ADR-0077.
       Region symbols in an ARM EABI relocatable object.
 - [x] Record the target build commands, toolchain, object profile, and symbol
       evidence in `docs/benchmarks/`.
+- [x] Link the ARM object against the fixed no-heap target support fixture and
+      verify that no `actus_*` symbols remain unresolved.
 - [ ] Link the shim with target-provided Buffer/result allocation symbols.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.

@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [features]
 target-abi = []
+target-fixture = []
 
 [[test]]
 name = "target_abi"

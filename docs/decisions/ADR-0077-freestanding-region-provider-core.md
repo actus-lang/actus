@@ -192,3 +192,9 @@ produces an ARM EABI relocatable object exporting all seven Region symbols.
 This confirms target compilation and symbol emission for a Cortex-M4F-class
 profile. The target's allocator link, resident-memory report, and cycle-level
 execution measurement remain open.
+
+A build-only fixed no-heap target fixture was linked into the ARM object. It
+defines `actus_buffer_drop`, `actus_enum_allocate`, and `actus_enum_drop`; the
+result exports all ten expected support/Region symbols and has no unresolved
+`actus_*` symbols. This is link evidence only. A board-specific allocator and
+buffer pool still must replace the fixture before hardware acceptance.
