@@ -75,7 +75,8 @@ pub struct RegionDescriptor {
 }
 
 impl RegionDescriptor {
-    fn validate(&self) -> Result<(), RegionError> {
+    /// Validates the descriptor before any native access or storage operation.
+    pub fn validate(&self) -> Result<(), RegionError> {
         let profile = RegionAddressProfile::new(self.logical_index_bits, self.byte_offset_bits)?;
         if self.handle == 0
             || self.element_stride == 0
@@ -100,6 +101,16 @@ impl RegionDescriptor {
             return Err(RegionError::InvalidWindow);
         }
         Ok(())
+    }
+
+    /// Returns the stable `repr(C)` descriptor size used by the runtime ABI.
+    pub const fn abi_size() -> usize {
+        std::mem::size_of::<Self>()
+    }
+
+    /// Returns the stable alignment required by the runtime ABI.
+    pub const fn abi_alignment() -> usize {
+        std::mem::align_of::<Self>()
     }
 
     fn contains(&self, index: u64) -> bool {
@@ -408,7 +419,28 @@ mod tests {
 
     #[test]
     fn descriptor_uses_fixed_width_c_layout() {
-        assert_eq!(size_of::<RegionDescriptor>(), 56);
-        assert_eq!(align_of::<RegionDescriptor>(), 8);
+        assert_eq!(size_of::<RegionDescriptor>(), RegionDescriptor::abi_size());
+        assert_eq!(align_of::<RegionDescriptor>(), RegionDescriptor::abi_alignment());
+        assert_eq!(RegionDescriptor::abi_size(), 56);
+        assert_eq!(RegionDescriptor::abi_alignment(), 8);
+    }
+
+    #[test]
+    fn invalid_descriptors_fail_through_typed_validation() {
+        let valid = InMemoryRegion::new(7, 2, 8, 0, 1)
+            .expect("valid region should provide a descriptor")
+            .descriptor();
+        let invalid_descriptors = [
+            RegionDescriptor { handle: 0, ..valid },
+            RegionDescriptor { element_stride: 0, ..valid },
+            RegionDescriptor { logical_length: 0, ..valid },
+            RegionDescriptor { window_count: 0, ..valid },
+            RegionDescriptor { generation: 0, ..valid },
+            RegionDescriptor { logical_index_bits: 16, ..valid },
+            RegionDescriptor { logical_length: u64::MAX, ..valid },
+        ];
+        for descriptor in invalid_descriptors {
+            assert!(descriptor.validate().is_err());
+        }
     }
 }
