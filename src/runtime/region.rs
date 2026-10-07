@@ -74,6 +74,7 @@ impl RegionDescriptor {
 pub struct InMemoryRegion {
     descriptor: RegionDescriptor,
     storage: Vec<u8>,
+    published_storage: Vec<u8>,
 }
 
 impl InMemoryRegion {
@@ -99,7 +100,8 @@ impl InMemoryRegion {
             window_count.checked_mul(element_stride).ok_or(RegionError::OffsetOverflow)?;
         let storage_length =
             usize::try_from(storage_length).map_err(|_| RegionError::OffsetOverflow)?;
-        Ok(Self { descriptor, storage: vec![0u8; storage_length] })
+        let storage = vec![0u8; storage_length];
+        Ok(Self { descriptor, published_storage: storage.clone(), storage })
     }
 
     /// Returns the current descriptor for explicit lifecycle operations.
@@ -134,9 +136,18 @@ impl InMemoryRegion {
     ) -> Result<RegionGeneration, RegionError> {
         self.validate_access(self.descriptor.handle, generation)?;
         let next = generation.checked_add(1).ok_or(RegionError::GenerationExhausted)?;
+        self.published_storage.clone_from(&self.storage);
         self.descriptor.generation = next;
         self.descriptor.dirty = 0;
         Ok(next)
+    }
+
+    /// Discards dirty resident bytes and keeps the last published generation.
+    pub fn cancel(&mut self, generation: RegionGeneration) -> Result<(), RegionError> {
+        self.validate_access(self.descriptor.handle, generation)?;
+        self.storage.clone_from(&self.published_storage);
+        self.descriptor.dirty = 0;
+        Ok(())
     }
 
     fn validate_access(
@@ -232,5 +243,29 @@ mod tests {
         let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
         region.descriptor.generation = u64::MAX;
         assert_eq!(region.publish(u64::MAX), Err(RegionError::GenerationExhausted));
+    }
+
+    #[test]
+    fn cancellation_restores_the_last_published_window() {
+        let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+        let generation = region.descriptor().generation;
+        {
+            let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+            view.write(0, &[41, 42]).expect("resident element should be writable");
+        }
+        region.cancel(generation).expect("cancellation should succeed");
+        let view = region.borrow_abs(7, generation).expect("read view should open");
+        let mut value = [9u8; 2];
+        view.read(0, &mut value).expect("resident element should be readable");
+        assert_eq!(value, [0, 0]);
+        assert_eq!(region.descriptor().dirty, 0);
+    }
+
+    #[test]
+    fn failed_publication_preserves_the_current_generation() {
+        let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+        let generation = region.descriptor().generation;
+        assert_eq!(region.publish(generation + 1), Err(RegionError::StaleGeneration));
+        assert_eq!(region.descriptor().generation, generation);
     }
 }
