@@ -186,3 +186,9 @@ A host integration fixture supplies those two symbols as test doubles and
 executes open, write, publish, read, cancel, close, and drop successfully. The
 fixture proves the ABI link and lifecycle contract only; it is not evidence of
 MCU memory placement, interrupt safety, or target timing.
+
+The shim also builds for the installed `thumbv7em-none-eabihf` target and
+produces an ARM EABI relocatable object exporting all seven Region symbols.
+This confirms target compilation and symbol emission for a Cortex-M4F-class
+profile. The target's allocator link, resident-memory report, and cycle-level
+execution measurement remain open.

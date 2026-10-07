@@ -527,6 +527,8 @@ defined by ADR-0077.
       Region symbols.
 - [x] Link the shim against test-provided allocator/release symbols and run
       the complete host lifecycle integration test.
+- [x] Build the shim for `thumbv7em-none-eabihf` and verify the seven exported
+      Region symbols in an ARM EABI relocatable object.
 - [ ] Link the shim with target-provided Buffer/result allocation symbols.
 - [x] Define the target pool's maximum window size and resident/published
       alignment policy, with policy validation in the provider core.
