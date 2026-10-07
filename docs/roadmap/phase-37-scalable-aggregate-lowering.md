@@ -342,6 +342,10 @@ Gate 37.6 progress, 2026-10-07:
   application syntax would bypass the reviewed ABI boundary, so the
   executable lowering, symbol, relocation, and call-boundary checkboxes stay
   open until the compiler/API gate defines that representation.
+- ADR-0074 resolves the next compiler contract: `Region[T]` is a distinct
+  opaque owned resource with explicit window operations and the reviewed
+  descriptor ABI. Its semantic registration, role rules, native layout, and
+  private runtime bridges are the remaining implementation gates.
 
 ### Gate 37.7 — Scale evidence
 
