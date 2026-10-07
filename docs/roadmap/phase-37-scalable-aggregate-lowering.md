@@ -425,7 +425,7 @@ Gate 37.6 progress, 2026-10-07:
 
 - [ ] Compile and run inline aggregate fixtures through the largest supported
       practical extent for the current compiler profile.
-- [ ] Run logical-region fixtures at 1 MiB, 1 GiB, and a terabyte-class logical
+- [x] Run logical-region fixtures at 1 MiB, 1 GiB, and a terabyte-class logical
       capacity using bounded resident windows rather than full allocation.
 - [ ] Record resident memory, peak compiler memory, executable size, build time,
       access latency, and failure status.
@@ -433,6 +433,16 @@ Gate 37.6 progress, 2026-10-07:
       profile before making target-specific claims.
 - [ ] Keep host, target, and simulated logical-capacity results in separate
       dated evidence sections.
+
+Gate 37.7 hosted logical-region evidence, 2026-10-07:
+
+- `tests/std_region_scale.rs` builds and runs strict hosted fixtures at 1 MiB,
+  1 GiB, and 1 TiB logical capacity with a one-byte resident window. All three
+  cases exit successfully, report `resident_bytes=1`, and emit the same
+  5,775,568-byte executable. The complete output and evidence boundary are in
+  `docs/benchmarks/phase-37-region-scale-2026-10-07.md`.
+- Peak compiler RSS, inline aggregate maximum extent, freestanding target
+  output, and embedded hardware evidence remain open.
 
 ### Gate 37.8 — Compatibility and quality acceptance
 
