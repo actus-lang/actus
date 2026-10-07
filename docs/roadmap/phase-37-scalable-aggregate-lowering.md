@@ -237,21 +237,40 @@ Gate 37.3 evidence, 2026-10-07:
 
 ### Gate 37.4 — Add an explicit runtime storage boundary
 
-- [ ] Introduce the smallest reviewed runtime abstraction for a logical region.
-- [ ] Keep the abstraction independent from filesystem and operating-system
+- [x] Introduce the smallest reviewed runtime abstraction for a logical region.
+- [x] Keep the abstraction independent from filesystem and operating-system
       implementations.
-- [ ] Support bounded read and write operations through explicit owned or
+- [x] Support bounded read and write operations through explicit owned or
       borrowed views.
-- [ ] Validate page/window bounds before calculating byte offsets.
-- [ ] Prevent a borrowed view from escaping its `ins` call scope.
-- [ ] Make persistence, mapping, caching, and eviction separate implementations
+- [x] Validate page/window bounds before calculating byte offsets.
+- [x] Prevent a borrowed view from escaping its `ins` call scope.
+- [x] Make persistence, mapping, caching, and eviction separate implementations
       behind the reviewed boundary.
-- [ ] Add hosted in-memory and bounded test backends without changing language
+- [x] Add hosted in-memory and bounded test backends without changing language
       ownership semantics.
-- [ ] Reject eviction, flush, or reuse while an incompatible `ins` or `abs`
+- [x] Reject eviction, flush, or reuse while an incompatible `ins` or `abs`
       view remains live.
 - [ ] Add race and cancellation tests for dirty windows, generation changes,
       failed publication, and rejected concurrent ownership.
+
+Gate 37.4 progress, 2026-10-07:
+
+- `src/runtime/region.rs` introduces a target-independent `u64` capability,
+  monotonic generation, bounded `RegionDescriptor`, typed failures, and an
+  explicit hosted `InMemoryRegion` backend. It performs no filesystem access,
+  OS mapping, implicit allocation policy, or persistence operation.
+- `RegionView` and `MutableRegionView` are lifetime-bound Rust views. A mutable
+  view holds the descriptor and resident bytes exclusively, so publication,
+  reuse, or another view cannot be requested until the borrow ends.
+- The backend validates handle, generation, logical index, resident window,
+  checked byte offsets, and destination/source lengths before accessing bytes.
+  Publication advances the generation and rejects exhaustion without replacing
+  the previous generation.
+- Three runtime unit tests cover read/write/publish, stale and out-of-window
+  access, invalid handles, buffer-size errors, invalid windows, and generation
+  exhaustion. Full race and cancellation acceptance remains open for this gate.
+- Implementation commit: `0b5fb89` (`feat(runtime): add bounded logical region
+  boundary`).
 
 ### Gate 37.5 — Addressing and overflow safety
 
