@@ -6,7 +6,7 @@ the descriptor opaque, derives its element stride with `size_of[T]()`, and
 exposes only checked operations. The operations do not perform filesystem I/O
 or allocate on the read, write, publish, cancel, or close paths.
 """
-import region::error;
+import error;
 
 """Private bridge that creates a region and consumes the supplied backing buffer."""
 unsafe extern "C" verb actus_region_open[T](dat backing: Buffer, erg element_stride: u64, erg logical_length: u64, erg window_start: u64, erg window_count: u64) -> Result[Region[T], RegionError];
