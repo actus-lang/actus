@@ -144,3 +144,8 @@ the target is not installed in the current toolchain (`can't find crate for
 core`); this is environment evidence, not target execution evidence. Target
 adapter implementation, ABI linking, generation-exhaustion evidence, and
 hardware measurements remain open implementation gates.
+
+The provider also now exposes a checked ABI contract module for the existing
+Actus buffer layout, result sizes and payload offsets, descriptor size, and
+public error-code mapping. This module defines the contract only; it does not
+allocate result objects or claim to provide a target adapter.

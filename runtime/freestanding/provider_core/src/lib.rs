@@ -4,8 +4,10 @@
 
 use core::array;
 
+mod abi;
 mod pool;
 
+pub use abi::{ActusBuffer, RegionAbiLayout};
 pub use pool::{PoolError, StaticWindowPool, WindowLease};
 
 /// Stable capability identifier: low 32 bits are slot plus one, high 32 bits are generation.
