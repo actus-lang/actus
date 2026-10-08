@@ -218,6 +218,22 @@ fn reachable_module_roots(
     Ok(roots)
 }
 
+fn reachable_wire_verbs(
+    program: &crate::ast::Program,
+    reachable_module_roots: &std::collections::HashSet<String>,
+) -> Vec<String> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) if reachable_module_roots.contains(&verb.name) => {
+                Some(verb.name.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 fn emit_module_objects(
     object_plan: &crate::modules::ModuleObjectPlan,
     configuration: &CompilerConfiguration,
@@ -228,7 +244,7 @@ fn emit_module_objects(
     let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
         let roots = if unit.namespace().module_path().starts_with("std::wire") {
-            if reachable_module_roots.is_empty() {
+            if reachable_wire_verbs(unit.program(), reachable_module_roots).is_empty() {
                 Vec::new()
             } else {
                 unit.program()
