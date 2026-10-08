@@ -46,12 +46,16 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 ## Gate 39.1 — Canonical module and public facade
 
 - [x] Add the canonical `library/std/src/wire/wire.act` facade.
-- [ ] Add responsibility-specific siblings for frame, codec, parser, checksum,
-      sequence, fragmentation, and errors.
+- [x] Add responsibility-specific siblings for the implemented frame, codec,
+      checksum, and error surfaces.
 - [x] Export only intentional public declarations through the facade.
 - [x] Add positive and negative facade-import tests.
 - [x] Keep every source file below the Actus hard limit and document all public
       types, constants, enums, and verbs.
+
+Parser, sequence, and fragmentation siblings are intentionally deferred to
+Gates 39.4, 39.5, and 39.6. They will be added with their implementations;
+this gate does not create empty placeholder modules.
 
 ## Gate 39.2 — Frame model and deterministic serialization
 
