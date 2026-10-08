@@ -17,4 +17,5 @@ language features.
 - [Generics](generics.md)
 - [Constants](constants.md)
 - [Comments and documentation](comments-and-documentation.md)
+- [Operators](operators.md)
 - [Formatting](formatting.md)
