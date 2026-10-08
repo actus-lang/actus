@@ -51,6 +51,40 @@ fn generic_nested_module_lowers_facade_constant_without_native_binding() {
 }
 
 #[test]
+fn native_lowering_inlines_facade_constant_in_else_if_branch() {
+    let source = "import feature; verb main() -> Int { erg input: u8 = 17u8; return inspect(value: erg input); }\n";
+    let (root, input, output) = project("constant-else-if-lowering", source);
+    fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
+    fs::write(root.join("src/config/config.act"), "open values;\n")
+        .expect("write configuration facade");
+    fs::write(root.join("src/config/values.act"), "open const EXPECTED: u8 = 17u8;\n")
+        .expect("write configuration values");
+    fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
+    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
+        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/implementation.act"),
+        r#"import config;
+
+open verb inspect(erg value: u8) -> Int {
+    if value == 0u8 {
+        return 2;
+    } else if value == EXPECTED {
+        return 0;
+    }
+    return 1;
+}
+"#,
+    )
+    .expect("write feature implementation");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(0));
+    fs::remove_dir_all(root).expect("remove constant else-if project");
+}
+
+#[test]
 fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
     let source = "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
     let (root, input, output) = project("generic-region-object", source);
