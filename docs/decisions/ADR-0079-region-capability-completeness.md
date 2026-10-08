@@ -255,6 +255,37 @@ resident window. The implementation performs no allocation or I/O.
 - Reject use after close, stale generation, invalid handle, and double release.
 - Ensure explicit close does not cause a second compiler-generated cleanup call.
 
+#### 5.5.1 Accepted ownership and native cleanup contract
+
+Every public Region operation states its Actus role at the declaration and at
+each call site. Opening and remapping consume resident buffers with `dat`.
+Read-only inspection and reads use `abs` Region views; writes, publication,
+cancellation, and close use an exclusive `ins` Region loan. Indexes, counts,
+and layout values are owned scalar inputs (`erg`). A `dat` transfer is written
+explicitly by the caller and the source binding is unavailable after the call.
+
+The descriptor stored in an Actus `Region[T]` value is an opaque pointer to the
+runtime-owned descriptor. Its generation is copied into every hosted view and
+is checked before the view reaches resident storage. Views are call-scoped;
+their implementation uses Rust lifetimes, so a view cannot escape the
+operation or coexist with a conflicting remap, close, or publication.
+
+The native cleanup bridge accepts the descriptor pointer directly. It searches
+the bounded descriptor table without dereferencing an unknown pointer, removes
+the matching resident capability, and drops the descriptor exactly once. A
+closed Region retains its descriptor registration until lexical cleanup so an
+explicit successful close and automatic cleanup are complementary operations,
+not two releases of the same descriptor. Unknown and repeated cleanup returns
+failure without dereferencing the supplied pointer.
+
+Recoverable close and lifecycle failures preserve the owner and its capability.
+The runtime validates descriptor identity and generation before taking a slot;
+therefore a failed close, stale view, or invalid access cannot consume the
+owner. Early returns, lexical scope exits, nested ownership transfer, and
+explicit close are all covered by native execution evidence. A transferred
+`dat` value is cleaned by its receiving scope, while the source receives no
+second cleanup action.
+
 ### 5.6 Provider boundary
 
 - Define a target-neutral provider interface for load, store, flush, cancel,

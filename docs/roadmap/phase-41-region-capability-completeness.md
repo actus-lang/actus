@@ -199,13 +199,38 @@ read, empty read, boundary rejection, and zero-floating-point IR.
 
 ## Gate 41.6 — Ownership, views, loans, and deterministic cleanup
 
-- [ ] Specify `erg`, `abs`, `dat`, and `ins` for every Region operation.
-- [ ] Make views generation-aware and non-escaping.
-- [ ] Reject use after close, use after move, stale views, and aliasing loans.
-- [ ] Generate exactly one cleanup action for every owned descriptor.
-- [ ] Prove explicit close, failed close, lexical drop, early return, and nested
+- [x] Specify `erg`, `abs`, `dat`, and `ins` for every Region operation.
+- [x] Make views generation-aware and non-escaping.
+- [x] Reject use after close, use after move, stale views, and aliasing loans.
+- [x] Generate exactly one cleanup action for every owned descriptor.
+- [x] Prove explicit close, failed close, lexical drop, early return, and nested
       call cleanup behavior.
-- [ ] Verify that failed recoverable operations preserve the owner.
+- [x] Verify that failed recoverable operations preserve the owner.
+
+#### Gate 41.6 evidence
+
+The public Region contract now records the role at every boundary: `dat` for
+opening and remapping backing storage, `abs` for read-only Region and source
+views, `ins` for exclusive mutation, publication, cancellation, and close, and
+`erg` for scalar indexes, counts, and layout values. Hosted views carry the
+descriptor generation through every borrow; Rust lifetimes keep the views
+non-escaping and prevent remap, close, or publication while a conflicting view
+is live. The bridge validates the descriptor pointer, capability identity, and
+generation before access.
+
+Native Region values are descriptor pointers. The compiler cleanup ABI now
+passes that pointer directly to `actus_region_drop`; it does not reinterpret a
+pointer as an encoded capability handle. The bridge locates the descriptor in
+the bounded capability table, releases its resident storage and descriptor
+exactly once, and rejects repeated or unknown cleanup. Explicit close removes
+the live resident capability while leaving one lexical descriptor cleanup;
+failed close leaves the owner and capability intact.
+
+Evidence includes runtime tests for failed-close owner preservation and
+repeated release, compiler lowering coverage for direct Region cleanup, and a
+strict hosted native fixture covering lexical drop, early return, nested
+ownership transfer, use after close, stale generations, and zero-floating-point
+IR. The fixture uses explicit `dat` at each ownership-transfer call site.
 
 ## Gate 41.7 — Publication, cancellation, and bounded transactions
 

@@ -2,11 +2,11 @@
 
 use std::ptr;
 
+use super::actus_enum_allocate;
 use super::allocation::take_buffer;
 use super::capabilities::decode_region_handle;
 use super::region::{InMemoryRegion, RegionDescriptor, RegionError, RegionHandle};
 use super::types::ActusBuffer;
-use super::{actus_enum_allocate, actus_enum_drop};
 
 const RESULT_OK: u32 = 0;
 const RESULT_ERR: u32 = 1;
@@ -39,7 +39,7 @@ impl RegionStore {
         }
     }
 
-    fn allocate(
+    pub(super) fn allocate(
         &mut self,
         backing: Vec<u8>,
         element_stride: u64,
@@ -87,7 +87,7 @@ impl RegionStore {
         Ok(region)
     }
 
-    fn attach_descriptor(
+    pub(super) fn attach_descriptor(
         &mut self,
         handle: RegionHandle,
         descriptor: *mut RegionDescriptor,
@@ -112,16 +112,31 @@ impl RegionStore {
         self.descriptors[index].take().ok_or(RegionError::InvalidHandle).map(Some)
     }
 
-    fn close(&mut self, handle: RegionHandle, descriptor: usize) -> Result<(), RegionError> {
+    fn remove_descriptor(&mut self, descriptor: usize) -> Result<Option<usize>, RegionError> {
+        let index = self
+            .descriptors
+            .iter()
+            .position(|candidate| *candidate == Some(descriptor))
+            .ok_or(RegionError::InvalidDescriptor)?;
+        let _ = self.slots[index].take();
+        Ok(self.descriptors[index].take())
+    }
+
+    pub(super) fn close(
+        &mut self,
+        handle: RegionHandle,
+        generation: u64,
+        descriptor: usize,
+    ) -> Result<(), RegionError> {
         let index = decode_store_handle(handle)?;
-        if self.slots[index].is_none() && self.descriptors[index] == Some(descriptor) {
-            return Ok(());
-        }
-        let region = self.slots[index].take().ok_or(RegionError::InvalidHandle)?;
+        let region = self.slots[index].as_ref().ok_or(RegionError::InvalidHandle)?;
         if region.descriptor().handle != handle || self.descriptors[index] != Some(descriptor) {
-            self.slots[index] = Some(region);
             return Err(RegionError::InvalidHandle);
         }
+        if region.descriptor().generation != generation {
+            return Err(RegionError::StaleGeneration);
+        }
+        self.slots[index].take().ok_or(RegionError::InvalidHandle)?;
         Ok(())
     }
 }
@@ -190,12 +205,13 @@ pub(super) fn validate_descriptor(
 ///
 /// # Safety
 ///
-/// `handle` must be a capability value previously returned by the region
-/// runtime. Invalid or repeated handles are rejected without dereferencing it.
+/// `region` must be a descriptor pointer previously returned by the region
+/// runtime. Invalid or repeated descriptors are rejected without dereferencing
+/// an unknown pointer.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn actus_region_drop(handle: RegionHandle) -> i32 {
+pub unsafe extern "C" fn actus_region_drop(region: *mut u8) -> i32 {
     let Ok(mut store) = REGION_STORE.lock() else { return -1 };
-    let Ok(descriptor) = store.remove(handle) else {
+    let Ok(descriptor) = store.remove_descriptor(region as usize) else {
         return -1;
     };
     if let Some(descriptor) = descriptor {
@@ -438,7 +454,7 @@ pub unsafe extern "C" fn actus_region_dirty(region: *const u8) -> *mut u8 {
 pub unsafe extern "C" fn actus_region_close(region: *mut u8) -> *mut u8 {
     match validate_descriptor(region).and_then(|descriptor| {
         let mut store = REGION_STORE.lock().map_err(|_| RegionError::BackendFailure)?;
-        store.close(descriptor.handle, region as usize)?;
+        store.close(descriptor.handle, descriptor.generation, region as usize)?;
         Ok(())
     }) {
         Ok(()) => result_int(0),
@@ -460,32 +476,4 @@ pub(super) fn result_u64(value: u64) -> *mut u8 {
         write_u64(result, RESULT_U64_PAYLOAD_OFFSET, value);
     }
     result
-}
-
-#[allow(dead_code)]
-fn release_result(result: *mut u8, size: usize) {
-    if !result.is_null() {
-        unsafe { actus_enum_drop(result, size) };
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{REGION_STORE, actus_region_drop};
-
-    #[test]
-    fn native_drop_releases_a_descriptor_once() {
-        let descriptor = {
-            let mut store = REGION_STORE.lock().expect("region store should not be poisoned");
-            let descriptor =
-                store.allocate(vec![0u8; 4], 4, 1, 1, 0, 1).expect("region slot should allocate");
-            let handle = descriptor.handle;
-            let pointer = Box::into_raw(Box::new(descriptor));
-            store.attach_descriptor(handle, pointer).expect("descriptor should attach");
-            handle
-        };
-
-        assert_eq!(unsafe { actus_region_drop(descriptor) }, 0);
-        assert_eq!(unsafe { actus_region_drop(descriptor) }, -1);
-    }
 }

@@ -36,7 +36,7 @@ pub(super) fn declare_runtime_functions(
     let ids = RuntimeFunctionIds {
         allocate: declare_allocate(module, pointer_type)?,
         drop: declare_drop(module, pointer_type)?,
-        region_drop: declare_region_drop(module)?,
+        region_drop: declare_region_drop(module, pointer_type)?,
         append: declare_append(module, pointer_type)?,
         buffer_length: declare_buffer_length(module, pointer_type)?,
         crc32: declare_crc32(module, pointer_type)?,
@@ -61,10 +61,10 @@ pub(super) fn declare_runtime_functions(
 pub(super) fn declare_region_cleanup_function(
     module: &mut ObjectModule,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
-    let region_drop = declare_region_drop(module)?;
+    let region_drop = declare_region_drop(module, module.isa().pointer_type())?;
     Ok(HashMap::from([(
         super::performance::dispatch_key(NativeType::Region, "drop"),
-        named_meta(region_drop, &["handle"], NativeType::Int),
+        named_meta(region_drop, &["region"], NativeType::Region),
     )]))
 }
 
@@ -117,7 +117,7 @@ fn runtime_metadata(
         (BUFFER_DROP_SYMBOL.to_owned(), named_meta(ids.drop, &["handle"], NativeType::Int)),
         (
             super::performance::dispatch_key(NativeType::Region, "drop"),
-            named_meta(ids.region_drop, &["handle"], NativeType::Int),
+            named_meta(ids.region_drop, &["region"], NativeType::Region),
         ),
         ("buffer_length".to_owned(), named_meta(ids.buffer_length, &["buffer"], NativeType::Int)),
         (
@@ -229,9 +229,10 @@ fn declare_drop(
 
 fn declare_region_drop(
     module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
 ) -> Result<cranelift_module::FuncId, NativeEmitError> {
     let mut signature = module.make_signature();
-    signature.params.push(AbiParam::new(types::I64));
+    signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(REGION_DROP_SYMBOL, Linkage::Import, &signature)

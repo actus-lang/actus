@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn native_drop_bridge_rejects_unknown_handles() {
-        assert_eq!(unsafe { actus_region_drop(0) }, -1);
-        assert_eq!(unsafe { actus_region_drop(u64::MAX) }, -1);
+        assert_eq!(unsafe { actus_region_drop(std::ptr::null_mut()) }, -1);
+        assert_eq!(unsafe { actus_region_drop(usize::MAX as *mut u8) }, -1);
     }
 }

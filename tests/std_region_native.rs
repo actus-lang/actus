@@ -389,6 +389,70 @@ fn hosted_std_region_rejects_access_after_close_without_trap() {
 }
 
 #[test]
+fn hosted_std_region_cleanup_handles_early_return_and_nested_transfer() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-region-cleanup-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-cleanup-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_cleanup_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        r#"import std::region;
+verb consume_region(dat region: Region[u32]) -> Int {
+    return 0;
+}
+verb open_and_return(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { return 0; }, };
+}
+verb open_and_transfer(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 2, Result.Ok(region) => { return consume_region(region: dat region); }, };
+}
+verb main() -> Int {
+    erg first: Buffer = Buffer[4];
+    erg early = open_and_return(backing: dat first);
+    if early != 0 { return 3; }
+    erg second: Buffer = Buffer[4];
+    return open_and_transfer(backing: dat second);
+}
+"#,
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "hosted Region cleanup build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("Region cleanup executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn hosted_region_object_has_bounded_abi_sections_and_relocations() {
     let small_root =
         std::env::temp_dir().join(format!("actus-region-object-small-{}", std::process::id()));

@@ -156,11 +156,10 @@ pub(crate) fn emit_binding_drop(
     };
     let address = binding_address(name, locals)?;
     if binding_type == NativeType::Region {
-        let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), address, 0);
         let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
             NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
         })?;
-        function.ins().call(target.reference, &[handle]);
+        function.ins().call(target.reference, &[address]);
         return Ok(());
     }
     emit_typed_binding_drop(function, address, binding_type, functions, layouts)

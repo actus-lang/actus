@@ -85,6 +85,28 @@ open verb region_close[T](ins region: Region[T]) -> Result[Int, RegionError];
 `cancel` restores the latest published bytes. `close` releases the capability;
 successful close ends the owner's usable lifecycle.
 
+### Ownership, views, and cleanup
+
+Region ownership is explicit at every call site. `region_open` and
+`region_remap` consume their backing `Buffer` with `dat`; the source binding
+cannot be used or dropped again. Read and inspection operations use an `abs`
+Region view. Mutation, publication, cancellation, and close use an exclusive
+`ins` loan. Scalar indexes, counts, and window values are `erg` inputs.
+
+The Region value carries an opaque runtime descriptor whose generation is
+checked for every operation. Views are limited to the call that created them;
+they cannot escape, overlap an exclusive loan, or remain valid after close or
+generation change. A stale, closed, moved, or aliased value produces a typed
+failure before resident bytes are accessed.
+
+An owned Region is released exactly once. Explicit successful close releases
+the live capability and leaves descriptor cleanup to lexical ownership teardown.
+Failed close preserves the owner, so the caller may inspect or retry it. Scope
+exit, early return, and nested `dat` transfer all use the same deterministic
+cleanup contract. The native bridge receives the descriptor pointer directly,
+validates it against the bounded capability table, and rejects repeated or
+unknown cleanup without dereferencing an invalid pointer.
+
 ## Window inspection and remapping
 
 ```actus

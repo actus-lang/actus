@@ -9,6 +9,8 @@ mod input;
 mod path;
 mod region;
 mod region_bridge;
+#[cfg(test)]
+mod region_bridge_tests;
 mod region_range_bridge;
 mod serialization;
 mod stream;
