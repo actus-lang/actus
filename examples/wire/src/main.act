@@ -1,0 +1,152 @@
+"""
+Transport-neutral `std::wire` example.
+
+The executable encodes and decodes one bounded frame, admits its sequence in
+the replay window, then feeds the same frame to the incremental parser in two
+chunks. It uses only caller-owned buffers and prints observable success lines.
+"""
+import std::io;
+
+import std::wire;
+
+verb encode_frame(ins encoded: Buffer) -> Int {
+    erg header = WireHeader {storage: Array[u8, 12]()};
+    header.magic_0 = WIRE_MAGIC_0;
+    header.magic_1 = WIRE_MAGIC_1;
+    header.version = WIRE_VERSION;
+    header.message_id = 7u8;
+    header.channel_id = 2u8;
+    header.sequence_num = 42u32;
+    header.payload_len = 3u16;
+    erg payload: Buffer = Buffer[0];
+    append(payload, 65u8);
+    append(payload, 66u8);
+    append(payload, 67u8);
+    erg encoded_result = wire_frame_encode(
+        header: abs header,
+        payload: abs payload,
+        output: ins encoded
+    );
+    erg encoded_count: u32 = case dat encoded_result {
+        Result.Ok(count) => count,
+        Result.Err(_) => 0u32,
+    };
+    if encoded_count != 17u32 {
+        return 1;
+    }
+    return 0;
+}
+
+verb validate_frame(abs encoded: Buffer) -> Int {
+    erg decoded_payload: Buffer = Buffer[3];
+    erg decoded_result = wire_frame_decode(input: abs encoded, payload_output: ins decoded_payload);
+    return case dat decoded_result {
+        Result.Err(_) => 1,
+        Result.Ok(value) => if value.sequence_num == 42u32 && decoded_payload[0] == 65u8 {
+            0;
+        } else {
+            2;
+        },
+    };
+}
+
+verb admit_sequence() -> Int {
+    erg sequence = wire_sequence_empty();
+    erg context_id: u32 = 1u32;
+    erg sequence_num: u32 = 42u32;
+    erg sequence_result = wire_sequence_accept(
+        window: ins sequence,
+        context_id: erg context_id,
+        sequence_num: erg sequence_num
+    );
+    return case dat sequence_result {
+        Result.Err(_) => 1,
+        Result.Ok(_) => 0,
+    };
+}
+
+verb prepare_frame(ins encoded: Buffer) -> Int {
+    if encode_frame(encoded: ins encoded) != 0 {
+        return 1;
+    }
+    if validate_frame(encoded: abs encoded) != 0 {
+        return 2;
+    }
+    if admit_sequence() != 0 {
+        return 3;
+    }
+    erg frame_message = "WIRE_DEMO frame=encoded-decoded sequence=42 payload=ABC";
+    println(abs frame_message);
+    return 0;
+}
+
+verb feed_first(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer) -> u32 {
+    erg first_chunk: Buffer = Buffer[5];
+    for erg index: u32 in 0u32 .. 5u32 {
+        first_chunk[index] = encoded[index];
+    }
+    erg first_result = wire_parser_feed(
+        parser: ins parser,
+        chunk: abs first_chunk,
+        payload_output: ins output
+    );
+    return case dat first_result {
+        Result.Ok(count) => count,
+        Result.Err(_) => 0u32,
+    };
+}
+
+verb feed_second(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer) -> u32 {
+    erg second_chunk: Buffer = Buffer[12];
+    for erg index: u32 in 0u32 .. 12u32 {
+        second_chunk[index] = encoded[index + 5u32];
+    }
+    erg second_result = wire_parser_feed(
+        parser: ins parser,
+        chunk: abs second_chunk,
+        payload_output: ins output
+    );
+    return case dat second_result {
+        Result.Ok(count) => count,
+        Result.Err(_) => 0u32,
+    };
+}
+
+verb parse_chunks(abs encoded: Buffer) -> Int {
+    erg parser = wire_parser_empty();
+    erg parser_payload: Buffer = Buffer[3];
+    erg first_count = feed_first(
+        parser: ins parser,
+        encoded: abs encoded,
+        output: ins parser_payload
+    );
+    if first_count != 5u32 {
+        return 4;
+    }
+    erg second_count = feed_second(
+        parser: ins parser,
+        encoded: abs encoded,
+        output: ins parser_payload
+    );
+    erg parser_status = wire_parser_status(parser: abs parser);
+    if second_count != 12u32 || case dat parser_status {
+        WireParserStatus.Ready => false,
+        _ => true,
+    } {
+        return 5;
+    }
+    erg parser_message = "WIRE_DEMO parser=split-chunks status=ready";
+    println(abs parser_message);
+    return 0;
+}
+
+verb main() -> Int {
+    erg encoded: Buffer = Buffer[17];
+    if prepare_frame(encoded: ins encoded) != 0 {
+        return 1;
+    }
+    if parse_chunks(encoded: abs encoded) != 0 {
+        return 2;
+    }
+    return 0;
+}
