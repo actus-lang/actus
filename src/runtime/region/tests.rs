@@ -356,3 +356,41 @@ fn invalid_descriptors_fail_through_typed_validation() {
         assert!(descriptor.validate().is_err());
     }
 }
+
+#[test]
+fn deterministic_boundary_matrix_preserves_region_failure_classes() {
+    let cases = [
+        (1u64, 0u64, 1u64, 0u64),
+        (4u64, 0u64, 2u64, 1u64),
+        (4u64, 2u64, 2u64, 3u64),
+        (4u64, 3u64, 1u64, 2u64),
+        (u64::MAX, 0u64, 1u64, 0u64),
+        (8u64, 7u64, 2u64, 7u64),
+    ];
+    for (logical_length, window_start, window_count, index) in cases {
+        let first = InMemoryRegion::new(7, 1, logical_length, window_start, window_count);
+        let second = InMemoryRegion::new(7, 1, logical_length, window_start, window_count);
+        assert_eq!(
+            first.as_ref().map(|region| region.descriptor()),
+            second.as_ref().map(|region| region.descriptor())
+        );
+        match (first, second) {
+            (Ok(mut first), Ok(mut second)) => {
+                let first_view = first.borrow_abs(7, first.descriptor().generation);
+                let second_view = second.borrow_abs(7, second.descriptor().generation);
+                assert_eq!(first_view.is_ok(), second_view.is_ok());
+                if let (Ok(first_view), Ok(second_view)) = (first_view, second_view) {
+                    let mut first_value = [0u8; 1];
+                    let mut second_value = [0u8; 1];
+                    assert_eq!(
+                        first_view.read(index, &mut first_value),
+                        second_view.read(index, &mut second_value)
+                    );
+                    assert_eq!(first_value, second_value);
+                }
+            }
+            (Err(first), Err(second)) => assert_eq!(first, second),
+            _ => panic!("identical boundary inputs produced different constructor classes"),
+        }
+    }
+}

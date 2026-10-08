@@ -444,14 +444,37 @@ specific behavior remains selected by the configured provider profile.
 
 ## Gate 41.14 — Adversarial and regression verification
 
-- [ ] Add accepted and rejected semantic tests for every public constraint.
-- [ ] Add native execution tests for every lifecycle state and failure branch.
-- [ ] Add deterministic fuzz or property-style coverage for indices, lengths,
+- [x] Add accepted and rejected semantic tests for every public constraint.
+- [x] Add native execution tests for every lifecycle state and failure branch.
+- [x] Add deterministic fuzz or property-style coverage for indices, lengths,
       windows, generations, and malformed provider results.
-- [ ] Add double-close, stale-handle, stale-view, generation-wrap, and
+- [x] Add double-close, stale-handle, stale-view, generation-wrap, and
       capability-reuse regressions.
-- [ ] Add layout and ABI regressions for every supported element category.
-- [ ] Run the full compiler and standard-library quality matrix.
+- [x] Add layout and ABI regressions for every supported element category.
+- [x] Run the full compiler and standard-library quality matrix.
+
+#### Gate 41.14 evidence
+
+- Semantic acceptance and rejection cover fixed-size primitive, array, pack,
+  and struct elements, generic Region declarations, unsupported dynamic or
+  nested Region elements, generic arity, and const-generic constraints.
+- Runtime and native fixtures cover open, read, write, range access, publish,
+  cancel, remap, pin, unpin, close, lexical cleanup, invalid descriptors,
+  wrong buffers, out-of-window access, overflow, dirty and pinned transitions,
+  stale generations, provider failures, corruption, truncation, interruption,
+  and recovery.
+- Capability tests cover repeated release, stale handles, slot reuse with a
+  new generation, and generation wrap rejection. Region tests cover stale
+  views and closed access without a native trap.
+- Layout and ABI tests cover primitive, packed, array, struct, generic,
+  aggregate return, direct and indirect descriptor paths, fixed-width layout,
+  cleanup, and freestanding provider symbols.
+- `deterministic_boundary_matrix_preserves_region_failure_classes` exercises
+  repeated index, length, window, and boundary inputs and requires identical
+  result classes and bytes for identical inputs.
+- The full `cargo test --all-targets --all-features` matrix and
+  `cargo clippy --all-targets --all-features -- -D warnings` passed after the
+  regression was added.
 
 ## Gate 41.15 — Scale and evidence package
 

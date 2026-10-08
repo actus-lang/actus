@@ -505,6 +505,18 @@ publication, cancellation, remapping, and explicit close. Provider recovery
 remains an adapter concern and is verified at that boundary; the core facade
 does not invent a recovery operation or perform implicit provider I/O.
 
+### 11.2 Gate 41.14 adversarial and regression evidence
+
+The semantic, runtime, native, provider, ABI, and cleanup suites cover the
+accepted and rejected Region contracts, including unsupported element layouts,
+stale views and handles, repeated close, capability reuse, generation
+exhaustion, malformed descriptors, dirty and pinned windows, provider
+interruption, corruption, truncation, and recovery. A deterministic boundary
+matrix repeats representative logical lengths, window ranges, generations, and
+indexes and requires identical result classes and resident bytes for identical
+inputs. Primitive, packed, array, struct, generic, aggregate-return, hosted,
+and freestanding lowering paths remain covered by the existing ABI fixtures.
+
 ## 12. Non-goals
 
 This ADR does not define:
