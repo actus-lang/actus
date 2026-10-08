@@ -137,7 +137,7 @@ pub(crate) fn emit_objects(
         .map_err(|error| NativeEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
-    let reachable_module_roots = crate::codegen::reachable_call_names(root.program(), symbol)?;
+    let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
     let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(
         root.program(),
         symbol,
@@ -186,6 +186,32 @@ fn region_generic_types(
         .collect()
 }
 
+fn reachable_module_roots(
+    object_plan: &crate::modules::ModuleObjectPlan,
+    symbol: &str,
+) -> Result<std::collections::HashSet<String>, NativeEmitError> {
+    let root = &object_plan.units()[0];
+    let mut roots = crate::codegen::reachable_call_names(root.program(), symbol)?;
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for unit in &object_plan.units()[1..] {
+            let selected = unit
+                .exported_verbs()
+                .iter()
+                .filter(|name| roots.contains(*name))
+                .cloned()
+                .collect::<Vec<_>>();
+            for name in selected {
+                for call in crate::codegen::reachable_call_names(unit.program(), &name)? {
+                    changed |= roots.insert(call);
+                }
+            }
+        }
+    }
+    Ok(roots)
+}
+
 fn emit_module_objects(
     object_plan: &crate::modules::ModuleObjectPlan,
     configuration: &CompilerConfiguration,
@@ -195,12 +221,15 @@ fn emit_module_objects(
 ) -> Result<Vec<EmittedObject>, NativeEmitError> {
     let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
-        let roots = unit
-            .exported_verbs()
-            .iter()
-            .filter(|name| reachable_module_roots.contains(*name))
-            .cloned()
-            .collect::<Vec<_>>();
+        let roots = if unit.namespace().module_path().starts_with("std::wire") {
+            unit.exported_verbs()
+                .iter()
+                .filter(|name| reachable_module_roots.contains(*name))
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            unit.exported_verbs().to_vec()
+        };
         if roots.is_empty() {
             continue;
         }

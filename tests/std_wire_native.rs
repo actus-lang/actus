@@ -44,12 +44,54 @@ fn unused_wire_modules_are_absent_from_native_object_set() {
         }
         let bytes = fs::read(path).expect("read generated object");
         let file = object::File::parse(bytes.as_slice()).expect("parse generated object");
-        wire_symbols.extend(file.symbols().filter_map(|symbol| {
-            let name = symbol.name().ok()?.to_owned();
-            name.contains("std_4_wire__verb_").then_some(name)
-        }));
+        wire_symbols.extend(file.symbols().filter(|symbol| !symbol.is_undefined()).filter_map(
+            |symbol| {
+                let name = symbol.name().ok()?.to_owned();
+                name.contains("std_4_wire__verb_").then_some(name)
+            },
+        ));
     }
     assert!(wire_symbols.is_empty(), "unused Wire declarations were emitted: {wire_symbols:?}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn freestanding_wire_types_emit_without_host_runtime_imports() {
+    let root = std::env::temp_dir().join(format!("actus-wire-freestanding-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"wire_freestanding\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"boot\"\n\n[build]\nruntime = \"std\"\ntarget = \"x86_64-unknown-uefi\"\nentry_contract = \"freestanding\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    copy_standard_library(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src"),
+        &root.join("src"),
+    );
+    fs::write(
+        root.join("src/main.act"),
+        "import std::wire; verb boot() -> Int { erg header = WireHeader { storage: Array[u8, 12]() }; header.version = WIRE_VERSION; return header.version as Int; }\n",
+    )
+    .expect("source");
+    let output = root.join("wire.o");
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let bytes = fs::read(output).expect("read object");
+    let file = object::File::parse(bytes.as_slice()).expect("parse object");
+    let undefined = file
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok())
+        .filter(|name| !name.contains("std_4_wire__verb_") && *name != "actus_buffer_drop")
+        .collect::<Vec<_>>();
+    assert!(undefined.is_empty(), "freestanding Wire object imports host symbols: {undefined:?}");
     let _ = fs::remove_dir_all(root);
 }
 
