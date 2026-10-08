@@ -429,7 +429,7 @@ handbook in one change.
       typed widths, and rejected runtime uses.
 - [x] Reconcile generic type and const-generic examples with current accepted
       domains and diagnostics.
-- [ ] Expand roles and `perform` documentation with static dispatch, explicit
+- [x] Expand roles and `perform` documentation with static dispatch, explicit
       dynamic boundaries, receiver roles, and ABI limitations.
 - [ ] Record unsupported or design-only behavior instead of presenting it as
       available syntax.
