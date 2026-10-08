@@ -1,59 +1,63 @@
 # `std::fs`
 
+`std::fs` provides hosted filesystem access through typed Actus values. It
+covers owned file handles, metadata, open modes, cursor movement, one-shot
+reads and writes, directory operations, and atomic publication.
+
 ```actus
 import std::fs;
 import std::path;
 ```
-`std::fs` provides hosted filesystem operations through typed file handles,
-metadata, open options, seek origins, and path-based operations.
 
-The public facade contains file, metadata, operations, options, and seek
-contracts. Filesystem access is hosted and performs external side effects; it
-must not be placed in inference, parsing, or other latency-sensitive hot paths
-unless the application explicitly owns that boundary.
+Filesystem calls are external side effects. They belong at an explicit
+application, persistence, or service boundary. Do not put synchronous file
+access in inference, impulse forwarding, parsing, or another latency-critical
+hot path.
 
-Use typed result values for open, read, write, seek, metadata, rename, and
-remove operations. Document path ownership, handle cleanup, append behavior,
-and error variants at the API boundary.
+## Reading order
 
-## Public surface
+1. [API](api.md) — complete public declarations and result contracts.
+2. [File handles](file-handles.md) — open, read, write, seek, flush, close,
+   and deterministic cleanup.
+3. [Open options](options.md) — explicit read/write/create/append behavior.
+4. [Operations](operations.md) — one-shot I/O, directories, rename, copy, and
+   atomic publication.
+5. [Ownership and lifecycle](lifecycle.md) — `abs`, `ins`, `dat`, and failure
+   paths.
+6. [Errors and runtime](errors.md) and [runtime](runtime.md).
+7. [Usage](usage.md) and [examples](examples.md).
 
-The facade includes:
+## Main type groups
 
-- `File` and `file_open`, `file_create`, `file_read`, `file_write`,
-  `file_flush`, `file_close`, and seek operations;
-- `Metadata` and metadata queries;
-- `OpenOptions` with read, write, append, truncate, create, and create-new
-  configuration;
-- filesystem operations for read, write, atomic write, rename, copy, remove,
-  and directory creation/removal;
-- `SeekFrom` positions.
+- `File` owns one opaque host handle and closes it through the `Drop`
+  performance when its owner leaves scope.
+- `Metadata` contains copied scalar facts and owns no host resource.
+- `OpenOptions` is an owned set of scalar switches consumed by `options_open`.
+- `SeekFrom` selects the origin for cursor movement.
+- `IoError` is supplied by `std::io` and is used for every fallible filesystem
+  result.
 
-File handles are owned resources. Mutating operations use an exclusive role and
-must preserve handle cleanup on success and failure. Path-based convenience
-operations inspect `abs Path`; contents are inspected through `abs Buffer` or
-returned in caller-owned buffers according to the declaration.
+## Path boundary
 
-## Detailed pages
+Filesystem APIs receive `Path`, not arbitrary text. Build and validate paths
+with `std::path` first. Path parameters are normally `abs` views: the runtime
+uses them for one call and does not retain or copy them as part of a `File`.
 
-- [Usage guide](usage.md)
-- [Source implementation](../../../../library/std/src/fs/)
-- [Filesystem tests](../../../../tests/fs.rs)
+## Important distinctions
 
-## Operation groups
+- `read_to_bytes` returns arbitrary bytes; `read_to_string` additionally
+  validates UTF-8 and returns `InvalidData` for malformed text.
+- `write_file` creates or truncates a destination directly.
+- `write_file_atomic` writes a caller-selected staging path, flushes it, then
+  renames it to the final path and removes staging on failure.
+- `File` operations provide a controlled streaming lifecycle; one-shot verbs
+  are simpler for bounded files.
 
-- Use `file_open` or `file_create` when the caller needs a persistent `File`
-  handle. The handle owns the native resource and must be flushed and closed
-  through its typed operations.
-- Use `OpenOptions` when read, write, append, truncate, create, or create-new
-  behavior must be selected explicitly.
-- Use `file_read` and `file_write` with caller-owned buffers. Read destinations
-  use `ins`; write sources use `abs`.
-- Use `read_to_bytes` or `read_to_string` for one-shot path operations. These
-  return owned buffers and therefore must be handled as moved values.
-- Use `write_file_atomic` when staging and publication must be separate. The
-  operation writes the staging path, flushes it, publishes it with rename, and
-  reports typed failure when any step cannot complete.
+## Source and evidence
 
-Filesystem operations are hosted side effects. Keep them behind an explicit
-application or persistence boundary rather than inside a computation hot path.
+- [API](api.md) documents the public facade, not private C ABI bridges.
+- The implementation is in
+  [`library/std/src/fs/`](../../../../library/std/src/fs/).
+- Contract fixtures are in
+  [`tests/library/`](../../../../tests/library/), including `fs_contracts.act`,
+  `fs_handles.act`, `fs_errors.act`, and `fs_create_new.act`.
