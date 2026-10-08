@@ -219,7 +219,7 @@ During migration:
 
 ### Gate 40.5: Modules and facades
 
-- [ ] Document the relationship between files, directories, canonical facades,
+- [x] Document the relationship between files, directories, canonical facades,
       child modules, sibling modules, and parent exports.
 - [ ] Document public and private declarations.
 - [ ] Document import paths and facade-only access.
