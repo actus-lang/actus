@@ -411,14 +411,36 @@ specific behavior remains selected by the configured provider profile.
 
 ## Gate 41.13 — Diagnostics, formatter, LSP, and guide completeness
 
-- [ ] Document every public type, error, constant, and operation.
-- [ ] Add actionable diagnostics for layout, bounds, generation, capability,
+- [x] Document every public type, error, constant, and operation.
+- [x] Add actionable diagnostics for layout, bounds, generation, capability,
       loan, provider, and recovery failures.
-- [ ] Preserve Region declarations through formatter round trips.
-- [ ] Add semantic model, hover, completion, and source-navigation coverage.
-- [ ] Add examples for inline arrays, one resident window, remap, bulk access,
+- [x] Preserve Region declarations through formatter round trips.
+- [x] Add semantic model, hover, completion, and source-navigation coverage.
+- [x] Add examples for inline arrays, one resident window, remap, bulk access,
       publication, cancellation, and recovery.
-- [ ] Keep all source and documentation files within repository limits.
+- [x] Keep all source and documentation files within repository limits.
+
+#### Gate 41.13 evidence
+
+- `docs/guide/library/region/api.md` documents `Region[T]`, every public
+  `RegionError` variant, all public operations, ownership roles, bounds,
+  allocation and I/O boundaries, and hosted/freestanding behavior.
+- Layout diagnostics are covered by the semantic rejection tests for unsized
+  Region elements. Bounds, generation, capability, loan, provider, and
+  recovery failures are covered by the typed runtime and native Region
+  fixtures; each failure remains a `RegionError` result rather than a native
+  status or implicit exception.
+- `tests/formatter/suite.rs` verifies an imported Region declaration and a
+  generic `region_open` call remain stable across a second formatting pass.
+- `tests/lsp/text_boundary.rs` verifies Region diagnostics, hover,
+  completion, definition, and formatting through the editor protocol.
+- `examples/region` is a runnable strict package using `Region[Array[u16, 2]]`.
+  It exercises one resident window, bounded bulk read/write, publication,
+  cancellation, remapping, and explicit close. Provider recovery is kept at
+  the provider boundary and is documented in the Region runtime guide rather
+  than represented by an invented public core operation.
+- Source limits are checked by the strict build and repository quality hooks;
+  the example was decomposed into responsibility-sized verbs.
 
 ## Gate 41.14 — Adversarial and regression verification
 

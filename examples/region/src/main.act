@@ -1,0 +1,138 @@
+"""
+`std::region` lifecycle example.
+
+The element type is `Array[u16, 2]`, so every resident element occupies four
+bytes. The logical region has four elements, while exactly one element is
+resident at a time. All buffers are caller-owned and all lifecycle operations
+return typed results.
+"""
+import std::region;
+
+verb open_example() -> Result[Region[Array[u16, 2]], RegionError] {
+    erg backing: Buffer = Buffer[4];
+    erg logical_length: u64 = 4u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    return region_open[Array[u16, 2]](
+        backing: dat backing,
+        logical_length: erg logical_length,
+        window_start: erg window_start,
+        window_count: erg window_count
+    );
+}
+
+verb publish_region(ins region: Region[Array[u16, 2]]) -> Int {
+    erg source: Buffer = Buffer[4];
+    erg write_start: u64 = 0u64;
+    erg write_count: u64 = 1u64;
+    erg written = region_write_range(
+        region: ins region,
+        start_index: erg write_start,
+        element_count: erg write_count,
+        source: abs source
+    );
+    return case dat written {
+        Result.Err(_) => 1,
+        Result.Ok(count) => {
+            if count != 1u64 {
+                return 1;
+            }
+            erg published = region_publish(region: ins region);
+            return case dat published {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 2,
+            };
+        },
+    };
+}
+
+verb read_published(abs region: Region[Array[u16, 2]]) -> Int {
+    erg destination: Buffer = Buffer[4];
+    erg read_start: u64 = 0u64;
+    erg read_count: u64 = 1u64;
+    erg read = region_read_range(
+        region: abs region,
+        start_index: erg read_start,
+        element_count: erg read_count,
+        destination: ins destination
+    );
+    return case dat read {
+        Result.Err(_) => 4,
+        Result.Ok(count) => {
+            if count != 1u64 {
+                return 3;
+            }
+            return 0;
+        },
+    };
+}
+
+verb cancel_region(ins region: Region[Array[u16, 2]]) -> Int {
+    erg source: Buffer = Buffer[4];
+    erg index: u64 = 0u64;
+    erg written = region_write(
+        region: ins region,
+        index: erg index,
+        source: abs source
+    );
+    return case dat written {
+        Result.Err(_) => 5,
+        Result.Ok(_) => {
+            erg canceled = region_cancel(region: ins region);
+            return case dat canceled {
+                Result.Ok(value) => if value == 0 {
+                    0;
+                } else {
+                    6;
+                },
+                Result.Err(_) => 6,
+            };
+        },
+    };
+}
+
+verb remap_region(ins region: Region[Array[u16, 2]]) -> Int {
+    erg replacement: Buffer = Buffer[4];
+    erg replacement_start: u64 = 2u64;
+    erg replacement_count: u64 = 1u64;
+    erg remapped = region_remap(
+        region: ins region,
+        backing: dat replacement,
+        window_start: erg replacement_start,
+        window_count: erg replacement_count
+    );
+    return case dat remapped {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 7,
+    };
+}
+
+verb main() -> Int {
+    erg opened = open_example();
+    return case dat opened {
+        Result.Err(_) => 10,
+        Result.Ok(region) => {
+            erg first = publish_region(region: ins region);
+            if first != 0 {
+                return first;
+            }
+            erg read = read_published(region: abs region);
+            if read != 0 {
+                return read;
+            }
+            erg second = cancel_region(region: ins region);
+            if second != 0 {
+                return second;
+            }
+            erg remapped = remap_region(region: ins region);
+            if remapped != 0 {
+                return remapped;
+            }
+            erg closed = region_close(region: ins region);
+            return case dat closed {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 11,
+            };
+        },
+    };
+}

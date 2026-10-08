@@ -493,6 +493,18 @@ A Region capability is complete only with evidence for:
 A successful semantic check alone does not prove native lowering, bounded
 resident memory, provider recovery, or concurrency behavior.
 
+### 11.1 Gate 41.13 tooling and guide evidence
+
+The public guide documents `Region[T]`, the complete `RegionError` taxonomy,
+all public operations, ownership roles, checked bounds, allocation and I/O
+boundaries, and the hosted/freestanding provider boundary. Semantic tests
+reject unsupported element layouts; formatter and LSP fixtures preserve and
+expose Region declarations; and the runnable `examples/region` package covers
+an inline array element, a single resident window, bounded bulk access,
+publication, cancellation, remapping, and explicit close. Provider recovery
+remains an adapter concern and is verified at that boundary; the core facade
+does not invent a recovery operation or perform implicit provider I/O.
+
 ## 12. Non-goals
 
 This ADR does not define:

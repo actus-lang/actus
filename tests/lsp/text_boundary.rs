@@ -89,3 +89,48 @@ fn lsp_exposes_the_public_wire_surface_to_editor_clients() {
     assert!(stdout.contains("\"newText\""), "formatting missing: {stdout}");
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn lsp_exposes_the_public_region_surface_to_editor_clients() {
+    let root = temp_root();
+    let source_path = root.join("src/main.act");
+    fs::create_dir_all(root.join("src")).expect("create source root");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-region-surface\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("write manifest");
+    let source = concat!(
+        "import std::region;\n",
+        "verb main() -> Int {\n",
+        "erg backing: Buffer = Buffer[4];\n",
+        "erg length: u64 = 1u64;\n",
+        "erg start: u64 = 0u64;\n",
+        "erg count: u64 = 1u64;\n",
+        "erg opened = region_open[u32](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count);\n",
+        "return 0;\n",
+        "}\n",
+    );
+    fs::write(&source_path, source).expect("write source");
+    let uri = file_uri(&source_path);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"region_open")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":6,"character":30}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":position_after(source,"region_open")}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    let hover = response_with_id(&stdout, 2).to_string();
+    let completion = response_with_id(&stdout, 3).to_string();
+    let definition = response_with_id(&stdout, 4).to_string();
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(hover.contains("region_open"), "hover missing: {hover}");
+    assert!(completion.contains("region_open"), "completion missing: {completion}");
+    assert!(definition.contains("library/std/src/region"), "definition missing: {definition}");
+    assert!(stdout.contains("\"newText\""), "formatting missing: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}

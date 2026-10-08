@@ -4,6 +4,26 @@
 import std::region;
 ```
 
+## `Region[T]`
+
+`Region[T]` is an owned, runtime-backed descriptor for a logical sequence of
+fully sized `T` elements. It exposes one bounded resident window at a time;
+the logical length may be larger than the resident storage. `Region[T]` is not
+an `Array[T, N]`, does not contain a raw pointer, and does not perform implicit
+remapping, allocation, provider I/O, or page faults during element access.
+
+`T` may be a fixed-width primitive, a fixed-size array, a `pack`, or a sized
+`struct`. Unsized and runtime-sized element types are rejected during semantic
+analysis. The compiler derives `size_of[T]()` and `align_of[T]()` at open time;
+the runtime validates stride, alignment, logical bounds, window bounds, and
+checked byte arithmetic before the capability becomes usable.
+
+The owner is created by `region_open` and is released by successful
+`region_close` or deterministic lexical cleanup. `abs` is a read-only view,
+`ins` is an exclusive call-scoped mutable loan, and `dat` transfers ownership.
+All Region operations return typed `Result` values; native status codes and
+runtime pointers are not part of the public API.
+
 ## `RegionError`
 
 | Variant | Meaning |
@@ -19,6 +39,9 @@ import std::region;
 | `BackendFailure` | Selected target provider rejected the operation. |
 | `WindowBusy` | A transition conflicts with unpublished mutations, a pin, or the single-threaded loan contract. |
 | `BulkLimitExceeded` | A range payload exceeds the fixed 64 KiB bulk-operation limit. |
+
+The enum is exhaustive. Callers must handle every variant with `case`; no
+implicit exception or sentinel-value path represents a Region failure.
 
 ## Read and write
 
@@ -144,3 +167,23 @@ The operation is memory-only: it performs no implicit filesystem, device, or
 provider I/O. A dirty or pinned resident window returns `WindowBusy`; invalid
 ranges, overflow, or an incorrect buffer size leave the current descriptor and
 bytes unchanged.
+
+## Bounds, allocation, and target behavior
+
+Single-element and range operations validate logical indexes, resident-window
+containment, checked multiplication and addition, exact buffer length, and
+alignment before touching bytes. Range operations are all-or-nothing: an
+`Err` result means zero elements were copied or changed. Each range is limited
+to 64 KiB of resident bytes; larger transfers must be explicitly chunked.
+
+The Region core performs no hidden allocation or filesystem, device, or
+network I/O on read, write, publish, cancel, inspection, pin, unpin, or close.
+Opening and remapping acquire the caller-provided bounded resident storage.
+Provider load, store, flush, cancel, and recovery are explicit adapter
+operations described in the runtime guide.
+
+Hosted builds use the configured hosted provider. Freestanding builds require
+an explicit target provider profile; importing this facade does not create a
+device backend. Target-specific behavior is selected by the provider profile,
+while the public descriptor, ownership roles, typed failures, and lifecycle
+remain target-neutral.
