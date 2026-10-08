@@ -330,6 +330,28 @@ second cleanup action.
   queue, its capacity, ownership, cancellation, timeout, and retry policy must
   be explicit and bounded.
 
+### 5.7 Integrity and generation recovery
+
+- Every accepted and staged provider buffer carries a deterministic CRC32
+  checksum. Load and recovery validate the accepted checksum before copying;
+  flush validates both accepted and staged checksums before changing the
+  accepted snapshot. A checksum mismatch or truncated buffer is rejected
+  without partial publication.
+- The provider tracks accepted and staged generations separately. A successful
+  flush advances the accepted generation once. An interrupted or failed flush
+  preserves the previous complete accepted generation and leaves the staged
+  bytes available for retry or cancellation.
+- Requests carrying an older generation return `StaleGeneration`; a generation
+  that cannot advance returns `GenerationExhausted`. Neither failure mutates the
+  accepted snapshot, staged bytes, checksum, or generation.
+- `ReadOnly` degradation permits validated load and recovery while rejecting
+  store, flush, and cancel. `Terminal` failure rejects all operations. These
+  are explicit provider states and must not be reinterpreted as successful
+  publication.
+- CRC32 is an integrity and continuity check only. It does not provide
+  authentication, authorization, confidentiality, or encryption. Those concerns
+  require a separate approved adapter contract.
+
 ## 6. Element layout contract
 
 `Region[T]` accepts only a fully sized element type whose native size,

@@ -292,12 +292,28 @@ publish, cancel, and close behavior.
 
 ## Gate 41.9 — Recovery, integrity, and generation continuity
 
-- [ ] Define checksum or integrity validation at the provider boundary.
-- [ ] Preserve the previous complete generation through interrupted publish.
-- [ ] Reject stale, truncated, mismatched, and partially validated state.
-- [ ] Define retry, rollback, read-only degradation, and terminal failure.
-- [ ] Verify dirty resident state after failed publication or cancellation.
-- [ ] Add corruption, interruption, retry, and recovery fixtures.
+- [x] Define checksum or integrity validation at the provider boundary.
+- [x] Preserve the previous complete generation through interrupted publish.
+- [x] Reject stale, truncated, mismatched, and partially validated state.
+- [x] Define retry, rollback, read-only degradation, and terminal failure.
+- [x] Verify dirty resident state after failed publication or cancellation.
+- [x] Add corruption, interruption, retry, and recovery fixtures.
+
+#### Gate 41.9 evidence
+
+The provider boundary now records CRC32 checksums for accepted and staged
+buffers and validates them before load, recovery, and flush. Accepted and
+staged generations are tracked independently; a timed-out or rejected flush
+leaves the previous complete generation readable and the staged operation
+retryable. Stale and exhausted generations, checksum mismatches, truncated
+buffers, and invalid capacity are rejected without mutating accepted state.
+Read-only degradation and terminal failure are explicit provider states.
+
+Eight focused provider tests cover checksum and truncation rejection,
+interrupted publication, retry, rollback, stale/exhausted generations,
+read-only behavior, terminal failure, and accepted-state preservation. CRC32 is
+documented as integrity detection only; authentication and encryption remain
+outside this gate.
 
 ## Gate 41.10 — Concurrency and pinning contract
 

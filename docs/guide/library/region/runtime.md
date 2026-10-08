@@ -61,6 +61,26 @@ descriptor. The initial contract has no implicit asynchronous queue: queued work
 if introduced by a later adapter, must declare its capacity and ownership
 explicitly.
 
+## Integrity and recovery
+
+The reference provider records a CRC32 checksum for both the accepted snapshot
+and the staged bytes. A load or recovery operation validates the accepted
+snapshot before copying it. A flush validates the accepted snapshot and staged
+bytes before replacing the accepted snapshot, so a checksum mismatch or
+truncated staging buffer cannot publish partial state.
+
+The provider tracks the accepted generation separately from the staged
+generation. A failed flush leaves the previous complete generation readable;
+the caller may retry the same staged operation or cancel it. Requests for an
+older generation return `StaleGeneration`, and generation overflow returns
+`GenerationExhausted` without changing provider state.
+
+A provider may enter `ReadOnly` degradation, which permits reads and recovery
+but rejects mutation, or `Terminal`, which rejects all operations. These states
+are explicit results and do not silently convert failed writes into successful
+publication. CRC32 provides corruption detection and continuity checks; it is
+not an authentication or encryption mechanism.
+
 ## ABI and hot path
 
 Native lowering may pass the small descriptor directly or use an indirect ABI
