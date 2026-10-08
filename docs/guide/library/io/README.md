@@ -1,7 +1,7 @@
 # `std::io`
 
 `std::io` is Actus's typed interface for console input and output and for
-stream-shaped components. It contains five related parts:
+stream-shaped components. It contains six related parts:
 
 | Part | Use it for |
 | --- | --- |
@@ -49,7 +49,8 @@ from these implementation units:
 1. [API reference](api.md)
 2. [Ownership and errors](ownership-and-errors.md)
 3. [Examples](examples.md)
-4. [Runtime and performance boundaries](runtime.md)
+4. [Buffers and capacity](buffers.md)
+5. [Runtime and performance boundaries](runtime.md)
 
 ## What `std::io` does not do
 

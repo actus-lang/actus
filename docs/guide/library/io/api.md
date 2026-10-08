@@ -37,6 +37,7 @@ storage with sufficient capacity and retain ownership after the call.
 | `printb(abs text: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes without a newline. |
 | `printlnb(abs text: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes, newline, and flushes. |
 | `flush() -> Result[Int, IoError]` | Flushes stdout and returns `Ok(0)` on success. |
+| `write(abs buffer: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes and returns the exact byte count. |
 
 Use `print` for the language's `String` value and `printb` for raw bytes. A
 `Buffer` is not silently interpreted as text.
@@ -85,7 +86,6 @@ open verb seek(ins self: Cursor, erg offset: Int) -> Result[Int, IoError];
 open verb cursor_flush(ins self: Cursor) -> Result[Int, IoError];
 ```
 
-The two return-type brackets in the abbreviated signatures above are shown as
 `Result[Int, IoError]` in source. `cursor` consumes the backing buffer. Reads
 and writes advance `position`; `seek` changes it only when the requested
 position is valid. Reading at the end returns `EndOfStream`.
