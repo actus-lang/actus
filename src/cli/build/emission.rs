@@ -230,7 +230,7 @@ fn emit_module_objects(
         } else {
             unit.exported_verbs().to_vec()
         };
-        if roots.is_empty() {
+        if roots.is_empty() && unit.namespace().module_path().starts_with("std::wire") {
             continue;
         }
         let bytes =
