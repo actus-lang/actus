@@ -179,7 +179,7 @@ authority and malformed bounded input with typed errors.
 
 Gate 39.8 compiler evidence is provided by the native reachability fixture in
 `tests/std_wire_native.rs`. An entry that imports `std::wire` but uses only
-`WIRE_VERSION` emits no Wire verb symbols. An entry that calls
+`WIRE_VERSION` defines no Wire verb bodies. An entry that calls
 `wire_crc16_ccitt` emits only the CRC verb and its private update helper; the
 parser, sequence, fragmentation, codec, and endpoint verbs are absent from the
 native object set. This behavior is implemented in the compiler's native
@@ -193,12 +193,12 @@ and formatting responses for the public CRC surface.
 
 ## Gate 39.9 — Acceptance and future security boundary
 
-- [ ] Run host round-trip and negative codec tests.
-- [ ] Run native serialization, parsing, CRC, sequence, and failure tests.
-- [ ] Run freestanding object checks with no hosted runtime dependency.
-- [ ] Record transport-neutral evidence separately from physical transport
+- [x] Run host round-trip and negative codec tests.
+- [x] Run native serialization, parsing, CRC, sequence, and failure tests.
+- [x] Run freestanding object checks with no hosted runtime dependency.
+- [x] Record transport-neutral evidence separately from physical transport
       evidence.
-- [ ] Document encryption as a future profile behind an audited external crypto
+- [x] Document encryption as a future profile behind an audited external crypto
       facade and explicit key/session contract.
 - [ ] Run the repository formatting, compilation, Clippy, test, source-limit,
       and diff checks.

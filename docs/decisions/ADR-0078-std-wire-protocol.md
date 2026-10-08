@@ -81,6 +81,15 @@ Application-specific schemas must not redefine these channel identifiers.
 The initial implementation does not provide encryption. CRC detects accidental
 corruption only and is never treated as authentication or authorization.
 
+### Future authenticated profile
+
+An authenticated profile may be added later behind a separate, versioned
+security contract. It must use an audited external cryptographic facade rather
+than Actus implementations of cryptographic primitives, bind the authenticated
+header and payload to an explicit session and key context, define authorization
+state and replay handling, and reject downgrade to the initial unauthenticated
+profile. This profile is outside the initial Wire implementation.
+
 ### 3. Actus ownership and allocation contract
 
 The core uses caller-owned bounded storage:
