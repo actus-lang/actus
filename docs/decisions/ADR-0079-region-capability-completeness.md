@@ -467,6 +467,15 @@ it must preserve the exact ownership role at every call site.
 
 ## 11. Evidence contract
 
+Native acceptance covers primitive, packed, array, and struct Region element
+types. Generic open and forward calls preserve `Result[Region[T], E]` aggregate
+returns and indirect Region return slots. Hosted fixtures execute the public
+operations with zero-floating-point verification; freestanding fixtures emit
+bounded objects and import only the documented provider bridges. The public
+descriptor remains fixed-width and pointer-free, and target behavior is
+selected through the configured provider profile rather than source-level
+platform branches.
+
 A Region capability is complete only with evidence for:
 
 - semantic acceptance and rejection;

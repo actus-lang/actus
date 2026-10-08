@@ -237,6 +237,98 @@ fn nested_facade_lowers_pack_backed_const_generic_parameters() {
 }
 
 #[test]
+fn generic_region_covers_array_struct_and_aggregate_return_abi() {
+    let source = r#"import std::region;
+
+struct Pair {
+    erg left: u32,
+    erg right: u32,
+}
+
+verb forward_region[T](dat region: Region[T]) -> Region[T] {
+    return region;
+}
+
+verb open_forward[T](dat backing: Buffer) -> Result[Region[T], RegionError] {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    return region_open[T](
+        backing: dat backing,
+        logical_length: erg logical_length,
+        window_start: erg window_start,
+        window_count: erg window_count
+    );
+}
+
+verb check_array() -> Int {
+    erg backing: Buffer = Buffer[4];
+    erg opened = open_forward[Array[u16, 2]](backing: dat backing);
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(region) => {
+            erg forwarded: Region[Array[u16, 2]] = forward_region(region: dat region);
+            erg destination: Buffer = Buffer[4];
+            erg index: u64 = 0u64;
+            erg read = region_read(region: abs forwarded, index: erg index, destination: ins destination);
+            erg closed = region_close(region: ins forwarded);
+            erg close_status: Int = case dat closed {
+                Result.Err(_) => 3,
+                Result.Ok(_) => 0,
+            };
+            return case dat read {
+                Result.Err(_) => 2,
+                Result.Ok(_) => close_status,
+            };
+        },
+    };
+}
+
+verb check_struct() -> Int {
+    erg backing: Buffer = Buffer[8];
+    erg opened = open_forward[Pair](backing: dat backing);
+    return case dat opened {
+        Result.Err(_) => 4,
+        Result.Ok(region) => {
+            erg forwarded: Region[Pair] = forward_region(region: dat region);
+            erg destination: Buffer = Buffer[8];
+            erg index: u64 = 0u64;
+            erg read = region_read(region: abs forwarded, index: erg index, destination: ins destination);
+            erg closed = region_close(region: ins forwarded);
+            erg close_status: Int = case dat closed {
+                Result.Err(_) => 6,
+                Result.Ok(_) => 0,
+            };
+            return case dat read {
+                Result.Err(_) => 5,
+                Result.Ok(_) => close_status,
+            };
+        },
+    };
+}
+
+verb main() -> Int {
+    erg array_status: Int = check_array();
+    if array_status != 0 { return array_status; }
+    return check_struct();
+}
+"#;
+    let (root, input, output) = project("generic-region-array-struct-abi", source);
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("enable standard runtime");
+
+    build(&root, &input, &output);
+    let execution = run(&root, &output, b"");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    fs::remove_dir_all(root).expect("remove aggregate Region ABI project");
+}
+
+#[test]
 fn generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization() {
     let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-uses", source);

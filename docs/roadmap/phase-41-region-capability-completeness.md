@@ -388,13 +388,26 @@ the same revision has a strict compiler RSS/object/executable/symbol snapshot.
 
 ## Gate 41.12 — Native lowering and target profiles
 
-- [ ] Cover primitive, array, pack, and struct Region elements in native ABI
+- [x] Cover primitive, array, pack, and struct Region elements in native ABI
       tests.
-- [ ] Cover nested generic calls, aggregate returns, and indirect return slots.
-- [ ] Cover hosted and supported freestanding profiles.
-- [ ] Verify no raw pointer leaks into public values or serialized state.
-- [ ] Verify zero-floating-point output where the package contract requires it.
-- [ ] Add target-specific behavior only behind documented provider profiles.
+- [x] Cover nested generic calls, aggregate returns, and indirect return slots.
+- [x] Cover hosted and supported freestanding profiles.
+- [x] Verify no raw pointer leaks into public values or serialized state.
+- [x] Verify zero-floating-point output where the package contract requires it.
+- [x] Add target-specific behavior only behind documented provider profiles.
+
+#### Gate 41.12 evidence
+
+`tests/applications/runtime_modules.rs::generic_region_covers_array_struct_and_aggregate_return_abi`
+executes `Region[Array[u16, 2]]` and `Region[Pair]` through generic open and
+forward verbs, aggregate `Result[Region[T], RegionError]` returns, indirect
+Region return values, native read, and explicit close. Existing
+`tests/std_region_native.rs` covers primitive and packed elements, hosted
+execution, freestanding object lowering, target-provider-only imports, stable
+logical-capacity output, and zero-floating-point IR verification. The public
+descriptor is fixed-width and contains no pointer field; freestanding object
+symbol assertions accept only the documented provider bridge symbols. Target
+specific behavior remains selected by the configured provider profile.
 
 ## Gate 41.13 — Diagnostics, formatter, LSP, and guide completeness
 
