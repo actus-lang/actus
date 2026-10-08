@@ -2,22 +2,29 @@
 
 | Value | Role and lifetime |
 | --- | --- |
-| `Buffer` passed to a constructor | `dat`; ownership moves into `Path` on success. |
-| `Path` inspected by a query | `abs`; no mutation or transfer. |
-| `Path` receiver of `push` or `set_*` | `ins`; exclusive call-scoped mutation. |
-| `Path` receiver of `join` or `normalize` | `dat`; the operation returns or cleans up the owner. |
-| `PathComponent` | borrowed `abs` view into the source path. |
-| `PathComponents` | borrowed iterator state with an `ins` cursor. |
+| constructor `Buffer` | `dat`; storage moves into `Path` on success |
+| queried `Path` | `abs`; no mutation or transfer |
+| builder receiver | `ins`; exclusive call-scoped mutation |
+| `join`/`normalize` receiver | `dat`; operation returns or cleans the owner |
+| `PathComponent` | borrowed view into the source path |
+| `PathComponents` | iterator state with a call-scoped cursor |
 
-`PathError` variants are:
+## Error variants
 
-- `EmbeddedNull`: a null unit appeared before the terminator;
-- `InvalidEncoding`: the platform unit sequence is malformed;
+- `EmbeddedNull`: a null unit appeared before required termination;
+- `InvalidEncoding`: platform units are malformed;
 - `InvalidLength`: metadata or unit width is inconsistent;
 - `MissingTerminator`: required termination is absent;
-- `CapacityExceeded`: existing storage cannot hold the result;
-- `UnsupportedPlatform`: the operation cannot combine the representations.
+- `CapacityExceeded`: existing storage cannot hold a result;
+- `UnsupportedPlatform`: representations cannot be combined.
 
 Handle a constructor result before assuming a `Path` exists. Handle a builder
 result before relying on the mutation or returned owner. Error mapping from
-private runtime status values happens inside the facade.
+private runtime statuses occurs inside the facade.
+
+## Component lifetime
+
+A component is a view, not a copied string. If it must survive a path mutation,
+copy it into separate caller-owned storage under an explicit conversion
+contract. Do not store a component offset without preserving the source path
+identity and lifetime.

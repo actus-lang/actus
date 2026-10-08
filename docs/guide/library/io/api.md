@@ -1,6 +1,6 @@
 # `std::io` API reference
 
-This page lists the public declarations exported by `import std::io;`. The
+This page explains the public operations exported by `import std::io;`. The
 signatures below are grouped by the job they perform. Raw `unsafe extern "C"`
 bridges are intentionally omitted because application code uses the typed
 Actus wrappers.

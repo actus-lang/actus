@@ -1,20 +1,40 @@
 # `std::region` runtime and target boundary
 
-The public region API is transport-neutral. Hosted builds use the configured
-runtime provider; freestanding builds require an explicit region provider
-contract. The provider owns the backing implementation, but it must preserve
-the public `Region[T]` descriptor, typed errors, generation checks, and
-ownership cleanup.
+The public region API is provider-neutral. A runtime provider may back the
+region with in-memory storage, mapped pages, a device, or another bounded
+backend, but `Region[T]` source code sees only its checked descriptor contract.
 
-The public read, write, publish, cancel, and close operations do not perform
-filesystem I/O. A target adapter may use a device, mapped storage, or another
-backend behind the private bridge, but that behavior is outside the language
-surface and must not leak raw operating-system pointers into `Region[T]`.
+## Provider obligations
 
-The region descriptor is intentionally opaque. Native lowering may pass a
-small descriptor or an indirect ABI representation according to the target;
-source code must not depend on that representation.
+A compatible provider must preserve:
 
-For large logical extents, the compiler and runtime must keep layout metadata
-symbolic and bounded. Logical capacity is not a promise that all elements are
-resident in RAM at once.
+- fixed layout validation for `T`;
+- logical length versus resident window distinction;
+- capability and generation checks;
+- checked read, write, publish, cancel, and close behavior;
+- deterministic cleanup without leaked handles;
+- typed errors for capacity, stale state, bounds, and lifecycle failures.
+
+The provider must not expose raw OS pointers in a region descriptor or make
+filesystem access implicit in a read/write operation.
+
+## Hosted and freestanding use
+
+Hosted builds select a configured provider. Freestanding builds need an
+explicit target provider; importing the facade alone does not create storage
+or prove that a device backend exists.
+
+## Scaling boundary
+
+Logical capacity can exceed resident memory. The compiler/runtime may keep
+layout metadata symbolic and use bounded windows, but the public contract does
+not promise that every logical element is simultaneously resident. A target
+adapter must document its window size, backing storage, publish/cancel cost,
+and failure behavior.
+
+## ABI and hot path
+
+Native lowering may pass the small descriptor directly or use an indirect ABI
+representation. Actus source must not depend on that choice. Region access is
+explicit and must not add hidden filesystem I/O, allocation, or page faults to
+a caller's real-time path.

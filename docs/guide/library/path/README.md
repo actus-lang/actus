@@ -46,7 +46,7 @@ exists. Filesystem side effects belong to `std::fs`.
 
 ## Detailed pages
 
-- [Complete public API inventory](api.md)
+- [Complete public API](api.md)
 - [Path implementation](../../../../library/std/src/path/)
 - [Path tests](../../../../tests/path_builders.rs)
 
