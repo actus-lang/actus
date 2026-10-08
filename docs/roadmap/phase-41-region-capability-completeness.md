@@ -234,12 +234,31 @@ IR. The fixture uses explicit `dat` at each ownership-transfer call site.
 
 ## Gate 41.7 — Publication, cancellation, and bounded transactions
 
-- [ ] Define dirty-state transitions and publication preconditions.
-- [ ] Implement generation advancement only after accepted publication.
-- [ ] Implement cancellation to the last accepted resident generation.
-- [ ] Define bounded transaction or staging semantics for multi-element updates.
-- [ ] Reject partial or invalid publication without losing the live generation.
-- [ ] Add repeated publish, cancel, failure, and retry evidence.
+- [x] Define dirty-state transitions and publication preconditions.
+- [x] Implement generation advancement only after accepted publication.
+- [x] Implement cancellation to the last accepted resident generation.
+- [x] Define bounded transaction or staging semantics for multi-element updates.
+- [x] Reject partial or invalid publication without losing the live generation.
+- [x] Add repeated publish, cancel, failure, and retry evidence.
+
+#### Gate 41.7 evidence
+
+The hosted Region backend now treats resident storage as a bounded transaction
+staging area and keeps a same-sized accepted snapshot. A successful publication
+validates the live capability, generation, descriptor, and both storage extents
+before copying the complete resident window, clearing `dirty`, and advancing
+the generation exactly once. Cancellation restores the complete accepted
+snapshot, clears `dirty`, and keeps the current generation unchanged. Failed
+publication caused by a stale generation or generation exhaustion leaves the
+generation, dirty state, staged bytes, and accepted snapshot available for
+retry or cancellation. No filesystem, provider, or implicit paging operation is
+performed by this memory-only transition.
+
+Runtime evidence covers multi-element atomic publication, full-window
+cancellation, repeated publish/cancel, stale-generation retry, generation
+exhaustion preservation, invalid publication storage, and the existing native
+publish/cancel fixtures. Focused validation passed with 19 Region unit tests
+and a warning-free all-target clippy run.
 
 ## Gate 41.8 — Provider-neutral storage boundary
 

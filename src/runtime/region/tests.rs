@@ -79,6 +79,120 @@ fn cancellation_restores_the_last_published_window() {
 }
 
 #[test]
+fn publication_commits_all_staged_elements_as_one_bounded_transaction() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 2).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write_range(0, 2, &[1, 2, 3, 4]).expect("both elements should be staged");
+    }
+    let next = region.publish(generation).expect("publication should accept the transaction");
+    assert_eq!(next, generation + 1);
+    let view = region.borrow_abs(7, next).expect("published view should open");
+    let mut value = [0u8; 4];
+    view.read_range(0, 2, &mut value).expect("published range should be readable");
+    assert_eq!(value, [1, 2, 3, 4]);
+    assert_eq!(region.descriptor().dirty, 0);
+}
+
+#[test]
+fn repeated_publish_and_cancel_follow_the_same_generation_contract() {
+    let mut region = InMemoryRegion::new(7, 1, 4, 0, 1).expect("region should be valid");
+    let first_generation = region.descriptor().generation;
+    {
+        let mut view =
+            region.borrow_ins(7, first_generation).expect("first mutable view should open");
+        view.write(0, &[31]).expect("first value should be staged");
+    }
+    let second_generation =
+        region.publish(first_generation).expect("first publication should succeed");
+    {
+        let mut view =
+            region.borrow_ins(7, second_generation).expect("second mutable view should open");
+        view.write(0, &[32]).expect("second value should be staged");
+    }
+    let third_generation =
+        region.publish(second_generation).expect("second publication should succeed");
+    assert_eq!(third_generation, second_generation + 1);
+    region.cancel(third_generation).expect("clean cancellation should be idempotent");
+    region.cancel(third_generation).expect("repeated cancellation should be safe");
+    assert_eq!(region.descriptor().generation, third_generation);
+    let view = region.borrow_abs(7, third_generation).expect("latest snapshot should open");
+    let mut value = [0u8; 1];
+    view.read(0, &mut value).expect("latest value should be readable");
+    assert_eq!(value, [32]);
+}
+
+#[test]
+fn cancellation_discards_all_staged_elements_without_advancing_generation() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 2).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write_range(0, 2, &[5, 6, 7, 8]).expect("both elements should be staged");
+    }
+    region.cancel(generation).expect("cancellation should restore the snapshot");
+    assert_eq!(region.descriptor().generation, generation);
+    let view = region.borrow_abs(7, generation).expect("restored view should open");
+    let mut value = [9u8; 4];
+    view.read_range(0, 2, &mut value).expect("restored range should be readable");
+    assert_eq!(value, [0, 0, 0, 0]);
+    assert_eq!(region.descriptor().dirty, 0);
+}
+
+#[test]
+fn failed_publication_preserves_dirty_staged_bytes_for_retry() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 2).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write_range(0, 2, &[11, 12, 13, 14]).expect("both elements should be staged");
+    }
+    assert_eq!(region.publish(generation + 1), Err(RegionError::StaleGeneration));
+    assert_eq!(region.descriptor().generation, generation);
+    assert_eq!(region.descriptor().dirty, 1);
+    let next = region.publish(generation).expect("retry with the live generation should work");
+    assert_eq!(next, generation + 1);
+    let view = region.borrow_abs(7, next).expect("retried publication should be readable");
+    let mut value = [0u8; 4];
+    view.read_range(0, 2, &mut value).expect("retried range should be readable");
+    assert_eq!(value, [11, 12, 13, 14]);
+}
+
+#[test]
+fn generation_exhaustion_preserves_dirty_staged_bytes() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write(0, &[21, 22]).expect("element should be staged");
+    }
+    region.descriptor.generation = u64::MAX;
+    assert_eq!(region.publish(u64::MAX), Err(RegionError::GenerationExhausted));
+    assert_eq!(region.descriptor().generation, u64::MAX);
+    assert_eq!(region.descriptor().dirty, 1);
+    let view = region.borrow_abs(7, u64::MAX).expect("failed publication must keep access live");
+    let mut value = [0u8; 2];
+    view.read(0, &mut value).expect("staged bytes should remain readable");
+    assert_eq!(value, [21, 22]);
+}
+
+#[test]
+fn invalid_publication_storage_preserves_the_live_transaction() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write(0, &[41, 42]).expect("element should be staged");
+    }
+    region.storage.pop();
+    assert_eq!(region.publish(generation), Err(RegionError::InvalidDescriptor));
+    assert_eq!(region.descriptor().generation, generation);
+    assert_eq!(region.descriptor().dirty, 1);
+    assert_eq!(region.published_storage, [0, 0]);
+}
+
+#[test]
 fn failed_publication_preserves_the_current_generation() {
     let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
     let generation = region.descriptor().generation;

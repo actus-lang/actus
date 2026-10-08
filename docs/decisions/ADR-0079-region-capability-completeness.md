@@ -240,12 +240,28 @@ resident window. The implementation performs no allocation or I/O.
 
 ### 5.4 Publication and transactions
 
-- Publish dirty resident bytes as an explicit operation.
-- Cancel dirty bytes back to the last accepted resident generation.
-- Support a bounded transaction or staging state when atomic multi-element
-  updates are required.
-- Make commit ordering, generation advancement, and failure recovery explicit.
-- Never publish partially validated bytes.
+- Publication is an explicit bounded transaction commit. The resident storage
+  is the transaction's staging area and a same-sized published snapshot is the
+  last accepted state. Range validation happens before any bytes are changed;
+  a successful `publish` validates the descriptor and both bounded storage
+  lengths, copies the complete resident window into the snapshot, clears the
+  dirty bit, and advances the generation exactly once.
+- `cancel` is the rollback operation. It copies the complete accepted snapshot
+  back into resident storage, clears the dirty bit, and keeps the current
+  generation. It is valid for dirty and clean state, so cleanup can be
+  deterministic and idempotent.
+- A stale generation, generation exhaustion, invalid layout, or other failed
+  publication is rejected before the snapshot or generation changes. Dirty
+  staged bytes remain available for retry or cancellation, and the last
+  accepted snapshot remains intact.
+- A multi-element update is visible as one bounded transaction: all requested
+  elements are staged in resident storage, and readers observe them as an
+  accepted set only after `publish` succeeds. The core performs no filesystem,
+  provider, or implicit page-fault I/O during this transition.
+- The publication order is: validate live capability and generation; validate
+  bounded resident and snapshot extents; copy the complete resident window;
+  clear dirty state; then advance generation. No partially validated bytes may
+  become the accepted snapshot.
 
 ### 5.5 Lifetime and cleanup
 

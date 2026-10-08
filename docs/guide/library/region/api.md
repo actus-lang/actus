@@ -81,9 +81,18 @@ open verb region_cancel[T](ins region: Region[T]) -> Result[Int, RegionError];
 open verb region_close[T](ins region: Region[T]) -> Result[Int, RegionError];
 ```
 
-`publish` commits the current resident bytes and returns the next generation.
-`cancel` restores the latest published bytes. `close` releases the capability;
-successful close ends the owner's usable lifecycle.
+`publish` is the bounded transaction commit. All resident bytes are validated
+before any publication state changes; on success the complete resident window
+becomes the new accepted snapshot, dirty state is cleared, and the generation
+advances exactly once. A stale generation, generation exhaustion, or invalid
+resident layout leaves the owner, generation, dirty state, and staged bytes
+unchanged, so the caller may retry with the live generation or cancel.
+
+`cancel` is the bounded transaction rollback. It restores the complete resident
+window from the latest accepted snapshot, clears dirty state, and keeps the
+current generation unchanged. It is safe to call after a failed publication or
+as an idempotent cleanup of a clean transaction. `close` releases the
+capability; successful close ends the owner's usable lifecycle.
 
 ### Ownership, views, and cleanup
 

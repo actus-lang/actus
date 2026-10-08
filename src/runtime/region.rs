@@ -294,7 +294,8 @@ impl InMemoryRegion {
     ) -> Result<RegionGeneration, RegionError> {
         self.validate_access(self.descriptor.handle, generation)?;
         let next = generation.checked_add(1).ok_or(RegionError::GenerationExhausted)?;
-        self.published_storage.clone_from(&self.storage);
+        self.validate_publication_storage()?;
+        self.published_storage.copy_from_slice(&self.storage);
         self.descriptor.generation = next;
         self.descriptor.dirty = 0;
         Ok(next)
@@ -303,8 +304,22 @@ impl InMemoryRegion {
     /// Discards dirty resident bytes and keeps the last published generation.
     pub fn cancel(&mut self, generation: RegionGeneration) -> Result<(), RegionError> {
         self.validate_access(self.descriptor.handle, generation)?;
-        self.storage.clone_from(&self.published_storage);
+        self.validate_publication_storage()?;
+        self.storage.copy_from_slice(&self.published_storage);
         self.descriptor.dirty = 0;
+        Ok(())
+    }
+
+    fn validate_publication_storage(&self) -> Result<(), RegionError> {
+        let expected = self
+            .descriptor
+            .window_count
+            .checked_mul(self.descriptor.element_stride)
+            .ok_or(RegionError::OffsetOverflow)?;
+        let expected = usize::try_from(expected).map_err(|_| RegionError::OffsetOverflow)?;
+        if self.storage.len() != expected || self.published_storage.len() != expected {
+            return Err(RegionError::InvalidDescriptor);
+        }
         Ok(())
     }
 
