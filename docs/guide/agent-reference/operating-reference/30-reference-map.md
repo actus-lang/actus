@@ -4,33 +4,26 @@ This page preserves the complete technical detail for this source section. The s
 
 ## 30. Reference map
 
-Use these repository documents as focused references. The canonical Actus
-repository root is:
+Use these repository documents as focused references. Paths are relative to the
+Actus repository root:
 
-```text
-/home/magradze/Projects/actus_project/actus
-```
-
-The paths below are absolute on the development machine so an agent launched
-from another project directory can locate the source of truth directly:
-
-- `/home/magradze/Projects/actus_project/actus/README.md`: project status, build basics, runtime selection, and ABI limits.
-- `/home/magradze/Projects/actus_project/actus/docs/language/alpha-user-guide.md`: implemented Alpha workflow.
-- `/home/magradze/Projects/actus_project/actus/docs/language/lexical-map.md`: keywords and future/reserved vocabulary.
-- `/home/magradze/Projects/actus_project/actus/docs/language/operators.md`: operator precedence and operand contracts.
-- `/home/magradze/Projects/actus_project/actus/docs/language/alpha-guarantees.md`: ownership, borrowing, cleanup, and
+- `README.md`: project status, build basics, runtime selection, and ABI limits.
+- `docs/language/alpha-user-guide.md`: implemented Alpha workflow.
+- `docs/language/lexical-map.md`: keywords and future/reserved vocabulary.
+- `docs/language/operators.md`: operator precedence and operand contracts.
+- `docs/language/alpha-guarantees.md`: ownership, borrowing, cleanup, and
   bounded storage guarantees.
-- `/home/magradze/Projects/actus_project/actus/docs/language/style-and-conventions.md`: source style and naming.
-- `/home/magradze/Projects/actus_project/actus/docs/language/lsp-protocol.md`: editor/LSP contract.
-- `/home/magradze/Projects/actus_project/actus/docs/conformance/limitless-policy.md`: source-limit exceptions.
-- `/home/magradze/Projects/actus_project/actus/docs/architecture/compiler-pipeline.md`: compiler architecture.
-- `/home/magradze/Projects/actus_project/actus/docs/decisions/ADR-0052-core-control-flow-constants-and-type-directed-ergonomics.md`:
+- `docs/language/style-and-conventions.md`: source style and naming.
+- `docs/language/lsp-protocol.md`: editor/LSP contract.
+- `docs/conformance/limitless-policy.md`: source-limit exceptions.
+- `docs/architecture/compiler-pipeline.md`: compiler architecture.
+- `docs/decisions/ADR-0052-core-control-flow-constants-and-type-directed-ergonomics.md`:
   current ergonomic/core direction.
-- `/home/magradze/Projects/actus_project/actus/docs/decisions/ADR-0053-production-language-capability-and-wire-readiness.md`:
+- `docs/decisions/ADR-0053-production-language-capability-and-wire-readiness.md`:
   production capability boundary.
-- `/home/magradze/Projects/actus_project/actus/examples/`: executable language examples.
-- `/home/magradze/Projects/actus_project/actus/library/std/src/`: public standard-library facades and sibling modules.
-- `/home/magradze/Projects/actus_project/actus/tests/`: compiler, native, runtime, LSP, and standard-library evidence.
+- `examples/`: executable language examples.
+- `library/std/src/`: public standard-library facades and sibling modules.
+- `tests/`: compiler, native, runtime, LSP, and standard-library evidence.
 
 The source code and tests are authoritative when a prose document is stale.
 If this guide and the compiler disagree, do not silently choose one: report
