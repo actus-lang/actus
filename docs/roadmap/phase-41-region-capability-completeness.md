@@ -365,13 +365,26 @@ test matrix. Native Region fixtures also report zero floating-point IR.
 
 ## Gate 41.11 — Bulk and performance behavior
 
-- [ ] Define bounded bulk operation sizes and queue limits.
-- [ ] Measure resident bytes independently from logical capacity.
-- [ ] Measure remap, read, write, publish, cancel, and close costs separately.
-- [ ] Record compiler memory, object size, executable size, and symbol effects.
-- [ ] Prove that increasing logical length does not materialize one element per
+- [x] Define bounded bulk operation sizes and queue limits.
+- [x] Measure resident bytes independently from logical capacity.
+- [x] Measure remap, read, write, publish, cancel, and close costs separately.
+- [x] Record compiler memory, object size, executable size, and symbol effects.
+- [x] Prove that increasing logical length does not materialize one element per
       logical position in compiler IR or native artifacts.
-- [ ] Record allocation and I/O behavior for every hot and provider path.
+- [x] Record allocation and I/O behavior for every hot and provider path.
+
+#### Gate 41.11 progress
+
+The core range boundary now accepts at most 64 KiB of resident bytes per
+operation and returns typed `BulkLimitExceeded` above that limit. There is no
+implicit asynchronous queue; the core queue capacity is zero. Larger transfers
+must be explicitly chunked by the caller or implemented by a separately
+specified provider adapter.
+
+The measurement and boundary evidence is recorded in
+`docs/benchmarks/phase-41-region-performance-2026-10-08.md`. The native close
+fixture compares explicit close with the equivalent lexical-drop baseline, and
+the same revision has a strict compiler RSS/object/executable/symbol snapshot.
 
 ## Gate 41.12 — Native lowering and target profiles
 

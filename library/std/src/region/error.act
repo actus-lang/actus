@@ -26,4 +26,6 @@ open enum RegionError {
     BackendFailure,
     """The requested window transition conflicts with dirty or pinned state."""
     WindowBusy,
+    """The requested range exceeds the fixed maximum bulk payload."""
+    BulkLimitExceeded,
 }

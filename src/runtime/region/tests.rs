@@ -43,6 +43,16 @@ fn bounded_range_access_is_atomic_and_supports_empty_and_full_windows() {
 }
 
 #[test]
+fn bounded_ranges_reject_payloads_above_the_bulk_limit() {
+    let mut region = InMemoryRegion::new(7, 1, 65_537, 0, 65_537)
+        .expect("resident window should fit the bounded test payload");
+    let generation = region.descriptor().generation;
+    let view = region.borrow_abs(7, generation).expect("read view should open");
+    let mut destination = vec![0u8; 65_537];
+    assert_eq!(view.read_range(0, 65_537, &mut destination), Err(RegionError::BulkLimitExceeded));
+}
+
+#[test]
 fn stale_and_out_of_window_accesses_are_rejected() {
     let mut region = InMemoryRegion::new(7, 2, 8, 2, 3).expect("region should be valid");
     let generation = region.descriptor().generation;

@@ -1,0 +1,86 @@
+"""
+Native Region close-latency fixture.
+
+Each iteration opens one resident byte, closes the capability through the
+public std::region API, and lets lexical cleanup release the descriptor.
+The elapsed integer nanoseconds are printed for external measurement capture.
+"""
+import std::io;
+
+import std::region;
+
+import std::time;
+
+verb close_once() -> Int {
+    erg backing: Buffer = Buffer[1];
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u8](
+        backing: dat backing,
+        logical_length: erg logical_length,
+        window_start: erg window_start,
+        window_count: erg window_count
+    );
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(region) => {
+            erg closed = region_close(region: ins region);
+            case dat closed {
+                Result.Err(_) => 2,
+                Result.Ok(_) => 0,
+            };
+        },
+    };
+}
+
+verb drop_once() -> Int {
+    erg backing: Buffer = Buffer[1];
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u8](
+        backing: dat backing,
+        logical_length: erg logical_length,
+        window_start: erg window_start,
+        window_count: erg window_count
+    );
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(region) => {
+            drop(region);
+            return 0;
+        },
+    };
+}
+
+verb main() -> Int {
+    erg close_started: u64 = monotonic_nanos();
+    for erg iteration: u32 in 0u32 .. 10000u32 {
+        erg status: Int = close_once();
+        if status != 0 {
+            return status;
+        }
+    }
+    erg close_finished: u64 = monotonic_nanos();
+    erg drop_started: u64 = monotonic_nanos();
+    for erg iteration: u32 in 0u32 .. 10000u32 {
+        erg status: Int = drop_once();
+        if status != 0 {
+            return status;
+        }
+    }
+    erg drop_finished: u64 = monotonic_nanos();
+    erg close_elapsed: Int = (close_finished - close_started) as Int;
+    erg drop_elapsed: Int = (drop_finished - drop_started) as Int;
+    erg close_reported = print_int(value: erg close_elapsed);
+    drop(close_reported);
+    erg separator = "\n";
+    erg separator_reported = println(abs separator);
+    drop(separator_reported);
+    erg drop_reported = print_int(value: erg drop_elapsed);
+    drop(drop_reported);
+    erg final_separator_reported = println(abs separator);
+    drop(final_separator_reported);
+    return 0;
+}

@@ -25,6 +25,7 @@ pub enum RegionError {
     BackendFailure,
     WindowBusy,
     GenerationExhausted,
+    BulkLimitExceeded,
 }
 
 /// Checked logical-index and byte-offset widths for one target profile.
@@ -155,6 +156,9 @@ impl RegionDescriptor {
             relative_index.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
         let byte_count =
             element_count.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
+        if byte_count > super::contract::REGION_MAX_BULK_BYTES as u64 {
+            return Err(RegionError::BulkLimitExceeded);
+        }
         let end = start.checked_add(byte_count).ok_or(RegionError::OffsetOverflow)?;
         let profile = RegionAddressProfile::new(self.logical_index_bits, self.byte_offset_bits)?;
         if end == 0 || end - 1 > profile.maximum_offset() {

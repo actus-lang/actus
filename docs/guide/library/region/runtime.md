@@ -64,7 +64,8 @@ integrity validation remain available because they do not evict the window.
 Provider instances and any provider queue remain outside the public `Region[T]`
 descriptor. The initial contract has no implicit asynchronous queue: queued work,
 if introduced by a later adapter, must declare its capacity and ownership
-explicitly.
+explicitly. The core queue capacity is zero; a range operation is bounded to
+64 KiB and returns `BulkLimitExceeded` above that limit.
 
 ## Integrity and recovery
 

@@ -18,6 +18,7 @@ import std::region;
 | `GenerationExhausted` | Capability generation cannot advance safely. |
 | `BackendFailure` | Selected target provider rejected the operation. |
 | `WindowBusy` | A transition conflicts with unpublished mutations, a pin, or the single-threaded loan contract. |
+| `BulkLimitExceeded` | A range payload exceeds the fixed 64 KiB bulk-operation limit. |
 
 ## Read and write
 
@@ -59,7 +60,8 @@ open verb region_write_range[T](
 ) -> Result[u64, RegionError];
 ```
 
-The buffer must be exactly `element_count * size_of[T]()` bytes wide. The
+The buffer must be exactly `element_count * size_of[T]()` bytes wide and the
+payload must not exceed 64 KiB. The
 runtime checks the index addition, byte multiplication, resident-window
 containment, and buffer length before copying. A non-empty range that crosses
 the resident window is rejected; callers must explicitly remap or stage a

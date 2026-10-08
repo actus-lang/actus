@@ -192,6 +192,7 @@ fn error_code(error: RegionError) -> u32 {
         RegionError::GenerationExhausted | RegionError::CapabilityGenerationExhausted => 7,
         RegionError::BackendFailure | RegionError::UnsupportedAddressWidth => 8,
         RegionError::WindowBusy => 9,
+        RegionError::BulkLimitExceeded => 10,
     }
 }
 

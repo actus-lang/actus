@@ -241,6 +241,13 @@ receives overlapping storage. Empty ranges are valid no-ops when their start
 position is within the logical extent; non-empty ranges may not cross the
 resident window. The implementation performs no allocation or I/O.
 
+Each range operation has a fixed 64 KiB maximum resident byte payload. A
+larger checked extent returns `BulkLimitExceeded` before copying. The core has
+no implicit asynchronous queue and therefore a queue capacity of zero. A
+caller or provider adapter that needs larger transfers must split them into
+bounded operations and define its own queue, ownership, cancellation, and
+retry contract.
+
 ### 5.4 Publication and transactions
 
 - Publication is an explicit bounded transaction commit. The resident storage
