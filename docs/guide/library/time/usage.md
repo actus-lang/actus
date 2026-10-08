@@ -1,26 +1,62 @@
-# `std::time` usage
+# Using `std::time`
 
-## Monotonic measurement
+## Measure a bounded operation
 
-Use `now` for an `Instant` and `duration_since` for checked elapsed time. An
-`Instant` is ordered runtime time, not a wall-clock date.
+```actus
+import std::time;
 
-## Durations
+open verb measure() -> Result[Duration, TimeError] {
+    erg started: Instant = now();
+    # perform the operation being measured
+    return elapsed_since(earlier: abs started);
+}
+```
 
-Construct durations with `duration_seconds`, `duration_milliseconds`, or
-`duration_microseconds`. Use the conversion verbs to obtain an integer unit.
-Addition, subtraction, multiplication, and division return a typed error when
-the result overflows, underflows, or divides by zero.
+The result is a monotonic elapsed span. It has no calendar interpretation.
 
-## Deadlines and waiting
+## Build an exact budget
 
-Use `deadline_after` or `deadline_from_now` to create a monotonic deadline.
-`expired` is a pure query; `remaining` returns a checked `Duration`. Use
-`delay` for a deliberate busy wait and `sleep` when the selected runtime has a
-sleep provider.
+```actus
+erg budget_result = duration_milliseconds(milliseconds: 25u64);
+return case dat budget_result {
+    Result.Err(error) => Err(error),
+    Result.Ok(budget) => use_budget(budget: abs budget),
+};
+```
 
-## Timers
+Unit constructors check scaling overflow. Conversions back to larger units
+require exact divisibility.
 
-`Timer` is a caller-owned state machine. Construct one-shot or periodic mode,
-arm it, poll it with an `Instant`, and handle `TimerPoll` according to the
-selected missed-tick policy. `timer_cancel` ends the active schedule.
+## Check a deadline without blocking
+
+```actus
+open verb still_allowed(abs deadline: Deadline) -> Bool {
+    return !expired(deadline: abs deadline);
+}
+```
+
+`remaining` returns zero after expiration, so callers can use it for a final
+bounded wait decision.
+
+## Use a one-shot timer
+
+```actus
+erg timer: Timer = timer_one_shot();
+erg armed = timer_arm(timer: ins timer, delay: abs budget);
+erg poll = timer_poll(timer: ins timer);
+```
+
+Handle `InvalidTimerState` if the surrounding lifecycle can poll or arm at an
+unexpected point.
+
+## Use a periodic timer
+
+Configure a positive duration and select an explicit missed-tick policy. Use
+`CatchUp` when phase matters, `Coalesce` when one notification is enough, and
+`Skip` when overdue work should be discarded.
+
+## Select delay or sleep
+
+Use `delay` only for a short busy wait. Use `sleep` when the runtime should
+cooperate with a scheduler or power-management layer. Neither is a precise
+calendar alarm.
