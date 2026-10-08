@@ -197,7 +197,7 @@ During migration:
 
 ### Gate 40.3: Language fundamentals
 
-- [ ] Write the language overview and mental model.
+- [x] Write the language overview and mental model.
 - [ ] Write the first-program and project-layout guides.
 - [ ] Document source files, declarations, verbs, contracts, expressions,
       statements, types, literals, constants, comments, documentation, and
