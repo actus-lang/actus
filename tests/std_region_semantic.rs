@@ -14,7 +14,9 @@ fn region_facade_exports_checked_public_operations() {
     let exports = exports_module(&resolver, "region").expect("std region facade should resolve");
     assert!(exports.contains("verb", "region_open"));
     assert!(exports.contains("verb", "region_read"));
+    assert!(exports.contains("verb", "region_read_range"));
     assert!(exports.contains("verb", "region_write"));
+    assert!(exports.contains("verb", "region_write_range"));
     assert!(exports.contains("verb", "region_publish"));
     assert!(exports.contains("verb", "region_cancel"));
     assert!(exports.contains("verb", "region_close"));

@@ -25,8 +25,12 @@ pub const REGION_DROP_SYMBOL: &str = "actus_region_drop";
 pub const REGION_OPEN_SYMBOL: &str = "actus_region_open";
 /// Stable runtime symbol for reading one resident region element.
 pub const REGION_READ_SYMBOL: &str = "actus_region_read";
+/// Stable runtime symbol for reading a bounded resident Region range.
+pub const REGION_READ_RANGE_SYMBOL: &str = "actus_region_read_range";
 /// Stable runtime symbol for writing one resident region element.
 pub const REGION_WRITE_SYMBOL: &str = "actus_region_write";
+/// Stable runtime symbol for writing a bounded resident Region range.
+pub const REGION_WRITE_RANGE_SYMBOL: &str = "actus_region_write_range";
 /// Stable runtime symbol for publishing a dirty resident region window.
 pub const REGION_PUBLISH_SYMBOL: &str = "actus_region_publish";
 /// Stable runtime symbol for cancelling dirty resident region bytes.

@@ -13,7 +13,7 @@ import std::region;
 | `StaleGeneration` | The supplied capability generation is no longer live. |
 | `OutOfWindow` | Index is outside the active resident window. |
 | `OffsetOverflow` | Logical index or byte offset cannot be represented. |
-| `BufferSize` | Source or destination is not exactly one element wide. |
+| `BufferSize` | Source or destination is not the exact requested range size. |
 | `CapabilityExhausted` | Runtime capability table has no free slot. |
 | `GenerationExhausted` | Capability generation cannot advance safely. |
 | `BackendFailure` | Selected target provider rejected the operation. |
@@ -40,6 +40,38 @@ element alignment from `align_of[T]()` and rejects a descriptor whose alignment
 is zero, non-power-of-two, or greater than its stride. `region_read` copies one
 resident element into the destination. `region_write` replaces one
 resident element and makes the region dirty until publish or cancel.
+
+## Bounded range access
+
+```actus
+open verb region_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError];
+
+open verb region_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError];
+```
+
+The buffer must be exactly `element_count * size_of[T]()` bytes wide. The
+runtime checks the index addition, byte multiplication, resident-window
+containment, and buffer length before copying. A non-empty range that crosses
+the resident window is rejected; callers must explicitly remap or stage a
+separate operation. An empty range is a successful no-op when its start is no
+greater than the logical length, including the logical end boundary.
+
+Range operations have an all-or-nothing validation contract. `Ok(count)` means
+all requested elements were copied and `count` equals `element_count`.
+`Err(error)` means zero elements were copied or changed, including when the
+range overflows or the buffer has the wrong size. The operations allocate no
+memory and perform no I/O. If source and resident storage overlap at a native
+boundary, copying follows memmove semantics.
 
 ## Lifecycle
 

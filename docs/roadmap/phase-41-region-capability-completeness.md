@@ -172,13 +172,30 @@ execution covering inspection, remap, close, and zero-floating-point IR.
 
 ## Gate 41.5 — Element and bounded range access
 
-- [ ] Keep single-element read and write checked and allocation-free.
-- [ ] Add bounded range read and write with caller-owned buffers.
-- [ ] Define overlap semantics for range operations.
-- [ ] Define partial-progress and failure reporting.
-- [ ] Reject ranges crossing the resident window unless an explicit staged
+- [x] Keep single-element read and write checked and allocation-free.
+- [x] Add bounded range read and write with caller-owned buffers.
+- [x] Define overlap semantics for range operations.
+- [x] Define partial-progress and failure reporting.
+- [x] Reject ranges crossing the resident window unless an explicit staged
       operation is used.
-- [ ] Add empty, one-element, full-window, boundary, and overflow tests.
+- [x] Add empty, one-element, full-window, boundary, and overflow tests.
+
+#### Gate 41.5 evidence
+
+The public facade now exposes `region_read_range` and `region_write_range`.
+Both operations require caller-owned buffers with exactly
+`element_count * size_of[T]()` bytes. The runtime validates the complete
+logical range, resident-window containment, checked byte extent, and buffer
+size before copying. Successful operations return the complete `u64` element
+count; failures return typed errors with zero progress. Native copies use
+memmove semantics for any overlapping storage boundary, and empty ranges are
+bounded no-ops. No allocation, filesystem operation, provider call, or
+implicit remap is performed.
+
+Evidence includes runtime tests for empty, one-element, full-window,
+cross-window, wrong-size, and overflow cases; semantic facade export tests;
+and a hosted strict native fixture covering range write, publication, range
+read, empty read, boundary rejection, and zero-floating-point IR.
 
 ## Gate 41.6 — Ownership, views, loans, and deterministic cleanup
 

@@ -23,12 +23,28 @@ unsafe extern "C" verb actus_region_read[T](
     ins destination: Buffer
 ) -> Result[Int, RegionError];
 
+"""Private bridge that reads a checked resident range into an exact-size buffer."""
+unsafe extern "C" verb actus_region_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError];
+
 """Private bridge that replaces one resident element from an exact-size buffer."""
 unsafe extern "C" verb actus_region_write[T](
     ins region: Region[T],
     erg index: u64,
     abs source: Buffer
 ) -> Result[Int, RegionError];
+
+"""Private bridge that writes a checked resident range from an exact-size buffer."""
+unsafe extern "C" verb actus_region_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError];
 
 """Private bridge that publishes dirty resident bytes and advances generation."""
 unsafe extern "C" verb actus_region_publish[T](ins region: Region[T]) -> Result[u64, RegionError];
@@ -105,6 +121,29 @@ open verb region_read[T](
 }
 
 """
+Read a bounded resident range into caller-provided storage.
+
+The destination must be exactly `element_count * size_of[T]()` bytes wide.
+The complete range must fit inside the current resident window and all range
+arithmetic is checked before copying. The operation is allocation-free and
+does not perform I/O. `Ok(count)` reports the complete element count; `Err`
+reports failure and guarantees that no element was copied.
+"""
+open verb region_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError] {
+    return actus_region_read_range(
+        region: abs region,
+        start_index: erg start_index,
+        element_count: erg element_count,
+        destination: ins destination
+    );
+}
+
+"""
 Write one logical element in the resident window.
 
 `region` is an exclusive loan and `source` is a read-only view. The source
@@ -119,6 +158,30 @@ open verb region_write[T](
     return actus_region_write(
         region: ins region,
         index: erg index,
+        source: abs source
+    );
+}
+
+"""
+Write a bounded resident range from caller-provided storage.
+
+The source must be exactly `element_count * size_of[T]()` bytes wide. The
+complete range must fit inside the current resident window and is validated
+before any byte changes. The operation is allocation-free, marks the region
+dirty on success, and performs no I/O. `Ok(count)` reports the complete
+element count; `Err` reports failure and guarantees that no element changed.
+Overlapping source and resident storage has memmove semantics.
+"""
+open verb region_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError] {
+    return actus_region_write_range(
+        region: ins region,
+        start_index: erg start_index,
+        element_count: erg element_count,
         source: abs source
     );
 }

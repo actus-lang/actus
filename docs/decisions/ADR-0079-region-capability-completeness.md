@@ -226,6 +226,18 @@ window admission remain later provider and concurrency contracts.
 - Define partial progress and failure reporting for bounded bulk operations.
 - Prohibit access outside the resident window and prohibit arithmetic overflow.
 
+Gate 41.5 defines `region_read_range` and `region_write_range` with caller-owned
+buffers and an explicit `u64` element count. The entire logical range, resident
+window, byte extent, and buffer length are validated before the first byte is
+copied. A successful operation returns the requested element count; a failed
+operation returns a typed `RegionError` and guarantees zero element progress.
+This is the partial-progress contract: range operations are atomic with
+respect to validation, so callers never have to infer how many elements were
+mutated from an error. Copies use memmove semantics if an implementation ever
+receives overlapping storage. Empty ranges are valid no-ops when their start
+position is within the logical extent; non-empty ranges may not cross the
+resident window. The implementation performs no allocation or I/O.
+
 ### 5.4 Publication and transactions
 
 - Publish dirty resident bytes as an explicit operation.

@@ -21,9 +21,10 @@ const REGION_WINDOW_COUNT_OFFSET: usize = 40;
 const REGION_GENERATION_OFFSET: usize = 48;
 const REGION_DIRTY_OFFSET: usize = 56;
 
-static REGION_STORE: std::sync::Mutex<RegionStore> = std::sync::Mutex::new(RegionStore::new());
+pub(super) static REGION_STORE: std::sync::Mutex<RegionStore> =
+    std::sync::Mutex::new(RegionStore::new());
 
-struct RegionStore {
+pub(super) struct RegionStore {
     slots: [Option<InMemoryRegion>; super::capabilities::REGION_CAPABILITY_CAPACITY],
     generations: [u32; super::capabilities::REGION_CAPABILITY_CAPACITY],
     descriptors: [Option<usize>; super::capabilities::REGION_CAPABILITY_CAPACITY],
@@ -74,7 +75,10 @@ impl RegionStore {
         Ok(descriptor)
     }
 
-    fn get_mut(&mut self, handle: RegionHandle) -> Result<&mut InMemoryRegion, RegionError> {
+    pub(super) fn get_mut(
+        &mut self,
+        handle: RegionHandle,
+    ) -> Result<&mut InMemoryRegion, RegionError> {
         let index = decode_store_handle(handle)?;
         let region = self.slots[index].as_mut().ok_or(RegionError::InvalidHandle)?;
         if region.descriptor().handle != handle {
@@ -150,7 +154,7 @@ fn allocate_result(size: usize, discriminant: u32) -> *mut u8 {
     result
 }
 
-fn error_result(size: usize, error: RegionError) -> *mut u8 {
+pub(super) fn error_result(size: usize, error: RegionError) -> *mut u8 {
     let result = allocate_result(size, RESULT_ERR);
     if !result.is_null() {
         write_u32(result, RESULT_INT_PAYLOAD_OFFSET, error_code(error));
@@ -173,7 +177,9 @@ fn error_code(error: RegionError) -> u32 {
     }
 }
 
-fn validate_descriptor(region: *const u8) -> Result<&'static RegionDescriptor, RegionError> {
+pub(super) fn validate_descriptor(
+    region: *const u8,
+) -> Result<&'static RegionDescriptor, RegionError> {
     if region.is_null() {
         return Err(RegionError::InvalidDescriptor);
     }
@@ -448,7 +454,7 @@ fn result_int(value: i32) -> *mut u8 {
     result
 }
 
-fn result_u64(value: u64) -> *mut u8 {
+pub(super) fn result_u64(value: u64) -> *mut u8 {
     let result = allocate_result(RESULT_U64_SIZE, RESULT_OK);
     if !result.is_null() {
         write_u64(result, RESULT_U64_PAYLOAD_OFFSET, value);

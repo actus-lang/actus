@@ -16,7 +16,7 @@ open enum RegionError {
     OutOfWindow,
     """The logical index or byte offset cannot be represented by the target."""
     OffsetOverflow,
-    """The source or destination buffer is not one exact element wide."""
+    """The source or destination buffer is not the exact requested range size."""
     BufferSize,
     """The bounded capability table has no free slot."""
     CapabilityExhausted,

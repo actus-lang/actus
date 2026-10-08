@@ -128,22 +128,30 @@ impl RegionDescriptor {
         super::contract::REGION_DESCRIPTOR_ABI_VERSION
     }
 
-    fn contains(&self, index: u64) -> bool {
-        index >= self.window_start
-            && self
-                .window_start
-                .checked_add(self.window_count)
-                .is_some_and(|window_end| index < window_end)
-    }
-
-    fn byte_range(&self, index: u64) -> Result<std::ops::Range<usize>, RegionError> {
-        if !self.contains(index) || index >= self.logical_length {
+    fn byte_range_for(
+        &self,
+        start_index: u64,
+        element_count: u64,
+    ) -> Result<std::ops::Range<usize>, RegionError> {
+        let end_index =
+            start_index.checked_add(element_count).ok_or(RegionError::OffsetOverflow)?;
+        if end_index > self.logical_length {
             return Err(RegionError::LogicalIndexOutOfBounds);
         }
-        let relative_index = index - self.window_start;
+        if element_count == 0 {
+            return Ok(0..0);
+        }
+        let window_end =
+            self.window_start.checked_add(self.window_count).ok_or(RegionError::OffsetOverflow)?;
+        if start_index < self.window_start || end_index > window_end {
+            return Err(RegionError::LogicalIndexOutOfBounds);
+        }
+        let relative_index = start_index - self.window_start;
         let start =
             relative_index.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
-        let end = start.checked_add(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
+        let byte_count =
+            element_count.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
+        let end = start.checked_add(byte_count).ok_or(RegionError::OffsetOverflow)?;
         let profile = RegionAddressProfile::new(self.logical_index_bits, self.byte_offset_bits)?;
         if end == 0 || end - 1 > profile.maximum_offset() {
             return Err(RegionError::OffsetOverflow);
@@ -359,12 +367,28 @@ pub struct RegionView<'region> {
 impl RegionView<'_> {
     /// Copies one resident element into caller-provided storage.
     pub fn read(&self, index: u64, destination: &mut [u8]) -> Result<(), RegionError> {
-        let range = self.descriptor.byte_range(index)?;
+        self.read_range(index, 1, destination).map(|_| ())
+    }
+
+    /// Copies a bounded resident range into caller-provided storage.
+    pub fn read_range(
+        &self,
+        start_index: u64,
+        element_count: u64,
+        destination: &mut [u8],
+    ) -> Result<u64, RegionError> {
+        let range = self.descriptor.byte_range_for(start_index, element_count)?;
         if destination.len() != range.len() {
             return Err(RegionError::BufferTooSmall);
         }
-        destination.copy_from_slice(&self.storage[range]);
-        Ok(())
+        unsafe {
+            std::ptr::copy(
+                self.storage.as_ptr().add(range.start),
+                destination.as_mut_ptr(),
+                range.len(),
+            );
+        }
+        Ok(element_count)
     }
 }
 
@@ -378,13 +402,29 @@ pub struct MutableRegionView<'region> {
 impl MutableRegionView<'_> {
     /// Replaces one resident element and marks the descriptor dirty.
     pub fn write(&mut self, index: u64, source: &[u8]) -> Result<(), RegionError> {
-        let range = self.descriptor.byte_range(index)?;
+        self.write_range(index, 1, source).map(|_| ())
+    }
+
+    /// Replaces a bounded resident range from caller-provided storage.
+    pub fn write_range(
+        &mut self,
+        start_index: u64,
+        element_count: u64,
+        source: &[u8],
+    ) -> Result<u64, RegionError> {
+        let range = self.descriptor.byte_range_for(start_index, element_count)?;
         if source.len() != range.len() {
             return Err(RegionError::BufferTooSmall);
         }
-        self.storage[range].copy_from_slice(source);
+        unsafe {
+            std::ptr::copy(
+                source.as_ptr(),
+                self.storage.as_mut_ptr().add(range.start),
+                range.len(),
+            );
+        }
         self.descriptor.dirty = 1;
-        Ok(())
+        Ok(element_count)
     }
 }
 

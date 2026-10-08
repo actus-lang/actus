@@ -19,6 +19,30 @@ fn bounded_views_read_write_and_publish() {
 }
 
 #[test]
+fn bounded_range_access_is_atomic_and_supports_empty_and_full_windows() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 2, 3).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        assert_eq!(view.write_range(2, 3, &[1, 2, 3, 4, 5, 6]), Ok(3));
+        assert_eq!(view.write_range(2, 3, &[9]), Err(RegionError::BufferTooSmall));
+        assert_eq!(
+            view.write_range(4, 2, &[7, 8, 9, 10]),
+            Err(RegionError::LogicalIndexOutOfBounds)
+        );
+        assert_eq!(view.write_range(u64::MAX, 1, &[]), Err(RegionError::OffsetOverflow));
+    }
+    assert_eq!(region.descriptor().dirty, 1);
+    let next = region.publish(generation).expect("publication should advance generation");
+    let view = region.borrow_abs(7, next).expect("read view should open");
+    let mut value = [0u8; 6];
+    assert_eq!(view.read_range(2, 3, &mut value), Ok(3));
+    assert_eq!(value, [1, 2, 3, 4, 5, 6]);
+    let mut empty = [];
+    assert_eq!(view.read_range(8, 0, &mut empty), Ok(0));
+}
+
+#[test]
 fn stale_and_out_of_window_accesses_are_rejected() {
     let mut region = InMemoryRegion::new(7, 2, 8, 2, 3).expect("region should be valid");
     let generation = region.descriptor().generation;
