@@ -198,10 +198,15 @@ fn reachable_module_roots(
         changed = false;
         for unit in &object_plan.units()[1..] {
             let selected = unit
-                .exported_verbs()
+                .program()
+                .declarations
                 .iter()
+                .filter_map(|declaration| match declaration {
+                    crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
+                    _ => None,
+                })
                 .filter(|name| roots.contains(*name))
-                .cloned()
+                .map(str::to_owned)
                 .collect::<Vec<_>>();
             for name in selected {
                 for call in crate::codegen::reachable_call_names(unit.program(), &name)? {
@@ -223,10 +228,15 @@ fn emit_module_objects(
     let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
         let roots = if unit.namespace().module_path().starts_with("std::wire") {
-            unit.exported_verbs()
+            unit.program()
+                .declarations
                 .iter()
+                .filter_map(|declaration| match declaration {
+                    crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
+                    _ => None,
+                })
                 .filter(|name| reachable_module_roots.contains(*name))
-                .cloned()
+                .map(str::to_owned)
                 .collect::<Vec<_>>()
         } else {
             unit.exported_verbs().to_vec()
