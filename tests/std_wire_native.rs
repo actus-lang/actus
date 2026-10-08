@@ -364,13 +364,14 @@ verb feed_chunks(abs encoded: Buffer) -> Int {
     for erg index: u32 in 0u32 .. 5u32 { append(first, encoded[index]); }
     erg second: Buffer = Buffer[0];
     for erg index: u32 in 5u32 .. 17u32 { append(second, encoded[index]); }
-    erg parser = wire_parser_new();
+    erg parser = wire_parser_empty();
     erg payload: Buffer = Buffer[3];
+    payload[0] = 91u8; payload[1] = 92u8; payload[2] = 93u8;
     erg first_result = wire_parser_feed(parser: ins parser, chunk: abs first, payload_output: ins payload);
     erg first_count: u32 = case dat first_result { Result.Err(_) => { return 1; }, Result.Ok(count) => count, };
     erg first_status = wire_parser_status(parser: abs parser);
     erg first_state: Int = case dat first_status { WireParserStatus.Collecting => 0, _ => 1, };
-    if first_count != 5u32 || first_state != 0 { return 2; }
+    if first_count != 5u32 || first_state != 0 || payload[0] != 91u8 { return 2; }
     erg second_result = wire_parser_feed(parser: ins parser, chunk: abs second, payload_output: ins payload);
     erg second_count: u32 = case dat second_result { Result.Err(_) => { return 3; }, Result.Ok(count) => count, };
     erg second_status = wire_parser_status(parser: abs parser);
@@ -379,6 +380,39 @@ verb feed_chunks(abs encoded: Buffer) -> Int {
     erg parsed = wire_parser_header(parser: abs parser);
     if parsed.sequence_num != 287454020u32 || payload[0] != 7u8 || payload[2] != 9u8 { return 5; }
     return 0;
+}
+verb parser_noise_status() -> Int {
+    erg noise: Buffer = Buffer[0];
+    append(noise, 0u8); append(noise, 1u8); append(noise, 2u8); append(noise, 3u8);
+    erg parser = wire_parser_empty();
+    erg output: Buffer = Buffer[3];
+    erg result = wire_parser_feed(parser: ins parser, chunk: abs noise, payload_output: ins output);
+    erg consumed: u32 = case dat result { Result.Err(_) => { return 1; }, Result.Ok(count) => count, };
+    if consumed != 4u32 { return 2; }
+    erg status = wire_parser_status(parser: abs parser);
+    return case dat status { WireParserStatus.Searching => 0, _ => 3, };
+}
+verb parser_rejection_status(ins encoded: Buffer) -> Int {
+    encoded[2] = 2u8;
+    erg parser = wire_parser_empty();
+    erg output: Buffer = Buffer[3];
+    erg version_result = wire_parser_feed(parser: ins parser, chunk: abs encoded, payload_output: ins output);
+    erg version_code: Int = case dat version_result {
+        Result.Err(error) => case dat error { WireError.UnsupportedVersion => 0, _ => 1, },
+        Result.Ok(_) => 2,
+    };
+    if version_code != 0 { return 1; }
+    erg status = wire_parser_status(parser: abs parser);
+    if case dat status { WireParserStatus.Searching => false, _ => true, } { return 2; }
+    encoded[2] = WIRE_VERSION;
+    encoded[12] ^= 1u8;
+    erg checksum_result = wire_parser_feed(parser: ins parser, chunk: abs encoded, payload_output: ins output);
+    erg checksum_code: Int = case dat checksum_result {
+        Result.Err(error) => case dat error { WireError.ChecksumMismatch => 0, _ => 1, },
+        Result.Ok(_) => 2,
+    };
+    encoded[12] ^= 1u8;
+    return if checksum_code == 0 { 0 } else { 3 };
 }
 verb main() -> Int {
     erg header = WireHeader {storage: Array[u8, 12]()};
@@ -391,7 +425,7 @@ verb main() -> Int {
     append(payload, 7u8); append(payload, 8u8); append(payload, 9u8);
     erg encoded = Buffer[17];
     erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins encoded);
-    return case dat result { Result.Err(_) => 6, Result.Ok(_) => feed_chunks(encoded: abs encoded), };
+    return case dat result { Result.Err(_) => 6, Result.Ok(_) => if parser_noise_status() == 0 && parser_rejection_status(encoded: ins encoded) == 0 { feed_chunks(encoded: abs encoded) } else { 7 }, };
 }
 "#,
     )

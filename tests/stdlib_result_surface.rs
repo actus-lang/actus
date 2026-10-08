@@ -83,6 +83,11 @@ fn infallible_verbs() -> BTreeSet<&'static str> {
         "expired",
         "timer_one_shot",
         "timer_state",
+        "wire_parser_empty",
+        "wire_parser_reset",
+        "wire_parser_status",
+        "wire_parser_consumed",
+        "wire_parser_header",
     ]
     .into_iter()
     .collect()

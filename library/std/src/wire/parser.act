@@ -39,7 +39,7 @@ The verb returns an owned `WireParser` containing exactly one bounded frame
 buffer. It performs no I/O, does not borrow caller state, and cannot fail
 because the storage size is fixed by the type contract.
 """
-open verb wire_parser_new() -> WireParser {
+open verb wire_parser_empty() -> WireParser {
     return WireParser {storage: Buffer[1038], filled: 0u32, expected_length: 0u32, state: 0u8, last_consumed: 0u32, header: WireHeader {storage: Array[u8, 12](
     )}};
 }
@@ -135,35 +135,34 @@ verb wire_parser_finish(ins parser: WireParser, ins payload_output: Buffer) -> R
     };
 }
 
-verb wire_parser_consume(
+verb wire_parser_consume_searching(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
+    if byte == WIRE_MAGIC_0 {
+        parser.storage[0] = byte;
+        parser.filled = 1u32;
+        parser.state = 1u8;
+    }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_parser_consume_magic(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
+    if byte == WIRE_MAGIC_1 {
+        parser.storage[1] = byte;
+        parser.filled = 2u32;
+        parser.state = 2u8;
+    } else if byte == WIRE_MAGIC_0 {
+        parser.storage[0] = byte;
+    } else {
+        parser.filled = 0u32;
+        parser.state = 0u8;
+    }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_parser_consume_body(
     ins parser: WireParser,
     erg byte: u8,
     ins payload_output: Buffer
 ) -> Result[Int, WireError] {
-    if parser.state == 3u8 {
-        return Result[Int, WireError].Err(WireError.PolicyRejected);
-    }
-    if parser.state == 0u8 {
-        if byte == WIRE_MAGIC_0 {
-            parser.storage[0] = byte;
-            parser.filled = 1u32;
-            parser.state = 1u8;
-        }
-        return Result[Int, WireError].Ok(0);
-    }
-    if parser.state == 1u8 {
-        if byte == WIRE_MAGIC_1 {
-            parser.storage[1] = byte;
-            parser.filled = 2u32;
-            parser.state = 2u8;
-        } else if byte == WIRE_MAGIC_0 {
-            parser.storage[0] = byte;
-        } else {
-            parser.filled = 0u32;
-            parser.state = 0u8;
-        }
-        return Result[Int, WireError].Ok(0);
-    }
     erg stored = wire_parser_store(parser: ins parser, byte: erg byte);
     erg stored_status: Int = case dat stored {
         Result.Err(error) => {
@@ -181,6 +180,27 @@ verb wire_parser_consume(
     };
     drop(header_status);
     return wire_parser_finish(parser: ins parser, payload_output: ins payload_output);
+}
+
+verb wire_parser_consume(
+    ins parser: WireParser,
+    erg byte: u8,
+    ins payload_output: Buffer
+) -> Result[Int, WireError] {
+    if parser.state == 3u8 {
+        return Result[Int, WireError].Err(WireError.PolicyRejected);
+    }
+    if parser.state == 0u8 {
+        return wire_parser_consume_searching(parser: ins parser, byte: erg byte);
+    }
+    if parser.state == 1u8 {
+        return wire_parser_consume_magic(parser: ins parser, byte: erg byte);
+    }
+    return wire_parser_consume_body(
+        parser: ins parser,
+        byte: erg byte,
+        payload_output: ins payload_output
+    );
 }
 
 """
