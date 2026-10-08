@@ -1,0 +1,225 @@
+"""
+Bounded incremental parser state for `std::wire` version-one frames.
+
+The parser owns one fixed 1038-byte frame buffer and accepts arbitrary caller
+chunks. It scans for the two-byte magic sequence, records the number of bytes
+consumed from the most recent chunk, and validates a complete frame before
+copying its payload into caller-owned output storage. It performs no I/O,
+allocation, or unbounded scanning.
+"""
+open enum WireParserStatus {
+    """The parser is searching for the first magic byte."""
+    Searching,
+    """The parser has a partial header or frame."""
+    Collecting,
+    """A complete validated frame is available until reset."""
+    Ready,
+}
+
+"""Caller-owned bounded state for one incremental version-one frame."""
+open struct WireParser {
+    """Fixed storage for one complete header, payload, and checksum."""
+    erg storage: Buffer,
+    """Number of valid bytes currently stored in `storage`."""
+    erg filled: u32,
+    """Expected complete frame length after the header has been decoded."""
+    erg expected_length: u32,
+    """State code: 0 searching, 1 saw magic zero, 2 collecting, 3 ready."""
+    erg state: u8,
+    """Bytes consumed from the most recent feed call."""
+    erg last_consumed: u32,
+    """Owned metadata for the most recently validated frame."""
+    erg header: WireHeader,
+}
+
+"""
+Create an empty parser with fixed storage for one maximum frame.
+
+The verb returns an owned `WireParser` containing exactly one bounded frame
+buffer. It performs no I/O, does not borrow caller state, and cannot fail
+because the storage size is fixed by the type contract.
+"""
+open verb wire_parser_new() -> WireParser {
+    return WireParser {storage: Buffer[1038], filled: 0u32, expected_length: 0u32, state: 0u8, last_consumed: 0u32, header: WireHeader {storage: Array[u8, 12](
+    )}};
+}
+
+"""
+Reset parser storage and lifecycle metadata without touching caller output.
+
+The `ins` parser owner is mutated in place and remains owned by the caller.
+The verb returns `Void`, performs no allocation or I/O, and clears any partial
+or ready frame so the parser can accept a new bounded frame.
+"""
+open verb wire_parser_reset(ins parser: WireParser) -> Void {
+    parser.filled = 0u32;
+    parser.expected_length = 0u32;
+    parser.state = 0u8;
+    parser.last_consumed = 0u32;
+}
+
+"""
+Return the parser lifecycle state without mutating or consuming it.
+
+The `abs` parser view is borrowed read-only. The verb returns the owned enum
+value, performs no allocation or I/O, and reports `Searching`, `Collecting`,
+or `Ready` from the parser's bounded state machine.
+"""
+open verb wire_parser_status(abs parser: WireParser) -> WireParserStatus {
+    return case parser.state {
+        3 => WireParserStatus.Ready,
+        1 => WireParserStatus.Collecting,
+        2 => WireParserStatus.Collecting,
+        _ => WireParserStatus.Searching,
+    };
+}
+
+"""Return bytes consumed by the most recent feed operation."""
+open verb wire_parser_consumed(abs parser: WireParser) -> u32 {
+    return parser.last_consumed;
+}
+
+"""
+Return the validated header while the parser is ready.
+
+The `abs` parser view is borrowed read-only. The verb returns an owned copy of
+the fixed-width header, performs no allocation or I/O, and does not publish
+partial metadata before frame validation completes.
+"""
+open verb wire_parser_header(abs parser: WireParser) -> WireHeader {
+    return parser.header;
+}
+
+verb wire_parser_store(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
+    if parser.filled >= WIRE_MAX_FRAME_BYTES {
+        return Result[Int, WireError].Err(WireError.PayloadTooLarge);
+    }
+    parser.storage[parser.filled] = byte;
+    parser.filled += 1u32;
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_parser_decode_header(ins parser: WireParser) -> Result[Int, WireError] {
+    if parser.filled != WIRE_HEADER_BYTES {
+        return Result[Int, WireError].Ok(0);
+    }
+    erg decoded = wire_header_decode(input: abs parser.storage);
+    return case dat decoded {
+        Result.Err(error) => {
+            wire_parser_reset(parser: ins parser);
+            return Result[Int, WireError].Err(error);
+        },
+        Result.Ok(header) => {
+            parser.header = header;
+            parser.expected_length = WIRE_HEADER_BYTES + (header.payload_len as u32) + WIRE_CRC_BYTES;
+            parser.state = 2u8;
+            return Result[Int, WireError].Ok(0);
+        },
+    };
+}
+
+verb wire_parser_finish(ins parser: WireParser, ins payload_output: Buffer) -> Result[Int, WireError] {
+    if parser.filled != parser.expected_length {
+        return Result[Int, WireError].Ok(0);
+    }
+    erg decoded = wire_frame_decode(input: abs parser.storage, payload_output: ins payload_output);
+    return case dat decoded {
+        Result.Err(error) => {
+            wire_parser_reset(parser: ins parser);
+            return Result[Int, WireError].Err(error);
+        },
+        Result.Ok(_) => {
+            parser.state = 3u8;
+            return Result[Int, WireError].Ok(1);
+        },
+    };
+}
+
+verb wire_parser_consume(
+    ins parser: WireParser,
+    erg byte: u8,
+    ins payload_output: Buffer
+) -> Result[Int, WireError] {
+    if parser.state == 3u8 {
+        return Result[Int, WireError].Err(WireError.PolicyRejected);
+    }
+    if parser.state == 0u8 {
+        if byte == WIRE_MAGIC_0 {
+            parser.storage[0] = byte;
+            parser.filled = 1u32;
+            parser.state = 1u8;
+        }
+        return Result[Int, WireError].Ok(0);
+    }
+    if parser.state == 1u8 {
+        if byte == WIRE_MAGIC_1 {
+            parser.storage[1] = byte;
+            parser.filled = 2u32;
+            parser.state = 2u8;
+        } else if byte == WIRE_MAGIC_0 {
+            parser.storage[0] = byte;
+        } else {
+            parser.filled = 0u32;
+            parser.state = 0u8;
+        }
+        return Result[Int, WireError].Ok(0);
+    }
+    erg stored = wire_parser_store(parser: ins parser, byte: erg byte);
+    erg stored_status: Int = case dat stored {
+        Result.Err(error) => {
+            return Result[Int, WireError].Err(error);
+        },
+        Result.Ok(_) => 0,
+    };
+    drop(stored_status);
+    erg header_state = wire_parser_decode_header(parser: ins parser);
+    erg header_status: Int = case dat header_state {
+        Result.Err(error) => {
+            return Result[Int, WireError].Err(error);
+        },
+        Result.Ok(_) => 0,
+    };
+    drop(header_status);
+    return wire_parser_finish(parser: ins parser, payload_output: ins payload_output);
+}
+
+"""
+Consume one arbitrary bounded chunk.
+
+The chunk is borrowed for the call and is never retained. `Ok(consumed)`
+reports how many bytes were consumed before the parser became ready or a
+typed error was returned. Incomplete chunks return `Ok(chunk_length)` and the
+status remains `Collecting`; a complete frame is copied only after CRC and
+capacity validation succeed. Call `wire_parser_reset` after `Ready` before
+feeding another frame.
+"""
+open verb wire_parser_feed(
+    ins parser: WireParser,
+    abs chunk: Buffer,
+    ins payload_output: Buffer
+) -> Result[u32, WireError] {
+    parser.last_consumed = 0u32;
+    erg chunk_length: u32 = buffer_length(buffer: abs chunk) as u32;
+    for erg index: u32 in 0u32 .. WIRE_MAX_FRAME_BYTES {
+        if index >= chunk_length {
+            break;
+        }
+        erg byte: u8 = chunk[index];
+        erg consumed = wire_parser_consume(
+            parser: ins parser,
+            byte: erg byte,
+            payload_output: ins payload_output
+        );
+        parser.last_consumed = index + 1u32;
+        erg consumed_status: Int = case dat consumed {
+            Result.Err(error) => {
+                return Result[u32, WireError].Err(error);
+            },
+            Result.Ok(status) => status,
+        };
+        if consumed_status == 1 {
+            return Result[u32, WireError].Ok(parser.last_consumed);
+        }
+    }
+    return Result[u32, WireError].Ok(parser.last_consumed);
+}

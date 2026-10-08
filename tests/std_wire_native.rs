@@ -341,3 +341,70 @@ verb main() -> Int {
     );
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn hosted_wire_parser_accepts_split_frame_chunks() {
+    let root = std::env::temp_dir().join(format!("actus-wire-parser-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"wire_parser\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    copy_standard_library(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src"),
+        &root.join("src"),
+    );
+    fs::write(
+        root.join("src/main.act"),
+        r#"import std::wire;
+verb feed_chunks(abs encoded: Buffer) -> Int {
+    erg first: Buffer = Buffer[0];
+    for erg index: u32 in 0u32 .. 5u32 { append(first, encoded[index]); }
+    erg second: Buffer = Buffer[0];
+    for erg index: u32 in 5u32 .. 17u32 { append(second, encoded[index]); }
+    erg parser = wire_parser_new();
+    erg payload: Buffer = Buffer[3];
+    erg first_result = wire_parser_feed(parser: ins parser, chunk: abs first, payload_output: ins payload);
+    erg first_count: u32 = case dat first_result { Result.Err(_) => { return 1; }, Result.Ok(count) => count, };
+    erg first_status = wire_parser_status(parser: abs parser);
+    erg first_state: Int = case dat first_status { WireParserStatus.Collecting => 0, _ => 1, };
+    if first_count != 5u32 || first_state != 0 { return 2; }
+    erg second_result = wire_parser_feed(parser: ins parser, chunk: abs second, payload_output: ins payload);
+    erg second_count: u32 = case dat second_result { Result.Err(_) => { return 3; }, Result.Ok(count) => count, };
+    erg second_status = wire_parser_status(parser: abs parser);
+    erg second_state: Int = case dat second_status { WireParserStatus.Ready => 0, _ => 1, };
+    if second_count != 12u32 || second_state != 0 { return 4; }
+    erg parsed = wire_parser_header(parser: abs parser);
+    if parsed.sequence_num != 287454020u32 || payload[0] != 7u8 || payload[2] != 9u8 { return 5; }
+    return 0;
+}
+verb main() -> Int {
+    erg header = WireHeader {storage: Array[u8, 12]()};
+    header.magic_0 = WIRE_MAGIC_0;
+    header.magic_1 = WIRE_MAGIC_1;
+    header.version = WIRE_VERSION;
+    header.sequence_num = 287454020u32;
+    header.payload_len = 3u16;
+    erg payload: Buffer = Buffer[0];
+    append(payload, 7u8); append(payload, 8u8); append(payload, 9u8);
+    erg encoded = Buffer[17];
+    erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins encoded);
+    return case dat result { Result.Err(_) => 6, Result.Ok(_) => feed_chunks(encoded: abs encoded), };
+}
+"#,
+    )
+    .expect("source");
+    let output = root.join("wire-parser");
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let execution = Command::new(&output).output().expect("execute");
+    assert_eq!(execution.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
+}

@@ -17,3 +17,6 @@ open checksum;
 
 """Re-export deterministic fixed-width header encoding and decoding."""
 open codec;
+
+"""Re-export the bounded incremental parser state and feed operation."""
+open parser;
