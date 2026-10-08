@@ -87,7 +87,7 @@ fn exported_implementation_names(module: &super::unit::ModuleUnit) -> Vec<String
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Verb(verb) = declaration else { return None };
-            module.exports().contains("verb", &verb.name).then(|| verb.name.clone())
+            verb.is_open.then(|| verb.name.clone())
         })
         .collect()
 }

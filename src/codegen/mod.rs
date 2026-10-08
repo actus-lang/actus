@@ -52,4 +52,5 @@ pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 pub(crate) use generic::expand_generic_instances;
 pub(crate) use generic::specialized_generic_name;
+pub(crate) use native::reachable_call_names;
 pub(crate) use result_constructors::normalize_program;

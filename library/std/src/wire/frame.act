@@ -1,0 +1,91 @@
+"""
+Version-one fixed-width frame metadata for `std::wire`.
+
+The header occupies exactly 12 bytes. Multi-byte numeric fields are encoded
+little-endian by the pack layout, while the two magic bytes remain explicit so
+their wire order is independent of host integer representation. Payload bytes
+follow the header and the CRC16 trailer follows the payload. This type stores
+header metadata only; it does not own payload storage or perform I/O.
+"""
+"""The first magic byte required by every version-one frame."""
+open const WIRE_MAGIC_0: u8 = 218u8;
+
+
+"""The second magic byte required by every version-one frame."""
+open const WIRE_MAGIC_1: u8 = 17u8;
+
+
+"""The supported fixed frame format version."""
+open const WIRE_VERSION: u8 = 1u8;
+
+
+"""The number of bytes occupied by a version-one frame header."""
+open const WIRE_HEADER_BYTES: u32 = 12u32;
+
+
+"""The number of CRC16 trailer bytes appended to a complete frame."""
+open const WIRE_CRC_BYTES: u32 = 2u32;
+
+
+"""The maximum payload accepted by the bounded version-one codec."""
+open const WIRE_MAX_PAYLOAD_BYTES: u32 = 1024u32;
+
+
+"""The largest complete version-one frame, including header and CRC."""
+open const WIRE_MAX_FRAME_BYTES: u32 = 1038u32;
+
+
+"""The CRC16-CCITT polynomial used by version-one frames."""
+open const WIRE_CRC16_POLYNOMIAL: u16 = 4129u16;
+
+
+"""The initial CRC16-CCITT register value for version-one frames."""
+open const WIRE_CRC16_INITIAL: u16 = 65535u16;
+
+
+"""The flag requesting an acknowledgement at the application boundary."""
+open const WIRE_FLAG_ACK_REQUIRED: u8 = 2u8;
+
+
+"""The flag marking a frame as urgent for a transport-neutral consumer."""
+open const WIRE_FLAG_URGENT: u8 = 4u8;
+
+
+"""The flag indicating an explicitly negotiated bounded compression profile."""
+open const WIRE_FLAG_COMPRESSED: u8 = 8u8;
+
+
+"""The complete set of flags accepted by the initial non-cryptographic codec."""
+open const WIRE_KNOWN_FLAGS: u8 = 14u8;
+
+
+"""
+The exact 12-byte version-one header.
+
+`sequence_num` is scoped by the surrounding endpoint/session contract. The
+header carries metadata only, so constructing or inspecting it cannot allocate,
+perform transport I/O, or authenticate a sender.
+"""
+open pack WireHeader {
+    """Owned fixed-size storage containing the serialized header bytes."""
+    erg storage: Array[u8, 12];
+    layout little;
+    fields {
+        """First magic byte at wire offset zero."""
+        erg magic_0: u8 at 0;
+        """Second magic byte at wire offset one."""
+        erg magic_1: u8 at 8;
+        """Protocol version byte at wire offset two."""
+        erg version: u8 at 16;
+        """Negotiated frame flags at wire offset three."""
+        erg flags: u8 at 24;
+        """Owned erg scalar containing the application-neutral message identifier at wire offset four."""
+        erg message_id: u8 at 32;
+        """Owned erg scalar containing the application-neutral channel identifier at wire offset five."""
+        erg channel_id: u8 at 40;
+        """Owned erg scalar containing the little-endian direction-scoped sequence at wire offset six."""
+        erg sequence_num: u32 at 48;
+        """Little-endian payload byte count at wire offset ten."""
+        erg payload_len: u16 at 80;
+    }
+}

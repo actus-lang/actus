@@ -1,0 +1,67 @@
+"""
+Optional hosted endpoint demonstration.
+
+The address is represented as caller-owned bytes. Parsing returns bounded
+offset metadata; it does not create a String or open a transport.
+"""
+import std::io;
+
+import std::wire;
+
+verb address_bytes() -> Buffer {
+    erg address = Buffer[25];
+    address[0] = 119u8;
+    address[1] = 105u8;
+    address[2] = 114u8;
+    address[3] = 101u8;
+    address[4] = 58u8;
+    address[5] = 47u8;
+    address[6] = 47u8;
+    address[7] = 114u8;
+    address[8] = 111u8;
+    address[9] = 98u8;
+    address[10] = 111u8;
+    address[11] = 116u8;
+    address[12] = 58u8;
+    address[13] = 56u8;
+    address[14] = 48u8;
+    address[15] = 56u8;
+    address[16] = 48u8;
+    address[17] = 47u8;
+    address[18] = 99u8;
+    address[19] = 111u8;
+    address[20] = 110u8;
+    address[21] = 116u8;
+    address[22] = 114u8;
+    address[23] = 111u8;
+    address[24] = 108u8;
+    return address;
+}
+
+verb parse_address(abs address: Buffer) -> Int {
+    erg parsed = wire_endpoint_parse(input: abs address);
+    return case dat parsed {
+        Result.Err(_) => 1,
+        Result.Ok(endpoint) => {
+            if endpoint.port != 8080u32 || endpoint.has_port != 1u32 {
+                return 2;
+            }
+            if endpoint.authority_length != 5u32 || endpoint.path_length != 8u32 {
+                return 3;
+            }
+            return 0;
+        },
+    };
+}
+
+verb main() -> Int {
+    erg address = address_bytes();
+    if parse_address(address: abs address) != 0 {
+        return 1;
+    }
+    erg parsed_message = "WIRE_ENDPOINT_DEMO parsed authority=robot port=8080 path=/control";
+    println(abs parsed_message);
+    erg transport_message = "WIRE_ENDPOINT_DEMO transport=not-selected core=frame-independent";
+    println(abs transport_message);
+    return 0;
+}

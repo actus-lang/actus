@@ -131,26 +131,13 @@ pub(crate) fn emit_objects(
         .generic_instances;
     let generic_instances =
         crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
-    let generic_types = generic_instances
-        .iter()
-        .filter(|instance| {
-            matches!(
-                instance.name.as_str(),
-                "region_open"
-                    | "region_read"
-                    | "region_write"
-                    | "region_publish"
-                    | "region_cancel"
-                    | "region_close"
-            )
-        })
-        .flat_map(|instance| instance.arguments.iter().cloned())
-        .collect::<Vec<_>>();
+    let generic_types = region_generic_types(&generic_instances);
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| NativeEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
+    let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
     let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(
         root.program(),
         symbol,
@@ -174,8 +161,77 @@ pub(crate) fn emit_objects(
         configuration,
         &bindings,
         &generic_instances,
+        &reachable_module_roots,
     )?);
     Ok(objects)
+}
+
+fn region_generic_types(
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Vec<crate::ast::TypeName> {
+    generic_instances
+        .iter()
+        .filter(|instance| {
+            matches!(
+                instance.name.as_str(),
+                "region_open"
+                    | "region_read"
+                    | "region_write"
+                    | "region_publish"
+                    | "region_cancel"
+                    | "region_close"
+            )
+        })
+        .flat_map(|instance| instance.arguments.iter().cloned())
+        .collect()
+}
+
+fn reachable_module_roots(
+    object_plan: &crate::modules::ModuleObjectPlan,
+    symbol: &str,
+) -> Result<std::collections::HashSet<String>, NativeEmitError> {
+    let root = &object_plan.units()[0];
+    let normalized_root = crate::codegen::normalize_program(root.program());
+    let mut roots = crate::codegen::reachable_call_names(&normalized_root, symbol)?;
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for unit in &object_plan.units()[1..] {
+            let selected = unit
+                .program()
+                .declarations
+                .iter()
+                .filter_map(|declaration| match declaration {
+                    crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
+                    _ => None,
+                })
+                .filter(|name| roots.contains(*name))
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            for name in selected {
+                for call in crate::codegen::reachable_call_names(unit.program(), &name)? {
+                    changed |= roots.insert(call);
+                }
+            }
+        }
+    }
+    Ok(roots)
+}
+
+fn reachable_wire_verbs(
+    program: &crate::ast::Program,
+    reachable_module_roots: &std::collections::HashSet<String>,
+) -> Vec<String> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) if reachable_module_roots.contains(&verb.name) => {
+                Some(verb.name.clone())
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn emit_module_objects(
@@ -183,9 +239,29 @@ fn emit_module_objects(
     configuration: &CompilerConfiguration,
     bindings: &crate::codegen::NativeSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
+    reachable_module_roots: &std::collections::HashSet<String>,
 ) -> Result<Vec<EmittedObject>, NativeEmitError> {
     let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
+        let roots = if unit.namespace().module_path().starts_with("std::wire") {
+            if reachable_wire_verbs(unit.program(), reachable_module_roots).is_empty() {
+                Vec::new()
+            } else {
+                unit.program()
+                    .declarations
+                    .iter()
+                    .filter_map(|declaration| match declaration {
+                        crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            }
+        } else {
+            unit.exported_verbs().to_vec()
+        };
+        if roots.is_empty() && unit.namespace().module_path().starts_with("std::wire") {
+            continue;
+        }
         let bytes =
             crate::codegen::emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
                 unit.program(),
@@ -194,7 +270,7 @@ fn emit_module_objects(
                 configuration.target(),
                 bindings,
                 generic_instances,
-                Some(unit.exported_verbs()),
+                Some(&roots),
             )
             .map_err(|error| {
                 NativeEmitError(format!(

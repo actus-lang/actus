@@ -1,0 +1,149 @@
+"""Caller-owned bounded state for incremental wire fragment reassembly."""
+
+open struct WireReassembly {
+    """Caller-provided storage receiving the complete message."""
+    erg storage: Buffer,
+    """Accepted fragment offsets indexed by fragment position."""
+    erg ranges_offset: Array[u32, 64],
+    """Accepted fragment lengths indexed by fragment position."""
+    erg ranges_length: Array[u32, 64],
+    """Declared complete message length."""
+    erg total_length: u32,
+    """Owned erg count of fragments in the active message; it is scalar metadata and needs no cleanup."""
+    erg fragment_count: u16,
+    """Owned erg count of accepted fragments; it is scalar metadata and needs no cleanup."""
+    erg received_count: u16,
+    """Number of payload bytes copied into storage."""
+    erg received_bytes: u32,
+    """Owned erg generation used to reject stale fragments; it is scalar metadata and needs no cleanup."""
+    erg generation: u32,
+    """Lifecycle state: zero idle, one collecting, two complete."""
+    erg state: u8,
+}
+
+"""
+Open reassembly over caller-provided storage without allocating.
+
+The `dat` storage ownership is transferred into the returned state, which
+returns ownership through normal scope cleanup. The result is an initialized
+reassembly value; the verb performs no allocation or I/O and reports invalid
+input only through later bounded operations.
+"""
+open verb wire_reassembly_open(dat storage: Buffer) -> WireReassembly {
+    return WireReassembly {storage: storage, ranges_offset: Array[u32, 64](), ranges_length: Array[u32, 64](), total_length: 0u32, fragment_count: 0u16, received_count: 0u16, received_bytes: 0u32, generation: 0u32, state: 0u8};
+}
+
+"""Start one generation and reject messages larger than caller storage."""
+open verb wire_reassembly_begin(ins reassembly: WireReassembly, erg total_length: u32, erg fragment_count: u16, erg generation: u32) -> Result[Int, WireError] {
+    if total_length == 0u32 || total_length > WIRE_REASSEMBLY_MAX_BYTES { return Result[Int, WireError].Err(WireError.FragmentRangeInvalid); }
+    if fragment_count == 0u16 || fragment_count > WIRE_FRAGMENT_MAX_COUNT { return Result[Int, WireError].Err(WireError.FragmentCountInvalid); }
+    if (buffer_length(buffer: abs reassembly.storage) as u32) < total_length { return Result[Int, WireError].Err(WireError.ReassemblyCapacity); }
+    reassembly.total_length = total_length;
+    reassembly.fragment_count = fragment_count;
+    reassembly.received_count = 0u16;
+    reassembly.received_bytes = 0u32;
+    reassembly.generation = generation;
+    reassembly.state = 1u8;
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_reassembly_overlaps(abs reassembly: WireReassembly, erg candidate_offset: u32, erg payload_length: u32) -> Bool {
+    erg candidate_end: u32 = candidate_offset + payload_length;
+    for erg index: u32 in 0u32 .. (WIRE_FRAGMENT_MAX_COUNT as u32) {
+        if index >= (reassembly.received_count as u32) { break; }
+        erg existing_start: u32 = reassembly.ranges_offset[index];
+        erg existing_end: u32 = existing_start + reassembly.ranges_length[index];
+        if candidate_offset < existing_end && existing_start < candidate_end { return true; }
+    }
+    return false;
+}
+
+verb wire_reassembly_check_identity(abs reassembly: WireReassembly, abs header: WireFragmentHeader) -> Result[Int, WireError] {
+    if header.generation != reassembly.generation { return Result[Int, WireError].Err(WireError.FragmentStale); }
+    if header.total_length != reassembly.total_length || header.fragment_count != reassembly.fragment_count { return Result[Int, WireError].Err(WireError.FragmentRangeInvalid); }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_reassembly_check_slot(abs reassembly: WireReassembly, abs header: WireFragmentHeader, erg payload_length: u32) -> Result[Int, WireError] {
+    erg index: u32 = header.fragment_index as u32;
+    erg candidate_offset: u32 = header.offset;
+    if reassembly.ranges_length[index] != 0u32 { return Result[Int, WireError].Err(WireError.FragmentDuplicate); }
+    if wire_reassembly_overlaps(reassembly: abs reassembly, candidate_offset: erg candidate_offset, payload_length: erg payload_length) { return Result[Int, WireError].Err(WireError.FragmentOverlap); }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_reassembly_copy_fragment(ins reassembly: WireReassembly, abs fragment: Buffer, abs header: WireFragmentHeader, erg payload_length: u32) -> Void {
+    erg payload_index: u32 = 0u32;
+    loop {
+        if payload_index >= payload_length { break; }
+        reassembly.storage[header.offset + payload_index] = fragment[WIRE_FRAGMENT_HEADER_BYTES + payload_index];
+        payload_index += 1u32;
+    }
+    erg index: u32 = header.fragment_index as u32;
+    reassembly.ranges_offset[index] = header.offset;
+    reassembly.ranges_length[index] = payload_length;
+    reassembly.received_count += 1u16;
+    reassembly.received_bytes += payload_length;
+}
+
+"""
+Accept one fragment, copy it into active storage, and report completion.
+
+The fragment is borrowed and the reassembly state is exclusively loaned. The
+operation performs no allocation or I/O and rejects stale, duplicate,
+overlapping, malformed, out-of-range, and exhausted input.
+"""
+open verb wire_reassembly_accept(ins reassembly: WireReassembly, abs fragment: Buffer) -> Result[Int, WireError] {
+    if reassembly.state != 1u8 { return Result[Int, WireError].Err(WireError.ReassemblyState); }
+    erg fragment_length: u32 = buffer_length(buffer: abs fragment) as u32;
+    if fragment_length < WIRE_FRAGMENT_HEADER_BYTES { return Result[Int, WireError].Err(WireError.Truncated); }
+    erg decoded = wire_fragment_decode(input: abs fragment);
+    case dat decoded {
+        Result.Err(error) => { return Result[Int, WireError].Err(error); },
+        Result.Ok(_) => {},
+    };
+    erg header: WireFragmentHeader = wire_fragment_read_header(input: abs fragment);
+    erg payload_length: u32 = fragment_length - WIRE_FRAGMENT_HEADER_BYTES;
+    erg identity = wire_reassembly_check_identity(reassembly: abs reassembly, header: abs header);
+    case dat identity { Result.Err(error) => { return Result[Int, WireError].Err(error); }, Result.Ok(_) => {}, };
+    erg slot = wire_reassembly_check_slot(reassembly: abs reassembly, header: abs header, payload_length: erg payload_length);
+    case dat slot { Result.Err(error) => { return Result[Int, WireError].Err(error); }, Result.Ok(_) => {}, };
+    wire_reassembly_copy_fragment(reassembly: ins reassembly, fragment: abs fragment, header: abs header, payload_length: erg payload_length);
+    if reassembly.received_count == reassembly.fragment_count { reassembly.state = 2u8; return Result[Int, WireError].Ok(1); }
+    return Result[Int, WireError].Ok(0);
+}
+
+"""
+Copy a complete message to caller storage without consuming reassembly.
+
+The `abs` reassembly is borrowed and the `ins` output is mutated in place.
+The result returns the copied byte count; incomplete or undersized output
+returns a typed error. No allocation, I/O, ownership transfer, or cleanup
+side effect occurs.
+"""
+open verb wire_reassembly_copy(abs reassembly: WireReassembly, ins output: Buffer) -> Result[u32, WireError] {
+    if reassembly.state != 2u8 { return Result[u32, WireError].Err(WireError.ReassemblyIncomplete); }
+    if (buffer_length(buffer: abs output) as u32) < reassembly.total_length { return Result[u32, WireError].Err(WireError.InsufficientCapacity); }
+    erg index: u32 = 0u32;
+    loop {
+        if index >= reassembly.total_length { break; }
+        output[index] = reassembly.storage[index];
+        index += 1u32;
+    }
+    return Result[u32, WireError].Ok(reassembly.total_length);
+}
+
+"""
+Cancel the active generation and make caller storage reusable.
+
+The `ins` reassembly state is mutated in place and retains ownership of its
+caller-provided storage. The verb returns `Void`, performs no allocation or
+I/O, and clears lifecycle counters for the next generation.
+"""
+open verb wire_reassembly_cancel(ins reassembly: WireReassembly) -> Void {
+    reassembly.total_length = 0u32;
+    reassembly.fragment_count = 0u16;
+    reassembly.received_count = 0u16;
+    reassembly.received_bytes = 0u32;
+    reassembly.state = 0u8;
+}

@@ -1,0 +1,11 @@
+"""
+The public `std::wire::fragment` facade.
+
+Fragment encoding and bounded reassembly are kept in separate modules so each
+implementation unit remains readable and within the standard-library source
+limits. The facade re-exports only their documented declarations.
+"""
+"""Re-export the fixed metadata encoder and decoder."""
+open codec;
+"""Re-export caller-owned bounded reassembly lifecycle operations."""
+open reassembly;

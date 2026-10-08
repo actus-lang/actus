@@ -37,11 +37,20 @@ pub fn link_objects(
     if output.status.success() {
         return Ok(());
     }
-    let details = String::from_utf8_lossy(&output.stderr);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let status = output
+        .status
+        .code()
+        .map_or_else(|| "terminated without an exit code".to_owned(), |code| code.to_string());
+    let arguments =
+        command.get_args().map(|argument| argument.to_string_lossy()).collect::<Vec<_>>().join(" ");
     Err(NativeLinkError(format!(
-        "linker `{}` failed: {}",
+        "linker `{}` failed with status {status}: stderr=`{}` stdout=`{}` command=`{} {arguments}`",
         linker.to_string_lossy(),
-        details.trim()
+        stderr.trim(),
+        stdout.trim(),
+        linker.to_string_lossy()
     )))
 }
 

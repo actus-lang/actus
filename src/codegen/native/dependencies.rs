@@ -50,6 +50,22 @@ pub(super) fn reachable_declarations_with_roots<'a>(
     Ok((selected_verbs, selected_external))
 }
 
+pub(super) fn reachable_call_names(
+    verbs: &[&VerbDecl],
+    external_verbs: &[&ExternalVerbDecl],
+    symbol: Option<&str>,
+) -> Result<HashSet<String>, NativeEmitError> {
+    let (selected_verbs, _) =
+        reachable_declarations_with_roots(verbs, external_verbs, symbol, None)?;
+    let mut names = HashSet::new();
+    for verb in selected_verbs {
+        let mut calls = Vec::new();
+        collect_block_calls(&verb.body, &mut calls);
+        names.extend(calls.into_iter().map(|call| call.name));
+    }
+    Ok(names)
+}
+
 struct NativeCall {
     name: String,
     span: SourceSpan,

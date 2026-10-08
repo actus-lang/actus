@@ -162,6 +162,26 @@ fn formats_the_public_utf8_boundary_idempotently() {
 }
 
 #[test]
+fn formats_the_public_wire_checksum_surface_idempotently() {
+    let source = concat!(
+        "import std::wire;\n",
+        "verb checksum() -> Int {\n",
+        "erg input: Buffer = Buffer[0];\n",
+        "erg start: u32 = 0u32;\n",
+        "erg end: u32 = 0u32;\n",
+        "erg result = wire_crc16_ccitt(input: abs input, start: erg start, end: erg end);\n",
+        "return 0;\n",
+        "}\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("import std::wire;"));
+    assert!(formatted.contains("wire_crc16_ccitt("));
+    assert!(formatted.contains("start:"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_const_generic_declarations_without_changing_meaning() {
     let formatted = format_source(
         "struct Fabric[N: Usize] { cells: Array[Int, N], } verb main() -> Bool { return false; }",
