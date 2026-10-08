@@ -425,7 +425,7 @@ handbook in one change.
 
 ### Gate 40.17: Constants, generics, roles, and dispatch pass
 
-- [ ] Expand constants with compile-time evaluation boundaries, visibility,
+- [x] Expand constants with compile-time evaluation boundaries, visibility,
       typed widths, and rejected runtime uses.
 - [ ] Reconcile generic type and const-generic examples with current accepted
       domains and diagnostics.
