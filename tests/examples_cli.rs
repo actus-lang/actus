@@ -160,6 +160,29 @@ fn wire_example_builds_and_runs_the_protocol_path() {
 
 #[cfg(unix)]
 #[test]
+fn wire_endpoint_example_builds_and_runs_optional_address_path() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/wire_endpoint");
+    let output =
+        std::env::temp_dir().join(format!("actus-wire-endpoint-example-{}", std::process::id()));
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("wire endpoint example should build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let execution =
+        std::process::Command::new(&output).output().expect("wire endpoint example should execute");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&execution.stdout),
+        "WIRE_ENDPOINT_DEMO parsed authority=robot port=8080 path=/control\nWIRE_ENDPOINT_DEMO transport=not-selected core=frame-independent\n"
+    );
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
 fn monotonic_time_example_builds_runs_and_emits_no_float_ir() {
     let root = std::env::temp_dir().join(format!("actus-monotonic-example-{}", std::process::id()));
     let output = root.join("monotonic-time-example");
