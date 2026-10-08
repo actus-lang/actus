@@ -14,3 +14,6 @@ open frame;
 
 """Re-export the allocation-free CRC16-CCITT integrity calculation."""
 open checksum;
+
+"""Re-export deterministic fixed-width header encoding and decoding."""
+open codec;

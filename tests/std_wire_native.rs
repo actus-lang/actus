@@ -37,18 +37,47 @@ fn hosted_wire_crc16_executes_with_deterministic_reference_value() {
     fs::write(
         root.join("src/main.act"),
         r#"import std::wire;
-verb main() -> Int {
-    erg input: Buffer = Buffer[0];
-    append(input, 1u8);
-    append(input, 2u8);
-    append(input, 3u8);
+verb crc_status() -> Int {
+    erg crc_input: Buffer = Buffer[0];
+    append(crc_input, 1u8);
+    append(crc_input, 2u8);
+    append(crc_input, 3u8);
     erg start: u32 = 0u32;
     erg end: u32 = 3u32;
-    erg result = wire_crc16_ccitt(input: abs input, start: erg start, end: erg end);
-    return case dat result {
+    erg checksum = wire_crc16_ccitt(input: abs crc_input, start: erg start, end: erg end);
+    return case dat checksum {
         Result.Ok(value) => if value == 44461u16 { 0 } else { 1 },
         Result.Err(_) => 2,
     };
+}
+verb header_status() -> Int {
+    erg header = WireHeader {storage: Array[u8, 12]()};
+    header.magic_0 = WIRE_MAGIC_0;
+    header.magic_1 = WIRE_MAGIC_1;
+    header.version = WIRE_VERSION;
+    header.flags = WIRE_FLAG_ACK_REQUIRED;
+    header.message_id = 9u8;
+    header.channel_id = 3u8;
+    header.sequence_num = 287454020u32;
+    header.payload_len = 3u16;
+    erg encoded = Buffer[12];
+    erg encoded_result = wire_header_encode(header: abs header, output: ins encoded);
+    return case dat encoded_result {
+        Result.Err(_) => 3,
+        Result.Ok(count) => {
+            erg decoded = wire_header_decode(input: abs encoded);
+            return case dat decoded {
+                Result.Err(_) => 4,
+                Result.Ok(value) => if count == 12u32 && value.sequence_num == 287454020u32 && value.payload_len == 3u16 { 0 } else { 1 },
+            };
+        },
+    };
+}
+verb main() -> Int {
+    if crc_status() != 0 {
+        return 7;
+    }
+    return header_status();
 }
 "#,
     )

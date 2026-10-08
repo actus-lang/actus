@@ -1,0 +1,87 @@
+"""
+Deterministic version-one header codec for `std::wire`.
+
+The encoder writes exactly the canonical 12-byte header into caller-owned
+storage. The decoder reads the same fixed range and validates magic, version,
+flags, and payload bounds before exposing metadata. Neither operation allocates
+storage, performs I/O, or owns the caller's buffers.
+"""
+"""Reject an invalid header contract before encoding or dispatch."""
+verb wire_validate_header(abs header: WireHeader) -> Result[Int, WireError] {
+    if header.magic_0 != WIRE_MAGIC_0 || header.magic_1 != WIRE_MAGIC_1 {
+        return Result[Int, WireError].Err(WireError.InvalidMagic);
+    }
+    if header.version != WIRE_VERSION {
+        return Result[Int, WireError].Err(WireError.UnsupportedVersion);
+    }
+    if (header.flags & WIRE_KNOWN_FLAGS) != header.flags {
+        return Result[Int, WireError].Err(WireError.UnknownFlags);
+    }
+    if (header.payload_len as u32) > WIRE_MAX_PAYLOAD_BYTES {
+        return Result[Int, WireError].Err(WireError.PayloadTooLarge);
+    }
+    return Result[Int, WireError].Ok(0);
+}
+
+"""
+Encode one validated header into a caller-owned fixed buffer.
+
+The `abs` header is borrowed and the `ins` output buffer is mutated in place.
+The output must contain at least `WIRE_HEADER_BYTES` bytes of fixed storage;
+no capacity growth or hidden allocation is attempted. The result is `Ok(12)`
+on success or a typed `WireError` when validation or output bounds fail.
+"""
+open verb wire_header_encode(abs header: WireHeader, ins output: Buffer) -> Result[u32, WireError] {
+    erg output_length: Int = buffer_length(buffer: abs output);
+    if output_length < (WIRE_HEADER_BYTES as Int) {
+        return Result[u32, WireError].Err(WireError.InsufficientCapacity);
+    }
+    erg valid = wire_validate_header(header: abs header);
+    case dat valid {
+        Result.Err(error) => {
+            return Result[u32, WireError].Err(error);
+        },
+        Result.Ok(_) => {},
+    };
+    output[0] = header.magic_0;
+    output[1] = header.magic_1;
+    output[2] = header.version;
+    output[3] = header.flags;
+    output[4] = header.message_id;
+    output[5] = header.channel_id;
+    output[6] = (header.sequence_num & 255u32) as u8;
+    output[7] = ((header.sequence_num >> 8u32) & 255u32) as u8;
+    output[8] = ((header.sequence_num >> 16u32) & 255u32) as u8;
+    output[9] = ((header.sequence_num >> 24u32) & 255u32) as u8;
+    output[10] = (header.payload_len & 255u16) as u8;
+    output[11] = ((header.payload_len >> 8u16) & 255u16) as u8;
+    return Result[u32, WireError].Ok(WIRE_HEADER_BYTES);
+}
+
+"""
+Decode and validate one canonical 12-byte header from caller-owned storage.
+
+The input is borrowed read-only and the returned `WireHeader` owns its fixed
+metadata storage. A short input or invalid field returns a typed `WireError`
+before any field is exposed to the caller.
+"""
+open verb wire_header_decode(abs input: Buffer) -> Result[WireHeader, WireError] {
+    erg input_length: Int = buffer_length(buffer: abs input);
+    if input_length < (WIRE_HEADER_BYTES as Int) {
+        return Result[WireHeader, WireError].Err(WireError.Truncated);
+    }
+    erg header = WireHeader {storage: Array[u8, 12]()};
+    header.magic_0 = input[0];
+    header.magic_1 = input[1];
+    header.version = input[2];
+    header.flags = input[3];
+    header.message_id = input[4];
+    header.channel_id = input[5];
+    header.sequence_num = (input[6] as u32) | ((input[7] as u32) << 8u32) | ((input[8] as u32) << 16u32) | ((input[9] as u32) << 24u32);
+    header.payload_len = (input[10] as u16) | ((input[11] as u16) << 8u16);
+    erg valid = wire_validate_header(header: abs header);
+    return case dat valid {
+        Result.Err(error) => Result[WireHeader, WireError].Err(error),
+        Result.Ok(_) => Result[WireHeader, WireError].Ok(header),
+    };
+}

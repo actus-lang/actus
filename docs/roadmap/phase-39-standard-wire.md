@@ -44,7 +44,7 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 
 - [x] Implement named protocol constants for magic, version, lengths, flags,
       payload bound, and CRC parameters.
-- [ ] Implement fixed-width little-endian header encoding and decoding.
+- [x] Implement fixed-width little-endian header encoding and decoding.
 - [ ] Validate payload length before payload access.
 - [ ] Serialize valid frames into caller-owned bounded buffers.
 - [ ] Reject insufficient output capacity with a typed error.
