@@ -39,3 +39,29 @@ The facade includes:
 Frame and parser inputs are read through `abs Buffer`; output and reassembly
 storage use caller-owned `ins Buffer` according to the declaration. The core
 has no hidden allocation or synchronous transport I/O.
+
+## Detailed pages
+
+- [Protocol reference](protocol.md)
+- [Protocol reference](../reference/20-standard-library.md)
+- [Wire implementation](../../../../library/std/src/wire/)
+- [Native Wire tests](../../../../tests/std_wire_native.rs)
+- [Semantic Wire tests](../../../../tests/std_wire_semantic.rs)
+
+## Processing lifecycle
+
+1. Build a `WireHeader` with a supported version, flags, channel, sequence,
+   and payload length.
+2. Encode the header or complete frame into caller-owned output storage.
+3. On receive, feed arbitrary byte chunks to `WireParser`; a split chunk is a
+   normal input, not an error.
+4. Read the validated header and copied payload only after the parser reaches
+   `Ready`.
+5. Use `WireSequenceWindow` to reject duplicates, stale sequence numbers, and
+   context mismatches.
+6. For messages larger than one frame, encode bounded fragments and use
+   `WireReassembly` with an explicit generation, capacity, and cancellation
+   path.
+
+`wire://` endpoint parsing is optional hosted metadata. The binary frame API
+does not require a URI, string, socket, or transport implementation.

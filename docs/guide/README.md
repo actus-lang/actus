@@ -38,7 +38,7 @@ test, format, and build a project.
 2. [Structs and enums](language/structs.md)
 3. [Arrays and buffers](language/arrays-and-buffers.md)
 4. [Modules and facades](modules/overview.md)
-5. [Errors and results](standard-library/errors-and-results.md)
+5. [Errors and results](library/errors/README.md)
 6. [Debugging](workflow/debugging.md)
 
 ### Advanced Actus work
@@ -46,9 +46,9 @@ test, format, and build a project.
 1. [Generics](language/generics.md)
 2. [Packs](language/packs.md)
 3. [Constants](language/constants.md)
-4. [Regions](standard-library/regions.md)
+4. [Regions](library/region/README.md)
 5. [Native builds](compiler/native-builds.md)
-6. [Wire](standard-library/wire.md)
+6. [Wire](library/wire/README.md)
 7. [Benchmarks](workflow/benchmarks.md)
 
 ### Building a project
@@ -56,7 +56,7 @@ test, format, and build a project.
 1. [Project setup](workflow/project-setup.md)
 2. [`Actus.toml`](compiler/actus-toml.md)
 3. [Modules and facades](modules/overview.md)
-4. [Runtime profiles](standard-library/runtime-profiles.md)
+4. [Runtime profiles](library/runtime-profiles.md)
 5. [Targets and profiles](compiler/targets-and-profiles.md)
 6. [Check, test, and build](workflow/check-test-and-build.md)
 7. [Native builds](compiler/native-builds.md)
@@ -64,15 +64,15 @@ test, format, and build a project.
 
 ### Using the standard library
 
-1. [Standard-library overview](standard-library/overview.md)
-2. [IO](standard-library/io.md)
-3. [Filesystem](standard-library/filesystem.md)
-4. [Paths](standard-library/paths.md)
-5. [Strings and UTF-8](standard-library/strings-and-utf8.md)
-6. [Time](standard-library/time.md)
-7. [Regions](standard-library/regions.md)
-8. [Wire](standard-library/wire.md)
-9. [Errors and results](standard-library/errors-and-results.md)
+1. [Standard-library overview](library/README.md)
+2. [IO](library/io/README.md)
+3. [Filesystem](library/filesystem/README.md)
+4. [Paths](library/path/README.md)
+5. [Strings and UTF-8](library/string/README.md)
+6. [Time](library/time/README.md)
+7. [Regions](library/region/README.md)
+8. [Wire](library/wire/README.md)
+9. [Errors and results](library/errors/README.md)
 
 ### Coding-agent reference
 
@@ -92,7 +92,8 @@ throughout the handbook.
 - [Language](language/README.md)
 - [Ownership](ownership/README.md)
 - [Modules](modules/README.md)
-- [Standard library](standard-library/README.md)
+- [Standard library](library/README.md)
+- [Detailed library guides](library/README.md)
 - [Compiler](compiler/README.md)
 - [Workflow](workflow/README.md)
 - [Agent reference](agent-reference/README.md)

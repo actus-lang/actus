@@ -367,3 +367,24 @@ git diff --check: passed
 
 The handbook is organized for human readers first, with the agent reference
 kept as a separate operational category.
+
+## Library handbook reorganization
+
+The standard-library section was subsequently reorganized into
+`docs/guide/library/`. Each public library now has its own directory and API
+inventory. The former `docs/guide/standard-library/` directory has been
+removed after its overview pages, reference material, and links were moved.
+
+Current dedicated library directories include:
+
+- `io/`
+- `filesystem/`
+- `path/`
+- `string/`
+- `time/`
+- `region/`
+- `wire/`
+- `errors/`
+
+The source library and tests remain the implementation reference for every
+API entry.

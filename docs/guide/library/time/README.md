@@ -33,3 +33,22 @@ The facade includes:
 Time values are inspected through `abs`; timers are changed through `ins`.
 Duration arithmetic returns typed failures where the result cannot be
 represented.
+
+## Detailed pages
+
+- [Usage guide](usage.md)
+- [Time implementation](../../../../library/std/src/time/)
+- [Time tests](../../../../tests/std_time_native.rs)
+
+## Choosing an operation
+
+- Use `now` and `duration_since` for elapsed monotonic measurement.
+- Use `Deadline` when a later operation must be bounded by an absolute
+  monotonic point.
+- Use `delay` for an explicit busy-wait and `sleep` when the runtime provider
+  can suspend execution.
+- Use `Timer` when polling a one-shot or periodic state machine and choose the
+  missed-tick policy explicitly.
+
+The numeric unit is part of the type contract. Do not compare raw tick values
+from unrelated providers or treat monotonic time as a calendar timestamp.
