@@ -503,16 +503,38 @@ specific behavior remains selected by the configured provider profile.
 
 ## Gate 41.16 — Final acceptance and release readiness
 
-- [ ] Run `cargo fmt --all -- --check`.
-- [ ] Run `cargo check --all-targets --all-features`.
-- [ ] Run `cargo clippy --all-targets --all-features -- -D warnings`.
-- [ ] Run `cargo test --all-targets --all-features`.
-- [ ] Run source-limit and diff validation.
-- [ ] Run Actus formatter, strict checks, native builds, and Region fixtures.
-- [ ] Confirm no unrelated standard-library or application work was included.
-- [ ] Update the guide, API index, ADR, and evidence documents.
-- [ ] Mark Phase 41 complete only when every gate has implementation and
+- [x] Run `cargo fmt --all -- --check`.
+- [x] Run `cargo check --all-targets --all-features`.
+- [x] Run `cargo clippy --all-targets --all-features -- -D warnings`.
+- [x] Run `cargo test --all-targets --all-features`.
+- [x] Run source-limit and diff validation.
+- [x] Run Actus formatter, strict checks, native builds, and Region fixtures.
+- [x] Confirm no unrelated standard-library or application work was included.
+- [x] Update the guide, API index, ADR, and evidence documents.
+- [x] Mark Phase 41 complete only when every gate has implementation and
       reproducible evidence.
+
+#### Gate 41.16 evidence
+
+- `cargo fmt --all -- --check`, `cargo check --all-targets --all-features`,
+  `cargo clippy --all-targets --all-features -- -D warnings`, and
+  `cargo test --all-targets --all-features` passed on the final branch.
+- The Region example passed `actus check --strict` and
+  `actus build --strict --emit exe`; Region native, semantic, scale, ABI,
+  formatter, LSP, documentation, and provider fixtures are green.
+- Commit hooks passed formatting, compilation, source limits, architecture
+  boundaries, public documentation, and secret scanning. The final diff is
+  limited to Region implementation evidence, documentation, tests, and the
+  runnable Region example.
+
+### Phase 41 acceptance record
+
+Phase 41 is complete. `std::region` now has a documented, provider-neutral,
+bounded logical-storage contract with explicit windows, typed lifecycle and
+recovery boundaries, generation-safe capabilities, deterministic cleanup,
+native ABI coverage, adversarial regressions, and reproducible MiB-to-TiB
+scale evidence. Hosted measurements remain host evidence and do not imply
+embedded hardware performance.
 
 ## Explicit non-goals
 

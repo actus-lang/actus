@@ -529,6 +529,16 @@ that moving among windows is explicit and that the Region core performs no
 implicit provider or filesystem I/O. These measurements are hosted evidence;
 they do not claim embedded latency, power, or scheduler behavior.
 
+### 11.4 Phase 41 acceptance
+
+Phase 41 acceptance is supported by the implementation, semantic and native
+fixtures, provider recovery tests, editor tooling coverage, strict example,
+adversarial regressions, and the recorded scale evidence. The resulting
+contract is bounded and provider-neutral: logical capacity is separate from
+resident memory, window movement is explicit, failures are typed, cleanup is
+deterministic, and hosted measurements are not presented as embedded hardware
+claims.
+
 ## 12. Non-goals
 
 This ADR does not define:
