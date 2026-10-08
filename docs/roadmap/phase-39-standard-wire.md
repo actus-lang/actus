@@ -138,7 +138,9 @@ authentication or authorization.
 - [x] Define cancellation and resource-exhaustion errors.
 - [x] Prove reassembly uses caller-owned storage without hidden allocation.
 
-Gate 39.6 implementation evidence is provided by `library/std/src/wire/fragment.act`.
+Gate 39.6 implementation evidence is provided by the public facade at
+`library/std/src/wire/fragment/fragment.act` and its codec and reassembly
+modules.
 The version-one metadata prefix is 17 bytes, carries a generation, and is
 validated before any storage write. Reassembly accepts at most 64 fragments
 into caller-provided storage capped at 4096 bytes, records each accepted byte
@@ -200,10 +202,67 @@ and formatting responses for the public CRC surface.
       evidence.
 - [x] Document encryption as a future profile behind an audited external crypto
       facade and explicit key/session contract.
-- [ ] Run the repository formatting, compilation, Clippy, test, source-limit,
+- [x] Run the repository formatting, compilation, Clippy, test, source-limit,
       and diff checks.
-- [ ] Close the phase only when every implementation gate has tests and
+- [x] Close the phase only when every implementation gate has tests and
       reproducible evidence.
+
+## Gate 39.10 — Generated serialization native dependency closure
+
+This gate is part of Phase 39 because the compiler integration changes used by
+the Wire object-emission checks must preserve the existing generated
+serialization contract. The failure is in compiler native lowering and object
+dependency discovery, not in the Wire protocol implementation.
+
+- [x] Reproduce the unresolved `frame_encode`, `frame_decode`,
+      `frame_migrate`, and `frame_validate` diagnostics in isolated fixtures.
+- [x] Trace each generated serialization verb from its source declaration
+      through semantic analysis, object planning, native lowering, and link
+      dependency collection.
+- [x] Make generated serialization verbs and their private helpers available
+      to native lowering through the canonical dependency graph, without
+      restoring unrelated unreachable Wire verb bodies.
+- [x] Preserve external runtime bridge declarations required by generated
+      serialization while retaining deterministic reachability for ordinary
+      Actus verbs.
+- [x] Add object and executable parity tests for generated encode, decode,
+      migration, and validation paths.
+- [x] Add negative tests for short input, invalid version, invalid checksum,
+      and migration rejection after the dependency fix.
+- [x] Prove the fix does not reintroduce unused `std::wire` symbols or hosted
+      runtime imports in the freestanding Wire object.
+- [x] Rerun the complete repository test suite and record the compiler,
+      target, command, and result in the Phase 39 evidence document.
+- [x] Mark Gate 39.9's repository-wide checks and Phase 39 completion only
+      after Gate 39.10 and every earlier gate are green.
+
+### Gate 39.10 evidence
+
+The failing generated serialization fixtures were reproduced with the native
+array CLI tests. The compiler was collecting native roots from the raw source
+program before generated serialization verbs were inserted by normalization.
+As a result, generated encode, decode, migration, and validation helpers were
+available to semantic checking but absent from the native dependency closure.
+
+`src/cli/build/emission.rs` now normalizes the root program before calling
+`reachable_call_names`. This includes compiler-generated serialization helpers
+in native lowering while preserving ordinary reachability pruning. The
+generated serialization object and executable tests now pass, including their
+negative input, version, checksum, and migration cases.
+
+The Wire implementation was also split into codec and reassembly modules under
+the canonical fragment facade. This keeps each implementation unit within the
+standard-library source limits without changing the public `std::wire` names or
+the bounded ownership contract. The local standard-library lock checksum was
+refreshed after this source change.
+
+Evidence is recorded in
+`docs/benchmarks/phase-39-wire-2026-10-08.md`. The full repository command was:
+
+```text
+CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/tmp/actus-wire-gate39-target \
+  cargo test --all-targets -- --test-threads=1
+```
 
 ## Definition of done
 
@@ -211,4 +270,6 @@ Phase 39 is complete when Actus provides a documented, bounded, deterministic
 `std::wire` codec that serializes and parses arbitrary application payloads,
 rejects malformed input safely, suppresses duplicate and stale frames, supports
 bounded fragmentation, and exposes no hidden operating-system or allocation
-dependency. Encryption and physical transports remain separate future work.
+dependency, while generated serialization contracts retain object and
+executable parity. Encryption and physical transports remain separate future
+work.
