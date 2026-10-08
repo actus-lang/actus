@@ -4,12 +4,11 @@ Phase 19 conditional-expression acceptance example.
 The final expressions in both branches are values. The compiler must type-check
 them together and lower the selected value through one native merge block.
 """
-
 verb main() -> Int {
     erg selected = if 1u32 < 2u32 {
-        41
+        41;
     } else {
-        7
+        7;
     };
     return selected;
 }

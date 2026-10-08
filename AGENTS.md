@@ -1,5 +1,7 @@
 # Actus Engineering Rules
 
+The human-facing language and compiler handbook is [docs/guide/README.md](docs/guide/README.md). Use the agent-reference section for the short operational workflow.
+
 This document defines the mandatory engineering rules for the Actus repository. These rules exist to keep the compiler modular, reviewable, testable, and predictable as the project grows.
 
 ## 1. Architectural Principles

@@ -6,19 +6,20 @@ captures an instant, constructs and converts a duration, checks a deadline,
 and observes a typed overflow failure.
 """
 import std::io;
+
 import std::time;
 
 verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration {
     return case dat candidate {
         Result.Ok(value) => value,
-        Result.Err(_) => Duration { nanos: 0u64, },
+        Result.Err(_) => Duration {nanos: 0u64},
     };
 }
 
 verb unwrap_deadline(erg candidate: Result[Deadline, TimeError]) -> Deadline {
     return case dat candidate {
         Result.Ok(value) => value,
-        Result.Err(_) => Deadline { expires_at: 0u64, },
+        Result.Err(_) => Deadline {expires_at: 0u64},
     };
 }
 
@@ -31,7 +32,7 @@ verb main() -> Int {
     erg deadline_result = deadline_after(start: abs started, duration: abs duration);
     erg deadline: Deadline = unwrap_deadline(candidate: erg deadline_result);
     erg expired_now: Bool = expired(deadline: abs deadline);
-    erg maximum: Instant = Instant { ticks: 18446744073709551615u64, };
+    erg maximum: Instant = Instant {ticks: 18446744073709551615u64};
     erg overflow_result = deadline_after(start: abs maximum, duration: abs duration);
     erg overflowed: Bool = case dat overflow_result {
         Result.Ok(_) => false,

@@ -15,24 +15,20 @@ verb consume(dat packet: Buffer) -> Int {
 
 verb main() -> Int {
     erg value = 40;
-
     {
         abs view = ref value;
         observe_scalar(view: view);
     }
-
     erg buffer: Buffer = Buffer[4];
     append(handle: buffer, byte: 7);
     {
         abs view = ref buffer;
         observe_buffer(view: view);
     }
-
     loop {
         value = value + 1;
         break;
     }
-
     rand();
     erg consumed = consume(packet: buffer);
     print(value: value + consumed);
