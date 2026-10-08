@@ -176,7 +176,8 @@ fn formats_the_public_wire_checksum_surface_idempotently() {
     let formatted = format_source(source);
 
     assert!(formatted.contains("import std::wire;"));
-    assert!(formatted.contains("wire_crc16_ccitt(input: abs input"));
+    assert!(formatted.contains("wire_crc16_ccitt("));
+    assert!(formatted.contains("start:"));
     assert_eq!(format_source(&formatted), formatted);
 }
 

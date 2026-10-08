@@ -173,7 +173,7 @@ authority and malformed bounded input with typed errors.
 - [x] Register `std::wire` as a target-neutral standard-library module.
 - [x] Verify hosted and freestanding resolution without host-only imports.
 - [x] Verify unused Wire modules are not compiled or linked unnecessarily.
-- [ ] Add formatter, semantic-model, hover, completion, and diagnostics
+- [x] Add formatter, semantic-model, hover, completion, and diagnostics
       evidence for public declarations.
 - [x] Add native object evidence for the bounded runtime surface.
 
@@ -184,6 +184,12 @@ Gate 39.8 compiler evidence is provided by the native reachability fixture in
 parser, sequence, fragmentation, codec, and endpoint verbs are absent from the
 native object set. This behavior is implemented in the compiler's native
 declaration reachability pass and does not depend on linker garbage collection.
+
+Editor integration evidence is provided by the standard formatter suite, the
+Wire-specific formatter idempotency test, the existing semantic-model public
+declaration tests, and `lsp_exposes_the_public_wire_surface_to_editor_clients`.
+The LSP fixture verifies clean diagnostics plus hover, completion, definition,
+and formatting responses for the public CRC surface.
 
 ## Gate 39.9 — Acceptance and future security boundary
 
