@@ -21,7 +21,7 @@ const REGION_WINDOW_COUNT_OFFSET: usize = 40;
 const REGION_GENERATION_OFFSET: usize = 48;
 const REGION_DIRTY_OFFSET: usize = 56;
 
-pub(super) static REGION_STORE: std::sync::Mutex<RegionStore> =
+pub(crate) static REGION_STORE: std::sync::Mutex<RegionStore> =
     std::sync::Mutex::new(RegionStore::new());
 
 pub(super) struct RegionStore {
@@ -75,7 +75,7 @@ impl RegionStore {
         Ok(descriptor)
     }
 
-    pub(super) fn get_mut(
+    pub(crate) fn get_mut(
         &mut self,
         handle: RegionHandle,
     ) -> Result<&mut InMemoryRegion, RegionError> {
@@ -136,6 +136,9 @@ impl RegionStore {
         if region.descriptor().generation != generation {
             return Err(RegionError::StaleGeneration);
         }
+        if region.descriptor().pinned != 0 {
+            return Err(RegionError::WindowBusy);
+        }
         self.slots[index].take().ok_or(RegionError::InvalidHandle)?;
         Ok(())
     }
@@ -169,7 +172,7 @@ fn allocate_result(size: usize, discriminant: u32) -> *mut u8 {
     result
 }
 
-pub(super) fn error_result(size: usize, error: RegionError) -> *mut u8 {
+pub(crate) fn error_result(size: usize, error: RegionError) -> *mut u8 {
     let result = allocate_result(size, RESULT_ERR);
     if !result.is_null() {
         write_u32(result, RESULT_INT_PAYLOAD_OFFSET, error_code(error));
@@ -192,7 +195,7 @@ fn error_code(error: RegionError) -> u32 {
     }
 }
 
-pub(super) fn validate_descriptor(
+pub(crate) fn validate_descriptor(
     region: *const u8,
 ) -> Result<&'static RegionDescriptor, RegionError> {
     if region.is_null() {
@@ -462,7 +465,7 @@ pub unsafe extern "C" fn actus_region_close(region: *mut u8) -> *mut u8 {
     }
 }
 
-fn result_int(value: i32) -> *mut u8 {
+pub(crate) fn result_int(value: i32) -> *mut u8 {
     let result = allocate_result(RESULT_INT_SIZE, RESULT_OK);
     if !result.is_null() {
         unsafe { ptr::write_unaligned(result.add(RESULT_INT_PAYLOAD_OFFSET).cast::<i32>(), value) };

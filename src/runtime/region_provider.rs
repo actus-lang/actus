@@ -9,6 +9,7 @@ pub struct RegionProviderRequest {
     pub window_start: u64,
     pub window_count: u64,
     pub byte_length: usize,
+    pub pinned: bool,
 }
 
 impl RegionProviderRequest {
@@ -44,6 +45,7 @@ pub enum RegionProviderError {
     Retryable,
     ReadOnly,
     Terminal,
+    Pinned,
 }
 
 impl From<RegionProviderError> for RegionError {
@@ -64,6 +66,7 @@ impl From<RegionProviderError> for RegionError {
             | RegionProviderError::ChecksumMismatch
             | RegionProviderError::ReadOnly
             | RegionProviderError::Terminal => RegionError::BackendFailure,
+            RegionProviderError::Pinned => RegionError::WindowBusy,
         }
     }
 }
@@ -222,6 +225,9 @@ impl RegionProvider for MemoryRegionProvider {
         destination: &mut [u8],
     ) -> Result<u64, RegionProviderError> {
         self.validate_buffer(request, destination.len())?;
+        if request.pinned {
+            return Err(RegionProviderError::Pinned);
+        }
         self.validate_accepted()?;
         destination.copy_from_slice(&self.accepted);
         Ok(destination.len() as u64)
@@ -286,6 +292,7 @@ mod tests {
             window_start: 0,
             window_count: 1,
             byte_length,
+            pinned: false,
         }
     }
 
@@ -381,6 +388,18 @@ mod tests {
         provider.load(request, &mut value).expect("read-only state remains readable");
         provider.enter_terminal();
         assert_eq!(provider.load(request, &mut value), Err(RegionProviderError::Terminal));
+    }
+
+    #[test]
+    fn pinned_load_and_recover_are_rejected_without_replacing_resident_bytes() {
+        let mut provider = MemoryRegionProvider::new(2).expect("provider should be bounded");
+        let request = RegionProviderRequest { pinned: true, ..request(2) };
+        let mut value = [9u8; 2];
+        assert_eq!(provider.load(request, &mut value), Err(RegionProviderError::Pinned));
+        assert_eq!(provider.recover(request, &mut value), Err(RegionProviderError::Pinned));
+        assert_eq!(value, [9, 9]);
+        let mapped: super::RegionError = RegionProviderError::Pinned.into();
+        assert_eq!(mapped, super::RegionError::WindowBusy);
     }
 
     #[test]

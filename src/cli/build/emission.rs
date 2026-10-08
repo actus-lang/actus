@@ -188,6 +188,9 @@ fn region_generic_types(
                     | "region_window_count"
                     | "region_generation"
                     | "region_dirty"
+                    | "region_pin"
+                    | "region_unpin"
+                    | "region_pinned"
             )
         })
         .flat_map(|instance| instance.arguments.iter().cloned())

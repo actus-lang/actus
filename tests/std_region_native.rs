@@ -351,6 +351,45 @@ fn hosted_std_region_rejects_out_of_window_read_without_trap() {
 }
 
 #[test]
+fn hosted_std_region_pinning_blocks_remap_until_unpinned() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-region-pinning-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-pinning-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_pinning_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg pinned = region_pin(region: ins region); return case dat pinned { Result.Err(_) => 2, Result.Ok(_) => { erg state = region_pinned(region: abs region); return case dat state { Result.Err(_) => 3, Result.Ok(value) => { if value != 1 { return 4; } erg replacement: Buffer = Buffer[4]; erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg window_start, window_count: erg window_count); return case dat remapped { Result.Ok(_) => 5, Result.Err(_) => { erg unpinned = region_unpin(region: ins region); return case dat unpinned { Result.Err(_) => 6, Result.Ok(_) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 7, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }, }; }",
+    )
+    .expect("fixture source should be written");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .output()
+        .expect("Actus pinning fixture should build");
+    assert!(
+        build.status.success(),
+        "pinning fixture build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let run = Command::new(&output).output().expect("pinning fixture should run");
+    assert!(run.status.success(), "pinning fixture returned {:?}", run.status);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn hosted_std_region_rejects_access_after_close_without_trap() {
     let root = std::env::temp_dir().join(format!("actus-std-region-closed-{}", std::process::id()));
     let source_root = root.join("src");

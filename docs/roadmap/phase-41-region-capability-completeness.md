@@ -63,9 +63,8 @@ The compatibility policy is versioned by the public Region descriptor and
 provider-result contract. Existing declarations remain source-compatible;
 descriptor or provider-result changes require an explicit version and typed
 compatibility failure. No silent descriptor conversion is allowed. Public
-operations remain `region_open`, `region_read`, `region_write`,
-`region_publish`, `region_cancel`, and `region_close` until a later gate adds
-new operations with their own contract and evidence.
+operations remain explicit and versioned; Gate 41.10 adds `region_pin`,
+`region_unpin`, and `region_pinned` with their own contract and evidence.
 
 The negative contract list is explicit: no implicit Array conversion, hidden
 allocation, implicit page fault, implicit filesystem or device I/O, raw pointer
@@ -124,7 +123,7 @@ descriptor pointer or provider-specific type was introduced.
 
 The compiler now provides `align_of[T]()` alongside `size_of[T]()` for fixed
 layout types. `region_open` derives both values and passes them through the
-private bridge. The runtime descriptor is version 2, 64 bytes, and stores the
+private bridge. The runtime descriptor is version 3, 64 bytes, and stores the
 validated element alignment at offset 16; bridge generation and dirty writes
 use the updated offsets at 48 and 56.
 
@@ -149,10 +148,11 @@ cargo test --test semantic_intrinsics --test std_region_semantic --test std_regi
 
 - [x] Define and implement explicit window inspection.
 - [x] Define and implement explicit window remap or replacement.
-- [x] Reject remap while a conflicting `ins` loan or dirty transaction is
-      active; persistent pinning is explicitly deferred to Gate 41.10.
+- [x] Reject remap while a conflicting `ins` loan, dirty transaction, or pin
+      is active.
 - [x] Define window replacement and admission results without implicit I/O;
-      provider-mediated load and eviction remain deferred to Gate 41.8.
+      provider-mediated load and eviction follow the Gate 41.8 provider
+      boundary.
 - [x] Preserve the previous valid generation when a transition fails.
 - [x] Test the initial window, forward movement, boundary rejection, dirty
       rejection, generation advancement, and invalid movement.
@@ -317,13 +317,51 @@ outside this gate.
 
 ## Gate 41.10 — Concurrency and pinning contract
 
-- [ ] Define the initial single-threaded guarantee explicitly.
-- [ ] Define immutable reader coexistence and exclusive writer rules.
-- [ ] Define pin and unpin behavior and eviction restrictions.
-- [ ] Reject remap, close, and publication that conflict with active loans.
-- [ ] Define unsupported concurrent operations as typed results.
-- [ ] Add deterministic state-machine tests for readers, writers, pins, and
+- [x] Define the initial single-threaded guarantee explicitly.
+- [x] Define immutable reader coexistence and exclusive writer rules.
+- [x] Define pin and unpin behavior and eviction restrictions.
+- [x] Reject remap and explicit close while a window is pinned; active loans
+      are rejected by the call-scoped `ins`/`abs` ownership contract.
+- [x] Define unsupported concurrent operations as typed `WindowBusy` results.
+- [x] Add deterministic state-machine tests for readers, writers, pins, and
       provider transitions.
+
+#### Gate 41.10 evidence
+
+The initial Region runtime is deliberately single-threaded at the semantic
+boundary. An `abs` operation is a call-scoped immutable view, while `ins` is a
+call-scoped exclusive mutable loan. Rust lifetime checks prevent a remap,
+publication, cancellation, or close from executing while either view remains
+live. Unsupported conflicting transitions are represented by typed
+`WindowBusy` results.
+
+The fixed 64-byte descriptor uses the previously unused byte at offset 59 for
+the `pinned` state and retains four reserved bytes. Pin and unpin preserve the
+generation and resident bytes. A pinned window may be published, but remap and
+explicit close are rejected until unpinned. Provider eviction must treat the
+same state as non-evictable. Repeated unpin is idempotent, and invalid pin
+states fail descriptor validation.
+
+Runtime tests cover loan lifetime exclusion, pin/remap/publication transitions,
+idempotent unpinning, descriptor layout, invalid pin state, and provider state
+transitions. Public facade tests cover the `region_pin`, `region_unpin`, and
+`region_pinned` operations. Multi-threaded execution and reader coexistence
+remain outside this initial contract and require a separately versioned design.
+
+Validation evidence:
+
+```text
+target/debug/actus lock --check
+target/debug/actus fmt --check library/std/src/region/api.act
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+```
+
+All commands passed. The full suite includes 11 native Region fixtures, 2
+public Region semantic tests, 9 provider tests, and the complete repository
+test matrix. Native Region fixtures also report zero floating-point IR.
 
 ## Gate 41.11 — Bulk and performance behavior
 

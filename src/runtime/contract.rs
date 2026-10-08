@@ -2,7 +2,7 @@
 pub const RUNTIME_ABI_VERSION: u32 = 1;
 
 /// Version of the fixed-width Region descriptor ABI.
-pub const REGION_DESCRIPTOR_ABI_VERSION: u32 = 2;
+pub const REGION_DESCRIPTOR_ABI_VERSION: u32 = 3;
 
 /// Successful scalar C-ABI operation status.
 pub const ABI_STATUS_SUCCESS: i32 = 0;
@@ -49,6 +49,12 @@ pub const REGION_WINDOW_COUNT_SYMBOL: &str = "actus_region_window_count";
 pub const REGION_GENERATION_SYMBOL: &str = "actus_region_generation";
 /// Stable runtime symbol for dirty-state inspection.
 pub const REGION_DIRTY_SYMBOL: &str = "actus_region_dirty";
+/// Stable runtime symbol for pinning a resident window against eviction.
+pub const REGION_PIN_SYMBOL: &str = "actus_region_pin";
+/// Stable runtime symbol for releasing a resident-window pin.
+pub const REGION_UNPIN_SYMBOL: &str = "actus_region_unpin";
+/// Stable runtime symbol for resident-window pin inspection.
+pub const REGION_PINNED_SYMBOL: &str = "actus_region_pinned";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.

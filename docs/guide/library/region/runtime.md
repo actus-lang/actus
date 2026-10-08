@@ -35,7 +35,8 @@ and failure behavior.
 ## Provider contract
 
 The runtime provider boundary uses a fixed `RegionProviderRequest` containing the
-capability handle, generation, resident window, and exact byte length. A
+capability handle, generation, resident window, exact byte length, and the
+current `pinned` state. A
 provider implements five explicit operations:
 
 - `load` copies the last accepted bytes into caller-owned resident storage;
@@ -55,6 +56,10 @@ provider. It owns one bounded accepted snapshot and one bounded staging buffer;
 each operation receives caller-owned buffers and performs no filesystem,
 device, or network I/O. Its deterministic failure injection is test-only
 evidence for preserving the accepted snapshot after a provider error.
+
+When `pinned` is true, `load` and `recover` return the typed `WindowBusy`
+condition and cannot replace resident bytes. Staging, flush, cancel, and
+integrity validation remain available because they do not evict the window.
 
 Provider instances and any provider queue remain outside the public `Region[T]`
 descriptor. The initial contract has no implicit asynchronous queue: queued work,

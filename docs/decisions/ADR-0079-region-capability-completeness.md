@@ -156,18 +156,21 @@ changing the Phase 38 public Region operations:
 - `RegionGeneration` is `u64` and starts at `1`; zero is never authorized.
 - `element_stride`, `element_alignment`, `logical_length`, `window_start`, and
   `window_count` are `u64` values.
-- `dirty`, `logical_index_bits`, and `byte_offset_bits` are `u8` values.
+- `dirty`, `logical_index_bits`, `byte_offset_bits`, and `pinned` are `u8`
+  values.
 - `element_alignment` must be non-zero, a power of two, and no greater than
   `element_stride`.
 - The runtime `repr(C)` descriptor is 64 bytes, aligned to 8 bytes, with a
-  descriptor ABI version of `2`. Its fixed field offsets are: handle `0`,
+  descriptor ABI version of `3`. Its fixed field offsets are: handle `0`,
   stride `8`, alignment `16`, logical length `24`, window start `32`, window
   count `40`, generation `48`, dirty `56`, logical-index width `57`, and
-  byte-offset width `58`.
+  byte-offset width `58`, and pinned `59`. Bytes `60` through `63` remain
+  reserved for future versioned extensions.
 
-The descriptor ABI version is checked at the runtime boundary. A version-1
-descriptor is not silently reinterpreted as version 2; mixed compiler/runtime
-artifacts must fail with the existing typed descriptor compatibility error.
+The descriptor ABI version is checked at the runtime boundary. A version-1 or
+version-2 descriptor is not silently reinterpreted as version 3; mixed
+compiler/runtime artifacts must fail with the existing typed descriptor
+compatibility error.
 
 The compiler exposes `size_of[T]()` and `align_of[T]()` as compile-time layout
 intrinsics. Region opening derives both values from the fully sized element
@@ -404,6 +407,20 @@ Required behavior includes:
 
 If concurrency is not implemented in the first release, the unsupported state
 must be a typed result and the roadmap must retain the later gate.
+
+The first release adopts the single-threaded semantic model. `abs` creates an
+immutable call-scoped view and `ins` creates an exclusive call-scoped mutable
+loan. Their lifetimes prevent remap, publication, cancellation, or close from
+running while the incompatible view remains live. `WindowBusy` represents
+unsupported or conflicting transitions at runtime.
+
+The 64-byte descriptor stores `pinned` at byte offset 59; bytes 60 through 63
+remain reserved. Pinning protects the resident window from provider eviction
+and remap without changing generation or bytes. Publication is allowed while
+pinned, while explicit close and remap return `WindowBusy` until unpin. The
+provider boundary must honor the same non-eviction rule. Multi-threaded reader
+coexistence and scheduler integration are deferred to a separately versioned
+contract rather than being implied by this initial model.
 
 ## 9. Failure and recovery contract
 

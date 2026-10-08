@@ -74,6 +74,15 @@ unsafe extern "C" verb actus_region_generation[T](abs region: Region[T]) -> Resu
 
 unsafe extern "C" verb actus_region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError];
 
+"""Private bridge that pins the resident window against remap and eviction."""
+unsafe extern "C" verb actus_region_pin[T](ins region: Region[T]) -> Result[Int, RegionError];
+
+"""Private bridge that releases a resident-window pin."""
+unsafe extern "C" verb actus_region_unpin[T](ins region: Region[T]) -> Result[Int, RegionError];
+
+"""Private bridge that reports whether the resident window is pinned."""
+unsafe extern "C" verb actus_region_pinned[T](abs region: Region[T]) -> Result[Int, RegionError];
+
 """
 Open a bounded logical region backed by caller-provided storage.
 
@@ -293,4 +302,41 @@ closed descriptors return a typed `RegionError` without changing the region.
 """
 open verb region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError] {
     return actus_region_dirty(region: abs region);
+}
+
+"""
+Pin the current resident window against remap and provider eviction.
+
+Pinning does not change the generation or perform I/O. Repeated pinning is
+idempotent. `region` is an exclusive call-scoped `ins` loan and resumes for
+the caller after the call. `Ok(0)` confirms the pin; `Err(RegionError)` reports
+an invalid, stale, closed, or backend-rejected descriptor. The caller must
+unpin before an explicit close or remap.
+"""
+open verb region_pin[T](ins region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_pin(region: ins region);
+}
+
+"""
+Release a resident-window pin without changing bytes or generation.
+
+`region` is an exclusive call-scoped `ins` loan and resumes for the caller
+after the call. Unpinning is idempotent and returns `Ok(0)`. `Err(RegionError)`
+reports an invalid, stale, closed, or backend-rejected descriptor. No bytes,
+generation, or provider storage are changed.
+"""
+open verb region_unpin[T](ins region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_unpin(region: ins region);
+}
+
+"""
+Return one when the resident window is protected from remap and eviction.
+
+The `abs` loan is read-only and resumes for the caller after the call. `Ok(1)`
+means the window is pinned and `Ok(0)` means it is unpinned. `Err(RegionError)`
+reports an invalid, stale, closed, or backend-rejected descriptor. The
+operation performs no allocation, I/O, or state mutation.
+"""
+open verb region_pinned[T](abs region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_pinned(region: abs region);
 }

@@ -286,7 +286,7 @@ fn descriptor_uses_fixed_width_c_layout() {
     assert_eq!(align_of::<RegionDescriptor>(), RegionDescriptor::abi_alignment());
     assert_eq!(RegionDescriptor::abi_size(), 64);
     assert_eq!(RegionDescriptor::abi_alignment(), 8);
-    assert_eq!(RegionDescriptor::abi_version(), 2);
+    assert_eq!(RegionDescriptor::abi_version(), 3);
     assert_eq!(offset_of!(RegionDescriptor, handle), 0);
     assert_eq!(offset_of!(RegionDescriptor, element_stride), 8);
     assert_eq!(offset_of!(RegionDescriptor, element_alignment), 16);
@@ -297,6 +297,32 @@ fn descriptor_uses_fixed_width_c_layout() {
     assert_eq!(offset_of!(RegionDescriptor, dirty), 56);
     assert_eq!(offset_of!(RegionDescriptor, logical_index_bits), 57);
     assert_eq!(offset_of!(RegionDescriptor, byte_offset_bits), 58);
+    assert_eq!(offset_of!(RegionDescriptor, pinned), 59);
+}
+
+#[test]
+fn pinning_blocks_remap_but_allows_publication_and_unpin_is_idempotent() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    region.pin(generation).expect("pin should succeed");
+    assert_eq!(region.descriptor().pinned, 1);
+    assert_eq!(region.remap(generation, vec![1, 2], 2, 1), Err(RegionError::WindowBusy));
+    let next = region.publish(generation).expect("publication should remain allowed while pinned");
+    region.unpin(next).expect("unpin should succeed");
+    region.unpin(next).expect("repeated unpin should be idempotent");
+    assert_eq!(region.descriptor().pinned, 0);
+    region.remap(next, vec![3, 4], 2, 1).expect("unpin should restore remap capability");
+}
+
+#[test]
+fn invalid_pin_state_fails_descriptor_validation() {
+    let valid = InMemoryRegion::new(7, 1, 1, 0, 1)
+        .expect("valid region should provide a descriptor")
+        .descriptor();
+    assert_eq!(
+        RegionDescriptor { pinned: 2, ..valid }.validate(),
+        Err(RegionError::InvalidDescriptor)
+    );
 }
 
 #[test]

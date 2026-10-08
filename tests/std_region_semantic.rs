@@ -26,6 +26,9 @@ fn region_facade_exports_checked_public_operations() {
     assert!(exports.contains("verb", "region_window_count"));
     assert!(exports.contains("verb", "region_generation"));
     assert!(exports.contains("verb", "region_dirty"));
+    assert!(exports.contains("verb", "region_pin"));
+    assert!(exports.contains("verb", "region_unpin"));
+    assert!(exports.contains("verb", "region_pinned"));
     assert!(exports.contains("enum", "RegionError"));
     analyze_module(&resolver, "region").expect("std region declarations should be valid");
 }

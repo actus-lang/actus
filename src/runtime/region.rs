@@ -81,6 +81,7 @@ pub struct RegionDescriptor {
     pub dirty: u8,
     pub logical_index_bits: u8,
     pub byte_offset_bits: u8,
+    pub pinned: u8,
 }
 
 impl RegionDescriptor {
@@ -93,6 +94,9 @@ impl RegionDescriptor {
             || self.logical_length == 0
             || self.generation == UNINITIALIZED_REGION_GENERATION
         {
+            return Err(RegionError::InvalidDescriptor);
+        }
+        if self.pinned > 1 {
             return Err(RegionError::InvalidDescriptor);
         }
         if self.logical_length - 1 > profile.maximum_index() {
@@ -211,6 +215,7 @@ impl InMemoryRegion {
             dirty: 0,
             logical_index_bits: profile.logical_index_bits,
             byte_offset_bits: profile.byte_offset_bits,
+            pinned: 0,
         };
         descriptor.validate()?;
         let storage_length =
@@ -247,6 +252,7 @@ impl InMemoryRegion {
             dirty: 0,
             logical_index_bits: 64,
             byte_offset_bits: 64,
+            pinned: 0,
         };
         descriptor.validate()?;
         Ok(Self { descriptor, published_storage: backing.clone(), storage: backing })
@@ -310,6 +316,20 @@ impl InMemoryRegion {
         Ok(())
     }
 
+    /// Pins the current resident window against remap and provider eviction.
+    pub fn pin(&mut self, generation: RegionGeneration) -> Result<(), RegionError> {
+        self.validate_access(self.descriptor.handle, generation)?;
+        self.descriptor.pinned = 1;
+        Ok(())
+    }
+
+    /// Releases the resident-window pin. Repeated unpin is idempotent.
+    pub fn unpin(&mut self, generation: RegionGeneration) -> Result<(), RegionError> {
+        self.validate_access(self.descriptor.handle, generation)?;
+        self.descriptor.pinned = 0;
+        Ok(())
+    }
+
     fn validate_publication_storage(&self) -> Result<(), RegionError> {
         let expected = self
             .descriptor
@@ -332,7 +352,7 @@ impl InMemoryRegion {
         window_count: u64,
     ) -> Result<RegionGeneration, RegionError> {
         self.validate_access(self.descriptor.handle, generation)?;
-        if self.descriptor.dirty != 0 {
+        if self.descriptor.dirty != 0 || self.descriptor.pinned != 0 {
             return Err(RegionError::WindowBusy);
         }
         let window_end =
