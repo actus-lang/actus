@@ -244,7 +244,7 @@ During migration:
 
 ### Gate 40.7: Compiler and project workflow
 
-- [ ] Document `Actus.toml`, `Actus.lock`, source roots, package settings,
+- [x] Document `Actus.toml`, `Actus.lock`, source roots, package settings,
       runtime profiles, target selection, and build profiles.
 - [ ] Document check, strict check, test, format, build, run, object, and
       executable workflows.
