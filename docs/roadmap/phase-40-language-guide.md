@@ -431,15 +431,30 @@ handbook in one change.
       domains and diagnostics.
 - [x] Expand roles and `perform` documentation with static dispatch, explicit
       dynamic boundaries, receiver roles, and ABI limitations.
-- [ ] Record unsupported or design-only behavior instead of presenting it as
+- [x] Record unsupported or design-only behavior instead of presenting it as
       available syntax.
 
 ### Gate 40.18: Core-language editorial validation
 
-- [ ] Verify all language-page links and code-fence languages.
-- [ ] Verify that examples use current Actus syntax and match focused tests.
-- [ ] Ensure the language index exposes every new subject page.
-- [ ] Record the completed audit and remaining limitations in this roadmap.
+- [x] Verify all language-page links and code-fence languages.
+- [x] Verify that examples use current Actus syntax and match focused tests.
+- [x] Ensure the language index exposes every new subject page.
+- [x] Record the completed audit and remaining limitations in this roadmap.
+
+#### Gate 40.18 audit record
+
+The language-page audit found no unresolved local Markdown links. The language
+index and root handbook index expose the new Arena page and the expanded
+struct, pack, constants, generics, and role pages. The examples were compared
+with the current semantic and native fixtures for those subjects. The focused
+runtime suites were not rerun during this documentation-only pass; the commit
+validation hook ran the repository documentation checks successfully.
+
+Remaining boundaries are documented in the subject pages: generic
+specialization is static and bounded, const generics currently use the tested
+positive `Usize` domain, packs require fixed validated storage, arenas are not
+general heaps or garbage collectors, and dynamic role dispatch is an explicit
+runtime boundary.
 
 ## Library handbook reorganization
 
