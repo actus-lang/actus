@@ -413,14 +413,14 @@ handbook in one change.
 
 ### Gate 40.16: Pack handbook depth pass
 
-- [ ] Expand the pack guide with backing storage, byte width, offsets,
+- [x] Expand the pack guide with backing storage, byte width, offsets,
       endianness, overlap and capacity validation, field access, and indexed
       pack arrays.
-- [ ] Explain which pack layouts are compile-time contracts and which values
+- [x] Explain which pack layouts are compile-time contracts and which values
       remain runtime data.
-- [ ] Document ownership roles on pack storage and fields without implying
+- [x] Document ownership roles on pack storage and fields without implying
       pointer casts or unchecked memory access.
-- [ ] Reconcile the guide with pack semantic tests, native pack examples, and
+- [x] Reconcile the guide with pack semantic tests, native pack examples, and
       the serialization reference.
 
 ### Gate 40.17: Constants, generics, roles, and dispatch pass
