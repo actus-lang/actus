@@ -1,0 +1,221 @@
+"""
+Optional hosted endpoint parsing for `std::wire`.
+
+This module recognizes the bounded `wire://authority[:port][/path]` address
+form without creating a String, allocating storage, or contacting a transport.
+The returned fixed-layout value contains offsets and lengths into the caller's
+unchanged byte buffer. The core frame codec does not depend on this module;
+embedded users may omit it and exchange frames through numeric identifiers.
+"""
+open const WIRE_ENDPOINT_SCHEME_BYTES: u32 = 7u32;
+
+
+open const WIRE_ENDPOINT_MAX_BYTES: u32 = 256u32;
+
+
+open const WIRE_ENDPOINT_MAX_AUTHORITY_BYTES: u32 = 128u32;
+
+
+open const WIRE_ENDPOINT_MAX_PATH_BYTES: u32 = 128u32;
+
+
+open const WIRE_ENDPOINT_DEFAULT_PORT: u32 = 0u32;
+
+
+"""Typed failures for bounded, transport-neutral endpoint parsing."""
+open enum WireEndpointError {
+    """The source exceeds the bounded endpoint representation."""
+    TooLong,
+    """The source does not begin with the exact `wire://` scheme."""
+    InvalidScheme,
+    """The authority component is absent or empty."""
+    MissingAuthority,
+    """The authority contains a forbidden or malformed byte."""
+    InvalidAuthority,
+    """The port separator is not followed by decimal digits."""
+    InvalidPort,
+    """The decimal port is outside the u16 transport range."""
+    PortOutOfRange,
+    """The path contains a forbidden control byte or exceeds its bound."""
+    InvalidPath,
+}
+
+"""
+Fixed-layout view of a parsed endpoint.
+
+Every field is owned erg scalar metadata. The view does not own or copy the
+source bytes; authority and path offsets remain valid only while the caller's
+abs input buffer remains available. No field requires cleanup or allocation.
+"""
+open pack WireEndpoint {
+    """Owned fixed metadata storage; it carries no source bytes or cleanup resource."""
+    erg storage: Array[u8, 32];
+    layout little;
+    fields {
+        """Owned erg source length used to validate endpoint views."""
+        erg source_length: u32 at 0;
+        """Owned erg authority start offset in the caller buffer."""
+        erg authority_offset: u32 at 32;
+        """Owned erg authority byte length."""
+        erg authority_length: u32 at 64;
+        """Owned erg decimal port, or zero when no port was supplied."""
+        erg port: u32 at 96;
+        """Owned erg flag: one when an explicit port was present."""
+        erg has_port: u32 at 128;
+        """Owned erg path start offset, or zero when no path was supplied."""
+        erg path_offset: u32 at 160;
+        """Owned erg path byte length."""
+        erg path_length: u32 at 192;
+        """Owned erg validity marker for metadata returned by the parser."""
+        erg valid: u32 at 224;
+    }
+}
+
+verb wire_endpoint_is_authority_byte(erg byte: u8) -> Bool {
+    return byte > 32u8 && byte != 47u8 && byte != 58u8 && byte != 63u8 && byte != 35u8;
+}
+
+verb wire_endpoint_is_path_byte(erg byte: u8) -> Bool {
+    return byte >= 32u8 && byte != 0u8;
+}
+
+verb wire_endpoint_check_scheme(abs input: Buffer) -> Bool {
+    return input[0] == 119u8 && input[1] == 105u8 && input[2] == 114u8 && input[3] == 101u8 && input[4] == 58u8 && input[5] == 47u8 && input[6] == 47u8;
+}
+
+verb wire_endpoint_find_boundary(abs input: Buffer, erg start: u32) -> u32 {
+    erg length: u32 = buffer_length(buffer: abs input) as u32;
+    for erg index: u32 in start .. WIRE_ENDPOINT_MAX_BYTES {
+        if index >= length || input[index] == 47u8 || input[index] == 58u8 {
+            return index;
+        }
+    }
+    return length;
+}
+
+verb wire_endpoint_validate_authority(
+    abs input: Buffer,
+    erg start: u32,
+    erg end: u32
+) -> Bool {
+    for erg index: u32 in start .. WIRE_ENDPOINT_MAX_AUTHORITY_BYTES {
+        if index >= end {
+            break;
+        }
+        erg byte: u8 = input[index];
+        if !wire_endpoint_is_authority_byte(byte: erg byte) {
+            return false;
+        }
+    }
+    return true;
+}
+
+verb wire_endpoint_parse_port(abs input: Buffer, erg start: u32, erg end: u32) -> Result[u32, WireEndpointError] {
+    if start >= end || end - start > 5u32 {
+        return Result[u32, WireEndpointError].Err(WireEndpointError.InvalidPort);
+    }
+    erg value: u32 = 0u32;
+    for erg index: u32 in start .. WIRE_ENDPOINT_MAX_BYTES {
+        if index >= end {
+            break;
+        }
+        erg byte: u8 = input[index];
+        if byte < 48u8 || byte > 57u8 {
+            return Result[u32, WireEndpointError].Err(WireEndpointError.InvalidPort);
+        }
+        value = value * 10u32 + (byte as u32) - 48u32;
+    }
+    if value == 0u32 || value > 65535u32 {
+        return Result[u32, WireEndpointError].Err(WireEndpointError.PortOutOfRange);
+    }
+    return Result[u32, WireEndpointError].Ok(value);
+}
+
+verb wire_endpoint_validate_path(abs input: Buffer, erg start: u32, erg end: u32) -> Bool {
+    if end - start > WIRE_ENDPOINT_MAX_PATH_BYTES {
+        return false;
+    }
+    for erg index: u32 in start .. WIRE_ENDPOINT_MAX_BYTES {
+        if index >= end {
+            break;
+        }
+        erg byte: u8 = input[index];
+        if !wire_endpoint_is_path_byte(byte: erg byte) {
+            return false;
+        }
+    }
+    return true;
+}
+
+"""
+Parse one optional `wire://authority[:port][/path]` endpoint.
+
+The `abs` input is borrowed and remains unchanged; the returned `WireEndpoint`
+contains scalar offsets into that input. The verb performs no allocation, I/O,
+or cleanup and returns a typed error for bounds, scheme, authority, port, or
+path violations. It does not select or open a transport.
+"""
+open verb wire_endpoint_parse(abs input: Buffer) -> Result[WireEndpoint, WireEndpointError] {
+    erg length: u32 = buffer_length(buffer: abs input) as u32;
+    if length > WIRE_ENDPOINT_MAX_BYTES {
+        return Result[WireEndpoint, WireEndpointError].Err(WireEndpointError.TooLong);
+    }
+    if length < WIRE_ENDPOINT_SCHEME_BYTES || !wire_endpoint_check_scheme(input: abs input) {
+        return Result[WireEndpoint, WireEndpointError].Err(WireEndpointError.InvalidScheme);
+    }
+    erg authority_start: u32 = WIRE_ENDPOINT_SCHEME_BYTES;
+    erg authority_end: u32 = wire_endpoint_find_boundary(input: abs input, start: erg authority_start);
+    if authority_end == authority_start {
+        return Result[WireEndpoint, WireEndpointError].Err(WireEndpointError.MissingAuthority);
+    }
+    if authority_end - authority_start > WIRE_ENDPOINT_MAX_AUTHORITY_BYTES || !wire_endpoint_validate_authority(
+        input: abs input,
+        start: erg authority_start,
+        end: erg authority_end
+    ) {
+        return Result[WireEndpoint, WireEndpointError].Err(WireEndpointError.InvalidAuthority);
+    }
+    erg endpoint = WireEndpoint {storage: Array[u8, 32]()};
+    endpoint.source_length = length;
+    endpoint.authority_offset = authority_start;
+    endpoint.authority_length = authority_end - authority_start;
+    endpoint.port = WIRE_ENDPOINT_DEFAULT_PORT;
+    endpoint.has_port = 0u32;
+    endpoint.path_offset = 0u32;
+    endpoint.path_length = 0u32;
+    endpoint.valid = 1u32;
+    if authority_end == length {
+        return Result[WireEndpoint, WireEndpointError].Ok(endpoint);
+    }
+    if input[authority_end] == 58u8 {
+        erg port_start: u32 = authority_end + 1u32;
+        erg path_start: u32 = wire_endpoint_find_boundary(input: abs input, start: erg port_start);
+        erg parsed_port = wire_endpoint_parse_port(
+            input: abs input,
+            start: erg port_start,
+            end: erg path_start
+        );
+        endpoint.port = case dat parsed_port {
+            Result.Err(error) => {
+                return Result[WireEndpoint, WireEndpointError].Err(error);
+            },
+            Result.Ok(value) => value,
+        };
+        endpoint.has_port = 1u32;
+        authority_end = path_start;
+    }
+    if input[authority_end] == 47u8 {
+        if !wire_endpoint_validate_path(
+            input: abs input,
+            start: erg authority_end,
+            end: erg length
+        ) {
+            return Result[WireEndpoint, WireEndpointError].Err(WireEndpointError.InvalidPath);
+        }
+        endpoint.path_offset = authority_end;
+        endpoint.path_length = length - authority_end;
+    } else if authority_end != length {
+        return Result[WireEndpoint, WireEndpointError].Err(WireEndpointError.InvalidAuthority);
+    }
+    return Result[WireEndpoint, WireEndpointError].Ok(endpoint);
+}

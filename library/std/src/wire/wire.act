@@ -26,3 +26,6 @@ open sequence;
 
 """Re-export bounded versioned fragmentation and caller-owned reassembly."""
 open fragment;
+
+"""Re-export the optional hosted endpoint parser without making it transport."""
+open endpoint;

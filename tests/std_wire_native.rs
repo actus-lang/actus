@@ -343,6 +343,72 @@ verb main() -> Int {
 }
 
 #[test]
+fn hosted_wire_endpoint_parser_is_optional_and_bounded() {
+    let root = std::env::temp_dir().join(format!("actus-wire-endpoint-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"wire_endpoint_native\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    copy_standard_library(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src"),
+        &root.join("src"),
+    );
+    fs::write(
+        root.join("src/main.act"),
+        r#"import std::wire;
+verb valid_status() -> Int {
+    erg input = Buffer[25];
+    input[0] = 119u8; input[1] = 105u8; input[2] = 114u8; input[3] = 101u8;
+    input[4] = 58u8; input[5] = 47u8; input[6] = 47u8;
+    input[7] = 114u8; input[8] = 111u8; input[9] = 98u8; input[10] = 111u8; input[11] = 116u8;
+    input[12] = 58u8; input[13] = 56u8; input[14] = 48u8; input[15] = 56u8; input[16] = 48u8;
+    input[17] = 47u8; input[18] = 99u8; input[19] = 111u8; input[20] = 110u8; input[21] = 116u8; input[22] = 114u8; input[23] = 111u8; input[24] = 108u8;
+    erg parsed = wire_endpoint_parse(input: abs input);
+    return case dat parsed {
+        Result.Err(error) => case dat error {
+            WireEndpointError.TooLong => 10,
+            WireEndpointError.InvalidScheme => 11,
+            WireEndpointError.MissingAuthority => 12,
+            WireEndpointError.InvalidAuthority => 13,
+            WireEndpointError.InvalidPort => 14,
+            WireEndpointError.PortOutOfRange => 15,
+            WireEndpointError.InvalidPath => 16,
+        },
+        Result.Ok(endpoint) => if endpoint.port == 8080u32 && endpoint.has_port == 1u32 && endpoint.path_length == 8u32 { 0 } else { 2 },
+    };
+}
+verb invalid_status() -> Int {
+    erg input = Buffer[7];
+    input[0] = 119u8; input[1] = 105u8; input[2] = 114u8; input[3] = 101u8;
+    input[4] = 58u8; input[5] = 47u8; input[6] = 47u8;
+    erg parsed = wire_endpoint_parse(input: abs input);
+    return case dat parsed { Result.Err(error) => case dat error { WireEndpointError.MissingAuthority => 0, _ => 1, }, Result.Ok(_) => 2, };
+}
+verb main() -> Int {
+    erg valid = valid_status();
+    erg invalid = invalid_status();
+    return valid;
+}
+"#,
+    )
+    .expect("source");
+    let output = root.join("wire-endpoint");
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let execution = Command::new(&output).output().expect("execute");
+    assert_eq!(execution.status.code(), Some(0));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn hosted_wire_parser_accepts_split_frame_chunks() {
     let root = std::env::temp_dir().join(format!("actus-wire-parser-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);

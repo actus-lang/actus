@@ -42,6 +42,9 @@ fn wire_facade_exports_frame_error_and_checksum_contracts() {
     assert!(exports.contains("verb", "wire_reassembly_begin"));
     assert!(exports.contains("verb", "wire_reassembly_accept"));
     assert!(exports.contains("verb", "wire_reassembly_cancel"));
+    assert!(exports.contains("pack", "WireEndpoint"));
+    assert!(exports.contains("enum", "WireEndpointError"));
+    assert!(exports.contains("verb", "wire_endpoint_parse"));
     assert!(exports.contains("const", "WIRE_MAX_PAYLOAD_BYTES"));
     analyze_module(&resolver, "wire").expect("std wire declarations should be valid");
 }

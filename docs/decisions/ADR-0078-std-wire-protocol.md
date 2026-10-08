@@ -171,6 +171,17 @@ channel/message identifiers and caller-owned buffers are preferred over URI
 strings. Endpoint parsing must not introduce filesystem, socket, or OS
 dependencies into the core codec.
 
+The bounded grammar is:
+
+```text
+wire://authority[:port][/path]
+```
+
+The authority is required and may contain up to 128 non-control bytes. The
+port is optional, decimal, and limited to `1..=65535`; the path is optional
+and limited to 128 non-control bytes. The parser returns offsets and lengths
+into the caller's byte buffer, so it does not construct or own a URI string.
+
 ### 9. Application schemas
 
 The universal core carries bounded bytes and generic message metadata. A

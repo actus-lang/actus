@@ -153,14 +153,20 @@ for two participants to exchange Wire frames, and the core library must remain
 usable on microcontrollers without URI strings. Direct typed APIs and physical
 transport adapters may use the core frame types without this endpoint module.
 
-- [ ] Define the grammar for `wire://` endpoint addresses.
-- [ ] Parse scheme, authority, port, and path without OS or transport calls.
-- [ ] Reject malformed, ambiguous, or over-sized addresses with typed errors.
-- [ ] Keep endpoint parsing separate from frame parsing and transport adapters;
+- [x] Define the grammar for `wire://` endpoint addresses.
+- [x] Parse scheme, authority, port, and path without OS or transport calls.
+- [x] Reject malformed, ambiguous, or over-sized addresses with typed errors.
+- [x] Keep endpoint parsing separate from frame parsing and transport adapters;
       the endpoint layer may depend on core Wire types, never the reverse.
-- [ ] Keep the endpoint layer optional for hosted desktop clients and absent
+- [x] Keep the endpoint layer optional for hosted desktop clients and absent
       from embedded builds that use numeric channels and caller-owned buffers.
-- [ ] Add formatter and documentation evidence for the endpoint API.
+- [x] Add formatter and documentation evidence for the endpoint API.
+
+Gate 39.7 evidence is provided by `library/std/src/wire/endpoint.act` and the
+hosted native fixture `hosted_wire_endpoint_parser_is_optional_and_bounded`.
+The parser uses a caller-owned byte buffer, returns fixed-layout offsets and
+lengths, performs no allocation or transport call, and rejects missing
+authority and malformed bounded input with typed errors.
 
 ## Gate 39.8 — Standard-library and compiler integration
 
