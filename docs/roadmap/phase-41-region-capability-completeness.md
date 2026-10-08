@@ -478,13 +478,28 @@ specific behavior remains selected by the configured provider profile.
 
 ## Gate 41.15 — Scale and evidence package
 
-- [ ] Run logical capacities from MiB through TiB with fixed resident windows.
-- [ ] Run multi-window remap workloads without hidden allocation or implicit I/O.
-- [ ] Record exact compiler revision, target, profile, commands, peak RSS,
+- [x] Run logical capacities from MiB through TiB with fixed resident windows.
+- [x] Run multi-window remap workloads without hidden allocation or implicit I/O.
+- [x] Record exact compiler revision, target, profile, commands, peak RSS,
       resident bytes, artifact sizes, timings, and failure boundaries.
-- [ ] Publish reproducible benchmark instructions and captured output.
-- [ ] Document supported limits and every intentional deferral.
-- [ ] Review the evidence independently against ADR-0079.
+- [x] Publish reproducible benchmark instructions and captured output.
+- [x] Document supported limits and every intentional deferral.
+- [x] Review the evidence independently against ADR-0079.
+
+#### Gate 41.15 evidence
+
+- `docs/benchmarks/phase-41-region-performance-2026-10-08.md` records the
+  current revision, hosted Linux x86-64 target, optimized profile, exact
+  commands, operation timings, MiB/GiB/TiB outputs, resident bytes, artifact
+  sizes, the 64 KiB failure boundary, and the existing RSS/object evidence.
+- The current rerun covers primitive `u8` and 64-byte packed elements with
+  one resident window at 1 MiB, 1 GiB, and 1 TiB logical capacities. All six
+  cases passed with constant executable size per element category.
+- Existing remap and range fixtures exercise multiple resident windows and
+  verify that the core performs no implicit provider or filesystem I/O.
+- The benchmark document records the supported bulk limit, explicit chunking
+  requirement, zero hidden queue capacity, and the distinction between
+  hosted observations and target-specific performance claims.
 
 ## Gate 41.16 — Final acceptance and release readiness
 

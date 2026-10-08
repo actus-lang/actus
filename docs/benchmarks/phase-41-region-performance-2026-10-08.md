@@ -23,8 +23,8 @@ cargo bench --bench region
 cargo test --test std_region_scale -- --nocapture --test-threads=1
 ```
 
-Compiler source revision for the operation benchmark: `6e605af`, with the
-Gate 41.11 working tree changes applied. Host profile: Linux x86-64, optimized
+Compiler source revision for the current rerun: `8bf487f` (`test(region):
+close adversarial regression gate`). Host profile: Linux x86-64, optimized
 Rust benchmark profile, hosted runtime. `ITERATIONS=10000`.
 
 ## Hosted operation costs
@@ -33,7 +33,7 @@ The benchmark reports average elapsed nanoseconds per operation over 10,000
 iterations on the local host:
 
 ```text
-REGION_OPS iterations=10000 avg_ns open=20 read=6 write=9 publish=13 cancel=12 remap=15 close=native_fixture
+REGION_OPS iterations=10000 avg_ns open=41 read=14 write=18 publish=25 cancel=17 remap=20 close=native_fixture
 ```
 
 `close` is covered by the hosted native lifecycle fixture because it operates
@@ -96,3 +96,22 @@ The RSS values are peak child-process values from the hosted Linux x86-64
 measurement process. Artifact sizes and symbol count describe this fixture;
 the logical-capacity scale result above remains the evidence for bounded
 specialization across 1 MiB, 1 GiB, and 1 TiB logical lengths.
+
+## Current scale rerun
+
+The current revision was rerun with the documented command and one resident
+window. The complete captured output was:
+
+```text
+REGION_SCALE element=Minicolumn logical_label=1MiB logical_bytes=1048576 resident_bytes=64 build_ms=70 executable_bytes=5810312 run_us=588 status=0
+REGION_SCALE element=Minicolumn logical_label=1GiB logical_bytes=1073741824 resident_bytes=64 build_ms=74 executable_bytes=5810312 run_us=668 status=0
+REGION_SCALE element=Minicolumn logical_label=1TiB logical_bytes=1099511627776 resident_bytes=64 build_ms=77 executable_bytes=5810312 run_us=811 status=0
+REGION_SCALE element=u8 logical_label=1MiB logical_bytes=1048576 resident_bytes=1 build_ms=77 executable_bytes=5810296 run_us=573 status=0
+REGION_SCALE element=u8 logical_label=1GiB logical_bytes=1073741824 resident_bytes=1 build_ms=74 executable_bytes=5810296 run_us=635 status=0
+REGION_SCALE element=u8 logical_label=1TiB logical_bytes=1099511627776 resident_bytes=1 build_ms=70 executable_bytes=5810296 run_us=569 status=0
+```
+
+All six cases passed. The tested failure boundary remains a single range
+payload above 64 KiB, which returns `BulkLimitExceeded` before copying. No
+case allocates the logical extent; resident bytes stay at one byte or one
+64-byte element, and executable size stays constant per element category.

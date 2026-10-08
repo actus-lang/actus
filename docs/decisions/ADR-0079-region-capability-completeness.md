@@ -517,6 +517,18 @@ indexes and requires identical result classes and resident bytes for identical
 inputs. Primitive, packed, array, struct, generic, aggregate-return, hosted,
 and freestanding lowering paths remain covered by the existing ABI fixtures.
 
+### 11.3 Gate 41.15 scale and evidence review
+
+The Phase 41 benchmark record captures a current Linux x86-64 hosted rerun at
+1 MiB, 1 GiB, and 1 TiB logical capacities for both one-byte and 64-byte
+packed elements, with one resident window in every case. It records the
+compiler revision, commands, profile, resident bytes, executable sizes,
+operation timings, the 64 KiB bulk failure boundary, and the previously
+captured compiler RSS and object evidence. Remap and range fixtures verify
+that moving among windows is explicit and that the Region core performs no
+implicit provider or filesystem I/O. These measurements are hosted evidence;
+they do not claim embedded latency, power, or scheduler behavior.
+
 ## 12. Non-goals
 
 This ADR does not define:
