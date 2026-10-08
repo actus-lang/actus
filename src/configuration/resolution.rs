@@ -63,8 +63,12 @@ pub(super) fn resolve_manifest_target(
         .unwrap_or_else(|| environment.target.clone());
     let linker_flavor = manifest.build.linker_flavor.unwrap_or(target.linker_flavor());
     let entry_contract = manifest.build.entry_contract.unwrap_or_else(|| target.entry_contract());
-    let linker = std::env::var_os(super::types::LINKER_ENVIRONMENT_VARIABLE)
-        .or_else(|| manifest.build.linker.as_deref().map(OsString::from))
+    let linker = manifest
+        .build
+        .linker
+        .as_deref()
+        .map(OsString::from)
+        .or_else(|| std::env::var_os(super::types::LINKER_ENVIRONMENT_VARIABLE))
         .unwrap_or_else(|| default_linker(&target));
     Ok((target, linker_flavor, entry_contract, linker))
 }
