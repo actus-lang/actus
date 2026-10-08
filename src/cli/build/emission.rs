@@ -191,7 +191,8 @@ fn reachable_module_roots(
     symbol: &str,
 ) -> Result<std::collections::HashSet<String>, NativeEmitError> {
     let root = &object_plan.units()[0];
-    let mut roots = crate::codegen::reachable_call_names(root.program(), symbol)?;
+    let normalized_root = crate::codegen::normalize_program(root.program());
+    let mut roots = crate::codegen::reachable_call_names(&normalized_root, symbol)?;
     let mut changed = true;
     while changed {
         changed = false;

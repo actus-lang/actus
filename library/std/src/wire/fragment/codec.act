@@ -1,0 +1,124 @@
+"""
+Bounded fragmentation metadata codec for `std::wire`.
+
+The codec handles only the fixed metadata prefix and payload copy. It uses
+caller-owned buffers, validates all bounds before writing, and performs no
+allocation or transport I/O.
+"""
+open const WIRE_FRAGMENT_VERSION: u8 = 1u8;
+open const WIRE_FRAGMENT_HEADER_BYTES: u32 = 17u32;
+open const WIRE_FRAGMENT_MAX_COUNT: u16 = 64u16;
+open const WIRE_FRAGMENT_MAX_PAYLOAD_BYTES: u32 = 1024u32;
+open const WIRE_REASSEMBLY_MAX_BYTES: u32 = 4096u32;
+
+"""Versioned fixed-layout metadata prefix carried in a frame payload."""
+open pack WireFragmentHeader {
+    """Fixed storage for the metadata prefix in wire byte order."""
+    erg storage: Array[u8, 17];
+    layout little;
+    fields {
+        """Owned erg version selected by the fragmentation format; it is scalar metadata without cleanup."""
+        erg version: u8 at 0;
+        """Owned erg position of this fragment in the message; it is scalar metadata without cleanup."""
+        erg fragment_index: u16 at 8;
+        """Owned erg total fragment count used for bounds checks; it is scalar metadata without cleanup."""
+        erg fragment_count: u16 at 24;
+        """Owned complete message length."""
+        erg total_length: u32 at 40;
+        """Owned fragment placement offset."""
+        erg offset: u32 at 72;
+        """Owned erg lifecycle generation used to reject stale fragments; it is scalar metadata without cleanup."""
+        erg generation: u32 at 104;
+    }
+}
+
+verb wire_fragment_header_valid(abs metadata: WireFragmentHeader, erg payload_length: u32) -> Result[Int, WireError] {
+    if metadata.version != WIRE_FRAGMENT_VERSION { return Result[Int, WireError].Err(WireError.FragmentUnsupportedVersion); }
+    if metadata.fragment_count == 0u16 || metadata.fragment_count > WIRE_FRAGMENT_MAX_COUNT { return Result[Int, WireError].Err(WireError.FragmentCountInvalid); }
+    if metadata.fragment_index >= metadata.fragment_count { return Result[Int, WireError].Err(WireError.FragmentIndexInvalid); }
+    if payload_length > WIRE_FRAGMENT_MAX_PAYLOAD_BYTES { return Result[Int, WireError].Err(WireError.FragmentTooLarge); }
+    if metadata.total_length == 0u32 || metadata.total_length > WIRE_REASSEMBLY_MAX_BYTES { return Result[Int, WireError].Err(WireError.FragmentRangeInvalid); }
+    if metadata.offset > metadata.total_length || payload_length > metadata.total_length - metadata.offset { return Result[Int, WireError].Err(WireError.FragmentRangeInvalid); }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_fragment_write_header(abs header: WireFragmentHeader, ins output: Buffer) -> Void {
+    output[0] = header.version;
+    output[1] = (header.fragment_index & 255u16) as u8;
+    output[2] = ((header.fragment_index >> 8u16) & 255u16) as u8;
+    output[3] = (header.fragment_count & 255u16) as u8;
+    output[4] = ((header.fragment_count >> 8u16) & 255u16) as u8;
+    output[5] = (header.total_length & 255u32) as u8;
+    output[6] = ((header.total_length >> 8u32) & 255u32) as u8;
+    output[7] = ((header.total_length >> 16u32) & 255u32) as u8;
+    output[8] = ((header.total_length >> 24u32) & 255u32) as u8;
+    output[9] = (header.offset & 255u32) as u8;
+    output[10] = ((header.offset >> 8u32) & 255u32) as u8;
+    output[11] = ((header.offset >> 16u32) & 255u32) as u8;
+    output[12] = ((header.offset >> 24u32) & 255u32) as u8;
+    output[13] = (header.generation & 255u32) as u8;
+    output[14] = ((header.generation >> 8u32) & 255u32) as u8;
+    output[15] = ((header.generation >> 16u32) & 255u32) as u8;
+    output[16] = ((header.generation >> 24u32) & 255u32) as u8;
+}
+
+verb wire_fragment_write_payload(abs payload: Buffer, ins output: Buffer) -> Void {
+    erg length: u32 = buffer_length(buffer: abs payload) as u32;
+    erg index: u32 = 0u32;
+    loop {
+        if index >= length { break; }
+        output[WIRE_FRAGMENT_HEADER_BYTES + index] = payload[index];
+        index += 1u32;
+    }
+}
+
+"""
+Encode validated fragment metadata and payload into caller-owned storage.
+
+The input buffers are borrowed, the output buffer is mutated in place, and the
+result is the encoded byte count. No allocation, I/O, or cleanup occurs.
+"""
+open verb wire_fragment_encode(abs header: WireFragmentHeader, abs payload: Buffer, ins output: Buffer) -> Result[u32, WireError] {
+    erg payload_length: u32 = buffer_length(buffer: abs payload) as u32;
+    erg valid = wire_fragment_header_valid(metadata: abs header, payload_length: erg payload_length);
+    case dat valid {
+        Result.Err(error) => { return Result[u32, WireError].Err(error); },
+        Result.Ok(_) => {},
+    };
+    erg required: u32 = WIRE_FRAGMENT_HEADER_BYTES + payload_length;
+    if (buffer_length(buffer: abs output) as u32) < required { return Result[u32, WireError].Err(WireError.InsufficientCapacity); }
+    wire_fragment_write_header(header: abs header, output: ins output);
+    wire_fragment_write_payload(payload: abs payload, output: ins output);
+    return Result[u32, WireError].Ok(required);
+}
+
+verb wire_fragment_read_header(abs input: Buffer) -> WireFragmentHeader {
+    erg header = WireFragmentHeader {storage: Array[u8, 17]()};
+    header.version = input[0];
+    header.fragment_index = (input[1] as u16) | ((input[2] as u16) << 8u16);
+    header.fragment_count = (input[3] as u16) | ((input[4] as u16) << 8u16);
+    header.total_length = (input[5] as u32) | ((input[6] as u32) << 8u32) | ((input[7] as u32) << 16u32) | ((input[8] as u32) << 24u32);
+    header.offset = (input[9] as u32) | ((input[10] as u32) << 8u32) | ((input[11] as u32) << 16u32) | ((input[12] as u32) << 24u32);
+    header.generation = (input[13] as u32) | ((input[14] as u32) << 8u32) | ((input[15] as u32) << 16u32) | ((input[16] as u32) << 24u32);
+    return header;
+}
+
+"""
+Decode and validate the fixed metadata prefix from a fragment payload.
+
+The `abs` input is borrowed and unchanged. The result returns the validated
+fixed-layout header; truncated, unsupported, out-of-range, and oversized
+inputs return typed errors. The operation performs no allocation, I/O, or
+cleanup.
+"""
+open verb wire_fragment_decode(abs input: Buffer) -> Result[WireFragmentHeader, WireError] {
+    if (buffer_length(buffer: abs input) as u32) < WIRE_FRAGMENT_HEADER_BYTES { return Result[WireFragmentHeader, WireError].Err(WireError.Truncated); }
+    erg header: WireFragmentHeader = wire_fragment_read_header(input: abs input);
+    erg payload_length: u32 = (buffer_length(buffer: abs input) as u32) - WIRE_FRAGMENT_HEADER_BYTES;
+    erg valid = wire_fragment_header_valid(metadata: abs header, payload_length: erg payload_length);
+    case dat valid {
+        Result.Err(error) => { return Result[WireFragmentHeader, WireError].Err(error); },
+        Result.Ok(_) => {},
+    };
+    return Result[WireFragmentHeader, WireError].Ok(header);
+}
