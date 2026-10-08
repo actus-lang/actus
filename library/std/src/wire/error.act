@@ -35,4 +35,26 @@ open enum WireError {
     SequenceJumpTooLarge,
     """The sequence belongs to a context that is not active in this window."""
     SequenceContextMismatch,
+    """The fragment metadata version is not supported."""
+    FragmentUnsupportedVersion,
+    """The fragment count is zero or exceeds the bounded reassembly limit."""
+    FragmentCountInvalid,
+    """The fragment index is outside the declared fragment set."""
+    FragmentIndexInvalid,
+    """The fragment offset and payload length exceed the message extent."""
+    FragmentRangeInvalid,
+    """The fragment payload is larger than the bounded fragment limit."""
+    FragmentTooLarge,
+    """The same fragment index was already accepted."""
+    FragmentDuplicate,
+    """The fragment range overlaps an accepted range."""
+    FragmentOverlap,
+    """The fragment generation does not match the active reassembly."""
+    FragmentStale,
+    """The reassembly storage cannot hold the declared message."""
+    ReassemblyCapacity,
+    """The reassembly operation is not active or is already complete."""
+    ReassemblyState,
+    """The caller requested a completed message before all fragments arrived."""
+    ReassemblyIncomplete,
 }

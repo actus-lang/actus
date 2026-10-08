@@ -510,6 +510,7 @@ verb accept_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequ
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, };
 }
+
 verb duplicate_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Err(error) => case dat error { WireError.SequenceDuplicate => 0, _ => 1, }, Result.Ok(_) => 2, };
@@ -576,6 +577,97 @@ verb main() -> Int {
     )
     .expect("source");
     let output = root.join("wire-sequence");
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let execution = Command::new(&output).output().expect("execute");
+    assert_eq!(
+        execution.status.code(),
+        Some(0),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&execution.stdout),
+        String::from_utf8_lossy(&execution.stderr)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn hosted_wire_fragment_reassembly_executes_bounded_lifecycle() {
+    let root = std::env::temp_dir().join(format!("actus-wire-fragment-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"wire_fragment_native\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    copy_standard_library(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src"),
+        &root.join("src"),
+    );
+    fs::write(
+        root.join("src/main.act"),
+        r#"import std::wire;
+verb make_fragment(ins output: Buffer, abs payload: Buffer, erg offset: u32, erg index: u16) -> Int {
+    erg header = WireFragmentHeader {storage: Array[u8, 17]()};
+    header.version = WIRE_FRAGMENT_VERSION;
+    header.fragment_index = index;
+    header.fragment_count = 2u16;
+    header.total_length = 6u32;
+    header.offset = offset;
+    header.generation = 9u32;
+    erg encoded = wire_fragment_encode(header: abs header, payload: abs payload, output: ins output);
+    return case dat encoded { Result.Ok(_) => 0, Result.Err(_) => 1, };
+}
+verb accept_first(ins reassembly: WireReassembly) -> Int {
+    erg first_payload = Buffer[3];
+    first_payload[0] = 65u8;
+    first_payload[1] = 66u8;
+    first_payload[2] = 67u8;
+    erg first = Buffer[20];
+    erg first_offset: u32 = 0u32;
+    erg first_index: u16 = 0u16;
+    if make_fragment(output: ins first, payload: abs first_payload, offset: erg first_offset, index: erg first_index) != 0 { return 2; }
+    erg accepted = wire_reassembly_accept(reassembly: ins reassembly, fragment: abs first);
+    if case dat accepted { Result.Ok(value) => value != 0, Result.Err(_) => true, } { return 3; }
+    erg duplicate = wire_reassembly_accept(reassembly: ins reassembly, fragment: abs first);
+    if case dat duplicate { Result.Err(error) => case dat error { WireError.FragmentDuplicate => false, _ => true, }, Result.Ok(_) => true, } { return 4; }
+    return 0;
+}
+verb complete_second(ins reassembly: WireReassembly) -> Int {
+    erg second_payload = Buffer[3];
+    second_payload[0] = 68u8;
+    second_payload[1] = 69u8;
+    second_payload[2] = 70u8;
+    erg second = Buffer[20];
+    erg second_offset: u32 = 3u32;
+    erg second_index: u16 = 1u16;
+    if make_fragment(output: ins second, payload: abs second_payload, offset: erg second_offset, index: erg second_index) != 0 { return 5; }
+    erg completed = wire_reassembly_accept(reassembly: ins reassembly, fragment: abs second);
+    if case dat completed { Result.Ok(_) => false, Result.Err(_) => true, } { return 6; }
+    erg output = Buffer[6];
+    erg copied = wire_reassembly_copy(reassembly: abs reassembly, output: ins output);
+    return case dat copied { Result.Ok(value) => if value == 6u32 && output[0] == 65u8 && output[5] == 70u8 { 0 } else { 7 }, Result.Err(_) => 8, };
+}
+verb main() -> Int {
+    erg storage = Buffer[6];
+    erg reassembly = wire_reassembly_open(storage: dat storage);
+    erg total_length: u32 = 6u32;
+    erg fragment_count: u16 = 2u16;
+    erg generation: u32 = 9u32;
+    erg started = wire_reassembly_begin(reassembly: ins reassembly, total_length: erg total_length, fragment_count: erg fragment_count, generation: erg generation);
+    if case dat started { Result.Ok(_) => false, Result.Err(_) => true, } { return 1; }
+    if accept_first(reassembly: ins reassembly) != 0 { return 2; }
+    return complete_second(reassembly: ins reassembly);
+}
+"#,
+    )
+    .expect("source");
+    let output = root.join("wire-fragment");
     let build = Command::new(compiler())
         .current_dir(&root)
         .args(["build", "--strict", "--emit", "exe", "-o"])

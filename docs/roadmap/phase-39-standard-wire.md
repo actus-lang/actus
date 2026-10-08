@@ -132,18 +132,34 @@ authentication or authorization.
 
 ## Gate 39.6 — Fragmentation and reassembly primitives
 
-- [ ] Define versioned fragmentation metadata outside the canonical header.
-- [ ] Bound fragment count, size, offsets, storage, and lifetime.
-- [ ] Reject duplicate, missing, overlapping, stale, and over-sized fragments.
-- [ ] Define cancellation and resource-exhaustion errors.
-- [ ] Prove reassembly uses caller-owned storage without hidden allocation.
+- [x] Define versioned fragmentation metadata outside the canonical header.
+- [x] Bound fragment count, size, offsets, storage, and lifetime.
+- [x] Reject duplicate, missing, overlapping, stale, and over-sized fragments.
+- [x] Define cancellation and resource-exhaustion errors.
+- [x] Prove reassembly uses caller-owned storage without hidden allocation.
 
-## Gate 39.7 — `wire://` endpoint contract
+Gate 39.6 implementation evidence is provided by `library/std/src/wire/fragment.act`.
+The version-one metadata prefix is 17 bytes, carries a generation, and is
+validated before any storage write. Reassembly accepts at most 64 fragments
+into caller-provided storage capped at 4096 bytes, records each accepted byte
+range, and rejects duplicates, overlap, stale generations, inconsistent
+message extents, and insufficient capacity. Completion and cancellation are
+explicit lifecycle states; the implementation performs no allocation or I/O.
+
+## Gate 39.7 — Optional hosted `wire://` endpoint contract
+
+`wire://` is an optional desktop-facing addressing layer. It is not required
+for two participants to exchange Wire frames, and the core library must remain
+usable on microcontrollers without URI strings. Direct typed APIs and physical
+transport adapters may use the core frame types without this endpoint module.
 
 - [ ] Define the grammar for `wire://` endpoint addresses.
 - [ ] Parse scheme, authority, port, and path without OS or transport calls.
 - [ ] Reject malformed, ambiguous, or over-sized addresses with typed errors.
-- [ ] Keep endpoint parsing separate from frame parsing and transport adapters.
+- [ ] Keep endpoint parsing separate from frame parsing and transport adapters;
+      the endpoint layer may depend on core Wire types, never the reverse.
+- [ ] Keep the endpoint layer optional for hosted desktop clients and absent
+      from embedded builds that use numeric channels and caller-owned buffers.
 - [ ] Add formatter and documentation evidence for the endpoint API.
 
 ## Gate 39.8 — Standard-library and compiler integration

@@ -156,11 +156,20 @@ timeouts, duplicates, cancellation, and resource exhaustion.
 
 ### 8. `wire://` addressing
 
-`wire://` is an endpoint-addressing convention, not a replacement for the
-binary frame codec. A future endpoint module may parse addresses such as
-`wire://localhost/control`, while transport adapters decide how to connect.
-Address parsing must not introduce filesystem, socket, or OS dependencies into
-the core codec.
+`wire://` is an optional endpoint-addressing convention, not a prerequisite
+for Wire communication. A sender and receiver may exchange `std::wire` frames
+directly through an adapter or a typed API without constructing or parsing a
+URI. The frame codec, parser, sequence window, and fragmentation primitives
+must never depend on endpoint strings.
+
+An optional hosted endpoint module may parse addresses such as
+`wire://localhost/control` and map them to a desktop transport or monitoring
+application. This module is intended for desktop coordination centers,
+robot-control applications, and visualization clients. It remains outside the
+target-neutral core and is not required on microcontrollers, where numeric
+channel/message identifiers and caller-owned buffers are preferred over URI
+strings. Endpoint parsing must not introduce filesystem, socket, or OS
+dependencies into the core codec.
 
 ### 9. Application schemas
 
@@ -199,11 +208,30 @@ must remain responsibility-oriented and below the Actus source-size limits.
 8. Transport adapters cannot alter canonical frame semantics.
 9. Application schemas cannot redefine reserved frame fields.
 10. Hardware safety behavior is outside the communication library.
+11. Core Wire communication does not require `wire://` addressing.
+12. Any `wire://` parser depends on the core codec, never the reverse.
+
+### Fragmentation profile
+
+Version-one fragmentation is represented by a 17-byte payload prefix outside
+the canonical 12-byte frame header. It contains a metadata version, fragment
+index and count, total message length, byte offset, and lifecycle generation.
+The implementation accepts at most 64 fragments, 1024 payload bytes per
+fragment, and 4096 bytes per reassembled message. A caller supplies the
+reassembly buffer; the library stores no hidden heap state.
+
+An active generation rejects stale metadata. An already accepted fragment
+index is rejected as a duplicate, and every new byte range is checked against
+all accepted ranges before copying. Missing fragments keep the reassembly
+incomplete, while cancellation explicitly returns the state to idle. Capacity,
+range, count, overlap, duplicate, stale, and incomplete conditions have typed
+errors. These primitives do not define transport retry, timeout, or encryption.
 
 ## Non-goals
 
 - no cryptographic primitive implementation in Actus;
 - no operating-system socket or filesystem implementation in `std::wire`;
+- no mandatory URI or string representation for embedded Wire communication;
 - no transport-specific retry or MTU policy in the core;
 - no application-specific command registry;
 - no guarantee of real-time delivery or physical emergency-stop behavior;

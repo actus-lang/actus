@@ -23,3 +23,6 @@ open parser;
 
 """Re-export bounded sequence-window replay suppression."""
 open sequence;
+
+"""Re-export bounded versioned fragmentation and caller-owned reassembly."""
+open fragment;
