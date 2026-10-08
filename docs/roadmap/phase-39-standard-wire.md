@@ -20,15 +20,28 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 
 ## Gate 39.0 — Contract and migration baseline
 
-- [ ] Mark the former Ustari split as superseded by ADR-0078.
-- [ ] Confirm `std::wire` as the only public protocol namespace.
-- [ ] Confirm the 12-byte header, byte order, payload bound, frame bound, and
+- [x] Mark the former Ustari split as superseded by ADR-0078.
+- [x] Confirm `std::wire` as the only public protocol namespace.
+- [x] Confirm the 12-byte header, byte order, payload bound, frame bound, and
       CRC16-CCITT parameters.
-- [ ] Define version 1 flags and reject unknown bits.
-- [ ] Define generic channels and message metadata without application schemas.
-- [ ] Define `erg`, `abs`, `dat`, and `ins` ownership for every public API.
-- [ ] Define the typed error taxonomy and failure behavior.
-- [ ] Record the compiler and standard-library profile used as evidence.
+- [x] Define version 1 flags and reject unknown bits.
+- [x] Define generic channels and message metadata without application schemas.
+- [x] Define `erg`, `abs`, `dat`, and `ins` ownership for every public API.
+- [x] Define the typed error taxonomy and failure behavior.
+- [x] Record the compiler and standard-library profile used as evidence.
+
+### Gate 39.0 evidence
+
+- ADR: [ADR-0078](../decisions/ADR-0078-std-wire-protocol.md) supersedes the
+  former `std::ustari` split and defines the target-neutral contract.
+- Public namespace evidence: `library/std/src/lib.act` exports only `wire` for
+  this protocol; the active standard-library manifest registers only `wire`.
+- Compiler profile: hosted and freestanding standard-library resolution was
+  validated with the installed Actus executable at
+  `/home/magradze/.cargo/bin/actus`.
+- Compiler artifact digest: `14181544766f3b8af67bc48b73170a339ff857cadcb2a1ff9c75bc6732d7fdb2`.
+- The installed compiler does not expose a version flag; the executable digest
+  is recorded so this evidence remains reproducible for this checkout.
 
 ## Gate 39.1 — Canonical module and public facade
 

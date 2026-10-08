@@ -70,7 +70,13 @@ payloads:
 
 Unknown flag bits are rejected with a typed error. Initial generic channels
 are control, telemetry, and application data. Their numeric values are part of
-the versioned contract; application-specific schemas must not redefine them.
+the versioned contract:
+
+- `WIRE_CHANNEL_CONTROL = 0x00`;
+- `WIRE_CHANNEL_TELEMETRY = 0x01`;
+- `WIRE_CHANNEL_APPLICATION = 0x02`.
+
+Application-specific schemas must not redefine these channel identifiers.
 
 The initial implementation does not provide encryption. CRC detects accidental
 corruption only and is never treated as authentication or authorization.
