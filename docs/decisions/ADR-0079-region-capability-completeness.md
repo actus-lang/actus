@@ -145,6 +145,32 @@ small aggregate or multi-register ABI. It must not expose a runtime pointer.
 The public type must remain opaque to callers while preserving stable generic
 identity through nested calls, returns, facade imports, and cleanup lowering.
 
+### 4.1 Current Gate 41.2 identity profile
+
+The current compatible descriptor profile fixes the following widths without
+changing the Phase 38 public Region operations:
+
+- `RegionHandle` is `u64`.
+- The low 32 bits encode a one-based capability slot index.
+- The high 32 bits encode the slot generation.
+- `RegionGeneration` is `u64` and starts at `1`; zero is never authorized.
+- `element_stride`, `logical_length`, `window_start`, and `window_count` are
+  `u64` values.
+- `dirty`, `logical_index_bits`, and `byte_offset_bits` are `u8` values.
+- The runtime `repr(C)` descriptor is 56 bytes, aligned to 8 bytes, with a
+  descriptor ABI version of `1`.
+
+Capability allocation increments the slot generation before returning a
+handle. Releasing a slot never resets that generation. Reusing the slot
+therefore produces a different handle, and the old handle is rejected even
+when its numeric slot index is reused. Generation exhaustion is a typed
+failure; it is never allowed to wrap to an earlier identity.
+
+The canonical handle encoder and decoder are shared by the capability table
+and hosted Region bridge. The public descriptor contains only fixed-width
+integers; pointers used internally by the hosted bridge remain outside the
+Actus value and outside the public facade.
+
 ## 5. Required operation families
 
 The final Region library must define and document operation families equivalent

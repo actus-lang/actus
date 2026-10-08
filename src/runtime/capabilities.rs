@@ -6,6 +6,12 @@ pub const REGION_CAPABILITY_CAPACITY: usize = 1024;
 const SLOT_BITS: u32 = 32;
 const SLOT_MASK: u64 = u32::MAX as u64;
 
+/// Number of bits reserved for the capability slot identity.
+pub const REGION_HANDLE_SLOT_BITS: u32 = SLOT_BITS;
+
+/// Number of bits reserved for the monotonic slot generation.
+pub const REGION_HANDLE_GENERATION_BITS: u32 = SLOT_BITS;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct CapabilitySlot {
     generation: u32,
@@ -38,14 +44,14 @@ impl<const CAPACITY: usize> RegionCapabilityTable<CAPACITY> {
                 slot.generation.checked_add(1).ok_or(RegionError::CapabilityGenerationExhausted)?;
             slot.generation = generation;
             slot.active = true;
-            return Ok(encode_handle(index, generation));
+            return Ok(encode_region_handle(index, generation));
         }
         Err(RegionError::CapabilityExhausted)
     }
 
     /// Releases a live slot and rejects stale or repeated handles.
     pub fn release(&mut self, handle: RegionHandle) -> Result<(), RegionError> {
-        let (index, generation) = decode_handle(handle)?;
+        let (index, generation) = decode_region_handle(handle)?;
         let slot = self.slots.get_mut(index).ok_or(RegionError::InvalidHandle)?;
         if !slot.active || slot.generation != generation {
             return Err(RegionError::InvalidHandle);
@@ -56,7 +62,7 @@ impl<const CAPACITY: usize> RegionCapabilityTable<CAPACITY> {
 
     /// Reports whether a handle currently names an active slot.
     pub fn contains(&self, handle: RegionHandle) -> bool {
-        decode_handle(handle)
+        decode_region_handle(handle)
             .ok()
             .and_then(|(index, generation)| self.slots.get(index).map(|slot| (slot, generation)))
             .is_some_and(|(slot, generation)| slot.active && slot.generation == generation)
@@ -69,11 +75,13 @@ impl<const CAPACITY: usize> Default for RegionCapabilityTable<CAPACITY> {
     }
 }
 
-fn encode_handle(index: usize, generation: u32) -> RegionHandle {
+/// Encodes a slot index and slot generation into the target-agnostic handle.
+pub(crate) fn encode_region_handle(index: usize, generation: u32) -> RegionHandle {
     (u64::from(generation) << SLOT_BITS) | (index as u64 + 1)
 }
 
-fn decode_handle(handle: RegionHandle) -> Result<(usize, u32), RegionError> {
+/// Decodes a target-agnostic handle without consulting provider state.
+pub(crate) fn decode_region_handle(handle: RegionHandle) -> Result<(usize, u32), RegionError> {
     if handle == 0 {
         return Err(RegionError::InvalidHandle);
     }
@@ -115,6 +123,25 @@ mod tests {
         let mut table = RegionCapabilityTable::<1>::new();
         table.slots[0].generation = u32::MAX;
         assert_eq!(table.allocate(), Err(RegionError::CapabilityGenerationExhausted));
+    }
+
+    #[test]
+    fn capability_reuse_gets_a_new_handle_generation() {
+        let mut table = RegionCapabilityTable::<1>::new();
+        let first = table.allocate().expect("first capability should allocate");
+        table.release(first).expect("first capability should release");
+        let second = table.allocate().expect("released slot should be reusable");
+        assert_ne!(first, second);
+        assert!(!table.contains(first));
+        assert!(table.contains(second));
+        assert_eq!(table.release(first), Err(RegionError::InvalidHandle));
+    }
+
+    #[test]
+    fn handle_encoding_preserves_slot_and_generation_identity() {
+        let handle = super::encode_region_handle(7, 42);
+        assert_eq!(super::decode_region_handle(handle), Ok((7, 42)));
+        assert_eq!(super::decode_region_handle(0), Err(RegionError::InvalidHandle));
     }
 
     #[test]

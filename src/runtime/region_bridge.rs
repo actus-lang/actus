@@ -3,6 +3,7 @@
 use std::ptr;
 
 use super::allocation::take_buffer;
+use super::capabilities::decode_region_handle;
 use super::region::{InMemoryRegion, RegionDescriptor, RegionError, RegionHandle};
 use super::types::ActusBuffer;
 use super::{actus_enum_allocate, actus_enum_drop};
@@ -54,7 +55,7 @@ impl RegionStore {
         let generation = self.generations[index]
             .checked_add(1)
             .ok_or(RegionError::CapabilityGenerationExhausted)?;
-        let handle = ((u64::from(generation)) << 32) | (index as u64 + 1);
+        let handle = super::capabilities::encode_region_handle(index, generation);
         let region = InMemoryRegion::from_backing(
             handle,
             backing,
@@ -121,12 +122,7 @@ fn decode_store_handle(handle: RegionHandle) -> Result<usize, RegionError> {
     if handle == 0 {
         return Err(RegionError::InvalidHandle);
     }
-    let raw_index = (handle & u32::MAX as u64) as usize;
-    let generation = handle >> 32;
-    if raw_index == 0 || generation == 0 {
-        return Err(RegionError::InvalidHandle);
-    }
-    let index = raw_index - 1;
+    let (index, _) = decode_region_handle(handle)?;
     if index >= super::capabilities::REGION_CAPABILITY_CAPACITY {
         return Err(RegionError::InvalidHandle);
     }

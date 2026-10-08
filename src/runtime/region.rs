@@ -116,6 +116,11 @@ impl RegionDescriptor {
         std::mem::align_of::<Self>()
     }
 
+    /// Returns the version of the fixed-width descriptor contract.
+    pub const fn abi_version() -> u32 {
+        super::contract::REGION_DESCRIPTOR_ABI_VERSION
+    }
+
     fn contains(&self, index: u64) -> bool {
         index >= self.window_start
             && self
@@ -340,7 +345,7 @@ impl MutableRegionView<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::mem::{align_of, size_of};
+    use std::mem::{align_of, offset_of, size_of};
 
     use super::{InMemoryRegion, RegionAddressProfile, RegionDescriptor, RegionError};
 
@@ -455,6 +460,16 @@ mod tests {
         assert_eq!(align_of::<RegionDescriptor>(), RegionDescriptor::abi_alignment());
         assert_eq!(RegionDescriptor::abi_size(), 56);
         assert_eq!(RegionDescriptor::abi_alignment(), 8);
+        assert_eq!(RegionDescriptor::abi_version(), 1);
+        assert_eq!(offset_of!(RegionDescriptor, handle), 0);
+        assert_eq!(offset_of!(RegionDescriptor, element_stride), 8);
+        assert_eq!(offset_of!(RegionDescriptor, logical_length), 16);
+        assert_eq!(offset_of!(RegionDescriptor, window_start), 24);
+        assert_eq!(offset_of!(RegionDescriptor, window_count), 32);
+        assert_eq!(offset_of!(RegionDescriptor, generation), 40);
+        assert_eq!(offset_of!(RegionDescriptor, dirty), 48);
+        assert_eq!(offset_of!(RegionDescriptor, logical_index_bits), 49);
+        assert_eq!(offset_of!(RegionDescriptor, byte_offset_bits), 50);
     }
 
     #[test]

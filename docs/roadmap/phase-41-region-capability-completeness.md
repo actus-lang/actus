@@ -73,13 +73,39 @@ remap, or provider-specific type in the public facade.
 
 ## Gate 41.2 — Descriptor representation and capability identity
 
-- [ ] Define the target-agnostic public descriptor fields and their widths.
-- [ ] Define capability-slot allocation, reuse, and exhaustion behavior.
-- [ ] Add a monotonic generation counter that cannot silently wrap.
-- [ ] Reject invalid, stale, closed, and reused capabilities before data access.
-- [ ] Prove that public descriptors contain no raw OS or provider pointers.
-- [ ] Specify pass-by-value, pass-by-reference, and return ABI behavior.
-- [ ] Add direct and nested generic descriptor identity tests.
+- [x] Define the target-agnostic public descriptor fields and their widths.
+- [x] Define capability-slot allocation, reuse, and exhaustion behavior.
+- [x] Add a monotonic generation counter that cannot silently wrap.
+- [x] Reject invalid, stale, closed, and reused capabilities before data access.
+- [x] Prove that public descriptors contain no raw OS or provider pointers.
+- [x] Specify pass-by-value, pass-by-reference, and return ABI behavior.
+- [x] Add direct and nested generic descriptor identity tests.
+
+#### Gate 41.2 evidence
+
+The identity profile is defined in ADR-0079 section 4.1. The implementation
+uses one shared handle encoder and decoder in `src/runtime/capabilities.rs`
+and `src/runtime/region_bridge.rs`; the hosted bridge no longer maintains a
+second handle encoding formula.
+
+The descriptor is `repr(C)`, 56 bytes, aligned to 8 bytes, and contains only
+fixed-width integer fields. The ABI version is `1`. Capability slot reuse
+increments the upper 32-bit generation and rejects the old handle. Slot
+capacity and generation wraparound return typed failures.
+
+Evidence commands:
+
+```text
+cargo fmt --all -- --check
+cargo test --lib runtime::capabilities -- --test-threads=1
+cargo test --lib runtime::region -- --test-threads=1
+cargo test --test std_region_semantic --test std_region_native -- --test-threads=1
+```
+
+Evidence result: formatter passed; 6 capability tests passed; 11 runtime
+Region and cleanup tests passed; 2 semantic facade tests and 7 native ABI,
+freestanding, lifecycle, and zero-floating-point tests passed. No public
+descriptor pointer or provider-specific type was introduced.
 
 ## Gate 41.3 — Element layout, stride, alignment, and overflow
 
