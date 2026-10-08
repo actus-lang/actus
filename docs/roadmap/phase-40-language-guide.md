@@ -230,7 +230,7 @@ During migration:
 
 ### Gate 40.6: Standard-library handbook
 
-- [ ] Create a standard-library overview and runtime-profile guide.
+- [x] Create a standard-library overview and runtime-profile guide.
 - [ ] Document each supported public standard-library category separately.
 - [ ] Cover IO, filesystem, paths, strings and UTF-8, time, regions, Wire, and
       typed errors/results.
