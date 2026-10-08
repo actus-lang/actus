@@ -186,7 +186,7 @@ During migration:
 
 ### Gate 40.2: Handbook information architecture
 
-- [ ] Create `docs/guide/README.md` as the handbook entry point.
+- [x] Create `docs/guide/README.md` as the handbook entry point.
 - [ ] Create the category directories.
 - [ ] Define the reading paths for beginners, experienced Actus developers, and
       coding agents.
