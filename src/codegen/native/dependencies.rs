@@ -44,10 +44,30 @@ pub(super) fn reachable_declarations_with_roots<'a>(
     let selected_verbs =
         verbs.iter().copied().filter(|verb| visited.contains(verb.name.as_str())).collect();
     // External bridges describe symbols supplied by another native object or
-    // the runtime. Keep the complete declaration set available to lowering;
-    // unlike Actus verbs, these declarations do not emit function bodies.
-    let selected_external = external_verbs.to_vec();
+    // the runtime. Keep only bridges reached by selected Actus verbs so an
+    // unused imported module cannot add linker-visible declarations.
+    let selected_external = external_verbs
+        .iter()
+        .copied()
+        .filter(|verb| visited.contains(verb.name.as_str()))
+        .collect();
     Ok((selected_verbs, selected_external))
+}
+
+pub(super) fn reachable_call_names(
+    verbs: &[&VerbDecl],
+    external_verbs: &[&ExternalVerbDecl],
+    symbol: Option<&str>,
+) -> Result<HashSet<String>, NativeEmitError> {
+    let (selected_verbs, _) =
+        reachable_declarations_with_roots(verbs, external_verbs, symbol, None)?;
+    let mut names = HashSet::new();
+    for verb in selected_verbs {
+        let mut calls = Vec::new();
+        collect_block_calls(&verb.body, &mut calls);
+        names.extend(calls.into_iter().map(|call| call.name));
+    }
+    Ok(names)
 }
 
 struct NativeCall {

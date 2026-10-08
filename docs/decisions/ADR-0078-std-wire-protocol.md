@@ -200,6 +200,7 @@ library/std/src/wire/checksum.act      # CRC16-CCITT
 library/std/src/wire/sequence.act      # bounded sequence window
 library/std/src/wire/fragment.act      # bounded reassembly
 library/std/src/wire/error.act         # typed errors
+library/std/src/wire/endpoint.act      # optional hosted endpoint parser
 ```
 
 Every public declaration must be exported through the canonical facade. Files
@@ -221,6 +222,9 @@ must remain responsibility-oriented and below the Actus source-size limits.
 10. Hardware safety behavior is outside the communication library.
 11. Core Wire communication does not require `wire://` addressing.
 12. Any `wire://` parser depends on the core codec, never the reverse.
+13. Native emission includes only Wire declarations reachable from the
+    selected entry verb; unused protocol surfaces do not become linker-visible
+    object symbols.
 
 ### Fragmentation profile
 

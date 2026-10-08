@@ -2,8 +2,55 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+use object::{Object, ObjectSymbol};
+
 fn compiler() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_actus"))
+}
+
+#[test]
+fn unused_wire_modules_are_absent_from_native_object_set() {
+    let root = std::env::temp_dir().join(format!("actus-wire-reachability-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"wire_reachability\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("manifest");
+    copy_standard_library(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src"),
+        &root.join("src"),
+    );
+    fs::write(
+        root.join("src/main.act"),
+        "import std::wire; verb main() -> Int { return WIRE_VERSION as Int; }\n",
+    )
+    .expect("source");
+    let output = root.join("wire.o");
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "obj", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+
+    let mut wire_symbols = Vec::new();
+    for entry in fs::read_dir(&root).expect("read fixture directory") {
+        let path = entry.expect("read fixture entry").path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("o") {
+            continue;
+        }
+        let bytes = fs::read(path).expect("read generated object");
+        let file = object::File::parse(bytes.as_slice()).expect("parse generated object");
+        wire_symbols.extend(file.symbols().filter_map(|symbol| {
+            let name = symbol.name().ok()?.to_owned();
+            name.contains("std_4_wire__verb_").then_some(name)
+        }));
+    }
+    assert!(wire_symbols.is_empty(), "unused Wire declarations were emitted: {wire_symbols:?}");
+    let _ = fs::remove_dir_all(root);
 }
 
 fn copy_standard_library(source: &std::path::Path, destination: &std::path::Path) {

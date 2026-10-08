@@ -172,10 +172,18 @@ authority and malformed bounded input with typed errors.
 
 - [x] Register `std::wire` as a target-neutral standard-library module.
 - [x] Verify hosted and freestanding resolution without host-only imports.
-- [ ] Verify unused Wire modules are not compiled or linked unnecessarily.
+- [x] Verify unused Wire modules are not compiled or linked unnecessarily.
 - [ ] Add formatter, semantic-model, hover, completion, and diagnostics
       evidence for public declarations.
-- [ ] Add native object evidence for the bounded runtime surface.
+- [x] Add native object evidence for the bounded runtime surface.
+
+Gate 39.8 compiler evidence is provided by the native reachability fixture in
+`tests/std_wire_native.rs`. An entry that imports `std::wire` but uses only
+`WIRE_VERSION` emits no Wire verb symbols. An entry that calls
+`wire_crc16_ccitt` emits only the CRC verb and its private update helper; the
+parser, sequence, fragmentation, codec, and endpoint verbs are absent from the
+native object set. This behavior is implemented in the compiler's native
+declaration reachability pass and does not depend on linker garbage collection.
 
 ## Gate 39.9 — Acceptance and future security boundary
 
