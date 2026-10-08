@@ -60,7 +60,7 @@ Indexed and field places retain their bounds and ownership checks.
 ## Operators
 
 Arithmetic, comparisons, logical operators, bitwise operators, shifts,
-division, and remainder are typed operations. Read the [operator reference](../../language/operators.md)
+division, and remainder are typed operations. Read the [operator reference](operators.md)
 for precedence and operand contracts.
 
 ## Case

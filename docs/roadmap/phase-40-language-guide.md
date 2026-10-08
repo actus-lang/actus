@@ -368,6 +368,79 @@ git diff --check: passed
 The handbook is organized for human readers first, with the agent reference
 kept as a separate operational category.
 
+
+## Follow-up: Core language reference audit
+
+The first handbook pass is complete, but the core language pages need a
+separate depth pass. This follow-up keeps the work ordered and source-driven.
+It expands one language subject at a time and does not regenerate the whole
+handbook in one change.
+
+### Gate 40.13: Core-language audit baseline
+
+- [x] Compare the `pack`, `Arena`, `struct`, `Array`, `Buffer`, constants,
+      generics, roles, and `perform` pages with the current parser, semantic
+      checks, native examples, and focused tests.
+- [x] Record the missing dedicated `Arena` reader page and the shallow
+      `struct` and `pack` explanations as follow-up work.
+- [x] Identify and correct the invalid relative link from the expressions page
+      to the operator guide.
+- [ ] Recheck every language-page example after the subject pages are updated.
+
+### Gate 40.14: Arena handbook
+
+- [ ] Create a dedicated human-facing `Arena` page under the language section.
+- [ ] Explain `Arena[N]`, bounded capacity, placement, returned references,
+      provenance, cleanup, and the rule that references cannot outlive the
+      arena owner.
+- [ ] Cover recursive and cyclic examples using the current `Option[abs T]`
+      form and link the relevant ownership pages.
+- [ ] Document the supported boundary and distinguish an arena from a general
+      heap or garbage collector.
+- [ ] Reconcile the page with `tests/arena_option.rs`, `tests/arena_graph.rs`,
+      `tests/arenas_cli.rs`, and the canonical arena examples.
+
+### Gate 40.15: Struct handbook depth pass
+
+- [ ] Expand the struct guide with field roles, aggregate construction,
+      partial-field moves, cleanup, nested structs, generic structs, and
+      arena-backed references.
+- [ ] Explain `perform` contracts through a complete role and implementation
+      example.
+- [ ] Add valid and rejected examples tied to current ownership and semantic
+      diagnostics.
+- [ ] Reconcile the guide with struct, drop, generic, and native ABI tests.
+
+### Gate 40.16: Pack handbook depth pass
+
+- [ ] Expand the pack guide with backing storage, byte width, offsets,
+      endianness, overlap and capacity validation, field access, and indexed
+      pack arrays.
+- [ ] Explain which pack layouts are compile-time contracts and which values
+      remain runtime data.
+- [ ] Document ownership roles on pack storage and fields without implying
+      pointer casts or unchecked memory access.
+- [ ] Reconcile the guide with pack semantic tests, native pack examples, and
+      the serialization reference.
+
+### Gate 40.17: Constants, generics, roles, and dispatch pass
+
+- [ ] Expand constants with compile-time evaluation boundaries, visibility,
+      typed widths, and rejected runtime uses.
+- [ ] Reconcile generic type and const-generic examples with current accepted
+      domains and diagnostics.
+- [ ] Expand roles and `perform` documentation with static dispatch, explicit
+      dynamic boundaries, receiver roles, and ABI limitations.
+- [ ] Record unsupported or design-only behavior instead of presenting it as
+      available syntax.
+
+### Gate 40.18: Core-language editorial validation
+
+- [ ] Verify all language-page links and code-fence languages.
+- [ ] Verify that examples use current Actus syntax and match focused tests.
+- [ ] Ensure the language index exposes every new subject page.
+- [ ] Record the completed audit and remaining limitations in this roadmap.
+
 ## Library handbook reorganization
 
 The standard-library section was subsequently reorganized into
