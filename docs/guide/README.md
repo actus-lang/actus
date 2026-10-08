@@ -37,9 +37,10 @@ test, format, and build a project.
 1. [Ownership overview](ownership/overview.md)
 2. [Structs and enums](language/structs.md)
 3. [Arrays and buffers](language/arrays-and-buffers.md)
-4. [Modules and facades](modules/overview.md)
-5. [Errors and results](library/errors/README.md)
-6. [Debugging](workflow/debugging.md)
+4. [Arenas](language/arenas.md)
+5. [Modules and facades](modules/overview.md)
+6. [Errors and results](library/errors/README.md)
+7. [Debugging](workflow/debugging.md)
 
 ### Advanced Actus work
 

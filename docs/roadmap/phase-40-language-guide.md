@@ -389,15 +389,15 @@ handbook in one change.
 
 ### Gate 40.14: Arena handbook
 
-- [ ] Create a dedicated human-facing `Arena` page under the language section.
-- [ ] Explain `Arena[N]`, bounded capacity, placement, returned references,
+- [x] Create a dedicated human-facing `Arena` page under the language section.
+- [x] Explain `Arena[N]`, bounded capacity, placement, returned references,
       provenance, cleanup, and the rule that references cannot outlive the
       arena owner.
-- [ ] Cover recursive and cyclic examples using the current `Option[abs T]`
+- [x] Cover recursive and graph examples using the current `Option[abs T]`
       form and link the relevant ownership pages.
-- [ ] Document the supported boundary and distinguish an arena from a general
+- [x] Document the supported boundary and distinguish an arena from a general
       heap or garbage collector.
-- [ ] Reconcile the page with `tests/arena_option.rs`, `tests/arena_graph.rs`,
+- [x] Reconcile the page with `tests/arena_option.rs`, `tests/arena_graph.rs`,
       `tests/arenas_cli.rs`, and the canonical arena examples.
 
 ### Gate 40.15: Struct handbook depth pass

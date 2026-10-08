@@ -14,6 +14,7 @@ language features.
 - [Packs](packs.md)
 - [Enums](enums.md)
 - [Arrays and buffers](arrays-and-buffers.md)
+- [Arenas](arenas.md)
 - [Generics](generics.md)
 - [Constants](constants.md)
 - [Comments and documentation](comments-and-documentation.md)
