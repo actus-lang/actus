@@ -65,8 +65,13 @@ this gate does not create empty placeholder modules.
 - [x] Validate payload length before payload access.
 - [x] Serialize valid frames into caller-owned bounded buffers.
 - [x] Reject insufficient output capacity with a typed error.
-- [ ] Prove byte-for-byte deterministic serialization across repeated builds.
-- [ ] Add empty, minimum, maximum, and over-sized payload tests.
+- [x] Prove byte-for-byte deterministic serialization across repeated builds.
+- [x] Add empty, minimum, maximum, and over-sized payload tests.
+
+Gate 39.2 evidence is provided by `tests/std_wire_native.rs`: the hosted
+native fixture encodes the same header and payload twice, verifies identical
+frame bytes, accepts payload lengths `0`, `1`, and `1024`, and rejects length
+`1025` with `WireError.PayloadTooLarge`.
 
 ## Gate 39.3 — CRC and typed failure paths
 

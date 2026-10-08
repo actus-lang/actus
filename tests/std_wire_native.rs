@@ -116,11 +116,133 @@ verb bad_checksum_status(ins encoded: Buffer) -> Int {
         },
     };
 }
+verb frame_count_status(abs header: WireHeader, abs payload: Buffer, abs expected_count: u32) -> Int {
+    erg output = Buffer[1038];
+    erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
+    return case dat result {
+        Result.Ok(count) => if count == expected_count { 0 } else { 1 },
+        Result.Err(_) => 2,
+    };
+}
+verb oversized_status(abs header: WireHeader) -> Int {
+    erg payload: Buffer = Buffer[1025];
+    erg output = Buffer[1039];
+    erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
+    return case dat result {
+        Result.Err(error) => case dat error { WireError.PayloadTooLarge => 0, _ => 1 },
+        Result.Ok(_) => 2,
+    };
+}
+verb maximum_status() -> Int {
+    erg maximum_header = WireHeader {storage: Array[u8, 12]()};
+    maximum_header.magic_0 = WIRE_MAGIC_0;
+    maximum_header.magic_1 = WIRE_MAGIC_1;
+    maximum_header.version = WIRE_VERSION;
+    maximum_header.payload_len = 1024u16;
+    erg maximum_payload: Buffer = Buffer[1024];
+    erg expected_count: u32 = 1038u32;
+    return frame_count_status(header: abs maximum_header, payload: abs maximum_payload, expected_count: abs expected_count);
+}
+verb empty_status() -> Int {
+    erg empty_header = WireHeader {storage: Array[u8, 12]()};
+    empty_header.magic_0 = WIRE_MAGIC_0;
+    empty_header.magic_1 = WIRE_MAGIC_1;
+    empty_header.version = WIRE_VERSION;
+    empty_header.payload_len = 0u16;
+    erg empty_payload: Buffer = Buffer[0];
+    erg empty_count: u32 = 14u32;
+    return frame_count_status(header: abs empty_header, payload: abs empty_payload, expected_count: abs empty_count);
+}
+verb minimum_status() -> Int {
+    erg minimum_header = WireHeader {storage: Array[u8, 12]()};
+    minimum_header.magic_0 = WIRE_MAGIC_0;
+    minimum_header.magic_1 = WIRE_MAGIC_1;
+    minimum_header.version = WIRE_VERSION;
+    minimum_header.payload_len = 1u16;
+    erg minimum_payload: Buffer = Buffer[1];
+    erg minimum_count: u32 = 15u32;
+    return frame_count_status(header: abs minimum_header, payload: abs minimum_payload, expected_count: abs minimum_count);
+}
+verb boundary_status() -> Int {
+    erg empty = empty_status();
+    if empty != 0 {
+        return 1;
+    }
+    erg minimum = minimum_status();
+    if minimum != 0 {
+        return 2;
+    }
+    erg maximum = maximum_status();
+    if maximum != 0 {
+        return 3;
+    }
+    erg oversized_header = WireHeader {storage: Array[u8, 12]()};
+    oversized_header.magic_0 = WIRE_MAGIC_0;
+    oversized_header.magic_1 = WIRE_MAGIC_1;
+    oversized_header.version = WIRE_VERSION;
+    oversized_header.payload_len = 1025u16;
+    if oversized_status(header: abs oversized_header) != 0 {
+        return 4;
+    }
+    return 0;
+}
+verb buffers_equal(abs left: Buffer, abs right: Buffer, abs length: u32) -> Bool {
+    for erg index: u32 in 0u32 .. length {
+        erg left_byte: u8 = left[index];
+        erg right_byte: u8 = right[index];
+        if left_byte != right_byte {
+            return false;
+        }
+    }
+    return true;
+}
+verb deterministic_encode_status(abs header: WireHeader, abs payload: Buffer, ins output: Buffer) -> Int {
+    erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
+    return case dat result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+verb deterministic_status() -> Int {
+    erg header = WireHeader {storage: Array[u8, 12]()};
+    header.magic_0 = WIRE_MAGIC_0;
+    header.magic_1 = WIRE_MAGIC_1;
+    header.version = WIRE_VERSION;
+    header.payload_len = 4u16;
+    erg payload: Buffer = Buffer[0];
+    append(payload, 3u8);
+    append(payload, 1u8);
+    append(payload, 4u8);
+    append(payload, 1u8);
+    erg first = Buffer[18];
+    erg second = Buffer[18];
+    if deterministic_encode_status(header: abs header, payload: abs payload, output: ins first) != 0 {
+        return 1;
+    }
+    if deterministic_encode_status(header: abs header, payload: abs payload, output: ins second) != 0 {
+        return 2;
+    }
+    erg frame_length: u32 = 18u32;
+    if !buffers_equal(left: abs first, right: abs second, length: abs frame_length) {
+        return 3;
+    }
+    return 0;
+}
 verb main() -> Int {
     if crc_status() != 0 {
         return 7;
     }
-    return header_status();
+    if header_status() != 0 {
+        return 8;
+    }
+    erg boundary = boundary_status();
+    if boundary != 0 {
+        return 9;
+    }
+    if deterministic_status() != 0 {
+        return 10;
+    }
+    return 0;
 }
 "#,
     )
@@ -134,6 +256,12 @@ verb main() -> Int {
         .expect("build");
     assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
     let execution = Command::new(&output).output().expect("execute");
-    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(
+        execution.status.code(),
+        Some(0),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&execution.stdout),
+        String::from_utf8_lossy(&execution.stderr)
+    );
     let _ = fs::remove_dir_all(root);
 }
