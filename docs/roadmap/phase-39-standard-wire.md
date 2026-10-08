@@ -92,24 +92,24 @@ with sentinel bytes and verifies that rejection leaves it unchanged.
 - [x] Accept arbitrary input chunks; never assume one read equals one frame.
 - [x] Track parser state using caller-owned bounded storage.
 - [x] Report consumed bytes and incomplete-frame status explicitly.
-- [ ] Resynchronize after malformed magic, version, length, flags, or CRC.
+- [x] Resynchronize after malformed magic, version, length, flags, or CRC.
 - [x] Bound scanning, buffering, and recovery work.
 - [x] Reject truncated input without dispatching a partial message.
 - [x] Add arbitrary-byte tests with no panic, out-of-bounds access, or
       unbounded loop.
 
-Gate 39.4 implementation evidence currently covers the bounded parser state in
-`library/std/src/wire/parser.act`, its public facade export, and a native test
-that feeds one valid frame through two independent chunks. The test verifies
-the intermediate `Collecting` state, consumed-byte counts, final `Ready` state,
+Gate 39.4 implementation evidence covers the bounded parser state in
+`library/std/src/wire/parser.act`, its public facade export, and native tests
+that feed one valid frame through two independent chunks. The tests verify the
+intermediate `Collecting` state, consumed-byte counts, final `Ready` state,
 decoded header, and payload. The same fixture verifies that incomplete input
 leaves sentinel output unchanged, arbitrary noise is consumed without leaving
-the searching state, and unsupported-version and CRC failures return typed
-errors. Native lowering also now traverses `else if`
-branches when inlining compile-time constants; this is covered by the compiler
-regression test `native_lowering_inlines_facade_constant_in_else_if_branch`.
-Coverage for every malformed header category listed above remains open until
-magic, length, and flags are exercised through the incremental parser itself.
+the searching state, a malformed magic prefix is skipped before a valid frame,
+and unsupported version, oversized length, unknown flags, and CRC failures
+return typed errors without dispatching invalid data. Native lowering also now
+traverses `else if` branches when inlining compile-time constants; this is
+covered by the compiler regression test
+`native_lowering_inlines_facade_constant_in_else_if_branch`.
 
 ## Gate 39.5 — Sequence and duplicate protection
 

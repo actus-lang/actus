@@ -392,6 +392,47 @@ verb parser_noise_status() -> Int {
     erg status = wire_parser_status(parser: abs parser);
     return case dat status { WireParserStatus.Searching => 0, _ => 3, };
 }
+verb parser_magic_resync_status(abs encoded: Buffer) -> Int {
+    erg input: Buffer = Buffer[18];
+    input[0] = 0u8;
+    for erg index: u32 in 0u32 .. 17u32 { input[index + 1u32] = encoded[index]; }
+    erg parser = wire_parser_empty();
+    erg output: Buffer = Buffer[3];
+    erg result = wire_parser_feed(parser: ins parser, chunk: abs input, payload_output: ins output);
+    return case dat result {
+        Result.Err(_) => 1,
+        Result.Ok(count) => {
+            erg status = wire_parser_status(parser: abs parser);
+            erg ready: Bool = case dat status { WireParserStatus.Ready => true, _ => false, };
+            if count == 18u32 && output[0] == 7u8 && ready { return 0; }
+            return 2;
+        },
+    };
+}
+verb parser_flags_status(ins encoded: Buffer) -> Int {
+    encoded[3] = 1u8;
+    erg parser = wire_parser_empty();
+    erg output: Buffer = Buffer[3];
+    erg result = wire_parser_feed(parser: ins parser, chunk: abs encoded, payload_output: ins output);
+    encoded[3] = 0u8;
+    erg code: Int = case dat result { Result.Err(error) => case dat error { WireError.UnknownFlags => 0, _ => 1, }, Result.Ok(_) => 2, };
+    if code != 0 { return code; }
+    erg status = wire_parser_status(parser: abs parser);
+    return case dat status { WireParserStatus.Searching => 0, _ => 3, };
+}
+verb parser_length_status(ins encoded: Buffer) -> Int {
+    encoded[10] = 1u8;
+    encoded[11] = 4u8;
+    erg parser = wire_parser_empty();
+    erg output: Buffer = Buffer[3];
+    erg result = wire_parser_feed(parser: ins parser, chunk: abs encoded, payload_output: ins output);
+    encoded[10] = 3u8;
+    encoded[11] = 0u8;
+    erg code: Int = case dat result { Result.Err(error) => case dat error { WireError.PayloadTooLarge => 0, _ => 1, }, Result.Ok(_) => 2, };
+    if code != 0 { return code; }
+    erg status = wire_parser_status(parser: abs parser);
+    return case dat status { WireParserStatus.Searching => 0, _ => 3, };
+}
 verb parser_rejection_status(ins encoded: Buffer) -> Int {
     encoded[2] = 2u8;
     erg parser = wire_parser_empty();
@@ -412,7 +453,12 @@ verb parser_rejection_status(ins encoded: Buffer) -> Int {
         Result.Ok(_) => 2,
     };
     encoded[12] ^= 1u8;
-    return if checksum_code == 0 { 0 } else { 3 };
+    if checksum_code != 0 { return 3; }
+    erg checksum_status = wire_parser_status(parser: abs parser);
+    if case dat checksum_status { WireParserStatus.Searching => false, _ => true, } { return 6; }
+    if parser_flags_status(encoded: ins encoded) != 0 { return 4; }
+    if parser_length_status(encoded: ins encoded) != 0 { return 5; }
+    return 0;
 }
 verb main() -> Int {
     erg header = WireHeader {storage: Array[u8, 12]()};
@@ -425,7 +471,7 @@ verb main() -> Int {
     append(payload, 7u8); append(payload, 8u8); append(payload, 9u8);
     erg encoded = Buffer[17];
     erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins encoded);
-    return case dat result { Result.Err(_) => 6, Result.Ok(_) => if parser_noise_status() == 0 && parser_rejection_status(encoded: ins encoded) == 0 { feed_chunks(encoded: abs encoded) } else { 7 }, };
+    return case dat result { Result.Err(_) => 6, Result.Ok(_) => if parser_noise_status() == 0 && parser_magic_resync_status(encoded: abs encoded) == 0 && parser_rejection_status(encoded: ins encoded) == 0 { feed_chunks(encoded: abs encoded) } else { 7 }, };
 }
 "#,
     )
