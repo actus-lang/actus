@@ -427,7 +427,7 @@ handbook in one change.
 
 - [x] Expand constants with compile-time evaluation boundaries, visibility,
       typed widths, and rejected runtime uses.
-- [ ] Reconcile generic type and const-generic examples with current accepted
+- [x] Reconcile generic type and const-generic examples with current accepted
       domains and diagnostics.
 - [ ] Expand roles and `perform` documentation with static dispatch, explicit
       dynamic boundaries, receiver roles, and ABI limitations.
