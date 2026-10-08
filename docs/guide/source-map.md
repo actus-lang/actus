@@ -114,5 +114,5 @@ are written and linked. Their content is not removed by this phase.
 - [x] Sections requiring splitting identified.
 - [x] Cross-link groups identified.
 - [x] Sections requiring implementation-source review identified.
-- [ ] Destination handbook files created.
-- [ ] Migrated sections reviewed against this map.
+- [x] Destination handbook files created.
+- [x] Migrated sections reviewed against this map.

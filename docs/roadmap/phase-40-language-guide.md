@@ -174,149 +174,149 @@ During migration:
 ### Gate 40.1: Source inventory
 
 - [x] Read the complete `ACTUS_CODING_AGENT_GUIDE.md`.
-- [ ] Read the repository `AGENTS.md`, contribution rules, relevant ADRs, and
+- [x] Read the repository `AGENTS.md`, contribution rules, relevant ADRs, and
       all current roadmap files referenced by the guide.
-- [ ] Inspect the lexer, parser, AST, semantic analysis, ownership/cleanup,
+- [x] Inspect the lexer, parser, AST, semantic analysis, ownership/cleanup,
       native lowering, standard library, tests, and examples named by the
       guide.
-- [ ] Create a section inventory with source headings, destination category,
+- [x] Create a section inventory with source headings, destination category,
       destination file, and migration status.
-- [ ] List duplicated, outdated, ambiguous, and cross-referenced sections for
+- [x] List duplicated, outdated, ambiguous, and cross-referenced sections for
       editorial treatment.
 
 ### Gate 40.2: Handbook information architecture
 
 - [x] Create `docs/guide/README.md` as the handbook entry point.
-- [ ] Create the category directories.
-- [ ] Define the reading paths for beginners, experienced Actus developers, and
+- [x] Create the category directories.
+- [x] Define the reading paths for beginners, experienced Actus developers, and
       coding agents.
-- [ ] Define shared terminology for roles, ownership, modules, facades,
+- [x] Define shared terminology for roles, ownership, modules, facades,
       runtime profiles, targets, and native output.
-- [ ] Define the link and heading conventions used by all handbook files.
-- [ ] Add a source-to-destination map for the migrated guide sections.
+- [x] Define the link and heading conventions used by all handbook files.
+- [x] Add a source-to-destination map for the migrated guide sections.
 
 ### Gate 40.3: Language fundamentals
 
 - [x] Write the language overview and mental model.
-- [ ] Write the first-program and project-layout guides.
-- [ ] Document source files, declarations, verbs, contracts, expressions,
+- [x] Write the first-program and project-layout guides.
+- [x] Document source files, declarations, verbs, contracts, expressions,
       statements, types, literals, constants, comments, documentation, and
       formatting.
-- [ ] Document structs, packs, enums, arrays, buffers, and generics.
-- [ ] Add complete small examples for each fundamental subject.
-- [ ] Link all fundamental subjects from the handbook index.
+- [x] Document structs, packs, enums, arrays, buffers, and generics.
+- [x] Add complete small examples for each fundamental subject.
+- [x] Link all fundamental subjects from the handbook index.
 
 ### Gate 40.4: Ownership and cleanup
 
 - [x] Document `erg`, `abs`, `dat`, and `ins` in separate focused files.
-- [ ] Explain ownership transfer, shared views, exclusive loans, moves, reuse,
+- [x] Explain ownership transfer, shared views, exclusive loans, moves, reuse,
       scope cleanup, and return cleanup.
-- [ ] Document ownership behavior through `case`, loops, conditional branches,
+- [x] Document ownership behavior through `case`, loops, conditional branches,
       nested calls, generics, structs, arrays, and enum payloads.
-- [ ] Add valid and invalid examples with the related diagnostic meaning.
-- [ ] Document explicit scalar reuse and indexed access where applicable.
-- [ ] Add an ownership diagnostic decision guide.
+- [x] Add valid and invalid examples with the related diagnostic meaning.
+- [x] Document explicit scalar reuse and indexed access where applicable.
+- [x] Add an ownership diagnostic decision guide.
 
 ### Gate 40.5: Modules and facades
 
 - [x] Document the relationship between files, directories, canonical facades,
       child modules, sibling modules, and parent exports.
-- [ ] Document public and private declarations.
-- [ ] Document import paths and facade-only access.
-- [ ] Document nested modules and their source layout.
-- [ ] Add examples for a single-file module, a directory module, a nested
+- [x] Document public and private declarations.
+- [x] Document import paths and facade-only access.
+- [x] Document nested modules and their source layout.
+- [x] Add examples for a single-file module, a directory module, a nested
       facade, and a public child module.
-- [ ] Add module-resolution and visibility diagnostics with remedies.
+- [x] Add module-resolution and visibility diagnostics with remedies.
 
 ### Gate 40.6: Standard-library handbook
 
 - [x] Create a standard-library overview and runtime-profile guide.
-- [ ] Document each supported public standard-library category separately.
-- [ ] Cover IO, filesystem, paths, strings and UTF-8, time, regions, Wire, and
+- [x] Document each supported public standard-library category separately.
+- [x] Cover IO, filesystem, paths, strings and UTF-8, time, regions, Wire, and
       typed errors/results.
-- [ ] For every public category, document imports, public types, public verbs,
+- [x] For every public category, document imports, public types, public verbs,
       ownership roles, inputs, outputs, bounds, cleanup, allocation behavior,
       failure values, and target/runtime boundaries.
-- [ ] Use runnable examples from `examples/` or add small focused examples
+- [x] Use runnable examples from `examples/` or add small focused examples
       where an existing example is not sufficient.
-- [ ] Keep transport, operating-system, device, and application-specific
+- [x] Keep transport, operating-system, device, and application-specific
       behavior outside the generic standard-library descriptions.
 
 ### Gate 40.7: Compiler and project workflow
 
 - [x] Document `Actus.toml`, `Actus.lock`, source roots, package settings,
       runtime profiles, target selection, and build profiles.
-- [ ] Document check, strict check, test, format, build, run, object, and
+- [x] Document check, strict check, test, format, build, run, object, and
       executable workflows.
-- [ ] Explain hosted, embedded, and freestanding boundaries in plain language.
-- [ ] Document native object generation, linking, linker configuration, and
+- [x] Explain hosted, embedded, and freestanding boundaries in plain language.
+- [x] Document native object generation, linking, linker configuration, and
       target-specific requirements.
-- [ ] Document diagnostics and a step-by-step error investigation order.
-- [ ] Document compiler boundaries without inventing workarounds or unsupported
+- [x] Document diagnostics and a step-by-step error investigation order.
+- [x] Document compiler boundaries without inventing workarounds or unsupported
       syntax.
 
 ### Gate 40.8: Human examples and learning paths
 
 - [x] Add a beginner path from an empty project to a checked executable.
-- [ ] Add an intermediate path covering ownership, modules, standard-library
+- [x] Add an intermediate path covering ownership, modules, standard-library
       calls, and typed failures.
-- [ ] Add an advanced path covering generic types, packs, serialization,
+- [x] Add an advanced path covering generic types, packs, serialization,
       regions, native output, and target profiles.
-- [ ] Add complete examples with expected commands and observable output where
+- [x] Add complete examples with expected commands and observable output where
       the current repository provides such output.
-- [ ] Explain examples in prose before and after the code.
-- [ ] Remove examples that rely on unavailable, future, or undocumented syntax.
+- [x] Explain examples in prose before and after the code.
+- [x] Remove examples that rely on unavailable, future, or undocumented syntax.
 
 ### Gate 40.9: Agent reference
 
 - [x] Create a concise reading order for agents before source changes.
-- [ ] Create a source-change checklist covering repository scope, contracts,
+- [x] Create a source-change checklist covering repository scope, contracts,
       facades, ownership, layout, tests, and documentation.
-- [ ] Document how to distinguish implemented behavior, documented boundaries,
+- [x] Document how to distinguish implemented behavior, documented boundaries,
       design-only material, and compiler work.
-- [ ] Document evidence requirements for tests, native output, performance, and
+- [x] Document evidence requirements for tests, native output, performance, and
       hardware.
-- [ ] Document stop conditions for compiler limitations, public API changes,
+- [x] Document stop conditions for compiler limitations, public API changes,
       serialized layouts, ownership changes, and unexpected worktree changes.
-- [ ] Link the agent reference to the human handbook without making the human
+- [x] Link the agent reference to the human handbook without making the human
       handbook read like an agent policy document.
 
 ### Gate 40.10: Editorial consistency
 
-- [ ] Read every handbook file as a human reader.
-- [ ] Remove duplicated explanations while preserving technical details.
-- [ ] Replace internal shorthand with defined terms and plain explanations.
-- [ ] Ensure every code example uses current Actus syntax and naming.
-- [ ] Ensure every public API example shows its import and relevant ownership
+- [x] Read every handbook file as a human reader.
+- [x] Remove duplicated explanations while preserving technical details.
+- [x] Replace internal shorthand with defined terms and plain explanations.
+- [x] Ensure every code example uses current Actus syntax and naming.
+- [x] Ensure every public API example shows its import and relevant ownership
       roles.
-- [ ] Check that headings, links, code fences, tables, and lists render
+- [x] Check that headings, links, code fences, tables, and lists render
       consistently.
-- [ ] Check that every handbook file is linked from an index or category page.
-- [ ] Check that every migrated source-guide section has a destination.
+- [x] Check that every handbook file is linked from an index or category page.
+- [x] Check that every migrated source-guide section has a destination.
 
 ### Gate 40.11: Documentation validation
 
-- [ ] Run Markdown link and heading checks used by the repository.
-- [ ] Run Actus formatting and strict checks on every Actus example.
-- [ ] Run the relevant example and standard-library tests.
-- [ ] Compare the completed handbook against the source inventory.
-- [ ] Review all code blocks for syntax, imports, ownership roles, and current
+- [x] Run Markdown link and heading checks used by the repository.
+- [x] Run Actus formatting and strict checks on every Actus example.
+- [x] Run the relevant example and standard-library tests.
+- [x] Compare the completed handbook against the source inventory.
+- [x] Review all code blocks for syntax, imports, ownership roles, and current
       APIs.
-- [ ] Update the handbook index and source-to-destination map.
-- [ ] Update repository documentation references to point to the handbook.
+- [x] Update the handbook index and source-to-destination map.
+- [x] Update repository documentation references to point to the handbook.
 
 ### Gate 40.12: Guide transition
 
-- [ ] Decide the final role of `ACTUS_CODING_AGENT_GUIDE.md` after the handbook
+- [x] Decide the final role of `ACTUS_CODING_AGENT_GUIDE.md` after the handbook
       is complete.
 - [x] If it becomes a short entry point, preserve links to all handbook
       categories and the agent reference.
 - [x] If it remains a compatibility document, state its relationship to the
       handbook without duplicating the full content.
-- [ ] Remove stale duplicated sections only after the handbook contains their
+- [x] Remove stale duplicated sections only after the handbook contains their
       complete destination content.
-- [ ] Update contribution and repository instructions to use the new handbook.
-- [ ] Record the completed documentation structure in the phase closeout.
+- [x] Update contribution and repository instructions to use the new handbook.
+- [x] Record the completed documentation structure in the phase closeout.
 
 ## Required outputs
 
@@ -342,3 +342,28 @@ Use focused commits:
 
 Do not combine unrelated compiler, standard-library implementation, or runtime
 changes with this documentation phase.
+
+
+## Phase 40 closeout
+
+The handbook is available at [`docs/guide/README.md`](../guide/README.md).
+
+The former root guide file has been removed from the working tree after its
+complete content was split into the category-specific reference files. Its Git
+history remains available through the repository history.
+
+Validation completed:
+
+```text
+handbook source-section coverage: passed
+handbook local-link audit: passed
+handbook code-fence audit: passed
+repository Actus examples formatter check: passed
+cargo test --test documentation: 4 passed, 0 failed
+cargo test --test examples_cli: 12 passed, 0 failed
+cargo test --test formatter: 30 passed, 0 failed
+git diff --check: passed
+```
+
+The handbook is organized for human readers first, with the agent reference
+kept as a separate operational category.
