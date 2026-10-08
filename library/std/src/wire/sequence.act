@@ -1,0 +1,181 @@
+"""
+Bounded sequence-window protection for `std::wire` frames.
+
+The window tracks one highest accepted sequence number and a 64-bit receipt
+mask. It accepts forward progress, bounded out-of-order delivery, and the
+single wrap boundary of the u32 sequence space. Duplicate, stale, context
+mismatch, and unreasonable-jump cases return typed errors. This is replay
+suppression only; it does not authenticate a sender or a transport.
+"""
+"""The fixed number of sequence positions retained by the replay window."""
+open const WIRE_SEQUENCE_WINDOW_BITS: u32 = 64u32;
+
+
+"""The largest forward sequence jump accepted in one context."""
+open const WIRE_SEQUENCE_MAX_FORWARD: u32 = 1024u32;
+
+
+"""The midpoint used to classify modular sequence distance and wrap."""
+open const WIRE_SEQUENCE_HALF_RANGE: u32 = 2147483648u32;
+
+
+"""
+Caller-owned replay window for one wire context.
+
+`highest` is the newest accepted sequence. Bit zero of `received` represents
+that value; higher bits represent earlier sequence values within the bounded
+window. A context replacement clears the mask before accepting its first
+sequence, so a new context cannot silently reuse the old receipt history.
+"""
+open struct WireSequenceWindow {
+    """Owned Boolean stating whether a context and first sequence exist."""
+    erg initialized: Bool,
+    """Owned application-neutral context identifier scoped by the caller."""
+    erg context_id: u32,
+    """Newest accepted sequence number in the active context."""
+    erg highest: u32,
+    """Receipt mask for the newest 64 sequence positions."""
+    erg received: u64,
+}
+
+"""
+Create an empty replay window.
+
+The returned value owns only fixed-width scalar state. It performs no I/O,
+allocation, authentication, or context selection; the first accepted frame
+establishes the supplied context explicitly at `wire_sequence_accept`.
+"""
+open verb wire_sequence_empty() -> WireSequenceWindow {
+    return WireSequenceWindow {initialized: false, context_id: 0u32, highest: 0u32, received: 0u64};
+}
+
+"""
+Clear the active context and receipt history.
+
+The caller retains ownership through `ins`. The verb returns `Void`, performs
+no allocation or I/O, and leaves the next accepted frame to start a new
+context. Reset is an explicit lifecycle boundary rather than an implicit
+response to a duplicate or stale sequence.
+"""
+open verb wire_sequence_reset(ins window: WireSequenceWindow) -> Void {
+    window.initialized = false;
+    window.context_id = 0u32;
+    window.highest = 0u32;
+    window.received = 0u64;
+}
+
+"""
+Replace the active context and discard its sequence history.
+
+The new context identifier is stored before the first sequence is accepted.
+The operation is bounded and allocation-free; callers must use this explicit
+verb when changing a stream or session context.
+"""
+open verb wire_sequence_replace_context(
+    ins window: WireSequenceWindow,
+    erg context_id: u32
+) -> Void {
+    window.initialized = false;
+    window.context_id = context_id;
+    window.highest = 0u32;
+    window.received = 0u64;
+}
+
+"""Read the newest sequence through `abs`, or return zero before initialization."""
+open verb wire_sequence_highest(abs window: WireSequenceWindow) -> u32 {
+    return window.highest;
+}
+
+verb wire_sequence_forward_distance(erg current: u32, erg previous: u32) -> u32 {
+    if current >= previous {
+        return current - previous;
+    }
+    return (4294967295u32 - previous) + current + 1u32;
+}
+
+verb wire_sequence_backward_distance(erg current: u32, erg previous: u32) -> u32 {
+    if previous >= current {
+        return previous - current;
+    }
+    return (4294967295u32 - current) + previous + 1u32;
+}
+
+verb wire_sequence_accept_forward(
+    ins window: WireSequenceWindow,
+    erg sequence_num: u32,
+    erg distance: u32
+) -> Result[Int, WireError] {
+    if distance > WIRE_SEQUENCE_MAX_FORWARD {
+        return Result[Int, WireError].Err(WireError.SequenceJumpTooLarge);
+    }
+    window.highest = sequence_num;
+    if distance >= WIRE_SEQUENCE_WINDOW_BITS {
+        window.received = 1u64;
+    } else {
+        window.received = (window.received << distance) | 1u64;
+    }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_sequence_accept_backward(
+    ins window: WireSequenceWindow,
+    erg distance: u32
+) -> Result[Int, WireError] {
+    if distance >= WIRE_SEQUENCE_WINDOW_BITS {
+        return Result[Int, WireError].Err(WireError.SequenceStale);
+    }
+    erg bit: u64 = 1u64 << distance;
+    if (window.received & bit) != 0u64 {
+        return Result[Int, WireError].Err(WireError.SequenceDuplicate);
+    }
+    window.received = window.received | bit;
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_sequence_accept_existing(
+    ins window: WireSequenceWindow,
+    erg sequence_num: u32
+) -> Result[Int, WireError] {
+    erg highest: u32 = window.highest;
+    erg forward = wire_sequence_forward_distance(current: erg sequence_num, previous: erg highest);
+    if forward == 0u32 {
+        return Result[Int, WireError].Err(WireError.SequenceDuplicate);
+    }
+    if forward < WIRE_SEQUENCE_HALF_RANGE {
+        return wire_sequence_accept_forward(
+            window: ins window,
+            sequence_num: erg sequence_num,
+            distance: erg forward
+        );
+    }
+    erg backward = wire_sequence_backward_distance(current: erg sequence_num, previous: erg highest);
+    return wire_sequence_accept_backward(window: ins window, distance: erg backward);
+}
+
+"""
+Accept one sequence number in the supplied context.
+
+The first sequence establishes an empty window. Forward values advance the
+window when their modular distance is at most `WIRE_SEQUENCE_MAX_FORWARD`;
+older values are accepted only once while their receipt bit remains visible.
+Duplicate, stale, unreasonable-jump, and context-mismatch values are rejected
+without changing the window. The result is an integer success marker or a
+typed `WireError`; no storage or transport operation occurs.
+"""
+open verb wire_sequence_accept(
+    ins window: WireSequenceWindow,
+    erg context_id: u32,
+    erg sequence_num: u32
+) -> Result[Int, WireError] {
+    if window.initialized && context_id != window.context_id {
+        return Result[Int, WireError].Err(WireError.SequenceContextMismatch);
+    }
+    if !window.initialized {
+        window.context_id = context_id;
+        window.highest = sequence_num;
+        window.received = 1u64;
+        window.initialized = true;
+        return Result[Int, WireError].Ok(0);
+    }
+    return wire_sequence_accept_existing(window: ins window, sequence_num: erg sequence_num);
+}

@@ -27,4 +27,12 @@ open enum WireError {
     InvalidRange,
     """A reserved protocol operation is not enabled in version one."""
     PolicyRejected,
+    """The sequence was already accepted in the active receipt window."""
+    SequenceDuplicate,
+    """The sequence is older than the retained receipt window."""
+    SequenceStale,
+    """The sequence advances farther than the bounded forward policy allows."""
+    SequenceJumpTooLarge,
+    """The sequence belongs to a context that is not active in this window."""
+    SequenceContextMismatch,
 }

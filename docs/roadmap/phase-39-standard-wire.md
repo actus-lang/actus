@@ -113,12 +113,22 @@ covered by the compiler regression test
 
 ## Gate 39.5 — Sequence and duplicate protection
 
-- [ ] Implement a bounded sliding sequence window.
-- [ ] Reject duplicate and stale frames deterministically.
-- [ ] Define forward advancement and unreasonable jump behavior.
-- [ ] Define sequence reset and context replacement without silent reuse.
-- [ ] Test first value, advancement, duplicate, stale value, jump, and wrap.
-- [ ] Document that this is replay suppression, not authentication.
+- [x] Implement a bounded sliding sequence window.
+- [x] Reject duplicate and stale frames deterministically.
+- [x] Define forward advancement and unreasonable jump behavior.
+- [x] Define sequence reset and context replacement without silent reuse.
+- [x] Test first value, advancement, duplicate, stale value, jump, and wrap.
+- [x] Document that this is replay suppression, not authentication.
+
+Gate 39.5 evidence is provided by `library/std/src/wire/sequence.act`, which
+keeps one 64-bit receipt mask and bounded scalar context state. The hosted
+native fixture in `tests/std_wire_native.rs` covers first acceptance, forward
+advancement, bounded out-of-order acceptance, duplicate rejection, stale
+rejection, unreasonable jumps, context mismatch, explicit replacement, reset,
+and the u32 wrap boundary. The public facade and typed-result surface are
+covered by `tests/std_wire_semantic.rs` and `tests/stdlib_result_surface.rs`.
+ADR-0078 defines the policy as replay suppression only; it does not provide
+authentication or authorization.
 
 ## Gate 39.6 — Fragmentation and reassembly primitives
 

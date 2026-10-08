@@ -20,3 +20,6 @@ open codec;
 
 """Re-export the bounded incremental parser state and feed operation."""
 open parser;
+
+"""Re-export bounded sequence-window replay suppression."""
+open sequence;

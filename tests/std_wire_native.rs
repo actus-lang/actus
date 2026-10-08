@@ -488,3 +488,108 @@ verb main() -> Int {
     assert_eq!(execution.status.code(), Some(0));
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn hosted_wire_sequence_window_rejects_replays_and_stale_contexts() {
+    let root = std::env::temp_dir().join(format!("actus-wire-sequence-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"wire_sequence\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("manifest");
+    copy_standard_library(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/src"),
+        &root.join("src"),
+    );
+    fs::write(
+        root.join("src/main.act"),
+        r#"import std::wire;
+verb accept_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
+    erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
+    return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, };
+}
+verb duplicate_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
+    erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
+    return case dat result { Result.Err(error) => case dat error { WireError.SequenceDuplicate => 0, _ => 1, }, Result.Ok(_) => 2, };
+}
+verb stale_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
+    erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
+    return case dat result { Result.Err(error) => case dat error { WireError.SequenceStale => 0, _ => 1, }, Result.Ok(_) => 2, };
+}
+verb jump_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
+    erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
+    return case dat result { Result.Err(error) => case dat error { WireError.SequenceJumpTooLarge => 0, _ => 1, }, Result.Ok(_) => 2, };
+}
+verb context_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
+    erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
+    return case dat result { Result.Err(error) => case dat error { WireError.SequenceContextMismatch => 0, _ => 1, }, Result.Ok(_) => 2, };
+}
+verb order_status() -> Int {
+    erg window = wire_sequence_empty();
+    erg context_id: u32 = 7u32;
+    erg sequence_num: u32 = 10u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 1; }
+    sequence_num = 12u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 2; }
+    sequence_num = 11u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 3; }
+    if duplicate_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 4; }
+    sequence_num = 80u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 5; }
+    sequence_num = 1u32;
+    if stale_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 6; }
+    if wire_sequence_highest(window: abs window) != 80u32 { return 7; }
+    sequence_num = 1105u32;
+    if jump_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 8; }
+    if wire_sequence_highest(window: abs window) != 80u32 { return 9; }
+    return 0;
+}
+verb lifecycle_status() -> Int {
+    erg window = wire_sequence_empty();
+    erg context_id: u32 = 7u32;
+    erg sequence_num: u32 = 0u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 10; }
+    context_id = 8u32;
+    sequence_num = 81u32;
+    if context_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 10; }
+    wire_sequence_replace_context(window: ins window, context_id: erg context_id);
+    sequence_num = 0u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 11; }
+    wire_sequence_reset(window: ins window);
+    context_id = 9u32;
+    sequence_num = 4294967294u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 12; }
+    sequence_num = 4294967295u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 13; }
+    sequence_num = 0u32;
+    if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 14; }
+    return if wire_sequence_highest(window: abs window) == 0u32 { 0 } else { 15 };
+}
+verb main() -> Int {
+    if order_status() != 0 { return 1; }
+    if lifecycle_status() != 0 { return 2; }
+    return 0;
+}
+"#,
+    )
+    .expect("source");
+    let output = root.join("wire-sequence");
+    let build = Command::new(compiler())
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let execution = Command::new(&output).output().expect("execute");
+    assert_eq!(
+        execution.status.code(),
+        Some(0),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&execution.stdout),
+        String::from_utf8_lossy(&execution.stderr)
+    );
+    let _ = fs::remove_dir_all(root);
+}
