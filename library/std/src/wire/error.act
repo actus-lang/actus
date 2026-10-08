@@ -19,6 +19,8 @@ open enum WireError {
     Truncated,
     """The caller-provided output storage cannot hold the complete frame."""
     InsufficientCapacity,
+    """The payload byte count does not match the header declaration."""
+    PayloadLengthMismatch,
     """The frame checksum does not match its encoded contents."""
     ChecksumMismatch,
     """A bounded range has an invalid start or end position."""

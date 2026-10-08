@@ -26,6 +26,8 @@ fn wire_facade_exports_frame_error_and_checksum_contracts() {
     assert!(exports.contains("verb", "wire_crc16_ccitt"));
     assert!(exports.contains("verb", "wire_header_encode"));
     assert!(exports.contains("verb", "wire_header_decode"));
+    assert!(exports.contains("verb", "wire_frame_encode"));
+    assert!(exports.contains("verb", "wire_frame_decode"));
     assert!(exports.contains("const", "WIRE_MAX_PAYLOAD_BYTES"));
     analyze_module(&resolver, "wire").expect("std wire declarations should be valid");
 }

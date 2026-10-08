@@ -60,16 +60,59 @@ verb header_status() -> Int {
     header.channel_id = 3u8;
     header.sequence_num = 287454020u32;
     header.payload_len = 3u16;
-    erg encoded = Buffer[12];
-    erg encoded_result = wire_header_encode(header: abs header, output: ins encoded);
+    erg payload: Buffer = Buffer[0];
+    append(payload, 7u8);
+    append(payload, 8u8);
+    append(payload, 9u8);
+    if capacity_status(header: abs header, payload: abs payload) != 0 {
+        return 5;
+    }
+    return frame_status(header: dat header);
+}
+verb capacity_status(abs header: WireHeader, abs payload: Buffer) -> Int {
+    erg output = Buffer[12];
+    erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(error) => case dat error {
+            WireError.InsufficientCapacity => 0,
+            _ => 2,
+        },
+    };
+}
+verb frame_status(dat header: WireHeader) -> Int {
+    erg payload: Buffer = Buffer[0];
+    append(payload, 7u8);
+    append(payload, 8u8);
+    append(payload, 9u8);
+    erg encoded = Buffer[17];
+    erg encoded_result = wire_frame_encode(header: abs header, payload: abs payload, output: ins encoded);
     return case dat encoded_result {
         Result.Err(_) => 3,
         Result.Ok(count) => {
-            erg decoded = wire_header_decode(input: abs encoded);
+            erg decoded_payload = Buffer[3];
+            erg decoded = wire_frame_decode(input: abs encoded, payload_output: ins decoded_payload);
             return case dat decoded {
                 Result.Err(_) => 4,
-                Result.Ok(value) => if count == 12u32 && value.sequence_num == 287454020u32 && value.payload_len == 3u16 { 0 } else { 1 },
+                Result.Ok(value) => {
+                    if count == 17u32 && value.sequence_num == 287454020u32 && decoded_payload[0] == 7u8 && decoded_payload[2] == 9u8 {
+                        encoded[12] ^= 1u8;
+                        return bad_checksum_status(encoded: ins encoded);
+                    }
+                    return 1;
+                },
             };
+        },
+    };
+}
+verb bad_checksum_status(ins encoded: Buffer) -> Int {
+    erg payload: Buffer = Buffer[3];
+    erg decoded = wire_frame_decode(input: abs encoded, payload_output: ins payload);
+    return case dat decoded {
+        Result.Ok(_) => 2,
+        Result.Err(error) => case dat error {
+            WireError.ChecksumMismatch => 0,
+            _ => 1,
         },
     };
 }

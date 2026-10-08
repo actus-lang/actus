@@ -85,3 +85,228 @@ open verb wire_header_decode(abs input: Buffer) -> Result[WireHeader, WireError]
         Result.Ok(_) => Result[WireHeader, WireError].Ok(header),
     };
 }
+
+verb wire_frame_data_end(abs header: WireHeader) -> u32 {
+    return WIRE_HEADER_BYTES + (header.payload_len as u32);
+}
+
+verb wire_copy_payload(
+    abs source: Buffer,
+    ins destination: Buffer,
+    erg source_offset: u32,
+    erg destination_offset: u32,
+    erg length: u32
+) -> Int {
+    erg index: u32 = 0u32;
+    loop {
+        if index >= length {
+            break;
+        }
+        destination[destination_offset + index] = source[source_offset + index];
+        index += 1u32;
+    }
+    return length as Int;
+}
+
+verb wire_read_checksum(abs input: Buffer, erg offset: u32) -> u16 {
+    return (input[offset] as u16) | ((input[offset + 1u32] as u16) << 8u16);
+}
+
+verb wire_write_payload_and_checksum(
+    abs payload: Buffer,
+    ins output: Buffer,
+    erg payload_length: u32,
+    erg frame_data_end: u32
+) -> Result[u32, WireError] {
+    erg payload_source_offset: u32 = 0u32;
+    erg payload_destination_offset: u32 = WIRE_HEADER_BYTES;
+    wire_copy_payload(
+        source: abs payload,
+        destination: ins output,
+        source_offset: erg payload_source_offset,
+        destination_offset: erg payload_destination_offset,
+        length: erg payload_length
+    );
+    erg checksum_start: u32 = 0u32;
+    erg checksum_result = wire_crc16_ccitt(
+        input: abs output,
+        start: erg checksum_start,
+        end: frame_data_end
+    );
+    return case dat checksum_result {
+        Result.Err(error) => Result[u32, WireError].Err(error),
+        Result.Ok(checksum) => {
+            output[frame_data_end] = (checksum & 255u16) as u8;
+            output[frame_data_end + 1u32] = ((checksum >> 8u16) & 255u16) as u8;
+            Result[u32, WireError].Ok(frame_data_end + WIRE_CRC_BYTES);
+        },
+    };
+}
+
+verb wire_prepare_frame_output(
+    abs header: WireHeader,
+    ins output: Buffer,
+    erg frame_length: u32
+) -> Result[Int, WireError] {
+    erg output_length: Int = buffer_length(buffer: abs output);
+    if output_length < (frame_length as Int) {
+        return Result[Int, WireError].Err(WireError.InsufficientCapacity);
+    }
+    erg encoded_header = wire_header_encode(header: abs header, output: ins output);
+    return case dat encoded_header {
+        Result.Err(error) => Result[Int, WireError].Err(error),
+        Result.Ok(_) => Result[Int, WireError].Ok(0),
+    };
+}
+
+verb wire_encode_frame_parts(
+    abs header: WireHeader,
+    abs payload: Buffer,
+    ins output: Buffer,
+    erg payload_length: u32
+) -> Result[u32, WireError] {
+    erg frame_data_end: u32 = wire_frame_data_end(header: abs header);
+    erg frame_length: u32 = frame_data_end + WIRE_CRC_BYTES;
+    erg prepared = wire_prepare_frame_output(
+        header: abs header,
+        output: ins output,
+        frame_length: erg frame_length
+    );
+    case dat prepared {
+        Result.Err(error) => {
+            return Result[u32, WireError].Err(error);
+        },
+        Result.Ok(_) => {},
+    };
+    erg payload_result = wire_write_payload_and_checksum(
+        payload: abs payload,
+        output: ins output,
+        payload_length: erg payload_length,
+        frame_data_end: erg frame_data_end
+    );
+    return case dat payload_result {
+        Result.Err(error) => Result[u32, WireError].Err(error),
+        Result.Ok(count) => Result[u32, WireError].Ok(count),
+    };
+}
+
+"""
+Encode a complete bounded frame with its payload and CRC trailer.
+
+The header and payload are borrowed, while `output` is an exclusive caller
+buffer that must already contain enough fixed storage for the complete frame.
+The payload length must equal `header.payload_len`; no allocation, growth, or
+transport I/O occurs. The returned count includes the two little-endian CRC
+bytes. Invalid payload lengths, insufficient output capacity, and invalid
+header fields return typed `WireError` failures.
+"""
+open verb wire_frame_encode(
+    abs header: WireHeader,
+    abs payload: Buffer,
+    ins output: Buffer
+) -> Result[u32, WireError] {
+    erg payload_length: u32 = buffer_length(buffer: abs payload) as u32;
+    if payload_length != (header.payload_len as u32) {
+        return Result[u32, WireError].Err(WireError.PayloadLengthMismatch);
+    }
+    return wire_encode_frame_parts(
+        header: abs header,
+        payload: abs payload,
+        output: ins output,
+        payload_length: erg payload_length
+    );
+}
+
+verb wire_validate_and_copy_payload(
+    abs input: Buffer,
+    ins payload_output: Buffer,
+    erg frame_data_end: u32,
+    erg payload_length: u32
+) -> Result[Int, WireError] {
+    erg checksum_valid = wire_validate_checksum(input: abs input, frame_data_end: erg frame_data_end);
+    case dat checksum_valid {
+        Result.Err(error) => {
+            return Result[Int, WireError].Err(error);
+        },
+        Result.Ok(_) => {},
+    };
+    erg output_length: Int = buffer_length(buffer: abs payload_output);
+    if output_length < (payload_length as Int) {
+        return Result[Int, WireError].Err(WireError.InsufficientCapacity);
+    }
+    erg payload_source_offset: u32 = WIRE_HEADER_BYTES;
+    erg payload_destination_offset: u32 = 0u32;
+    wire_copy_payload(
+        source: abs input,
+        destination: ins payload_output,
+        source_offset: erg payload_source_offset,
+        destination_offset: erg payload_destination_offset,
+        length: erg payload_length
+    );
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_validate_checksum(abs input: Buffer, erg frame_data_end: u32) -> Result[Int, WireError] {
+    erg checksum_start: u32 = 0u32;
+    erg checksum_result = wire_crc16_ccitt(
+        input: abs input,
+        start: erg checksum_start,
+        end: frame_data_end
+    );
+    erg expected_checksum: u16 = wire_read_checksum(input: abs input, offset: erg frame_data_end);
+    erg computed_checksum: u16 = case dat checksum_result {
+        Result.Err(error) => {
+            return Result[Int, WireError].Err(error);
+        },
+        Result.Ok(value) => value,
+    };
+    if computed_checksum != expected_checksum {
+        return Result[Int, WireError].Err(WireError.ChecksumMismatch);
+    }
+    return Result[Int, WireError].Ok(0);
+}
+
+verb wire_decode_frame_with_header(
+    dat header: WireHeader,
+    abs input: Buffer,
+    ins payload_output: Buffer
+) -> Result[WireHeader, WireError] {
+    erg frame_data_end: u32 = wire_frame_data_end(header: abs header);
+    erg frame_length: u32 = frame_data_end + WIRE_CRC_BYTES;
+    erg input_length: Int = buffer_length(buffer: abs input);
+    if input_length < (frame_length as Int) {
+        return Result[WireHeader, WireError].Err(WireError.Truncated);
+    }
+    erg payload_length: u32 = header.payload_len as u32;
+    erg payload_result = wire_validate_and_copy_payload(
+        input: abs input,
+        payload_output: ins payload_output,
+        frame_data_end: erg frame_data_end,
+        payload_length: erg payload_length
+    );
+    return case dat payload_result {
+        Result.Err(error) => Result[WireHeader, WireError].Err(error),
+        Result.Ok(_) => Result[WireHeader, WireError].Ok(header),
+    };
+}
+
+"""
+Decode one complete frame and copy its validated payload into caller storage.
+
+The input is borrowed and may contain bytes after the first complete frame;
+only the declared frame is consumed. `payload_output` is mutated only after
+header, length, and CRC validation succeeds. The result returns the validated
+header, while truncated, malformed, corrupt, or undersized operations return
+a typed `WireError` without partial payload delivery.
+"""
+open verb wire_frame_decode(abs input: Buffer, ins payload_output: Buffer) -> Result[WireHeader, WireError] {
+    erg header_result = wire_header_decode(input: abs input);
+    return case dat header_result {
+        Result.Err(error) => Result[WireHeader, WireError].Err(error),
+        Result.Ok(header) => wire_decode_frame_with_header(
+            header: dat header,
+            input: abs input,
+            payload_output: ins payload_output
+        ),
+    };
+}

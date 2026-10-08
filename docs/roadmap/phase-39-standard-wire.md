@@ -45,9 +45,9 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 - [x] Implement named protocol constants for magic, version, lengths, flags,
       payload bound, and CRC parameters.
 - [x] Implement fixed-width little-endian header encoding and decoding.
-- [ ] Validate payload length before payload access.
-- [ ] Serialize valid frames into caller-owned bounded buffers.
-- [ ] Reject insufficient output capacity with a typed error.
+- [x] Validate payload length before payload access.
+- [x] Serialize valid frames into caller-owned bounded buffers.
+- [x] Reject insufficient output capacity with a typed error.
 - [ ] Prove byte-for-byte deterministic serialization across repeated builds.
 - [ ] Add empty, minimum, maximum, and over-sized payload tests.
 
@@ -57,7 +57,7 @@ This phase supersedes the former `std::ustari` split. The protocol name is
 - [ ] Reject bad magic, version, reserved flags, impossible lengths, and CRC.
 - [ ] Distinguish framing, capacity, integrity, version, and policy failures.
 - [ ] Prove rejected frames do not mutate caller-owned protocol state.
-- [ ] Add native execution tests for successful and failed CRC paths.
+- [x] Add native execution tests for successful and failed CRC paths.
 
 ## Gate 39.4 — Incremental bounded parser
 
