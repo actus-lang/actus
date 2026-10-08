@@ -1,67 +1,53 @@
 # `std::wire`
 
+`std::wire` is a bounded, transport-neutral binary framing library. It
+encodes and validates fixed-width metadata, payloads, CRC16 integrity trailers,
+incremental input, replay-window state, fragmentation, and optional endpoint
+text parsing.
+
 ```actus
 import std::wire;
 ```
-`std::wire` is a target-neutral bounded binary framing library. It provides
-fixed-width frame metadata, typed protocol errors, checksum calculation,
-encoding and decoding, incremental parsing, sequence-window replay
-suppression, fragmentation, and caller-owned reassembly.
 
-The initial frame contract uses a 12-byte header, a bounded payload, and a
-CRC16 trailer. All multi-byte fields use the declared little-endian layout.
-CRC detects accidental corruption; it is not authentication or authorization.
+The core protocol operates on caller-owned `Buffer` values. It does not open
+sockets, access a filesystem, allocate a heap buffer, select a transport, or
+require a `wire://` string. A desktop application may use the optional
+endpoint parser as a convenient address representation; embedded code may
+exchange frames using numeric identifiers and byte buffers only.
 
-The core does not require a URI, operating system, filesystem, transport,
-allocation, or cryptographic service. `wire://` endpoint parsing is optional
-and belongs to a hosted endpoint layer. Direct typed frame APIs and numeric
-channels remain valid communication paths.
+## Reading order
 
-See the protocol ADR and the Wire examples for complete frame fields and
-lifecycle operations.
+1. [API](api.md) — public types, constants, verbs, and result mapping.
+2. [Frame protocol](protocol.md) — header layout, payload, CRC, and flags.
+3. [Codec and parser](codec-and-parser.md) — complete frames and split input.
+4. [Sequence window](sequence.md) — duplicate, stale, and context handling.
+5. [Fragments](fragments.md) — bounded message reassembly.
+6. [Endpoints](endpoints.md) — optional `wire://` parser and offset views.
+7. [Ownership and lifecycle](lifecycle.md), [errors](errors.md), and
+   [runtime](runtime.md).
+8. [Usage](usage.md) and [examples](examples.md).
 
-## Public surface
+## Core versus optional layers
 
-The facade includes:
+The core layers are frame metadata, CRC, encode/decode, incremental parsing,
+sequence acceptance, and fragment reassembly. They are usable with a serial
+link, shared memory, a file-like test fixture, a device driver, or another
+transport selected by the caller.
 
-- `WireHeader` and version-one frame constants;
-- `WireError` typed protocol failures;
-- header and complete-frame encode/decode operations;
-- `wire_crc16_ccitt` over a bounded input range;
-- `WireParser` construction, reset, status, consumed-byte, header, and feed
-  operations;
-- `WireSequenceWindow` construction, reset, context replacement, highest
-  sequence, and bounded admission operations;
-- `WireFragmentHeader`, bounded fragment encode/decode, and
-  `WireReassembly` open, begin, accept, copy, and cancel operations;
-- optional hosted `wire://` endpoint parsing with bounded fixed metadata.
+`wire_endpoint_parse` is an optional hosted convenience. It recognizes a
+bounded `wire://authority[:port][/path]` byte form and returns offsets into the
+unchanged input. It does not open a connection or make endpoint syntax
+mandatory for frame exchange.
 
-Frame and parser inputs are read through `abs Buffer`; output and reassembly
-storage use caller-owned `ins Buffer` according to the declaration. The core
-has no hidden allocation or synchronous transport I/O.
+## Security boundary
 
-## Detailed pages
+CRC16 detects accidental corruption. It is not cryptographic authentication,
+anti-tamper protection, authorization, or encryption. A higher-level protocol
+must add those properties explicitly when required.
 
-- [Protocol reference](protocol.md)
-- [Protocol reference](../reference/20-standard-library.md)
-- [Wire implementation](../../../../library/std/src/wire/)
-- [Native Wire tests](../../../../tests/std_wire_native.rs)
-- [Semantic Wire tests](../../../../tests/std_wire_semantic.rs)
+## Source and evidence
 
-## Processing lifecycle
-
-1. Build a `WireHeader` with a supported version, flags, channel, sequence,
-   and payload length.
-2. Encode the header or complete frame into caller-owned output storage.
-3. On receive, feed arbitrary byte chunks to `WireParser`; a split chunk is a
-   normal input, not an error.
-4. Read the validated header and copied payload only after the parser reaches
-   `Ready`.
-5. Use `WireSequenceWindow` to reject duplicates, stale sequence numbers, and
-   context mismatches.
-6. For messages larger than one frame, encode bounded fragments and use
-   `WireReassembly` with an explicit generation, capacity, and cancellation
-   path.
-
-`wire://` endpoint parsing is optional hosted metadata. The binary frame API
-does not require a URI, string, socket, or transport implementation.
+The implementation is in
+[`library/std/src/wire/`](../../../../library/std/src/wire/). Native coverage
+is in [`tests/std_wire_native.rs`](../../../../tests/std_wire_native.rs); facade
+and visibility coverage is in [`tests/std_wire_semantic.rs`](../../../../tests/std_wire_semantic.rs).

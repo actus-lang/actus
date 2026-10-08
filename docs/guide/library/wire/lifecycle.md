@@ -1,30 +1,39 @@
-# `std::wire` lifecycle
+# Ownership and lifecycle
 
-## Incremental parsing
+## Buffer roles
 
-Create a `WireParser`, feed arbitrary chunks, inspect `consumed`, and check
-`status`. A split header or payload is normal. When the parser reaches `Ready`,
-read the validated header and copied payload, then reset before feeding the
-next frame.
+- `abs` frame, payload, input, and endpoint buffers are borrowed read-only.
+- `ins` output, parser, sequence window, and reassembly state are mutated in
+  caller-owned storage for the duration of a call.
+- `dat` reassembly storage transfers ownership into `WireReassembly`.
 
-## Sequence admission
+The codec never allocates a replacement buffer when output capacity is too
+small. The caller chooses and provisions storage before encoding, feeding, or
+reassembly.
 
-`WireSequenceWindow` is scoped by an explicit context. The first sequence
-establishes the window; forward sequences advance it; duplicates and stale
-values are rejected. Replacing the context clears the prior history. The
-window is bounded and uses a 64-frame bitmask.
+## Parser lifecycle
 
-## Fragment reassembly
+Create with `wire_parser_empty`, feed chunks until `Ready`, read the header
+and copied payload, then reset before accepting another frame. A parser may be
+reset after a malformed frame or abandoned partial input.
 
-Open reassembly with caller-owned storage, begin a generation with total
-length and fragment count, then accept each encoded fragment. Duplicate,
-overlapping, stale, out-of-range, and capacity-violating fragments are
-rejected. Copy the complete payload only after all fragments arrive, or call
-cancel to discard the lifecycle.
+## Sequence lifecycle
 
-## Endpoint metadata
+Create an empty window, establish a context on the first accepted sequence,
+and use explicit reset or context replacement when the stream changes. A
+rejected duplicate, stale, or mismatched frame does not mutate the window.
 
-`wire_endpoint_parse` is optional hosted metadata for bounded
-`wire://authority[:port][/path]` values. It returns offsets into the unchanged
-input buffer and does not open a socket. Embedded users can omit endpoint
-parsing and exchange frames through numeric channel identifiers.
+## Reassembly lifecycle
+
+`wire_reassembly_open` consumes caller storage. `wire_reassembly_begin`
+starts one generation after checking capacity. Accepted fragments are copied
+into that storage. `wire_reassembly_copy` borrows the completed state; it does
+not consume it. `wire_reassembly_cancel` clears metadata and keeps storage
+owned by the reassembly value for reuse.
+
+## Endpoint view lifetime
+
+`WireEndpoint` contains offsets into the input buffer, not owned endpoint text.
+The input must remain available while those offsets are interpreted. Do not
+serialize the offset view without also defining the lifetime and identity of
+the source bytes.
