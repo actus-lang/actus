@@ -208,7 +208,7 @@ During migration:
 
 ### Gate 40.4: Ownership and cleanup
 
-- [ ] Document `erg`, `abs`, `dat`, and `ins` in separate focused files.
+- [x] Document `erg`, `abs`, `dat`, and `ins` in separate focused files.
 - [ ] Explain ownership transfer, shared views, exclusive loans, moves, reuse,
       scope cleanup, and return cleanup.
 - [ ] Document ownership behavior through `case`, loops, conditional branches,
