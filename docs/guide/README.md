@@ -32,6 +32,25 @@ test, format, and build a project.
 8. [Cleanup and scope](ownership/cleanup-and-scope.md)
 9. [Ownership diagnostics](ownership/common-diagnostics.md)
 
+### Intermediate Actus work
+
+1. [Ownership overview](ownership/overview.md)
+2. [Structs and enums](language/structs.md)
+3. [Arrays and buffers](language/arrays-and-buffers.md)
+4. [Modules and facades](modules/overview.md)
+5. [Errors and results](standard-library/errors-and-results.md)
+6. [Debugging](workflow/debugging.md)
+
+### Advanced Actus work
+
+1. [Generics](language/generics.md)
+2. [Packs](language/packs.md)
+3. [Constants](language/constants.md)
+4. [Regions](standard-library/regions.md)
+5. [Native builds](compiler/native-builds.md)
+6. [Wire](standard-library/wire.md)
+7. [Benchmarks](workflow/benchmarks.md)
+
 ### Building a project
 
 1. [Project setup](workflow/project-setup.md)

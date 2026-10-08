@@ -257,7 +257,7 @@ During migration:
 
 ### Gate 40.8: Human examples and learning paths
 
-- [ ] Add a beginner path from an empty project to a checked executable.
+- [x] Add a beginner path from an empty project to a checked executable.
 - [ ] Add an intermediate path covering ownership, modules, standard-library
       calls, and typed failures.
 - [ ] Add an advanced path covering generic types, packs, serialization,
@@ -269,7 +269,7 @@ During migration:
 
 ### Gate 40.9: Agent reference
 
-- [ ] Create a concise reading order for agents before source changes.
+- [x] Create a concise reading order for agents before source changes.
 - [ ] Create a source-change checklist covering repository scope, contracts,
       facades, ownership, layout, tests, and documentation.
 - [ ] Document how to distinguish implemented behavior, documented boundaries,
