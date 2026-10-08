@@ -402,14 +402,14 @@ handbook in one change.
 
 ### Gate 40.15: Struct handbook depth pass
 
-- [ ] Expand the struct guide with field roles, aggregate construction,
+- [x] Expand the struct guide with field roles, aggregate construction,
       partial-field moves, cleanup, nested structs, generic structs, and
       arena-backed references.
-- [ ] Explain `perform` contracts through a complete role and implementation
+- [x] Explain `perform` contracts through a complete role and implementation
       example.
-- [ ] Add valid and rejected examples tied to current ownership and semantic
+- [x] Add valid and rejected examples tied to current ownership and semantic
       diagnostics.
-- [ ] Reconcile the guide with struct, drop, generic, and native ABI tests.
+- [x] Reconcile the guide with struct, drop, generic, and native ABI tests.
 
 ### Gate 40.16: Pack handbook depth pass
 
