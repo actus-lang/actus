@@ -76,10 +76,16 @@ frame bytes, accepts payload lengths `0`, `1`, and `1024`, and rejects length
 ## Gate 39.3 — CRC and typed failure paths
 
 - [x] Implement CRC16-CCITT with the ADR-0078 parameters.
-- [ ] Reject bad magic, version, reserved flags, impossible lengths, and CRC.
-- [ ] Distinguish framing, capacity, integrity, version, and policy failures.
-- [ ] Prove rejected frames do not mutate caller-owned protocol state.
+- [x] Reject bad magic, version, reserved flags, impossible lengths, and CRC.
+- [x] Distinguish framing, capacity, integrity, version, and policy failures.
+- [x] Prove rejected frames do not mutate caller-owned protocol state.
 - [x] Add native execution tests for successful and failed CRC paths.
+
+Gate 39.3 evidence is provided by `tests/std_wire_native.rs`: native execution
+checks typed failures for invalid magic, unsupported version, unknown flags,
+oversized payload declarations, truncated headers, insufficient capacity, and
+CRC mismatch. The CRC failure path initializes a caller-owned payload buffer
+with sentinel bytes and verifies that rejection leaves it unchanged.
 
 ## Gate 39.4 — Incremental bounded parser
 

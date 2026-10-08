@@ -107,14 +107,68 @@ verb frame_status(dat header: WireHeader) -> Int {
 }
 verb bad_checksum_status(ins encoded: Buffer) -> Int {
     erg payload: Buffer = Buffer[3];
+    payload[0] = 91u8;
+    payload[1] = 92u8;
+    payload[2] = 93u8;
     erg decoded = wire_frame_decode(input: abs encoded, payload_output: ins payload);
     return case dat decoded {
         Result.Ok(_) => 2,
         Result.Err(error) => case dat error {
-            WireError.ChecksumMismatch => 0,
+            WireError.ChecksumMismatch => if payload[0] == 91u8 && payload[1] == 92u8 && payload[2] == 93u8 { 0 } else { 3 },
             _ => 1,
         },
     };
+}
+verb invalid_magic_status() -> Int {
+    erg input: Buffer = Buffer[12];
+    input[0] = 0u8;
+    input[1] = WIRE_MAGIC_1;
+    input[2] = WIRE_VERSION;
+    erg decoded = wire_header_decode(input: abs input);
+    return case dat decoded { Result.Err(error) => case dat error { WireError.InvalidMagic => 0, _ => 1 }, _ => 1 };
+}
+verb invalid_version_status() -> Int {
+    erg input: Buffer = Buffer[12];
+    input[0] = WIRE_MAGIC_0;
+    input[1] = WIRE_MAGIC_1;
+    input[2] = 2u8;
+    erg decoded = wire_header_decode(input: abs input);
+    return case dat decoded { Result.Err(error) => case dat error { WireError.UnsupportedVersion => 0, _ => 1 }, _ => 1 };
+}
+verb unknown_flags_status() -> Int {
+    erg input: Buffer = Buffer[12];
+    input[0] = WIRE_MAGIC_0;
+    input[1] = WIRE_MAGIC_1;
+    input[2] = WIRE_VERSION;
+    input[3] = 1u8;
+    erg decoded = wire_header_decode(input: abs input);
+    return case dat decoded { Result.Err(error) => case dat error { WireError.UnknownFlags => 0, _ => 1 }, _ => 1 };
+}
+verb oversized_header_status() -> Int {
+    erg input: Buffer = Buffer[12];
+    input[0] = WIRE_MAGIC_0;
+    input[1] = WIRE_MAGIC_1;
+    input[2] = WIRE_VERSION;
+    input[3] = 0u8;
+    input[10] = 1u8;
+    input[11] = 4u8;
+    erg decoded = wire_header_decode(input: abs input);
+    return case dat decoded {
+        Result.Err(error) => case dat error {
+            WireError.InvalidMagic => 1,
+            WireError.UnsupportedVersion => 2,
+            WireError.UnknownFlags => 3,
+            WireError.PayloadTooLarge => 0,
+            WireError.Truncated => 4,
+            _ => 5,
+        },
+        Result.Ok(_) => 6,
+    };
+}
+verb truncated_header_status() -> Int {
+    erg input: Buffer = Buffer[11];
+    erg decoded = wire_header_decode(input: abs input);
+    return case dat decoded { Result.Err(error) => case dat error { WireError.Truncated => 0, _ => 1 }, _ => 1 };
 }
 verb frame_count_status(abs header: WireHeader, abs payload: Buffer, abs expected_count: u32) -> Int {
     erg output = Buffer[1038];
@@ -228,12 +282,34 @@ verb deterministic_status() -> Int {
     }
     return 0;
 }
+verb negative_status() -> Int {
+    if invalid_magic_status() != 0 {
+        return 1;
+    }
+    if invalid_version_status() != 0 {
+        return 2;
+    }
+    if unknown_flags_status() != 0 {
+        return 3;
+    }
+    if oversized_header_status() != 0 {
+        return 4;
+    }
+    if truncated_header_status() != 0 {
+        return 5;
+    }
+    return 0;
+}
 verb main() -> Int {
     if crc_status() != 0 {
         return 7;
     }
     if header_status() != 0 {
         return 8;
+    }
+    erg negative = negative_status();
+    if negative != 0 {
+        return 11;
     }
     erg boundary = boundary_status();
     if boundary != 0 {
