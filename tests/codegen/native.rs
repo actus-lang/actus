@@ -246,6 +246,23 @@ fn lowers_size_of_to_a_compile_time_integer_constant() {
 }
 
 #[test]
+fn lowers_align_of_to_a_compile_time_integer_constant() {
+    let source = "verb main() -> u64 { return align_of[u64](); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("align_of source should parse");
+    let bytes = actus::codegen::emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("align_of should lower without a runtime dependency");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(!symbols.iter().any(|symbol| symbol.contains("align_of")));
+}
+
+#[test]
 fn generic_external_abi_uses_the_canonical_native_symbol() {
     let source = "unsafe extern \"C\" verb bridge[N: Usize]() -> Int; verb main() -> Int { return bridge[4](); }";
     let (tokens, errors) = scan(source);

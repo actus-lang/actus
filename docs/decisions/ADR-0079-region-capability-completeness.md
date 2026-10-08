@@ -145,7 +145,7 @@ small aggregate or multi-register ABI. It must not expose a runtime pointer.
 The public type must remain opaque to callers while preserving stable generic
 identity through nested calls, returns, facade imports, and cleanup lowering.
 
-### 4.1 Current Gate 41.2 identity profile
+### 4.1 Current Gate 41.3 identity and layout profile
 
 The current compatible descriptor profile fixes the following widths without
 changing the Phase 38 public Region operations:
@@ -154,11 +154,25 @@ changing the Phase 38 public Region operations:
 - The low 32 bits encode a one-based capability slot index.
 - The high 32 bits encode the slot generation.
 - `RegionGeneration` is `u64` and starts at `1`; zero is never authorized.
-- `element_stride`, `logical_length`, `window_start`, and `window_count` are
-  `u64` values.
+- `element_stride`, `element_alignment`, `logical_length`, `window_start`, and
+  `window_count` are `u64` values.
 - `dirty`, `logical_index_bits`, and `byte_offset_bits` are `u8` values.
-- The runtime `repr(C)` descriptor is 56 bytes, aligned to 8 bytes, with a
-  descriptor ABI version of `1`.
+- `element_alignment` must be non-zero, a power of two, and no greater than
+  `element_stride`.
+- The runtime `repr(C)` descriptor is 64 bytes, aligned to 8 bytes, with a
+  descriptor ABI version of `2`. Its fixed field offsets are: handle `0`,
+  stride `8`, alignment `16`, logical length `24`, window start `32`, window
+  count `40`, generation `48`, dirty `56`, logical-index width `57`, and
+  byte-offset width `58`.
+
+The descriptor ABI version is checked at the runtime boundary. A version-1
+descriptor is not silently reinterpreted as version 2; mixed compiler/runtime
+artifacts must fail with the existing typed descriptor compatibility error.
+
+The compiler exposes `size_of[T]()` and `align_of[T]()` as compile-time layout
+intrinsics. Region opening derives both values from the fully sized element
+type. The runtime validates multiplication, addition, logical extent, window
+range, and byte offsets with checked arithmetic before native access.
 
 Capability allocation increments the slot generation before returning a
 handle. Releasing a slot never resets that generation. Reusing the slot

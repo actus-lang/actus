@@ -16,8 +16,8 @@ const RESULT_REGION_SIZE: usize = 16;
 const RESULT_REGION_PAYLOAD_OFFSET: usize = 8;
 const RESULT_U64_PAYLOAD_OFFSET: usize = 8;
 const RESULT_INT_PAYLOAD_OFFSET: usize = 4;
-const REGION_GENERATION_OFFSET: usize = 40;
-const REGION_DIRTY_OFFSET: usize = 48;
+const REGION_GENERATION_OFFSET: usize = 48;
+const REGION_DIRTY_OFFSET: usize = 56;
 
 static REGION_STORE: std::sync::Mutex<RegionStore> = std::sync::Mutex::new(RegionStore::new());
 
@@ -40,6 +40,7 @@ impl RegionStore {
         &mut self,
         backing: Vec<u8>,
         element_stride: u64,
+        element_alignment: u64,
         logical_length: u64,
         window_start: u64,
         window_count: u64,
@@ -60,6 +61,7 @@ impl RegionStore {
             handle,
             backing,
             element_stride,
+            element_alignment,
             logical_length,
             window_start,
             window_count,
@@ -198,6 +200,7 @@ pub unsafe extern "C" fn actus_region_drop(handle: RegionHandle) -> i32 {
 pub unsafe extern "C" fn actus_region_open(
     backing: *mut ActusBuffer,
     element_stride: u64,
+    element_alignment: u64,
     logical_length: u64,
     window_start: u64,
     window_count: u64,
@@ -209,8 +212,14 @@ pub unsafe extern "C" fn actus_region_open(
         Ok(store) => store,
         Err(_) => return error_result(RESULT_REGION_SIZE, RegionError::BackendFailure),
     };
-    match store.allocate(backing_bytes, element_stride, logical_length, window_start, window_count)
-    {
+    match store.allocate(
+        backing_bytes,
+        element_stride,
+        element_alignment,
+        logical_length,
+        window_start,
+        window_count,
+    ) {
         Ok(descriptor) => {
             let result = allocate_result(RESULT_REGION_SIZE, RESULT_OK);
             if result.is_null() {
@@ -381,7 +390,7 @@ mod tests {
         let descriptor = {
             let mut store = REGION_STORE.lock().expect("region store should not be poisoned");
             let descriptor =
-                store.allocate(vec![0u8; 4], 4, 1, 0, 1).expect("region slot should allocate");
+                store.allocate(vec![0u8; 4], 4, 1, 1, 0, 1).expect("region slot should allocate");
             let handle = descriptor.handle;
             let pointer = Box::into_raw(Box::new(descriptor));
             store.attach_descriptor(handle, pointer).expect("descriptor should attach");

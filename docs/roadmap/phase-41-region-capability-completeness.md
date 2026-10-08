@@ -7,8 +7,9 @@ complete, target-neutral, bounded logical-storage library. No downstream
 application, device, model, or product integration belongs in this phase.
 
 Phase 38 remains the completed foundation. Phase 41 extends and hardens that
-foundation; it does not redefine `Array[T, N]` and does not silently change the
-existing Region ABI or serialized contracts.
+foundation; it does not redefine `Array[T, N]`. The internal Region descriptor
+ABI is versioned when its validated layout contract expands; public Region
+operation names and ownership roles remain source-compatible.
 
 The governing agreement is [ADR-0079](../decisions/ADR-0079-region-capability-completeness.md).
 
@@ -88,8 +89,9 @@ uses one shared handle encoder and decoder in `src/runtime/capabilities.rs`
 and `src/runtime/region_bridge.rs`; the hosted bridge no longer maintains a
 second handle encoding formula.
 
-The descriptor is `repr(C)`, 56 bytes, aligned to 8 bytes, and contains only
-fixed-width integer fields. The ABI version is `1`. Capability slot reuse
+The descriptor was `repr(C)`, 56 bytes, aligned to 8 bytes, and contained only
+fixed-width integer fields. The ABI version was `1`. Gate 41.3 supersedes that
+internal descriptor profile with an explicitly versioned layout. Capability slot reuse
 increments the upper 32-bit generation and rejects the old handle. Slot
 capacity and generation wraparound return typed failures.
 
@@ -109,14 +111,39 @@ descriptor pointer or provider-specific type was introduced.
 
 ## Gate 41.3 — Element layout, stride, alignment, and overflow
 
-- [ ] Accept supported sized primitives, arrays, packs, and structs.
-- [ ] Reject unsized, incomplete, malformed, and unsupported element types.
-- [ ] Validate size, alignment, stride, logical length, window count, and byte
+- [x] Accept supported sized primitives, arrays, packs, and structs.
+- [x] Reject unsized, incomplete, malformed, and unsupported element types.
+- [x] Validate size, alignment, stride, logical length, window count, and byte
       offset before native access.
-- [ ] Detect index-times-stride and range-end overflow deterministically.
-- [ ] Preserve pack layout, byte order, padding, and field offsets.
-- [ ] Add accepted and rejected layout fixtures for hosted and freestanding
+- [x] Detect index-times-stride and range-end overflow deterministically.
+- [x] Preserve pack layout, byte order, padding, and field offsets.
+- [x] Add accepted and rejected layout fixtures for hosted and freestanding
       profiles.
+
+#### Gate 41.3 evidence
+
+The compiler now provides `align_of[T]()` alongside `size_of[T]()` for fixed
+layout types. `region_open` derives both values and passes them through the
+private bridge. The runtime descriptor is version 2, 64 bytes, and stores the
+validated element alignment at offset 16; bridge generation and dirty writes
+use the updated offsets at 48 and 56.
+
+Runtime validation rejects zero, non-power-of-two, and over-stride alignment,
+zero or overflowing extents, invalid windows, unsupported address widths, and
+index-times-stride or range-end overflow. Existing primitive and packed
+layouts retain their field offsets and byte order. Semantic fixtures cover
+accepted fixed-size types and rejected unsized or missing intrinsic arguments;
+runtime fixtures cover valid packed alignment and invalid descriptor profiles.
+
+Evidence commands and results are recorded after the gate implementation is
+validated:
+
+```text
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo test --lib runtime::region -- --test-threads=1
+cargo test --test semantic_intrinsics --test std_region_semantic --test std_region_native -- --test-threads=1
+```
 
 ## Gate 41.4 — Complete window lifecycle
 

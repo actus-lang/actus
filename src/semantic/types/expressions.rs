@@ -78,7 +78,7 @@ impl Analyzer {
                 | IntrinsicKind::ValidateFixedFrame
                 | IntrinsicKind::Print,
             ) => Some(BuiltinType::Int),
-            Some(IntrinsicKind::SizeOf) => Some(BuiltinType::Int),
+            Some(IntrinsicKind::SizeOf | IntrinsicKind::AlignOf) => Some(BuiltinType::Int),
             Some(IntrinsicKind::Copy) => self
                 .inferred_expression_types
                 .get(&(span.start, span.end))

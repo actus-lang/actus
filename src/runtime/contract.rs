@@ -2,7 +2,7 @@
 pub const RUNTIME_ABI_VERSION: u32 = 1;
 
 /// Version of the fixed-width Region descriptor ABI.
-pub const REGION_DESCRIPTOR_ABI_VERSION: u32 = 1;
+pub const REGION_DESCRIPTOR_ABI_VERSION: u32 = 2;
 
 /// Successful scalar C-ABI operation status.
 pub const ABI_STATUS_SUCCESS: i32 = 0;

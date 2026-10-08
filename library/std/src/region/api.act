@@ -7,13 +7,28 @@ exposes only checked operations. The operations do not perform filesystem I/O
 or allocate on the read, write, publish, cancel, or close paths.
 """
 """Private bridge that creates a region and consumes the supplied backing buffer."""
-unsafe extern "C" verb actus_region_open[T](dat backing: Buffer, erg element_stride: u64, erg logical_length: u64, erg window_start: u64, erg window_count: u64) -> Result[Region[T], RegionError];
+unsafe extern "C" verb actus_region_open[T](
+    dat backing: Buffer,
+    erg element_stride: u64,
+    erg element_alignment: u64,
+    erg logical_length: u64,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[Region[T], RegionError];
 
 """Private bridge that reads one resident element into an exact-size buffer."""
-unsafe extern "C" verb actus_region_read[T](abs region: Region[T], erg index: u64, ins destination: Buffer) -> Result[Int, RegionError];
+unsafe extern "C" verb actus_region_read[T](
+    abs region: Region[T],
+    erg index: u64,
+    ins destination: Buffer
+) -> Result[Int, RegionError];
 
 """Private bridge that replaces one resident element from an exact-size buffer."""
-unsafe extern "C" verb actus_region_write[T](ins region: Region[T], erg index: u64, abs source: Buffer) -> Result[Int, RegionError];
+unsafe extern "C" verb actus_region_write[T](
+    ins region: Region[T],
+    erg index: u64,
+    abs source: Buffer
+) -> Result[Int, RegionError];
 
 """Private bridge that publishes dirty resident bytes and advances generation."""
 unsafe extern "C" verb actus_region_publish[T](ins region: Region[T]) -> Result[u64, RegionError];
@@ -33,11 +48,18 @@ validation succeeds. The logical length may exceed resident storage, while
 fully sized primitive, array, pack, or struct type. No filesystem operation is
 performed by this call.
 """
-open verb region_open[T](dat backing: Buffer, erg logical_length: u64, erg window_start: u64, erg window_count: u64) -> Result[Region[T], RegionError] {
+open verb region_open[T](
+    dat backing: Buffer,
+    erg logical_length: u64,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[Region[T], RegionError] {
     erg element_stride: u64 = size_of[T]();
+    erg element_alignment: u64 = align_of[T]();
     return actus_region_open(
         backing: dat backing,
         element_stride: erg element_stride,
+        element_alignment: erg element_alignment,
         logical_length: erg logical_length,
         window_start: erg window_start,
         window_count: erg window_count
@@ -51,8 +73,16 @@ Read one logical element from the resident window.
 the call. The destination must be exactly `size_of[T]()` bytes wide. The
 region owner remains valid after the operation.
 """
-open verb region_read[T](abs region: Region[T], erg index: u64, ins destination: Buffer) -> Result[Int, RegionError] {
-    return actus_region_read(region: abs region, index: erg index, destination: ins destination);
+open verb region_read[T](
+    abs region: Region[T],
+    erg index: u64,
+    ins destination: Buffer
+) -> Result[Int, RegionError] {
+    return actus_region_read(
+        region: abs region,
+        index: erg index,
+        destination: ins destination
+    );
 }
 
 """
@@ -62,8 +92,16 @@ Write one logical element in the resident window.
 must be exactly `size_of[T]()` bytes wide. The operation remains in memory and
 marks the region dirty until `region_publish` or `region_cancel` is called.
 """
-open verb region_write[T](ins region: Region[T], erg index: u64, abs source: Buffer) -> Result[Int, RegionError] {
-    return actus_region_write(region: ins region, index: erg index, source: abs source);
+open verb region_write[T](
+    ins region: Region[T],
+    erg index: u64,
+    abs source: Buffer
+) -> Result[Int, RegionError] {
+    return actus_region_write(
+        region: ins region,
+        index: erg index,
+        source: abs source
+    );
 }
 
 """

@@ -47,6 +47,8 @@ fn intrinsic_registry_defines_source_contracts() {
     assert_eq!(lookup_call_intrinsic("copy"), Some(IntrinsicKind::Copy));
     assert_eq!(lookup_intrinsic("size_of"), Some(IntrinsicKind::SizeOf));
     assert_eq!(lookup_call_intrinsic("size_of[u32]"), Some(IntrinsicKind::SizeOf));
+    assert_eq!(lookup_intrinsic("align_of"), Some(IntrinsicKind::AlignOf));
+    assert_eq!(lookup_call_intrinsic("align_of[u32]"), Some(IntrinsicKind::AlignOf));
     assert_eq!(lookup_call_intrinsic("crc32"), Some(IntrinsicKind::Crc32));
     assert_eq!(lookup_call_intrinsic("crc32_matches"), Some(IntrinsicKind::Crc32Matches));
     assert_eq!(
@@ -62,6 +64,25 @@ fn accepts_compile_time_size_of_for_fixed_types() {
         .expect("size_of should accept a fixed-width primitive");
     analyze_source("verb main() -> u64 { return size_of[Array[u8, 4]](); }")
         .expect("size_of should accept a fixed-size array");
+}
+
+#[test]
+fn accepts_compile_time_align_of_for_fixed_types() {
+    analyze_source("verb main() -> u64 { return align_of[u32](); }")
+        .expect("align_of should accept a fixed-width primitive");
+    analyze_source("verb main() -> u64 { return align_of[Array[u64, 4]](); }")
+        .expect("align_of should accept a fixed-size array");
+}
+
+#[test]
+fn rejects_align_of_without_a_fixed_type_argument() {
+    for source in [
+        "verb main() -> u64 { return align_of(); }",
+        "verb main() -> u64 { return align_of[Buffer](); }",
+        "verb main() -> u64 { return align_of[Region[u32]](); }",
+    ] {
+        analyze_source(source).expect_err("align_of must reject non-fixed or missing types");
+    }
 }
 
 #[test]

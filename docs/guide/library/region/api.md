@@ -34,8 +34,10 @@ open verb region_write[T](
 ) -> Result[Int, RegionError];
 ```
 
-Both buffers must be exactly `size_of[T]()` bytes wide. `region_read` copies
-one resident element into the destination. `region_write` replaces one
+Both buffers must be exactly `size_of[T]()` bytes wide. The runtime derives the
+element alignment from `align_of[T]()` and rejects a descriptor whose alignment
+is zero, non-power-of-two, or greater than its stride. `region_read` copies one
+resident element into the destination. `region_write` replaces one
 resident element and makes the region dirty until publish or cancel.
 
 ## Lifecycle
