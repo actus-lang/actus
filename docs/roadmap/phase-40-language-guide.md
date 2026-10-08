@@ -309,9 +309,9 @@ During migration:
 
 - [ ] Decide the final role of `ACTUS_CODING_AGENT_GUIDE.md` after the handbook
       is complete.
-- [ ] If it becomes a short entry point, preserve links to all handbook
+- [x] If it becomes a short entry point, preserve links to all handbook
       categories and the agent reference.
-- [ ] If it remains a compatibility document, state its relationship to the
+- [x] If it remains a compatibility document, state its relationship to the
       handbook without duplicating the full content.
 - [ ] Remove stale duplicated sections only after the handbook contains their
       complete destination content.

@@ -9,7 +9,6 @@ import std::io;
 
 verb main() -> Void {
     erg ready: Bool = true;
-
     case ready {
         true => {
             erg message = "ACTUS_EVENT branch=case status=ready";
@@ -20,7 +19,6 @@ verb main() -> Void {
             println(abs not_ready_message);
         },
     };
-
     if false {
         erg skipped_message = "ACTUS_EVENT branch=if status=skipped";
         println(abs skipped_message);

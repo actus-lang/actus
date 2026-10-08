@@ -15,11 +15,10 @@ pack ControlRegister {
 }
 
 verb configure_control() -> Int {
-    erg control = ControlRegister { storage: 0, };
+    erg control = ControlRegister {storage: 0};
     control.enabled = 1;
     control.prescaler = 5;
     control.mode = 2;
-
     """`ready` is an abs field: it is observable but cannot be mutated."""
     return control.enabled + control.ready + control.prescaler + control.mode;
 }

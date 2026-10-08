@@ -1,5 +1,4 @@
 """Rejected fixture: a borrowed Buffer cannot be dropped by the callee."""
-
 verb invalid(abs output: Buffer) {
     drop(output);
 }

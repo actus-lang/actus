@@ -8,3 +8,8 @@ links to the human handbook instead of repeating language explanations.
 - [Evidence and scope](evidence-and-scope.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Diagnostic decision tree](diagnostic-decision-tree.md)
+
+## Complete reference details
+
+The [operating reference](operating-reference/) preserves the complete agent
+workflow and repository reference material.

@@ -23,9 +23,15 @@ verb main() -> Int {
                 eprintln(text: abs message);
                 return 2;
             },
-            IoError.Failed => { return 3; },
-            IoError.InvalidInput => { return 4; },
-            IoError.InvalidData => { return 5; },
+            IoError.Failed => {
+                return 3;
+            },
+            IoError.InvalidInput => {
+                return 4;
+            },
+            IoError.InvalidData => {
+                return 5;
+            },
         },
     };
 }

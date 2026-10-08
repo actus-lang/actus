@@ -11,34 +11,22 @@ struct Node {
 verb sum(abs node: Node) -> Int {
     abs left = ref node.left;
     abs right = ref node.right;
-    return node.value
-        + case left {
-            Option.Some(child) => sum(node: abs child),
-            Option.None => 0,
-        }
-        + case right {
-            Option.Some(child) => sum(node: abs child),
-            Option.None => 0,
-        };
+    return node.value + case left {
+        Option.Some(child) => sum(node: abs child),
+        Option.None => 0,
+    } + case right {
+        Option.Some(child) => sum(node: abs child),
+        Option.None => 0,
+    };
 }
 
 verb main() -> Int {
     erg arena: Arena[512] = Arena[512]();
-    erg left = arena.place(value: Node {
-        value: 10,
-        left: Option[abs Node].None,
-        right: Option[abs Node].None,
-    });
-    erg right = arena.place(value: Node {
-        value: 20,
-        left: Option[abs Node].None,
-        right: Option[abs Node].None,
-    });
-    erg root = arena.place(value: Node {
-        value: 30,
-        left: Option[abs Node].Some(left),
-        right: Option[abs Node].Some(right),
-    });
+    erg left = arena.place(value: Node {value: 10, left: Option[abs Node].None, right: Option[abs Node].None});
+    erg right = arena.place(value: Node {value: 20, left: Option[abs Node].None, right: Option[abs Node].None});
+    erg root = arena.place(value: Node {value: 30, left: Option[abs Node].Some(left), right: Option[abs Node].Some(
+        right
+    )});
     abs view = ref root;
     return sum(node: abs view);
 }

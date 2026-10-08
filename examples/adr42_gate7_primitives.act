@@ -4,7 +4,6 @@ This example exercises native Buffer indexing, checked byte access,
 aggregate `ins` Array loans, read-only Array views, and checked u8 pack
 field mutation without an application-specific bridge.
 """
-
 pack ByteRegister {
     erg storage: u8;
     layout little;
@@ -38,14 +37,14 @@ verb exercise_buffer_indexing() -> Int {
 }
 
 verb exercise_array_loans() -> Int {
-    erg values: Array[Int, 4] = Array[Int, 4]();
+    erg values: Array[Int,4] = Array[Int, 4]();
     mutate_array(values: ins values);
     erg observed = inspect_array(values: abs values);
     return observed + values[3];
 }
 
 verb exercise_checked_u8_pack_write() -> Int {
-    erg register = ByteRegister { storage: 0, };
+    erg register = ByteRegister {storage: 0};
     erg input = 41;
     register.payload = input;
     return register.payload;

@@ -2,6 +2,8 @@
 
 Actus is an experimental low-level systems programming language focused on explicit semantic roles, deterministic ownership, and a small compile-time safety core.
 
+Read the complete [Actus Handbook](docs/guide/README.md) for language syntax, ownership, modules, standard-library APIs, compiler workflow, examples, and contributor guidance.
+
 The project is in an early alpha stage. The current architecture is built around four roles:
 
 - `erg` — an exclusive owned binding that may read, mutate, borrow, move, or be dropped;

@@ -10,3 +10,8 @@ testing, examples, benchmarks, debugging, and contributions.
 - [Benchmarks](benchmarks.md)
 - [Debugging](debugging.md)
 - [Contribution workflow](contribution-workflow.md)
+
+## Complete reference details
+
+The [limits and patterns reference](limits-and-patterns-reference/) preserves
+the detailed workflow boundaries and coding patterns.

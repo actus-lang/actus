@@ -1,5 +1,4 @@
 """A compact telemetry frame using Actus's width-qualified primitives."""
-
 enum TelemetryError {
     InvalidMagic,
 }
@@ -27,11 +26,9 @@ verb main() -> Int {
     erg timestamp: u64 = 1700000000;
     erg extended_counter: u128 = 255;
     erg signed_delta: i8 = -2;
-
     """IEEE-754 telemetry values."""
     erg temperature: f32 = 21.5;
     erg pressure: f64 = 1013.25;
-
     erg frame = Buffer[16];
     append(frame, 7);
     append(frame, 128);
@@ -39,7 +36,6 @@ verb main() -> Int {
     append(frame, 190);
     append(frame, 173);
     append(frame, 222);
-
     erg result = process_frame(frame: abs frame);
     return case dat result {
         Result.Ok(_) => 0,

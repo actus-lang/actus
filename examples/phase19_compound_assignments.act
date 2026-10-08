@@ -2,7 +2,13 @@
 Gate 19.3.2 acceptance: typed arithmetic and every native compound assignment
 operator across scalar, array, struct-field, and pack-field places.
 """
-pack Register { erg storage: u8; layout little; fields { erg value: u8 at 0; } }
+pack Register {
+    erg storage: u8;
+    layout little;
+    fields {
+        erg value: u8 at 0;
+    }
+}
 
 struct Counter {
     erg value: u8,

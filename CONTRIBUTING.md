@@ -5,6 +5,7 @@ Thank you for your interest in Actus. Actus is an experimental open-source syste
 Before contributing, read:
 
 - [AGENTS.md](AGENTS.md) for engineering and architecture rules;
+- [Actus Handbook](docs/guide/README.md) for language, standard-library, compiler, and workflow usage;
 - [ROADMAP.md](ROADMAP.md) for planned work;
 - [MANIFESTO.md](MANIFESTO.md) for the language direction.
 

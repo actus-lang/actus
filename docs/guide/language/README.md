@@ -19,3 +19,8 @@ language features.
 - [Comments and documentation](comments-and-documentation.md)
 - [Operators](operators.md)
 - [Formatting](formatting.md)
+
+## Complete reference details
+
+The [language reference directory](reference/) preserves the detailed source
+sections for advanced syntax and compiler contracts.

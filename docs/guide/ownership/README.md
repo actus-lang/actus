@@ -14,3 +14,8 @@ and deterministic cleanup.
 - [Cleanup and scope](cleanup-and-scope.md)
 - [Case and branch ownership](case-and-branch-ownership.md)
 - [Common diagnostics](common-diagnostics.md)
+
+## Complete reference details
+
+The [ownership reference directory](reference/) preserves the detailed source
+rules for ownership states and cleanup.

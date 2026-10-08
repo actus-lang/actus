@@ -1,7 +1,6 @@
 """Rejected fixture: runtime values cannot become const-generic capacities."""
-
 verb main() -> Int {
     erg capacity: Usize = 2;
-    erg values: Array[Int, capacity] = Array[Int, capacity]();
+    erg values: Array[Int,capacity] = Array[Int, capacity]();
     return values[0];
 }

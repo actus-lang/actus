@@ -4,15 +4,30 @@ It constructs a raw POSIX path, writes and reads a file, inspects metadata,
 removes the file, and validates the typed missing-file failure afterward.
 """
 import io;
+
 import path;
+
 import fs;
 
 verb utility_path() -> Result[Path, PathError] {
     erg raw = Buffer[0];
-    append(raw, 46); append(raw, 47); append(raw, 97); append(raw, 99);
-    append(raw, 116); append(raw, 117); append(raw, 115); append(raw, 95);
-    append(raw, 112); append(raw, 49); append(raw, 57); append(raw, 50);
-    append(raw, 46); append(raw, 98); append(raw, 105); append(raw, 110); append(raw, 0);
+    append(raw, 46);
+    append(raw, 47);
+    append(raw, 97);
+    append(raw, 99);
+    append(raw, 116);
+    append(raw, 117);
+    append(raw, 115);
+    append(raw, 95);
+    append(raw, 112);
+    append(raw, 49);
+    append(raw, 57);
+    append(raw, 50);
+    append(raw, 46);
+    append(raw, 98);
+    append(raw, 105);
+    append(raw, 110);
+    append(raw, 0);
     erg parsed = path_from_ascii(storage: dat raw);
     return case dat parsed {
         Result.Err(error) => Result[Path, PathError].Err(error),
@@ -22,8 +37,10 @@ verb utility_path() -> Result[Path, PathError] {
 
 verb validate_path(abs path: Path) -> Int {
     case is_relative(self: abs path) {
-        true => { },
-        _ => { return 20; },
+        true => {},
+        _ => {
+            return 20;
+        },
     };
     erg name = file_name(self: abs path);
     return case dat name {
@@ -35,12 +52,16 @@ verb validate_path(abs path: Path) -> Int {
 verb process_file(abs path: Path, abs payload: Buffer) -> Int {
     erg written = write_file(path: abs path, contents: abs payload);
     case dat written {
-        Result.Err(_) => { return 11; },
-        Result.Ok(_) => { },
+        Result.Err(_) => {
+            return 11;
+        },
+        Result.Ok(_) => {},
     };
     erg loaded = read_to_bytes(path: abs path);
     case dat loaded {
-        Result.Err(_) => { return 12; },
+        Result.Err(_) => {
+            return 12;
+        },
         Result.Ok(value) => {
             printb(text: abs value);
             flush();
@@ -54,13 +75,17 @@ verb process_file(abs path: Path, abs payload: Buffer) -> Int {
 verb inspect_and_remove(abs path: Path) -> Int {
     erg information = metadata(path: abs path);
     case dat information {
-        Result.Err(_) => { return 13; },
-        Result.Ok(_) => { },
+        Result.Err(_) => {
+            return 13;
+        },
+        Result.Ok(_) => {},
     };
     erg removed = remove_file(path: abs path);
     case dat removed {
-        Result.Err(_) => { return 14; },
-        Result.Ok(_) => { },
+        Result.Err(_) => {
+            return 14;
+        },
+        Result.Ok(_) => {},
     };
     erg missing = read_to_bytes(path: abs path);
     return case dat missing {

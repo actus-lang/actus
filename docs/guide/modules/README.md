@@ -10,3 +10,8 @@ facades define public boundaries, and how imports resolve.
 - [Imports](imports.md)
 - [Nested modules](nested-modules.md)
 - [Module diagnostics](module-diagnostics.md)
+
+## Complete reference details
+
+The [modules reference directory](reference/) preserves the detailed source
+rules for package configuration, imports, and facades.
