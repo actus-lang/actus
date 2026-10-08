@@ -39,6 +39,25 @@ unsafe extern "C" verb actus_region_cancel[T](ins region: Region[T]) -> Result[I
 """Private bridge that releases the capability and marks the owner closed."""
 unsafe extern "C" verb actus_region_close[T](ins region: Region[T]) -> Result[Int, RegionError];
 
+"""Private bridge that replaces a clean resident window without external I/O."""
+unsafe extern "C" verb actus_region_remap[T](
+    ins region: Region[T],
+    dat backing: Buffer,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[u64, RegionError];
+
+"""Private bridge that reads one fixed-width Region metadata value."""
+unsafe extern "C" verb actus_region_logical_length[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_window_start[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_window_count[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_generation[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError];
+
 """
 Open a bounded logical region backed by caller-provided storage.
 
@@ -137,4 +156,78 @@ failed close and is consumed after a successful close.
 """
 open verb region_close[T](ins region: Region[T]) -> Result[Int, RegionError] {
     return actus_region_close(region: ins region);
+}
+
+"""
+Replace the resident window using caller-owned memory.
+
+The backing buffer is consumed by the operation. The requested window must be
+valid, the buffer must contain exactly `window_count * size_of[T]()` bytes, and
+the current window must be clean. No filesystem, device, provider, or implicit
+page operation is performed. A successful remap advances the generation;
+failure preserves the current descriptor and resident bytes.
+"""
+open verb region_remap[T](
+    ins region: Region[T],
+    dat backing: Buffer,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[u64, RegionError] {
+    return actus_region_remap(
+        region: ins region,
+        backing: dat backing,
+        window_start: erg window_start,
+        window_count: erg window_count
+    );
+}
+
+"""
+Return the logical element count without changing ownership or window state.
+
+The `abs` loan resumes for the caller after the read. The result is `Err` when
+the descriptor is invalid, stale, or already closed; no allocation or state
+mutation occurs.
+"""
+open verb region_logical_length[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_logical_length(region: abs region);
+}
+
+"""
+Return the first logical index in the current resident window.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_window_start[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_window_start(region: abs region);
+}
+
+"""
+Return the element count in the current resident window.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_window_count[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_window_count(region: abs region);
+}
+
+"""
+Return the current generation used for subsequent checked access.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_generation[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_generation(region: abs region);
+}
+
+"""
+Return one when the resident window has unpublished mutations.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_dirty(region: abs region);
 }

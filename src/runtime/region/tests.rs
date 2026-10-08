@@ -63,6 +63,41 @@ fn failed_publication_preserves_the_current_generation() {
 }
 
 #[test]
+fn remap_replaces_a_clean_window_and_advances_generation() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    let next =
+        region.remap(generation, vec![41, 42, 43, 44], 4, 2).expect("clean window should remap");
+    let descriptor = region.descriptor();
+    assert_eq!(descriptor.window_start, 4);
+    assert_eq!(descriptor.window_count, 2);
+    assert_eq!(descriptor.generation, next);
+    let view = region.borrow_abs(7, next).expect("new window should open");
+    let mut value = [0u8; 2];
+    view.read(5, &mut value).expect("new resident element should be readable");
+    assert_eq!(value, [43, 44]);
+}
+
+#[test]
+fn remap_rejects_dirty_and_invalid_windows_without_changing_state() {
+    let mut region = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write(0, &[9, 8]).expect("resident element should be writable");
+    }
+    assert_eq!(region.remap(generation, vec![1, 2], 2, 1), Err(RegionError::WindowBusy));
+    let descriptor = region.descriptor();
+    assert_eq!(descriptor.window_start, 0);
+    assert_eq!(descriptor.window_count, 1);
+    assert_eq!(descriptor.generation, generation);
+    let mut clean = InMemoryRegion::new(7, 2, 8, 0, 1).expect("region should be valid");
+    let clean_generation = clean.descriptor().generation;
+    assert_eq!(clean.remap(clean_generation, vec![1, 2], 8, 1), Err(RegionError::InvalidWindow));
+    assert_eq!(clean.descriptor().window_start, 0);
+}
+
+#[test]
 fn address_profiles_reject_unsupported_widths_and_large_32_bit_regions() {
     assert_eq!(RegionAddressProfile::new(16, 32), Err(RegionError::UnsupportedAddressWidth));
     let profile = RegionAddressProfile::new(32, 32).expect("32-bit profile should be valid");

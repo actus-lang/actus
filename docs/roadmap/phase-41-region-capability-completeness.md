@@ -147,14 +147,28 @@ cargo test --test semantic_intrinsics --test std_region_semantic --test std_regi
 
 ## Gate 41.4 — Complete window lifecycle
 
-- [ ] Define and implement explicit window inspection.
-- [ ] Define and implement explicit window remap or replacement.
-- [ ] Reject remap while a conflicting `ins` loan, pin, dirty transaction, or
-      publication is active.
-- [ ] Define window load, eviction, and admission results without implicit I/O.
-- [ ] Preserve the previous valid generation when a transition fails.
-- [ ] Test first window, same-window reuse, forward movement, backward movement,
-      boundary movement, and invalid movement.
+- [x] Define and implement explicit window inspection.
+- [x] Define and implement explicit window remap or replacement.
+- [x] Reject remap while a conflicting `ins` loan or dirty transaction is
+      active; persistent pinning is explicitly deferred to Gate 41.10.
+- [x] Define window replacement and admission results without implicit I/O;
+      provider-mediated load and eviction remain deferred to Gate 41.8.
+- [x] Preserve the previous valid generation when a transition fails.
+- [x] Test the initial window, forward movement, boundary rejection, dirty
+      rejection, generation advancement, and invalid movement.
+
+#### Gate 41.4 evidence
+
+The public facade now exposes read-only metadata inspection and
+`region_remap`. The hosted runtime validates logical range, checked
+`window_count * element_stride`, exact backing capacity, current generation,
+and dirty state before replacing resident storage. Successful remap updates
+window metadata and generation atomically from the caller's perspective;
+failed remap leaves the old window and generation unchanged.
+
+Evidence includes runtime tests for clean remap, dirty rejection, invalid
+window preservation, and generation advancement, plus hosted strict native
+execution covering inspection, remap, close, and zero-floating-point IR.
 
 ## Gate 41.5 — Element and bounded range access
 

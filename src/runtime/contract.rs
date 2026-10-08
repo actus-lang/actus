@@ -33,6 +33,18 @@ pub const REGION_PUBLISH_SYMBOL: &str = "actus_region_publish";
 pub const REGION_CANCEL_SYMBOL: &str = "actus_region_cancel";
 /// Stable runtime symbol for closing a region capability.
 pub const REGION_CLOSE_SYMBOL: &str = "actus_region_close";
+/// Stable runtime symbol for explicit resident-window replacement.
+pub const REGION_REMAP_SYMBOL: &str = "actus_region_remap";
+/// Stable runtime symbol for logical-length inspection.
+pub const REGION_LOGICAL_LENGTH_SYMBOL: &str = "actus_region_logical_length";
+/// Stable runtime symbol for resident-window start inspection.
+pub const REGION_WINDOW_START_SYMBOL: &str = "actus_region_window_start";
+/// Stable runtime symbol for resident-window count inspection.
+pub const REGION_WINDOW_COUNT_SYMBOL: &str = "actus_region_window_count";
+/// Stable runtime symbol for generation inspection.
+pub const REGION_GENERATION_SYMBOL: &str = "actus_region_generation";
+/// Stable runtime symbol for dirty-state inspection.
+pub const REGION_DIRTY_SYMBOL: &str = "actus_region_dirty";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.

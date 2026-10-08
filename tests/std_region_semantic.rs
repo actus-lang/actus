@@ -18,6 +18,12 @@ fn region_facade_exports_checked_public_operations() {
     assert!(exports.contains("verb", "region_publish"));
     assert!(exports.contains("verb", "region_cancel"));
     assert!(exports.contains("verb", "region_close"));
+    assert!(exports.contains("verb", "region_remap"));
+    assert!(exports.contains("verb", "region_logical_length"));
+    assert!(exports.contains("verb", "region_window_start"));
+    assert!(exports.contains("verb", "region_window_count"));
+    assert!(exports.contains("verb", "region_generation"));
+    assert!(exports.contains("verb", "region_dirty"));
     assert!(exports.contains("enum", "RegionError"));
     analyze_module(&resolver, "region").expect("std region declarations should be valid");
 }

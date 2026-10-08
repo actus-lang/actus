@@ -16,6 +16,8 @@ const RESULT_REGION_SIZE: usize = 16;
 const RESULT_REGION_PAYLOAD_OFFSET: usize = 8;
 const RESULT_U64_PAYLOAD_OFFSET: usize = 8;
 const RESULT_INT_PAYLOAD_OFFSET: usize = 4;
+const REGION_WINDOW_START_OFFSET: usize = 32;
+const REGION_WINDOW_COUNT_OFFSET: usize = 40;
 const REGION_GENERATION_OFFSET: usize = 48;
 const REGION_DIRTY_OFFSET: usize = 56;
 
@@ -167,6 +169,7 @@ fn error_code(error: RegionError) -> u32 {
         RegionError::CapabilityExhausted => 6,
         RegionError::GenerationExhausted | RegionError::CapabilityGenerationExhausted => 7,
         RegionError::BackendFailure | RegionError::UnsupportedAddressWidth => 8,
+        RegionError::WindowBusy => 9,
     }
 }
 
@@ -341,6 +344,85 @@ pub unsafe extern "C" fn actus_region_cancel(region: *mut u8) -> *mut u8 {
         Ok(())
     }) {
         Ok(()) => result_int(0),
+        Err(error) => error_result(RESULT_INT_SIZE, error),
+    }
+}
+
+/// Replaces a clean resident window and advances its generation.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_remap(
+    region: *mut u8,
+    backing: *mut ActusBuffer,
+    window_start: u64,
+    window_count: u64,
+) -> *mut u8 {
+    let Some(descriptor) = validate_descriptor(region).ok() else {
+        return error_result(RESULT_U64_SIZE, RegionError::InvalidDescriptor);
+    };
+    let Some(backing_bytes) = (unsafe { take_buffer(backing) }) else {
+        return error_result(RESULT_U64_SIZE, RegionError::InvalidHandle);
+    };
+    match REGION_STORE.lock() {
+        Ok(mut store) => match store.get_mut(descriptor.handle).and_then(|backend| {
+            backend.remap(descriptor.generation, backing_bytes, window_start, window_count)
+        }) {
+            Ok(next) => {
+                unsafe {
+                    ptr::write_unaligned(
+                        region.add(REGION_WINDOW_START_OFFSET).cast::<u64>(),
+                        window_start,
+                    );
+                    ptr::write_unaligned(
+                        region.add(REGION_WINDOW_COUNT_OFFSET).cast::<u64>(),
+                        window_count,
+                    );
+                    ptr::write_unaligned(region.add(REGION_GENERATION_OFFSET).cast::<u64>(), next);
+                    ptr::write_unaligned(region.add(REGION_DIRTY_OFFSET), 0);
+                }
+                result_u64(next)
+            }
+            Err(error) => error_result(RESULT_U64_SIZE, error),
+        },
+        Err(_) => error_result(RESULT_U64_SIZE, RegionError::BackendFailure),
+    }
+}
+
+fn inspect_u64(region: *const u8, value: impl FnOnce(&RegionDescriptor) -> u64) -> *mut u8 {
+    match validate_descriptor(region) {
+        Ok(descriptor) => result_u64(value(descriptor)),
+        Err(error) => error_result(RESULT_U64_SIZE, error),
+    }
+}
+
+/// Returns the logical element count from a validated descriptor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_logical_length(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.logical_length)
+}
+
+/// Returns the first logical index in the resident window.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_window_start(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.window_start)
+}
+
+/// Returns the element count in the resident window.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_window_count(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.window_count)
+}
+
+/// Returns the current publication generation.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_generation(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.generation)
+}
+
+/// Returns one when resident bytes are dirty.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_dirty(region: *const u8) -> *mut u8 {
+    match validate_descriptor(region) {
+        Ok(descriptor) => result_int(i32::from(descriptor.dirty)),
         Err(error) => error_result(RESULT_INT_SIZE, error),
     }
 }

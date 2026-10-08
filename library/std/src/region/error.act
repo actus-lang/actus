@@ -24,4 +24,6 @@ open enum RegionError {
     GenerationExhausted,
     """The selected runtime backend rejected the operation."""
     BackendFailure,
+    """The requested window transition conflicts with dirty or pinned state."""
+    WindowBusy,
 }

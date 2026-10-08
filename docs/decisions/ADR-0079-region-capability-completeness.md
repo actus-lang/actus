@@ -209,6 +209,15 @@ no family may be omitted without an ADR update.
 - Preserve the old generation until the transition is accepted.
 - Report unavailable, dirty, pinned, stale, or provider-rejected transitions.
 
+Gate 41.4 implements the memory-only portion of this family. Inspection verbs
+return logical length, current window start and count, generation, and dirty
+state without changing ownership. `region_remap` consumes caller-owned
+resident storage, validates its exact byte capacity and logical range, rejects
+dirty state with `WindowBusy`, and advances generation only after the new
+window is accepted. No provider call, filesystem operation, implicit page
+fault, or eviction is performed. Persistent pinning and provider-mediated
+window admission remain later provider and concurrency contracts.
+
 ### 5.3 Element and range access
 
 - Read and write one fully sized element with checked logical indexing.

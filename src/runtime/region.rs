@@ -23,6 +23,7 @@ pub enum RegionError {
     OffsetOverflow,
     BufferTooSmall,
     BackendFailure,
+    WindowBusy,
     GenerationExhausted,
 }
 
@@ -297,6 +298,39 @@ impl InMemoryRegion {
         self.storage.clone_from(&self.published_storage);
         self.descriptor.dirty = 0;
         Ok(())
+    }
+
+    /// Replaces a clean resident window and advances its generation.
+    pub fn remap(
+        &mut self,
+        generation: RegionGeneration,
+        backing: Vec<u8>,
+        window_start: u64,
+        window_count: u64,
+    ) -> Result<RegionGeneration, RegionError> {
+        self.validate_access(self.descriptor.handle, generation)?;
+        if self.descriptor.dirty != 0 {
+            return Err(RegionError::WindowBusy);
+        }
+        let window_end =
+            window_start.checked_add(window_count).ok_or(RegionError::OffsetOverflow)?;
+        if window_count == 0 || window_end > self.descriptor.logical_length {
+            return Err(RegionError::InvalidWindow);
+        }
+        let expected = window_count
+            .checked_mul(self.descriptor.element_stride)
+            .ok_or(RegionError::OffsetOverflow)?;
+        let expected = usize::try_from(expected).map_err(|_| RegionError::OffsetOverflow)?;
+        if backing.len() != expected {
+            return Err(RegionError::BufferTooSmall);
+        }
+        let next = generation.checked_add(1).ok_or(RegionError::GenerationExhausted)?;
+        self.storage = backing.clone();
+        self.published_storage = backing;
+        self.descriptor.window_start = window_start;
+        self.descriptor.window_count = window_count;
+        self.descriptor.generation = next;
+        Ok(next)
     }
 
     fn validate_access(

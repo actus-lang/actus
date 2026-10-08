@@ -180,6 +180,12 @@ fn region_generic_types(
                     | "region_publish"
                     | "region_cancel"
                     | "region_close"
+                    | "region_remap"
+                    | "region_logical_length"
+                    | "region_window_start"
+                    | "region_window_count"
+                    | "region_generation"
+                    | "region_dirty"
             )
         })
         .flat_map(|instance| instance.arguments.iter().cloned())
