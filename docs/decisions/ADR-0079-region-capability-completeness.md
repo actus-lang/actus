@@ -304,15 +304,31 @@ second cleanup action.
 
 ### 5.6 Provider boundary
 
-- Define a target-neutral provider interface for load, store, flush, cancel,
-  and recovery results.
-- Keep provider calls explicit and observable.
-- Permit a memory-only provider for deterministic tests.
-- Permit filesystem, device, or remote providers only through separate adapter
-  modules.
-- Define cancellation, retry, timeout, corruption, and unavailable states.
-- Do not require asynchronous execution in the core API; if asynchronous work
-  is added, its queue and ownership bounds must be explicit.
+- The runtime provider boundary is target-neutral and receives a fixed
+  `RegionProviderRequest` containing the capability handle, generation, resident
+  window, and exact byte length. It defines explicit `load`, `store`, `flush`,
+  `cancel`, and `recover` operations. The provider returns a bounded byte count
+  or a typed provider failure; it does not return platform status codes.
+- `load` and `recover` write only to caller-owned destination storage. `store`
+  reads caller-owned source storage. `flush` accepts provider staging and
+  `cancel` restores staging from the last accepted provider generation. Provider
+  buffer ownership therefore remains explicit at every boundary.
+- The provider failure domain distinguishes invalid request, buffer too small,
+  unavailable, cancelled, timed out, corrupt, truncated, rejected, and
+  retryable outcomes. The runtime maps these classes to the public
+  `BackendFailure` family without pretending that a failed provider operation
+  succeeded.
+- The hosted `MemoryRegionProvider` is the deterministic reference provider. It
+  has one fixed-capacity accepted snapshot and one fixed-capacity staging buffer,
+  performs no external I/O, and supports deterministic one-shot failure
+  injection for tests. It proves staging, flush, cancel, recovery, capacity,
+  and failure-preservation behavior without selecting a platform.
+- Provider-specific types, queues, OS handles, and raw pointers remain outside
+  the public `Region[T]` descriptor. Filesystem, device, and remote adapters are
+  separate modules and are not implied by importing `std::region`.
+- The core does not require asynchronous execution. If an adapter later adds a
+  queue, its capacity, ownership, cancellation, timeout, and retry policy must
+  be explicit and bounded.
 
 ## 6. Element layout contract
 

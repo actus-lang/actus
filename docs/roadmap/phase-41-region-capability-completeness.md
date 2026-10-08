@@ -262,15 +262,33 @@ and a warning-free all-target clippy run.
 
 ## Gate 41.8 — Provider-neutral storage boundary
 
-- [ ] Define the target-neutral provider contract for load, store, flush, and
+- [x] Define the target-neutral provider contract for load, store, flush, and
       recovery.
-- [ ] Add a deterministic memory-only provider for unit and native tests.
-- [ ] Define explicit provider results for unavailable, cancelled, timed out,
+- [x] Add a deterministic memory-only provider for unit and native tests.
+- [x] Define explicit provider results for unavailable, cancelled, timed out,
       corrupt, truncated, rejected, and retryable operations.
-- [ ] Keep provider-specific types and pointers outside the public Region type.
-- [ ] Prove that core Region operations do not perform hidden filesystem or
+- [x] Keep provider-specific types and pointers outside the public Region type.
+- [x] Prove that core Region operations do not perform hidden filesystem or
       device I/O.
-- [ ] Define the ownership of provider buffers and queued work.
+- [x] Define the ownership of provider buffers and queued work.
+
+#### Gate 41.8 evidence
+
+The runtime now exposes a target-neutral `RegionProvider` contract with fixed
+request metadata and explicit load, store, flush, cancel, and recover methods.
+`MemoryRegionProvider` supplies one bounded accepted snapshot and one bounded
+staging buffer for deterministic tests. Provider failures distinguish invalid
+requests, capacity errors, unavailable, cancelled, timed-out, corrupt,
+truncated, rejected, and retryable states; the public Region descriptor remains
+free of provider-specific types and pointers. Provider buffers are caller-owned
+at load/store boundaries, while provider snapshots remain bounded provider
+state. The core has no implicit provider, filesystem, device, or asynchronous
+queue operation.
+
+Focused evidence covers staging versus accepted bytes, cancellation and
+recovery, explicit timeout preservation, and wrong-capacity rejection. The
+existing Region tests continue to exercise memory-only read, write, remap,
+publish, cancel, and close behavior.
 
 ## Gate 41.9 — Recovery, integrity, and generation continuity
 

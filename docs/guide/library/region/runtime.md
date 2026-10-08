@@ -32,6 +32,35 @@ not promise that every logical element is simultaneously resident. A target
 adapter must document its window size, backing storage, publish/cancel cost,
 and failure behavior.
 
+## Provider contract
+
+The runtime provider boundary uses a fixed `RegionProviderRequest` containing the
+capability handle, generation, resident window, and exact byte length. A
+provider implements five explicit operations:
+
+- `load` copies the last accepted bytes into caller-owned resident storage;
+- `store` copies caller-owned bytes into bounded provider staging storage;
+- `flush` accepts staged bytes as the provider generation;
+- `cancel` restores staging from the last accepted generation;
+- `recover` loads the last accepted generation after an interrupted operation.
+
+Provider operations return bytes completed or one of the explicit provider
+failures: unavailable, cancelled, timed out, corrupt, truncated, rejected,
+retryable, invalid request, or buffer too small. The core maps provider failure
+classes to the public `BackendFailure` domain without exposing platform status
+codes.
+
+The hosted `MemoryRegionProvider` is a fixed-capacity, memory-only reference
+provider. It owns one bounded accepted snapshot and one bounded staging buffer;
+each operation receives caller-owned buffers and performs no filesystem,
+device, or network I/O. Its deterministic failure injection is test-only
+evidence for preserving the accepted snapshot after a provider error.
+
+Provider instances and any provider queue remain outside the public `Region[T]`
+descriptor. The initial contract has no implicit asynchronous queue: queued work,
+if introduced by a later adapter, must declare its capacity and ownership
+explicitly.
+
 ## ABI and hot path
 
 Native lowering may pass the small descriptor directly or use an indirect ABI

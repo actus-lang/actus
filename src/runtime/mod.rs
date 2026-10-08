@@ -11,6 +11,7 @@ mod region;
 mod region_bridge;
 #[cfg(test)]
 mod region_bridge_tests;
+mod region_provider;
 mod region_range_bridge;
 mod serialization;
 mod stream;
@@ -84,6 +85,9 @@ pub use region::{
     RegionGeneration, RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
 };
 pub use region_bridge::actus_region_drop;
+pub use region_provider::{
+    MemoryRegionProvider, RegionProvider, RegionProviderError, RegionProviderRequest,
+};
 pub use region_range_bridge::{actus_region_read_range, actus_region_write_range};
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
