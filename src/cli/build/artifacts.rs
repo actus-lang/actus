@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::build_graph::write_metadata;
-use crate::configuration::CompilerConfiguration;
+use crate::configuration::{CompilerConfiguration, LinkerFlavor};
 
 use super::options::EmitKind;
 
@@ -14,7 +14,13 @@ pub(super) fn write_artifact(
     configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
     let persistent_capsula_artifact = output.starts_with(configuration.capsula_target_directory());
-    let paths = object_paths(output, &objects, emit, persistent_capsula_artifact);
+    let paths = object_paths(
+        output,
+        &objects,
+        emit,
+        persistent_capsula_artifact,
+        configuration.linker_flavor(),
+    );
     write_objects(&paths, &objects)?;
     if matches!(emit, EmitKind::Executable) {
         let references = paths.iter().map(PathBuf::as_path).collect::<Vec<_>>();
@@ -45,13 +51,14 @@ fn object_paths(
     objects: &[super::emission::EmittedObject],
     emit: EmitKind,
     persistent: bool,
+    linker_flavor: LinkerFlavor,
 ) -> Vec<PathBuf> {
     if matches!(emit, EmitKind::Object) {
         let mut paths = vec![output.to_owned()];
         paths.extend(objects.iter().skip(1).map(|object| sidecar_path(output, &object.name)));
         return paths;
     }
-    let extension = if persistent { "obj" } else { "o" };
+    let extension = if persistent || linker_flavor == LinkerFlavor::Msvc { "obj" } else { "o" };
     let root = output.with_extension(format!("root.{extension}"));
     let mut paths = vec![root];
     paths.extend(
