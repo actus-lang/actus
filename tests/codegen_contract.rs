@@ -2,8 +2,8 @@ use actus::ast::Role;
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendContractError, BackendFunction, BackendInstruction,
     BackendLayout, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
-    BackendTargetContext, BackendUnsupportedOperation, BackendValueType, SymbolIdentity,
-    SymbolKind,
+    BackendTargetContext, BackendUnsupportedOperation, BackendValueType, NativeInstruction,
+    SymbolIdentity, SymbolKind,
 };
 use actus::lexer::SourceSpan;
 
@@ -115,6 +115,44 @@ fn rejects_role_and_passing_mode_mismatches() {
         vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
     );
     assert_eq!(function.validate(), Err(BackendContractError::RolePassingMismatch));
+}
+
+#[test]
+fn preserves_capability_passing_modes_and_cleanup_actions() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let function = unit_function(
+        vec![
+            BackendParameter {
+                name: "view".to_owned(),
+                role: Role::Abs,
+                ty: BackendValueType::Aggregate { layout },
+                passing: BackendPassingMode::Borrowed { layout },
+            },
+            BackendParameter {
+                name: "loan".to_owned(),
+                role: Role::Ins,
+                ty: BackendValueType::Aggregate { layout },
+                passing: BackendPassingMode::ExclusiveLoan { layout },
+            },
+            BackendParameter {
+                name: "resource".to_owned(),
+                role: Role::Dat,
+                ty: BackendValueType::Aggregate { layout },
+                passing: BackendPassingMode::OwnershipTransfer { layout },
+            },
+        ],
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: NativeInstruction::ResetArena {
+                    binding_index: 2,
+                    name: "region".to_owned(),
+                },
+                span: SourceSpan::new(4, 10),
+            }],
+        }],
+    );
+    assert!(function.validate().is_ok());
 }
 
 #[test]
