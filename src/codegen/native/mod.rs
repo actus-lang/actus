@@ -8,11 +8,7 @@ use crate::target::TargetSpec;
 
 use super::types::NativeType;
 
-mod declarations;
-mod dependencies;
-mod emission;
-
-use emission::NativeRootSelection;
+pub(super) mod dependencies;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub String);
@@ -129,9 +125,9 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    emission::emit_program_object_for_target(
+    super::cranelift::emission::emit_program_object_for_target(
         program,
-        NativeRootSelection { symbol: Some(symbol), exported: None },
+        super::cranelift::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
         "actus_root",
         configuration,
         target,
@@ -165,9 +161,9 @@ pub fn emit_program_object_for_target_in_namespace_with_bindings(
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    emission::emit_program_object_for_target(
+    super::cranelift::emission::emit_program_object_for_target(
         program,
-        NativeRootSelection { symbol: Some(symbol), exported: None },
+        super::cranelift::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
         namespace_prefix,
         configuration,
         target,
@@ -236,9 +232,9 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
     generic_instances: &[super::super::semantic::GenericInstance],
     exported_roots: Option<&[String]>,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    emission::emit_program_object_for_target(
+    super::cranelift::emission::emit_program_object_for_target(
         program,
-        NativeRootSelection { symbol: None, exported: exported_roots },
+        super::cranelift::emission::NativeRootSelection { symbol: None, exported: exported_roots },
         namespace_prefix,
         configuration,
         target,

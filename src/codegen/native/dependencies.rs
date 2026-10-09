@@ -11,7 +11,7 @@ use super::NativeEmitError;
 /// has already established which declarations are legal. This pass only keeps
 /// private implementation helpers reachable from a legal public root while
 /// retaining external bridges as declarations.
-pub(super) fn reachable_declarations_with_roots<'a>(
+pub(crate) fn reachable_declarations_with_roots<'a>(
     verbs: &[&'a VerbDecl],
     external_verbs: &[&'a ExternalVerbDecl],
     symbol: Option<&str>,

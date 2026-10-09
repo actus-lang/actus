@@ -1,3 +1,5 @@
+pub(super) mod declarations;
+pub(super) mod emission;
 pub(super) mod ir_audit;
 mod isa;
 pub(super) mod object;
