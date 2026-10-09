@@ -92,6 +92,16 @@ pub enum BackendInstruction {
         result: Option<BackendValueId>,
         span: SourceSpan,
     },
+    Branch {
+        condition: BackendValueId,
+        then_block: BackendBlockId,
+        else_block: BackendBlockId,
+        span: SourceSpan,
+    },
+    Jump {
+        target: BackendBlockId,
+        span: SourceSpan,
+    },
     Return {
         value: Option<BackendValueId>,
         span: SourceSpan,
@@ -148,16 +158,33 @@ impl BackendFunction {
             if !block_ids.insert(block.id) {
                 return Err(BackendContractError::DuplicateBlockId);
             }
-            for instruction in &block.instructions {
-                if let BackendInstruction::Call { callee, .. } = instruction {
-                    if callee.as_str().is_empty() {
-                        return Err(BackendContractError::InvalidCallSymbol);
-                    }
-                }
-            }
         }
         if self.blocks.iter().filter(|block| block.id == self.entry).count() != 1 {
             return Err(BackendContractError::MissingEntryBlock);
+        }
+        for block in &self.blocks {
+            for instruction in &block.instructions {
+                match instruction {
+                    BackendInstruction::Call { callee, .. } => {
+                        if callee.as_str().is_empty() {
+                            return Err(BackendContractError::InvalidCallSymbol);
+                        }
+                    }
+                    BackendInstruction::Branch { then_block, else_block, .. } => {
+                        if !block_ids.contains(then_block) || !block_ids.contains(else_block) {
+                            return Err(BackendContractError::InvalidBlockReference);
+                        }
+                    }
+                    BackendInstruction::Jump { target, .. } => {
+                        if !block_ids.contains(target) {
+                            return Err(BackendContractError::InvalidBlockReference);
+                        }
+                    }
+                    BackendInstruction::Return { .. }
+                    | BackendInstruction::Trap { .. }
+                    | BackendInstruction::Cleanup { .. } => {}
+                }
+            }
         }
         Ok(())
     }
@@ -195,6 +222,7 @@ pub enum BackendContractError {
     EmptyParameterName,
     DuplicateParameterName,
     DuplicateBlockId,
+    InvalidBlockReference,
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
@@ -240,6 +268,9 @@ impl std::fmt::Display for BackendContractError {
             }
             Self::DuplicateBlockId => {
                 formatter.write_str("backend function has duplicate block ids")
+            }
+            Self::InvalidBlockReference => {
+                formatter.write_str("backend control flow references an unknown block")
             }
             Self::ReturnSlotTypeMismatch => {
                 formatter.write_str("backend return slot must match an aggregate return type")
@@ -410,5 +441,34 @@ mod tests {
         blocks_only.parameters.clear();
         blocks_only.blocks[1].id = BackendBlockId(0);
         assert_eq!(blocks_only.validate(), Err(BackendContractError::DuplicateBlockId));
+    }
+
+    #[test]
+    fn validates_control_flow_targets_without_a_machine_backend() {
+        let valid = BackendFunction {
+            symbol: verb_symbol(),
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![
+                BackendBlock {
+                    id: BackendBlockId(0),
+                    instructions: vec![BackendInstruction::Jump {
+                        target: BackendBlockId(1),
+                        span: SourceSpan::new(0, 1),
+                    }],
+                },
+                BackendBlock { id: BackendBlockId(1), instructions: Vec::new() },
+            ],
+        };
+        assert!(valid.validate().is_ok());
+
+        let mut invalid = valid;
+        invalid.blocks[0].instructions[0] =
+            BackendInstruction::Jump { target: BackendBlockId(2), span: SourceSpan::new(0, 1) };
+        assert_eq!(invalid.validate(), Err(BackendContractError::InvalidBlockReference));
     }
 }
