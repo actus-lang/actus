@@ -278,6 +278,18 @@ check.
 - [ ] Do not claim embedded latency, memory, or power behavior without a
       target-specific measurement.
 
+### Gate 42.7 execution plan
+
+The repository CI matrix runs the dedicated `std_region_native` suite on
+`ubuntu-latest`, `macos-latest`, and `windows-latest`. The suite covers hosted
+native Region execution, exact 128 KiB transfers, aggregate cleanup, bounded
+logical capacity, freestanding object emission, provider-bridge symbol
+boundaries, and the zero-floating-point verification policy. The workflow now
+publishes a separate Region gate summary for each operating system. The Gate
+42.7 checkboxes remain open until that matrix has produced passing evidence for
+the current revision and the remaining pointer-width, byte-order, and
+freestanding target checks are executed.
+
 ## Gate 42.8 — Documentation and compatibility
 
 - [ ] Update the Region API guide with aggregate element requirements and
