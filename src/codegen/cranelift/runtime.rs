@@ -12,8 +12,8 @@ use crate::runtime::{
     PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
-use super::native::{FunctionMeta, NativeEmitError};
-use super::types::NativeType;
+use super::super::native::{FunctionMeta, NativeEmitError};
+use super::super::types::NativeType;
 
 const SERIALIZATION_I64: NativeType = NativeType::Integer { signed: true, width: 64 };
 const VALIDATE_FIXED_FRAME_PARAMS: &[&str] = &[
@@ -28,7 +28,7 @@ const VALIDATE_FIXED_FRAME_PARAMS: &[&str] = &[
     "checksum_offset",
 ];
 
-pub(super) fn declare_runtime_functions(
+pub(crate) fn declare_runtime_functions(
     module: &mut ObjectModule,
     has_print_definition: bool,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
@@ -58,17 +58,17 @@ pub(super) fn declare_runtime_functions(
     Ok(functions)
 }
 
-pub(super) fn declare_region_cleanup_function(
+pub(crate) fn declare_region_cleanup_function(
     module: &mut ObjectModule,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let region_drop = declare_region_drop(module, module.isa().pointer_type())?;
     Ok(HashMap::from([(
-        super::performance::dispatch_key(NativeType::Region, "drop"),
+        super::super::performance::dispatch_key(NativeType::Region, "drop"),
         named_meta(region_drop, &["region"], NativeType::Region),
     )]))
 }
 
-pub(super) fn declare_enum_cleanup_function(
+pub(crate) fn declare_enum_cleanup_function(
     module: &mut ObjectModule,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let enum_drop = declare_enum_drop(module, module.isa().pointer_type())?;
@@ -78,7 +78,7 @@ pub(super) fn declare_enum_cleanup_function(
     )]))
 }
 
-pub(super) fn declare_buffer_cleanup_function(
+pub(crate) fn declare_buffer_cleanup_function(
     module: &mut ObjectModule,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let buffer_drop = declare_drop(module, module.isa().pointer_type())?;
@@ -116,7 +116,7 @@ fn runtime_metadata(
         ),
         (BUFFER_DROP_SYMBOL.to_owned(), named_meta(ids.drop, &["handle"], NativeType::Int)),
         (
-            super::performance::dispatch_key(NativeType::Region, "drop"),
+            super::super::performance::dispatch_key(NativeType::Region, "drop"),
             named_meta(ids.region_drop, &["region"], NativeType::Region),
         ),
         ("buffer_length".to_owned(), named_meta(ids.buffer_length, &["buffer"], NativeType::Int)),

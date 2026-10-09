@@ -21,7 +21,6 @@ mod literals;
 mod lowering;
 mod model;
 mod native;
-mod native_runtime;
 mod performance;
 mod result_constructor_spans;
 mod result_constructors;
