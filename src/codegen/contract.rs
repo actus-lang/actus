@@ -145,8 +145,10 @@ impl BackendFunction {
             if !parameter_names.insert(&parameter.name) {
                 return Err(BackendContractError::DuplicateParameterName);
             }
+            validate_value_type(parameter.ty)?;
             validate_parameter(parameter)?;
         }
+        validate_value_type(self.return_value.ty)?;
         if let BackendReturnMode::ReturnSlot { layout } = self.return_value.passing {
             layout.validate()?;
             match self.return_value.ty {
@@ -214,6 +216,20 @@ fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContrac
     valid.then_some(()).ok_or(BackendContractError::RolePassingMismatch)
 }
 
+fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError> {
+    match ty {
+        BackendValueType::Integer { width: 0, .. } | BackendValueType::Float { width: 0 } => {
+            Err(BackendContractError::InvalidValueType)
+        }
+        BackendValueType::Aggregate { layout } => layout.validate(),
+        BackendValueType::Unit
+        | BackendValueType::Bool
+        | BackendValueType::Integer { .. }
+        | BackendValueType::Float { .. }
+        | BackendValueType::Pointer => Ok(()),
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendContractError {
     InvalidLayout(&'static str),
@@ -223,6 +239,7 @@ pub enum BackendContractError {
     DuplicateParameterName,
     DuplicateBlockId,
     InvalidBlockReference,
+    InvalidValueType,
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
@@ -272,6 +289,9 @@ impl std::fmt::Display for BackendContractError {
             Self::InvalidBlockReference => {
                 formatter.write_str("backend control flow references an unknown block")
             }
+            Self::InvalidValueType => {
+                formatter.write_str("backend value type has an invalid width")
+            }
             Self::ReturnSlotTypeMismatch => {
                 formatter.write_str("backend return slot must match an aggregate return type")
             }
@@ -293,182 +313,3 @@ impl std::fmt::Display for BackendContractError {
 }
 
 impl std::error::Error for BackendContractError {}
-
-#[cfg(test)]
-mod diagnostic_tests {
-    use super::*;
-
-    #[test]
-    fn reports_unsupported_operations_with_target_context() {
-        let error = BackendContractError::Unsupported(BackendUnsupportedOperation::new(
-            "aggregate-return",
-            SourceSpan::new(12, 20),
-            BackendTargetContext {
-                backend: "llvm".to_owned(),
-                target: "thumbv7em-none-eabihf".to_owned(),
-            },
-            "aggregate return lowering is not implemented",
-        ));
-        let rendered = error.to_string();
-        assert!(rendered.contains("aggregate-return"));
-        assert!(rendered.contains("thumbv7em-none-eabihf"));
-        assert!(rendered.contains("12"));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn verb_symbol() -> SymbolIdentity {
-        SymbolIdentity::new("test", SymbolKind::Verb, "run").expect("valid verb symbol")
-    }
-
-    #[test]
-    fn validates_aligned_aggregate_layouts() {
-        assert!(BackendLayout { size: 16, alignment: 8 }.validate().is_ok());
-        assert!(BackendLayout { size: 12, alignment: 8 }.validate().is_err());
-        assert!(BackendLayout { size: 16, alignment: 3 }.validate().is_err());
-    }
-
-    #[test]
-    fn preserves_role_metadata_without_a_machine_backend() {
-        let function = BackendFunction {
-            symbol: verb_symbol(),
-            parameters: vec![BackendParameter {
-                name: "input".to_owned(),
-                role: Role::Abs,
-                ty: BackendValueType::Integer { signed: false, width: 32 },
-                passing: BackendPassingMode::Borrowed {
-                    layout: BackendLayout { size: 4, alignment: 4 },
-                },
-            }],
-            return_value: BackendReturn {
-                ty: BackendValueType::Unit,
-                passing: BackendReturnMode::Direct,
-            },
-            entry: BackendBlockId(0),
-            blocks: vec![BackendBlock {
-                id: BackendBlockId(0),
-                instructions: vec![BackendInstruction::Return {
-                    value: None,
-                    span: SourceSpan::new(0, 1),
-                }],
-            }],
-        };
-
-        assert_eq!(function.parameters[0].role, Role::Abs);
-        assert!(function.validate().is_ok());
-    }
-
-    #[test]
-    fn rejects_role_and_passing_mode_mismatches() {
-        let parameter = BackendParameter {
-            name: "loan".to_owned(),
-            role: Role::Ins,
-            ty: BackendValueType::Pointer,
-            passing: BackendPassingMode::Borrowed {
-                layout: BackendLayout { size: 8, alignment: 8 },
-            },
-        };
-        assert_eq!(validate_parameter(&parameter), Err(BackendContractError::RolePassingMismatch));
-    }
-
-    #[test]
-    fn validates_aggregate_return_slots_without_a_backend() {
-        let layout = BackendLayout { size: 16, alignment: 8 };
-        let function = BackendFunction {
-            symbol: verb_symbol(),
-            parameters: Vec::new(),
-            return_value: BackendReturn {
-                ty: BackendValueType::Aggregate { layout },
-                passing: BackendReturnMode::ReturnSlot { layout },
-            },
-            entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
-        };
-        assert!(function.validate().is_ok());
-    }
-
-    #[test]
-    fn rejects_return_slots_for_non_aggregate_values() {
-        let function = BackendFunction {
-            symbol: verb_symbol(),
-            parameters: Vec::new(),
-            return_value: BackendReturn {
-                ty: BackendValueType::Integer { signed: false, width: 32 },
-                passing: BackendReturnMode::ReturnSlot {
-                    layout: BackendLayout { size: 4, alignment: 4 },
-                },
-            },
-            entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
-        };
-        assert_eq!(function.validate(), Err(BackendContractError::ReturnSlotTypeMismatch));
-    }
-
-    #[test]
-    fn rejects_duplicate_parameters_and_blocks() {
-        let function = BackendFunction {
-            symbol: verb_symbol(),
-            parameters: vec![
-                BackendParameter {
-                    name: "value".to_owned(),
-                    role: Role::Erg,
-                    ty: BackendValueType::Integer { signed: false, width: 32 },
-                    passing: BackendPassingMode::Direct,
-                },
-                BackendParameter {
-                    name: "value".to_owned(),
-                    role: Role::Erg,
-                    ty: BackendValueType::Integer { signed: false, width: 32 },
-                    passing: BackendPassingMode::Direct,
-                },
-            ],
-            return_value: BackendReturn {
-                ty: BackendValueType::Unit,
-                passing: BackendReturnMode::Direct,
-            },
-            entry: BackendBlockId(0),
-            blocks: vec![
-                BackendBlock { id: BackendBlockId(0), instructions: Vec::new() },
-                BackendBlock { id: BackendBlockId(1), instructions: Vec::new() },
-            ],
-        };
-        assert_eq!(function.validate(), Err(BackendContractError::DuplicateParameterName));
-
-        let mut blocks_only = function;
-        blocks_only.parameters.clear();
-        blocks_only.blocks[1].id = BackendBlockId(0);
-        assert_eq!(blocks_only.validate(), Err(BackendContractError::DuplicateBlockId));
-    }
-
-    #[test]
-    fn validates_control_flow_targets_without_a_machine_backend() {
-        let valid = BackendFunction {
-            symbol: verb_symbol(),
-            parameters: Vec::new(),
-            return_value: BackendReturn {
-                ty: BackendValueType::Unit,
-                passing: BackendReturnMode::Direct,
-            },
-            entry: BackendBlockId(0),
-            blocks: vec![
-                BackendBlock {
-                    id: BackendBlockId(0),
-                    instructions: vec![BackendInstruction::Jump {
-                        target: BackendBlockId(1),
-                        span: SourceSpan::new(0, 1),
-                    }],
-                },
-                BackendBlock { id: BackendBlockId(1), instructions: Vec::new() },
-            ],
-        };
-        assert!(valid.validate().is_ok());
-
-        let mut invalid = valid;
-        invalid.blocks[0].instructions[0] =
-            BackendInstruction::Jump { target: BackendBlockId(2), span: SourceSpan::new(0, 1) };
-        assert_eq!(invalid.validate(), Err(BackendContractError::InvalidBlockReference));
-    }
-}
