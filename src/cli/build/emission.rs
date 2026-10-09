@@ -118,6 +118,7 @@ pub(crate) struct EmittedObject {
     pub(crate) symbols: std::collections::BTreeSet<String>,
 }
 
+#[cfg(feature = "cranelift")]
 pub(crate) fn emit_objects(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
@@ -167,6 +168,18 @@ pub(crate) fn emit_objects(
     Ok(objects)
 }
 
+#[cfg(not(feature = "cranelift"))]
+pub(crate) fn emit_objects(
+    _plan: &crate::modules::ModuleCompilationPlan,
+    _symbol: &str,
+    _configuration: &CompilerConfiguration,
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
+    Err(BackendEmitError(
+        "backend `cranelift` is not enabled; rebuild with feature `cranelift`".to_owned(),
+    ))
+}
+
+#[cfg(feature = "cranelift")]
 fn region_generic_types(
     generic_instances: &[crate::semantic::GenericInstance],
 ) -> Vec<crate::ast::TypeName> {
@@ -198,6 +211,7 @@ fn region_generic_types(
         .collect()
 }
 
+#[cfg(feature = "cranelift")]
 fn reachable_module_roots(
     object_plan: &crate::modules::ModuleObjectPlan,
     symbol: &str,
@@ -230,6 +244,7 @@ fn reachable_module_roots(
     Ok(roots)
 }
 
+#[cfg(feature = "cranelift")]
 fn reachable_wire_verbs(
     program: &crate::ast::Program,
     reachable_module_roots: &std::collections::HashSet<String>,
@@ -246,6 +261,7 @@ fn reachable_wire_verbs(
         .collect()
 }
 
+#[cfg(feature = "cranelift")]
 fn emit_module_objects(
     object_plan: &crate::modules::ModuleObjectPlan,
     configuration: &CompilerConfiguration,
@@ -304,6 +320,7 @@ fn emit_module_objects(
     Ok(objects)
 }
 
+#[cfg(feature = "cranelift")]
 fn declared_symbols(
     program: &crate::ast::Program,
     namespace: &str,
@@ -344,6 +361,7 @@ fn declared_symbols(
     Ok(names.into_iter().collect())
 }
 
+#[cfg(feature = "cranelift")]
 fn module_bindings(
     plan: &crate::modules::ModuleObjectPlan,
     generic_instances: &[crate::semantic::GenericInstance],

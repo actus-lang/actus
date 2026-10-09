@@ -3,6 +3,7 @@ mod bindings;
 mod body;
 mod constants;
 mod contract;
+#[cfg(feature = "cranelift")]
 pub mod cranelift;
 mod linker;
 mod model;
@@ -34,7 +35,10 @@ pub use signature::{
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
+#[cfg(feature = "cranelift")]
 pub(crate) use cranelift::generic::expand_generic_instances;
+#[cfg(feature = "cranelift")]
 pub(crate) use cranelift::generic::specialized_generic_name;
+#[cfg(feature = "cranelift")]
 pub(crate) use cranelift::native::reachable_call_names;
 pub(crate) use result_constructors::normalize_program;

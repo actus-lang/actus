@@ -18,7 +18,11 @@ impl BackendKind {
 
     pub fn validate_target(self, target: &TargetSpec) -> Result<(), BackendTargetError> {
         match self {
-            Self::Cranelift => Ok(()),
+            Self::Cranelift if cfg!(feature = "cranelift") => Ok(()),
+            Self::Cranelift => Err(BackendTargetError::Unavailable {
+                backend: self,
+                target: target.triple().to_string(),
+            }),
             Self::Llvm => Err(BackendTargetError::Unavailable {
                 backend: self,
                 target: target.triple().to_string(),

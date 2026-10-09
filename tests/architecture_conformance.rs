@@ -172,6 +172,20 @@ fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
 }
 
 #[test]
+fn cranelift_dependencies_are_optional_and_defaulted() {
+    let manifest = fs::read_to_string(repository_path("Cargo.toml"))
+        .expect("Cargo manifest should be readable");
+    assert!(manifest.contains("default = [\"cranelift\"]"));
+    assert!(manifest.contains("cranelift = ["));
+    for dependency in
+        ["cranelift-codegen", "cranelift-frontend", "cranelift-module", "cranelift-object"]
+    {
+        let declaration = format!("{dependency} = {{ version = \"0.136.2\", optional = true }}");
+        assert!(manifest.contains(&declaration), "{dependency} must be optional");
+    }
+}
+
+#[test]
 fn cranelift_implementation_stays_inside_its_backend_boundary() {
     let root = repository_path("src/codegen");
     for path in rust_sources(&root) {

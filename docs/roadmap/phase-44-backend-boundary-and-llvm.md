@@ -246,7 +246,7 @@ not hardware measurements.
 - [x] Define object format, relocation, symbol visibility, entry symbol,
       linker arguments, runtime archive, and startup requirements per target.
 - [x] Reject incompatible backend-target combinations with typed diagnostics.
-- [ ] Prove that unused backend modules are not compiled or linked.
+- [x] Prove that unused backend modules are not compiled or linked.
 - [x] Add deterministic object and linker-plan tests for every supported host
       profile.
 
@@ -264,7 +264,12 @@ zero failures. Relocation-model and symbol-visibility policy remain open for
 the next Gate 44.4 block. `RelocationModel` now distinguishes static and
 position-independent artifacts, while `TargetArtifactContract` records
 exported entry symbols and imported runtime symbols explicitly. Configuration
-and target regression tests cover both policies.
+and target regression tests cover both policies. Cranelift dependencies are
+optional Cargo dependencies under the default `cranelift` feature, and the
+architecture suite verifies that feature contract. The command
+`CARGO_TARGET_DIR=/tmp/actus-target-no-cranelift cargo check
+--no-default-features --lib --bin actus` passes without compiling Cranelift
+crates; the no-feature CLI retains a typed unavailable-backend error path.
 
 ## Gate 44.5 — Add the LLVM backend on a hosted target
 
