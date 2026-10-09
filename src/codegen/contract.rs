@@ -1,5 +1,6 @@
 use crate::ast::Role;
 use crate::lexer::SourceSpan;
+use std::collections::BTreeSet;
 
 use super::model::NativeInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
@@ -77,10 +78,10 @@ pub struct BackendReturn {
     pub passing: BackendReturnMode,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BackendValueId(pub u32);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BackendBlockId(pub u32);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -125,16 +126,28 @@ impl BackendFunction {
         if self.symbol.kind() != SymbolKind::Verb && self.symbol.kind() != SymbolKind::External {
             return Err(BackendContractError::InvalidFunctionSymbol);
         }
-        if self.blocks.iter().filter(|block| block.id == self.entry).count() != 1 {
-            return Err(BackendContractError::MissingEntryBlock);
-        }
+        let mut block_ids = BTreeSet::new();
+        let mut parameter_names = BTreeSet::new();
         for parameter in &self.parameters {
+            if parameter.name.is_empty() {
+                return Err(BackendContractError::EmptyParameterName);
+            }
+            if !parameter_names.insert(&parameter.name) {
+                return Err(BackendContractError::DuplicateParameterName);
+            }
             validate_parameter(parameter)?;
         }
         if let BackendReturnMode::ReturnSlot { layout } = self.return_value.passing {
             layout.validate()?;
+            match self.return_value.ty {
+                BackendValueType::Aggregate { layout: value_layout } if value_layout == layout => {}
+                _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
+            }
         }
         for block in &self.blocks {
+            if !block_ids.insert(block.id) {
+                return Err(BackendContractError::DuplicateBlockId);
+            }
             for instruction in &block.instructions {
                 if let BackendInstruction::Call { callee, .. } = instruction {
                     if callee.as_str().is_empty() {
@@ -142,6 +155,9 @@ impl BackendFunction {
                     }
                 }
             }
+        }
+        if self.blocks.iter().filter(|block| block.id == self.entry).count() != 1 {
+            return Err(BackendContractError::MissingEntryBlock);
         }
         Ok(())
     }
@@ -176,6 +192,10 @@ pub enum BackendContractError {
     InvalidLayout(&'static str),
     InvalidFunctionSymbol,
     MissingEntryBlock,
+    EmptyParameterName,
+    DuplicateParameterName,
+    DuplicateBlockId,
+    ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
     Unsupported(BackendUnsupportedOperation),
@@ -213,6 +233,16 @@ impl std::fmt::Display for BackendContractError {
             Self::InvalidFunctionSymbol => formatter.write_str("invalid backend function symbol"),
             Self::MissingEntryBlock => {
                 formatter.write_str("backend function is missing its entry block")
+            }
+            Self::EmptyParameterName => formatter.write_str("backend parameter name is empty"),
+            Self::DuplicateParameterName => {
+                formatter.write_str("backend function has duplicate parameter names")
+            }
+            Self::DuplicateBlockId => {
+                formatter.write_str("backend function has duplicate block ids")
+            }
+            Self::ReturnSlotTypeMismatch => {
+                formatter.write_str("backend return slot must match an aggregate return type")
             }
             Self::InvalidCallSymbol => formatter.write_str("backend call has an empty symbol"),
             Self::RolePassingMismatch => {
@@ -327,5 +357,58 @@ mod tests {
             blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
         };
         assert!(function.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_return_slots_for_non_aggregate_values() {
+        let function = BackendFunction {
+            symbol: verb_symbol(),
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                ty: BackendValueType::Integer { signed: false, width: 32 },
+                passing: BackendReturnMode::ReturnSlot {
+                    layout: BackendLayout { size: 4, alignment: 4 },
+                },
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        };
+        assert_eq!(function.validate(), Err(BackendContractError::ReturnSlotTypeMismatch));
+    }
+
+    #[test]
+    fn rejects_duplicate_parameters_and_blocks() {
+        let function = BackendFunction {
+            symbol: verb_symbol(),
+            parameters: vec![
+                BackendParameter {
+                    name: "value".to_owned(),
+                    role: Role::Erg,
+                    ty: BackendValueType::Integer { signed: false, width: 32 },
+                    passing: BackendPassingMode::Direct,
+                },
+                BackendParameter {
+                    name: "value".to_owned(),
+                    role: Role::Erg,
+                    ty: BackendValueType::Integer { signed: false, width: 32 },
+                    passing: BackendPassingMode::Direct,
+                },
+            ],
+            return_value: BackendReturn {
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![
+                BackendBlock { id: BackendBlockId(0), instructions: Vec::new() },
+                BackendBlock { id: BackendBlockId(1), instructions: Vec::new() },
+            ],
+        };
+        assert_eq!(function.validate(), Err(BackendContractError::DuplicateParameterName));
+
+        let mut blocks_only = function;
+        blocks_only.parameters.clear();
+        blocks_only.blocks[1].id = BackendBlockId(0);
+        assert_eq!(blocks_only.validate(), Err(BackendContractError::DuplicateBlockId));
     }
 }
