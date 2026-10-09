@@ -198,10 +198,10 @@ is required by the contract.
       declarations, object emission, and linker integration under a dedicated
       backend boundary without changing behavior.
 - [x] Keep target profiles and runtime contracts outside the Cranelift module.
-- [ ] Remove direct Cranelift types from shared lowering and semantic APIs.
-- [ ] Preserve object identity, symbol names, cleanup order, ABI layout,
+- [x] Remove direct Cranelift types from shared lowering and semantic APIs.
+- [x] Preserve object identity, symbol names, cleanup order, ABI layout,
       diagnostics, and zero-float verification.
-- [ ] Run the complete existing test and benchmark suite after each cohesive
+- [x] Run the complete existing test and benchmark suite after each cohesive
       move.
 - [x] Add an architecture test that prevents new backend-specific imports from
       entering shared frontend or semantic modules.
@@ -225,9 +225,18 @@ explicit `codegen::cranelift` namespace instead of the shared facade. The
 architecture suite also rejects re-exporting those entry points from
 `src/codegen/mod.rs`.
 Target and runtime source trees are also checked for Cranelift implementation
-imports. Remaining Gate 44.3 work covers removing the remaining backend-shaped
-symbol-binding and emission entry points from the shared public facade and
-preserving all ABI, symbol, cleanup, and zero-float behavior through that move.
+imports. The shared facade no longer re-exports Cranelift emission or native
+signature validation entry points; callers use the explicit
+`codegen::cranelift` namespace. Existing symbol identity tests, native cleanup
+fixtures, FFI/link tests, target tests, and strict zero-float native tests pass
+after the moves. The complete suite passes with zero failures. The benchmark
+executables also pass: with 100 frontend iterations, lexer latency was 489 ns
+per iteration and parser latency was 1.337 us per iteration; the Region
+benchmark reported 23 ns open, 12 ns read, 9 ns write, 13 ns publish, 12 ns
+cancel, and 17 ns remap averages over 10,000 iterations. Its 100-iteration
+bulk measurements reported 1040 ns read and 924 ns write for 64 KiB, and 2051
+ns read and 1858 ns write for 128 KiB. These are hosted benchmark observations,
+not hardware measurements.
 
 ## Gate 44.4 — Formalize target, object, and linker boundaries
 
