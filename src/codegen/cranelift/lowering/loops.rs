@@ -5,13 +5,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Block, ForBinding};
 
-use super::super::control_flow::{assigned_outer_bindings, carried_values, jump_with_values};
-use super::super::cranelift::expressions::{initializer_type, lower_expression};
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::expressions::{initializer_type, lower_expression};
+use super::super::literals::StringDataValues;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use crate::codegen::control_flow::{assigned_outer_bindings, carried_values, jump_with_values};
+use crate::codegen::layout::LayoutRegistry;
 
 type LoopState<'source> =
     (HashMap<&'source String, cranelift_codegen::ir::Value>, HashMap<&'source String, NativeType>);

@@ -16,8 +16,8 @@ use super::literals::{StringDataIds, StringDataValues, declare_string_values};
 use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
+use crate::codegen::cranelift::lowering::lower_body;
 use crate::codegen::layout::LayoutRegistry;
-use crate::codegen::lowering::lower_body;
 use crate::codegen::model::NativeCleanupSchedule;
 use flow::emit_flow;
 pub(crate) use flow::emit_value_return;
@@ -122,7 +122,11 @@ fn lower_function_flow(
     layouts: &LayoutRegistry,
     force_entry_return: bool,
 ) -> Result<
-    (Option<NativeType>, Option<cranelift_codegen::ir::Value>, crate::codegen::lowering::Flow),
+    (
+        Option<NativeType>,
+        Option<cranelift_codegen::ir::Value>,
+        crate::codegen::cranelift::lowering::Flow,
+    ),
     NativeEmitError,
 > {
     let (return_type, return_slot, (locals, local_types)) =

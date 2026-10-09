@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Block, Expr, IfBranch};
 
-use super::super::super::lowering::LoopTargets;
-use super::super::super::lowering::{Flow, lower_statements};
 use super::super::super::model::NativeCleanupSchedule;
 use super::super::literals::StringDataValues;
+use super::super::lowering::LoopTargets;
+use super::super::lowering::{Flow, lower_statements};
 use super::super::native::FunctionRef;
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
@@ -28,7 +28,7 @@ pub(crate) fn lower_statement_if<'source>(
     string_data: &StringDataValues,
     layouts: &crate::codegen::layout::LayoutRegistry,
     targets: Option<LoopTargets>,
-) -> Result<super::super::super::lowering::Flow, NativeEmitError> {
+) -> Result<super::super::lowering::Flow, NativeEmitError> {
     let condition = super::lower_expression_with_targets(
         function,
         condition,
@@ -65,7 +65,7 @@ pub(crate) fn lower_statement_if<'source>(
     function.seal_block(then_block);
     function.seal_block(else_block);
     function.seal_block(merge_block);
-    Ok(super::super::super::lowering::Flow::Fallthrough)
+    Ok(super::super::lowering::Flow::Fallthrough)
 }
 
 #[allow(clippy::too_many_arguments)]

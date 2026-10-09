@@ -10,21 +10,22 @@ pub(super) fn emit_flow(
     function: &mut FunctionBuilder<'_>,
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,
-    flow: crate::codegen::lowering::Flow,
+    flow: crate::codegen::cranelift::lowering::Flow,
     layouts: &LayoutRegistry,
     force_void_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
     match flow {
-        crate::codegen::lowering::Flow::Return(result, _) => {
+        crate::codegen::cranelift::lowering::Flow::Return(result, _) => {
             emit_value_return(function, return_type, return_slot, result, layouts)
         }
-        crate::codegen::lowering::Flow::Fallthrough => {
+        crate::codegen::cranelift::lowering::Flow::Fallthrough => {
             emit_fallthrough(function, return_type, return_slot, force_void_entry_return)
         }
-        crate::codegen::lowering::Flow::VoidReturn => {
+        crate::codegen::cranelift::lowering::Flow::VoidReturn => {
             emit_void_return(function, return_type, return_slot, force_void_entry_return)
         }
-        crate::codegen::lowering::Flow::Break | crate::codegen::lowering::Flow::Continue => {
+        crate::codegen::cranelift::lowering::Flow::Break
+        | crate::codegen::cranelift::lowering::Flow::Continue => {
             Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
         }
     }

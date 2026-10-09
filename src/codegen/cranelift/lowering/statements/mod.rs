@@ -6,14 +6,14 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, Stmt};
 use crate::semantic::LoopExitKind;
 
-use super::super::cleanup::emit_loop_cleanup;
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::expressions::lower_expression;
+use super::super::literals::StringDataValues;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use crate::codegen::cleanup::emit_loop_cleanup;
 use crate::codegen::cranelift::structs::emit_binding_drop;
+use crate::codegen::layout::LayoutRegistry;
 
 mod compound;
 mod control_flow;
@@ -94,7 +94,7 @@ fn lower_void_return(
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    super::super::cleanup::emit_return_cleanup(
+    crate::codegen::cleanup::emit_return_cleanup(
         function,
         cleanup_schedule,
         span,
@@ -159,7 +159,7 @@ fn lower_plain_expression_statement(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     if let Expr::Case { subject, branches, .. } = expression {
-        super::super::cranelift::case::lower_case(
+        super::super::case::lower_case(
             function,
             subject,
             branches,
@@ -174,7 +174,7 @@ fn lower_plain_expression_statement(
         )?;
         return Ok(Flow::Fallthrough);
     }
-    super::super::cranelift::expressions::lower_expression_with_targets(
+    super::super::expressions::lower_expression_with_targets(
         function,
         expression,
         locals,

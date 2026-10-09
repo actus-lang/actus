@@ -4,11 +4,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Block, Expr, IfBranch, Stmt};
 
-use super::super::super::cranelift::literals::StringDataValues;
-use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::super::cranelift::types::NativeType;
-use super::super::super::layout::LayoutRegistry;
+use super::super::super::literals::StringDataValues;
+use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use crate::codegen::layout::LayoutRegistry;
 
 pub(super) fn statement_if_can_merge(then_branch: &Block, else_branch: Option<&IfBranch>) -> bool {
     !block_has_control_flow(then_branch)
@@ -49,7 +49,7 @@ pub(super) fn lower_if_statement<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     if statement_if_can_merge(then_branch, else_branch.as_ref()) {
-        return super::super::super::cranelift::expressions::lower_statement_if(
+        return super::super::super::expressions::lower_statement_if(
             function,
             condition,
             then_branch,

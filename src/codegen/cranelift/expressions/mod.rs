@@ -69,7 +69,7 @@ pub(crate) fn lower_expression_with_targets(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-    loop_targets: Option<super::super::lowering::LoopTargets>,
+    loop_targets: Option<super::lowering::LoopTargets>,
 ) -> Result<Value, NativeEmitError> {
     let context = CallLoweringContext::new(
         locals,

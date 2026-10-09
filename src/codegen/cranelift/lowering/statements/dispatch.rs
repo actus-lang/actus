@@ -4,11 +4,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, Place, Role, Stmt};
 
-use super::super::super::cranelift::literals::StringDataValues;
-use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::super::cranelift::types::NativeType;
-use super::super::super::layout::LayoutRegistry;
+use super::super::super::literals::StringDataValues;
+use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::types::NativeType;
 use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
+use crate::codegen::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_statement<'source>(

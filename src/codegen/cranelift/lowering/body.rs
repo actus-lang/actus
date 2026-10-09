@@ -4,12 +4,12 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Stmt;
 
-use super::super::cleanup::emit_scope_cleanup;
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataValues;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
+use crate::codegen::cleanup::emit_scope_cleanup;
+use crate::codegen::layout::LayoutRegistry;
 
 type CaseBlockState<'source> = (
     Flow,
@@ -132,7 +132,7 @@ fn lower_case_tail(
         return Ok(None);
     }
     tail.map(|expression| {
-        super::super::cranelift::expressions::lower_expression_with_targets(
+        super::super::expressions::lower_expression_with_targets(
             function,
             expression,
             locals,

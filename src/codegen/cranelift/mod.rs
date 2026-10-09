@@ -14,6 +14,7 @@ pub(super) mod function_definition;
 pub(super) mod ir_audit;
 mod isa;
 pub(super) mod literals;
+pub(super) mod lowering;
 pub(super) mod native;
 pub(super) mod object;
 pub(super) mod runtime;

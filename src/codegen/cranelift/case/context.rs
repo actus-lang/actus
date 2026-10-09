@@ -5,8 +5,8 @@ use cranelift_codegen::ir::Value;
 use super::super::literals::StringDataValues;
 use super::super::native::FunctionRef;
 use super::super::types::NativeType;
+use crate::codegen::cranelift::lowering::LoopTargets;
 use crate::codegen::layout::LayoutRegistry;
-use crate::codegen::lowering::LoopTargets;
 use crate::codegen::model::NativeCleanupSchedule;
 
 pub(super) struct CaseLoweringContext<'maps, 'keys> {

@@ -31,7 +31,7 @@ pub(crate) fn lower_case(
     cleanup_schedule: &crate::codegen::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-    loop_targets: Option<crate::codegen::lowering::LoopTargets>,
+    loop_targets: Option<crate::codegen::cranelift::lowering::LoopTargets>,
     value_producing: bool,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let context = case_context(
@@ -98,7 +98,7 @@ fn case_context<'maps, 'keys>(
     cleanup_schedule: &'maps crate::codegen::model::NativeCleanupSchedule,
     string_data: &'maps StringDataValues,
     layouts: &'maps LayoutRegistry,
-    loop_targets: Option<crate::codegen::lowering::LoopTargets>,
+    loop_targets: Option<crate::codegen::cranelift::lowering::LoopTargets>,
 ) -> CaseLoweringContext<'maps, 'keys> {
     CaseLoweringContext::new(
         locals,

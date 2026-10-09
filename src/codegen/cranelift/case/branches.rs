@@ -9,7 +9,7 @@ use super::super::types::NativeType;
 use super::context::CaseLoweringContext;
 use super::matching::match_pattern;
 use super::payload::{BranchLocals, bind_payload};
-use crate::codegen::lowering::{Flow, lower_case_block};
+use crate::codegen::cranelift::lowering::{Flow, lower_case_block};
 
 const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
 type CaseBranchResult<'a> = Option<(cranelift_codegen::ir::Value, BranchLocals<'a>)>;

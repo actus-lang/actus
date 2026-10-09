@@ -3,13 +3,13 @@ mod loops;
 mod scopes;
 mod statements;
 
-use super::cranelift::types::NativeType;
-pub(super) use super::model::NativeCleanupSchedule;
+use super::types::NativeType;
+pub(super) use crate::codegen::model::NativeCleanupSchedule;
 pub(super) use body::{lower_body, lower_case_block};
 pub(super) use statements::lower_statements;
 
 #[derive(Clone, Copy)]
-pub(super) enum Flow {
+pub(crate) enum Flow {
     Fallthrough,
     Return(cranelift_codegen::ir::Value, Option<NativeType>),
     VoidReturn,
@@ -18,8 +18,8 @@ pub(super) enum Flow {
 }
 
 #[derive(Clone)]
-pub(super) struct LoopTargets {
-    pub(super) header: cranelift_codegen::ir::Block,
-    pub(super) exit: cranelift_codegen::ir::Block,
-    pub(super) carried: Vec<String>,
+pub(crate) struct LoopTargets {
+    pub(crate) header: cranelift_codegen::ir::Block,
+    pub(crate) exit: cranelift_codegen::ir::Block,
+    pub(crate) carried: Vec<String>,
 }

@@ -7,7 +7,6 @@ mod enum_layout;
 mod generic;
 mod layout;
 mod linker;
-mod lowering;
 mod model;
 mod performance;
 mod result_constructor_spans;

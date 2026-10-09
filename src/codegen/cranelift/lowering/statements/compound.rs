@@ -5,17 +5,15 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, CompoundAssignmentOp, Expr, Place};
 
-use super::super::super::cranelift::expressions::{
-    lower_compound_integer_operation, lower_expression,
-};
-use super::super::super::cranelift::literals::StringDataValues;
-use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::super::cranelift::types::NativeType;
-use super::super::super::layout::LayoutRegistry;
+use super::super::super::expressions::{lower_compound_integer_operation, lower_expression};
+use super::super::super::literals::StringDataValues;
+use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
 use crate::codegen::cranelift::arrays::lower_array_compound_assignment;
 use crate::codegen::cranelift::buffer_index::lower_buffer_compound_assignment;
 use crate::codegen::cranelift::structs::{expression_native_type, lower_field_compound_assignment};
+use crate::codegen::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_compound_assignment<'source>(
@@ -109,9 +107,9 @@ fn lower_identifier<'source>(
         string_data,
         layouts,
     )?;
-    let right = left_type.ir_type(layouts.pointer_type).map(|ty| {
-        super::super::super::cranelift::expressions::coerce_to_ir_type(function, right, ty)
-    })?;
+    let right = left_type
+        .ir_type(layouts.pointer_type)
+        .map(|ty| super::super::super::expressions::coerce_to_ir_type(function, right, ty))?;
     let updated = lower_compound_integer_operation(function, left, operator, right, left_type)?;
     if is_indirect_scalar(function, destination, left_type, layouts) {
         function.ins().store(MemFlagsData::new(), updated, destination, 0);
