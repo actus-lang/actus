@@ -307,10 +307,35 @@ verb check_struct() -> Int {
     };
 }
 
+verb check_byte_array() -> Int {
+    erg backing: Buffer = Buffer[16];
+    erg opened = open_forward[Array[u8, 16]](backing: dat backing);
+    return case dat opened {
+        Result.Err(_) => 7,
+        Result.Ok(region) => {
+            erg forwarded: Region[Array[u8, 16]] = forward_region(region: dat region);
+            erg destination: Buffer = Buffer[16];
+            erg index: u64 = 0u64;
+            erg read = region_read(region: abs forwarded, index: erg index, destination: ins destination);
+            erg closed = region_close(region: ins forwarded);
+            erg close_status: Int = case dat closed {
+                Result.Err(_) => 9,
+                Result.Ok(_) => 0,
+            };
+            return case dat read {
+                Result.Err(_) => 8,
+                Result.Ok(_) => close_status,
+            };
+        },
+    };
+}
+
 verb main() -> Int {
     erg array_status: Int = check_array();
     if array_status != 0 { return array_status; }
-    return check_struct();
+    erg struct_status: Int = check_struct();
+    if struct_status != 0 { return struct_status; }
+    return check_byte_array();
 }
 "#;
     let (root, input, output) = project("generic-region-array-struct-abi", source);

@@ -11,6 +11,11 @@ foundation; it does not redefine `Array[T, N]`. The internal Region descriptor
 ABI is versioned when its validated layout contract expands; public Region
 operation names and ownership roles remain source-compatible.
 
+The phase remains open until the aggregate native path and the revised bulk
+transfer contract below have independent compiler, runtime, and target-profile
+evidence. Existing aggregate semantic and code-generation coverage does not
+close the native runtime acceptance gate by itself.
+
 The governing agreement is [ADR-0079](../decisions/ADR-0079-region-capability-completeness.md).
 
 ## Objective
@@ -375,8 +380,8 @@ test matrix. Native Region fixtures also report zero floating-point IR.
 
 #### Gate 41.11 progress
 
-The core range boundary now accepts at most 64 KiB of resident bytes per
-operation and returns typed `BulkLimitExceeded` above that limit. There is no
+The hosted core range boundary now accepts at most 128 KiB of resident bytes
+per operation and returns typed `BulkLimitExceeded` above that limit. There is no
 implicit asynchronous queue; the core queue capacity is zero. Larger transfers
 must be explicitly chunked by the caller or implemented by a separately
 specified provider adapter.
@@ -491,7 +496,7 @@ specific behavior remains selected by the configured provider profile.
 - `docs/benchmarks/phase-41-region-performance-2026-10-08.md` records the
   current revision, hosted Linux x86-64 target, optimized profile, exact
   commands, operation timings, MiB/GiB/TiB outputs, resident bytes, artifact
-  sizes, the 64 KiB failure boundary, and the existing RSS/object evidence.
+  sizes, the 128 KiB hosted failure boundary, and the existing RSS/object evidence.
 - The current rerun covers primitive `u8` and 64-byte packed elements with
   one resident window at 1 MiB, 1 GiB, and 1 TiB logical capacities. All six
   cases passed with constant executable size per element category.
@@ -501,7 +506,68 @@ specific behavior remains selected by the configured provider profile.
   requirement, zero hidden queue capacity, and the distinction between
   hosted observations and target-specific performance claims.
 
-## Gate 41.16 — Final acceptance and release readiness
+## Gate 41.16 — Aggregate Region native execution
+
+- [x] Execute `Region[Array[u8, 16]]` through open, single-element read, and
+      close in the hosted generic native regression.
+- [ ] Extend the same fixture through single-element write, bounded range read
+      and write, publish, cancel, and remap.
+- [ ] Preserve the aggregate layout contract: element size 16 bytes, valid
+      alignment, exact stride, deterministic field order, and checked byte
+      bounds.
+- [x] Cover aggregate Region values in nested generic calls, `Result` payloads,
+      direct returns, and ownership-consuming forwarding.
+- [ ] Cover aggregate Region values in indirect return slots.
+- [ ] Prove that native lowering does not materialize a logical Region as an
+      inline stack array and does not allocate one object per logical element.
+- [ ] Add hosted Linux, Windows, and macOS execution fixtures and a supported
+      freestanding object fixture with the same source contract.
+- [ ] Report the exact failure variant for invalid aggregate layout, wrong
+      buffer size, out-of-window access, overflow, stale generation, and
+      closed capability.
+
+#### Gate 41.16 acceptance evidence
+
+This gate remains open until the same aggregate fixture passes semantic
+analysis, native linking, execution, cleanup, and zero-floating-point checks.
+The current Twin-e reproduction is a required external consumer fixture: a
+semantic or compile-only pass is insufficient when `region_open` rejects the
+aggregate at native execution.
+
+The extended hosted regression now executes `Region[Array[u8, 16]]` through
+generic forwarding, native read, and explicit close. Cross-target execution,
+range mutation, publication, remap, and freestanding evidence remain open.
+
+## Gate 41.17 — 128 KiB bounded bulk-transfer profile
+
+- [x] Raise the hosted default `REGION_MAX_BULK_BYTES` from 64 KiB to 128 KiB
+      without changing the public operation names or ownership roles.
+- [x] Accept an exact 128 KiB read and write and reject 128 KiB plus one byte
+      with `BulkLimitExceeded` before copying.
+- [x] Validate all byte-count, element-count, stride, and range-end arithmetic
+      with checked 64-bit calculations before the native copy begins.
+- [x] Keep the transfer buffer caller-owned; increasing the limit must not
+      introduce hidden allocation, automatic resident-window growth, or a
+      provider queue in the Region core.
+- [ ] Keep a documented 64 KiB embedded profile and permit target profiles to
+      select a lower limit without source-level changes.
+- [ ] Measure peak resident memory, copy time, executable output, and failure
+      behavior at 64 KiB, 128 KiB, and 128 KiB plus one byte on hosted and
+      supported freestanding profiles.
+- [x] Update the Region guide, API index, ADR, runtime contract, and evidence
+      document with the profile rule and compatibility boundary.
+
+#### Gate 41.17 acceptance evidence
+
+The hosted 128 KiB default is acceptable only if the exact caller buffer is
+used and the Region core remains allocation-free on range operations. Embedded
+targets retain a smaller profile when their memory or latency budget requires
+it; the larger hosted default must never be treated as an embedded hardware
+guarantee. The hosted runtime test now accepts an exact 128 KiB range and the
+runtime unit test rejects 128 KiB plus one byte. Target-selectable embedded
+profiles and cross-platform measurements remain open.
+
+## Gate 41.18 — Final acceptance and release readiness
 
 - [x] Run `cargo fmt --all -- --check`.
 - [x] Run `cargo check --all-targets --all-features`.
@@ -511,10 +577,10 @@ specific behavior remains selected by the configured provider profile.
 - [x] Run Actus formatter, strict checks, native builds, and Region fixtures.
 - [x] Confirm no unrelated standard-library or application work was included.
 - [x] Update the guide, API index, ADR, and evidence documents.
-- [x] Mark Phase 41 complete only when every gate has implementation and
+- [ ] Mark Phase 41 complete only when every gate has implementation and
       reproducible evidence.
 
-#### Gate 41.16 evidence
+#### Gate 41.18 evidence
 
 - `cargo fmt --all -- --check`, `cargo check --all-targets --all-features`,
   `cargo clippy --all-targets --all-features -- -D warnings`, and
@@ -529,12 +595,13 @@ specific behavior remains selected by the configured provider profile.
 
 ### Phase 41 acceptance record
 
-Phase 41 is complete. `std::region` now has a documented, provider-neutral,
-bounded logical-storage contract with explicit windows, typed lifecycle and
-recovery boundaries, generation-safe capabilities, deterministic cleanup,
-native ABI coverage, adversarial regressions, and reproducible MiB-to-TiB
-scale evidence. Hosted measurements remain host evidence and do not imply
-embedded hardware performance.
+Phase 41 remains open. The original Region contract has documented,
+provider-neutral bounded logical storage with explicit windows, typed lifecycle
+and recovery boundaries, generation-safe capabilities, deterministic cleanup,
+native ABI coverage, adversarial regressions, and reproducible MiB-to-TiB scale
+evidence. Gates 41.16 and 41.17 remain required before release readiness;
+hosted measurements remain host evidence and do not imply embedded hardware
+performance.
 
 ## Explicit non-goals
 

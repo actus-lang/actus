@@ -3,8 +3,8 @@ pub const RUNTIME_ABI_VERSION: u32 = 1;
 
 /// Version of the fixed-width Region descriptor ABI.
 pub const REGION_DESCRIPTOR_ABI_VERSION: u32 = 3;
-/// Maximum resident byte payload accepted by one Region range operation.
-pub const REGION_MAX_BULK_BYTES: usize = 64 * 1024;
+/// Maximum hosted resident byte payload accepted by one Region range operation.
+pub const REGION_MAX_BULK_BYTES: usize = 128 * 1024;
 /// The core Region boundary has no implicit asynchronous provider queue.
 pub const REGION_PROVIDER_QUEUE_CAPACITY: usize = 0;
 

@@ -241,8 +241,9 @@ receives overlapping storage. Empty ranges are valid no-ops when their start
 position is within the logical extent; non-empty ranges may not cross the
 resident window. The implementation performs no allocation or I/O.
 
-Each range operation has a fixed 64 KiB maximum resident byte payload. A
-larger checked extent returns `BulkLimitExceeded` before copying. The core has
+Each hosted range operation has a fixed 128 KiB maximum resident byte payload.
+A larger checked extent returns `BulkLimitExceeded` before copying. Embedded
+profiles may select a lower bound such as 64 KiB. The core has
 no implicit asynchronous queue and therefore a queue capacity of zero. A
 caller or provider adapter that needs larger transfers must split them into
 bounded operations and define its own queue, ownership, cancellation, and
@@ -523,7 +524,7 @@ The Phase 41 benchmark record captures a current Linux x86-64 hosted rerun at
 1 MiB, 1 GiB, and 1 TiB logical capacities for both one-byte and 64-byte
 packed elements, with one resident window in every case. It records the
 compiler revision, commands, profile, resident bytes, executable sizes,
-operation timings, the 64 KiB bulk failure boundary, and the previously
+operation timings, the 128 KiB hosted bulk failure boundary, and the previously
 captured compiler RSS and object evidence. Remap and range fixtures verify
 that moving among windows is explicit and that the Region core performs no
 implicit provider or filesystem I/O. These measurements are hosted evidence;

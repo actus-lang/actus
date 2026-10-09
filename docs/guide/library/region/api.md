@@ -38,7 +38,7 @@ runtime pointers are not part of the public API.
 | `GenerationExhausted` | Capability generation cannot advance safely. |
 | `BackendFailure` | Selected target provider rejected the operation. |
 | `WindowBusy` | A transition conflicts with unpublished mutations, a pin, or the single-threaded loan contract. |
-| `BulkLimitExceeded` | A range payload exceeds the fixed 64 KiB bulk-operation limit. |
+| `BulkLimitExceeded` | A range payload exceeds the profile's fixed bulk-operation limit. |
 
 The enum is exhaustive. Callers must handle every variant with `case`; no
 implicit exception or sentinel-value path represents a Region failure.
@@ -84,7 +84,7 @@ open verb region_write_range[T](
 ```
 
 The buffer must be exactly `element_count * size_of[T]()` bytes wide and the
-payload must not exceed 64 KiB. The
+payload must not exceed 128 KiB in the hosted profile. The
 runtime checks the index addition, byte multiplication, resident-window
 containment, and buffer length before copying. A non-empty range that crosses
 the resident window is rejected; callers must explicitly remap or stage a
@@ -174,7 +174,8 @@ Single-element and range operations validate logical indexes, resident-window
 containment, checked multiplication and addition, exact buffer length, and
 alignment before touching bytes. Range operations are all-or-nothing: an
 `Err` result means zero elements were copied or changed. Each range is limited
-to 64 KiB of resident bytes; larger transfers must be explicitly chunked.
+to 128 KiB of resident bytes in the hosted profile; larger transfers must be
+explicitly chunked. Embedded profiles may use a lower limit.
 
 The Region core performs no hidden allocation or filesystem, device, or
 network I/O on read, write, publish, cancel, inspection, pin, unpin, or close.

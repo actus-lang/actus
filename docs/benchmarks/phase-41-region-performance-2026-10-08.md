@@ -8,8 +8,8 @@ boundary; it does not claim embedded hardware latency.
 
 ## Bulk contract
 
-- Maximum payload for one `region_read_range` or `region_write_range` call:
-  64 KiB.
+- Maximum hosted payload for one `region_read_range` or
+  `region_write_range` call: 128 KiB.
 - A larger checked payload returns `BulkLimitExceeded` before copying.
 - Core provider queue capacity: zero. The core performs no implicit queued
   asynchronous work.
@@ -112,6 +112,6 @@ REGION_SCALE element=u8 logical_label=1TiB logical_bytes=1099511627776 resident_
 ```
 
 All six cases passed. The tested failure boundary remains a single range
-payload above 64 KiB, which returns `BulkLimitExceeded` before copying. No
+payload above 128 KiB, which returns `BulkLimitExceeded` before copying. No
 case allocates the logical extent; resident bytes stay at one byte or one
 64-byte element, and executable size stays constant per element category.
