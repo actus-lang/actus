@@ -1,9 +1,10 @@
-use actus::ast::Role;
+use actus::ast::{Block, DispatchMode, Param, ReturnAccess, ReturnType, Role, TypeName, VerbDecl};
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendCleanupAction, BackendContractError, BackendFailure,
-    BackendFunction, BackendInstruction, BackendLayout, BackendParameter, BackendPassingMode,
-    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
-    BackendValueType, NativeInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup,
+    BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider, BackendParameter,
+    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
+    BackendUnsupportedOperation, BackendValueType, NativeInstruction, SymbolIdentity, SymbolKind,
+    lower_semantic_cleanup, lower_verb_signature,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -12,6 +13,72 @@ use actus::semantic::{
 
 fn verb_symbol() -> SymbolIdentity {
     SymbolIdentity::new("test", SymbolKind::Verb, "run").expect("valid verb symbol")
+}
+
+struct TestLayouts;
+
+impl BackendLayoutProvider for TestLayouts {
+    fn layout_for(&self, type_name: &TypeName) -> Option<actus::codegen::BackendLayout> {
+        (!type_name.name.is_empty())
+            .then_some(actus::codegen::BackendLayout { size: 16, alignment: 8 })
+    }
+}
+
+fn type_name(name: &str, role: Option<Role>) -> TypeName {
+    TypeName {
+        name: name.to_owned(),
+        arguments: Vec::new(),
+        reference_role: role,
+        span: SourceSpan::new(0, name.len()),
+    }
+}
+
+fn verb_with_signature() -> VerbDecl {
+    VerbDecl {
+        is_open: false,
+        doc: None,
+        contract: None,
+        metadata: Vec::new(),
+        name: "process".to_owned(),
+        generic_parameters: Vec::new(),
+        params: vec![
+            Param {
+                role: Role::Abs,
+                name: "view".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("Region", Some(Role::Abs)),
+                span: SourceSpan::new(0, 5),
+            },
+            Param {
+                role: Role::Ins,
+                name: "loan".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("Region", Some(Role::Ins)),
+                span: SourceSpan::new(6, 10),
+            },
+            Param {
+                role: Role::Dat,
+                name: "resource".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("Region", Some(Role::Dat)),
+                span: SourceSpan::new(11, 19),
+            },
+            Param {
+                role: Role::Erg,
+                name: "value".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("u32", Some(Role::Erg)),
+                span: SourceSpan::new(20, 25),
+            },
+        ],
+        return_type: Some(ReturnType {
+            access: ReturnAccess::Owned,
+            ty: type_name("Result", None),
+            span: SourceSpan::new(26, 32),
+        }),
+        body: Block { statements: Vec::new(), span: SourceSpan::new(0, 32) },
+        span: SourceSpan::new(0, 32),
+    }
 }
 
 fn unit_function(parameters: Vec<BackendParameter>, blocks: Vec<BackendBlock>) -> BackendFunction {
@@ -312,5 +379,29 @@ fn rejects_invalid_semantic_cleanup_before_backend_lowering() {
     assert!(matches!(
         lower_semantic_cleanup(&model),
         Err(BackendContractError::InvalidCleanupContract(_))
+    ));
+}
+
+#[test]
+fn lowers_callable_roles_and_layouts_without_a_machine_backend() {
+    let signature = lower_verb_signature("app", &verb_with_signature(), &TestLayouts)
+        .expect("signature should lower through the neutral provider");
+    assert_eq!(signature.symbol.as_str(), "app__verb_process");
+    assert!(matches!(signature.parameters[0].passing, BackendPassingMode::Borrowed { .. }));
+    assert!(matches!(signature.parameters[1].passing, BackendPassingMode::ExclusiveLoan { .. }));
+    assert!(matches!(
+        signature.parameters[2].passing,
+        BackendPassingMode::OwnershipTransfer { .. }
+    ));
+    assert!(matches!(signature.return_value.passing, BackendReturnMode::ReturnSlot { .. }));
+}
+
+#[test]
+fn rejects_transferred_scalar_without_a_layout_provider() {
+    let mut verb = verb_with_signature();
+    verb.params[2].ty = type_name("u32", Some(Role::Dat));
+    assert!(matches!(
+        lower_verb_signature("app", &verb, &TestLayouts),
+        Err(BackendContractError::Unsupported(_))
     ));
 }
