@@ -6,9 +6,9 @@ use crate::ast::Expr;
 
 use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::cranelift::types::NativeType;
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
-use super::types::NativeType;
 
 mod branches;
 mod context;

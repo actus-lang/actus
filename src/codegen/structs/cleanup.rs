@@ -4,10 +4,10 @@ use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::expressions::emit_buffer_drop;
 use super::super::layout::LayoutRegistry;
 use super::super::performance::dispatch_key;
-use super::super::types::NativeType;
 
 pub(crate) fn emit_struct_drop(
     function: &mut FunctionBuilder<'_>,

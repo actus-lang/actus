@@ -6,8 +6,8 @@ use crate::ast::{Block, Expr, IfBranch, Stmt};
 
 use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::super::cranelift::types::NativeType;
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
 pub(super) fn statement_if_can_merge(then_branch: &Block, else_branch: Option<&IfBranch>) -> bool {

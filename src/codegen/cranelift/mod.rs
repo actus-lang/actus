@@ -8,6 +8,7 @@ pub(super) mod literals;
 pub(super) mod native;
 pub(super) mod object;
 pub(super) mod runtime;
+pub(super) mod types;
 pub(super) mod vtable;
 
 pub(super) use isa::build_isa_with_optimization;

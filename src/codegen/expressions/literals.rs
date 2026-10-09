@@ -111,7 +111,7 @@ pub(in crate::codegen) fn lower_identifier(
     function: &mut FunctionBuilder<'_>,
     name: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, super::super::types::NativeType>,
+    local_types: &HashMap<&String, super::super::cranelift::types::NativeType>,
     pointer_type: cranelift_codegen::ir::Type,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let (binding, value) = locals

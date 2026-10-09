@@ -13,7 +13,7 @@ use crate::runtime::{
 };
 
 use super::super::cranelift::native::{FunctionMeta, NativeEmitError};
-use super::super::types::NativeType;
+use super::types::NativeType;
 
 const SERIALIZATION_I64: NativeType = NativeType::Integer { signed: true, width: 64 };
 const VALIDATE_FIXED_FRAME_PARAMS: &[&str] = &[

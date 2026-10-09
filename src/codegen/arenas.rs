@@ -7,12 +7,12 @@ use crate::ast::{Argument, Expr};
 
 use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::cranelift::types::NativeType;
 use super::expressions::coerce_to_ir_type;
 use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::model::NativeCleanupSchedule;
 use super::structs::{copy_bytes, expression_native_type};
-use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_place(

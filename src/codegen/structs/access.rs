@@ -7,10 +7,10 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
-use super::super::types::NativeType;
 use super::memory::copy_bytes;
 use super::types::expression_native_type;
 

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::ast::{Expr, LayoutEndianness, TypeName};
 
+use super::super::cranelift::types::NativeType;
 use super::super::layout::LayoutRegistry;
-use super::super::types::NativeType;
 
 pub(crate) fn expression_native_type(
     expression: &Expr,

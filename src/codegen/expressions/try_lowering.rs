@@ -7,8 +7,8 @@ use crate::lexer::SourceSpan;
 use super::super::calls::CallLoweringContext;
 use super::super::cleanup::emit_return_cleanup;
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::layout::LayoutRegistry;
-use super::super::types::NativeType;
 use super::initializer_types::initializer_type;
 
 struct TryPayloadLayout {

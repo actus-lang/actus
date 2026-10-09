@@ -8,10 +8,10 @@ use crate::ast::{Block, Expr, IfBranch};
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::FunctionRef;
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::lowering::LoopTargets;
 use super::super::lowering::{Flow, lower_statements};
 use super::super::model::NativeCleanupSchedule;
-use super::super::types::NativeType;
 use super::CallLoweringContext;
 use super::{coerce_to_ir_type, initializer_type, lower_expression_with_context};
 

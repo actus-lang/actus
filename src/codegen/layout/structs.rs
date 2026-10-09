@@ -5,7 +5,7 @@ use crate::ast::{
 
 use super::{FieldLayout, LayoutRegistry, StructLayout, align_up, integer_storage_bytes};
 use crate::codegen::cranelift::native::NativeEmitError;
-use crate::codegen::types::NativeType;
+use crate::codegen::cranelift::types::NativeType;
 
 impl LayoutRegistry {
     pub(in crate::codegen) fn layout_for(

@@ -6,7 +6,7 @@ use crate::ast::Program;
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::types::NativeType;
+use super::types::NativeType;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub String);

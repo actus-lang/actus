@@ -8,8 +8,8 @@ use super::super::symbols::{SymbolIdentity, SymbolKind};
 
 use super::super::layout::LayoutRegistry;
 use super::super::performance::{PerformanceDefinition, dispatch_key};
-use super::super::types::NativeType;
 use super::native::{FunctionMeta, NativeEmitError};
+use super::types::NativeType;
 
 pub(crate) type VtableDataIds = HashMap<String, DataId>;
 

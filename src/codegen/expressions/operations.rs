@@ -9,7 +9,7 @@ use crate::ast::{BinaryOp, Expr, UnaryOp};
 
 use super::super::calls::CallLoweringContext;
 use super::super::cranelift::native::NativeEmitError;
-use super::super::types::NativeType;
+use super::super::cranelift::types::NativeType;
 use super::initializer_type;
 
 pub(in crate::codegen) fn lower_operation(

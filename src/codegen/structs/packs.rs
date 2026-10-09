@@ -7,10 +7,10 @@ use crate::ast::{Expr, StructFieldInit};
 
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::expressions::lower_expression;
 use super::super::layout::{LayoutRegistry, PackFieldLayout};
 use super::super::model::NativeCleanupSchedule;
-use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 
 #[allow(clippy::too_many_arguments)]

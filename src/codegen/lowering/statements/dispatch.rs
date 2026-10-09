@@ -6,8 +6,8 @@ use crate::ast::{Expr, Place, Role, Stmt};
 
 use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::super::cranelift::types::NativeType;
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::types::NativeType;
 use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
 
 #[allow(clippy::too_many_arguments)]

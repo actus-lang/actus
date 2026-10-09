@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::ast::{CaseBody, CaseBranch};
 
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::expressions::initializer_type;
 use super::super::layout::LayoutRegistry;
-use super::super::types::NativeType;
 use super::payload::add_payload_types;
 
 pub(in crate::codegen) fn infer_case_type(

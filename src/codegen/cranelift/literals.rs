@@ -27,7 +27,7 @@ impl StringDataValues {
     pub(crate) fn vtable_symbol(
         &self,
         role: &str,
-        native_type: crate::codegen::types::NativeType,
+        native_type: crate::codegen::cranelift::types::NativeType,
     ) -> String {
         super::vtable::vtable_symbol_for_native_in_namespace(
             &self.namespace_prefix,

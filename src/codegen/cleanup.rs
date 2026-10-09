@@ -9,10 +9,10 @@ use crate::semantic::LoopExitKind;
 
 use super::cranelift::native::FunctionRef;
 use super::cranelift::native::NativeEmitError;
+use super::cranelift::types::NativeType;
 use super::layout::LayoutRegistry;
 use super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
 use super::structs::emit_binding_drop;
-use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_return_cleanup(

@@ -6,9 +6,9 @@ use super::super::arrays::lower_array_constructor;
 use super::super::calls::CallLoweringContext;
 use super::super::calls::{lower_call, lower_method_call};
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::enums::{enum_receiver_name, lower_enum_constructor};
 use super::super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
-use super::super::types::NativeType;
 
 pub(in crate::codegen) fn lower_construct(
     function: &mut FunctionBuilder<'_>,

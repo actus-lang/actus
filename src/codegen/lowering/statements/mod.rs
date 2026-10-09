@@ -9,10 +9,10 @@ use crate::semantic::LoopExitKind;
 use super::super::cleanup::emit_loop_cleanup;
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::structs::emit_binding_drop;
-use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 
 mod compound;

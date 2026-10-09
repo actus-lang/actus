@@ -2,8 +2,8 @@ use cranelift_codegen::ir::{InstBuilder, Value, types};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::layout::{LayoutRegistry, PackFieldLayout};
-use super::super::types::NativeType;
 use super::packs::{field_mask, mapped_bit_offset_for_storage, sign_extend_field};
 
 pub(super) fn lower_indexed_pack_field_address(

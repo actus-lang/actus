@@ -2,9 +2,9 @@ use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::layout::LayoutRegistry;
 use super::super::structs::copy_bytes;
-use super::super::types::NativeType;
 
 pub(super) fn emit_flow(
     function: &mut FunctionBuilder<'_>,

@@ -2,10 +2,10 @@ use cranelift_codegen::ir::Type;
 
 use crate::ast::{BuiltinType, PrimitiveType, TypeName, lookup_builtin_type, primitive_type};
 
-use super::cranelift::native::NativeEmitError;
+use super::native::NativeEmitError;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum NativeType {
+pub(crate) enum NativeType {
     Int,
     Integer { signed: bool, width: u8 },
     Float { width: u8 },
@@ -22,7 +22,7 @@ pub(super) enum NativeType {
 }
 
 impl NativeType {
-    pub(super) fn uses_indirect_ins(self) -> bool {
+    pub(crate) fn uses_indirect_ins(self) -> bool {
         matches!(
             self,
             Self::Int
@@ -33,15 +33,15 @@ impl NativeType {
         )
     }
 
-    pub(super) fn uses_sret(self) -> bool {
+    pub(crate) fn uses_sret(self) -> bool {
         matches!(self, Self::Struct(_) | Self::Array(_) | Self::Integer { width: 65..=128, .. })
     }
 
-    pub(super) fn is_wide_integer(self) -> bool {
+    pub(crate) fn is_wide_integer(self) -> bool {
         matches!(self, Self::Integer { width: 65..=128, .. })
     }
 
-    pub(super) fn from_name(name: &str) -> Option<Self> {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
         if let Some(capacity) = name.strip_prefix("Arena[").and_then(|name| name.strip_suffix(']'))
         {
             return capacity.parse::<u32>().ok().map(Self::Arena);
@@ -61,7 +61,7 @@ impl NativeType {
         }
     }
 
-    pub(super) fn from_primitive(primitive: PrimitiveType) -> Self {
+    pub(crate) fn from_primitive(primitive: PrimitiveType) -> Self {
         match primitive {
             PrimitiveType::Integer { signed, width } => Self::Integer { signed, width },
             PrimitiveType::Float { width } => Self::Float { width },
@@ -69,27 +69,27 @@ impl NativeType {
         }
     }
 
-    pub(super) fn from_name_with_layout(
+    pub(crate) fn from_name_with_layout(
         name: &str,
-        layouts: &super::layout::LayoutRegistry,
+        layouts: &super::super::layout::LayoutRegistry,
     ) -> Option<Self> {
         Self::from_name(name)
             .or_else(|| layouts.id_for(name).map(Self::Struct))
             .or_else(|| layouts.enum_id_for(name).map(Self::Enum))
     }
 
-    pub(super) fn from_type_name_with_layout(
+    pub(crate) fn from_type_name_with_layout(
         type_name: Option<&TypeName>,
-        layouts: &super::layout::LayoutRegistry,
+        layouts: &super::super::layout::LayoutRegistry,
     ) -> Result<Self, NativeEmitError> {
         let Some(type_name) = type_name else { return Ok(Self::Void) };
         Self::try_from_type_name_with_layout(Some(type_name), layouts)
             .ok_or_else(|| NativeEmitError(format!("unknown native type `{}`", type_name.name)))
     }
 
-    pub(super) fn try_from_type_name_with_layout(
+    pub(crate) fn try_from_type_name_with_layout(
         type_name: Option<&TypeName>,
-        layouts: &super::layout::LayoutRegistry,
+        layouts: &super::super::layout::LayoutRegistry,
     ) -> Option<Self> {
         type_name.and_then(|type_name| {
             if type_name.name == "Arena" {
@@ -106,7 +106,7 @@ impl NativeType {
         })
     }
 
-    pub(super) fn ir_type(self, pointer_type: Type) -> Result<Type, NativeEmitError> {
+    pub(crate) fn ir_type(self, pointer_type: Type) -> Result<Type, NativeEmitError> {
         match self {
             Self::Int => Ok(cranelift_codegen::ir::types::I32),
             Self::Integer { width, .. } => integer_ir_type(width),

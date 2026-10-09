@@ -6,10 +6,10 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::enum_layout::{EnumLayout, EnumVariantLayout};
 use super::super::layout::LayoutRegistry;
 use super::super::structs::copy_bytes;
-use super::super::types::NativeType;
 
 pub(super) type BranchLocals<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);

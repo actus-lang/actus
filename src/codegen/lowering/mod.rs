@@ -3,8 +3,8 @@ mod loops;
 mod scopes;
 mod statements;
 
+use super::cranelift::types::NativeType;
 pub(super) use super::model::NativeCleanupSchedule;
-use super::types::NativeType;
 pub(super) use body::{lower_body, lower_case_block};
 pub(super) use statements::lower_statements;
 

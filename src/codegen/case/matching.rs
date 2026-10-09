@@ -4,8 +4,8 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::Pattern;
 
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::layout::LayoutRegistry;
-use super::super::types::NativeType;
 
 pub(super) fn match_pattern(
     function: &mut FunctionBuilder<'_>,

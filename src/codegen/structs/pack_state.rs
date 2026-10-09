@@ -4,7 +4,7 @@ use cranelift_codegen::ir::Value;
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::cranelift::native::NativeEmitError;
-use super::super::types::NativeType;
+use super::super::cranelift::types::NativeType;
 
 pub(super) fn seal_checked_pack_block(
     function: &mut FunctionBuilder<'_>,

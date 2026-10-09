@@ -8,8 +8,8 @@ use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::super::layout::LayoutRegistry;
 use super::super::symbols::{SymbolIdentity, SymbolKind};
-use super::super::types::NativeType;
 use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
+use super::types::NativeType;
 
 pub(crate) struct FunctionDeclarationContext<'a> {
     pub(super) entry_symbol: Option<&'a str>,

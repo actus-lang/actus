@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::enums::enum_expression_type;
 use super::super::layout::LayoutRegistry;
 use super::super::performance;
 use super::super::structs::{expression_native_type, field_type};
-use super::super::types::NativeType;
 
 pub(crate) fn initializer_type(
     expression: &Expr,

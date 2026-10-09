@@ -7,9 +7,9 @@ use crate::ast::Expr;
 
 use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::super::cranelift::types::NativeType;
 use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::types::NativeType;
 use super::super::Flow;
 
 #[allow(clippy::too_many_arguments)]

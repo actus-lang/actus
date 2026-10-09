@@ -7,10 +7,10 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::expressions::{lower_compound_integer_operation, lower_expression};
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
-use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 use super::packs::{
     binding_name, ensure_pack_field_is_mutable, lower_pack_field, lower_pack_field_write,

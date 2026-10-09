@@ -9,11 +9,11 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
+use super::cranelift::types::NativeType;
 use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::model::NativeCleanupSchedule;
 use super::structs::copy_bytes;
-use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_array_index(

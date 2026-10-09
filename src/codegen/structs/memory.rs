@@ -2,8 +2,8 @@ use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::types::NativeType;
 use super::super::layout::{FieldLayout, LayoutRegistry};
-use super::super::types::NativeType;
 
 pub(super) fn store_struct_field(
     function: &mut FunctionBuilder<'_>,

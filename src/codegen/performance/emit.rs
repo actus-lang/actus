@@ -5,11 +5,11 @@ use cranelift_object::ObjectModule;
 
 use super::super::cranelift::literals::StringDataIds;
 use super::super::cranelift::native::{FunctionMeta, NativeEmitError};
+use super::super::cranelift::types::NativeType;
 use super::super::cranelift::vtable::VtableDataIds;
 use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
-use super::super::types::NativeType;
 use super::{PerformanceDefinition, dispatch_key};
 use crate::configuration::NativeBackendConfiguration;
 
