@@ -5,9 +5,9 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Block, Expr, IfBranch};
 
+use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::FunctionRef;
 use super::super::cranelift::native::NativeEmitError;
-use super::super::literals::StringDataValues;
 use super::super::lowering::LoopTargets;
 use super::super::lowering::{Flow, lower_statements};
 use super::super::model::NativeCleanupSchedule;

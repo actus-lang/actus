@@ -4,14 +4,14 @@ use cranelift_module::DataId;
 use cranelift_module::{DataDescription, Linkage, Module};
 use cranelift_object::ObjectModule;
 
-use super::symbols::{SymbolIdentity, SymbolKind};
+use super::super::symbols::{SymbolIdentity, SymbolKind};
 
-use super::cranelift::native::{FunctionMeta, NativeEmitError};
-use super::layout::LayoutRegistry;
-use super::performance::{PerformanceDefinition, dispatch_key};
-use super::types::NativeType;
+use super::super::layout::LayoutRegistry;
+use super::super::performance::{PerformanceDefinition, dispatch_key};
+use super::super::types::NativeType;
+use super::native::{FunctionMeta, NativeEmitError};
 
-pub(super) type VtableDataIds = HashMap<String, DataId>;
+pub(crate) type VtableDataIds = HashMap<String, DataId>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct VtableDefinition {
@@ -53,7 +53,7 @@ pub(super) fn define_vtables(
     Ok(data_ids)
 }
 
-pub(super) fn declare_vtable_values(
+pub(crate) fn declare_vtable_values(
     module: &mut ObjectModule,
     function: &mut cranelift_codegen::ir::Function,
     data_ids: &VtableDataIds,

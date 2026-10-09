@@ -6,10 +6,8 @@ use crate::target::TargetSpec;
 use cranelift_module::Module;
 
 use super::super::cranelift::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
-use super::super::cranelift::object::create_module;
 use super::super::generic::GenericLayoutRegistry;
 use super::super::layout::LayoutRegistry;
-use super::super::literals::define_string_data;
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::performance::PerformanceRegistry;
 use super::super::performance::define_performances;
@@ -18,6 +16,8 @@ use super::declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
     define_verbs, function_metadata, validate_native_program,
 };
+use super::literals::define_string_data;
+use super::object::create_module;
 
 pub(crate) struct NativeRootSelection<'a> {
     pub(crate) symbol: Option<&'a str>,
@@ -243,8 +243,8 @@ fn define_vtable_data(
     functions: &std::collections::HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
-) -> Result<super::super::vtable::VtableDataIds, NativeEmitError> {
-    super::super::vtable::define_vtables(
+) -> Result<super::vtable::VtableDataIds, NativeEmitError> {
+    super::vtable::define_vtables(
         module,
         performance_definitions,
         functions,
@@ -281,9 +281,9 @@ struct EmissionDefinitions<'items, 'program> {
     performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
     functions: &'items std::collections::HashMap<String, FunctionMeta>,
     cleanup_schedule: &'items NativeCleanupSchedule,
-    string_data: &'items super::super::literals::StringDataIds,
+    string_data: &'items super::literals::StringDataIds,
     layouts: &'items LayoutRegistry,
-    vtable_data: &'items super::super::vtable::VtableDataIds,
+    vtable_data: &'items super::vtable::VtableDataIds,
     namespace_prefix: &'items str,
     entry_symbol: Option<&'items str>,
     target: &'items TargetSpec,

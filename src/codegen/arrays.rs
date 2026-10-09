@@ -7,10 +7,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
+use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::layout::LayoutRegistry;
-use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::structs::copy_bytes;
 use super::types::NativeType;

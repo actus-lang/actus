@@ -17,7 +17,6 @@ mod function_definition;
 mod generic;
 mod layout;
 mod linker;
-mod literals;
 mod lowering;
 mod model;
 mod performance;
@@ -28,7 +27,6 @@ mod serialization_migration;
 mod structs;
 mod symbols;
 mod types;
-mod vtable;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
 pub use cranelift::native::{

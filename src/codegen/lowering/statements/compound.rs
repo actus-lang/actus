@@ -7,10 +7,10 @@ use crate::ast::{BinaryOp, CompoundAssignmentOp, Expr, Place};
 
 use super::super::super::arrays::lower_array_compound_assignment;
 use super::super::super::buffer_index::lower_buffer_compound_assignment;
+use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::super::expressions::{lower_compound_integer_operation, lower_expression};
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::literals::StringDataValues;
 use super::super::super::structs::{expression_native_type, lower_field_compound_assignment};
 use super::super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};

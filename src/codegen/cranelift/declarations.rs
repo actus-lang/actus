@@ -15,8 +15,8 @@ use super::super::cranelift::runtime::{
 use super::super::declarations::{FunctionDeclarationContext, declare_functions};
 use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
-use super::super::literals::StringDataIds;
 use super::super::model::NativeCleanupSchedule;
+use super::literals::StringDataIds;
 
 pub(super) fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
     match declaration {
@@ -188,7 +188,7 @@ pub(super) fn define_verbs(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
-    vtable_data: &super::super::vtable::VtableDataIds,
+    vtable_data: &super::vtable::VtableDataIds,
     namespace_prefix: &str,
     entry_symbol: Option<&str>,
     target: &TargetSpec,

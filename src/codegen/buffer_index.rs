@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
+use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::expressions::lower_expression;
 use super::layout::LayoutRegistry;
-use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
 use super::types::NativeType;
 

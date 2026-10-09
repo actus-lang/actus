@@ -6,25 +6,25 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::{CaseBody, Expr, IfBranch, Stmt, VerbDecl};
 
-use super::symbols::{SymbolIdentity, SymbolKind};
+use super::super::symbols::{SymbolIdentity, SymbolKind};
 
-pub(super) type StringDataIds = HashMap<String, DataId>;
+pub(crate) type StringDataIds = HashMap<String, DataId>;
 
-pub(super) struct StringDataValues {
+pub(crate) struct StringDataValues {
     values: HashMap<String, GlobalValue>,
     namespace_prefix: String,
 }
 
 impl StringDataValues {
-    pub(super) fn get(&self, key: &str) -> Option<&GlobalValue> {
+    pub(crate) fn get(&self, key: &str) -> Option<&GlobalValue> {
         self.values.get(key)
     }
 
-    pub(super) fn extend_vtables(&mut self, values: HashMap<String, GlobalValue>) {
+    pub(crate) fn extend_vtables(&mut self, values: HashMap<String, GlobalValue>) {
         self.values.extend(values);
     }
 
-    pub(super) fn vtable_symbol(
+    pub(crate) fn vtable_symbol(
         &self,
         role: &str,
         native_type: crate::codegen::types::NativeType,
@@ -66,7 +66,7 @@ pub(super) fn define_string_data(
         .collect()
 }
 
-pub(super) fn declare_string_values(
+pub(crate) fn declare_string_values(
     module: &mut ObjectModule,
     function: &mut cranelift_codegen::ir::Function,
     data_ids: &StringDataIds,

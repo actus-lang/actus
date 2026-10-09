@@ -6,10 +6,10 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Block, ForBinding};
 
 use super::super::control_flow::{assigned_outer_bindings, carried_values, jump_with_values};
+use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::expressions::{initializer_type, lower_expression};
 use super::super::layout::LayoutRegistry;
-use super::super::literals::StringDataValues;
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 

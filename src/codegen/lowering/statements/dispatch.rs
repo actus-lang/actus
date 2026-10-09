@@ -4,9 +4,9 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, Place, Role, Stmt};
 
+use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::literals::StringDataValues;
 use super::super::super::types::NativeType;
 use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
 
