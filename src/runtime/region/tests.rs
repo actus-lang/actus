@@ -93,6 +93,27 @@ fn target_profile_can_lower_the_bulk_limit_without_changing_region_operations() 
 }
 
 #[test]
+fn aggregate_bytes_are_preserved_across_pointer_width_profiles() {
+    for (index_bits, offset_bits) in [(32u8, 32u8), (64u8, 64u8)] {
+        let profile = RegionAddressProfile::new(index_bits, offset_bits)
+            .expect("supported pointer profiles should be valid");
+        let mut region = InMemoryRegion::new_with_profile(profile, 7, 4, 2, 2, 0, 2)
+            .expect("profiled Region should be valid");
+        let generation = region.descriptor().generation;
+        {
+            let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+            view.write_range(0, 2, &[0x01, 0x02, 0x80, 0xff, 0x10, 0x20, 0x40, 0x7f])
+                .expect("aggregate bytes should be writable");
+        }
+        let next = region.publish(generation).expect("publication should advance generation");
+        let view = region.borrow_abs(7, next).expect("read view should open");
+        let mut destination = [0u8; 8];
+        view.read_range(0, 2, &mut destination).expect("aggregate bytes should be readable");
+        assert_eq!(destination, [0x01, 0x02, 0x80, 0xff, 0x10, 0x20, 0x40, 0x7f]);
+    }
+}
+
+#[test]
 fn bulk_copy_preserves_memmove_overlap_semantics() {
     let mut bytes = [1u8, 2, 3, 4];
     unsafe { copy_bulk_bytes(bytes.as_ptr(), bytes.as_mut_ptr().add(1), 3) };

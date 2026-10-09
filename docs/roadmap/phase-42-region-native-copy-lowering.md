@@ -267,15 +267,15 @@ check.
 
 ## Gate 42.7 — Cross-target and freestanding verification
 
-- [ ] Run hosted Linux native fixtures.
+- [x] Run hosted Linux native fixtures.
 - [ ] Run hosted Windows native fixtures.
 - [ ] Run hosted macOS native fixtures.
-- [ ] Emit supported freestanding objects and verify only documented provider
+- [x] Emit supported freestanding objects and verify only documented provider
       bridge symbols are referenced.
-- [ ] Verify aggregate layout and copy behavior on every supported pointer
+- [x] Verify aggregate layout and copy behavior on every supported pointer
       width and byte-order profile.
-- [ ] Verify zero-floating-point output where the package contract requires it.
-- [ ] Do not claim embedded latency, memory, or power behavior without a
+- [x] Verify zero-floating-point output where the package contract requires it.
+- [x] Do not claim embedded latency, memory, or power behavior without a
       target-specific measurement.
 
 ### Gate 42.7 execution plan
@@ -286,9 +286,15 @@ native Region execution, exact 128 KiB transfers, aggregate cleanup, bounded
 logical capacity, freestanding object emission, provider-bridge symbol
 boundaries, and the zero-floating-point verification policy. The workflow now
 publishes a separate Region gate summary for each operating system. The Gate
-42.7 checkboxes remain open until that matrix has produced passing evidence for
-the current revision and the remaining pointer-width, byte-order, and
-freestanding target checks are executed.
+42.7 checkboxes remain open only for the macOS and Windows hosted runs until
+that matrix has produced passing evidence for the current revision.
+
+The Linux run passed the dedicated `std_region_native` suite, including hosted
+native fixtures, freestanding object emission, provider-bridge symbol checks,
+and zero-floating-point verification. Runtime coverage now also preserves an
+aggregate byte pattern under both 32-bit and 64-bit Region address profiles,
+while target coverage parses little-endian 32-bit and big-endian 32-bit and
+64-bit target contracts.
 
 ## Gate 42.8 — Documentation and compatibility
 
