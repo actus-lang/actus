@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, condcodes::IntCC, types};
 use cranelift_frontend::FunctionBuilder;
 
+use super::super::super::cleanup::emit_return_cleanup;
 use super::super::super::expressions::{coerce_to_ir_type, lower_float_as};
 use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::literals::StringDataValues;
@@ -10,7 +11,6 @@ use super::super::super::native::{FunctionRef, NativeEmitError};
 use super::super::super::types::NativeType;
 use super::super::{Flow, NativeCleanupSchedule};
 use crate::ast::Expr;
-use crate::codegen::cleanup::emit_return_cleanup;
 use crate::codegen::cranelift::structs;
 use crate::codegen::enum_layout;
 use crate::codegen::layout::LayoutRegistry;

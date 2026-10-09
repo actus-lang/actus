@@ -7,12 +7,11 @@ use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
-use super::cranelift::native::FunctionRef;
-use super::cranelift::native::NativeEmitError;
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
-use super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
-use crate::codegen::cranelift::structs::emit_binding_drop;
+use super::super::layout::LayoutRegistry;
+use super::super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
+use super::native::{FunctionRef, NativeEmitError};
+use super::structs::emit_binding_drop;
+use super::types::NativeType;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_return_cleanup(
@@ -162,7 +161,7 @@ fn emit_payload_cleanup(
     else {
         return Ok(());
     };
-    super::cranelift::enums::emit_enum_payload_drop(
+    super::enums::emit_enum_payload_drop(
         function, name, enum_name, variant, field, locals, types, functions, layouts,
     )
 }

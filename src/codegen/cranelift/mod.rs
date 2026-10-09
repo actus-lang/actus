@@ -1,8 +1,11 @@
+pub(super) mod abi;
 pub(super) mod arenas;
 pub(super) mod arrays;
 pub(super) mod buffer_index;
 pub(super) mod calls;
 pub(super) mod case;
+pub(super) mod cleanup;
+pub(super) mod control_flow;
 pub(super) mod declarations;
 pub(super) mod dependencies;
 pub(super) mod dynamic_call;

@@ -6,12 +6,12 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, Stmt};
 use crate::semantic::LoopExitKind;
 
+use super::super::cleanup::emit_loop_cleanup;
 use super::super::expressions::lower_expression;
 use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
-use crate::codegen::cleanup::emit_loop_cleanup;
 use crate::codegen::cranelift::structs::emit_binding_drop;
 use crate::codegen::layout::LayoutRegistry;
 
@@ -94,7 +94,7 @@ fn lower_void_return(
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    crate::codegen::cleanup::emit_return_cleanup(
+    super::super::cleanup::emit_return_cleanup(
         function,
         cleanup_schedule,
         span,

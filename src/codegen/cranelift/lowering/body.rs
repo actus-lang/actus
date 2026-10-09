@@ -4,11 +4,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Stmt;
 
+use super::super::cleanup::emit_scope_cleanup;
 use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
-use crate::codegen::cleanup::emit_scope_cleanup;
 use crate::codegen::layout::LayoutRegistry;
 
 type CaseBlockState<'source> = (

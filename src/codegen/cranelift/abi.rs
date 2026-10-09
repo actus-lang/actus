@@ -1,7 +1,7 @@
 use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
+use super::super::layout::LayoutRegistry;
+use super::types::NativeType;
 
 #[derive(Debug)]
 pub struct NativeAbiError(String);

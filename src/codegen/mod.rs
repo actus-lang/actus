@@ -1,7 +1,4 @@
-mod abi;
-mod cleanup;
 mod constants;
-mod control_flow;
 mod cranelift;
 mod enum_layout;
 mod generic;
@@ -14,7 +11,9 @@ mod serialization_generation;
 mod serialization_migration;
 mod symbols;
 
-pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};
+pub use cranelift::abi::{
+    NativeAbiError, validate_external_native_signature, validate_native_signature,
+};
 pub use cranelift::native::{
     NativeEmitError, NativeSymbolBindings, emit_module_object_for_target_in_namespace,
     emit_module_object_for_target_in_namespace_with_bindings,

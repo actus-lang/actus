@@ -4,9 +4,9 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 
-use super::super::super::cleanup::emit_return_cleanup;
 use super::super::super::layout::LayoutRegistry;
 use super::super::calls::CallLoweringContext;
+use super::super::cleanup::emit_return_cleanup;
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::initializer_types::initializer_type;
