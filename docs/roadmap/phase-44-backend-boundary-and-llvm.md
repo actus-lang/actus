@@ -139,9 +139,9 @@ recorded; responsibility mapping and baseline regression evidence remain open.
 - [x] Define a backend-neutral representation for functions, blocks,
       instructions, values, layouts, calls, returns, traps, cleanup, and
       external runtime symbols.
-- [ ] Define how ownership cleanup plans and aggregate return slots are passed
+- [x] Define how ownership cleanup plans and aggregate return slots are passed
       to a backend without exposing Cranelift or LLVM types.
-- [ ] Define target-neutral ABI metadata for scalar, aggregate, borrowed,
+- [x] Define target-neutral ABI metadata for scalar, aggregate, borrowed,
       exclusive, and runtime bridge parameters.
 - [ ] Define deterministic symbol identity independently of backend mangling.
 - [ ] Define error reporting for unsupported backend operations with source

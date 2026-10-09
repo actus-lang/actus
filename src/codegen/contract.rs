@@ -39,6 +39,42 @@ pub struct BackendParameter {
     pub name: String,
     pub role: Role,
     pub ty: BackendValueType,
+    pub passing: BackendPassingMode,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendPassingMode {
+    Direct,
+    Indirect { layout: BackendLayout },
+    Borrowed { layout: BackendLayout },
+    ExclusiveLoan { layout: BackendLayout },
+    OwnershipTransfer { layout: BackendLayout },
+    RuntimeBridge { layout: BackendLayout },
+}
+
+impl BackendPassingMode {
+    fn layout(self) -> Option<BackendLayout> {
+        match self {
+            Self::Direct => None,
+            Self::Indirect { layout }
+            | Self::Borrowed { layout }
+            | Self::ExclusiveLoan { layout }
+            | Self::OwnershipTransfer { layout }
+            | Self::RuntimeBridge { layout } => Some(layout),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendReturnMode {
+    Direct,
+    ReturnSlot { layout: BackendLayout },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackendReturn {
+    pub ty: BackendValueType,
+    pub passing: BackendReturnMode,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -79,7 +115,7 @@ pub struct BackendBlock {
 pub struct BackendFunction {
     pub symbol: SymbolIdentity,
     pub parameters: Vec<BackendParameter>,
-    pub return_type: BackendValueType,
+    pub return_value: BackendReturn,
     pub entry: BackendBlockId,
     pub blocks: Vec<BackendBlock>,
 }
@@ -91,6 +127,12 @@ impl BackendFunction {
         }
         if self.blocks.iter().filter(|block| block.id == self.entry).count() != 1 {
             return Err(BackendContractError::MissingEntryBlock);
+        }
+        for parameter in &self.parameters {
+            validate_parameter(parameter)?;
+        }
+        if let BackendReturnMode::ReturnSlot { layout } = self.return_value.passing {
+            layout.validate()?;
         }
         for block in &self.blocks {
             for instruction in &block.instructions {
@@ -105,12 +147,37 @@ impl BackendFunction {
     }
 }
 
+fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContractError> {
+    if let Some(layout) = parameter.passing.layout() {
+        layout.validate()?;
+    }
+    let valid = match parameter.role {
+        Role::Erg => matches!(
+            parameter.passing,
+            BackendPassingMode::Direct
+                | BackendPassingMode::Indirect { .. }
+                | BackendPassingMode::RuntimeBridge { .. }
+        ),
+        Role::Abs => matches!(
+            parameter.passing,
+            BackendPassingMode::Direct
+                | BackendPassingMode::Indirect { .. }
+                | BackendPassingMode::Borrowed { .. }
+                | BackendPassingMode::RuntimeBridge { .. }
+        ),
+        Role::Ins => matches!(parameter.passing, BackendPassingMode::ExclusiveLoan { .. }),
+        Role::Dat => matches!(parameter.passing, BackendPassingMode::OwnershipTransfer { .. }),
+    };
+    valid.then_some(()).ok_or(BackendContractError::RolePassingMismatch)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendContractError {
     InvalidLayout(&'static str),
     InvalidFunctionSymbol,
     MissingEntryBlock,
     InvalidCallSymbol,
+    RolePassingMismatch,
 }
 
 #[cfg(test)]
@@ -136,8 +203,14 @@ mod tests {
                 name: "input".to_owned(),
                 role: Role::Abs,
                 ty: BackendValueType::Integer { signed: false, width: 32 },
+                passing: BackendPassingMode::Borrowed {
+                    layout: BackendLayout { size: 4, alignment: 4 },
+                },
             }],
-            return_type: BackendValueType::Unit,
+            return_value: BackendReturn {
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
                 id: BackendBlockId(0),
@@ -149,6 +222,35 @@ mod tests {
         };
 
         assert_eq!(function.parameters[0].role, Role::Abs);
+        assert!(function.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_role_and_passing_mode_mismatches() {
+        let parameter = BackendParameter {
+            name: "loan".to_owned(),
+            role: Role::Ins,
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Borrowed {
+                layout: BackendLayout { size: 8, alignment: 8 },
+            },
+        };
+        assert_eq!(validate_parameter(&parameter), Err(BackendContractError::RolePassingMismatch));
+    }
+
+    #[test]
+    fn validates_aggregate_return_slots_without_a_backend() {
+        let layout = BackendLayout { size: 16, alignment: 8 };
+        let function = BackendFunction {
+            symbol: verb_symbol(),
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                ty: BackendValueType::Aggregate { layout },
+                passing: BackendReturnMode::ReturnSlot { layout },
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        };
         assert!(function.validate().is_ok());
     }
 }

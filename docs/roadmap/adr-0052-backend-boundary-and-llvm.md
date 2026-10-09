@@ -111,7 +111,11 @@ The initial contract surface is implemented in `src/codegen/contract.rs`. It
 contains backend-independent function, block, value, aggregate-layout,
 role-aware parameter, call, return, trap, cleanup, and symbol references. Its
 validation checks layout alignment, entry-block identity, and deterministic
-call-symbol presence without selecting a machine backend.
+call-symbol presence without selecting a machine backend. Parameter passing is
+represented by target-neutral direct, indirect, borrowed, exclusive-loan,
+ownership-transfer, and runtime-bridge modes. Aggregate returns can require an
+explicit validated return slot; register assignment and stack placement remain
+backend responsibilities.
 
 ## Mandatory contracts
 
