@@ -299,15 +299,16 @@ The initial LLVM boundary is documented in
 `docs/roadmap/adr-0052-backend-boundary-and-llvm.md`. The integration boundary
 is `src/codegen/llvm/`; LLVM bindings and discovery are reserved for that
 module and must never enter shared lowering, target contracts, or the default
-Cranelift dependency path. The supported policy is an explicitly selected LLVM
-major version with discovery through the host LLVM toolchain; the exact major
-and binding crate will be accepted together with the first hosted IR emitter,
-after the CI toolchain is available. The manifest now exposes an opt-in
-`llvm` feature backed by `llvm-sys 231.0.0` with strict versioning, while
-keeping `cranelift` as the only default backend feature. Architecture tests
-verify that LLVM is opt-in and that the binding is absent from the default
-dependency surface. The feature currently validates toolchain availability;
-hosted LLVM IR emission remains open for the next gate.
+Cranelift dependency path. The selected policy is LLVM 23.1.x through
+`llvm-sys 231.0.0` with strict versioning and discovery through `llvm-config`
+or `LLVM_SYS_231_PREFIX`. The manifest exposes this as an opt-in `llvm`
+feature while keeping `cranelift` as the only default backend feature.
+Architecture tests verify that LLVM is opt-in and that the binding is absent
+from the default dependency surface. The first emitter slice now creates a
+validated LLVM module with scalar/unit function signatures, basic blocks, and
+unit returns; calls, scalar return values, aggregates, cleanup, and typed
+failures remain explicit open work. The feature build and this emitter slice
+are covered by the LLVM integration test.
 
 ## Gate 44.6 — Add ARM32/Thumb target support
 

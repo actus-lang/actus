@@ -23,6 +23,7 @@ impl BackendKind {
                 backend: self,
                 target: target.triple().to_string(),
             }),
+            Self::Llvm if cfg!(feature = "llvm") => Ok(()),
             Self::Llvm => Err(BackendTargetError::Unavailable {
                 backend: self,
                 target: target.triple().to_string(),
@@ -65,12 +66,17 @@ mod tests {
     #[test]
     fn unavailable_backend_target_pairs_fail_with_typed_diagnostics() {
         let target = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
-        assert_eq!(
-            BackendKind::Llvm.validate_target(&target),
-            Err(BackendTargetError::Unavailable {
-                backend: BackendKind::Llvm,
-                target: "x86_64-unknown-linux-gnu".to_owned(),
-            })
-        );
+        let result = BackendKind::Llvm.validate_target(&target);
+        if cfg!(feature = "llvm") {
+            assert_eq!(result, Ok(()));
+        } else {
+            assert_eq!(
+                result,
+                Err(BackendTargetError::Unavailable {
+                    backend: BackendKind::Llvm,
+                    target: "x86_64-unknown-linux-gnu".to_owned(),
+                })
+            );
+        }
     }
 }

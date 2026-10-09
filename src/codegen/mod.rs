@@ -6,6 +6,8 @@ mod contract;
 #[cfg(feature = "cranelift")]
 pub mod cranelift;
 mod linker;
+#[cfg(feature = "llvm")]
+pub mod llvm;
 mod model;
 mod result_constructor_spans;
 mod result_constructors;
