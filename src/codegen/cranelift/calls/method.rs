@@ -3,10 +3,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, ArgumentRoleResolution, Expr};
 
-use super::super::super::performance::dispatch_key;
 use super::super::dynamic_call::lower_dynamic_call;
 use super::super::expressions::lower_expression;
 use super::super::native::NativeEmitError;
+use super::super::performance::dispatch_key;
 use super::super::types::NativeType;
 use super::context::CallLoweringContext;
 use super::lower::lower_call;

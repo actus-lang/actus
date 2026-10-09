@@ -63,7 +63,7 @@ pub(crate) fn declare_region_cleanup_function(
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let region_drop = declare_region_drop(module, module.isa().pointer_type())?;
     Ok(HashMap::from([(
-        super::super::performance::dispatch_key(NativeType::Region, "drop"),
+        super::performance::dispatch_key(NativeType::Region, "drop"),
         named_meta(region_drop, &["region"], NativeType::Region),
     )]))
 }
@@ -116,7 +116,7 @@ fn runtime_metadata(
         ),
         (BUFFER_DROP_SYMBOL.to_owned(), named_meta(ids.drop, &["handle"], NativeType::Int)),
         (
-            super::super::performance::dispatch_key(NativeType::Region, "drop"),
+            super::performance::dispatch_key(NativeType::Region, "drop"),
             named_meta(ids.region_drop, &["region"], NativeType::Region),
         ),
         ("buffer_length".to_owned(), named_meta(ids.buffer_length, &["buffer"], NativeType::Int)),

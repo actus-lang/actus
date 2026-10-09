@@ -44,7 +44,7 @@ pub(super) fn declare_all_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
-    performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
+    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
     context: DeclarationContext<'_>,
 ) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
     let force_entry_return = target_requires_host_runtime(context.target)
@@ -67,7 +67,7 @@ pub(super) fn declare_all_functions(
             force_entry_return,
         },
     )?;
-    metadata.extend(super::super::performance::declare_performance_functions(
+    metadata.extend(super::performance::declare_performance_functions(
         module,
         performance_definitions,
         context.layouts,

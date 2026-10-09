@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use crate::codegen::cranelift::performance::dispatch_key;
 use crate::codegen::cranelift::structs::emit_struct_drop;
 use crate::codegen::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
 use crate::codegen::layout::LayoutRegistry;
-use crate::codegen::performance::dispatch_key;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_enum_payload_drop(

@@ -9,8 +9,6 @@ use super::super::cranelift::native::{FunctionMeta, NativeEmitError, NativeSymbo
 use super::super::generic::GenericLayoutRegistry;
 use super::super::layout::LayoutRegistry;
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
-use super::super::performance::PerformanceRegistry;
-use super::super::performance::define_performances;
 use super::super::result_constructors::normalize_program;
 use super::emitter_declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
@@ -18,6 +16,8 @@ use super::emitter_declarations::{
 };
 use super::literals::define_string_data;
 use super::object::create_module;
+use super::performance::PerformanceRegistry;
+use super::performance::define_performances;
 
 pub(crate) struct NativeRootSelection<'a> {
     pub(crate) symbol: Option<&'a str>,
@@ -176,7 +176,7 @@ struct VerbEmission<'items, 'program> {
     verbs: &'items [&'program VerbDecl],
     external_verbs: &'items [&'program ExternalVerbDecl],
     generic_instances: &'items [GenericInstance],
-    performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
+    performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
     symbol: Option<&'items str>,
     namespace_prefix: &'items str,
     cleanup_schedule: &'items NativeCleanupSchedule,
@@ -239,7 +239,7 @@ fn build_layouts_and_metadata(
 
 fn define_vtable_data(
     module: &mut cranelift_object::ObjectModule,
-    performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
+    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
     functions: &std::collections::HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
@@ -258,7 +258,7 @@ fn declare_emission_functions(
     module: &mut cranelift_object::ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
-    performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
+    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
     symbol: Option<&str>,
     namespace_prefix: &str,
     layouts: &LayoutRegistry,
@@ -278,7 +278,7 @@ fn declare_emission_functions(
 struct EmissionDefinitions<'items, 'program> {
     module: &'items mut cranelift_object::ObjectModule,
     verbs: &'items [&'program VerbDecl],
-    performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
+    performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
     functions: &'items std::collections::HashMap<String, FunctionMeta>,
     cleanup_schedule: &'items NativeCleanupSchedule,
     string_data: &'items super::literals::StringDataIds,

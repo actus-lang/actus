@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::performance;
 use super::super::enums::enum_expression_type;
 use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::performance;
 use super::super::types::NativeType;
 use crate::codegen::cranelift::structs::{expression_native_type, field_type};
 

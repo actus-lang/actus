@@ -8,7 +8,6 @@ mod generic;
 mod layout;
 mod linker;
 mod model;
-mod performance;
 mod result_constructor_spans;
 mod result_constructors;
 mod serialization_generation;

@@ -6,8 +6,8 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::expressions::emit_buffer_drop;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use crate::codegen::cranelift::performance::dispatch_key;
 use crate::codegen::layout::LayoutRegistry;
-use crate::codegen::performance::dispatch_key;
 
 pub(crate) fn emit_struct_drop(
     function: &mut FunctionBuilder<'_>,

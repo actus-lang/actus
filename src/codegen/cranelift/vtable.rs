@@ -7,8 +7,8 @@ use cranelift_object::ObjectModule;
 use super::super::symbols::{SymbolIdentity, SymbolKind};
 
 use super::super::layout::LayoutRegistry;
-use super::super::performance::{PerformanceDefinition, dispatch_key};
 use super::native::{FunctionMeta, NativeEmitError};
+use super::performance::{PerformanceDefinition, dispatch_key};
 use super::types::NativeType;
 
 pub(crate) type VtableDataIds = HashMap<String, DataId>;

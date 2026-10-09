@@ -17,6 +17,7 @@ pub(super) mod literals;
 pub(super) mod lowering;
 pub(super) mod native;
 pub(super) mod object;
+pub(super) mod performance;
 pub(super) mod runtime;
 pub(super) mod structs;
 pub(super) mod types;

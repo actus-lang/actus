@@ -4,10 +4,10 @@ use crate::semantic::ReachablePerformance;
 
 use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
 
-use super::cranelift::native::{FunctionMeta, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
-use super::symbols::{SymbolIdentity, SymbolKind};
+use super::native::{FunctionMeta, NativeEmitError};
+use super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::symbols::{SymbolIdentity, SymbolKind};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
@@ -159,11 +159,8 @@ fn declare_performance_function(
     definition: &PerformanceDefinition<'_>,
     layouts: &LayoutRegistry,
 ) -> Result<FunctionMeta, NativeEmitError> {
-    let signature = super::cranelift::declarations::native_signature_for_definition(
-        module,
-        definition.method,
-        layouts,
-    )?;
+    let signature =
+        super::declarations::native_signature_for_definition(module, definition.method, layouts)?;
     let id = module
         .declare_function(&definition.symbol, Linkage::Local, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))?;
