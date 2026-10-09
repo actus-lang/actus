@@ -229,6 +229,26 @@ fn lowers_region_owner_cleanup_to_the_runtime_release_bridge() {
 }
 
 #[test]
+fn lowers_fixed_aggregate_copies_through_target_aware_memory_copy() {
+    let source = "struct Payload { bytes: Array[u8, 64], } verb main() -> Int { erg values: Array[Payload, 2] = Array[Payload, 2](); values[1] = Payload { bytes: Array[u8, 64](), }; return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("aggregate copy source should parse");
+    let bytes = emit_program_object_with_configuration(
+        &program,
+        "main",
+        &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+    )
+    .expect("aggregate copy should emit natively");
+    let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
+    let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(
+        symbols.iter().any(|symbol| symbol.contains("memmove") || symbol.contains("memcpy")),
+        "aggregate lowering must use a target-aware memory copy primitive: {symbols:?}"
+    );
+}
+
+#[test]
 fn lowers_size_of_to_a_compile_time_integer_constant() {
     let source = "verb main() -> u64 { return size_of[u32](); }";
     let (tokens, errors) = scan(source);

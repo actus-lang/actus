@@ -25,6 +25,12 @@ fn accepts_region_with_fixed_size_elements() {
         .expect("Region should accept a fully sized struct element");
     analyze_source("verb inspect(abs values: Region[Array[u64, 4]]) { }")
         .expect("Region should accept a fully sized array element");
+    analyze_source(
+        "pack Frame { erg storage: Array[u8, 16]; layout little; fields { erg marker: u8 at 0; abs _reserved: u120 at 8 = 0; } } verb inspect(abs values: Region[Frame]) { }",
+    )
+    .expect("Region should accept a fully sized packed element");
+    analyze_source("verb inspect(abs values: Region[u32]) { }")
+        .expect("Region should accept a fixed-width primitive element");
 }
 
 #[test]

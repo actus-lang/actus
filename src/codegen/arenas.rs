@@ -109,7 +109,7 @@ fn lower_placed_value(
     function.switch_to_block(ok_block);
     function.ins().store(MemFlagsData::new(), new_offset, offset_address, 0);
     let destination = function.ins().iadd(arena, aligned);
-    copy_bytes(function, value, destination, size);
+    copy_bytes(function, value, destination, size, layouts)?;
     function.seal_block(ok_block);
     Ok(coerce_to_ir_type(function, destination, layouts.pointer_type))
 }

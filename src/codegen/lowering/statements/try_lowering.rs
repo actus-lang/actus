@@ -13,6 +13,7 @@ use super::super::super::native::{FunctionRef, NativeEmitError};
 use super::super::super::types::NativeType;
 use super::super::{Flow, NativeCleanupSchedule};
 use crate::ast::Expr;
+use crate::codegen::structs;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_return(
@@ -124,7 +125,7 @@ fn lower_try_return(
         .enum_variant(enum_id, "Ok")
         .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
     let result = allocate_enum(function, layout.size, functions, layouts)?;
-    let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts);
+    let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts)?;
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts, None)?;
     Ok(Flow::Return(return_value, Some(NativeType::Enum(enum_id))))
 }
@@ -136,7 +137,7 @@ fn emit_try_return_branches(
     layout: &enum_layout::EnumLayout,
     ok: &enum_layout::EnumVariantLayout,
     layouts: &LayoutRegistry,
-) -> cranelift_codegen::ir::Value {
+) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let discriminant = function.ins().load(
         types::I32,
         MemFlagsData::new(),
@@ -150,18 +151,18 @@ fn emit_try_return_branches(
     function.append_block_param(merge, layouts.pointer_type);
     function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
     function.switch_to_block(ok_block);
-    write_ok_result(function, source, result, layout, ok, layouts);
+    write_ok_result(function, source, result, layout, ok, layouts)?;
     let ok_argument = cranelift_codegen::ir::BlockArg::Value(result);
     function.ins().jump(merge, [&ok_argument]);
     function.seal_block(ok_block);
     function.switch_to_block(err_block);
-    copy_enum_bytes(function, source, result, layout.size);
+    copy_enum_bytes(function, source, result, layout.size, layouts)?;
     let err_argument = cranelift_codegen::ir::BlockArg::Value(result);
     function.ins().jump(merge, [&err_argument]);
     function.seal_block(err_block);
     function.switch_to_block(merge);
     function.seal_block(merge);
-    function.block_params(merge)[0]
+    Ok(function.block_params(merge)[0])
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -283,8 +284,9 @@ fn copy_enum_bytes(
     source: cranelift_codegen::ir::Value,
     destination: cranelift_codegen::ir::Value,
     size: u32,
-) {
-    copy_bytes(function, source, destination, 0, 0, size);
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    structs::copy_bytes(function, source, destination, size, layouts)
 }
 
 fn allocate_enum(
@@ -312,7 +314,7 @@ fn write_ok_result(
     layout: &enum_layout::EnumLayout,
     ok: &enum_layout::EnumVariantLayout,
     layouts: &LayoutRegistry,
-) {
+) -> Result<(), NativeEmitError> {
     let discriminant = function.ins().iconst(types::I32, i64::from(ok.discriminant));
     function.ins().store(
         MemFlagsData::new(),
@@ -324,30 +326,9 @@ fn write_ok_result(
         && let Some(size) = layouts.type_size(field.ty)
     {
         let offset = layout.payload_offset + field.offset;
-        copy_bytes(function, source, destination, offset, offset, size);
+        let source = function.ins().iadd_imm_s(source, i64::from(offset));
+        let destination = function.ins().iadd_imm_s(destination, i64::from(offset));
+        structs::copy_bytes(function, source, destination, size, layouts)?;
     }
-}
-
-fn copy_bytes(
-    function: &mut FunctionBuilder<'_>,
-    source: cranelift_codegen::ir::Value,
-    destination: cranelift_codegen::ir::Value,
-    source_offset: u32,
-    destination_offset: u32,
-    size: u32,
-) {
-    for offset in 0..size {
-        let byte = function.ins().load(
-            types::I8,
-            MemFlagsData::new(),
-            source,
-            (source_offset + offset) as i32,
-        );
-        function.ins().store(
-            MemFlagsData::new(),
-            byte,
-            destination,
-            (destination_offset + offset) as i32,
-        );
-    }
+    Ok(())
 }

@@ -69,7 +69,7 @@ fn emit_sret_return(
     let size = layouts
         .type_size(return_type)
         .ok_or_else(|| NativeEmitError("missing sret return layout".to_owned()))?;
-    copy_bytes(function, result, destination, size);
+    copy_bytes(function, result, destination, size, layouts)?;
     function.ins().return_(&[]);
     Ok(())
 }
@@ -84,7 +84,7 @@ fn emit_borrowed_slot_return(
     let size = layouts
         .return_slot_size(return_type)
         .ok_or_else(|| NativeEmitError("missing borrowed view return layout".to_owned()))?;
-    emit_borrowed_view_return(function, destination, result, size);
+    emit_borrowed_view_return(function, destination, result, size, layouts)?;
     Ok(())
 }
 
@@ -136,7 +136,8 @@ fn emit_borrowed_view_return(
     destination: cranelift_codegen::ir::Value,
     result: cranelift_codegen::ir::Value,
     size: u32,
-) {
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
     let some = function.create_block();
     let none = function.create_block();
     let merge = function.create_block();
@@ -144,7 +145,7 @@ fn emit_borrowed_view_return(
     function.append_block_param(merge, pointer_type);
     function.ins().brif(result, some, &[], none, &[]);
     function.switch_to_block(some);
-    super::super::structs::copy_bytes(function, result, destination, size);
+    super::super::structs::copy_bytes(function, result, destination, size, layouts)?;
     let some_argument = cranelift_codegen::ir::BlockArg::Value(destination);
     function.ins().jump(merge, [&some_argument]);
     function.seal_block(some);
@@ -156,4 +157,5 @@ fn emit_borrowed_view_return(
     let returned = function.block_params(merge)[0];
     function.ins().return_(&[returned]);
     function.seal_block(merge);
+    Ok(())
 }

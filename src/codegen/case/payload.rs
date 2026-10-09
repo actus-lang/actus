@@ -278,7 +278,7 @@ fn load_payload_binding<'a>(
                 function.inst_results(allocation).first().copied().ok_or_else(|| {
                     NativeEmitError("enum payload allocation returned no pointer".to_owned())
                 })?;
-            copy_bytes(function, address, destination, layout.size);
+            copy_bytes(function, address, destination, layout.size, layouts)?;
             destination
         }
         _ => function.ins().load(layouts.ir_type(field.ty)?, MemFlagsData::new(), address, 0),
