@@ -148,12 +148,21 @@ tests and 0 failures.
 - [x] Define deterministic symbol identity independently of backend mangling.
 - [x] Define error reporting for unsupported backend operations with source
       spans and target context.
-- [ ] Keep the representation minimal and Actus-oriented; do not reproduce a
+- [x] Keep the representation minimal and Actus-oriented; do not reproduce a
       general optimization, instruction-selection, or register-allocation IR.
 - [ ] Prove that roles, cleanup, Region capabilities, typed failures, and
       aggregate layout survive lowering without backend-specific handles.
-- [ ] Add semantic and codegen tests for the contract without selecting a
+- [x] Add semantic and codegen tests for the contract without selecting a
       concrete machine backend.
+
+### Gate 44.2 evidence
+
+The backend-independent contract suite is in `tests/codegen_contract.rs` and
+does not select Cranelift or LLVM. It covers role-aware passing, aggregate
+layouts and return slots, deterministic unsupported-operation diagnostics,
+block identity, and neutral control-flow targets. The command
+`cargo test --test codegen_contract --all-features -- --format terse` passes
+with 9 tests and 0 failures.
 
 ## Gate 44.3 — Isolate the existing Cranelift backend
 
