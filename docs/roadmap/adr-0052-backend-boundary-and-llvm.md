@@ -60,11 +60,43 @@ The intended shape is:
 
 ```text
 src/codegen/
+├── mod.rs               # codegen facade and backend selection
 ├── contract.rs          # backend-neutral operations and metadata
+├── ir/                  # minimal Actus-oriented lowering values
+├── abi.rs               # shared ABI metadata and validation contracts
+├── layout/              # shared Actus layout decisions
 ├── target.rs            # target profiles and capabilities
-├── cranelift/           # current native implementation
-└── llvm/                # optional LLVM implementation
+├── runtime.rs           # shared runtime import contract
+├── cranelift/           # Cranelift-only implementation
+│   ├── mod.rs
+│   ├── lowering/
+│   ├── native_runtime.rs
+│   ├── object.rs
+│   └── linker.rs
+└── llvm/                # optional LLVM-only implementation
+    ├── mod.rs
+    ├── lowering/
+    ├── runtime.rs
+    ├── object.rs
+    └── linker.rs
 ```
+
+The directory name is part of the architectural boundary. A file that imports
+Cranelift belongs under `src/codegen/cranelift/`; a file that imports LLVM
+belongs under `src/codegen/llvm/`. Shared files may not import either backend.
+The shared directories contain Actus contracts and target metadata only.
+
+Tests follow the same distinction:
+
+```text
+tests/codegen/
+├── shared/               # backend-independent semantic and contract tests
+├── cranelift/            # Cranelift object and execution tests
+└── llvm/                 # LLVM object and execution tests
+```
+
+This layout is intentionally visible in the filesystem so a contributor can
+identify the backend responsible for a file without reading its internals.
 
 The contract represents only Actus requirements: typed values, blocks,
 control flow, calls, returns, traps, cleanup actions, aggregate layouts,
