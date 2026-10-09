@@ -5,6 +5,7 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
+use super::super::cranelift::object::create_module;
 use super::super::generic::GenericLayoutRegistry;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::define_string_data;
@@ -16,7 +17,6 @@ use super::declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
     define_verbs, function_metadata, validate_native_program,
 };
-use super::object::create_module;
 use super::{NativeEmitError, NativeSymbolBindings};
 
 pub(super) struct NativeRootSelection<'a> {

@@ -12,7 +12,6 @@ mod declarations;
 mod dependencies;
 mod emission;
 pub(super) mod ir_audit;
-mod object;
 
 use emission::NativeRootSelection;
 
@@ -104,7 +103,12 @@ pub(crate) fn reachable_call_names(
 
 pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
     let target = TargetSpec::host().map_err(|error| NativeEmitError(error.to_string()))?;
-    object::emit_i32_object(symbol, 0, &NativeBackendConfiguration::default(), &target)
+    super::cranelift::object::emit_i32_object(
+        symbol,
+        0,
+        &NativeBackendConfiguration::default(),
+        &target,
+    )
 }
 
 pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {

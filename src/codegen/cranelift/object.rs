@@ -6,10 +6,10 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::cranelift::build_isa_with_optimization;
-use super::NativeEmitError;
+use super::super::native::NativeEmitError;
+use super::build_isa_with_optimization;
 
-pub(super) fn create_module(
+pub(crate) fn create_module(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<ObjectModule, NativeEmitError> {
@@ -24,7 +24,7 @@ pub(super) fn create_module(
     Ok(ObjectModule::new(builder))
 }
 
-pub(super) fn emit_i32_object(
+pub(crate) fn emit_i32_object(
     symbol: &str,
     value: i64,
     configuration: &NativeBackendConfiguration,
