@@ -1,4 +1,5 @@
 mod constants;
+mod contract;
 mod cranelift;
 mod linker;
 mod model;
@@ -8,6 +9,10 @@ mod serialization_generation;
 mod serialization_migration;
 mod symbols;
 
+pub use contract::{
+    BackendBlock, BackendBlockId, BackendContractError, BackendFunction, BackendInstruction,
+    BackendLayout, BackendParameter, BackendValueId, BackendValueType,
+};
 pub use cranelift::abi::{
     NativeAbiError, validate_external_native_signature, validate_native_signature,
 };

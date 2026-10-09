@@ -136,7 +136,7 @@ recorded; responsibility mapping and baseline regression evidence remain open.
 
 ## Gate 44.2 — Define the backend-neutral lowering contract
 
-- [ ] Define a backend-neutral representation for functions, blocks,
+- [x] Define a backend-neutral representation for functions, blocks,
       instructions, values, layouts, calls, returns, traps, cleanup, and
       external runtime symbols.
 - [ ] Define how ownership cleanup plans and aggregate return slots are passed

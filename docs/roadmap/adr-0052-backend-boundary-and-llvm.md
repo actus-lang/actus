@@ -64,7 +64,7 @@ The intended shape is:
 ```text
 src/codegen/
 ├── mod.rs               # codegen facade and backend selection
-├── contract.rs          # backend-neutral operations and metadata
+├── contract.rs          # backend-neutral lowering operations and metadata
 ├── ir/                  # minimal Actus-oriented lowering values
 ├── abi.rs               # shared ABI metadata and validation contracts
 ├── layout/              # shared Actus layout decisions
@@ -106,6 +106,12 @@ control flow, calls, returns, traps, cleanup actions, aggregate layouts,
 runtime imports, ABI metadata, and deterministic symbols. It is not intended
 to reproduce LLVM's optimizer, instruction selector, register allocator, or
 object writer.
+
+The initial contract surface is implemented in `src/codegen/contract.rs`. It
+contains backend-independent function, block, value, aggregate-layout,
+role-aware parameter, call, return, trap, cleanup, and symbol references. Its
+validation checks layout alignment, entry-block identity, and deterministic
+call-symbol presence without selecting a machine backend.
 
 ## Mandatory contracts
 

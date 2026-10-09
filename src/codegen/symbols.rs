@@ -39,6 +39,7 @@ impl SymbolKind {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct SymbolIdentity {
     encoded: String,
+    kind: SymbolKind,
 }
 
 impl SymbolIdentity {
@@ -63,11 +64,15 @@ impl SymbolIdentity {
             true => format!("{namespace_prefix}__{}_{}", kind.tag(), encode(name)),
             false => format!("{namespace_prefix}__{}_{}__{suffix}", kind.tag(), encode(name)),
         };
-        Ok(Self { encoded })
+        Ok(Self { encoded, kind })
     }
 
     pub fn as_str(&self) -> &str {
         &self.encoded
+    }
+
+    pub(crate) fn kind(&self) -> SymbolKind {
+        self.kind
     }
 }
 
