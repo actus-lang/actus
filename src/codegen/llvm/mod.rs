@@ -2,24 +2,27 @@ use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
 
 use llvm_sys::core::{
-    LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildRetVoid, LLVMContextCreate,
-    LLVMContextDispose, LLVMCreateBuilderInContext, LLVMDisposeBuilder, LLVMDisposeMessage,
-    LLVMDisposeModule, LLVMFunctionType, LLVMInt1TypeInContext, LLVMInt8TypeInContext,
-    LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
+    LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildCall2, LLVMBuildRet, LLVMBuildRetVoid,
+    LLVMContextCreate, LLVMContextDispose, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
+    LLVMDisposeMessage, LLVMDisposeModule, LLVMFunctionType, LLVMGetParam, LLVMInt1TypeInContext,
+    LLVMInt8TypeInContext, LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
     LLVMModuleCreateWithNameInContext, LLVMPrintModuleToString, LLVMVoidTypeInContext,
 };
-use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMTypeRef};
+use llvm_sys::prelude::{
+    LLVMBasicBlockRef, LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef,
+};
 
 use super::{
     BackendBlockId, BackendEmitError, BackendFunction, BackendInstruction, BackendModule,
-    BackendReturnMode, BackendValueType,
+    BackendParameter, BackendReturn, BackendReturnMode, BackendValueId, BackendValueType,
 };
 
 /// Emits the supported first slice of the Actus backend-neutral contract as LLVM IR.
 ///
-/// The initial slice covers validated scalar and unit function signatures, basic blocks,
-/// and direct returns. Aggregate values, calls, cleanup instructions, and typed failure
-/// lowering remain explicit unsupported operations until their corresponding gates are added.
+/// The initial slice covers validated scalar and unit function signatures, parameter mapping,
+/// basic blocks, direct returns, and direct calls. Aggregate values, control flow, cleanup
+/// instructions, and typed failure lowering remain explicit unsupported operations until their
+/// corresponding gates are added.
 pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
     let context = LlvmContext::new()?;
@@ -31,8 +34,33 @@ pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
         return Err(BackendEmitError("LLVM failed to create a module".to_owned()));
     }
     let owned_module = LlvmModule { raw: llvm_module };
+    let mut declarations = BTreeMap::new();
+    for external in &module.externals {
+        let declaration = declare_function(
+            context.raw,
+            owned_module.raw,
+            external.symbol.as_str(),
+            &external.parameters,
+            &external.return_value,
+        )?;
+        declarations.insert(external.symbol.as_str().to_owned(), declaration);
+    }
     for function in &module.functions {
-        emit_function(context.raw, owned_module.raw, function)?;
+        let declaration = declare_function(
+            context.raw,
+            owned_module.raw,
+            function.symbol.as_str(),
+            &function.parameters,
+            &function.return_value,
+        )?;
+        declarations.insert(function.symbol.as_str().to_owned(), declaration);
+    }
+    for function in &module.functions {
+        let declaration = declarations
+            .get(function.symbol.as_str())
+            .copied()
+            .ok_or_else(|| BackendEmitError("LLVM function declaration is missing".to_owned()))?;
+        emit_function(context.raw, function, declaration, &declarations)?;
     }
     print_module(owned_module.raw)
 }
@@ -68,30 +96,11 @@ impl Drop for LlvmModule {
 
 fn emit_function(
     context: LLVMContextRef,
-    module: LLVMModuleRef,
     function: &BackendFunction,
+    declaration: FunctionDeclaration,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
 ) -> Result<(), BackendEmitError> {
-    let return_type = llvm_type(context, function.return_value.ty)?;
-    if !matches!(function.return_value.passing, BackendReturnMode::Direct) {
-        return Err(unsupported(function, "aggregate return slots are not implemented"));
-    }
-    let mut parameter_types = function
-        .parameters
-        .iter()
-        .map(|parameter| llvm_type(context, parameter.ty))
-        .collect::<Result<Vec<_>, _>>()?;
-    let function_name = CString::new(function.symbol.as_str())
-        .map_err(|_| BackendEmitError("LLVM function symbol contains NUL".to_owned()))?;
-    let function_type = unsafe {
-        LLVMFunctionType(return_type, parameter_types.as_mut_ptr(), parameter_types.len() as u32, 0)
-    };
-    let llvm_function = unsafe { LLVMAddFunction(module, function_name.as_ptr(), function_type) };
-    if llvm_function.is_null() {
-        return Err(BackendEmitError(format!(
-            "LLVM rejected function `{}`",
-            function.symbol.as_str()
-        )));
-    }
+    let llvm_function = declaration.value;
     let mut blocks = BTreeMap::new();
     for block in &function.blocks {
         let block_name = CString::new(format!("bb{}", block.id.0))
@@ -104,16 +113,63 @@ fn emit_function(
     if builder.is_null() {
         return Err(BackendEmitError("LLVM failed to create a builder".to_owned()));
     }
-    let result = emit_blocks(builder, function, &blocks);
+    let result = emit_blocks(builder, function, declaration, declarations, &blocks);
     unsafe { LLVMDisposeBuilder(builder) };
     result
+}
+
+#[derive(Clone, Copy)]
+struct FunctionDeclaration {
+    value: LLVMValueRef,
+    function_type: LLVMTypeRef,
+    parameter_count: usize,
+    returns_void: bool,
+}
+
+fn declare_function(
+    context: LLVMContextRef,
+    module: LLVMModuleRef,
+    symbol: &str,
+    parameters: &[BackendParameter],
+    return_value: &BackendReturn,
+) -> Result<FunctionDeclaration, BackendEmitError> {
+    if !matches!(return_value.passing, BackendReturnMode::Direct) {
+        return Err(BackendEmitError("LLVM aggregate return slots are not implemented".to_owned()));
+    }
+    let return_type = llvm_type(context, return_value.ty)?;
+    let mut parameter_types = parameters
+        .iter()
+        .map(|parameter| llvm_type(context, parameter.ty))
+        .collect::<Result<Vec<_>, _>>()?;
+    let function_type = unsafe {
+        LLVMFunctionType(return_type, parameter_types.as_mut_ptr(), parameter_types.len() as u32, 0)
+    };
+    let function_name = CString::new(symbol)
+        .map_err(|_| BackendEmitError("LLVM function symbol contains NUL".to_owned()))?;
+    let value = unsafe { LLVMAddFunction(module, function_name.as_ptr(), function_type) };
+    if value.is_null() {
+        return Err(BackendEmitError(format!("LLVM rejected function `{symbol}`")));
+    }
+    Ok(FunctionDeclaration {
+        value,
+        function_type,
+        parameter_count: parameters.len(),
+        returns_void: matches!(return_value.ty, BackendValueType::Unit),
+    })
 }
 
 fn emit_blocks(
     builder: LLVMBuilderRef,
     function: &BackendFunction,
-    blocks: &BTreeMap<BackendBlockId, llvm_sys::prelude::LLVMBasicBlockRef>,
+    declaration: FunctionDeclaration,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
 ) -> Result<(), BackendEmitError> {
+    let mut values = BTreeMap::new();
+    for index in 0..declaration.parameter_count {
+        let value = unsafe { LLVMGetParam(declaration.value, index as u32) };
+        values.insert(BackendValueId(index as u32), value);
+    }
     for block in &function.blocks {
         let llvm_block = blocks
             .get(&block.id)
@@ -122,33 +178,13 @@ fn emit_blocks(
         unsafe { llvm_sys::core::LLVMPositionBuilderAtEnd(builder, llvm_block) };
         let mut terminated = false;
         for instruction in &block.instructions {
-            match instruction {
-                BackendInstruction::Return { value: None, .. } => {
-                    if !matches!(function.return_value.ty, BackendValueType::Unit) {
-                        return Err(BackendEmitError(
-                            "non-unit LLVM function requires a return value".to_owned(),
-                        ));
-                    }
-                    unsafe { LLVMBuildRetVoid(builder) };
-                    terminated = true;
-                }
-                BackendInstruction::Return { value: Some(_), .. } => {
-                    return Err(BackendEmitError(
-                        "scalar LLVM return values are not implemented".to_owned(),
-                    ));
-                }
-                BackendInstruction::Call { .. }
-                | BackendInstruction::Branch { .. }
-                | BackendInstruction::Jump { .. }
-                | BackendInstruction::Fail { .. }
-                | BackendInstruction::Trap { .. }
-                | BackendInstruction::Cleanup { .. } => {
-                    return Err(BackendEmitError(
-                        "LLVM instruction lowering is not implemented for this contract node"
-                            .to_owned(),
-                    ));
-                }
+            if terminated {
+                return Err(BackendEmitError(
+                    "LLVM block has instructions after a terminator".to_owned(),
+                ));
             }
+            terminated =
+                emit_instruction(builder, function, instruction, declarations, &mut values)?;
         }
         if !terminated {
             if matches!(function.return_value.ty, BackendValueType::Unit) {
@@ -159,6 +195,106 @@ fn emit_blocks(
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+fn emit_instruction(
+    builder: LLVMBuilderRef,
+    function: &BackendFunction,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    match instruction {
+        BackendInstruction::Return { value, .. } => {
+            emit_return(builder, function, *value, values)?;
+            Ok(true)
+        }
+        BackendInstruction::Call { callee, arguments, result, .. } => {
+            emit_call(builder, callee.as_str(), arguments, *result, declarations, values)?;
+            Ok(false)
+        }
+        BackendInstruction::Branch { .. }
+        | BackendInstruction::Jump { .. }
+        | BackendInstruction::Fail { .. }
+        | BackendInstruction::Trap { .. }
+        | BackendInstruction::Cleanup { .. } => Err(BackendEmitError(
+            "LLVM instruction lowering is not implemented for this contract node".to_owned(),
+        )),
+    }
+}
+
+fn emit_return(
+    builder: LLVMBuilderRef,
+    function: &BackendFunction,
+    value_id: Option<BackendValueId>,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    match value_id {
+        None if matches!(function.return_value.ty, BackendValueType::Unit) => {
+            unsafe { LLVMBuildRetVoid(builder) };
+            Ok(())
+        }
+        None => Err(BackendEmitError("non-unit LLVM function requires a return value".to_owned())),
+        Some(value_id) => {
+            let value = values.get(&value_id).copied().ok_or_else(|| {
+                BackendEmitError(format!("LLVM return value {} is unavailable", value_id.0))
+            })?;
+            unsafe { LLVMBuildRet(builder, value) };
+            Ok(())
+        }
+    }
+}
+
+fn emit_call(
+    builder: LLVMBuilderRef,
+    callee: &str,
+    argument_ids: &[BackendValueId],
+    result: Option<BackendValueId>,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    let declaration = declarations
+        .get(callee)
+        .copied()
+        .ok_or_else(|| BackendEmitError(format!("LLVM callee `{callee}` is unavailable")))?;
+    if argument_ids.len() != declaration.parameter_count {
+        return Err(BackendEmitError(format!(
+            "LLVM call `{callee}` expects {} arguments, got {}",
+            declaration.parameter_count,
+            argument_ids.len()
+        )));
+    }
+    let mut arguments = argument_ids
+        .iter()
+        .map(|id| {
+            values
+                .get(id)
+                .copied()
+                .ok_or_else(|| BackendEmitError(format!("LLVM call value {} is unavailable", id.0)))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let call_name = CString::new(result.map(|id| format!("call{}", id.0)).unwrap_or_default())
+        .map_err(|_| BackendEmitError("LLVM call name contains NUL".to_owned()))?;
+    let call = unsafe {
+        LLVMBuildCall2(
+            builder,
+            declaration.function_type,
+            declaration.value,
+            arguments.as_mut_ptr(),
+            arguments.len() as u32,
+            call_name.as_ptr(),
+        )
+    };
+    if call.is_null() {
+        return Err(BackendEmitError("LLVM failed to build call".to_owned()));
+    }
+    if let Some(result) = result {
+        if declaration.returns_void {
+            return Err(BackendEmitError("LLVM call result cannot be void".to_owned()));
+        }
+        values.insert(result, call);
     }
     Ok(())
 }
@@ -196,8 +332,4 @@ fn print_module(module: LLVMModuleRef) -> Result<String, BackendEmitError> {
         .to_owned();
     unsafe { LLVMDisposeMessage(printed) };
     Ok(text)
-}
-
-fn unsupported(function: &BackendFunction, reason: &str) -> BackendEmitError {
-    BackendEmitError(format!("LLVM function `{}` unsupported: {reason}", function.symbol.as_str()))
 }

@@ -305,10 +305,10 @@ or `LLVM_SYS_231_PREFIX`. The manifest exposes this as an opt-in `llvm`
 feature while keeping `cranelift` as the only default backend feature.
 Architecture tests verify that LLVM is opt-in and that the binding is absent
 from the default dependency surface. The first emitter slice now creates a
-validated LLVM module with scalar/unit function signatures, basic blocks, and
-unit returns; calls, scalar return values, aggregates, cleanup, and typed
-failures remain explicit open work. The feature build and this emitter slice
-are covered by the LLVM integration test.
+validated LLVM module with scalar/unit function signatures, basic blocks,
+parameter mapping, direct scalar returns, and direct calls. Aggregates,
+control flow, cleanup, and typed failures remain explicit open work. The
+feature build and this emitter slice are covered by the LLVM integration test.
 
 ## Gate 44.6 — Add ARM32/Thumb target support
 
