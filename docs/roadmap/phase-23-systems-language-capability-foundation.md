@@ -635,7 +635,7 @@ Gate 23.16 evidence:
   is not used to claim a formatter result for files outside this repository.
 - IR verification: `test_zero_float_verification` and its float-positive
   companion inspect Cranelift instructions, operands, and result types in
-  `src/codegen/native/ir_audit.rs`.
+  `src/codegen/cranelift/ir_audit.rs`.
 - Repository gates pass with `cargo fmt --all -- --check`, `cargo check
   --all-targets --all-features`, `cargo clippy --all-targets --all-features
   -- -D warnings`, `cargo test --all-targets --all-features`,

@@ -330,7 +330,7 @@ instruction identities; it is not inferred from disassembly or byte-pattern
 heuristics. The compiler-level evidence is covered by
 `test_zero_float_verification_inspects_generated_integer_ir`,
 `zero_float_verification_rejects_generated_float_ir`, and the unit audit tests
-in `src/codegen/native/ir_audit.rs`.
+in `src/codegen/cranelift/ir_audit.rs`.
 
 For a package-wide contract, configure the same compiler-owned audit in the
 manifest rather than enabling it only in an individual backend test:

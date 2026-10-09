@@ -24,10 +24,13 @@ lowering and machine-specific code generation.
 
 The current Cranelift dependency surface includes:
 
-- `src/codegen/target.rs`: Cranelift ISA lookup and optimization flags;
-- `src/codegen/native/`: native function discovery, object emission, and IR
-  audit;
-- `src/codegen/native_runtime.rs`: runtime bridge declarations and function
+- `src/codegen/cranelift/isa.rs`: Cranelift ISA lookup and optimization flags;
+- `src/codegen/cranelift/native.rs`: Cranelift native facade, function metadata,
+  object entry points, and public emission API;
+- `src/codegen/cranelift/declarations.rs`, `emission.rs`, `dependencies.rs`,
+  and `ir_audit.rs`: Cranelift-specific function discovery, object emission,
+  reachability, and zero-float verification;
+- `src/codegen/cranelift/runtime.rs`: runtime bridge declarations and function
   identifiers;
 - `src/codegen/linker.rs`: object linking and platform linker arguments;
 - `src/codegen/abi.rs`, `layout/`, `types.rs`, and `structs/`: layout, ABI, and

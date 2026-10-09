@@ -103,7 +103,7 @@ The audit confirms the following existing boundaries:
   before native emission. `std::time` will use this same unavailable-module
   contract rather than inventing a second visibility path.
 - Native external declarations and symbol bindings are owned by the existing
-  `src/codegen/native` and `src/runtime` boundaries. The timer bridge must be
+  `src/codegen/cranelift` and `src/runtime` boundaries. The timer bridge must be
   registered there, not through a special case in expression lowering.
 - The hosted boundary is the `Hosted` entry contract and the existing hosted
   runtime bridges. Freestanding/core builds do not inherit a host clock; a
