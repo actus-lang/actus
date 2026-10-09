@@ -1,3 +1,4 @@
+mod backend;
 mod bindings;
 mod body;
 mod constants;
@@ -12,6 +13,7 @@ mod serialization_migration;
 mod signature;
 mod symbols;
 
+pub use backend::{BackendKind, BackendTargetError};
 pub use bindings::BackendSymbolBindings;
 pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{

@@ -240,12 +240,12 @@ not hardware measurements.
 
 ## Gate 44.4 — Formalize target, object, and linker boundaries
 
-- [ ] Define target profiles for hosted x86-64, hosted AArch64, freestanding
+- [x] Define target profiles for hosted x86-64, hosted AArch64, freestanding
       targets, and ARM32/Thumb targets.
-- [ ] Separate target selection from backend selection.
+- [x] Separate target selection from backend selection.
 - [ ] Define object format, relocation, symbol visibility, entry symbol,
       linker arguments, runtime archive, and startup requirements per target.
-- [ ] Reject incompatible backend-target combinations with typed diagnostics.
+- [x] Reject incompatible backend-target combinations with typed diagnostics.
 - [ ] Prove that unused backend modules are not compiled or linked.
 - [ ] Add deterministic object and linker-plan tests for every supported host
       profile.
