@@ -142,6 +142,13 @@ pub enum BackendInstruction {
         action: LoweredCleanupInstruction,
         span: SourceSpan,
     },
+    MemoryCopy {
+        destination: BackendValueId,
+        source: BackendValueId,
+        size: u32,
+        alignment: u32,
+        span: SourceSpan,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -330,6 +337,14 @@ fn validate_instruction(
         {
             Err(BackendContractError::InvalidFailureType)
         }
+        BackendInstruction::MemoryCopy { size, alignment, .. }
+            if *size == 0
+                || *alignment == 0
+                || !alignment.is_power_of_two()
+                || size % alignment != 0 =>
+        {
+            Err(BackendContractError::InvalidMemoryCopy)
+        }
         _ => Ok(()),
     }
 }
@@ -386,6 +401,7 @@ pub enum BackendContractError {
     InvalidBlockReference,
     InvalidValueType,
     InvalidFailureType,
+    InvalidMemoryCopy,
     InvalidCleanupContract(String),
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
@@ -443,6 +459,9 @@ impl std::fmt::Display for BackendContractError {
             }
             Self::InvalidFailureType => {
                 formatter.write_str("backend typed failure must reference an enum result type")
+            }
+            Self::InvalidMemoryCopy => {
+                formatter.write_str("backend memory copy requires a non-zero aligned extent")
             }
             Self::InvalidCleanupContract(reason) => {
                 write!(formatter, "invalid semantic cleanup contract: {reason}")

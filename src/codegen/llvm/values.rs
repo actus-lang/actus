@@ -1,6 +1,7 @@
 use llvm_sys::core::{
     LLVMArrayType2, LLVMInt1TypeInContext, LLVMInt8TypeInContext, LLVMInt16TypeInContext,
-    LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMVoidTypeInContext,
+    LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMPointerTypeInContext,
+    LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 
@@ -17,12 +18,11 @@ pub(super) fn llvm_type(
         BackendValueType::Integer { width: 16, .. } => unsafe { LLVMInt16TypeInContext(context) },
         BackendValueType::Integer { width: 32, .. } => unsafe { LLVMInt32TypeInContext(context) },
         BackendValueType::Integer { width: 64, .. } => unsafe { LLVMInt64TypeInContext(context) },
+        BackendValueType::Pointer => unsafe { LLVMPointerTypeInContext(context, 0) },
         BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => {
             return aggregate_type(context, layout);
         }
-        BackendValueType::Integer { .. }
-        | BackendValueType::Float { .. }
-        | BackendValueType::Pointer => {
+        BackendValueType::Integer { .. } | BackendValueType::Float { .. } => {
             return Err(BackendEmitError("LLVM type lowering is not implemented".to_owned()));
         }
     };

@@ -78,7 +78,7 @@ fn emit_function(
     if builder.is_null() {
         return Err(BackendEmitError("LLVM failed to create a builder".to_owned()));
     }
-    let result = emit_blocks(builder, function, declaration, declarations, &blocks);
+    let result = emit_blocks(context, builder, function, declaration, declarations, &blocks);
     unsafe { LLVMDisposeBuilder(builder) };
     result
 }

@@ -188,6 +188,51 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
 }
 
 #[test]
+fn lowers_pointer_memory_copy_with_declared_extent_and_alignment() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "copy").expect("valid symbol");
+    let pointer = BackendParameter {
+        name: "pointer".to_owned(),
+        role: actus::ast::Role::Abs,
+        ty: BackendValueType::Pointer,
+        passing: actus::codegen::BackendPassingMode::Direct,
+    };
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![
+            pointer.clone(),
+            BackendParameter { name: "target".to_owned(), ..pointer },
+        ],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::MemoryCopy {
+                    destination: BackendValueId(1),
+                    source: BackendValueId(0),
+                    size: 16,
+                    alignment: 8,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("pointer memory copy should lower to LLVM memmove");
+    assert!(ir.contains("llvm.memmove"));
+    assert!(ir.contains("i64 16"));
+}
+
+#[test]
 fn emits_fixed_layout_aggregate_parameter_and_return() {
     let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
     let aggregate = BackendValueType::Aggregate { layout };

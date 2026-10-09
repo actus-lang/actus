@@ -316,6 +316,11 @@ open work. Compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while runtime-backed cleanup actions fail closed until
 their bridge ABI and storage representation are implemented. The feature build
 and this emitter slice are covered by the LLVM integration test.
+The neutral contract now also validates non-zero, alignment-compatible pointer
+copy extents, and the LLVM slice lowers those extents through overlap-safe
+`llvm.memmove` calls. Full semantic copy propagation and aggregate field copy
+integration remain open until the common body lowering carries pointer values
+for those operations.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

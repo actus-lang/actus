@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
+use llvm_sys::LLVMTypeKind::LLVMPointerTypeKind;
+use llvm_sys::core::LLVMGetTypeKind;
 use llvm_sys::core::{
-    LLVMBuildBr, LLVMBuildCondBr, LLVMBuildRetVoid, LLVMBuildUnreachable, LLVMGetParam,
-    LLVMPositionBuilderAtEnd,
+    LLVMBuildBr, LLVMBuildCondBr, LLVMBuildMemMove, LLVMBuildRetVoid, LLVMBuildUnreachable,
+    LLVMConstInt, LLVMGetParam, LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
@@ -16,6 +18,7 @@ use super::declarations::FunctionDeclaration;
 use super::returns::emit_return;
 
 pub(super) fn emit_blocks(
+    context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
@@ -34,6 +37,7 @@ pub(super) fn emit_blocks(
                 ));
             }
             terminated = emit_instruction(
+                context,
                 builder,
                 function,
                 declaration,
@@ -66,6 +70,7 @@ fn parameter_values(declaration: FunctionDeclaration) -> BTreeMap<BackendValueId
 }
 
 fn emit_instruction(
+    context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
@@ -99,7 +104,43 @@ fn emit_instruction(
             "LLVM instruction lowering is not implemented for this contract node".to_owned(),
         )),
         BackendInstruction::Cleanup { action, .. } => emit_cleanup(action),
+        BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
+            emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
+        }
     }
+}
+
+fn emit_memory_copy(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    destination_id: BackendValueId,
+    source_id: BackendValueId,
+    size: u32,
+    alignment: u32,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let destination = pointer_value(destination_id, values, "destination")?;
+    let source = pointer_value(source_id, values, "source")?;
+    let length = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(size), 0) };
+    let copy =
+        unsafe { LLVMBuildMemMove(builder, destination, alignment, source, alignment, length) };
+    (!copy.is_null())
+        .then_some(false)
+        .ok_or_else(|| BackendEmitError("LLVM failed to build memory copy".to_owned()))
+}
+
+fn pointer_value(
+    id: BackendValueId,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+    role: &str,
+) -> Result<LLVMValueRef, BackendEmitError> {
+    let value = values.get(&id).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM memory-copy {role} value {} is unavailable", id.0))
+    })?;
+    let kind = unsafe { LLVMGetTypeKind(LLVMTypeOf(value)) };
+    (kind == LLVMPointerTypeKind)
+        .then_some(value)
+        .ok_or_else(|| BackendEmitError(format!("LLVM memory-copy {role} must be a pointer")))
 }
 
 fn emit_cleanup(action: &LoweredCleanupInstruction) -> Result<bool, BackendEmitError> {

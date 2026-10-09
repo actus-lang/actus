@@ -5,9 +5,10 @@ use actus::codegen::{
     BackendBlock, BackendBlockId, BackendBodyProvider, BackendCleanupAction, BackendContractError,
     BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
     BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
-    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
-    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb,
-    lower_verb_body, lower_verb_signature, lower_verb_with_cleanup,
+    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueId,
+    BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_signature,
+    lower_verb_with_cleanup,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -159,6 +160,24 @@ fn validates_aligned_aggregate_layouts() {
     assert!(BackendLayout { size: 16, alignment: 8 }.validate().is_ok());
     assert!(BackendLayout { size: 12, alignment: 8 }.validate().is_err());
     assert!(BackendLayout { size: 16, alignment: 3 }.validate().is_err());
+}
+
+#[test]
+fn rejects_zero_or_misaligned_memory_copy_extents() {
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::MemoryCopy {
+                destination: BackendValueId(0),
+                source: BackendValueId(1),
+                size: 12,
+                alignment: 8,
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidMemoryCopy));
 }
 
 #[test]
