@@ -153,3 +153,37 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
     assert!(ir.contains("br label %bb3"));
     assert!(ir.contains("unreachable"));
 }
+
+#[test]
+fn emits_fixed_layout_aggregate_parameter_and_return() {
+    let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let aggregate = BackendValueType::Aggregate { layout };
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "aggregate").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "value".to_owned(),
+            role: Role::Erg,
+            ty: aggregate,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: Some(BackendValueId(0)),
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("fixed-layout aggregate should lower to LLVM IR");
+    assert!(ir.contains("define [2 x i64] @test__verb_aggregate([2 x i64] %0)"));
+    assert!(ir.contains("ret [2 x i64] %0"));
+}
