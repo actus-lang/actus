@@ -1,9 +1,9 @@
 use crate::ast::{Param, PrimitiveType, ReturnAccess, ReturnType, Role, TypeName, VerbDecl};
 
 use super::{
-    BackendContractError, BackendFunction, BackendLayout, BackendParameter, BackendPassingMode,
-    BackendReturn, BackendReturnMode, BackendTargetContext, BackendValueType, SymbolIdentity,
-    SymbolKind,
+    BackendBodyProvider, BackendContractError, BackendFunction, BackendLayout, BackendParameter,
+    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext, BackendValueType,
+    SymbolIdentity, SymbolKind, lower_verb_body,
 };
 
 pub trait BackendLayoutProvider {
@@ -31,6 +31,20 @@ impl BackendSignature {
             blocks,
         }
     }
+}
+
+pub fn lower_verb(
+    namespace: &str,
+    verb: &VerbDecl,
+    layouts: &impl BackendLayoutProvider,
+    body_provider: &impl BackendBodyProvider,
+    entry: super::BackendBlockId,
+) -> Result<BackendFunction, BackendContractError> {
+    let signature = lower_verb_signature(namespace, verb, layouts)?;
+    let blocks = lower_verb_body(verb, body_provider)?;
+    let function = signature.into_function(entry, blocks);
+    function.validate()?;
+    Ok(function)
 }
 
 pub fn lower_verb_signature(

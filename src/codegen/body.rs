@@ -22,7 +22,7 @@ pub fn lower_verb_body(
 ) -> Result<Vec<BackendBlock>, BackendContractError> {
     let mut lowering = BodyLowering { provider, next_block: 1, blocks: Vec::new() };
     let entry = BackendBlockId(0);
-    let entry_block = lowering.lower_block(entry, &verb.body)?;
+    let entry_block = lowering.lower_block(entry, &verb.body, None)?;
     lowering.blocks.insert(0, entry_block);
     Ok(lowering.blocks)
 }
@@ -38,18 +38,35 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
         &mut self,
         id: BackendBlockId,
         block: &Block,
+        fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
-            if matches!(statement, Stmt::If { .. }) && index + 1 < block.statements.len() {
-                return Err(unsupported(
-                    statement_span(statement),
-                    "if statement with following statements",
-                ));
+            if let Stmt::If { condition, then_branch, else_branch, span } = statement {
+                let continuation_id = self.allocate_block();
+                self.lower_if(
+                    condition,
+                    then_branch,
+                    else_branch.as_ref(),
+                    *span,
+                    continuation_id,
+                    &mut instructions,
+                )?;
+                let continuation =
+                    Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+                let continuation_block =
+                    self.lower_block(continuation_id, &continuation, fallthrough)?;
+                self.blocks.push(continuation_block);
+                return Ok(BackendBlock { id, instructions });
             }
             self.lower_statement(statement, &mut instructions)?;
             if terminates(instructions.last()) {
                 break;
+            }
+        }
+        if !terminates(instructions.last()) {
+            if let Some(target) = fallthrough {
+                instructions.push(BackendInstruction::Jump { target, span: block.span });
             }
         }
         Ok(BackendBlock { id, instructions })
@@ -81,9 +98,6 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
                     span: *stmt_span,
                 });
             }
-            Stmt::If { condition, then_branch, else_branch, span } => {
-                self.lower_if(condition, then_branch, else_branch.as_ref(), *span, instructions)?;
-            }
             _ => return Err(unsupported(statement_span(statement), unsupported_name(statement))),
         }
         Ok(())
@@ -95,27 +109,28 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
         then_branch: &Block,
         else_branch: Option<&IfBranch>,
         span: SourceSpan,
+        continuation_id: BackendBlockId,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         let condition = self.provider.value_for(condition)?;
         let then_id = self.allocate_block();
         let else_id = self.allocate_block();
-        let continuation_id = self.allocate_block();
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: then_id,
             else_block: else_id,
             span,
         });
-        let then_block = self.lower_block(then_id, then_branch)?;
-        self.blocks.push(ensure_jump(then_block, continuation_id, span));
+        let then_block = self.lower_block(then_id, then_branch, Some(continuation_id))?;
+        self.blocks.push(then_block);
         let else_block = match else_branch {
             None => BackendBlock { id: else_id, instructions: Vec::new() },
-            Some(IfBranch::Block(block)) => self.lower_block(else_id, block)?,
+            Some(IfBranch::Block(block)) => {
+                self.lower_block(else_id, block, Some(continuation_id))?
+            }
             Some(IfBranch::ElseIf(_)) => return Err(unsupported(span, "else-if expression")),
         };
         self.blocks.push(ensure_jump(else_block, continuation_id, span));
-        self.blocks.push(BackendBlock { id: continuation_id, instructions: Vec::new() });
         Ok(())
     }
 

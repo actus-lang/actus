@@ -36,7 +36,7 @@ pub use model::{
     NativeCleanupPlan, NativeInstruction, NativeLoopUnwindPlan, NativeUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
-pub use signature::{BackendLayoutProvider, BackendSignature, lower_verb_signature};
+pub use signature::{BackendLayoutProvider, BackendSignature, lower_verb, lower_verb_signature};
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 pub(crate) use cranelift::generic::expand_generic_instances;

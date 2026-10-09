@@ -6,7 +6,7 @@ use actus::codegen::{
     BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
     BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
     BackendUnsupportedOperation, BackendValueType, NativeInstruction, SymbolIdentity, SymbolKind,
-    lower_semantic_cleanup, lower_verb_body, lower_verb_signature,
+    lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_signature,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -466,19 +466,22 @@ fn lowers_return_and_direct_calls_through_a_neutral_body_provider() {
 fn lowers_if_control_flow_with_explicit_value_provider() {
     let mut verb = verb_with_signature();
     verb.body = Block {
-        statements: vec![Stmt::If {
-            condition: Expr::BoolLiteral { value: true, span: SourceSpan::new(0, 4) },
-            then_branch: Block {
-                statements: vec![Stmt::Return { value: None, span: SourceSpan::new(5, 11) }],
-                span: SourceSpan::new(5, 11),
+        statements: vec![
+            Stmt::If {
+                condition: Expr::BoolLiteral { value: true, span: SourceSpan::new(0, 4) },
+                then_branch: Block {
+                    statements: vec![Stmt::Return { value: None, span: SourceSpan::new(5, 11) }],
+                    span: SourceSpan::new(5, 11),
+                },
+                else_branch: Some(actus::ast::IfBranch::Block(Block {
+                    statements: vec![Stmt::Return { value: None, span: SourceSpan::new(12, 18) }],
+                    span: SourceSpan::new(12, 18),
+                })),
+                span: SourceSpan::new(0, 18),
             },
-            else_branch: Some(actus::ast::IfBranch::Block(Block {
-                statements: vec![Stmt::Return { value: None, span: SourceSpan::new(12, 18) }],
-                span: SourceSpan::new(12, 18),
-            })),
-            span: SourceSpan::new(0, 18),
-        }],
-        span: SourceSpan::new(0, 18),
+            Stmt::Return { value: None, span: SourceSpan::new(19, 25) },
+        ],
+        span: SourceSpan::new(0, 25),
     };
 
     let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("if should lower");
@@ -486,6 +489,22 @@ fn lowers_if_control_flow_with_explicit_value_provider() {
     assert!(matches!(blocks[0].instructions[0], BackendInstruction::Branch { .. }));
     assert!(matches!(blocks[1].instructions[0], BackendInstruction::Return { .. }));
     assert!(matches!(blocks[2].instructions[0], BackendInstruction::Return { .. }));
+    assert!(matches!(blocks[3].instructions[0], BackendInstruction::Return { .. }));
+}
+
+#[test]
+fn integrates_signature_and_body_into_a_valid_neutral_function() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Return { value: None, span: SourceSpan::new(0, 6) }],
+        span: SourceSpan::new(0, 6),
+    };
+
+    let function = lower_verb("app", &verb, &TestLayouts, &TestBodyProvider, BackendBlockId(0))
+        .expect("signature and body should form a valid function");
+    assert_eq!(function.symbol.as_str(), "app__verb_process");
+    assert_eq!(function.blocks.len(), 1);
+    assert!(function.validate().is_ok());
 }
 
 #[test]
