@@ -4,7 +4,7 @@ use cranelift_codegen::settings::{self, Configurable};
 use crate::configuration::OptimizationLevel;
 use crate::target::{TargetSpec, TargetSpecError};
 
-pub(super) fn build_isa_with_optimization(
+pub(crate) fn build_isa_with_optimization(
     target: &TargetSpec,
     position_independent: bool,
     optimization_level: OptimizationLevel,

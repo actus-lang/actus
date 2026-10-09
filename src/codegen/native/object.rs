@@ -6,7 +6,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::target::build_isa_with_optimization;
+use super::super::cranelift::build_isa_with_optimization;
 use super::NativeEmitError;
 
 pub(super) fn create_module(

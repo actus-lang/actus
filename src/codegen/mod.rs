@@ -7,6 +7,7 @@ mod case;
 mod cleanup;
 mod constants;
 mod control_flow;
+mod cranelift;
 mod declarations;
 mod dynamic_call;
 mod enum_layout;
@@ -28,7 +29,6 @@ mod serialization_generation;
 mod serialization_migration;
 mod structs;
 mod symbols;
-mod target;
 mod types;
 mod vtable;
 
