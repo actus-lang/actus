@@ -309,7 +309,8 @@ validated LLVM module with scalar/unit function signatures, basic blocks,
 parameter mapping, direct scalar returns, direct calls, conditional branches,
 jumps, terminating traps, and fixed-layout direct aggregate/Region values with
 1, 2, 4, or 8-byte alignment. Non-direct aggregate parameters now lower to
-opaque pointers with explicit parameter alignment. Return-slot ABI, memory-copy
+opaque pointers with explicit parameter alignment. Aggregate return slots now
+use a hidden aligned pointer with caller-side stack storage. Memory-copy
 lowering, cleanup, and typed failures remain explicit open work. The feature
 build and this emitter slice are covered by the LLVM integration test.
 

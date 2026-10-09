@@ -213,3 +213,69 @@ fn emits_non_direct_aggregate_parameter_as_aligned_pointer() {
         .expect("non-direct aggregate parameter should lower to a pointer");
     assert!(ir.contains("define void @test__verb_loan(ptr align 8 %0)"));
 }
+
+#[test]
+fn lowers_aggregate_return_slot_between_caller_and_callee() {
+    let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let aggregate = BackendValueType::Aggregate { layout };
+    let callee_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "make").expect("valid callee symbol");
+    let caller_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "use").expect("valid caller symbol");
+    let parameter = BackendParameter {
+        name: "value".to_owned(),
+        role: Role::Erg,
+        ty: aggregate,
+        passing: actus::codegen::BackendPassingMode::Direct,
+    };
+    let callee = BackendFunction {
+        symbol: callee_symbol.clone(),
+        parameters: vec![parameter.clone()],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate,
+            passing: BackendReturnMode::ReturnSlot { layout },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: Some(BackendValueId(0)),
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let caller = BackendFunction {
+        symbol: caller_symbol,
+        parameters: vec![parameter],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: callee_symbol,
+                    arguments: vec![BackendValueId(0)],
+                    result: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![callee, caller] })
+        .expect("aggregate return slot should lower to LLVM IR");
+    assert!(ir.contains("define void @test__verb_make(ptr align 8"));
+    assert!(ir.contains("call void @test__verb_make(ptr"));
+    assert!(ir.contains("store "));
+    assert!(ir.contains("load [2 x i64]"));
+}

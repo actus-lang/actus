@@ -35,6 +35,7 @@ pub(super) fn emit_blocks(
             terminated = emit_instruction(
                 builder,
                 function,
+                declaration,
                 instruction,
                 declarations,
                 blocks,
@@ -66,6 +67,7 @@ fn parameter_values(declaration: FunctionDeclaration) -> BTreeMap<BackendValueId
 fn emit_instruction(
     builder: LLVMBuilderRef,
     function: &BackendFunction,
+    declaration: FunctionDeclaration,
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, FunctionDeclaration>,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
@@ -73,7 +75,7 @@ fn emit_instruction(
 ) -> Result<bool, BackendEmitError> {
     match instruction {
         BackendInstruction::Return { value, .. } => {
-            emit_return(builder, function, *value, values)?;
+            emit_return(builder, function, declaration, *value, values)?;
             Ok(true)
         }
         BackendInstruction::Call { callee, arguments, result, .. } => {

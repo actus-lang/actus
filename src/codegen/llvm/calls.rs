@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::ffi::CString;
 
-use llvm_sys::core::LLVMBuildCall2;
+use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendValueId};
@@ -19,22 +19,66 @@ pub(super) fn emit_call(
         .get(callee)
         .copied()
         .ok_or_else(|| BackendEmitError(format!("LLVM callee `{callee}` is unavailable")))?;
-    if argument_ids.len() != declaration.parameter_count {
-        return Err(BackendEmitError(format!(
-            "LLVM call `{callee}` expects {} arguments, got {}",
-            declaration.parameter_count,
-            argument_ids.len()
-        )));
+    validate_argument_count(callee, argument_ids, declaration.parameter_count)?;
+    let mut arguments = collect_arguments(argument_ids, values)?;
+    let return_slot = prepare_return_slot(builder, declaration, result, &mut arguments)?;
+    let call = build_call(builder, declaration, result, &mut arguments)?;
+    record_call_result(declaration, result, return_slot, call, values, builder)
+}
+
+fn validate_argument_count(
+    callee: &str,
+    arguments: &[BackendValueId],
+    expected: usize,
+) -> Result<(), BackendEmitError> {
+    if arguments.len() == expected {
+        return Ok(());
     }
-    let mut arguments = argument_ids
-        .iter()
+    Err(BackendEmitError(format!(
+        "LLVM call `{callee}` expects {expected} arguments, got {}",
+        arguments.len()
+    )))
+}
+
+fn collect_arguments(
+    ids: &[BackendValueId],
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<Vec<LLVMValueRef>, BackendEmitError> {
+    ids.iter()
         .map(|id| {
             values
                 .get(id)
                 .copied()
                 .ok_or_else(|| BackendEmitError(format!("LLVM call value {} is unavailable", id.0)))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect()
+}
+
+fn prepare_return_slot(
+    builder: LLVMBuilderRef,
+    declaration: FunctionDeclaration,
+    result: Option<BackendValueId>,
+    arguments: &mut Vec<LLVMValueRef>,
+) -> Result<Option<LLVMValueRef>, BackendEmitError> {
+    if !declaration.return_slot {
+        return Ok(None);
+    }
+    let result = result.ok_or_else(|| {
+        BackendEmitError("LLVM return-slot call requires a result value".to_owned())
+    })?;
+    let slot_name = CString::new(format!("slot{}", result.0))
+        .map_err(|_| BackendEmitError("LLVM return slot name contains NUL".to_owned()))?;
+    let slot = unsafe { LLVMBuildAlloca(builder, declaration.return_type, slot_name.as_ptr()) };
+    arguments.insert(0, slot);
+    Ok(Some(slot))
+}
+
+fn build_call(
+    builder: LLVMBuilderRef,
+    declaration: FunctionDeclaration,
+    result: Option<BackendValueId>,
+    arguments: &mut [LLVMValueRef],
+) -> Result<LLVMValueRef, BackendEmitError> {
     let call_name = CString::new(result.map(|id| format!("call{}", id.0)).unwrap_or_default())
         .map_err(|_| BackendEmitError("LLVM call name contains NUL".to_owned()))?;
     let call = unsafe {
@@ -47,13 +91,32 @@ pub(super) fn emit_call(
             call_name.as_ptr(),
         )
     };
-    if call.is_null() {
-        return Err(BackendEmitError("LLVM failed to build call".to_owned()));
-    }
-    if let Some(result) = result {
-        if declaration.returns_void {
-            return Err(BackendEmitError("LLVM call result cannot be void".to_owned()));
+    (!call.is_null())
+        .then_some(call)
+        .ok_or_else(|| BackendEmitError("LLVM failed to build call".to_owned()))
+}
+
+fn record_call_result(
+    declaration: FunctionDeclaration,
+    result: Option<BackendValueId>,
+    return_slot: Option<LLVMValueRef>,
+    call: LLVMValueRef,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+    builder: LLVMBuilderRef,
+) -> Result<(), BackendEmitError> {
+    let Some(result) = result else { return Ok(()) };
+    if let Some(slot) = return_slot {
+        let name = CString::new(format!("result{}", result.0))
+            .map_err(|_| BackendEmitError("LLVM result name contains NUL".to_owned()))?;
+        let value =
+            unsafe { LLVMBuildLoad2(builder, declaration.return_type, slot, name.as_ptr()) };
+        if value.is_null() {
+            return Err(BackendEmitError("LLVM failed to load return slot".to_owned()));
         }
+        values.insert(result, value);
+    } else if declaration.returns_void {
+        return Err(BackendEmitError("LLVM call result cannot be void".to_owned()));
+    } else {
         values.insert(result, call);
     }
     Ok(())

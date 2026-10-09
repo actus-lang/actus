@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use llvm_sys::core::{
     LLVMAddFunction, LLVMFunctionType, LLVMGetParam, LLVMPointerTypeInContext,
-    LLVMSetParamAlignment,
+    LLVMSetParamAlignment, LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
 
@@ -15,7 +15,9 @@ use super::values::llvm_type;
 pub(super) struct FunctionDeclaration {
     pub(super) value: LLVMValueRef,
     pub(super) function_type: LLVMTypeRef,
+    pub(super) return_type: LLVMTypeRef,
     pub(super) parameter_count: usize,
+    pub(super) return_slot: bool,
     pub(super) returns_void: bool,
 }
 
@@ -26,14 +28,17 @@ pub(super) fn declare_function(
     parameters: &[BackendParameter],
     return_value: &BackendReturn,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
-    if !matches!(return_value.passing, BackendReturnMode::Direct) {
-        return Err(BackendEmitError("LLVM aggregate return slots are not implemented".to_owned()));
-    }
-    let return_type = llvm_type(context, return_value.ty)?;
+    let return_slot = matches!(return_value.passing, BackendReturnMode::ReturnSlot { .. });
+    let value_type = llvm_type(context, return_value.ty)?;
+    let return_type =
+        if return_slot { unsafe { LLVMVoidTypeInContext(context) } } else { value_type };
     let mut parameter_types = parameters
         .iter()
         .map(|parameter| parameter_type(context, parameter))
         .collect::<Result<Vec<_>, _>>()?;
+    if return_slot {
+        parameter_types.insert(0, unsafe { LLVMPointerTypeInContext(context, 0) });
+    }
     let function_type = unsafe {
         LLVMFunctionType(return_type, parameter_types.as_mut_ptr(), parameter_types.len() as u32, 0)
     };
@@ -43,12 +48,15 @@ pub(super) fn declare_function(
     if value.is_null() {
         return Err(BackendEmitError(format!("LLVM rejected function `{symbol}`")));
     }
-    apply_parameter_alignments(value, parameters);
+    apply_parameter_alignments(value, parameters, return_value, return_slot);
     Ok(FunctionDeclaration {
         value,
         function_type,
+        return_type: value_type,
         parameter_count: parameters.len(),
-        returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit),
+        return_slot,
+        returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit)
+            || return_slot,
     })
 }
 
@@ -68,12 +76,22 @@ fn parameter_type(
     }
 }
 
-fn apply_parameter_alignments(function: LLVMValueRef, parameters: &[BackendParameter]) {
+fn apply_parameter_alignments(
+    function: LLVMValueRef,
+    parameters: &[BackendParameter],
+    return_value: &BackendReturn,
+    return_slot: bool,
+) {
+    if let BackendReturnMode::ReturnSlot { layout } = return_value.passing {
+        let value = unsafe { LLVMGetParam(function, 0) };
+        unsafe { LLVMSetParamAlignment(value, layout.alignment) };
+    }
     for (index, parameter) in parameters.iter().enumerate() {
         let Some(layout) = parameter.passing.layout() else {
             continue;
         };
-        let value = unsafe { LLVMGetParam(function, index as u32) };
+        let physical_index = index + usize::from(return_slot);
+        let value = unsafe { LLVMGetParam(function, physical_index as u32) };
         unsafe { LLVMSetParamAlignment(value, layout.alignment) };
     }
 }
