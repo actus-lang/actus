@@ -248,7 +248,7 @@ fn reachable_wire_verbs(
 fn emit_module_objects(
     object_plan: &crate::modules::ModuleObjectPlan,
     configuration: &CompilerConfiguration,
-    bindings: &crate::codegen::NativeSymbolBindings,
+    bindings: &crate::codegen::BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
     reachable_module_roots: &std::collections::HashSet<String>,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
@@ -307,7 +307,7 @@ fn declared_symbols(
     program: &crate::ast::Program,
     namespace: &str,
     entry_symbol: &str,
-    bindings: &crate::codegen::NativeSymbolBindings,
+    bindings: &crate::codegen::BackendSymbolBindings,
 ) -> Result<std::collections::BTreeSet<String>, BackendEmitError> {
     let mut names = Vec::new();
     for declaration in &program.declarations {
@@ -346,7 +346,7 @@ fn declared_symbols(
 fn module_bindings(
     plan: &crate::modules::ModuleObjectPlan,
     generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<crate::codegen::NativeSymbolBindings, BackendEmitError> {
+) -> Result<crate::codegen::BackendSymbolBindings, BackendEmitError> {
     let mut bindings = Vec::new();
     for unit in &plan.units()[1..] {
         for name in unit.exported_verbs() {
@@ -377,7 +377,7 @@ fn module_bindings(
             }
         }
     }
-    Ok(crate::codegen::NativeSymbolBindings::new(bindings))
+    Ok(crate::codegen::BackendSymbolBindings::new(bindings))
 }
 
 fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {

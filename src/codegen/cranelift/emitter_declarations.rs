@@ -12,7 +12,7 @@ use super::declarations::{FunctionDeclarationContext, declare_functions};
 use super::function_definition::define_function;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataIds;
-use super::native::{BackendEmitError, FunctionMeta, NativeSymbolBindings};
+use super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
 use super::runtime::{
     declare_buffer_cleanup_function, declare_enum_cleanup_function,
     declare_region_cleanup_function, declare_runtime_functions,
@@ -37,7 +37,7 @@ pub(super) struct DeclarationContext<'a> {
     pub(super) namespace_prefix: &'a str,
     pub(super) layouts: &'a LayoutRegistry,
     pub(super) target: &'a TargetSpec,
-    pub(super) bindings: &'a NativeSymbolBindings,
+    pub(super) bindings: &'a BackendSymbolBindings,
 }
 
 pub(super) fn declare_all_functions(

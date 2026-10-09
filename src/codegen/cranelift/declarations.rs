@@ -8,14 +8,14 @@ use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::super::symbols::{SymbolIdentity, SymbolKind};
 use super::layout::LayoutRegistry;
-use super::native::{BackendEmitError, FunctionMeta, NativeSymbolBindings};
+use super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
 use super::types::NativeType;
 
 pub(crate) struct FunctionDeclarationContext<'a> {
     pub(super) entry_symbol: Option<&'a str>,
     pub(super) namespace_prefix: &'a str,
     pub(super) layouts: &'a LayoutRegistry,
-    pub(super) bindings: &'a NativeSymbolBindings,
+    pub(super) bindings: &'a BackendSymbolBindings,
     pub(super) force_entry_return: bool,
 }
 
@@ -69,7 +69,7 @@ fn declare_external_functions(
     verbs: &[&ExternalVerbDecl],
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
     metadata: &mut HashMap<String, FunctionMeta>,
 ) -> Result<(), BackendEmitError> {
     for verb in verbs {

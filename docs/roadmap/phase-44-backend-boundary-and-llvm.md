@@ -215,7 +215,10 @@ cannot contain Cranelift implementation imports or crate tokens; the root
 `src/codegen/mod.rs` remains the explicit public facade. The architecture suite
 cannot contain Cranelift implementation imports or crate tokens, and the facade
 must expose neutral `BackendEmitError` and `BackendAbiError` contracts rather
-than the former native error names. The architecture suite now covers 7 tests.
+than the former native error names. Symbol binding metadata is now represented
+by the neutral `BackendSymbolBindings` contract and is no longer named as a
+native backend type in the shared facade. The architecture suite now covers 7
+tests.
 Target and runtime source trees are also checked for Cranelift implementation
 imports. Remaining Gate 44.3 work covers removing the remaining backend-shaped
 symbol-binding and emission entry points from the shared public facade and

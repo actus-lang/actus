@@ -5,7 +5,7 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
-use super::super::cranelift::native::{BackendEmitError, FunctionMeta, NativeSymbolBindings};
+use super::super::cranelift::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::result_constructors::normalize_program;
 use super::emitter_declarations::{
@@ -30,7 +30,7 @@ pub(crate) fn emit_program_object_for_target(
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
     additional_instances: &[GenericInstance],
 ) -> Result<Vec<u8>, BackendEmitError> {
     let (program, semantic) = prepare_program(program, target, additional_instances)?;
@@ -180,7 +180,7 @@ struct VerbEmission<'items, 'program> {
     symbol: Option<&'items str>,
     namespace_prefix: &'items str,
     cleanup_schedule: &'items NativeCleanupSchedule,
-    bindings: &'items NativeSymbolBindings,
+    bindings: &'items BackendSymbolBindings,
     configuration: &'items NativeBackendConfiguration,
     target: &'items TargetSpec,
 }
@@ -263,7 +263,7 @@ fn declare_emission_functions(
     namespace_prefix: &str,
     layouts: &LayoutRegistry,
     target: &TargetSpec,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
 ) -> Result<std::collections::HashMap<String, FunctionMeta>, BackendEmitError> {
     validate_native_program(verbs, external_verbs, layouts)?;
     declare_all_functions(

@@ -1,3 +1,4 @@
+mod bindings;
 mod body;
 mod constants;
 mod contract;
@@ -11,6 +12,7 @@ mod serialization_migration;
 mod signature;
 mod symbols;
 
+pub use bindings::BackendSymbolBindings;
 pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{
     BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan,
@@ -21,7 +23,7 @@ pub use contract::{
 };
 pub use cranelift::abi::{validate_external_native_signature, validate_native_signature};
 pub use cranelift::native::{
-    NativeSymbolBindings, emit_module_object_for_target_in_namespace,
+    emit_module_object_for_target_in_namespace,
     emit_module_object_for_target_in_namespace_with_bindings,
     emit_module_object_for_target_in_namespace_with_bindings_and_instances,
     emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots,

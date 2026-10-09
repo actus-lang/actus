@@ -1,6 +1,5 @@
 use cranelift_codegen::ir::FuncRef;
 use cranelift_module::FuncId;
-use std::collections::BTreeMap;
 
 use crate::ast::Program;
 use crate::configuration::NativeBackendConfiguration;
@@ -8,41 +7,8 @@ use crate::target::TargetSpec;
 
 use super::types::NativeType;
 
+pub use super::super::bindings::BackendSymbolBindings;
 pub use super::super::contract::BackendEmitError;
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct NativeSymbolBindings {
-    external: BTreeMap<(String, String), String>,
-    unique_source: BTreeMap<String, String>,
-}
-
-impl NativeSymbolBindings {
-    pub fn new(bindings: impl IntoIterator<Item = (String, String, String)>) -> Self {
-        let mut external = BTreeMap::new();
-        let mut unique_source = BTreeMap::new();
-        for (namespace, source, symbol) in bindings {
-            external.insert((namespace, source.clone()), symbol.clone());
-            match unique_source.get(&source) {
-                None => {
-                    unique_source.insert(source, symbol);
-                }
-                Some(existing) if existing == &symbol => {}
-                Some(_) => {
-                    unique_source.remove(&source);
-                }
-            }
-        }
-        Self { external, unique_source }
-    }
-
-    pub(crate) fn external_symbol<'a>(&'a self, namespace: &str, source_name: &'a str) -> &'a str {
-        self.external
-            .get(&(namespace.to_owned(), source_name.to_owned()))
-            .map(String::as_str)
-            .or_else(|| self.unique_source.get(source_name).map(String::as_str))
-            .unwrap_or(source_name)
-    }
-}
 
 pub(crate) struct FunctionMeta {
     pub(crate) id: FuncId,
@@ -115,7 +81,7 @@ pub fn emit_program_object_for_target(
         "actus_root",
         configuration,
         target,
-        &NativeSymbolBindings::default(),
+        &BackendSymbolBindings::default(),
         &[],
     )
 }
@@ -133,7 +99,7 @@ pub fn emit_program_object_for_target_in_namespace(
         namespace_prefix,
         configuration,
         target,
-        &NativeSymbolBindings::default(),
+        &BackendSymbolBindings::default(),
     )
 }
 
@@ -143,7 +109,7 @@ pub fn emit_program_object_for_target_in_namespace_with_bindings(
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
 ) -> Result<Vec<u8>, BackendEmitError> {
     super::emission::emit_program_object_for_target(
         program,
@@ -167,7 +133,7 @@ pub fn emit_module_object_for_target_in_namespace(
         namespace_prefix,
         configuration,
         target,
-        &NativeSymbolBindings::default(),
+        &BackendSymbolBindings::default(),
     )
 }
 
@@ -176,7 +142,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings(
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
 ) -> Result<Vec<u8>, BackendEmitError> {
     emit_module_object_for_target_in_namespace_with_bindings_and_instances(
         program,
@@ -193,7 +159,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances(
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<Vec<u8>, BackendEmitError> {
     emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
@@ -212,7 +178,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-    bindings: &NativeSymbolBindings,
+    bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
     exported_roots: Option<&[String]>,
 ) -> Result<Vec<u8>, BackendEmitError> {
@@ -229,11 +195,11 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
 
 #[cfg(test)]
 mod tests {
-    use super::NativeSymbolBindings;
+    use super::BackendSymbolBindings;
 
     #[test]
     fn keeps_same_source_name_distinct_per_namespace() {
-        let bindings = NativeSymbolBindings::new([
+        let bindings = BackendSymbolBindings::new([
             ("actus_mod_left".to_owned(), "read__Int".to_owned(), "left_symbol".to_owned()),
             ("actus_mod_right".to_owned(), "read__Int".to_owned(), "right_symbol".to_owned()),
         ]);
