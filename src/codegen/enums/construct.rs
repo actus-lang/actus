@@ -184,7 +184,7 @@ fn store_payload(
         let size = layouts
             .type_size(ty)
             .ok_or_else(|| NativeEmitError("missing enum payload layout".to_owned()))?;
-        copy_bytes(function, value, destination, size);
+        copy_bytes(function, value, destination, size, layouts)?;
     } else {
         function.ins().store(MemFlagsData::new(), value, destination, 0);
     }

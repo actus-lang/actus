@@ -1,0 +1,620 @@
+# Phase 41 — Complete `std::region` Capability and Windowing
+
+## Status
+
+Proposed. This phase is dedicated exclusively to making `std::region` a
+complete, target-neutral, bounded logical-storage library. No downstream
+application, device, model, or product integration belongs in this phase.
+
+Phase 38 remains the completed foundation. Phase 41 extends and hardens that
+foundation; it does not redefine `Array[T, N]`. The internal Region descriptor
+ABI is versioned when its validated layout contract expands; public Region
+operation names and ownership roles remain source-compatible.
+
+The phase remains open until the aggregate native path and the revised bulk
+transfer contract below have independent compiler, runtime, and target-profile
+evidence. Existing aggregate semantic and code-generation coverage does not
+close the native runtime acceptance gate by itself.
+
+The governing agreement is [ADR-0079](../decisions/ADR-0079-region-capability-completeness.md).
+
+## Objective
+
+Deliver a production-grade Region abstraction that can represent a large
+logical index space through a bounded resident window with explicit movement,
+checked access, deterministic ownership, typed provider failures, generation
+safety, cleanup, recovery, and reproducible native evidence.
+
+## Priority rule
+
+Until this phase is complete, no unrelated standard-library feature or
+application integration advances. Every gate below is an evidence gate. A
+checkbox may be marked only after implementation, tests, documentation, and
+reproducible evidence support the exact claim.
+
+## Gate 41.1 — Contract inventory and compatibility baseline
+
+- [x] Accept ADR-0079 and cross-reference it from the standard-library index.
+- [x] Inventory every existing public Region declaration, bridge, error, test,
+      guide section, and runtime manifest entry.
+- [x] Record the Phase 38 ABI, lifecycle, layout, and compatibility guarantees.
+- [x] Define the versioning policy for Region descriptors and provider results.
+- [x] Define which existing operations remain source- and binary-compatible.
+- [x] Add a negative contract list for unsupported implicit behavior.
+
+#### Gate 41.1 evidence
+
+The inventory is recorded in the `std::region` section of the standard-library
+API index and in ADR-0079 section 2.1. The current implementation inventory is:
+
+- Public facade: `library/std/src/region/region.act`.
+- Public error taxonomy: `library/std/src/region/error.act`.
+- Public typed operations and private unsafe bridges:
+  `library/std/src/region/api.act`.
+- Compiler-owned runtime model: `src/runtime/region.rs` and
+  `src/runtime/region_bridge.rs`.
+- Runtime symbol contract: `src/runtime/contract.rs`.
+- Capability table: `src/runtime/capabilities.rs`.
+- Semantic coverage: `tests/std_region_semantic.rs` and
+  `tests/semantic/generics.rs`.
+- Native and cleanup coverage: `tests/std_region_native.rs`,
+  `tests/codegen/native.rs`, and `tests/applications/runtime_modules.rs`.
+- Logical-capacity evidence: `tests/std_region_scale.rs` and the Phase 38
+  scale evidence document.
+- Language and ownership guidance: the Region section of
+  `docs/guide/README.md` and the standard-library API index.
+
+The compatibility policy is versioned by the public Region descriptor and
+provider-result contract. Existing declarations remain source-compatible;
+descriptor or provider-result changes require an explicit version and typed
+compatibility failure. No silent descriptor conversion is allowed. Public
+operations remain explicit and versioned; Gate 41.10 adds `region_pin`,
+`region_unpin`, and `region_pinned` with their own contract and evidence.
+
+The negative contract list is explicit: no implicit Array conversion, hidden
+allocation, implicit page fault, implicit filesystem or device I/O, raw pointer
+in public values, unbounded collection, silent generation repair, automatic
+remap, or provider-specific type in the public facade.
+
+## Gate 41.2 — Descriptor representation and capability identity
+
+- [x] Define the target-agnostic public descriptor fields and their widths.
+- [x] Define capability-slot allocation, reuse, and exhaustion behavior.
+- [x] Add a monotonic generation counter that cannot silently wrap.
+- [x] Reject invalid, stale, closed, and reused capabilities before data access.
+- [x] Prove that public descriptors contain no raw OS or provider pointers.
+- [x] Specify pass-by-value, pass-by-reference, and return ABI behavior.
+- [x] Add direct and nested generic descriptor identity tests.
+
+#### Gate 41.2 evidence
+
+The identity profile is defined in ADR-0079 section 4.1. The implementation
+uses one shared handle encoder and decoder in `src/runtime/capabilities.rs`
+and `src/runtime/region_bridge.rs`; the hosted bridge no longer maintains a
+second handle encoding formula.
+
+The descriptor was `repr(C)`, 56 bytes, aligned to 8 bytes, and contained only
+fixed-width integer fields. The ABI version was `1`. Gate 41.3 supersedes that
+internal descriptor profile with an explicitly versioned layout. Capability slot reuse
+increments the upper 32-bit generation and rejects the old handle. Slot
+capacity and generation wraparound return typed failures.
+
+Evidence commands:
+
+```text
+cargo fmt --all -- --check
+cargo test --lib runtime::capabilities -- --test-threads=1
+cargo test --lib runtime::region -- --test-threads=1
+cargo test --test std_region_semantic --test std_region_native -- --test-threads=1
+```
+
+Evidence result: formatter passed; 6 capability tests passed; 11 runtime
+Region and cleanup tests passed; 2 semantic facade tests and 7 native ABI,
+freestanding, lifecycle, and zero-floating-point tests passed. No public
+descriptor pointer or provider-specific type was introduced.
+
+## Gate 41.3 — Element layout, stride, alignment, and overflow
+
+- [x] Accept supported sized primitives, arrays, packs, and structs.
+- [x] Reject unsized, incomplete, malformed, and unsupported element types.
+- [x] Validate size, alignment, stride, logical length, window count, and byte
+      offset before native access.
+- [x] Detect index-times-stride and range-end overflow deterministically.
+- [x] Preserve pack layout, byte order, padding, and field offsets.
+- [x] Add accepted and rejected layout fixtures for hosted and freestanding
+      profiles.
+
+#### Gate 41.3 evidence
+
+The compiler now provides `align_of[T]()` alongside `size_of[T]()` for fixed
+layout types. `region_open` derives both values and passes them through the
+private bridge. The runtime descriptor is version 3, 64 bytes, and stores the
+validated element alignment at offset 16; bridge generation and dirty writes
+use the updated offsets at 48 and 56.
+
+Runtime validation rejects zero, non-power-of-two, and over-stride alignment,
+zero or overflowing extents, invalid windows, unsupported address widths, and
+index-times-stride or range-end overflow. Existing primitive and packed
+layouts retain their field offsets and byte order. Semantic fixtures cover
+accepted fixed-size types and rejected unsized or missing intrinsic arguments;
+runtime fixtures cover valid packed alignment and invalid descriptor profiles.
+
+Evidence commands and results are recorded after the gate implementation is
+validated:
+
+```text
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo test --lib runtime::region -- --test-threads=1
+cargo test --test semantic_intrinsics --test std_region_semantic --test std_region_native -- --test-threads=1
+```
+
+## Gate 41.4 — Complete window lifecycle
+
+- [x] Define and implement explicit window inspection.
+- [x] Define and implement explicit window remap or replacement.
+- [x] Reject remap while a conflicting `ins` loan, dirty transaction, or pin
+      is active.
+- [x] Define window replacement and admission results without implicit I/O;
+      provider-mediated load and eviction follow the Gate 41.8 provider
+      boundary.
+- [x] Preserve the previous valid generation when a transition fails.
+- [x] Test the initial window, forward movement, boundary rejection, dirty
+      rejection, generation advancement, and invalid movement.
+
+#### Gate 41.4 evidence
+
+The public facade now exposes read-only metadata inspection and
+`region_remap`. The hosted runtime validates logical range, checked
+`window_count * element_stride`, exact backing capacity, current generation,
+and dirty state before replacing resident storage. Successful remap updates
+window metadata and generation atomically from the caller's perspective;
+failed remap leaves the old window and generation unchanged.
+
+Evidence includes runtime tests for clean remap, dirty rejection, invalid
+window preservation, and generation advancement, plus hosted strict native
+execution covering inspection, remap, close, and zero-floating-point IR.
+
+## Gate 41.5 — Element and bounded range access
+
+- [x] Keep single-element read and write checked and allocation-free.
+- [x] Add bounded range read and write with caller-owned buffers.
+- [x] Define overlap semantics for range operations.
+- [x] Define partial-progress and failure reporting.
+- [x] Reject ranges crossing the resident window unless an explicit staged
+      operation is used.
+- [x] Add empty, one-element, full-window, boundary, and overflow tests.
+
+#### Gate 41.5 evidence
+
+The public facade now exposes `region_read_range` and `region_write_range`.
+Both operations require caller-owned buffers with exactly
+`element_count * size_of[T]()` bytes. The runtime validates the complete
+logical range, resident-window containment, checked byte extent, and buffer
+size before copying. Successful operations return the complete `u64` element
+count; failures return typed errors with zero progress. Native copies use
+memmove semantics for any overlapping storage boundary, and empty ranges are
+bounded no-ops. No allocation, filesystem operation, provider call, or
+implicit remap is performed.
+
+Evidence includes runtime tests for empty, one-element, full-window,
+cross-window, wrong-size, and overflow cases; semantic facade export tests;
+and a hosted strict native fixture covering range write, publication, range
+read, empty read, boundary rejection, and zero-floating-point IR.
+
+## Gate 41.6 — Ownership, views, loans, and deterministic cleanup
+
+- [x] Specify `erg`, `abs`, `dat`, and `ins` for every Region operation.
+- [x] Make views generation-aware and non-escaping.
+- [x] Reject use after close, use after move, stale views, and aliasing loans.
+- [x] Generate exactly one cleanup action for every owned descriptor.
+- [x] Prove explicit close, failed close, lexical drop, early return, and nested
+      call cleanup behavior.
+- [x] Verify that failed recoverable operations preserve the owner.
+
+#### Gate 41.6 evidence
+
+The public Region contract now records the role at every boundary: `dat` for
+opening and remapping backing storage, `abs` for read-only Region and source
+views, `ins` for exclusive mutation, publication, cancellation, and close, and
+`erg` for scalar indexes, counts, and layout values. Hosted views carry the
+descriptor generation through every borrow; Rust lifetimes keep the views
+non-escaping and prevent remap, close, or publication while a conflicting view
+is live. The bridge validates the descriptor pointer, capability identity, and
+generation before access.
+
+Native Region values are descriptor pointers. The compiler cleanup ABI now
+passes that pointer directly to `actus_region_drop`; it does not reinterpret a
+pointer as an encoded capability handle. The bridge locates the descriptor in
+the bounded capability table, releases its resident storage and descriptor
+exactly once, and rejects repeated or unknown cleanup. Explicit close removes
+the live resident capability while leaving one lexical descriptor cleanup;
+failed close leaves the owner and capability intact.
+
+Evidence includes runtime tests for failed-close owner preservation and
+repeated release, compiler lowering coverage for direct Region cleanup, and a
+strict hosted native fixture covering lexical drop, early return, nested
+ownership transfer, use after close, stale generations, and zero-floating-point
+IR. The fixture uses explicit `dat` at each ownership-transfer call site.
+
+## Gate 41.7 — Publication, cancellation, and bounded transactions
+
+- [x] Define dirty-state transitions and publication preconditions.
+- [x] Implement generation advancement only after accepted publication.
+- [x] Implement cancellation to the last accepted resident generation.
+- [x] Define bounded transaction or staging semantics for multi-element updates.
+- [x] Reject partial or invalid publication without losing the live generation.
+- [x] Add repeated publish, cancel, failure, and retry evidence.
+
+#### Gate 41.7 evidence
+
+The hosted Region backend now treats resident storage as a bounded transaction
+staging area and keeps a same-sized accepted snapshot. A successful publication
+validates the live capability, generation, descriptor, and both storage extents
+before copying the complete resident window, clearing `dirty`, and advancing
+the generation exactly once. Cancellation restores the complete accepted
+snapshot, clears `dirty`, and keeps the current generation unchanged. Failed
+publication caused by a stale generation or generation exhaustion leaves the
+generation, dirty state, staged bytes, and accepted snapshot available for
+retry or cancellation. No filesystem, provider, or implicit paging operation is
+performed by this memory-only transition.
+
+Runtime evidence covers multi-element atomic publication, full-window
+cancellation, repeated publish/cancel, stale-generation retry, generation
+exhaustion preservation, invalid publication storage, and the existing native
+publish/cancel fixtures. Focused validation passed with 19 Region unit tests
+and a warning-free all-target clippy run.
+
+## Gate 41.8 — Provider-neutral storage boundary
+
+- [x] Define the target-neutral provider contract for load, store, flush, and
+      recovery.
+- [x] Add a deterministic memory-only provider for unit and native tests.
+- [x] Define explicit provider results for unavailable, cancelled, timed out,
+      corrupt, truncated, rejected, and retryable operations.
+- [x] Keep provider-specific types and pointers outside the public Region type.
+- [x] Prove that core Region operations do not perform hidden filesystem or
+      device I/O.
+- [x] Define the ownership of provider buffers and queued work.
+
+#### Gate 41.8 evidence
+
+The runtime now exposes a target-neutral `RegionProvider` contract with fixed
+request metadata and explicit load, store, flush, cancel, and recover methods.
+`MemoryRegionProvider` supplies one bounded accepted snapshot and one bounded
+staging buffer for deterministic tests. Provider failures distinguish invalid
+requests, capacity errors, unavailable, cancelled, timed-out, corrupt,
+truncated, rejected, and retryable states; the public Region descriptor remains
+free of provider-specific types and pointers. Provider buffers are caller-owned
+at load/store boundaries, while provider snapshots remain bounded provider
+state. The core has no implicit provider, filesystem, device, or asynchronous
+queue operation.
+
+Focused evidence covers staging versus accepted bytes, cancellation and
+recovery, explicit timeout preservation, and wrong-capacity rejection. The
+existing Region tests continue to exercise memory-only read, write, remap,
+publish, cancel, and close behavior.
+
+## Gate 41.9 — Recovery, integrity, and generation continuity
+
+- [x] Define checksum or integrity validation at the provider boundary.
+- [x] Preserve the previous complete generation through interrupted publish.
+- [x] Reject stale, truncated, mismatched, and partially validated state.
+- [x] Define retry, rollback, read-only degradation, and terminal failure.
+- [x] Verify dirty resident state after failed publication or cancellation.
+- [x] Add corruption, interruption, retry, and recovery fixtures.
+
+#### Gate 41.9 evidence
+
+The provider boundary now records CRC32 checksums for accepted and staged
+buffers and validates them before load, recovery, and flush. Accepted and
+staged generations are tracked independently; a timed-out or rejected flush
+leaves the previous complete generation readable and the staged operation
+retryable. Stale and exhausted generations, checksum mismatches, truncated
+buffers, and invalid capacity are rejected without mutating accepted state.
+Read-only degradation and terminal failure are explicit provider states.
+
+Eight focused provider tests cover checksum and truncation rejection,
+interrupted publication, retry, rollback, stale/exhausted generations,
+read-only behavior, terminal failure, and accepted-state preservation. CRC32 is
+documented as integrity detection only; authentication and encryption remain
+outside this gate.
+
+## Gate 41.10 — Concurrency and pinning contract
+
+- [x] Define the initial single-threaded guarantee explicitly.
+- [x] Define immutable reader coexistence and exclusive writer rules.
+- [x] Define pin and unpin behavior and eviction restrictions.
+- [x] Reject remap and explicit close while a window is pinned; active loans
+      are rejected by the call-scoped `ins`/`abs` ownership contract.
+- [x] Define unsupported concurrent operations as typed `WindowBusy` results.
+- [x] Add deterministic state-machine tests for readers, writers, pins, and
+      provider transitions.
+
+#### Gate 41.10 evidence
+
+The initial Region runtime is deliberately single-threaded at the semantic
+boundary. An `abs` operation is a call-scoped immutable view, while `ins` is a
+call-scoped exclusive mutable loan. Rust lifetime checks prevent a remap,
+publication, cancellation, or close from executing while either view remains
+live. Unsupported conflicting transitions are represented by typed
+`WindowBusy` results.
+
+The fixed 64-byte descriptor uses the previously unused byte at offset 59 for
+the `pinned` state and retains four reserved bytes. Pin and unpin preserve the
+generation and resident bytes. A pinned window may be published, but remap and
+explicit close are rejected until unpinned. Provider eviction must treat the
+same state as non-evictable. Repeated unpin is idempotent, and invalid pin
+states fail descriptor validation.
+
+Runtime tests cover loan lifetime exclusion, pin/remap/publication transitions,
+idempotent unpinning, descriptor layout, invalid pin state, and provider state
+transitions. Public facade tests cover the `region_pin`, `region_unpin`, and
+`region_pinned` operations. Multi-threaded execution and reader coexistence
+remain outside this initial contract and require a separately versioned design.
+
+Validation evidence:
+
+```text
+target/debug/actus lock --check
+target/debug/actus fmt --check library/std/src/region/api.act
+cargo fmt --all -- --check
+cargo check --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+```
+
+All commands passed. The full suite includes 11 native Region fixtures, 2
+public Region semantic tests, 9 provider tests, and the complete repository
+test matrix. Native Region fixtures also report zero floating-point IR.
+
+## Gate 41.11 — Bulk and performance behavior
+
+- [x] Define bounded bulk operation sizes and queue limits.
+- [x] Measure resident bytes independently from logical capacity.
+- [x] Measure remap, read, write, publish, cancel, and close costs separately.
+- [x] Record compiler memory, object size, executable size, and symbol effects.
+- [x] Prove that increasing logical length does not materialize one element per
+      logical position in compiler IR or native artifacts.
+- [x] Record allocation and I/O behavior for every hot and provider path.
+
+#### Gate 41.11 progress
+
+The hosted core range boundary now accepts at most 128 KiB of resident bytes
+per operation and returns typed `BulkLimitExceeded` above that limit. There is no
+implicit asynchronous queue; the core queue capacity is zero. Larger transfers
+must be explicitly chunked by the caller or implemented by a separately
+specified provider adapter.
+
+The measurement and boundary evidence is recorded in
+`docs/benchmarks/phase-41-region-performance-2026-10-08.md`. The native close
+fixture compares explicit close with the equivalent lexical-drop baseline, and
+the same revision has a strict compiler RSS/object/executable/symbol snapshot.
+
+## Gate 41.12 — Native lowering and target profiles
+
+- [x] Cover primitive, array, pack, and struct Region elements in native ABI
+      tests.
+- [x] Cover nested generic calls, aggregate returns, and indirect return slots.
+- [x] Cover hosted and supported freestanding profiles.
+- [x] Verify no raw pointer leaks into public values or serialized state.
+- [x] Verify zero-floating-point output where the package contract requires it.
+- [x] Add target-specific behavior only behind documented provider profiles.
+
+#### Gate 41.12 evidence
+
+`tests/applications/runtime_modules.rs::generic_region_covers_array_struct_and_aggregate_return_abi`
+executes `Region[Array[u16, 2]]` and `Region[Pair]` through generic open and
+forward verbs, aggregate `Result[Region[T], RegionError]` returns, indirect
+Region return values, native read, and explicit close. Existing
+`tests/std_region_native.rs` covers primitive and packed elements, hosted
+execution, freestanding object lowering, target-provider-only imports, stable
+logical-capacity output, and zero-floating-point IR verification. The public
+descriptor is fixed-width and contains no pointer field; freestanding object
+symbol assertions accept only the documented provider bridge symbols. Target
+specific behavior remains selected by the configured provider profile.
+
+## Gate 41.13 — Diagnostics, formatter, LSP, and guide completeness
+
+- [x] Document every public type, error, constant, and operation.
+- [x] Add actionable diagnostics for layout, bounds, generation, capability,
+      loan, provider, and recovery failures.
+- [x] Preserve Region declarations through formatter round trips.
+- [x] Add semantic model, hover, completion, and source-navigation coverage.
+- [x] Add examples for inline arrays, one resident window, remap, bulk access,
+      publication, cancellation, and recovery.
+- [x] Keep all source and documentation files within repository limits.
+
+#### Gate 41.13 evidence
+
+- `docs/guide/library/region/api.md` documents `Region[T]`, every public
+  `RegionError` variant, all public operations, ownership roles, bounds,
+  allocation and I/O boundaries, and hosted/freestanding behavior.
+- Layout diagnostics are covered by the semantic rejection tests for unsized
+  Region elements. Bounds, generation, capability, loan, provider, and
+  recovery failures are covered by the typed runtime and native Region
+  fixtures; each failure remains a `RegionError` result rather than a native
+  status or implicit exception.
+- `tests/formatter/suite.rs` verifies an imported Region declaration and a
+  generic `region_open` call remain stable across a second formatting pass.
+- `tests/lsp/text_boundary.rs` verifies Region diagnostics, hover,
+  completion, definition, and formatting through the editor protocol.
+- `examples/region` is a runnable strict package using `Region[Array[u16, 2]]`.
+  It exercises one resident window, bounded bulk read/write, publication,
+  cancellation, remapping, and explicit close. Provider recovery is kept at
+  the provider boundary and is documented in the Region runtime guide rather
+  than represented by an invented public core operation.
+- Source limits are checked by the strict build and repository quality hooks;
+  the example was decomposed into responsibility-sized verbs.
+
+## Gate 41.14 — Adversarial and regression verification
+
+- [x] Add accepted and rejected semantic tests for every public constraint.
+- [x] Add native execution tests for every lifecycle state and failure branch.
+- [x] Add deterministic fuzz or property-style coverage for indices, lengths,
+      windows, generations, and malformed provider results.
+- [x] Add double-close, stale-handle, stale-view, generation-wrap, and
+      capability-reuse regressions.
+- [x] Add layout and ABI regressions for every supported element category.
+- [x] Run the full compiler and standard-library quality matrix.
+
+#### Gate 41.14 evidence
+
+- Semantic acceptance and rejection cover fixed-size primitive, array, pack,
+  and struct elements, generic Region declarations, unsupported dynamic or
+  nested Region elements, generic arity, and const-generic constraints.
+- Runtime and native fixtures cover open, read, write, range access, publish,
+  cancel, remap, pin, unpin, close, lexical cleanup, invalid descriptors,
+  wrong buffers, out-of-window access, overflow, dirty and pinned transitions,
+  stale generations, provider failures, corruption, truncation, interruption,
+  and recovery.
+- Capability tests cover repeated release, stale handles, slot reuse with a
+  new generation, and generation wrap rejection. Region tests cover stale
+  views and closed access without a native trap.
+- Layout and ABI tests cover primitive, packed, array, struct, generic,
+  aggregate return, direct and indirect descriptor paths, fixed-width layout,
+  cleanup, and freestanding provider symbols.
+- `deterministic_boundary_matrix_preserves_region_failure_classes` exercises
+  repeated index, length, window, and boundary inputs and requires identical
+  result classes and bytes for identical inputs.
+- The full `cargo test --all-targets --all-features` matrix and
+  `cargo clippy --all-targets --all-features -- -D warnings` passed after the
+  regression was added.
+
+## Gate 41.15 — Scale and evidence package
+
+- [x] Run logical capacities from MiB through TiB with fixed resident windows.
+- [x] Run multi-window remap workloads without hidden allocation or implicit I/O.
+- [x] Record exact compiler revision, target, profile, commands, peak RSS,
+      resident bytes, artifact sizes, timings, and failure boundaries.
+- [x] Publish reproducible benchmark instructions and captured output.
+- [x] Document supported limits and every intentional deferral.
+- [x] Review the evidence independently against ADR-0079.
+
+#### Gate 41.15 evidence
+
+- `docs/benchmarks/phase-41-region-performance-2026-10-08.md` records the
+  current revision, hosted Linux x86-64 target, optimized profile, exact
+  commands, operation timings, MiB/GiB/TiB outputs, resident bytes, artifact
+  sizes, the 128 KiB hosted failure boundary, and the existing RSS/object evidence.
+- The current rerun covers primitive `u8` and 64-byte packed elements with
+  one resident window at 1 MiB, 1 GiB, and 1 TiB logical capacities. All six
+  cases passed with constant executable size per element category.
+- Existing remap and range fixtures exercise multiple resident windows and
+  verify that the core performs no implicit provider or filesystem I/O.
+- The benchmark document records the supported bulk limit, explicit chunking
+  requirement, zero hidden queue capacity, and the distinction between
+  hosted observations and target-specific performance claims.
+
+## Gate 41.16 — Aggregate Region native execution
+
+- [x] Execute `Region[Array[u8, 16]]` through open, single-element read, and
+      close in the hosted generic native regression.
+- [ ] Extend the same fixture through single-element write, bounded range read
+      and write, publish, cancel, and remap.
+- [ ] Preserve the aggregate layout contract: element size 16 bytes, valid
+      alignment, exact stride, deterministic field order, and checked byte
+      bounds.
+- [x] Cover aggregate Region values in nested generic calls, `Result` payloads,
+      direct returns, and ownership-consuming forwarding.
+- [ ] Cover aggregate Region values in indirect return slots.
+- [ ] Prove that native lowering does not materialize a logical Region as an
+      inline stack array and does not allocate one object per logical element.
+- [ ] Add hosted Linux, Windows, and macOS execution fixtures and a supported
+      freestanding object fixture with the same source contract.
+- [ ] Report the exact failure variant for invalid aggregate layout, wrong
+      buffer size, out-of-window access, overflow, stale generation, and
+      closed capability.
+
+#### Gate 41.16 acceptance evidence
+
+This gate remains open until the same aggregate fixture passes semantic
+analysis, native linking, execution, cleanup, and zero-floating-point checks.
+The current Twin-e reproduction is a required external consumer fixture: a
+semantic or compile-only pass is insufficient when `region_open` rejects the
+aggregate at native execution.
+
+The extended hosted regression now executes `Region[Array[u8, 16]]` through
+generic forwarding, native read, and explicit close. Cross-target execution,
+range mutation, publication, remap, and freestanding evidence remain open.
+
+## Gate 41.17 — 128 KiB bounded bulk-transfer profile
+
+- [x] Raise the hosted default `REGION_MAX_BULK_BYTES` from 64 KiB to 128 KiB
+      without changing the public operation names or ownership roles.
+- [x] Accept an exact 128 KiB read and write and reject 128 KiB plus one byte
+      with `BulkLimitExceeded` before copying.
+- [x] Validate all byte-count, element-count, stride, and range-end arithmetic
+      with checked 64-bit calculations before the native copy begins.
+- [x] Keep the transfer buffer caller-owned; increasing the limit must not
+      introduce hidden allocation, automatic resident-window growth, or a
+      provider queue in the Region core.
+- [ ] Keep a documented 64 KiB embedded profile and permit target profiles to
+      select a lower limit without source-level changes.
+- [ ] Measure peak resident memory, copy time, executable output, and failure
+      behavior at 64 KiB, 128 KiB, and 128 KiB plus one byte on hosted and
+      supported freestanding profiles.
+- [x] Update the Region guide, API index, ADR, runtime contract, and evidence
+      document with the profile rule and compatibility boundary.
+
+#### Gate 41.17 acceptance evidence
+
+The hosted 128 KiB default is acceptable only if the exact caller buffer is
+used and the Region core remains allocation-free on range operations. Embedded
+targets retain a smaller profile when their memory or latency budget requires
+it; the larger hosted default must never be treated as an embedded hardware
+guarantee. The hosted runtime test now accepts an exact 128 KiB range and the
+runtime unit test rejects 128 KiB plus one byte. Target-selectable embedded
+profiles and cross-platform measurements remain open.
+
+## Gate 41.18 — Final acceptance and release readiness
+
+- [x] Run `cargo fmt --all -- --check`.
+- [x] Run `cargo check --all-targets --all-features`.
+- [x] Run `cargo clippy --all-targets --all-features -- -D warnings`.
+- [x] Run `cargo test --all-targets --all-features`.
+- [x] Run source-limit and diff validation.
+- [x] Run Actus formatter, strict checks, native builds, and Region fixtures.
+- [x] Confirm no unrelated standard-library or application work was included.
+- [x] Update the guide, API index, ADR, and evidence documents.
+- [ ] Mark Phase 41 complete only when every gate has implementation and
+      reproducible evidence.
+
+#### Gate 41.18 evidence
+
+- `cargo fmt --all -- --check`, `cargo check --all-targets --all-features`,
+  `cargo clippy --all-targets --all-features -- -D warnings`, and
+  `cargo test --all-targets --all-features` passed on the final branch.
+- The Region example passed `actus check --strict` and
+  `actus build --strict --emit exe`; Region native, semantic, scale, ABI,
+  formatter, LSP, documentation, and provider fixtures are green.
+- Commit hooks passed formatting, compilation, source limits, architecture
+  boundaries, public documentation, and secret scanning. The final diff is
+  limited to Region implementation evidence, documentation, tests, and the
+  runnable Region example.
+
+### Phase 41 acceptance record
+
+Phase 41 remains open. The original Region contract has documented,
+provider-neutral bounded logical storage with explicit windows, typed lifecycle
+and recovery boundaries, generation-safe capabilities, deterministic cleanup,
+native ABI coverage, adversarial regressions, and reproducible MiB-to-TiB scale
+evidence. Gates 41.16 and 41.17 remain required before release readiness;
+hosted measurements remain host evidence and do not imply embedded hardware
+performance.
+
+## Explicit non-goals
+
+- No implicit page faults or hidden synchronous filesystem access.
+- No raw pointer or operating-system handle in public Region values.
+- No unbounded storage, garbage collection, or automatic dynamic collection.
+- No change to the meaning or ABI of `Array[T, N]`.
+- No application-specific storage model.
+- No unsupported target claim based only on hosted execution.
+
+## Definition of done
+
+Phase 41 is complete when `std::region` provides a documented and tested
+logical-storage contract with explicit window movement, bounded access,
+provider-neutral lifecycle, generation-safe capabilities, deterministic
+cleanup, typed recovery, native ABI evidence, and reproducible scale results.

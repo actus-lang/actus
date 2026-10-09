@@ -183,6 +183,26 @@ fn wire_endpoint_example_builds_and_runs_optional_address_path() {
 
 #[cfg(unix)]
 #[test]
+fn region_example_builds_and_runs_the_checked_lifecycle_path() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/region");
+    let output =
+        std::env::temp_dir().join(format!("actus-region-example-{}.bin", std::process::id()));
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .current_dir(&root)
+        .args(["build", "--strict", "--emit", "exe", "-o"])
+        .arg(&output)
+        .output()
+        .expect("build std::region example");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let execution = std::process::Command::new(&output).output().expect("run std::region example");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
 fn monotonic_time_example_builds_runs_and_emits_no_float_ir() {
     let root = std::env::temp_dir().join(format!("actus-monotonic-example-{}", std::process::id()));
     let output = root.join("monotonic-time-example");

@@ -176,10 +176,21 @@ fn region_generic_types(
                 instance.name.as_str(),
                 "region_open"
                     | "region_read"
+                    | "region_read_range"
                     | "region_write"
+                    | "region_write_range"
                     | "region_publish"
                     | "region_cancel"
                     | "region_close"
+                    | "region_remap"
+                    | "region_logical_length"
+                    | "region_window_start"
+                    | "region_window_count"
+                    | "region_generation"
+                    | "region_dirty"
+                    | "region_pin"
+                    | "region_unpin"
+                    | "region_pinned"
             )
         })
         .flat_map(|instance| instance.arguments.iter().cloned())

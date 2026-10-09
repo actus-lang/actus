@@ -14,10 +14,21 @@ fn region_facade_exports_checked_public_operations() {
     let exports = exports_module(&resolver, "region").expect("std region facade should resolve");
     assert!(exports.contains("verb", "region_open"));
     assert!(exports.contains("verb", "region_read"));
+    assert!(exports.contains("verb", "region_read_range"));
     assert!(exports.contains("verb", "region_write"));
+    assert!(exports.contains("verb", "region_write_range"));
     assert!(exports.contains("verb", "region_publish"));
     assert!(exports.contains("verb", "region_cancel"));
     assert!(exports.contains("verb", "region_close"));
+    assert!(exports.contains("verb", "region_remap"));
+    assert!(exports.contains("verb", "region_logical_length"));
+    assert!(exports.contains("verb", "region_window_start"));
+    assert!(exports.contains("verb", "region_window_count"));
+    assert!(exports.contains("verb", "region_generation"));
+    assert!(exports.contains("verb", "region_dirty"));
+    assert!(exports.contains("verb", "region_pin"));
+    assert!(exports.contains("verb", "region_unpin"));
+    assert!(exports.contains("verb", "region_pinned"));
     assert!(exports.contains("enum", "RegionError"));
     analyze_module(&resolver, "region").expect("std region declarations should be valid");
 }

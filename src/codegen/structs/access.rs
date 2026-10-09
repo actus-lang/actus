@@ -413,7 +413,7 @@ fn store_struct_field(
             .type_size(field_layout.ty)
             .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
         let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
-        copy_bytes(function, value, destination, size);
+        copy_bytes(function, value, destination, size, layouts)?;
     } else {
         function.ins().store(MemFlagsData::new(), value, address, field_layout.offset as i32);
     }

@@ -9,6 +9,7 @@ pub enum IntrinsicKind {
     Print,
     Drop,
     SizeOf,
+    AlignOf,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,11 +72,14 @@ impl IntrinsicKind {
                 parameters: &["binding"],
                 status: RegistryStatus::Active,
             },
-            Self::SizeOf => {
-                IntrinsicSpec { name: "size_of", parameters: &[], status: RegistryStatus::Active }
-            }
+            Self::SizeOf => layout_spec("size_of"),
+            Self::AlignOf => layout_spec("align_of"),
         }
     }
+}
+
+const fn layout_spec(name: &'static str) -> IntrinsicSpec {
+    IntrinsicSpec { name, parameters: &[], status: RegistryStatus::Active }
 }
 
 pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
@@ -89,6 +93,7 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
         "print" => Some(IntrinsicKind::Print),
         "drop" => Some(IntrinsicKind::Drop),
         "size_of" => Some(IntrinsicKind::SizeOf),
+        "align_of" => Some(IntrinsicKind::AlignOf),
         _ => None,
     }
 }
@@ -104,7 +109,8 @@ pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
             | IntrinsicKind::ValidateFixedFrame
             | IntrinsicKind::Copy
             | IntrinsicKind::Print
-            | IntrinsicKind::SizeOf,
+            | IntrinsicKind::SizeOf
+            | IntrinsicKind::AlignOf,
         ) => lookup_intrinsic(base_name),
         Some(IntrinsicKind::Drop) | None => None,
     }

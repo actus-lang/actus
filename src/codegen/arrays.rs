@@ -87,7 +87,7 @@ pub(super) fn lower_array_assignment(
         let size = layouts
             .type_size(element)
             .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
-        copy_bytes(function, value, address, size);
+        copy_bytes(function, value, address, size, layouts)?;
     } else {
         let value = coerce_to_ir_type(function, value, layouts.ir_type(element)?);
         let value = swap_indexed_pack_element_if_needed(

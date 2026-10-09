@@ -182,6 +182,28 @@ fn formats_the_public_wire_checksum_surface_idempotently() {
 }
 
 #[test]
+fn formats_the_public_region_surface_idempotently() {
+    let source = concat!(
+        "import std::region;\n",
+        "verb main() -> Int {\n",
+        "erg backing: Buffer = Buffer[4];\n",
+        "erg length: u64 = 1u64;\n",
+        "erg start: u64 = 0u64;\n",
+        "erg count: u64 = 1u64;\n",
+        "erg opened = region_open[u32](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count);\n",
+        "return 0;\n",
+        "}\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("import std::region;"));
+    assert!(formatted.contains("region_open[u32]("));
+    assert!(formatted.contains("backing: dat backing"));
+    assert!(formatted.contains("window_count: erg count"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_const_generic_declarations_without_changing_meaning() {
     let formatted = format_source(
         "struct Fabric[N: Usize] { cells: Array[Int, N], } verb main() -> Bool { return false; }",

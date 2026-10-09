@@ -185,6 +185,7 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
             if let Some(array) = parse_array_type_name(callee) {
                 collect_type_arrays(&array, definitions);
             }
+            collect_layout_intrinsic_arrays(callee, definitions);
             arguments
                 .iter()
                 .for_each(|argument| collect_expression_arrays(&argument.expression, definitions));
@@ -237,29 +238,26 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
     }
 }
 
+fn collect_layout_intrinsic_arrays(callee: &str, definitions: &mut Vec<TypeName>) {
+    if !callee.starts_with("size_of[") && !callee.starts_with("align_of[") {
+        return;
+    }
+    let Some(type_name) = callee
+        .split_once('[')
+        .and_then(|(_, application)| application.strip_suffix(']'))
+        .and_then(|application| {
+            crate::semantic::parse_type_name_key(application, crate::lexer::SourceSpan::new(0, 0))
+        })
+    else {
+        return;
+    };
+    collect_type_arrays(&type_name, definitions);
+}
+
 fn parse_array_type_name(text: &str) -> Option<TypeName> {
-    let inner = text.strip_prefix("Array[")?.strip_suffix(']')?;
-    let (element, capacity) = inner.split_once(',')?;
-    let span = crate::lexer::SourceSpan::new(0, 0);
-    Some(TypeName {
-        name: "Array".to_owned(),
-        arguments: vec![
-            TypeName {
-                name: element.trim().to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
-            TypeName {
-                name: capacity.trim().to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
-        ],
-        reference_role: None,
-        span,
-    })
+    let type_name =
+        crate::semantic::parse_type_name_key(text, crate::lexer::SourceSpan::new(0, 0))?;
+    (type_name.name == "Array" && type_name.arguments.len() == 2).then_some(type_name)
 }
 
 impl LayoutRegistry {

@@ -49,7 +49,10 @@ fn infer_complex_initializer_type(
     match expression {
         Expr::Try { expression, .. } => infer_try_type(expression, types, functions, layouts),
         Expr::Call { callee, arguments, .. } => {
-            if lookup_call_intrinsic(callee) == Some(IntrinsicKind::SizeOf) {
+            if matches!(
+                lookup_call_intrinsic(callee),
+                Some(IntrinsicKind::SizeOf | IntrinsicKind::AlignOf)
+            ) {
                 return Ok(NativeType::Integer { signed: false, width: 64 });
             }
             infer_call_type(callee, arguments, types, functions, layouts)

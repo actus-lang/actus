@@ -2,10 +2,11 @@
 
 use std::ptr;
 
+use super::actus_enum_allocate;
 use super::allocation::take_buffer;
+use super::capabilities::decode_region_handle;
 use super::region::{InMemoryRegion, RegionDescriptor, RegionError, RegionHandle};
 use super::types::ActusBuffer;
-use super::{actus_enum_allocate, actus_enum_drop};
 
 const RESULT_OK: u32 = 0;
 const RESULT_ERR: u32 = 1;
@@ -15,12 +16,15 @@ const RESULT_REGION_SIZE: usize = 16;
 const RESULT_REGION_PAYLOAD_OFFSET: usize = 8;
 const RESULT_U64_PAYLOAD_OFFSET: usize = 8;
 const RESULT_INT_PAYLOAD_OFFSET: usize = 4;
-const REGION_GENERATION_OFFSET: usize = 40;
-const REGION_DIRTY_OFFSET: usize = 48;
+const REGION_WINDOW_START_OFFSET: usize = 32;
+const REGION_WINDOW_COUNT_OFFSET: usize = 40;
+const REGION_GENERATION_OFFSET: usize = 48;
+const REGION_DIRTY_OFFSET: usize = 56;
 
-static REGION_STORE: std::sync::Mutex<RegionStore> = std::sync::Mutex::new(RegionStore::new());
+pub(crate) static REGION_STORE: std::sync::Mutex<RegionStore> =
+    std::sync::Mutex::new(RegionStore::new());
 
-struct RegionStore {
+pub(super) struct RegionStore {
     slots: [Option<InMemoryRegion>; super::capabilities::REGION_CAPABILITY_CAPACITY],
     generations: [u32; super::capabilities::REGION_CAPABILITY_CAPACITY],
     descriptors: [Option<usize>; super::capabilities::REGION_CAPABILITY_CAPACITY],
@@ -35,10 +39,11 @@ impl RegionStore {
         }
     }
 
-    fn allocate(
+    pub(super) fn allocate(
         &mut self,
         backing: Vec<u8>,
         element_stride: u64,
+        element_alignment: u64,
         logical_length: u64,
         window_start: u64,
         window_count: u64,
@@ -54,11 +59,12 @@ impl RegionStore {
         let generation = self.generations[index]
             .checked_add(1)
             .ok_or(RegionError::CapabilityGenerationExhausted)?;
-        let handle = ((u64::from(generation)) << 32) | (index as u64 + 1);
+        let handle = super::capabilities::encode_region_handle(index, generation);
         let region = InMemoryRegion::from_backing(
             handle,
             backing,
             element_stride,
+            element_alignment,
             logical_length,
             window_start,
             window_count,
@@ -69,7 +75,10 @@ impl RegionStore {
         Ok(descriptor)
     }
 
-    fn get_mut(&mut self, handle: RegionHandle) -> Result<&mut InMemoryRegion, RegionError> {
+    pub(crate) fn get_mut(
+        &mut self,
+        handle: RegionHandle,
+    ) -> Result<&mut InMemoryRegion, RegionError> {
         let index = decode_store_handle(handle)?;
         let region = self.slots[index].as_mut().ok_or(RegionError::InvalidHandle)?;
         if region.descriptor().handle != handle {
@@ -78,7 +87,7 @@ impl RegionStore {
         Ok(region)
     }
 
-    fn attach_descriptor(
+    pub(super) fn attach_descriptor(
         &mut self,
         handle: RegionHandle,
         descriptor: *mut RegionDescriptor,
@@ -103,16 +112,34 @@ impl RegionStore {
         self.descriptors[index].take().ok_or(RegionError::InvalidHandle).map(Some)
     }
 
-    fn close(&mut self, handle: RegionHandle, descriptor: usize) -> Result<(), RegionError> {
+    fn remove_descriptor(&mut self, descriptor: usize) -> Result<Option<usize>, RegionError> {
+        let index = self
+            .descriptors
+            .iter()
+            .position(|candidate| *candidate == Some(descriptor))
+            .ok_or(RegionError::InvalidDescriptor)?;
+        let _ = self.slots[index].take();
+        Ok(self.descriptors[index].take())
+    }
+
+    pub(super) fn close(
+        &mut self,
+        handle: RegionHandle,
+        generation: u64,
+        descriptor: usize,
+    ) -> Result<(), RegionError> {
         let index = decode_store_handle(handle)?;
-        if self.slots[index].is_none() && self.descriptors[index] == Some(descriptor) {
-            return Ok(());
-        }
-        let region = self.slots[index].take().ok_or(RegionError::InvalidHandle)?;
+        let region = self.slots[index].as_ref().ok_or(RegionError::InvalidHandle)?;
         if region.descriptor().handle != handle || self.descriptors[index] != Some(descriptor) {
-            self.slots[index] = Some(region);
             return Err(RegionError::InvalidHandle);
         }
+        if region.descriptor().generation != generation {
+            return Err(RegionError::StaleGeneration);
+        }
+        if region.descriptor().pinned != 0 {
+            return Err(RegionError::WindowBusy);
+        }
+        self.slots[index].take().ok_or(RegionError::InvalidHandle)?;
         Ok(())
     }
 }
@@ -121,12 +148,7 @@ fn decode_store_handle(handle: RegionHandle) -> Result<usize, RegionError> {
     if handle == 0 {
         return Err(RegionError::InvalidHandle);
     }
-    let raw_index = (handle & u32::MAX as u64) as usize;
-    let generation = handle >> 32;
-    if raw_index == 0 || generation == 0 {
-        return Err(RegionError::InvalidHandle);
-    }
-    let index = raw_index - 1;
+    let (index, _) = decode_region_handle(handle)?;
     if index >= super::capabilities::REGION_CAPABILITY_CAPACITY {
         return Err(RegionError::InvalidHandle);
     }
@@ -150,7 +172,7 @@ fn allocate_result(size: usize, discriminant: u32) -> *mut u8 {
     result
 }
 
-fn error_result(size: usize, error: RegionError) -> *mut u8 {
+pub(crate) fn error_result(size: usize, error: RegionError) -> *mut u8 {
     let result = allocate_result(size, RESULT_ERR);
     if !result.is_null() {
         write_u32(result, RESULT_INT_PAYLOAD_OFFSET, error_code(error));
@@ -169,10 +191,14 @@ fn error_code(error: RegionError) -> u32 {
         RegionError::CapabilityExhausted => 6,
         RegionError::GenerationExhausted | RegionError::CapabilityGenerationExhausted => 7,
         RegionError::BackendFailure | RegionError::UnsupportedAddressWidth => 8,
+        RegionError::WindowBusy => 9,
+        RegionError::BulkLimitExceeded => 10,
     }
 }
 
-fn validate_descriptor(region: *const u8) -> Result<&'static RegionDescriptor, RegionError> {
+pub(crate) fn validate_descriptor(
+    region: *const u8,
+) -> Result<&'static RegionDescriptor, RegionError> {
     if region.is_null() {
         return Err(RegionError::InvalidDescriptor);
     }
@@ -183,12 +209,13 @@ fn validate_descriptor(region: *const u8) -> Result<&'static RegionDescriptor, R
 ///
 /// # Safety
 ///
-/// `handle` must be a capability value previously returned by the region
-/// runtime. Invalid or repeated handles are rejected without dereferencing it.
+/// `region` must be a descriptor pointer previously returned by the region
+/// runtime. Invalid or repeated descriptors are rejected without dereferencing
+/// an unknown pointer.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn actus_region_drop(handle: RegionHandle) -> i32 {
+pub unsafe extern "C" fn actus_region_drop(region: *mut u8) -> i32 {
     let Ok(mut store) = REGION_STORE.lock() else { return -1 };
-    let Ok(descriptor) = store.remove(handle) else {
+    let Ok(descriptor) = store.remove_descriptor(region as usize) else {
         return -1;
     };
     if let Some(descriptor) = descriptor {
@@ -202,6 +229,7 @@ pub unsafe extern "C" fn actus_region_drop(handle: RegionHandle) -> i32 {
 pub unsafe extern "C" fn actus_region_open(
     backing: *mut ActusBuffer,
     element_stride: u64,
+    element_alignment: u64,
     logical_length: u64,
     window_start: u64,
     window_count: u64,
@@ -213,8 +241,14 @@ pub unsafe extern "C" fn actus_region_open(
         Ok(store) => store,
         Err(_) => return error_result(RESULT_REGION_SIZE, RegionError::BackendFailure),
     };
-    match store.allocate(backing_bytes, element_stride, logical_length, window_start, window_count)
-    {
+    match store.allocate(
+        backing_bytes,
+        element_stride,
+        element_alignment,
+        logical_length,
+        window_start,
+        window_count,
+    ) {
         Ok(descriptor) => {
             let result = allocate_result(RESULT_REGION_SIZE, RESULT_OK);
             if result.is_null() {
@@ -340,12 +374,91 @@ pub unsafe extern "C" fn actus_region_cancel(region: *mut u8) -> *mut u8 {
     }
 }
 
+/// Replaces a clean resident window and advances its generation.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_remap(
+    region: *mut u8,
+    backing: *mut ActusBuffer,
+    window_start: u64,
+    window_count: u64,
+) -> *mut u8 {
+    let Some(descriptor) = validate_descriptor(region).ok() else {
+        return error_result(RESULT_U64_SIZE, RegionError::InvalidDescriptor);
+    };
+    let Some(backing_bytes) = (unsafe { take_buffer(backing) }) else {
+        return error_result(RESULT_U64_SIZE, RegionError::InvalidHandle);
+    };
+    match REGION_STORE.lock() {
+        Ok(mut store) => match store.get_mut(descriptor.handle).and_then(|backend| {
+            backend.remap(descriptor.generation, backing_bytes, window_start, window_count)
+        }) {
+            Ok(next) => {
+                unsafe {
+                    ptr::write_unaligned(
+                        region.add(REGION_WINDOW_START_OFFSET).cast::<u64>(),
+                        window_start,
+                    );
+                    ptr::write_unaligned(
+                        region.add(REGION_WINDOW_COUNT_OFFSET).cast::<u64>(),
+                        window_count,
+                    );
+                    ptr::write_unaligned(region.add(REGION_GENERATION_OFFSET).cast::<u64>(), next);
+                    ptr::write_unaligned(region.add(REGION_DIRTY_OFFSET), 0);
+                }
+                result_u64(next)
+            }
+            Err(error) => error_result(RESULT_U64_SIZE, error),
+        },
+        Err(_) => error_result(RESULT_U64_SIZE, RegionError::BackendFailure),
+    }
+}
+
+fn inspect_u64(region: *const u8, value: impl FnOnce(&RegionDescriptor) -> u64) -> *mut u8 {
+    match validate_descriptor(region) {
+        Ok(descriptor) => result_u64(value(descriptor)),
+        Err(error) => error_result(RESULT_U64_SIZE, error),
+    }
+}
+
+/// Returns the logical element count from a validated descriptor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_logical_length(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.logical_length)
+}
+
+/// Returns the first logical index in the resident window.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_window_start(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.window_start)
+}
+
+/// Returns the element count in the resident window.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_window_count(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.window_count)
+}
+
+/// Returns the current publication generation.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_generation(region: *const u8) -> *mut u8 {
+    inspect_u64(region, |descriptor| descriptor.generation)
+}
+
+/// Returns one when resident bytes are dirty.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_region_dirty(region: *const u8) -> *mut u8 {
+    match validate_descriptor(region) {
+        Ok(descriptor) => result_int(i32::from(descriptor.dirty)),
+        Err(error) => error_result(RESULT_INT_SIZE, error),
+    }
+}
+
 /// Closes a capability while leaving descriptor cleanup to lexical ownership teardown.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_region_close(region: *mut u8) -> *mut u8 {
     match validate_descriptor(region).and_then(|descriptor| {
         let mut store = REGION_STORE.lock().map_err(|_| RegionError::BackendFailure)?;
-        store.close(descriptor.handle, region as usize)?;
+        store.close(descriptor.handle, descriptor.generation, region as usize)?;
         Ok(())
     }) {
         Ok(()) => result_int(0),
@@ -353,7 +466,7 @@ pub unsafe extern "C" fn actus_region_close(region: *mut u8) -> *mut u8 {
     }
 }
 
-fn result_int(value: i32) -> *mut u8 {
+pub(crate) fn result_int(value: i32) -> *mut u8 {
     let result = allocate_result(RESULT_INT_SIZE, RESULT_OK);
     if !result.is_null() {
         unsafe { ptr::write_unaligned(result.add(RESULT_INT_PAYLOAD_OFFSET).cast::<i32>(), value) };
@@ -361,38 +474,10 @@ fn result_int(value: i32) -> *mut u8 {
     result
 }
 
-fn result_u64(value: u64) -> *mut u8 {
+pub(super) fn result_u64(value: u64) -> *mut u8 {
     let result = allocate_result(RESULT_U64_SIZE, RESULT_OK);
     if !result.is_null() {
         write_u64(result, RESULT_U64_PAYLOAD_OFFSET, value);
     }
     result
-}
-
-#[allow(dead_code)]
-fn release_result(result: *mut u8, size: usize) {
-    if !result.is_null() {
-        unsafe { actus_enum_drop(result, size) };
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{REGION_STORE, actus_region_drop};
-
-    #[test]
-    fn native_drop_releases_a_descriptor_once() {
-        let descriptor = {
-            let mut store = REGION_STORE.lock().expect("region store should not be poisoned");
-            let descriptor =
-                store.allocate(vec![0u8; 4], 4, 1, 0, 1).expect("region slot should allocate");
-            let handle = descriptor.handle;
-            let pointer = Box::into_raw(Box::new(descriptor));
-            store.attach_descriptor(handle, pointer).expect("descriptor should attach");
-            handle
-        };
-
-        assert_eq!(unsafe { actus_region_drop(descriptor) }, 0);
-        assert_eq!(unsafe { actus_region_drop(descriptor) }, -1);
-    }
 }

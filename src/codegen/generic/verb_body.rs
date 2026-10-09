@@ -213,7 +213,7 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
-    if callee.starts_with("size_of[") {
+    if callee.starts_with("size_of[") || callee.starts_with("align_of[") {
         let specialized = specialize_size_of_callee(callee, substitution);
         return Expr::Call { callee: specialized, arguments: Vec::new(), span: *span };
     }

@@ -120,6 +120,201 @@ fn hosted_std_region_operations_build_and_run() {
 }
 
 #[test]
+fn hosted_std_region_inspection_and_clean_remap_run_natively() {
+    let root = std::env::temp_dir().join(format!("actus-std-region-remap-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-remap-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_remap_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        r#"import std::region;
+verb check_start(abs region: Region[u32]) -> Int {
+    erg result = region_window_start(region: abs region);
+    return case dat result { Result.Err(_) => 1, Result.Ok(value) => if value == 0u64 { return 0; } else { return 2; }, };
+}
+
+verb check_generation(abs region: Region[u32]) -> Int {
+    erg result = region_generation(region: abs region);
+    return case dat result { Result.Err(_) => 1, Result.Ok(value) => if value == 2u64 { return 0; } else { return 2; }, };
+}
+verb main() -> Int {
+    erg backing: Buffer = Buffer[4];
+    erg logical_length: u64 = 4u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened {
+        Result.Err(_) => 20,
+        Result.Ok(region) => {
+            erg before = check_start(region: abs region);
+            if before != 0 { return 21; }
+            erg replacement: Buffer = Buffer[8];
+            erg replacement_start: u64 = 2u64;
+            erg replacement_count: u64 = 2u64;
+            erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg replacement_start, window_count: erg replacement_count);
+            return case dat remapped {
+                Result.Err(_) => 22,
+                Result.Ok(generation) => {
+                    if generation != 2u64 { return 23; }
+                    erg after = check_generation(region: abs region);
+                    if after != 0 { return 24; }
+                    erg closed = region_close(region: ins region);
+                    return case dat closed { Result.Err(_) => 25, Result.Ok(_) => 0, };
+                },
+            };
+        },
+    };
+}
+"#,
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "hosted Region remap build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("Region remap executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn hosted_std_region_bounded_ranges_run_natively() {
+    let root = std::env::temp_dir().join(format!("actus-std-region-range-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-range-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_range_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        r#"import std::region;
+verb verify_published(ins region: Region[u32]) -> Int {
+    erg published = region_publish(region: ins region);
+    return case dat published {
+        Result.Err(_) => 6,
+        Result.Ok(_) => {
+            erg destination: Buffer = Buffer[8];
+            erg read_start: u64 = 0u64;
+            erg range_count: u64 = 2u64;
+            erg read = region_read_range(region: abs region, start_index: erg read_start, element_count: erg range_count, destination: ins destination);
+            return case dat read {
+                Result.Err(_) => 7,
+                Result.Ok(count) => {
+                    if count != 2u64 { return 8; }
+                    erg empty: Buffer = Buffer[0];
+                    erg empty_start: u64 = 4u64;
+                    erg empty_count: u64 = 0u64;
+                    erg no_op = region_read_range(region: abs region, start_index: erg empty_start, element_count: erg empty_count, destination: ins empty);
+                    return case dat no_op { Result.Err(_) => 9, Result.Ok(empty_result) => if empty_result == 0u64 { return 0; } else { return 10; }, };
+                },
+            };
+        },
+    };
+}
+verb verify_ranges(ins region: Region[u32], abs source: Buffer) -> Int {
+    erg crossing_start: u64 = 1u64;
+    erg range_count: u64 = 2u64;
+    erg crossing = region_write_range(region: ins region, start_index: erg crossing_start, element_count: erg range_count, source: abs source);
+    erg crossed = case dat crossing { Result.Err(_) => 0, Result.Ok(_) => 2, };
+    if crossed != 0 { return 3; }
+    erg write_start: u64 = 0u64;
+    erg written = region_write_range(region: ins region, start_index: erg write_start, element_count: erg range_count, source: abs source);
+    return case dat written { Result.Err(_) => 4, Result.Ok(count) => if count == 2u64 { return verify_published(region: ins region); } else { return 5; }, };
+}
+verb main() -> Int {
+    erg backing: Buffer = Buffer[8];
+    erg source: Buffer = Buffer[8];
+    erg logical_length: u64 = 4u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 2u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { return verify_ranges(region: ins region, source: abs source); }, };
+}
+"#,
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "hosted Region range build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("Region range executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn hosted_std_region_accepts_exact_128_kib_bulk_transfer() {
+    let root = std::env::temp_dir().join(format!("actus-std-region-128k-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-128k-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_128k_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[131072]; erg logical_length: u64 = 131072u64; erg window_start: u64 = 0u64; erg window_count: u64 = 131072u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[131072]; erg start: u64 = 0u64; erg count: u64 = 131072u64; erg written = region_write_range(region: ins region, start_index: erg start, element_count: erg count, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[131072]; erg read = region_read_range(region: abs region, start_index: erg start, element_count: erg count, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(value) => { if value != 131072u64 { return 5; } erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 6, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }",
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "hosted 128 KiB Region build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("128 KiB Region executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn hosted_std_region_write_publish_and_read_are_visible() {
     let root = std::env::temp_dir().join(format!("actus-std-region-write-{}", std::process::id()));
     let source_root = root.join("src");
@@ -194,6 +389,45 @@ fn hosted_std_region_rejects_out_of_window_read_without_trap() {
 }
 
 #[test]
+fn hosted_std_region_pinning_blocks_remap_until_unpinned() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-region-pinning-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-pinning-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_pinning_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg pinned = region_pin(region: ins region); return case dat pinned { Result.Err(_) => 2, Result.Ok(_) => { erg state = region_pinned(region: abs region); return case dat state { Result.Err(_) => 3, Result.Ok(value) => { if value != 1 { return 4; } erg replacement: Buffer = Buffer[4]; erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg window_start, window_count: erg window_count); return case dat remapped { Result.Ok(_) => 5, Result.Err(_) => { erg unpinned = region_unpin(region: ins region); return case dat unpinned { Result.Err(_) => 6, Result.Ok(_) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 7, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }, }; }",
+    )
+    .expect("fixture source should be written");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .output()
+        .expect("Actus pinning fixture should build");
+    assert!(
+        build.status.success(),
+        "pinning fixture build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let run = Command::new(&output).output().expect("pinning fixture should run");
+    assert!(run.status.success(), "pinning fixture returned {:?}", run.status);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn hosted_std_region_rejects_access_after_close_without_trap() {
     let root = std::env::temp_dir().join(format!("actus-std-region-closed-{}", std::process::id()));
     let source_root = root.join("src");
@@ -225,6 +459,90 @@ fn hosted_std_region_rejects_access_after_close_without_trap() {
     assert!(status.success(), "hosted closed Region build failed: {status}");
 
     let execution = Command::new(&output).output().expect("closed-region executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn hosted_std_region_cleanup_handles_early_return_and_nested_transfer() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-region-cleanup-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-cleanup-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_cleanup_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        r#"import std::region;
+verb consume_region(dat region: Region[u32]) -> Int {
+    return 0;
+}
+verb open_and_return(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { return 0; }, };
+}
+verb open_and_transfer(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 2, Result.Ok(region) => { return consume_region(region: dat region); }, };
+}
+verb open_and_branch(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 4, Result.Ok(region) => { erg branch: Bool = true; if branch { return 0; } return 5; }, };
+}
+verb open_and_fail(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 6, Result.Ok(region) => { erg destination: Buffer = Buffer[1]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 7, }; }, };
+}
+verb main() -> Int {
+    erg first: Buffer = Buffer[4];
+    erg early = open_and_return(backing: dat first);
+    if early != 0 { return 3; }
+    erg second: Buffer = Buffer[4];
+    erg transferred = open_and_transfer(backing: dat second);
+    if transferred != 0 { return transferred; }
+    erg third: Buffer = Buffer[4];
+    erg branched = open_and_branch(backing: dat third);
+    if branched != 0 { return branched; }
+    erg fourth: Buffer = Buffer[4];
+    return open_and_fail(backing: dat fourth);
+}
+"#,
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "hosted Region cleanup build failed: {status}");
+
+    let execution = Command::new(&output).output().expect("Region cleanup executable should run");
     assert_eq!(execution.status.code(), Some(0));
     assert!(execution.stdout.is_empty());
     assert!(execution.stderr.is_empty());

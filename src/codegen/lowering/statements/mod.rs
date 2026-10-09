@@ -289,7 +289,7 @@ fn lower_assignment<'source>(
         let size = layouts
             .type_size(NativeType::Struct(id))
             .ok_or_else(|| NativeEmitError("aggregate binding has no native size".to_owned()))?;
-        super::super::structs::copy_bytes(function, value, destination, size);
+        super::super::structs::copy_bytes(function, value, destination, size, layouts)?;
         return Ok(Flow::Fallthrough);
     }
     locals.insert(name, value);

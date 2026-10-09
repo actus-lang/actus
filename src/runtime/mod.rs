@@ -9,6 +9,12 @@ mod input;
 mod path;
 mod region;
 mod region_bridge;
+#[cfg(test)]
+mod region_bridge_tests;
+mod region_pinning_bridge;
+mod region_profile;
+mod region_provider;
+mod region_range_bridge;
 mod serialization;
 mod stream;
 mod time;
@@ -19,7 +25,10 @@ pub use allocation::{
     actus_buffer_append_range, actus_buffer_capacity, actus_buffer_clear, actus_buffer_drop,
     actus_buffer_reserve, actus_copy_buffer_reserve, actus_enum_allocate, actus_enum_drop,
 };
-pub use capabilities::{REGION_CAPABILITY_CAPACITY, RegionCapabilityTable};
+pub use capabilities::{
+    REGION_CAPABILITY_CAPACITY, REGION_HANDLE_GENERATION_BITS, REGION_HANDLE_SLOT_BITS,
+    RegionCapabilityTable,
+};
 pub use console::{
     actus_flush_stderr, actus_flush_stdout, actus_print_buffer_stderr, actus_print_buffer_stdout,
     actus_print_int, actus_print_int_stderr, actus_print_line_buffer_stderr,
@@ -37,8 +46,12 @@ pub use contract::{
     PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_STDERR_SYMBOL, PRINT_INT_SYMBOL,
     PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL, PRINT_STRING_STDERR_SYMBOL,
     PRINT_STRING_SYMBOL, READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL, REGION_CANCEL_SYMBOL,
-    REGION_CLOSE_SYMBOL, REGION_DROP_SYMBOL, REGION_OPEN_SYMBOL, REGION_PUBLISH_SYMBOL,
-    REGION_READ_SYMBOL, REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
+    REGION_CLOSE_SYMBOL, REGION_DESCRIPTOR_ABI_VERSION, REGION_DIRTY_SYMBOL, REGION_DROP_SYMBOL,
+    REGION_GENERATION_SYMBOL, REGION_LOGICAL_LENGTH_SYMBOL, REGION_MAX_BULK_BYTES,
+    REGION_OPEN_SYMBOL, REGION_PIN_SYMBOL, REGION_PINNED_SYMBOL, REGION_PROVIDER_QUEUE_CAPACITY,
+    REGION_PUBLISH_SYMBOL, REGION_READ_RANGE_SYMBOL, REGION_READ_SYMBOL, REGION_REMAP_SYMBOL,
+    REGION_UNPIN_SYMBOL, REGION_WINDOW_COUNT_SYMBOL, REGION_WINDOW_START_SYMBOL,
+    REGION_WRITE_RANGE_SYMBOL, REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
     SLEEP_CONTEXT_CRITICAL_SECTION, SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL,
     SLEEP_CONTEXT_INTERRUPT, SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL,
     STRING_COPY_STATUS_CAPACITY, STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL,
@@ -75,6 +88,11 @@ pub use region::{
     RegionGeneration, RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
 };
 pub use region_bridge::actus_region_drop;
+pub use region_pinning_bridge::{actus_region_pin, actus_region_pinned, actus_region_unpin};
+pub use region_provider::{
+    MemoryRegionProvider, RegionProvider, RegionProviderError, RegionProviderRequest,
+};
+pub use region_range_bridge::{actus_region_read_range, actus_region_write_range};
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
     validate_fixed_frame,

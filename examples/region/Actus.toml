@@ -1,0 +1,9 @@
+[package]
+name = "region-example"
+version = "0.1.0"
+edition = "alpha"
+entry = "main"
+
+[build]
+runtime = "std"
+

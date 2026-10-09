@@ -21,7 +21,7 @@ pub(super) fn store_struct_field(
             .type_size(field.ty)
             .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
         let destination = function.ins().iadd_imm_s(address, i64::from(field.offset));
-        copy_bytes(function, value, destination, size);
+        copy_bytes(function, value, destination, size, layouts)?;
     } else {
         function.ins().store(MemFlagsData::new(), value, address, field.offset as i32);
     }
@@ -33,16 +33,19 @@ pub(crate) fn copy_bytes(
     source: cranelift_codegen::ir::Value,
     destination: cranelift_codegen::ir::Value,
     size: u32,
-) {
-    for offset in 0..size {
-        let source_address = function.ins().iadd_imm_s(source, i64::from(offset));
-        let destination_address = function.ins().iadd_imm_s(destination, i64::from(offset));
-        let byte = function.ins().load(
-            cranelift_codegen::ir::types::I8,
-            MemFlagsData::new(),
-            source_address,
-            0,
-        );
-        function.ins().store(MemFlagsData::new(), byte, destination_address, 0);
-    }
+    layouts: &LayoutRegistry,
+) -> Result<(), NativeEmitError> {
+    let config = layouts.frontend_config()?;
+    let size = u64::from(size);
+    function.emit_small_memory_copy(
+        config,
+        destination,
+        source,
+        size,
+        1,
+        1,
+        false,
+        MemFlagsData::new(),
+    );
+    Ok(())
 }

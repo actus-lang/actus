@@ -1,6 +1,13 @@
 /// Version of the C ABI exported by the hosted Actus runtime.
 pub const RUNTIME_ABI_VERSION: u32 = 1;
 
+/// Version of the fixed-width Region descriptor ABI.
+pub const REGION_DESCRIPTOR_ABI_VERSION: u32 = 3;
+/// Maximum hosted resident byte payload accepted by one Region range operation.
+pub const REGION_MAX_BULK_BYTES: usize = 128 * 1024;
+/// The core Region boundary has no implicit asynchronous provider queue.
+pub const REGION_PROVIDER_QUEUE_CAPACITY: usize = 0;
+
 /// Successful scalar C-ABI operation status.
 pub const ABI_STATUS_SUCCESS: i32 = 0;
 
@@ -22,14 +29,36 @@ pub const REGION_DROP_SYMBOL: &str = "actus_region_drop";
 pub const REGION_OPEN_SYMBOL: &str = "actus_region_open";
 /// Stable runtime symbol for reading one resident region element.
 pub const REGION_READ_SYMBOL: &str = "actus_region_read";
+/// Stable runtime symbol for reading a bounded resident Region range.
+pub const REGION_READ_RANGE_SYMBOL: &str = "actus_region_read_range";
 /// Stable runtime symbol for writing one resident region element.
 pub const REGION_WRITE_SYMBOL: &str = "actus_region_write";
+/// Stable runtime symbol for writing a bounded resident Region range.
+pub const REGION_WRITE_RANGE_SYMBOL: &str = "actus_region_write_range";
 /// Stable runtime symbol for publishing a dirty resident region window.
 pub const REGION_PUBLISH_SYMBOL: &str = "actus_region_publish";
 /// Stable runtime symbol for cancelling dirty resident region bytes.
 pub const REGION_CANCEL_SYMBOL: &str = "actus_region_cancel";
 /// Stable runtime symbol for closing a region capability.
 pub const REGION_CLOSE_SYMBOL: &str = "actus_region_close";
+/// Stable runtime symbol for explicit resident-window replacement.
+pub const REGION_REMAP_SYMBOL: &str = "actus_region_remap";
+/// Stable runtime symbol for logical-length inspection.
+pub const REGION_LOGICAL_LENGTH_SYMBOL: &str = "actus_region_logical_length";
+/// Stable runtime symbol for resident-window start inspection.
+pub const REGION_WINDOW_START_SYMBOL: &str = "actus_region_window_start";
+/// Stable runtime symbol for resident-window count inspection.
+pub const REGION_WINDOW_COUNT_SYMBOL: &str = "actus_region_window_count";
+/// Stable runtime symbol for generation inspection.
+pub const REGION_GENERATION_SYMBOL: &str = "actus_region_generation";
+/// Stable runtime symbol for dirty-state inspection.
+pub const REGION_DIRTY_SYMBOL: &str = "actus_region_dirty";
+/// Stable runtime symbol for pinning a resident window against eviction.
+pub const REGION_PIN_SYMBOL: &str = "actus_region_pin";
+/// Stable runtime symbol for releasing a resident-window pin.
+pub const REGION_UNPIN_SYMBOL: &str = "actus_region_unpin";
+/// Stable runtime symbol for resident-window pin inspection.
+pub const REGION_PINNED_SYMBOL: &str = "actus_region_pinned";
 pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.

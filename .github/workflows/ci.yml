@@ -72,6 +72,18 @@ jobs:
       - name: Run LSP contract suite
         run: cargo test --test lsp --all-features -- --test-threads=1
 
+      - name: Run Region native gate
+        run: cargo test --test std_region_native --all-features -- --test-threads=1
+
+      - name: Record Region cross-target evidence
+        shell: bash
+        run: |
+          {
+            echo "## Region native gate evidence (${RUNNER_OS})"
+            echo "- cargo test --test std_region_native --all-features -- --test-threads=1 passed"
+            echo "- hosted native Region fixtures and freestanding object fixtures passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Record LSP platform evidence
         shell: bash
         run: |

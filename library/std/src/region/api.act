@@ -7,13 +7,44 @@ exposes only checked operations. The operations do not perform filesystem I/O
 or allocate on the read, write, publish, cancel, or close paths.
 """
 """Private bridge that creates a region and consumes the supplied backing buffer."""
-unsafe extern "C" verb actus_region_open[T](dat backing: Buffer, erg element_stride: u64, erg logical_length: u64, erg window_start: u64, erg window_count: u64) -> Result[Region[T], RegionError];
+unsafe extern "C" verb actus_region_open[T](
+    dat backing: Buffer,
+    erg element_stride: u64,
+    erg element_alignment: u64,
+    erg logical_length: u64,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[Region[T], RegionError];
 
 """Private bridge that reads one resident element into an exact-size buffer."""
-unsafe extern "C" verb actus_region_read[T](abs region: Region[T], erg index: u64, ins destination: Buffer) -> Result[Int, RegionError];
+unsafe extern "C" verb actus_region_read[T](
+    abs region: Region[T],
+    erg index: u64,
+    ins destination: Buffer
+) -> Result[Int, RegionError];
+
+"""Private bridge that reads a checked resident range into an exact-size buffer."""
+unsafe extern "C" verb actus_region_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError];
 
 """Private bridge that replaces one resident element from an exact-size buffer."""
-unsafe extern "C" verb actus_region_write[T](ins region: Region[T], erg index: u64, abs source: Buffer) -> Result[Int, RegionError];
+unsafe extern "C" verb actus_region_write[T](
+    ins region: Region[T],
+    erg index: u64,
+    abs source: Buffer
+) -> Result[Int, RegionError];
+
+"""Private bridge that writes a checked resident range from an exact-size buffer."""
+unsafe extern "C" verb actus_region_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError];
 
 """Private bridge that publishes dirty resident bytes and advances generation."""
 unsafe extern "C" verb actus_region_publish[T](ins region: Region[T]) -> Result[u64, RegionError];
@@ -24,6 +55,34 @@ unsafe extern "C" verb actus_region_cancel[T](ins region: Region[T]) -> Result[I
 """Private bridge that releases the capability and marks the owner closed."""
 unsafe extern "C" verb actus_region_close[T](ins region: Region[T]) -> Result[Int, RegionError];
 
+"""Private bridge that replaces a clean resident window without external I/O."""
+unsafe extern "C" verb actus_region_remap[T](
+    ins region: Region[T],
+    dat backing: Buffer,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[u64, RegionError];
+
+"""Private bridge that reads one fixed-width Region metadata value."""
+unsafe extern "C" verb actus_region_logical_length[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_window_start[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_window_count[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_generation[T](abs region: Region[T]) -> Result[u64, RegionError];
+
+unsafe extern "C" verb actus_region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError];
+
+"""Private bridge that pins the resident window against remap and eviction."""
+unsafe extern "C" verb actus_region_pin[T](ins region: Region[T]) -> Result[Int, RegionError];
+
+"""Private bridge that releases a resident-window pin."""
+unsafe extern "C" verb actus_region_unpin[T](ins region: Region[T]) -> Result[Int, RegionError];
+
+"""Private bridge that reports whether the resident window is pinned."""
+unsafe extern "C" verb actus_region_pinned[T](abs region: Region[T]) -> Result[Int, RegionError];
+
 """
 Open a bounded logical region backed by caller-provided storage.
 
@@ -33,11 +92,18 @@ validation succeeds. The logical length may exceed resident storage, while
 fully sized primitive, array, pack, or struct type. No filesystem operation is
 performed by this call.
 """
-open verb region_open[T](dat backing: Buffer, erg logical_length: u64, erg window_start: u64, erg window_count: u64) -> Result[Region[T], RegionError] {
+open verb region_open[T](
+    dat backing: Buffer,
+    erg logical_length: u64,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[Region[T], RegionError] {
     erg element_stride: u64 = size_of[T]();
+    erg element_alignment: u64 = align_of[T]();
     return actus_region_open(
         backing: dat backing,
         element_stride: erg element_stride,
+        element_alignment: erg element_alignment,
         logical_length: erg logical_length,
         window_start: erg window_start,
         window_count: erg window_count
@@ -51,8 +117,39 @@ Read one logical element from the resident window.
 the call. The destination must be exactly `size_of[T]()` bytes wide. The
 region owner remains valid after the operation.
 """
-open verb region_read[T](abs region: Region[T], erg index: u64, ins destination: Buffer) -> Result[Int, RegionError] {
-    return actus_region_read(region: abs region, index: erg index, destination: ins destination);
+open verb region_read[T](
+    abs region: Region[T],
+    erg index: u64,
+    ins destination: Buffer
+) -> Result[Int, RegionError] {
+    return actus_region_read(
+        region: abs region,
+        index: erg index,
+        destination: ins destination
+    );
+}
+
+"""
+Read a bounded resident range into caller-provided storage.
+
+The destination must be exactly `element_count * size_of[T]()` bytes wide.
+The complete range must fit inside the current resident window and all range
+arithmetic is checked before copying. The operation is allocation-free and
+does not perform I/O. `Ok(count)` reports the complete element count; `Err`
+reports failure and guarantees that no element was copied.
+"""
+open verb region_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError] {
+    return actus_region_read_range(
+        region: abs region,
+        start_index: erg start_index,
+        element_count: erg element_count,
+        destination: ins destination
+    );
 }
 
 """
@@ -62,8 +159,40 @@ Write one logical element in the resident window.
 must be exactly `size_of[T]()` bytes wide. The operation remains in memory and
 marks the region dirty until `region_publish` or `region_cancel` is called.
 """
-open verb region_write[T](ins region: Region[T], erg index: u64, abs source: Buffer) -> Result[Int, RegionError] {
-    return actus_region_write(region: ins region, index: erg index, source: abs source);
+open verb region_write[T](
+    ins region: Region[T],
+    erg index: u64,
+    abs source: Buffer
+) -> Result[Int, RegionError] {
+    return actus_region_write(
+        region: ins region,
+        index: erg index,
+        source: abs source
+    );
+}
+
+"""
+Write a bounded resident range from caller-provided storage.
+
+The source must be exactly `element_count * size_of[T]()` bytes wide. The
+complete range must fit inside the current resident window and is validated
+before any byte changes. The operation is allocation-free, marks the region
+dirty on success, and performs no I/O. `Ok(count)` reports the complete
+element count; `Err` reports failure and guarantees that no element changed.
+Overlapping source and resident storage has memmove semantics.
+"""
+open verb region_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError] {
+    return actus_region_write_range(
+        region: ins region,
+        start_index: erg start_index,
+        element_count: erg element_count,
+        source: abs source
+    );
 }
 
 """
@@ -99,4 +228,115 @@ failed close and is consumed after a successful close.
 """
 open verb region_close[T](ins region: Region[T]) -> Result[Int, RegionError] {
     return actus_region_close(region: ins region);
+}
+
+"""
+Replace the resident window using caller-owned memory.
+
+The backing buffer is consumed by the operation. The requested window must be
+valid, the buffer must contain exactly `window_count * size_of[T]()` bytes, and
+the current window must be clean. No filesystem, device, provider, or implicit
+page operation is performed. A successful remap advances the generation;
+failure preserves the current descriptor and resident bytes.
+"""
+open verb region_remap[T](
+    ins region: Region[T],
+    dat backing: Buffer,
+    erg window_start: u64,
+    erg window_count: u64
+) -> Result[u64, RegionError] {
+    return actus_region_remap(
+        region: ins region,
+        backing: dat backing,
+        window_start: erg window_start,
+        window_count: erg window_count
+    );
+}
+
+"""
+Return the logical element count without changing ownership or window state.
+
+The `abs` loan resumes for the caller after the read. The result is `Err` when
+the descriptor is invalid, stale, or already closed; no allocation or state
+mutation occurs.
+"""
+open verb region_logical_length[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_logical_length(region: abs region);
+}
+
+"""
+Return the first logical index in the current resident window.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_window_start[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_window_start(region: abs region);
+}
+
+"""
+Return the element count in the current resident window.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_window_count[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_window_count(region: abs region);
+}
+
+"""
+Return the current generation used for subsequent checked access.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_generation[T](abs region: Region[T]) -> Result[u64, RegionError] {
+    return actus_region_generation(region: abs region);
+}
+
+"""
+Return one when the resident window has unpublished mutations.
+
+The `abs` loan is read-only and resumes after the call. Invalid, stale, or
+closed descriptors return a typed `RegionError` without changing the region.
+"""
+open verb region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_dirty(region: abs region);
+}
+
+"""
+Pin the current resident window against remap and provider eviction.
+
+Pinning does not change the generation or perform I/O. Repeated pinning is
+idempotent. `region` is an exclusive call-scoped `ins` loan and resumes for
+the caller after the call. `Ok(0)` confirms the pin; `Err(RegionError)` reports
+an invalid, stale, closed, or backend-rejected descriptor. The caller must
+unpin before an explicit close or remap.
+"""
+open verb region_pin[T](ins region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_pin(region: ins region);
+}
+
+"""
+Release a resident-window pin without changing bytes or generation.
+
+`region` is an exclusive call-scoped `ins` loan and resumes for the caller
+after the call. Unpinning is idempotent and returns `Ok(0)`. `Err(RegionError)`
+reports an invalid, stale, closed, or backend-rejected descriptor. No bytes,
+generation, or provider storage are changed.
+"""
+open verb region_unpin[T](ins region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_unpin(region: ins region);
+}
+
+"""
+Return one when the resident window is protected from remap and eviction.
+
+The `abs` loan is read-only and resumes for the caller after the call. `Ok(1)`
+means the window is pinned and `Ok(0)` means it is unpinned. `Err(RegionError)`
+reports an invalid, stale, closed, or backend-rejected descriptor. The
+operation performs no allocation, I/O, or state mutation.
+"""
+open verb region_pinned[T](abs region: Region[T]) -> Result[Int, RegionError] {
+    return actus_region_pinned(region: abs region);
 }
