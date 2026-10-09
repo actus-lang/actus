@@ -304,7 +304,7 @@ while target coverage parses little-endian 32-bit and big-endian 32-bit and
       profile rule.
 - [x] Update the Region ADR with the aggregate lowering and bulk-copy ABI.
 - [x] Document failure classes, atomicity, overlap semantics, and cleanup.
-- [ ] Record the compiler revision, runtime revision, target, profile, commands,
+- [x] Record the compiler revision, runtime revision, target, profile, commands,
       output, and known limits in a dated evidence document.
 - [x] Confirm that public Region operation names and ownership roles remain
       source-compatible.

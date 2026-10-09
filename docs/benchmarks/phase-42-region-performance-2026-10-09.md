@@ -17,6 +17,25 @@ uses 10,000 iterations. Bulk timing uses 100 iterations per payload size. The
 benchmark allocates the resident window and caller buffers before timing each
 bulk loop; allocation is not included in the copy measurement.
 
+## Revision and target metadata
+
+- Actus compiler and runtime revision: `a14ce425ad526962c753e58d72f6d47d78ffd748`
+- Rust toolchain: `rustc 1.98.0 (88d9e12ae 2026-08-18)`
+- Cargo: `cargo 1.98.0 (797e8a9bc 2026-08-05)`
+- Host target: Linux `7.2.7-arch1-1` x86-64
+- Profile: Cargo `dev` for focused tests; Cargo `bench` for timing output
+- Focused commands:
+
+```sh
+cargo test runtime::region::tests::aggregate_bytes_are_preserved_across_pointer_width_profiles --lib
+cargo test --test target target_contracts_expose_supported_pointer_widths_and_byte_orders
+cargo test --test std_region_native --all-features -- --test-threads=1
+```
+
+The focused Region and target-profile checks passed on this revision. The
+hosted macOS and Windows runs are executed by the repository CI matrix rather
+than claimed from this Linux host.
+
 ## Captured output
 
 ```text
