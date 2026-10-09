@@ -252,6 +252,19 @@ native and runtime evidence.
 - The dated benchmark record includes compiler peak RSS, object and executable
   sizes, build time, and runtime copy time for the 64 KiB and 128 KiB cases.
 
+### Gate 42.6 optimization audit
+
+The two remaining optimization checks stay open deliberately. `RegionDescriptor`
+receives the logical index, element count, window bounds, element stride, and
+bulk limit at runtime. The compiler therefore cannot currently prove that the
+validated range remains unchanged across the copy call, so removing a second
+check would weaken the safety contract. The stride is also descriptor data
+rather than a compile-time constant for every generic `Region[T]` instance;
+replacing its checked arithmetic with target-specific strength reduction needs
+an explicit compiler proof and cross-target codegen evidence. No wrapper,
+unchecked arithmetic, or target-specific exception is used to close either
+check.
+
 ## Gate 42.7 — Cross-target and freestanding verification
 
 - [ ] Run hosted Linux native fixtures.
