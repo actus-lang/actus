@@ -1,3 +1,4 @@
+pub(super) mod ir_audit;
 mod isa;
 pub(super) mod object;
 pub(super) mod runtime;

@@ -11,7 +11,6 @@ use super::types::NativeType;
 mod declarations;
 mod dependencies;
 mod emission;
-pub(super) mod ir_audit;
 
 use emission::NativeRootSelection;
 

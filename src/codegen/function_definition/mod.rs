@@ -61,7 +61,7 @@ pub(super) fn define_function(
         NativeEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
     })?;
     if configuration.verifies_no_float_ir() {
-        let floating = super::native::ir_audit::floating_point_instructions(&context.func);
+        let floating = super::cranelift::ir_audit::floating_point_instructions(&context.func);
         if !floating.is_empty() {
             return Err(NativeEmitError(format!(
                 "native function `{}` contains floating-point IR instructions: {floating:?}",
