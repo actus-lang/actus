@@ -5,7 +5,7 @@ use actus::codegen::llvm::emit_module;
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendFunction, BackendInstruction, BackendModule,
     BackendParameter, BackendReturn, BackendReturnMode, BackendValueId, BackendValueType,
-    SymbolIdentity, SymbolKind,
+    LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
 };
 
 #[test]
@@ -152,6 +152,39 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
     assert!(ir.contains("br i1 %0, label %bb1, label %bb2"));
     assert!(ir.contains("br label %bb3"));
     assert!(ir.contains("unreachable"));
+}
+
+#[test]
+fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "cleanup").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Cleanup {
+                    action: LoweredCleanupInstruction::EndBorrow { borrow_id: 3 },
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("end-borrow cleanup should lower without a runtime call");
+    assert!(ir.contains("define void @test__verb_cleanup()"));
+    assert!(ir.contains("ret void"));
 }
 
 #[test]

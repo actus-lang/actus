@@ -311,8 +311,11 @@ jumps, terminating traps, and fixed-layout direct aggregate/Region values with
 1, 2, 4, or 8-byte alignment. Non-direct aggregate parameters now lower to
 opaque pointers with explicit parameter alignment. Aggregate return slots now
 use a hidden aligned pointer with caller-side stack storage. Memory-copy
-lowering, cleanup, and typed failures remain explicit open work. The feature
-build and this emitter slice are covered by the LLVM integration test.
+lowering, runtime-backed cleanup actions, and typed failures remain explicit
+open work. Compile-time `EndBorrow` cleanup boundaries are lowered as no-op
+semantic boundaries, while runtime-backed cleanup actions fail closed until
+their bridge ABI and storage representation are implemented. The feature build
+and this emitter slice are covered by the LLVM integration test.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

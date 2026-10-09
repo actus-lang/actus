@@ -6,6 +6,7 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
+use super::super::model::LoweredCleanupInstruction;
 use super::super::{
     BackendBlockId, BackendEmitError, BackendFunction, BackendInstruction, BackendValueId,
     BackendValueType,
@@ -94,11 +95,30 @@ fn emit_instruction(
             unsafe { LLVMBuildUnreachable(builder) };
             Ok(true)
         }
-        BackendInstruction::Fail { .. } | BackendInstruction::Cleanup { .. } => {
-            Err(BackendEmitError(
-                "LLVM instruction lowering is not implemented for this contract node".to_owned(),
-            ))
-        }
+        BackendInstruction::Fail { .. } => Err(BackendEmitError(
+            "LLVM instruction lowering is not implemented for this contract node".to_owned(),
+        )),
+        BackendInstruction::Cleanup { action, .. } => emit_cleanup(action),
+    }
+}
+
+fn emit_cleanup(action: &LoweredCleanupInstruction) -> Result<bool, BackendEmitError> {
+    if matches!(action, LoweredCleanupInstruction::EndBorrow { .. }) {
+        return Ok(false);
+    }
+    Err(BackendEmitError(format!(
+        "LLVM cleanup action `{}` requires a runtime bridge lowering",
+        cleanup_name(action)
+    )))
+}
+
+fn cleanup_name(action: &LoweredCleanupInstruction) -> &'static str {
+    match action {
+        LoweredCleanupInstruction::EndBorrow { .. } => "end-borrow",
+        LoweredCleanupInstruction::DropPayloadField { .. } => "drop-payload-field",
+        LoweredCleanupInstruction::DropBinding { .. } => "drop-binding",
+        LoweredCleanupInstruction::DropBindingFields { .. } => "drop-binding-fields",
+        LoweredCleanupInstruction::ResetArena { .. } => "reset-arena",
     }
 }
 

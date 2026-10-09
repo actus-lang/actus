@@ -17,8 +17,9 @@ use super::declarations::{FunctionDeclaration, declare_function};
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.
 ///
 /// The current slice covers validated scalar and unit signatures, parameter mapping, basic
-/// blocks, direct returns, direct calls, conditional branches, jumps, and terminating traps.
-/// Aggregate values, cleanup instructions, and typed failure lowering remain explicit open work.
+/// blocks, direct returns, direct calls, conditional branches, jumps, terminating traps, and
+/// compile-time end-borrow cleanup boundaries. Runtime-backed cleanup actions and typed failure
+/// lowering remain explicit open work.
 pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
     let context = LlvmContext::new()?;
