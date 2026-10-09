@@ -166,7 +166,7 @@ layouts and return slots, deterministic unsupported-operation diagnostics,
 ownership capability passing, cleanup actions, block identity, and neutral
 control-flow targets, and typed failure discriminants. The command
 `cargo test --test codegen_contract --all-features -- --format terse` passes
-with 20 tests and 0 failures. The suite now also exercises an explicit
+with 21 tests and 0 failures. The suite now also exercises an explicit
 backend-neutral `Region` value with borrowed, exclusive-loan, and ownership
 transfer capability modes. `lower_semantic_cleanup` validates semantic cleanup
 plans before converting them into backend-neutral cleanup actions; full
@@ -182,6 +182,9 @@ source-spanned unsupported-operation diagnostic rather than being approximated.
 `BackendModule` now validates functions and external runtime symbols together,
 including symbol uniqueness and external signature contracts, without exposing
 backend-specific handles.
+Typed failure resolution is delegated to the neutral body provider and lowers
+to a validated `BackendInstruction::Fail` with an enum symbol, discriminant,
+and optional payload value.
 
 ## Gate 44.3 — Isolate the existing Cranelift backend
 

@@ -2,12 +2,19 @@ use crate::ast::{Block, Expr, IfBranch, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
 
 use super::{
-    BackendBlock, BackendBlockId, BackendContractError, BackendInstruction, BackendTargetContext,
-    BackendValueId, SymbolIdentity,
+    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
+    BackendTargetContext, BackendValueId, SymbolIdentity,
 };
 
 pub trait BackendBodyProvider {
     fn value_for(&self, expression: &Expr) -> Result<BackendValueId, BackendContractError>;
+
+    fn failure_for(
+        &self,
+        _expression: &Expr,
+    ) -> Result<Option<BackendFailure>, BackendContractError> {
+        Ok(None)
+    }
 
     fn callee_for(
         &self,
@@ -79,8 +86,17 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
     ) -> Result<(), BackendContractError> {
         match statement {
             Stmt::Return { value, span } => {
-                let value = value.as_ref().map(|expr| self.provider.value_for(expr)).transpose()?;
-                instructions.push(BackendInstruction::Return { value, span: *span });
+                let Some(expression) = value else {
+                    instructions.push(BackendInstruction::Return { value: None, span: *span });
+                    return Ok(());
+                };
+                if let Some(failure) = self.provider.failure_for(expression)? {
+                    instructions.push(BackendInstruction::Fail { failure, span: *span });
+                } else {
+                    let value = self.provider.value_for(expression)?;
+                    instructions
+                        .push(BackendInstruction::Return { value: Some(value), span: *span });
+                }
             }
             Stmt::Expression {
                 expression: Expr::Call { callee, arguments, span },

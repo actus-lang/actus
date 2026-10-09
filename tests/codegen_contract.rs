@@ -38,6 +38,24 @@ impl BackendBodyProvider for TestBodyProvider {
         SymbolIdentity::new("test", SymbolKind::Verb, callee)
             .map_err(|_| BackendContractError::InvalidCallSymbol)
     }
+
+    fn failure_for(
+        &self,
+        expression: &Expr,
+    ) -> Result<Option<BackendFailure>, BackendContractError> {
+        let Expr::Call { callee, .. } = expression else {
+            return Ok(None);
+        };
+        if callee != "Err" {
+            return Ok(None);
+        }
+        Ok(Some(BackendFailure {
+            result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Result")
+                .expect("valid result symbol"),
+            discriminant: 1,
+            payload: Some(actus::codegen::BackendValueId(7)),
+        }))
+    }
 }
 
 impl BackendLayoutProvider for TestLayouts {
@@ -542,6 +560,30 @@ fn integrates_signature_and_body_into_a_valid_neutral_function() {
         .expect("signature and body should form a valid function");
     assert_eq!(function.symbol.as_str(), "app__verb_process");
     assert_eq!(function.blocks.len(), 1);
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn lowers_typed_failures_without_backend_specific_handles() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Return {
+            value: Some(Expr::Call {
+                callee: "Err".to_owned(),
+                arguments: Vec::new(),
+                span: SourceSpan::new(0, 6),
+            }),
+            span: SourceSpan::new(0, 10),
+        }],
+        span: SourceSpan::new(0, 10),
+    };
+
+    let function = lower_verb("app", &verb, &TestLayouts, &TestBodyProvider, BackendBlockId(0))
+        .expect("typed failure should lower through the neutral contract");
+    let BackendInstruction::Fail { failure, .. } = &function.blocks[0].instructions[0] else {
+        panic!("expected a typed failure instruction");
+    };
+    assert_eq!(failure.discriminant, 1);
     assert!(function.validate().is_ok());
 }
 
