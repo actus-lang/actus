@@ -166,7 +166,10 @@ layouts and return slots, deterministic unsupported-operation diagnostics,
 ownership capability passing, cleanup actions, block identity, and neutral
 control-flow targets, and typed failure discriminants. The command
 `cargo test --test codegen_contract --all-features -- --format terse` passes
-with 11 tests and 0 failures.
+with 11 tests and 0 failures. The suite now also exercises an explicit
+backend-neutral `Region` value with borrowed, exclusive-loan, and ownership
+transfer capability modes. The semantic-model adapter that produces this
+contract remains open under the next checklist item.
 
 ## Gate 44.3 — Isolate the existing Cranelift backend
 
