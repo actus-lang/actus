@@ -161,7 +161,7 @@ fn lower_special_initializer(
                     "array initializer type does not match binding".to_owned(),
                 ));
             }
-            Some(super::super::super::arrays::lower_array_constructor(function, id, layouts)?)
+            Some(crate::codegen::cranelift::arrays::lower_array_constructor(function, id, layouts)?)
         }
         (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
             Some(super::super::super::cranelift::expressions::lower_wide_integer(function, value)?)

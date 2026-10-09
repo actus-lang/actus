@@ -7,16 +7,16 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
-use super::cranelift::expressions::{coerce_to_ir_type, lower_expression};
-use super::cranelift::literals::StringDataValues;
-use super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
-use super::model::NativeCleanupSchedule;
-use super::structs::copy_bytes;
+use super::expressions::{coerce_to_ir_type, lower_expression};
+use super::literals::StringDataValues;
+use super::native::{FunctionRef, NativeEmitError};
+use super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::structs::copy_bytes;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_array_index(
+pub(crate) fn lower_array_index(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -48,7 +48,7 @@ pub(super) fn lower_array_index(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_array_assignment(
+pub(crate) fn lower_array_assignment(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -104,7 +104,7 @@ pub(super) fn lower_array_assignment(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_array_compound_assignment(
+pub(crate) fn lower_array_compound_assignment(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -188,7 +188,7 @@ fn lower_array_compound_value(
         layouts,
     )?;
     let right = coerce_to_ir_type(function, right, layouts.ir_type(element)?);
-    let updated = super::cranelift::expressions::lower_compound_integer_operation(
+    let updated = super::expressions::lower_compound_integer_operation(
         function, current, operator, right, element,
     )?;
     Ok(swap_indexed_pack_element_if_needed(
@@ -209,7 +209,7 @@ fn swap_indexed_pack_element_if_needed(
     local_types: &HashMap<&String, NativeType>,
     layouts: &LayoutRegistry,
 ) -> Value {
-    if super::structs::indexed_pack_endianness(target, local_types, layouts)
+    if crate::codegen::structs::indexed_pack_endianness(target, local_types, layouts)
         != Some(crate::ast::LayoutEndianness::Big)
     {
         return value;
@@ -220,7 +220,7 @@ fn swap_indexed_pack_element_if_needed(
     }
 }
 
-pub(super) fn lower_array_constructor(
+pub(crate) fn lower_array_constructor(
     function: &mut FunctionBuilder<'_>,
     id: usize,
     layouts: &LayoutRegistry,
@@ -257,7 +257,7 @@ pub(crate) fn lower_array_address(
     layouts: &LayoutRegistry,
 ) -> Result<(Value, NativeType), NativeEmitError> {
     let NativeType::Array(id) =
-        super::structs::expression_native_type(target, local_types, layouts)
+        crate::codegen::structs::expression_native_type(target, local_types, layouts)
             .ok_or_else(|| NativeEmitError("indexed target has no native array type".to_owned()))?
     else {
         return Err(NativeEmitError("indexed target is not a native array".to_owned()));

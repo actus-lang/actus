@@ -140,7 +140,7 @@ fn lower_indexed_pack_field_compound_assignment<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
-    let (address, element) = super::super::arrays::lower_array_address(
+    let (address, element) = super::super::cranelift::arrays::lower_array_address(
         function,
         target,
         index,

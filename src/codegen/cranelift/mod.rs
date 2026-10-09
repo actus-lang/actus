@@ -1,3 +1,4 @@
+pub(super) mod arrays;
 pub(super) mod buffer_index;
 pub(super) mod calls;
 pub(super) mod case;

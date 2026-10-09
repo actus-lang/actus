@@ -166,7 +166,7 @@ fn lower_indexed_pack_field_assignment(
     target: &Expr,
     index: &Expr,
 ) -> Result<(), NativeEmitError> {
-    let (address, element) = super::super::arrays::lower_array_address(
+    let (address, element) = super::super::cranelift::arrays::lower_array_address(
         context.function,
         target,
         index,

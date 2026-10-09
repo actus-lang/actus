@@ -74,7 +74,7 @@ fn lower_indirect_ins_argument(
 ) -> Result<Value, NativeEmitError> {
     match argument {
         Expr::Index { target, index, .. } => {
-            let (address, _) = super::super::super::arrays::lower_array_address(
+            let (address, _) = super::super::arrays::lower_array_address(
                 function,
                 target,
                 index,

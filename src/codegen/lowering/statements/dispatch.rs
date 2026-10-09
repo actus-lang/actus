@@ -306,7 +306,7 @@ fn lower_index_assignment_statement(
             layouts,
         )
     } else {
-        super::super::super::arrays::lower_array_assignment(
+        crate::codegen::cranelift::arrays::lower_array_assignment(
             function,
             target,
             index,

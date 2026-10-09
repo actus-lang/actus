@@ -1,6 +1,5 @@
 mod abi;
 mod arenas;
-mod arrays;
 mod cleanup;
 mod constants;
 mod control_flow;
