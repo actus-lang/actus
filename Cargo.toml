@@ -16,7 +16,7 @@ target-lexicon = "0.13.5"
 toml = "0.9.8"
 
 [dev-dependencies]
-object = "0.39.1"
+object = "0.40.0"
 
 [[bench]]
 name = "frontend"
