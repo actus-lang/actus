@@ -1,7 +1,7 @@
 use crate::ast::Expr;
 
 use super::super::types::NativeType;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(crate) fn enum_receiver_name(receiver: &Expr) -> Option<&str> {
     let Expr::Identifier { name, .. } = receiver else { return None };

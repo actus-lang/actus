@@ -1,6 +1,6 @@
 use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
-use super::super::layout::LayoutRegistry;
+use super::layout::LayoutRegistry;
 use super::types::NativeType;
 
 #[derive(Debug)]

@@ -1,8 +1,8 @@
 use crate::ast::{EnumDef, EnumPayload, TypeName};
 
-use super::cranelift::native::NativeEmitError;
-use super::cranelift::types::NativeType;
 use super::layout::{LayoutRegistry, integer_storage_bytes};
+use super::native::NativeEmitError;
+use super::types::NativeType;
 
 #[derive(Clone, Debug)]
 pub(super) struct EnumFieldLayout {

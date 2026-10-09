@@ -6,11 +6,11 @@ use crate::ast::{ExternalVerbDecl, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::{FunctionDeclarationContext, declare_functions};
 use super::function_definition::define_function;
+use super::layout::LayoutRegistry;
 use super::literals::StringDataIds;
 use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::runtime::{

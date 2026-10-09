@@ -6,8 +6,8 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
-use super::super::layout::LayoutRegistry;
 use super::super::symbols::{SymbolIdentity, SymbolKind};
+use super::layout::LayoutRegistry;
 use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::types::NativeType;
 

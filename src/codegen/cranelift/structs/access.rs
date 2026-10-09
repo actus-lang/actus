@@ -11,7 +11,7 @@ use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::memory::copy_bytes;
 use super::types::expression_native_type;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
@@ -111,7 +111,7 @@ fn lower_struct_field_access(
 fn load_struct_field(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
-    field_layout: &crate::codegen::layout::FieldLayout,
+    field_layout: &crate::codegen::cranelift::layout::FieldLayout,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     if field_layout.indirect {
@@ -399,7 +399,7 @@ fn store_struct_field(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
     value: cranelift_codegen::ir::Value,
-    field_layout: &crate::codegen::layout::FieldLayout,
+    field_layout: &crate::codegen::cranelift::layout::FieldLayout,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     if field_layout.indirect
@@ -431,7 +431,10 @@ fn lower_field_address(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(cranelift_codegen::ir::Value, crate::codegen::layout::FieldLayout), NativeEmitError> {
+) -> Result<
+    (cranelift_codegen::ir::Value, crate::codegen::cranelift::layout::FieldLayout),
+    NativeEmitError,
+> {
     let object_type = expression_native_type(object, local_types, layouts)
         .ok_or_else(|| NativeEmitError("field access requires a struct value".to_owned()))?;
     let NativeType::Struct(id) = object_type else {

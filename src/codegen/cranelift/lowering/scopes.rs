@@ -9,7 +9,7 @@ use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_scoped_block<'source>(

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use cranelift_codegen::ir::Value;
 
-use super::super::super::layout::LayoutRegistry;
 use super::super::super::model::NativeCleanupSchedule;
+use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
 use super::super::lowering::LoopTargets;
 use super::super::native::FunctionRef;

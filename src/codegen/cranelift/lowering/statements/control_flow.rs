@@ -8,7 +8,7 @@ use super::super::super::literals::StringDataValues;
 use super::super::super::native::{FunctionRef, NativeEmitError};
 use super::super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(super) fn statement_if_can_merge(then_branch: &Block, else_branch: Option<&IfBranch>) -> bool {
     !block_has_control_flow(then_branch)

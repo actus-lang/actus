@@ -14,7 +14,7 @@ use super::packs::{
     binding_name, ensure_pack_field_is_mutable, lower_pack_field, lower_pack_field_write,
     packed_field,
 };
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]

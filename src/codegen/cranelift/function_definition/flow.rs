@@ -3,8 +3,8 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::copy_bytes;
-use crate::codegen::layout::LayoutRegistry;
 
 pub(super) fn emit_flow(
     function: &mut FunctionBuilder<'_>,

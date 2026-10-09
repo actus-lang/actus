@@ -71,7 +71,7 @@ impl NativeType {
 
     pub(crate) fn from_name_with_layout(
         name: &str,
-        layouts: &super::super::layout::LayoutRegistry,
+        layouts: &super::layout::LayoutRegistry,
     ) -> Option<Self> {
         Self::from_name(name)
             .or_else(|| layouts.id_for(name).map(Self::Struct))
@@ -80,7 +80,7 @@ impl NativeType {
 
     pub(crate) fn from_type_name_with_layout(
         type_name: Option<&TypeName>,
-        layouts: &super::super::layout::LayoutRegistry,
+        layouts: &super::layout::LayoutRegistry,
     ) -> Result<Self, NativeEmitError> {
         let Some(type_name) = type_name else { return Ok(Self::Void) };
         Self::try_from_type_name_with_layout(Some(type_name), layouts)
@@ -89,7 +89,7 @@ impl NativeType {
 
     pub(crate) fn try_from_type_name_with_layout(
         type_name: Option<&TypeName>,
-        layouts: &super::super::layout::LayoutRegistry,
+        layouts: &super::layout::LayoutRegistry,
     ) -> Option<Self> {
         type_name.and_then(|type_name| {
             if type_name.name == "Arena" {

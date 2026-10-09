@@ -26,7 +26,7 @@ pub(crate) fn lower_statement_if<'source>(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
-    layouts: &crate::codegen::layout::LayoutRegistry,
+    layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     targets: Option<LoopTargets>,
 ) -> Result<super::super::lowering::Flow, NativeEmitError> {
     let condition = super::lower_expression_with_targets(
@@ -82,7 +82,7 @@ fn lower_statement_if_branches<'source>(
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
-    layouts: &crate::codegen::layout::LayoutRegistry,
+    layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
 ) -> Result<(), NativeEmitError> {
     lower_statement_if_branch(
@@ -130,7 +130,7 @@ fn create_statement_if_blocks<'source>(
     function: &mut FunctionBuilder<'_>,
     bindings: &[&'source String],
     local_types: &HashMap<&'source String, NativeType>,
-    layouts: &crate::codegen::layout::LayoutRegistry,
+    layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
 ) -> Result<
     (cranelift_codegen::ir::Block, cranelift_codegen::ir::Block, cranelift_codegen::ir::Block),
     NativeEmitError,
@@ -160,7 +160,7 @@ fn lower_statement_if_else_branch<'source>(
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
-    layouts: &crate::codegen::layout::LayoutRegistry,
+    layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
 ) -> Result<(), NativeEmitError> {
     match else_branch {
@@ -201,7 +201,7 @@ fn lower_statement_if_branch<'source>(
     targets: Option<LoopTargets>,
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
-    layouts: &crate::codegen::layout::LayoutRegistry,
+    layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
 ) -> Result<(), NativeEmitError> {
     function.switch_to_block(branch_block);
@@ -351,7 +351,7 @@ fn emit_branch_flow(
     function: &mut FunctionBuilder<'_>,
     flow: Flow,
     result_type: NativeType,
-    layouts: &crate::codegen::layout::LayoutRegistry,
+    layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     match flow {
         Flow::Return(value, value_type) => {

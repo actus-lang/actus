@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::packs::{field_mask, mapped_bit_offset_for_storage, sign_extend_field};
-use crate::codegen::layout::{LayoutRegistry, PackFieldLayout};
+use crate::codegen::cranelift::layout::{LayoutRegistry, PackFieldLayout};
 
 pub(super) fn lower_indexed_pack_field_address(
     function: &mut FunctionBuilder<'_>,

@@ -1,7 +1,7 @@
 use crate::ast::{StructDef, StructFieldRole, TypeName};
 use crate::semantic::TypeSubstitution;
 
-use super::super::cranelift::native::NativeEmitError;
+use super::super::native::NativeEmitError;
 use super::layout::{
     GenericFieldLayout, GenericLayoutRegistry, GenericStructLayout, align_up, application_key,
     enter_layout,

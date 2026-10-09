@@ -10,7 +10,7 @@ use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::memory::store_struct_field;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
@@ -48,7 +48,7 @@ fn resolve_struct_layout<'a>(
     name: &str,
     type_arguments: &[TypeName],
     layouts: &'a LayoutRegistry,
-) -> Result<&'a crate::codegen::layout::StructLayout, NativeEmitError> {
+) -> Result<&'a crate::codegen::cranelift::layout::StructLayout, NativeEmitError> {
     let type_name = TypeName {
         name: name.to_owned(),
         arguments: type_arguments.to_vec(),
@@ -70,7 +70,7 @@ fn lower_struct_fields(
     function: &mut FunctionBuilder<'_>,
     fields: &[StructFieldInit],
     address: cranelift_codegen::ir::Value,
-    layout: &crate::codegen::layout::StructLayout,
+    layout: &crate::codegen::cranelift::layout::StructLayout,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,

@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
-use crate::codegen::layout::{FieldLayout, LayoutRegistry};
+use crate::codegen::cranelift::layout::{FieldLayout, LayoutRegistry};
 
 pub(super) fn store_struct_field(
     function: &mut FunctionBuilder<'_>,

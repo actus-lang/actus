@@ -10,8 +10,8 @@ use super::expressions::{initializer_type, lower_expression};
 use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::{copy_bytes, expression_native_type};
-use crate::codegen::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]

@@ -6,8 +6,8 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::expressions::emit_buffer_drop;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::performance::dispatch_key;
-use crate::codegen::layout::LayoutRegistry;
 
 pub(crate) fn emit_struct_drop(
     function: &mut FunctionBuilder<'_>,
@@ -38,7 +38,7 @@ fn emit_struct_drop_except(
 fn emit_owned_field_drop(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
-    field: &crate::codegen::layout::FieldLayout,
+    field: &crate::codegen::cranelift::layout::FieldLayout,
     moved_fields: &[String],
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,

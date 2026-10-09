@@ -1,8 +1,5 @@
 mod constants;
 mod cranelift;
-mod enum_layout;
-mod generic;
-mod layout;
 mod linker;
 mod model;
 mod result_constructor_spans;
@@ -31,7 +28,7 @@ pub use model::{
 };
 pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
+pub(crate) use cranelift::generic::expand_generic_instances;
+pub(crate) use cranelift::generic::specialized_generic_name;
 pub(crate) use cranelift::native::reachable_call_names;
-pub(crate) use generic::expand_generic_instances;
-pub(crate) use generic::specialized_generic_name;
 pub(crate) use result_constructors::normalize_program;

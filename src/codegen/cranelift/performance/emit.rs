@@ -9,7 +9,7 @@ use super::super::types::NativeType;
 use super::super::vtable::VtableDataIds;
 use super::{PerformanceDefinition, dispatch_key};
 use crate::codegen::cranelift::function_definition::define_function;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
 use crate::configuration::NativeBackendConfiguration;
 

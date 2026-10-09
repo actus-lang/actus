@@ -11,9 +11,9 @@ use super::super::super::native::{FunctionRef, NativeEmitError};
 use super::super::super::types::NativeType;
 use super::super::{Flow, NativeCleanupSchedule};
 use crate::ast::Expr;
+use crate::codegen::cranelift::enum_layout;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs;
-use crate::codegen::enum_layout;
-use crate::codegen::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_return(

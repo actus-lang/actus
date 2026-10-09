@@ -10,7 +10,7 @@ use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
-use crate::codegen::layout::{LayoutRegistry, PackFieldLayout};
+use crate::codegen::cranelift::layout::{LayoutRegistry, PackFieldLayout};
 use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
@@ -399,7 +399,7 @@ fn shift_value(
 }
 
 pub(super) fn packed_field<'a>(
-    pack: &'a crate::codegen::layout::PackLayout,
+    pack: &'a crate::codegen::cranelift::layout::PackLayout,
     field: &str,
 ) -> Result<&'a PackFieldLayout, NativeEmitError> {
     pack.fields
@@ -458,7 +458,7 @@ fn packed_storage_bits(
 }
 
 fn mapped_bit_offset(
-    pack: &crate::codegen::layout::PackLayout,
+    pack: &crate::codegen::cranelift::layout::PackLayout,
     field: &PackFieldLayout,
     layouts: &LayoutRegistry,
 ) -> Result<u16, NativeEmitError> {

@@ -8,7 +8,7 @@ use super::expressions::{initializer_type, lower_expression};
 use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 mod branches;
 mod context;

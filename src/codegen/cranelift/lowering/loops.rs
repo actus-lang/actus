@@ -11,7 +11,7 @@ use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 type LoopState<'source> =
     (HashMap<&'source String, cranelift_codegen::ir::Value>, HashMap<&'source String, NativeType>);

@@ -1,7 +1,7 @@
 use crate::ast::{EnumDef, EnumPayload, EnumVariant, TypeName};
 use crate::semantic::TypeSubstitution;
 
-use super::super::cranelift::native::NativeEmitError;
+use super::super::native::NativeEmitError;
 use super::layout::{
     GenericEnumLayout, GenericEnumVariantLayout, GenericFieldLayout, GenericLayoutRegistry,
     align_up, application_key, enter_layout,

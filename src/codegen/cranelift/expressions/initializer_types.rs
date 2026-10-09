@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 
-use super::super::super::layout::LayoutRegistry;
 use super::super::enums::enum_expression_type;
+use super::super::layout::LayoutRegistry;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::performance;
 use super::super::types::NativeType;

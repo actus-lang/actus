@@ -9,10 +9,10 @@ use crate::ast::{
 };
 use crate::semantic::GenericInstance;
 
-use super::cranelift::native::NativeEmitError;
-use super::cranelift::types::NativeType;
 use super::enum_layout::EnumLayout;
 use super::generic::{canonical_type_name, specialized_enums, specialized_structs};
+use super::native::NativeEmitError;
+use super::types::NativeType;
 
 mod arrays;
 mod packs;
@@ -30,7 +30,7 @@ pub(super) struct FieldLayout {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct StructLayout {
+pub(crate) struct StructLayout {
     pub(super) size: u32,
     pub(super) alignment: u32,
     pub(super) fields: Vec<FieldLayout>,

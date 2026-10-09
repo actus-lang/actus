@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{Expr, LayoutEndianness, TypeName};
 
 use super::super::types::NativeType;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(crate) fn expression_native_type(
     expression: &Expr,

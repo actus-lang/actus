@@ -7,8 +7,8 @@ use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
-use super::super::layout::LayoutRegistry;
 use super::super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
+use super::layout::LayoutRegistry;
 use super::native::{FunctionRef, NativeEmitError};
 use super::structs::emit_binding_drop;
 use super::types::NativeType;

@@ -6,14 +6,14 @@ use crate::target::TargetSpec;
 use cranelift_module::Module;
 
 use super::super::cranelift::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
-use super::super::generic::GenericLayoutRegistry;
-use super::super::layout::LayoutRegistry;
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::result_constructors::normalize_program;
 use super::emitter_declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
     define_verbs, function_metadata, validate_native_program,
 };
+use super::generic::GenericLayoutRegistry;
+use super::layout::LayoutRegistry;
 use super::literals::define_string_data;
 use super::object::create_module;
 use super::performance::PerformanceRegistry;
@@ -96,8 +96,8 @@ fn prepare_program(
         &local_instances,
     );
     let specialized_program =
-        super::super::generic::specialize_program(&normalized_program, &generic_instances)?;
-    for instance in super::super::generic::collect_concrete_type_instances(&specialized_program) {
+        super::generic::specialize_program(&normalized_program, &generic_instances)?;
+    for instance in super::generic::collect_concrete_type_instances(&specialized_program) {
         if !generic_instances.iter().any(|known| known.identity() == instance.identity()) {
             generic_instances.push(instance);
         }

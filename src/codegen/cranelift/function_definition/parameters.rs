@@ -9,7 +9,7 @@ use crate::ast::{DispatchMode, Param, VerbDecl};
 
 use super::super::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(super) type BoundParameters<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);

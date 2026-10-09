@@ -8,7 +8,7 @@ use crate::codegen::cranelift::native::NativeEmitError;
 use crate::codegen::cranelift::types::NativeType;
 
 impl LayoutRegistry {
-    pub(in crate::codegen) fn layout_for(
+    pub(crate) fn layout_for(
         &self,
         definition: &StructDef,
         visiting: &mut Vec<String>,
@@ -71,7 +71,7 @@ impl LayoutRegistry {
         Ok((layout, size, field_alignment))
     }
 
-    pub(in crate::codegen) fn native_type(
+    pub(crate) fn native_type(
         &self,
         name: &str,
         visiting: &mut Vec<String>,
@@ -127,7 +127,7 @@ impl LayoutRegistry {
         self.enum_layout_for(definition, visiting).map(|_| ())
     }
 
-    pub(in crate::codegen) fn native_type_for_type_name(
+    pub(crate) fn native_type_for_type_name(
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
@@ -138,10 +138,7 @@ impl LayoutRegistry {
         self.native_type(&type_name.name, visiting)
     }
 
-    pub(in crate::codegen) fn type_layout(
-        &self,
-        ty: NativeType,
-    ) -> Result<(u32, u32), NativeEmitError> {
+    pub(crate) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {
         Ok(match ty {
             NativeType::Int => (4, 4),
             NativeType::Integer { width, .. } => integer_layout(width)?,
@@ -210,7 +207,7 @@ impl LayoutRegistry {
         self.type_layout(pack.storage)
     }
 
-    pub(in crate::codegen) fn alignment(&self, ty: NativeType) -> Result<u32, NativeEmitError> {
+    pub(crate) fn alignment(&self, ty: NativeType) -> Result<u32, NativeEmitError> {
         Ok(match ty {
             NativeType::Struct(id) => self
                 .get(id)

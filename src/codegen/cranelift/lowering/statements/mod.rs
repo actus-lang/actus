@@ -12,8 +12,8 @@ use super::super::literals::StringDataValues;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::emit_binding_drop;
-use crate::codegen::layout::LayoutRegistry;
 
 mod compound;
 mod control_flow;

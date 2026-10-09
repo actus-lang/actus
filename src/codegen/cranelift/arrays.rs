@@ -11,8 +11,8 @@ use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::copy_bytes;
-use crate::codegen::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]

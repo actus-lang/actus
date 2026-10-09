@@ -6,7 +6,7 @@ use super::super::expressions::initializer_type;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::payload::add_payload_types;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(crate) fn infer_case_type(
     branches: &[CaseBranch],

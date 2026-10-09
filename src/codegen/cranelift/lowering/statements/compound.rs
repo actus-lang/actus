@@ -12,8 +12,8 @@ use super::super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
 use crate::codegen::cranelift::arrays::lower_array_compound_assignment;
 use crate::codegen::cranelift::buffer_index::lower_buffer_compound_assignment;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::{expression_native_type, lower_field_compound_assignment};
-use crate::codegen::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_compound_assignment<'source>(

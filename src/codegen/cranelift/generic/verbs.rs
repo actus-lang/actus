@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeIdentity, TypeName, VerbDecl};
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::cranelift::native::NativeEmitError;
+use super::super::native::NativeEmitError;
 use super::definitions::canonical_type_name;
 use super::verb_body::{specialize_block, specialize_param, specialize_return_type};
 
@@ -400,7 +400,7 @@ fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codegen::generic::definitions::specialized_enums;
+    use crate::codegen::cranelift::generic::definitions::specialized_enums;
 
     #[test]
     fn generic_specialization_preserves_structured_contracts() {

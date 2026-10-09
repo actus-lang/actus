@@ -6,7 +6,7 @@ use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
 
 use super::native::{FunctionMeta, NativeEmitError};
 use super::types::NativeType;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::symbols::{SymbolIdentity, SymbolKind};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;

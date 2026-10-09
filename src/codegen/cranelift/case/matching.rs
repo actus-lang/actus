@@ -5,7 +5,7 @@ use crate::ast::Pattern;
 
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(super) fn match_pattern(
     function: &mut FunctionBuilder<'_>,
@@ -53,8 +53,8 @@ fn variant_match_value(
     function: &mut FunctionBuilder<'_>,
     subject: cranelift_codegen::ir::Value,
     variant: &str,
-    enum_layout: &crate::codegen::enum_layout::EnumLayout,
-    variant_layout: &crate::codegen::enum_layout::EnumVariantLayout,
+    enum_layout: &crate::codegen::cranelift::enum_layout::EnumLayout,
+    variant_layout: &crate::codegen::cranelift::enum_layout::EnumVariantLayout,
 ) -> cranelift_codegen::ir::Value {
     if enum_layout.niche_pointer {
         let comparison = if variant == "None" { IntCC::Equal } else { IntCC::NotEqual };

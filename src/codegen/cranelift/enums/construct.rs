@@ -9,9 +9,9 @@ use super::super::calls::CallLoweringContext;
 use super::super::expressions::lower_expression;
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use crate::codegen::cranelift::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
+use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::copy_bytes;
-use crate::codegen::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
-use crate::codegen::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_enum_constructor(

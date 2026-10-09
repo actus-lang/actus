@@ -10,7 +10,7 @@ use super::super::super::literals::StringDataValues;
 use super::super::super::native::{FunctionRef, NativeEmitError};
 use super::super::super::types::NativeType;
 use super::super::Flow;
-use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::cranelift::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_owner_declaration<'source>(
