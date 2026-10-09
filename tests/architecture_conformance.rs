@@ -145,3 +145,25 @@ fn compiler_layers_do_not_import_reverse_pipeline_or_backend_logic() {
 fn shared_codegen_excludes_backend_specific_crates() {
     assert_shared_codegen_excludes_backend_crates();
 }
+
+#[test]
+fn cranelift_implementation_stays_inside_its_backend_boundary() {
+    let root = repository_path("src/codegen");
+    for path in rust_sources(&root) {
+        let relative = path.strip_prefix(&root).expect("codegen path should be below root");
+        if relative.components().any(|component| component.as_os_str() == "cranelift") {
+            continue;
+        }
+        if relative == Path::new("mod.rs") {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("codegen source should be readable");
+        for token in ["cranelift::", "cranelift_codegen", "cranelift_frontend"] {
+            assert!(
+                !source.contains(token),
+                "{} leaks Cranelift implementation `{token}`",
+                path.display()
+            );
+        }
+    }
+}

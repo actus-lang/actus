@@ -153,7 +153,7 @@ zero-float checks.
       spans and target context.
 - [x] Keep the representation minimal and Actus-oriented; do not reproduce a
       general optimization, instruction-selection, or register-allocation IR.
-- [ ] Prove that roles, cleanup, Region capabilities, typed failures, and
+- [x] Prove that roles, cleanup, Region capabilities, typed failures, and
       aggregate layout survive lowering without backend-specific handles.
 - [x] Add semantic and codegen tests for the contract without selecting a
       concrete machine backend.
@@ -187,10 +187,14 @@ to a validated `BackendInstruction::Fail` with an enum symbol, discriminant,
 and optional payload value. Cleanup plans can now be attached to the neutral
 function contract through `lower_verb_with_cleanup`, preserving their declared
 depth, source span, action order, and ownership cleanup operations.
+Together these tests prove that the semantic roles, Region capability modes,
+aggregate return slots, typed failure discriminants, and cleanup actions are
+represented by neutral values and metadata only; no Cranelift or LLVM handle
+is required by the contract.
 
 ## Gate 44.3 — Isolate the existing Cranelift backend
 
-- [ ] Move Cranelift-specific lowering, instruction construction, runtime
+- [x] Move Cranelift-specific lowering, instruction construction, runtime
       declarations, object emission, and linker integration under a dedicated
       backend boundary without changing behavior.
 - [ ] Keep target profiles and runtime contracts outside the Cranelift module.
@@ -201,6 +205,17 @@ depth, source span, action order, and ownership cleanup operations.
       move.
 - [x] Add an architecture test that prevents new backend-specific imports from
       entering shared frontend or semantic modules.
+
+### Gate 44.3 evidence
+
+The existing Cranelift lowering, runtime declarations, object emission, and
+linker-facing implementation are contained under `src/codegen/cranelift/`.
+`tests/architecture_conformance.rs` now verifies that shared codegen modules
+cannot contain Cranelift implementation imports or crate tokens; the root
+`src/codegen/mod.rs` remains the explicit public facade. The architecture suite
+passes with 5 tests and 0 failures. Remaining Gate 44.3 work covers target
+profiles, runtime contract extraction, and removal of backend-specific types
+from the shared public API.
 
 ## Gate 44.4 — Formalize target, object, and linker boundaries
 
