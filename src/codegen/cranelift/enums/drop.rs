@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
-use super::super::layout::LayoutRegistry;
-use super::super::performance::dispatch_key;
-use super::super::structs::emit_struct_drop;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
+use crate::codegen::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::performance::dispatch_key;
+use crate::codegen::structs::emit_struct_drop;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_enum_payload_drop(

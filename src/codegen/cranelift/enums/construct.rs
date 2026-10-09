@@ -5,13 +5,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::super::cranelift::calls::CallLoweringContext;
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
-use super::super::layout::LayoutRegistry;
-use super::super::structs::copy_bytes;
+use super::super::calls::CallLoweringContext;
+use super::super::expressions::lower_expression;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
+use crate::codegen::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::structs::copy_bytes;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_enum_constructor(

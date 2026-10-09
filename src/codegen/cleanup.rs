@@ -162,7 +162,7 @@ fn emit_payload_cleanup(
     else {
         return Ok(());
     };
-    super::enums::emit_enum_payload_drop(
+    super::cranelift::enums::emit_enum_payload_drop(
         function, name, enum_name, variant, field, locals, types, functions, layouts,
     )
 }

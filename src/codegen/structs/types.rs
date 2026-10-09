@@ -37,7 +37,9 @@ pub(crate) fn expression_native_type(
                 NativeType::Buffer => Some(NativeType::Integer { signed: false, width: 8 }),
                 _ => None,
             }),
-        Expr::MethodCall { .. } => super::super::enums::enum_expression_type(expression, layouts),
+        Expr::MethodCall { .. } => {
+            super::super::cranelift::enums::enum_expression_type(expression, layouts)
+        }
         Expr::Integer { .. } => Some(NativeType::Int),
         Expr::FloatLiteral { suffix, .. } => Some(NativeType::Float {
             width: if suffix.as_deref() == Some("f32") { 32 } else { 64 },
