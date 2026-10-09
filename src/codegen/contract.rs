@@ -166,6 +166,7 @@ pub struct BackendFunction {
     pub return_value: BackendReturn,
     pub entry: BackendBlockId,
     pub blocks: Vec<BackendBlock>,
+    pub cleanup: Vec<BackendCleanupPlan>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

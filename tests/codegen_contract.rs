@@ -7,7 +7,7 @@ use actus::codegen::{
     BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
     BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
     NativeInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb,
-    lower_verb_body, lower_verb_signature,
+    lower_verb_body, lower_verb_signature, lower_verb_with_cleanup,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -133,6 +133,7 @@ fn unit_function(parameters: Vec<BackendParameter>, blocks: Vec<BackendBlock>) -
         },
         entry: BackendBlockId(0),
         blocks,
+        cleanup: Vec::new(),
     }
 }
 
@@ -280,6 +281,7 @@ fn validates_aggregate_return_slots_without_a_backend() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        cleanup: Vec::new(),
     };
     assert!(function.validate().is_ok());
 }
@@ -298,6 +300,7 @@ fn rejects_return_slots_for_non_aggregate_values() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        cleanup: Vec::new(),
     };
     assert_eq!(function.validate(), Err(BackendContractError::ReturnSlotTypeMismatch));
 }
@@ -560,6 +563,35 @@ fn integrates_signature_and_body_into_a_valid_neutral_function() {
         .expect("signature and body should form a valid function");
     assert_eq!(function.symbol.as_str(), "app__verb_process");
     assert_eq!(function.blocks.len(), 1);
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn preserves_cleanup_plans_on_the_neutral_function_contract() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Return { value: None, span: SourceSpan::new(0, 6) }],
+        span: SourceSpan::new(0, 6),
+    };
+    let cleanup = vec![actus::codegen::BackendCleanupPlan {
+        depth: 2,
+        span: SourceSpan::new(0, 6),
+        actions: vec![BackendCleanupAction::DropBinding {
+            binding_index: 0,
+            name: "resource".to_owned(),
+        }],
+    }];
+
+    let function = lower_verb_with_cleanup(
+        "app",
+        &verb,
+        &TestLayouts,
+        &TestBodyProvider,
+        BackendBlockId(0),
+        cleanup.clone(),
+    )
+    .expect("cleanup should remain part of the neutral function");
+    assert_eq!(function.cleanup, cleanup);
     assert!(function.validate().is_ok());
 }
 

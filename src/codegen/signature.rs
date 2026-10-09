@@ -23,12 +23,22 @@ impl BackendSignature {
         entry: super::BackendBlockId,
         blocks: Vec<super::BackendBlock>,
     ) -> BackendFunction {
+        self.into_function_with_cleanup(entry, blocks, Vec::new())
+    }
+
+    pub fn into_function_with_cleanup(
+        self,
+        entry: super::BackendBlockId,
+        blocks: Vec<super::BackendBlock>,
+        cleanup: Vec<super::BackendCleanupPlan>,
+    ) -> BackendFunction {
         BackendFunction {
             symbol: self.symbol,
             parameters: self.parameters,
             return_value: self.return_value,
             entry,
             blocks,
+            cleanup,
         }
     }
 }
@@ -43,6 +53,21 @@ pub fn lower_verb(
     let signature = lower_verb_signature(namespace, verb, layouts)?;
     let blocks = lower_verb_body(verb, body_provider)?;
     let function = signature.into_function(entry, blocks);
+    function.validate()?;
+    Ok(function)
+}
+
+pub fn lower_verb_with_cleanup(
+    namespace: &str,
+    verb: &VerbDecl,
+    layouts: &impl BackendLayoutProvider,
+    body_provider: &impl BackendBodyProvider,
+    entry: super::BackendBlockId,
+    cleanup: Vec<super::BackendCleanupPlan>,
+) -> Result<BackendFunction, BackendContractError> {
+    let signature = lower_verb_signature(namespace, verb, layouts)?;
+    let blocks = lower_verb_body(verb, body_provider)?;
+    let function = signature.into_function_with_cleanup(entry, blocks, cleanup);
     function.validate()?;
     Ok(function)
 }
