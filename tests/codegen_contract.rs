@@ -1,9 +1,9 @@
 use actus::ast::Role;
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendContractError, BackendFunction, BackendInstruction,
-    BackendLayout, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
-    BackendTargetContext, BackendUnsupportedOperation, BackendValueType, NativeInstruction,
-    SymbolIdentity, SymbolKind,
+    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendFunction,
+    BackendInstruction, BackendLayout, BackendParameter, BackendPassingMode, BackendReturn,
+    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
+    NativeInstruction, SymbolIdentity, SymbolKind,
 };
 use actus::lexer::SourceSpan;
 
@@ -232,4 +232,41 @@ fn validates_control_flow_targets_without_a_machine_backend() {
     invalid.blocks[0].instructions[0] =
         BackendInstruction::Jump { target: BackendBlockId(2), span: SourceSpan::new(0, 1) };
     assert_eq!(invalid.validate(), Err(BackendContractError::InvalidBlockReference));
+}
+
+#[test]
+fn preserves_typed_failures_without_a_machine_backend() {
+    let result_type =
+        SymbolIdentity::new("std", SymbolKind::Enum, "Result").expect("valid enum symbol");
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: result_type.clone(),
+                    discriminant: 1,
+                    payload: None,
+                },
+                span: SourceSpan::new(8, 18),
+            }],
+        }],
+    );
+    assert!(function.validate().is_ok());
+
+    let invalid = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: verb_symbol(),
+                    discriminant: 1,
+                    payload: None,
+                },
+                span: SourceSpan::new(8, 18),
+            }],
+        }],
+    );
+    assert_eq!(invalid.validate(), Err(BackendContractError::InvalidFailureType));
 }

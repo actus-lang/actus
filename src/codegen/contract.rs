@@ -102,6 +102,10 @@ pub enum BackendInstruction {
         target: BackendBlockId,
         span: SourceSpan,
     },
+    Fail {
+        failure: BackendFailure,
+        span: SourceSpan,
+    },
     Return {
         value: Option<BackendValueId>,
         span: SourceSpan,
@@ -114,6 +118,13 @@ pub enum BackendInstruction {
         action: NativeInstruction,
         span: SourceSpan,
     },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendFailure {
+    pub result_type: SymbolIdentity,
+    pub discriminant: u32,
+    pub payload: Option<BackendValueId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -133,62 +144,100 @@ pub struct BackendFunction {
 
 impl BackendFunction {
     pub fn validate(&self) -> Result<(), BackendContractError> {
-        if self.symbol.kind() != SymbolKind::Verb && self.symbol.kind() != SymbolKind::External {
-            return Err(BackendContractError::InvalidFunctionSymbol);
-        }
-        let mut block_ids = BTreeSet::new();
-        let mut parameter_names = BTreeSet::new();
-        for parameter in &self.parameters {
-            if parameter.name.is_empty() {
-                return Err(BackendContractError::EmptyParameterName);
-            }
-            if !parameter_names.insert(&parameter.name) {
-                return Err(BackendContractError::DuplicateParameterName);
-            }
-            validate_value_type(parameter.ty)?;
-            validate_parameter(parameter)?;
-        }
-        validate_value_type(self.return_value.ty)?;
-        if let BackendReturnMode::ReturnSlot { layout } = self.return_value.passing {
-            layout.validate()?;
-            match self.return_value.ty {
-                BackendValueType::Aggregate { layout: value_layout } if value_layout == layout => {}
-                _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
-            }
-        }
-        for block in &self.blocks {
-            if !block_ids.insert(block.id) {
-                return Err(BackendContractError::DuplicateBlockId);
-            }
-        }
-        if self.blocks.iter().filter(|block| block.id == self.entry).count() != 1 {
-            return Err(BackendContractError::MissingEntryBlock);
-        }
-        for block in &self.blocks {
-            for instruction in &block.instructions {
-                match instruction {
-                    BackendInstruction::Call { callee, .. } => {
-                        if callee.as_str().is_empty() {
-                            return Err(BackendContractError::InvalidCallSymbol);
-                        }
-                    }
-                    BackendInstruction::Branch { then_block, else_block, .. } => {
-                        if !block_ids.contains(then_block) || !block_ids.contains(else_block) {
-                            return Err(BackendContractError::InvalidBlockReference);
-                        }
-                    }
-                    BackendInstruction::Jump { target, .. } => {
-                        if !block_ids.contains(target) {
-                            return Err(BackendContractError::InvalidBlockReference);
-                        }
-                    }
-                    BackendInstruction::Return { .. }
-                    | BackendInstruction::Trap { .. }
-                    | BackendInstruction::Cleanup { .. } => {}
-                }
-            }
-        }
+        validate_function_symbol(&self.symbol)?;
+        validate_parameters(&self.parameters)?;
+        validate_return(&self.return_value)?;
+        let block_ids = validate_blocks(&self.blocks, self.entry)?;
+        validate_instructions(&self.blocks, &block_ids)?;
         Ok(())
+    }
+}
+
+fn validate_function_symbol(symbol: &SymbolIdentity) -> Result<(), BackendContractError> {
+    if matches!(symbol.kind(), SymbolKind::Verb | SymbolKind::External) {
+        Ok(())
+    } else {
+        Err(BackendContractError::InvalidFunctionSymbol)
+    }
+}
+
+fn validate_parameters(parameters: &[BackendParameter]) -> Result<(), BackendContractError> {
+    let mut names = BTreeSet::new();
+    for parameter in parameters {
+        if parameter.name.is_empty() {
+            return Err(BackendContractError::EmptyParameterName);
+        }
+        if !names.insert(&parameter.name) {
+            return Err(BackendContractError::DuplicateParameterName);
+        }
+        validate_value_type(parameter.ty)?;
+        validate_parameter(parameter)?;
+    }
+    Ok(())
+}
+
+fn validate_return(return_value: &BackendReturn) -> Result<(), BackendContractError> {
+    validate_value_type(return_value.ty)?;
+    if let BackendReturnMode::ReturnSlot { layout } = return_value.passing {
+        layout.validate()?;
+        match return_value.ty {
+            BackendValueType::Aggregate { layout: value_layout } if value_layout == layout => {}
+            _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
+        }
+    }
+    Ok(())
+}
+
+fn validate_blocks(
+    blocks: &[BackendBlock],
+    entry: BackendBlockId,
+) -> Result<BTreeSet<BackendBlockId>, BackendContractError> {
+    let mut ids = BTreeSet::new();
+    for block in blocks {
+        if !ids.insert(block.id) {
+            return Err(BackendContractError::DuplicateBlockId);
+        }
+    }
+    if !ids.contains(&entry) {
+        return Err(BackendContractError::MissingEntryBlock);
+    }
+    Ok(ids)
+}
+
+fn validate_instructions(
+    blocks: &[BackendBlock],
+    block_ids: &BTreeSet<BackendBlockId>,
+) -> Result<(), BackendContractError> {
+    for block in blocks {
+        for instruction in &block.instructions {
+            validate_instruction(instruction, block_ids)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_instruction(
+    instruction: &BackendInstruction,
+    block_ids: &BTreeSet<BackendBlockId>,
+) -> Result<(), BackendContractError> {
+    match instruction {
+        BackendInstruction::Call { callee, .. } if callee.as_str().is_empty() => {
+            Err(BackendContractError::InvalidCallSymbol)
+        }
+        BackendInstruction::Branch { then_block, else_block, .. }
+            if !block_ids.contains(then_block) || !block_ids.contains(else_block) =>
+        {
+            Err(BackendContractError::InvalidBlockReference)
+        }
+        BackendInstruction::Jump { target, .. } if !block_ids.contains(target) => {
+            Err(BackendContractError::InvalidBlockReference)
+        }
+        BackendInstruction::Fail { failure, .. }
+            if failure.result_type.kind() != SymbolKind::Enum =>
+        {
+            Err(BackendContractError::InvalidFailureType)
+        }
+        _ => Ok(()),
     }
 }
 
@@ -240,6 +289,7 @@ pub enum BackendContractError {
     DuplicateBlockId,
     InvalidBlockReference,
     InvalidValueType,
+    InvalidFailureType,
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
@@ -291,6 +341,9 @@ impl std::fmt::Display for BackendContractError {
             }
             Self::InvalidValueType => {
                 formatter.write_str("backend value type has an invalid width")
+            }
+            Self::InvalidFailureType => {
+                formatter.write_str("backend typed failure must reference an enum result type")
             }
             Self::ReturnSlotTypeMismatch => {
                 formatter.write_str("backend return slot must match an aggregate return type")
