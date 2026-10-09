@@ -51,6 +51,22 @@ rg -l "cranelift" src tests benches | sort
 The inventory is intentionally recorded before any move so the migration can
 prove that shared modules no longer import backend-specific types.
 
+## Responsibility mapping
+
+| Responsibility | Shared boundary | Cranelift implementation |
+| --- | --- | --- |
+| Backend-neutral functions, blocks, values, calls, returns, traps, cleanup, and role-aware passing | `src/codegen/contract.rs` | Consumes the contract when backend lowering is introduced |
+| Deterministic symbol identity and symbol kinds | `src/codegen/symbols.rs` | Uses the identity when declaring and emitting symbols |
+| Cleanup and unwind plans derived from semantic state | `src/codegen/model.rs` | Emits the plan through Cranelift cleanup lowering |
+| Actus semantic lowering and source diagnostics | parser, semantic, and shared codegen interfaces | Must not import backend crates |
+| Native instruction construction, target ISA setup, object emission, runtime declarations, and linker integration | Target-neutral metadata only | `src/codegen/cranelift/` |
+
+The mapping is enforced by the architecture conformance test. Shared codegen
+modules may expose Actus contracts and metadata, but they may not name
+Cranelift crates. The implementation boundary is visible in the filesystem:
+Cranelift imports remain below `src/codegen/cranelift/`; a future LLVM
+implementation belongs below `src/codegen/llvm/`.
+
 ## Decision
 
 Actus will introduce a backend-neutral lowering contract under `src/codegen`
@@ -181,8 +197,9 @@ ownership rules.
       commit.
 - [x] The current Cranelift dependency surface is recorded above.
 - [x] The proposed backend-neutral boundary and migration order are recorded.
-- [ ] The shared contract is implemented and covered by backend-independent
-      tests.
+- [x] The shared contract is implemented and covered by backend-independent
+      tests for layouts, role-aware passing, return slots, diagnostics, and
+      control-flow targets.
 - [ ] Cranelift is isolated without observable behavior changes.
 - [ ] Optional LLVM hosted lowering passes the shared contract suite.
 - [ ] ARM32/Thumb output passes target-specific ABI and execution evidence.

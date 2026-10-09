@@ -116,9 +116,9 @@ optimization and instruction-selection layers.
       target-profile, and zero-float contracts.
 - [x] Add a migration ADR describing the accepted boundary and compatibility
       rules.
-- [ ] Map each shared codegen responsibility to a backend-neutral contract or a
+- [x] Map each shared codegen responsibility to a backend-neutral contract or a
       backend-specific implementation.
-- [ ] Enforce the filesystem boundary: Cranelift-only files under
+- [x] Enforce the filesystem boundary: Cranelift-only files under
       `src/codegen/cranelift/`, LLVM-only files under `src/codegen/llvm/`, and
       backend-independent contracts in shared `src/codegen/` modules.
 - [ ] Add baseline tests that prove current Cranelift behavior before any
