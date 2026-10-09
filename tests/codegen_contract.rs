@@ -3,10 +3,10 @@ use actus::ast::{
 };
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendBodyProvider, BackendCleanupAction, BackendContractError,
-    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
-    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueId,
-    BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
+    BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode,
+    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
+    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
     lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_signature,
     lower_verb_with_cleanup,
 };
@@ -55,7 +55,19 @@ impl BackendBodyProvider for TestBodyProvider {
                 .expect("valid result symbol"),
             discriminant: 1,
             payload: Some(actus::codegen::BackendValueId(7)),
+            layout: result_layout(),
         }))
+    }
+}
+
+fn result_layout() -> BackendEnumLayout {
+    BackendEnumLayout {
+        layout: BackendLayout { size: 16, alignment: 8 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 8,
+        payload: Some(BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
     }
 }
 
@@ -382,7 +394,8 @@ fn preserves_typed_failures_without_a_machine_backend() {
                 failure: BackendFailure {
                     result_type: result_type.clone(),
                     discriminant: 1,
-                    payload: None,
+                    payload: Some(BackendValueId(7)),
+                    layout: result_layout(),
                 },
                 span: SourceSpan::new(8, 18),
             }],
@@ -398,7 +411,8 @@ fn preserves_typed_failures_without_a_machine_backend() {
                 failure: BackendFailure {
                     result_type: verb_symbol(),
                     discriminant: 1,
-                    payload: None,
+                    payload: Some(BackendValueId(7)),
+                    layout: result_layout(),
                 },
                 span: SourceSpan::new(8, 18),
             }],

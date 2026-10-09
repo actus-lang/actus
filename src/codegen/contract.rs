@@ -2,6 +2,7 @@ use crate::ast::Role;
 use crate::lexer::SourceSpan;
 use std::collections::BTreeSet;
 
+use super::enum_layout::BackendEnumLayout;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
@@ -156,6 +157,7 @@ pub struct BackendFailure {
     pub result_type: SymbolIdentity,
     pub discriminant: u32,
     pub payload: Option<BackendValueId>,
+    pub layout: BackendEnumLayout,
 }
 
 pub type BackendCleanupAction = LoweredCleanupInstruction;
@@ -332,11 +334,7 @@ fn validate_instruction(
         BackendInstruction::Jump { target, .. } if !block_ids.contains(target) => {
             Err(BackendContractError::InvalidBlockReference)
         }
-        BackendInstruction::Fail { failure, .. }
-            if failure.result_type.kind() != SymbolKind::Enum =>
-        {
-            Err(BackendContractError::InvalidFailureType)
-        }
+        BackendInstruction::Fail { failure, .. } => super::enum_layout::validate_failure(failure),
         BackendInstruction::MemoryCopy { size, alignment, .. }
             if *size == 0
                 || *alignment == 0
@@ -392,6 +390,7 @@ fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError>
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendContractError {
     InvalidLayout(&'static str),
+    InvalidEnumLayout(&'static str),
     InvalidFunctionSymbol,
     InvalidExternalSymbol,
     MissingEntryBlock,
@@ -439,6 +438,9 @@ impl std::fmt::Display for BackendContractError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidLayout(reason) => write!(formatter, "invalid backend layout: {reason}"),
+            Self::InvalidEnumLayout(reason) => {
+                write!(formatter, "invalid backend enum layout: {reason}")
+            }
             Self::InvalidFunctionSymbol => formatter.write_str("invalid backend function symbol"),
             Self::InvalidExternalSymbol => formatter.write_str("invalid backend external symbol"),
             Self::MissingEntryBlock => {

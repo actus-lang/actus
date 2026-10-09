@@ -137,6 +137,23 @@ source span, selected backend, target profile, and stable reason text. A
 backend must return this diagnostic instead of approximating an unsupported
 Actus contract.
 
+### Enum and typed-failure representation
+
+Typed failures carry an explicit `BackendEnumLayout` through the neutral
+contract. The layout records the aggregate extent and alignment, discriminant
+byte offset and width, payload byte offset and layout when a payload exists,
+and whether the representation uses a niche pointer. The contract validates
+every range, alignment, and payload-presence relationship before backend
+emission. A backend therefore cannot infer a `Result` or `Option` layout from
+only its type name.
+
+The LLVM hosted emitter lowers regular aggregate enum failures with an integer
+payload by materializing the declared layout, writing the discriminant and
+payload at their explicit byte offsets, and returning the aggregate directly
+or through the declared return slot. Niche-pointer representations remain an
+explicit unsupported case until their pointer sentinel and ownership rules
+are represented in the shared contract.
+
 ## Mandatory contracts
 
 ### Initial LLVM integration policy

@@ -5,6 +5,7 @@ mod constants;
 mod contract;
 #[cfg(feature = "cranelift")]
 pub mod cranelift;
+mod enum_layout;
 mod linker;
 #[cfg(feature = "llvm")]
 pub mod llvm;
@@ -26,6 +27,7 @@ pub use contract::{
     BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
     BackendValueId, BackendValueType, lower_semantic_cleanup,
 };
+pub use enum_layout::BackendEnumLayout;
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};
 pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,

@@ -3,9 +3,9 @@
 use actus::ast::Role;
 use actus::codegen::llvm::emit_module;
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendFunction, BackendInstruction, BackendModule,
-    BackendParameter, BackendReturn, BackendReturnMode, BackendValueId, BackendValueType,
-    LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    BackendBlock, BackendBlockId, BackendEnumLayout, BackendFailure, BackendFunction,
+    BackendInstruction, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
+    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
 };
 
 #[test]
@@ -230,6 +230,95 @@ fn lowers_pointer_memory_copy_with_declared_extent_and_alignment() {
         .expect("pointer memory copy should lower to LLVM memmove");
     assert!(ir.contains("llvm.memmove"));
     assert!(ir.contains("i64 16"));
+}
+
+#[test]
+fn lowers_regular_enum_failure_with_discriminant_and_integer_payload() {
+    let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let enum_layout = BackendEnumLayout {
+        layout,
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 8,
+        payload: Some(actus::codegen::BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
+    };
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "failure").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "error".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Integer { signed: true, width: 32 },
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::Aggregate { layout },
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Result")
+                        .expect("valid result symbol"),
+                    discriminant: 1,
+                    payload: Some(BackendValueId(0)),
+                    layout: enum_layout,
+                },
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("regular enum failure should lower to an aggregate return");
+    assert!(ir.contains("store i32 1"));
+    assert!(ir.contains("store i32 %0"));
+    assert!(ir.contains("ret [2 x i64]"));
+}
+
+#[test]
+fn rejects_niche_enum_failure_until_pointer_niche_lowering_exists() {
+    let layout = actus::codegen::BackendLayout { size: 8, alignment: 8 };
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "niche_failure").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::Aggregate { layout },
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Option")
+                        .expect("valid option symbol"),
+                    discriminant: 1,
+                    payload: None,
+                    layout: BackendEnumLayout {
+                        layout,
+                        discriminant_offset: 0,
+                        discriminant_size: 4,
+                        payload_offset: 0,
+                        payload: None,
+                        niche_pointer: true,
+                    },
+                },
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let error = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect_err("niche enum lowering is intentionally not approximated");
+    assert!(error.0.contains("niche-pointer failure lowering is not implemented"));
 }
 
 #[test]

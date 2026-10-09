@@ -324,6 +324,14 @@ for those operations.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.
+The neutral contract now carries explicit enum representation metadata for
+typed failures: aggregate extent and alignment, discriminant offset and width,
+payload offset and layout, and niche-pointer mode. Contract validation rejects
+invalid ranges and mismatched payload metadata. LLVM lowers regular aggregate
+enum failures with integer payloads by constructing the declared byte layout
+and returning it directly or through the declared return slot; the LLVM module
+verifier covers the generated IR. Niche-pointer `Option` lowering remains open
+and is rejected with a stable diagnostic rather than approximated.
 CI now runs a separate Cranelift-only configuration across all targets and a
 separate LLVM-only configuration that checks the compiler library and binary
 surface plus the LLVM integration suite. The LLVM-only configuration does not
