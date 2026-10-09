@@ -285,7 +285,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       trap, and cleanup contract.
 - [ ] Add aggregate layout, memory-copy, enum discriminant, and Result/Option
       lowering using the same Actus layout rules as Cranelift.
-- [ ] Add runtime bridge declarations and external symbol validation.
+- [x] Add runtime bridge declarations and external symbol validation.
 - [ ] Emit deterministic object files and link a hosted executable.
 - [ ] Compare LLVM and Cranelift semantic results for shared fixtures.
 - [ ] Verify integer-only programs do not acquire floating-point instructions
@@ -332,6 +332,10 @@ enum failures with integer payloads by constructing the declared byte layout
 and returning it directly or through the declared return slot; the LLVM module
 verifier covers the generated IR. Niche-pointer `Option` lowering remains open
 and is rejected with a stable diagnostic rather than approximated.
+Neutral `BackendExternal` declarations are emitted with the same validated
+symbol identity and signature contract as internal functions. The LLVM suite
+also covers an external runtime-style declaration and call, including the
+deterministic symbol spelling and typed argument.
 CI now runs a separate Cranelift-only configuration across all targets and a
 separate LLVM-only configuration that checks the compiler library and binary
 surface plus the LLVM integration suite. The LLVM-only configuration does not

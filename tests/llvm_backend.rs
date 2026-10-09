@@ -3,9 +3,10 @@
 use actus::ast::Role;
 use actus::codegen::llvm::emit_module;
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendEnumLayout, BackendFailure, BackendFunction,
-    BackendInstruction, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
-    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    BackendBlock, BackendBlockId, BackendEnumLayout, BackendExternal, BackendFailure,
+    BackendFunction, BackendInstruction, BackendModule, BackendParameter, BackendReturn,
+    BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity,
+    SymbolKind,
 };
 
 #[test]
@@ -94,6 +95,62 @@ fn emits_scalar_parameter_return_and_direct_call() {
     assert!(ir.contains("define i32 @test__verb_add_5fone"));
     assert!(ir.contains("define i32 @test__verb_main"));
     assert!(ir.contains("call i32 @test__verb_add_5fone"));
+}
+
+#[test]
+fn declares_and_calls_a_neutral_external_runtime_symbol() {
+    let external_symbol =
+        SymbolIdentity::new("runtime", SymbolKind::External, "write_byte").expect("valid symbol");
+    let external = BackendExternal {
+        symbol: external_symbol.clone(),
+        parameters: vec![BackendParameter {
+            name: "byte".to_owned(),
+            role: Role::Abs,
+            ty: BackendValueType::Integer { signed: false, width: 32 },
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+    };
+    let function = BackendFunction {
+        symbol: SymbolIdentity::new("test", SymbolKind::Verb, "runtime_call")
+            .expect("valid symbol"),
+        parameters: vec![BackendParameter {
+            name: "byte".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Integer { signed: false, width: 32 },
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: external_symbol,
+                    arguments: vec![BackendValueId(0)],
+                    result: None,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: vec![external], functions: vec![function] })
+        .expect("neutral external should be declared and called");
+    assert!(ir.contains("declare void @runtime__extern_write_5fbyte(i32)"));
+    assert!(ir.contains("call void @runtime__extern_write_5fbyte(i32 %0)"));
 }
 
 #[test]
