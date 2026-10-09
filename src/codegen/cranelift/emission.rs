@@ -12,7 +12,7 @@ use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::performance::PerformanceRegistry;
 use super::super::performance::define_performances;
 use super::super::result_constructors::normalize_program;
-use super::declarations::{
+use super::emitter_declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
     define_verbs, function_metadata, validate_native_program,
 };

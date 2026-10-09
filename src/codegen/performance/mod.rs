@@ -159,8 +159,11 @@ fn declare_performance_function(
     definition: &PerformanceDefinition<'_>,
     layouts: &LayoutRegistry,
 ) -> Result<FunctionMeta, NativeEmitError> {
-    let signature =
-        super::declarations::native_signature_for_definition(module, definition.method, layouts)?;
+    let signature = super::cranelift::declarations::native_signature_for_definition(
+        module,
+        definition.method,
+        layouts,
+    )?;
     let id = module
         .declare_function(&definition.symbol, Linkage::Local, &signature)
         .map_err(|error| NativeEmitError(error.to_string()))?;
