@@ -109,17 +109,27 @@ optimization and instruction-selection layers.
 
 ## Gate 44.1 — Freeze the current backend contract
 
-- [ ] Record the checkpoint commit and tag as the migration baseline.
-- [ ] Inventory every Cranelift import outside the backend implementation
+- [x] Record the checkpoint commit and tag as the migration baseline.
+- [x] Inventory every Cranelift import outside the backend implementation
       boundary.
-- [ ] Inventory the current native ABI, runtime bridge, linker, object-format,
+- [x] Inventory the current native ABI, runtime bridge, linker, object-format,
       target-profile, and zero-float contracts.
+- [x] Add a migration ADR describing the accepted boundary and compatibility
+      rules.
 - [ ] Map each shared codegen responsibility to a backend-neutral contract or a
       backend-specific implementation.
-- [ ] Add a migration ADR describing the accepted boundary and compatibility
-      rules.
 - [ ] Add baseline tests that prove current Cranelift behavior before any
       implementation move.
+
+### Gate 44.1 evidence
+
+The baseline tag is `checkpoint/pre-backend-refactor`. The current dependency
+and source inventory, proposed backend boundary, optional LLVM policy, target
+ABI controls, and migration order are recorded in
+`docs/roadmap/adr-0052-backend-boundary-and-llvm.md`.
+
+**Gate status: In progress** — the inventory and architecture decision are
+recorded; responsibility mapping and baseline regression evidence remain open.
 
 ## Gate 44.2 — Define the backend-neutral lowering contract
 
