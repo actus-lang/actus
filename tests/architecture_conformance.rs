@@ -167,3 +167,13 @@ fn cranelift_implementation_stays_inside_its_backend_boundary() {
         }
     }
 }
+
+#[test]
+fn target_and_runtime_layers_exclude_cranelift_implementation_types() {
+    for directory in ["src/target", "src/runtime"] {
+        assert_layer_excludes(
+            directory,
+            &["crate::codegen::cranelift", "cranelift_codegen", "cranelift_frontend"],
+        );
+    }
+}

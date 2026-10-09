@@ -197,7 +197,7 @@ is required by the contract.
 - [x] Move Cranelift-specific lowering, instruction construction, runtime
       declarations, object emission, and linker integration under a dedicated
       backend boundary without changing behavior.
-- [ ] Keep target profiles and runtime contracts outside the Cranelift module.
+- [x] Keep target profiles and runtime contracts outside the Cranelift module.
 - [ ] Remove direct Cranelift types from shared lowering and semantic APIs.
 - [ ] Preserve object identity, symbol names, cleanup order, ABI layout,
       diagnostics, and zero-float verification.
@@ -213,9 +213,10 @@ linker-facing implementation are contained under `src/codegen/cranelift/`.
 `tests/architecture_conformance.rs` now verifies that shared codegen modules
 cannot contain Cranelift implementation imports or crate tokens; the root
 `src/codegen/mod.rs` remains the explicit public facade. The architecture suite
-passes with 5 tests and 0 failures. Remaining Gate 44.3 work covers target
-profiles, runtime contract extraction, and removal of backend-specific types
-from the shared public API.
+passes with 6 tests and 0 failures. Target and runtime source trees are also
+checked for Cranelift implementation imports. Remaining Gate 44.3 work covers
+removing backend-specific types from the shared public API and preserving all
+ABI, symbol, cleanup, and zero-float behavior through the boundary.
 
 ## Gate 44.4 — Formalize target, object, and linker boundaries
 
