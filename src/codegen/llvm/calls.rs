@@ -79,8 +79,12 @@ fn build_call(
     result: Option<BackendValueId>,
     arguments: &mut [LLVMValueRef],
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let call_name = CString::new(result.map(|id| format!("call{}", id.0)).unwrap_or_default())
-        .map_err(|_| BackendEmitError("LLVM call name contains NUL".to_owned()))?;
+    let call_name = if declaration.returns_void {
+        CString::new("")
+    } else {
+        CString::new(result.map(|id| format!("call{}", id.0)).unwrap_or_default())
+    }
+    .map_err(|_| BackendEmitError("LLVM call name contains NUL".to_owned()))?;
     let call = unsafe {
         LLVMBuildCall2(
             builder,

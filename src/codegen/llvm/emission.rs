@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
+use std::ptr;
 
+use llvm_sys::analysis::{LLVMVerifierFailureAction, LLVMVerifyModule};
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
     LLVMDisposeMessage, LLVMPrintModuleToString,
@@ -31,6 +33,7 @@ pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
             .ok_or_else(|| BackendEmitError("LLVM function declaration is missing".to_owned()))?;
         emit_function(context.raw, function, declaration, &declarations)?;
     }
+    verify_module(owned_module.raw)?;
     print_module(owned_module.raw)
 }
 
@@ -106,4 +109,23 @@ fn print_module(module: LLVMModuleRef) -> Result<String, BackendEmitError> {
         .to_owned();
     unsafe { LLVMDisposeMessage(printed) };
     Ok(text)
+}
+
+fn verify_module(module: LLVMModuleRef) -> Result<(), BackendEmitError> {
+    let mut message = ptr::null_mut();
+    let failed = unsafe {
+        LLVMVerifyModule(module, LLVMVerifierFailureAction::LLVMReturnStatusAction, &mut message)
+            != 0
+    };
+    if !failed {
+        return Ok(());
+    }
+    let diagnostic = if message.is_null() {
+        "LLVM module verification failed".to_owned()
+    } else {
+        let text = unsafe { CStr::from_ptr(message) }.to_string_lossy().into_owned();
+        unsafe { LLVMDisposeMessage(message) };
+        text
+    };
+    Err(BackendEmitError(format!("LLVM module verification failed: {diagnostic}")))
 }
