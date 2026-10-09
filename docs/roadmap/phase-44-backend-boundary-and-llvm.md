@@ -277,7 +277,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       policy.
 - [x] Put the LLVM integration behind an explicit Cargo feature such as
       `llvm`; the default Cranelift build must not require LLVM or llvm-sys.
-- [ ] Test the default feature set and the LLVM feature set as independent CI
+- [x] Test the default feature set and the LLVM feature set as independent CI
       configurations.
 - [ ] Report LLVM installation, build-time, dependency, and binary-size
       requirements separately from the default compiler.
@@ -316,6 +316,11 @@ build and this emitter slice are covered by the LLVM integration test.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.
+CI now runs a separate Cranelift-only configuration across all targets and a
+separate LLVM-only configuration that checks the compiler library and binary
+surface plus the LLVM integration suite. The LLVM-only configuration does not
+claim that Cranelift-specific native fixtures are supported without the
+Cranelift feature.
 
 ## Gate 44.6 — Add ARM32/Thumb target support
 

@@ -103,3 +103,37 @@ jobs:
       - name: Check standard library conformance
         shell: bash
         run: ./scripts/check_stdlib.sh
+
+  cranelift-only:
+    name: Cranelift-only feature contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check compilation without LLVM
+        run: cargo check --no-default-features --features cranelift --all-targets
+
+      - name: Run Cranelift-only tests
+        run: cargo test --no-default-features --features cranelift --all-targets -- --test-threads=1
+
+  llvm-only:
+    name: LLVM-only feature contract
+    runs-on: ubuntu-latest
+    env:
+      LLVM_SYS_231_PREFIX: /usr
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify LLVM installation
+        shell: bash
+        run: |
+          llvm-config --version
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
+      - name: Check LLVM compiler surface
+        run: cargo check --no-default-features --features llvm --lib --bin actus
+
+      - name: Run LLVM backend integration suite
+        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
