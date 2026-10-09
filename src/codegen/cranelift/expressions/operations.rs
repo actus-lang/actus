@@ -7,12 +7,12 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr, UnaryOp};
 
-use super::super::calls::CallLoweringContext;
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
+use super::super::super::calls::CallLoweringContext;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 use super::initializer_type;
 
-pub(in crate::codegen) fn lower_operation(
+pub(crate) fn lower_operation(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
@@ -156,7 +156,7 @@ fn lower_integer_operation(
     })
 }
 
-pub(in crate::codegen) fn lower_compound_integer_operation(
+pub(crate) fn lower_compound_integer_operation(
     function: &mut FunctionBuilder<'_>,
     left: cranelift_codegen::ir::Value,
     operator: BinaryOp,

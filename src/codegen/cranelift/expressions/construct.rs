@@ -2,15 +2,15 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::super::arrays::lower_array_constructor;
-use super::super::calls::CallLoweringContext;
-use super::super::calls::{lower_call, lower_method_call};
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
-use super::super::enums::{enum_receiver_name, lower_enum_constructor};
-use super::super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
+use super::super::super::arrays::lower_array_constructor;
+use super::super::super::calls::CallLoweringContext;
+use super::super::super::calls::{lower_call, lower_method_call};
+use super::super::super::enums::{enum_receiver_name, lower_enum_constructor};
+use super::super::super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 
-pub(in crate::codegen) fn lower_construct(
+pub(crate) fn lower_construct(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
@@ -138,7 +138,7 @@ fn lower_arena_method(
     if !is_arena_method(receiver, method, context) {
         return None;
     }
-    Some(super::super::arenas::lower_place(
+    Some(super::super::super::arenas::lower_place(
         function,
         receiver,
         arguments,
@@ -154,7 +154,7 @@ fn lower_arena_method(
 fn is_arena_method(receiver: &Expr, method: &str, context: &CallLoweringContext<'_, '_>) -> bool {
     method == "place"
         && matches!(
-            super::super::structs::expression_native_type(
+            super::super::super::structs::expression_native_type(
                 receiver,
                 context.local_types,
                 context.layouts,

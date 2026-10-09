@@ -59,7 +59,11 @@ pub(super) fn lower_inline_pack_field(
         load_type.bits() as u16,
         load_type,
     );
-    Ok(super::super::expressions::coerce_to_ir_type(function, value, layouts.ir_type(field.ty)?))
+    Ok(super::super::cranelift::expressions::coerce_to_ir_type(
+        function,
+        value,
+        layouts.ir_type(field.ty)?,
+    ))
 }
 
 pub(super) fn lower_inline_pack_field_write(
@@ -90,7 +94,11 @@ pub(super) fn lower_inline_pack_field_write(
     let shifted_mask = function.ins().ishl(mask, shift);
     let inverse_mask = function.ins().bnot(shifted_mask);
     let cleared = function.ins().band(current, inverse_mask);
-    let value = super::super::expressions::coerce_to_ir_type(function, new_value, container_type);
+    let value = super::super::cranelift::expressions::coerce_to_ir_type(
+        function,
+        new_value,
+        container_type,
+    );
     let masked_value = function.ins().band(value, mask);
     let value = function.ins().ishl(masked_value, shift);
     let mut updated = function.ins().bor(cleared, value);

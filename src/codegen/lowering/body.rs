@@ -132,7 +132,7 @@ fn lower_case_tail(
         return Ok(None);
     }
     tail.map(|expression| {
-        super::super::expressions::lower_expression_with_targets(
+        super::super::cranelift::expressions::lower_expression_with_targets(
             function,
             expression,
             locals,

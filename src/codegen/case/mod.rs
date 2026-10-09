@@ -4,10 +4,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
+use super::cranelift::expressions::{initializer_type, lower_expression};
 use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::cranelift::types::NativeType;
-use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 
 mod branches;

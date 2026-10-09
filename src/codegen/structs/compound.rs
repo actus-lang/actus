@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
+use super::super::cranelift::expressions::{lower_compound_integer_operation, lower_expression};
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
-use super::super::expressions::{lower_compound_integer_operation, lower_expression};
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
@@ -266,5 +266,9 @@ fn lower_pack_compound_rhs(
         string_data,
         layouts,
     )?;
-    Ok(super::super::expressions::coerce_to_ir_type(function, value, layouts.ir_type(field_type)?))
+    Ok(super::super::cranelift::expressions::coerce_to_ir_type(
+        function,
+        value,
+        layouts.ir_type(field_type)?,
+    ))
 }

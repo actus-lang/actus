@@ -49,7 +49,7 @@ pub(super) fn lower_if_statement<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     if statement_if_can_merge(then_branch, else_branch.as_ref()) {
-        return super::super::super::expressions::lower_statement_if(
+        return super::super::super::cranelift::expressions::lower_statement_if(
             function,
             condition,
             then_branch,

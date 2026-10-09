@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
+use super::super::super::cranelift::expressions::{initializer_type, lower_expression};
 use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::super::cranelift::types::NativeType;
-use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::layout::LayoutRegistry;
 use super::super::Flow;
 
@@ -106,7 +106,7 @@ fn coerce_owner_value(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     match declared_native {
-        Some(declared) => Ok(super::super::super::expressions::coerce_to_ir_type(
+        Some(declared) => Ok(super::super::super::cranelift::expressions::coerce_to_ir_type(
             function,
             value,
             layouts.ir_type(declared)?,
@@ -164,10 +164,10 @@ fn lower_special_initializer(
             Some(super::super::super::arrays::lower_array_constructor(function, id, layouts)?)
         }
         (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
-            Some(super::super::super::expressions::lower_wide_integer(function, value)?)
+            Some(super::super::super::cranelift::expressions::lower_wide_integer(function, value)?)
         }
         (Some(NativeType::Float { width }), Expr::FloatLiteral { value, .. }) => {
-            Some(super::super::super::expressions::lower_float_as(
+            Some(super::super::super::cranelift::expressions::lower_float_as(
                 function,
                 value,
                 layouts.ir_type(NativeType::Float { width })?,

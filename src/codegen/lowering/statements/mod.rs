@@ -7,10 +7,10 @@ use crate::ast::{Expr, Stmt};
 use crate::semantic::LoopExitKind;
 
 use super::super::cleanup::emit_loop_cleanup;
+use super::super::cranelift::expressions::lower_expression;
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
-use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::structs::emit_binding_drop;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
@@ -174,7 +174,7 @@ fn lower_plain_expression_statement(
         )?;
         return Ok(Flow::Fallthrough);
     }
-    super::super::expressions::lower_expression_with_targets(
+    super::super::cranelift::expressions::lower_expression_with_targets(
         function,
         expression,
         locals,
@@ -265,7 +265,7 @@ fn lower_assignment<'source>(
         .get(name)
         .and_then(|ty| ty.ir_type(layouts.pointer_type).ok())
         .map_or(value, |target| {
-            crate::codegen::expressions::coerce_to_ir_type(function, value, target)
+            crate::codegen::cranelift::expressions::coerce_to_ir_type(function, value, target)
         });
     if locals.contains_key(name) {
         super::super::structs::emit_binding_drop(

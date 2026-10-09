@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::ast::{CaseBody, CaseBranch};
 
+use super::super::cranelift::expressions::initializer_type;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
-use super::super::expressions::initializer_type;
 use super::super::layout::LayoutRegistry;
 use super::payload::add_payload_types;
 

@@ -4,9 +4,9 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Argument, ArgumentRoleResolution, Expr};
 
 use super::super::cranelift::dynamic_call::lower_dynamic_call;
+use super::super::cranelift::expressions::lower_expression;
 use super::super::cranelift::native::NativeEmitError;
 use super::super::cranelift::types::NativeType;
-use super::super::expressions::lower_expression;
 use super::super::performance::dispatch_key;
 use super::context::CallLoweringContext;
 use super::lower::lower_call;
@@ -72,7 +72,7 @@ fn receiver_native_type(
     receiver: &Expr,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<NativeType, NativeEmitError> {
-    super::super::expressions::initializer_type(
+    super::super::cranelift::expressions::initializer_type(
         receiver,
         context.local_types,
         context.functions,

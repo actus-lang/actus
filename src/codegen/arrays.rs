@@ -7,10 +7,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
+use super::cranelift::expressions::{coerce_to_ir_type, lower_expression};
 use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::cranelift::types::NativeType;
-use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::model::NativeCleanupSchedule;
 use super::structs::copy_bytes;
@@ -188,7 +188,7 @@ fn lower_array_compound_value(
         layouts,
     )?;
     let right = coerce_to_ir_type(function, right, layouts.ir_type(element)?);
-    let updated = super::expressions::lower_compound_integer_operation(
+    let updated = super::cranelift::expressions::lower_compound_integer_operation(
         function, current, operator, right, element,
     )?;
     Ok(swap_indexed_pack_element_if_needed(

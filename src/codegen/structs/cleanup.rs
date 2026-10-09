@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
+use super::super::cranelift::expressions::emit_buffer_drop;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
-use super::super::expressions::emit_buffer_drop;
 use super::super::layout::LayoutRegistry;
 use super::super::performance::dispatch_key;
 

@@ -5,8 +5,8 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
+use super::super::cranelift::expressions::lower_expression;
 use super::super::cranelift::native::NativeEmitError;
-use super::super::expressions::lower_expression;
 use super::context::CallLoweringContext;
 
 struct CallArgumentModes<'a> {
@@ -164,7 +164,7 @@ fn dynamic_vtable_value(
     role: &str,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<GlobalValue, NativeEmitError> {
-    let native_type = super::super::expressions::initializer_type(
+    let native_type = super::super::cranelift::expressions::initializer_type(
         argument,
         context.local_types,
         context.functions,

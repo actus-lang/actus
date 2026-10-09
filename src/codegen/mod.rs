@@ -10,7 +10,6 @@ mod control_flow;
 mod cranelift;
 mod enum_layout;
 mod enums;
-mod expressions;
 mod function_definition;
 mod generic;
 mod layout;

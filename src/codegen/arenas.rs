@@ -5,11 +5,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
+use super::cranelift::expressions::coerce_to_ir_type;
+use super::cranelift::expressions::{initializer_type, lower_expression};
 use super::cranelift::literals::StringDataValues;
 use super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::cranelift::types::NativeType;
-use super::expressions::coerce_to_ir_type;
-use super::expressions::{initializer_type, lower_expression};
 use super::layout::LayoutRegistry;
 use super::model::NativeCleanupSchedule;
 use super::structs::{copy_bytes, expression_native_type};

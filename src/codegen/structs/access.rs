@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
+use super::super::cranelift::expressions::lower_expression;
 use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
-use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
 use super::memory::copy_bytes;
@@ -328,9 +328,12 @@ fn lower_struct_compound_value<'source>(
         string_data,
         layouts,
     )?;
-    let right =
-        super::super::expressions::coerce_to_ir_type(function, right, layouts.ir_type(field_type)?);
-    let updated = super::super::expressions::lower_compound_integer_operation(
+    let right = super::super::cranelift::expressions::coerce_to_ir_type(
+        function,
+        right,
+        layouts.ir_type(field_type)?,
+    );
+    let updated = super::super::cranelift::expressions::lower_compound_integer_operation(
         function, current, operator, right, field_type,
     )?;
     Ok(updated)

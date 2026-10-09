@@ -122,7 +122,7 @@ fn resolve_call_target<'a>(
         && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
     {
         let argument_type = arguments.first().and_then(|argument| {
-            super::super::expressions::initializer_type(
+            super::super::cranelift::expressions::initializer_type(
                 &argument.expression,
                 context.local_types,
                 context.functions,

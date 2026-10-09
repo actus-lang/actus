@@ -5,13 +5,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::calls::CallLoweringContext;
-use super::case::lower_case;
-use super::cranelift::literals::StringDataValues;
-use super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
-use super::model::NativeCleanupSchedule;
+use super::super::calls::CallLoweringContext;
+use super::super::case::lower_case;
+use super::super::layout::LayoutRegistry;
+use super::super::model::NativeCleanupSchedule;
+use super::literals::StringDataValues;
+use super::native::{FunctionRef, NativeEmitError};
+use super::types::NativeType;
 
 mod buffer;
 mod cast;
@@ -23,20 +23,20 @@ mod operations;
 mod short_circuit;
 mod try_lowering;
 
-pub(super) use buffer::emit_buffer_drop;
-pub(super) use construct::lower_construct;
+pub(crate) use buffer::emit_buffer_drop;
+pub(crate) use construct::lower_construct;
 pub(crate) use if_lowering::lower_statement_if;
-pub(super) use initializer_types::initializer_type;
-pub(super) use literals::{
+pub(crate) use initializer_types::initializer_type;
+pub(crate) use literals::{
     coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
     lower_wide_integer,
 };
-pub(super) use operations::lower_compound_integer_operation;
-pub(super) use operations::lower_operation;
-pub(super) use try_lowering::lower_try_expression;
+pub(crate) use operations::lower_compound_integer_operation;
+pub(crate) use operations::lower_operation;
+pub(crate) use try_lowering::lower_try_expression;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_expression(
+pub(crate) fn lower_expression(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     locals: &HashMap<&String, Value>,
@@ -60,7 +60,7 @@ pub(super) fn lower_expression(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_expression_with_targets(
+pub(crate) fn lower_expression_with_targets(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     locals: &HashMap<&String, Value>,
@@ -69,7 +69,7 @@ pub(super) fn lower_expression_with_targets(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-    loop_targets: Option<super::lowering::LoopTargets>,
+    loop_targets: Option<super::super::lowering::LoopTargets>,
 ) -> Result<Value, NativeEmitError> {
     let context = CallLoweringContext::new(
         locals,
@@ -132,13 +132,13 @@ fn lower_index_expression(
     index: &Expr,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
-    let lower = match super::structs::expression_native_type(
+    let lower = match super::super::structs::expression_native_type(
         target,
         context.local_types,
         context.layouts,
     ) {
-        Some(NativeType::Buffer) => super::buffer_index::lower_buffer_index,
-        _ => super::arrays::lower_array_index,
+        Some(NativeType::Buffer) => super::super::buffer_index::lower_buffer_index,
+        _ => super::super::arrays::lower_array_index,
     };
     lower(
         function,

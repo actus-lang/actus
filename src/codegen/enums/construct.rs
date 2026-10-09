@@ -6,10 +6,10 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Argument, Expr};
 
 use super::super::calls::CallLoweringContext;
+use super::super::cranelift::expressions::lower_expression;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
 use super::super::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
-use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::structs::copy_bytes;
 

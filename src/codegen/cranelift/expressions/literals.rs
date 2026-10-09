@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::NativeEmitError;
+use super::super::literals::StringDataValues;
+use super::super::native::NativeEmitError;
 
-pub(in crate::codegen) fn lower_integer(
+pub(crate) fn lower_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     typed: bool,
@@ -29,7 +29,7 @@ pub(in crate::codegen) fn lower_integer(
     Err(NativeEmitError("integer literal exceeds native lowering width".to_owned()))
 }
 
-pub(in crate::codegen) fn lower_float(
+pub(crate) fn lower_float(
     function: &mut FunctionBuilder<'_>,
     value: &str,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -39,7 +39,7 @@ pub(in crate::codegen) fn lower_float(
         .map_err(|error| NativeEmitError(format!("invalid floating-point literal: {error}")))
 }
 
-pub(in crate::codegen) fn lower_wide_integer(
+pub(crate) fn lower_wide_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
@@ -61,7 +61,7 @@ pub(in crate::codegen) fn lower_wide_integer(
     Ok(address)
 }
 
-pub(in crate::codegen) fn lower_float_as(
+pub(crate) fn lower_float_as(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     target: Type,
@@ -76,7 +76,7 @@ pub(in crate::codegen) fn lower_float_as(
     })
 }
 
-pub(in crate::codegen) fn coerce_to_ir_type(
+pub(crate) fn coerce_to_ir_type(
     function: &mut FunctionBuilder<'_>,
     value: cranelift_codegen::ir::Value,
     target: Type,
@@ -95,7 +95,7 @@ pub(in crate::codegen) fn coerce_to_ir_type(
     value
 }
 
-pub(in crate::codegen) fn lower_string(
+pub(crate) fn lower_string(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     string_data: &StringDataValues,
@@ -107,11 +107,11 @@ pub(in crate::codegen) fn lower_string(
         .ok_or_else(|| NativeEmitError(format!("string literal `{value}` has no native data")))
 }
 
-pub(in crate::codegen) fn lower_identifier(
+pub(crate) fn lower_identifier(
     function: &mut FunctionBuilder<'_>,
     name: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-    local_types: &HashMap<&String, super::super::cranelift::types::NativeType>,
+    local_types: &HashMap<&String, super::super::types::NativeType>,
     pointer_type: cranelift_codegen::ir::Type,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let (binding, value) = locals

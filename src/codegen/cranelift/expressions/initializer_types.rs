@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::enums::enum_expression_type;
-use super::super::layout::LayoutRegistry;
-use super::super::performance;
-use super::super::structs::{expression_native_type, field_type};
+use super::super::super::enums::enum_expression_type;
+use super::super::super::layout::LayoutRegistry;
+use super::super::super::performance;
+use super::super::super::structs::{expression_native_type, field_type};
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 
 pub(crate) fn initializer_type(
     expression: &Expr,
@@ -65,7 +65,7 @@ fn infer_complex_initializer_type(
             infer_field_type(expression, object, field, types, layouts)
         }
         Expr::Case { branches, .. } => {
-            super::super::case::infer_case_type(branches, types, functions, layouts)
+            super::super::super::case::infer_case_type(branches, types, functions, layouts)
         }
         Expr::If { then_branch, else_branch, .. } => {
             infer_if_type(then_branch, else_branch.as_ref(), types, functions, layouts)
