@@ -95,3 +95,61 @@ fn emits_scalar_parameter_return_and_direct_call() {
     assert!(ir.contains("define i32 @test__verb_main"));
     assert!(ir.contains("call i32 @test__verb_add_5fone"));
 }
+
+#[test]
+fn emits_scalar_branch_jump_and_trap_terminators() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "control").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "condition".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Bool,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![
+            BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![BackendInstruction::Branch {
+                    condition: BackendValueId(0),
+                    then_block: BackendBlockId(1),
+                    else_block: BackendBlockId(2),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                }],
+            },
+            BackendBlock {
+                id: BackendBlockId(1),
+                instructions: vec![BackendInstruction::Jump {
+                    target: BackendBlockId(3),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                }],
+            },
+            BackendBlock {
+                id: BackendBlockId(2),
+                instructions: vec![BackendInstruction::Trap {
+                    reason: "false branch".to_owned(),
+                    span: actus::lexer::SourceSpan::new(2, 3),
+                }],
+            },
+            BackendBlock {
+                id: BackendBlockId(3),
+                instructions: vec![BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(3, 4),
+                }],
+            },
+        ],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("scalar control flow should lower to LLVM IR");
+    assert!(ir.contains("br i1 %0, label %bb1, label %bb2"));
+    assert!(ir.contains("br label %bb3"));
+    assert!(ir.contains("unreachable"));
+}

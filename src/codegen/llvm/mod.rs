@@ -2,10 +2,11 @@ use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
 
 use llvm_sys::core::{
-    LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildCall2, LLVMBuildRet, LLVMBuildRetVoid,
-    LLVMContextCreate, LLVMContextDispose, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
-    LLVMDisposeMessage, LLVMDisposeModule, LLVMFunctionType, LLVMGetParam, LLVMInt1TypeInContext,
-    LLVMInt8TypeInContext, LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
+    LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildBr, LLVMBuildCall2, LLVMBuildCondBr,
+    LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildUnreachable, LLVMContextCreate, LLVMContextDispose,
+    LLVMCreateBuilderInContext, LLVMDisposeBuilder, LLVMDisposeMessage, LLVMDisposeModule,
+    LLVMFunctionType, LLVMGetParam, LLVMInt1TypeInContext, LLVMInt8TypeInContext,
+    LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
     LLVMModuleCreateWithNameInContext, LLVMPrintModuleToString, LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{
@@ -183,8 +184,14 @@ fn emit_blocks(
                     "LLVM block has instructions after a terminator".to_owned(),
                 ));
             }
-            terminated =
-                emit_instruction(builder, function, instruction, declarations, &mut values)?;
+            terminated = emit_instruction(
+                builder,
+                function,
+                instruction,
+                declarations,
+                blocks,
+                &mut values,
+            )?;
         }
         if !terminated {
             if matches!(function.return_value.ty, BackendValueType::Unit) {
@@ -204,6 +211,7 @@ fn emit_instruction(
     function: &BackendFunction,
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, FunctionDeclaration>,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     match instruction {
@@ -215,14 +223,61 @@ fn emit_instruction(
             emit_call(builder, callee.as_str(), arguments, *result, declarations, values)?;
             Ok(false)
         }
-        BackendInstruction::Branch { .. }
-        | BackendInstruction::Jump { .. }
-        | BackendInstruction::Fail { .. }
-        | BackendInstruction::Trap { .. }
-        | BackendInstruction::Cleanup { .. } => Err(BackendEmitError(
-            "LLVM instruction lowering is not implemented for this contract node".to_owned(),
-        )),
+        BackendInstruction::Branch { condition, then_block, else_block, .. } => {
+            emit_branch(builder, *condition, *then_block, *else_block, blocks, values)?;
+            Ok(true)
+        }
+        BackendInstruction::Jump { target, .. } => {
+            emit_jump(builder, *target, blocks)?;
+            Ok(true)
+        }
+        BackendInstruction::Trap { .. } => {
+            unsafe { LLVMBuildUnreachable(builder) };
+            Ok(true)
+        }
+        BackendInstruction::Fail { .. } | BackendInstruction::Cleanup { .. } => {
+            Err(BackendEmitError(
+                "LLVM instruction lowering is not implemented for this contract node".to_owned(),
+            ))
+        }
     }
+}
+
+fn emit_branch(
+    builder: LLVMBuilderRef,
+    condition_id: BackendValueId,
+    then_id: BackendBlockId,
+    else_id: BackendBlockId,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    let condition = values.get(&condition_id).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM branch value {} is unavailable", condition_id.0))
+    })?;
+    let then_block = block_value(blocks, then_id)?;
+    let else_block = block_value(blocks, else_id)?;
+    unsafe { LLVMBuildCondBr(builder, condition, then_block, else_block) };
+    Ok(())
+}
+
+fn emit_jump(
+    builder: LLVMBuilderRef,
+    target: BackendBlockId,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+) -> Result<(), BackendEmitError> {
+    let target = block_value(blocks, target)?;
+    unsafe { LLVMBuildBr(builder, target) };
+    Ok(())
+}
+
+fn block_value(
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    id: BackendBlockId,
+) -> Result<LLVMBasicBlockRef, BackendEmitError> {
+    blocks
+        .get(&id)
+        .copied()
+        .ok_or_else(|| BackendEmitError(format!("LLVM block {} is unavailable", id.0)))
 }
 
 fn emit_return(
