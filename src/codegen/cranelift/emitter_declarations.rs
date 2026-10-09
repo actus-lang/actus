@@ -6,7 +6,7 @@ use crate::ast::{ExternalVerbDecl, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::model::NativeCleanupSchedule;
+use super::super::model::LoweredCleanupSchedule;
 use super::abi::{validate_external_native_signature, validate_native_signature};
 use super::declarations::{FunctionDeclarationContext, declare_functions};
 use super::function_definition::define_function;
@@ -185,7 +185,7 @@ pub(super) fn define_verbs(
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
     verbs: &[&VerbDecl],
     functions: &HashMap<String, FunctionMeta>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &super::vtable::VtableDataIds,

@@ -156,6 +156,9 @@ fn shared_codegen_facade_uses_neutral_error_contracts() {
     assert!(!facade.contains("NativeEmitError"));
     assert!(!facade.contains("NativeAbiError"));
     assert!(!facade.contains("NativeSymbolBindings"));
+    assert!(!facade.contains("NativeInstruction"));
+    assert!(!facade.contains("NativeCleanupPlan"));
+    assert!(!facade.contains("NativeCleanupSchedule"));
 }
 
 #[test]

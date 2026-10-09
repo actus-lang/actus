@@ -10,7 +10,7 @@ use super::super::vtable::VtableDataIds;
 use super::{PerformanceDefinition, dispatch_key};
 use crate::codegen::cranelift::function_definition::define_function;
 use crate::codegen::cranelift::layout::LayoutRegistry;
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 use crate::configuration::NativeBackendConfiguration;
 
 #[allow(clippy::too_many_arguments)]
@@ -19,7 +19,7 @@ pub(in crate::codegen) fn define_performances(
     frontend_config: TargetFrontendConfig,
     definitions: &[PerformanceDefinition<'_>],
     functions: &HashMap<String, FunctionMeta>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,

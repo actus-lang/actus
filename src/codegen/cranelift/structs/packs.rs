@@ -11,7 +11,7 @@ use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 use crate::codegen::cranelift::layout::{LayoutRegistry, PackFieldLayout};
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_pack_literal(
@@ -21,7 +21,7 @@ pub(crate) fn lower_pack_literal(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -53,7 +53,7 @@ fn lower_pack_storage_value(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     storage_type: NativeType,
     layouts: &LayoutRegistry,
@@ -85,7 +85,7 @@ pub(crate) fn lower_pack_field_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -114,7 +114,7 @@ struct PackAssignmentContext<'input, 'source, 'function> {
     locals: &'input mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &'input HashMap<&'source String, NativeType>,
     functions: &'input HashMap<String, FunctionRef>,
-    cleanup_schedule: &'input NativeCleanupSchedule,
+    cleanup_schedule: &'input LoweredCleanupSchedule,
     string_data: &'input StringDataValues,
     layouts: &'input LayoutRegistry,
 }
@@ -262,7 +262,7 @@ fn lower_pack_assignment_operands(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), BackendEmitError> {

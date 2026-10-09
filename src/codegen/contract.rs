@@ -2,7 +2,7 @@ use crate::ast::Role;
 use crate::lexer::SourceSpan;
 use std::collections::BTreeSet;
 
-use super::model::NativeInstruction;
+use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -139,7 +139,7 @@ pub enum BackendInstruction {
         span: SourceSpan,
     },
     Cleanup {
-        action: NativeInstruction,
+        action: LoweredCleanupInstruction,
         span: SourceSpan,
     },
 }
@@ -151,7 +151,7 @@ pub struct BackendFailure {
     pub payload: Option<BackendValueId>,
 }
 
-pub type BackendCleanupAction = NativeInstruction;
+pub type BackendCleanupAction = LoweredCleanupInstruction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendCleanupPlan {

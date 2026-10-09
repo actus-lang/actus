@@ -21,7 +21,7 @@ pub(super) fn lower_owner_declaration<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &super::super::NativeCleanupSchedule,
+    cleanup_schedule: &super::super::LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -81,7 +81,7 @@ fn lower_owner_value(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &super::super::NativeCleanupSchedule,
+    cleanup_schedule: &super::super::LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -123,7 +123,7 @@ fn lower_initializer_value(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &super::super::NativeCleanupSchedule,
+    cleanup_schedule: &super::super::LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {

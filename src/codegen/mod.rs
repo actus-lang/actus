@@ -34,7 +34,7 @@ pub use cranelift::native::{
 };
 pub use linker::{NativeLinkError, link_object, link_objects};
 pub use model::{
-    NativeCleanupPlan, NativeInstruction, NativeLoopUnwindPlan, NativeUnwindPlan,
+    LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
 pub use signature::{

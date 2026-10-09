@@ -12,7 +12,7 @@ use super::super::types::NativeType;
 use super::memory::copy_bytes;
 use super::types::expression_native_type;
 use crate::codegen::cranelift::layout::LayoutRegistry;
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_field_access(
@@ -22,7 +22,7 @@ pub(crate) fn lower_field_access(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -62,7 +62,7 @@ fn lower_pack_field_access(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -90,7 +90,7 @@ fn lower_struct_field_access(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -145,7 +145,7 @@ pub(crate) fn lower_field_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -177,7 +177,7 @@ pub(crate) fn lower_field_compound_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -220,7 +220,7 @@ pub(crate) fn lower_field_address_for_ins<'source>(
     locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -247,7 +247,7 @@ struct FieldCompoundContext<'input, 'source, 'function> {
     locals: &'input mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &'input HashMap<&'source String, NativeType>,
     functions: &'input HashMap<String, FunctionRef>,
-    cleanup_schedule: &'input NativeCleanupSchedule,
+    cleanup_schedule: &'input LoweredCleanupSchedule,
     string_data: &'input StringDataValues,
     layouts: &'input LayoutRegistry,
 }
@@ -313,7 +313,7 @@ fn lower_struct_compound_value<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     field_type: NativeType,
@@ -344,7 +344,7 @@ struct FieldAssignmentContext<'input, 'source, 'function> {
     locals: &'input mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &'input HashMap<&'source String, NativeType>,
     functions: &'input HashMap<String, FunctionRef>,
-    cleanup_schedule: &'input NativeCleanupSchedule,
+    cleanup_schedule: &'input LoweredCleanupSchedule,
     string_data: &'input StringDataValues,
     layouts: &'input LayoutRegistry,
 }
@@ -428,7 +428,7 @@ fn lower_field_address(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<

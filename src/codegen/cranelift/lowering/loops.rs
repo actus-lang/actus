@@ -10,7 +10,7 @@ use super::super::expressions::{initializer_type, lower_expression};
 use super::super::literals::StringDataValues;
 use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
-use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use super::{Flow, LoopTargets, LoweredCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 type LoopState<'source> =
@@ -55,7 +55,7 @@ pub(super) fn lower_for_range<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -178,7 +178,7 @@ fn lower_for_range_body<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -234,7 +234,7 @@ fn lower_for_bound(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -275,7 +275,7 @@ pub(super) fn lower_for_array<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -348,7 +348,7 @@ pub(super) fn lower_loop<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {

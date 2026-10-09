@@ -7,7 +7,7 @@ use crate::ast::{Expr, Place, Role, Stmt};
 use super::super::super::literals::StringDataValues;
 use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
-use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
+use super::super::{Flow, LoopTargets, LoweredCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
@@ -18,7 +18,7 @@ pub(super) fn lower_statement<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -56,7 +56,7 @@ fn lower_value_statement<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Option<Flow>, BackendEmitError> {
@@ -111,7 +111,7 @@ fn lower_owner_or_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -167,7 +167,7 @@ fn lower_owner_declaration<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -193,7 +193,7 @@ fn lower_binding_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -218,7 +218,7 @@ fn lower_other_value_statement<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Option<Flow>, BackendEmitError> {
@@ -257,7 +257,7 @@ fn lower_field_or_return<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -286,7 +286,7 @@ fn lower_index_assignment_statement(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -331,7 +331,7 @@ fn lower_place_assignment<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -375,7 +375,7 @@ fn lower_expression_or_drop<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -423,7 +423,7 @@ fn lower_control_statement<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -466,7 +466,7 @@ fn lower_loop_exit<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     layouts: &LayoutRegistry,
     is_continue: bool,
 ) -> Result<Flow, BackendEmitError> {

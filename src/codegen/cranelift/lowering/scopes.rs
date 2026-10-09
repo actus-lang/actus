@@ -8,7 +8,7 @@ use super::super::cleanup::emit_scope_cleanup;
 use super::super::literals::StringDataValues;
 use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
-use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use super::{Flow, LoopTargets, LoweredCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
@@ -19,7 +19,7 @@ pub(super) fn lower_scoped_block<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -56,7 +56,7 @@ fn finish_scoped_block(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
     if matches!(flow, Flow::Fallthrough) {

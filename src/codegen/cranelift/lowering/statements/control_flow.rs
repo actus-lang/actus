@@ -7,7 +7,7 @@ use crate::ast::{Block, Expr, IfBranch, Stmt};
 use super::super::super::literals::StringDataValues;
 use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
-use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use super::{Flow, LoopTargets, LoweredCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(super) fn statement_if_can_merge(then_branch: &Block, else_branch: Option<&IfBranch>) -> bool {
@@ -44,7 +44,7 @@ pub(super) fn lower_if_statement<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {

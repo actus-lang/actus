@@ -7,7 +7,7 @@ use crate::ast::Stmt;
 use super::super::super::literals::StringDataValues;
 use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
-use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
+use super::super::{Flow, LoopTargets, LoweredCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 #[allow(clippy::too_many_arguments)]
@@ -19,7 +19,7 @@ pub(super) fn lower_structured_control_statement<'source>(
     types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {

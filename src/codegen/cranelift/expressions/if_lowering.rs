@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Block, Expr, IfBranch};
 
-use super::super::super::model::NativeCleanupSchedule;
+use super::super::super::model::LoweredCleanupSchedule;
 use super::super::literals::StringDataValues;
 use super::super::lowering::LoopTargets;
 use super::super::lowering::{Flow, lower_statements};
@@ -24,7 +24,7 @@ pub(crate) fn lower_statement_if<'source>(
     locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
     local_types: &mut HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     targets: Option<LoopTargets>,
@@ -80,7 +80,7 @@ fn lower_statement_if_branches<'source>(
     bindings: &[&'source String],
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
@@ -158,7 +158,7 @@ fn lower_statement_if_else_branch<'source>(
     bindings: &[&'source String],
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
@@ -199,7 +199,7 @@ fn lower_statement_if_branch<'source>(
     bindings: &[&'source String],
     functions: &HashMap<String, FunctionRef>,
     targets: Option<LoopTargets>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,

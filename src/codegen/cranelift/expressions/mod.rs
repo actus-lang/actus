@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::super::model::NativeCleanupSchedule;
+use super::super::model::LoweredCleanupSchedule;
 use super::calls::CallLoweringContext;
 use super::case::lower_case;
 use super::layout::LayoutRegistry;
@@ -42,7 +42,7 @@ pub(crate) fn lower_expression(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Value, BackendEmitError> {
@@ -66,7 +66,7 @@ pub(crate) fn lower_expression_with_targets(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     loop_targets: Option<super::lowering::LoopTargets>,

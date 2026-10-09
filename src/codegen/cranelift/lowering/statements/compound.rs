@@ -9,7 +9,7 @@ use super::super::super::expressions::{lower_compound_integer_operation, lower_e
 use super::super::super::literals::StringDataValues;
 use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
-use super::{Flow, NativeCleanupSchedule};
+use super::{Flow, LoweredCleanupSchedule};
 use crate::codegen::cranelift::arrays::lower_array_compound_assignment;
 use crate::codegen::cranelift::buffer_index::lower_buffer_compound_assignment;
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -24,7 +24,7 @@ pub(crate) fn lower_compound_assignment<'source>(
     locals: &mut HashMap<&'source String, Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -82,7 +82,7 @@ fn lower_identifier<'source>(
     locals: &mut HashMap<&'source String, Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -154,7 +154,7 @@ fn lower_index<'source>(
     locals: &HashMap<&'source String, Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {

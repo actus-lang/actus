@@ -18,7 +18,7 @@ use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::lowering::lower_body;
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 use flow::emit_flow;
 pub(crate) use flow::emit_value_return;
 use parameters::{BoundParameters, bind_parameters, declare_function_refs};
@@ -30,7 +30,7 @@ pub(crate) fn define_function(
     verb: &VerbDecl,
     metadata: &FunctionMeta,
     functions: &HashMap<String, FunctionMeta>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
@@ -83,7 +83,7 @@ fn lower_function_body(
     frontend_config: TargetFrontendConfig,
     verb: &VerbDecl,
     functions: &HashMap<String, FunctionMeta>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
     vtable_data: &VtableDataIds,
@@ -117,7 +117,7 @@ fn lower_function_flow(
     module: &mut ObjectModule,
     verb: &VerbDecl,
     references: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_values: &StringDataValues,
     layouts: &LayoutRegistry,
     force_entry_return: bool,

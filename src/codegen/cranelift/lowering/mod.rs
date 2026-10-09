@@ -4,7 +4,7 @@ mod scopes;
 mod statements;
 
 use super::types::NativeType;
-pub(super) use crate::codegen::model::NativeCleanupSchedule;
+pub(super) use crate::codegen::model::LoweredCleanupSchedule;
 pub(super) use body::{lower_body, lower_case_block};
 pub(super) use statements::lower_statements;
 

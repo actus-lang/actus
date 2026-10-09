@@ -8,7 +8,7 @@ use super::super::cleanup::emit_scope_cleanup;
 use super::super::literals::StringDataValues;
 use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
-use super::{Flow, NativeCleanupSchedule};
+use super::{Flow, LoweredCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 type CaseBlockState<'source> = (
@@ -25,7 +25,7 @@ pub(crate) fn lower_body(
     initial_locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     initial_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -57,7 +57,7 @@ pub(crate) fn lower_case_block<'source>(
     locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     targets: Option<super::LoopTargets>,
@@ -123,7 +123,7 @@ fn lower_case_tail(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     targets: Option<super::LoopTargets>,
@@ -155,7 +155,7 @@ fn finish_case_block(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
     if matches!(flow, Flow::Fallthrough) {

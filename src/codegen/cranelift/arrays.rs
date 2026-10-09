@@ -13,7 +13,7 @@ use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::copy_bytes;
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_array_index(
@@ -23,7 +23,7 @@ pub(crate) fn lower_array_index(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Value, BackendEmitError> {
@@ -56,7 +56,7 @@ pub(crate) fn lower_array_assignment(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -113,7 +113,7 @@ pub(crate) fn lower_array_compound_assignment(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -163,7 +163,7 @@ fn lower_array_compound_value(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     element: NativeType,
     layouts: &LayoutRegistry,
@@ -252,7 +252,7 @@ pub(crate) fn lower_array_address(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(Value, NativeType), BackendEmitError> {

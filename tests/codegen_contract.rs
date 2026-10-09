@@ -6,7 +6,7 @@ use actus::codegen::{
     BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
     BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
     BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
-    NativeInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb,
+    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb,
     lower_verb_body, lower_verb_signature, lower_verb_with_cleanup,
 };
 use actus::lexer::SourceSpan;
@@ -257,7 +257,7 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
         vec![BackendBlock {
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Cleanup {
-                action: NativeInstruction::ResetArena {
+                action: LoweredCleanupInstruction::ResetArena {
                     binding_index: 2,
                     name: "region".to_owned(),
                 },

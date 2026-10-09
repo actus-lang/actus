@@ -3,7 +3,7 @@ use crate::semantic::{CleanupAction, LoopExitKind, SemanticModel};
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum NativeInstruction {
+pub enum LoweredCleanupInstruction {
     EndBorrow {
         borrow_id: usize,
     },
@@ -30,32 +30,32 @@ pub enum NativeInstruction {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NativeCleanupPlan {
+pub struct LoweredCleanupPlan {
     pub depth: usize,
     pub span: SourceSpan,
-    pub instructions: Vec<NativeInstruction>,
+    pub instructions: Vec<LoweredCleanupInstruction>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NativeUnwindPlan {
+pub struct LoweredUnwindPlan {
     pub span: SourceSpan,
-    pub scopes: Vec<NativeCleanupPlan>,
+    pub scopes: Vec<LoweredCleanupPlan>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NativeLoopUnwindPlan {
+pub struct LoweredLoopUnwindPlan {
     pub span: SourceSpan,
     pub kind: LoopExitKind,
-    pub scopes: Vec<NativeCleanupPlan>,
+    pub scopes: Vec<LoweredCleanupPlan>,
 }
 
-pub(super) struct NativeCleanupSchedule {
-    scopes: Vec<NativeCleanupPlan>,
-    returns: Vec<NativeUnwindPlan>,
-    loops: Vec<NativeLoopUnwindPlan>,
+pub(super) struct LoweredCleanupSchedule {
+    scopes: Vec<LoweredCleanupPlan>,
+    returns: Vec<LoweredUnwindPlan>,
+    loops: Vec<LoweredLoopUnwindPlan>,
 }
 
-impl NativeCleanupSchedule {
+impl LoweredCleanupSchedule {
     pub(super) fn from_model(model: &SemanticModel) -> Self {
         Self {
             scopes: lower_cleanup_plans(model),
@@ -64,11 +64,11 @@ impl NativeCleanupSchedule {
         }
     }
 
-    pub(super) fn scope(&self, span: SourceSpan) -> Option<&NativeCleanupPlan> {
+    pub(super) fn scope(&self, span: SourceSpan) -> Option<&LoweredCleanupPlan> {
         self.scopes.iter().find(|plan| plan.span == span)
     }
 
-    pub(super) fn return_plan(&self, span: SourceSpan) -> Option<&NativeUnwindPlan> {
+    pub(super) fn return_plan(&self, span: SourceSpan) -> Option<&LoweredUnwindPlan> {
         self.returns
             .iter()
             .find(|plan| plan.span == span)
@@ -79,31 +79,31 @@ impl NativeCleanupSchedule {
         &self,
         span: SourceSpan,
         kind: &LoopExitKind,
-    ) -> Option<&NativeLoopUnwindPlan> {
+    ) -> Option<&LoweredLoopUnwindPlan> {
         self.loops.iter().find(|plan| plan.span == span && &plan.kind == kind)
     }
 }
 
-pub fn lower_cleanup_plans(model: &SemanticModel) -> Vec<NativeCleanupPlan> {
+pub fn lower_cleanup_plans(model: &SemanticModel) -> Vec<LoweredCleanupPlan> {
     model.cleanup_plans.iter().map(|scope| lower_scope(scope, model)).collect()
 }
 
-pub fn lower_return_unwind_plans(model: &SemanticModel) -> Vec<NativeUnwindPlan> {
+pub fn lower_return_unwind_plans(model: &SemanticModel) -> Vec<LoweredUnwindPlan> {
     model
         .return_unwind_plans
         .iter()
-        .map(|plan| NativeUnwindPlan {
+        .map(|plan| LoweredUnwindPlan {
             span: plan.span,
             scopes: plan.scopes.iter().map(|scope| lower_scope(scope, model)).collect(),
         })
         .collect()
 }
 
-pub fn lower_loop_unwind_plans(model: &SemanticModel) -> Vec<NativeLoopUnwindPlan> {
+pub fn lower_loop_unwind_plans(model: &SemanticModel) -> Vec<LoweredLoopUnwindPlan> {
     model
         .loop_unwind_plans
         .iter()
-        .map(|plan| NativeLoopUnwindPlan {
+        .map(|plan| LoweredLoopUnwindPlan {
             span: plan.span,
             kind: plan.kind.clone(),
             scopes: plan.scopes.iter().map(|scope| lower_scope(scope, model)).collect(),
@@ -213,21 +213,21 @@ fn validate_arena(binding_index: usize, model: &SemanticModel) -> Result<(), Str
     Ok(())
 }
 
-fn lower_scope(scope: &crate::semantic::ScopeCleanup, model: &SemanticModel) -> NativeCleanupPlan {
-    NativeCleanupPlan {
+fn lower_scope(scope: &crate::semantic::ScopeCleanup, model: &SemanticModel) -> LoweredCleanupPlan {
+    LoweredCleanupPlan {
         depth: scope.depth,
         span: scope.span,
         instructions: scope.actions.iter().map(|action| lower_action(action, model)).collect(),
     }
 }
 
-fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruction {
+fn lower_action(action: &CleanupAction, model: &SemanticModel) -> LoweredCleanupInstruction {
     match action {
         CleanupAction::EndBorrow { borrow_id } => {
-            NativeInstruction::EndBorrow { borrow_id: *borrow_id }
+            LoweredCleanupInstruction::EndBorrow { borrow_id: *borrow_id }
         }
         CleanupAction::DropPayloadField { binding_index, enum_name, variant, field } => {
-            NativeInstruction::DropPayloadField {
+            LoweredCleanupInstruction::DropPayloadField {
                 binding_index: *binding_index,
                 name: model.bindings[*binding_index].name.clone(),
                 enum_name: enum_name.clone(),
@@ -236,24 +236,24 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> NativeInstruct
             }
         }
         CleanupAction::DropBinding { binding_index } => lower_binding_drop(*binding_index, model),
-        CleanupAction::ResetArena { binding_index } => NativeInstruction::ResetArena {
+        CleanupAction::ResetArena { binding_index } => LoweredCleanupInstruction::ResetArena {
             binding_index: *binding_index,
             name: model.bindings[*binding_index].name.clone(),
         },
     }
 }
 
-fn lower_binding_drop(binding_index: usize, model: &SemanticModel) -> NativeInstruction {
+fn lower_binding_drop(binding_index: usize, model: &SemanticModel) -> LoweredCleanupInstruction {
     let binding = &model.bindings[binding_index];
     match &binding.ownership {
         crate::semantic::OwnershipState::PartiallyMoved { fields } => {
-            NativeInstruction::DropBindingFields {
+            LoweredCleanupInstruction::DropBindingFields {
                 binding_index,
                 name: binding.name.clone(),
                 moved_fields: fields.clone(),
             }
         }
-        _ => NativeInstruction::DropBinding { binding_index, name: binding.name.clone() },
+        _ => LoweredCleanupInstruction::DropBinding { binding_index, name: binding.name.clone() },
     }
 }
 

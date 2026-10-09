@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cranelift_codegen::ir::Value;
 
-use super::super::super::model::NativeCleanupSchedule;
+use super::super::super::model::LoweredCleanupSchedule;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
 use super::super::lowering::LoopTargets;
@@ -13,7 +13,7 @@ pub(crate) struct CallLoweringContext<'maps, 'keys> {
     pub(crate) locals: &'maps HashMap<&'keys String, Value>,
     pub(crate) local_types: &'maps HashMap<&'keys String, NativeType>,
     pub(crate) functions: &'maps HashMap<String, FunctionRef>,
-    pub(crate) cleanup_schedule: &'maps NativeCleanupSchedule,
+    pub(crate) cleanup_schedule: &'maps LoweredCleanupSchedule,
     pub(crate) string_data: &'maps StringDataValues,
     pub(crate) layouts: &'maps LayoutRegistry,
     pub(crate) loop_targets: Option<LoopTargets>,
@@ -24,7 +24,7 @@ impl<'maps, 'keys> CallLoweringContext<'maps, 'keys> {
         locals: &'maps HashMap<&'keys String, Value>,
         local_types: &'maps HashMap<&'keys String, NativeType>,
         functions: &'maps HashMap<String, FunctionRef>,
-        cleanup_schedule: &'maps NativeCleanupSchedule,
+        cleanup_schedule: &'maps LoweredCleanupSchedule,
         string_data: &'maps StringDataValues,
         layouts: &'maps LayoutRegistry,
     ) -> Self {

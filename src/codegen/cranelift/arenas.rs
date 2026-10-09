@@ -12,7 +12,7 @@ use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::{copy_bytes, expression_native_type};
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_place(
@@ -22,7 +22,7 @@ pub(crate) fn lower_place(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {

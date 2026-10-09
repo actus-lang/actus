@@ -7,7 +7,7 @@ use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
-use super::super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
+use super::super::model::{LoweredCleanupInstruction, LoweredCleanupPlan, LoweredCleanupSchedule};
 use super::layout::LayoutRegistry;
 use super::native::{BackendEmitError, FunctionRef};
 use super::structs::emit_binding_drop;
@@ -16,7 +16,7 @@ use super::types::NativeType;
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_return_cleanup(
     function: &mut FunctionBuilder<'_>,
-    schedule: &NativeCleanupSchedule,
+    schedule: &LoweredCleanupSchedule,
     span: SourceSpan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
@@ -53,7 +53,7 @@ fn returned_binding_name(expression: &Expr) -> Option<&str> {
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_loop_cleanup(
     function: &mut FunctionBuilder<'_>,
-    schedule: &NativeCleanupSchedule,
+    schedule: &LoweredCleanupSchedule,
     span: SourceSpan,
     kind: LoopExitKind,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
@@ -72,7 +72,7 @@ pub(super) fn emit_loop_cleanup(
 
 pub(super) fn emit_scope_cleanup(
     function: &mut FunctionBuilder<'_>,
-    schedule: &NativeCleanupSchedule,
+    schedule: &LoweredCleanupSchedule,
     span: SourceSpan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
@@ -88,7 +88,7 @@ pub(super) fn emit_scope_cleanup(
 
 fn emit_scope_instructions(
     function: &mut FunctionBuilder<'_>,
-    plan: &NativeCleanupPlan,
+    plan: &LoweredCleanupPlan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
@@ -103,7 +103,7 @@ fn emit_scope_instructions(
 #[allow(clippy::too_many_arguments)]
 fn emit_scope_instructions_filtered(
     function: &mut FunctionBuilder<'_>,
-    plan: &NativeCleanupPlan,
+    plan: &LoweredCleanupPlan,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
@@ -113,7 +113,7 @@ fn emit_scope_instructions_filtered(
     for instruction in &plan.instructions {
         if matches!(
             instruction,
-            NativeInstruction::DropBinding { name, .. }
+            LoweredCleanupInstruction::DropBinding { name, .. }
                 if Some(name.as_str()) == returned_binding
         ) {
             continue;
@@ -126,24 +126,24 @@ fn emit_scope_instructions_filtered(
 #[allow(clippy::too_many_arguments)]
 fn emit_cleanup_instruction(
     function: &mut FunctionBuilder<'_>,
-    instruction: &NativeInstruction,
+    instruction: &LoweredCleanupInstruction,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
     match instruction {
-        NativeInstruction::EndBorrow { .. } => Ok(()),
-        NativeInstruction::DropPayloadField { .. } => {
+        LoweredCleanupInstruction::EndBorrow { .. } => Ok(()),
+        LoweredCleanupInstruction::DropPayloadField { .. } => {
             emit_payload_cleanup(function, instruction, locals, types, functions, layouts)
         }
-        NativeInstruction::DropBinding { name, .. } => {
+        LoweredCleanupInstruction::DropBinding { name, .. } => {
             emit_binding_drop(function, name, locals, types, functions, layouts)
         }
-        NativeInstruction::DropBindingFields { .. } => {
+        LoweredCleanupInstruction::DropBindingFields { .. } => {
             emit_partial_binding_cleanup(function, instruction, locals, types, functions, layouts)
         }
-        NativeInstruction::ResetArena { name, .. } => {
+        LoweredCleanupInstruction::ResetArena { name, .. } => {
             reset_arena(function, name, locals, types, layouts)
         }
     }
@@ -151,13 +151,14 @@ fn emit_cleanup_instruction(
 
 fn emit_payload_cleanup(
     function: &mut FunctionBuilder<'_>,
-    instruction: &NativeInstruction,
+    instruction: &LoweredCleanupInstruction,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
-    let NativeInstruction::DropPayloadField { name, enum_name, variant, field, .. } = instruction
+    let LoweredCleanupInstruction::DropPayloadField { name, enum_name, variant, field, .. } =
+        instruction
     else {
         return Ok(());
     };
@@ -168,13 +169,14 @@ fn emit_payload_cleanup(
 
 fn emit_partial_binding_cleanup(
     function: &mut FunctionBuilder<'_>,
-    instruction: &NativeInstruction,
+    instruction: &LoweredCleanupInstruction,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
-    let NativeInstruction::DropBindingFields { name, moved_fields, .. } = instruction else {
+    let LoweredCleanupInstruction::DropBindingFields { name, moved_fields, .. } = instruction
+    else {
         return Ok(());
     };
     crate::codegen::cranelift::structs::emit_partial_binding_drop(

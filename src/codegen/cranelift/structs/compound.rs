@@ -15,7 +15,7 @@ use super::packs::{
     packed_field,
 };
 use crate::codegen::cranelift::layout::LayoutRegistry;
-use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::model::LoweredCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_pack_field_compound_assignment<'source>(
@@ -28,7 +28,7 @@ pub(crate) fn lower_pack_field_compound_assignment<'source>(
     locals: &mut HashMap<&'source String, Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -76,7 +76,7 @@ fn lower_direct_pack_field_compound_assignment<'source>(
     locals: &mut HashMap<&'source String, Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -137,7 +137,7 @@ fn lower_indexed_pack_field_compound_assignment<'source>(
     locals: &mut HashMap<&'source String, Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -184,7 +184,7 @@ fn lower_indexed_pack_compound_at_address<'source>(
     locals: &mut HashMap<&'source String, Value>,
     local_types: &HashMap<&'source String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
@@ -254,7 +254,7 @@ fn lower_pack_compound_rhs(
     locals: &HashMap<&String, Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Value, BackendEmitError> {

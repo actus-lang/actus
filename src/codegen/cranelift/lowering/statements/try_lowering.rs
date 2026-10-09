@@ -9,7 +9,7 @@ use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::literals::StringDataValues;
 use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
-use super::super::{Flow, NativeCleanupSchedule};
+use super::super::{Flow, LoweredCleanupSchedule};
 use crate::ast::Expr;
 use crate::codegen::cranelift::enum_layout;
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -23,7 +23,7 @@ pub(super) fn lower_return(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -70,7 +70,7 @@ fn lower_return_value(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -101,7 +101,7 @@ fn lower_try_return(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -173,7 +173,7 @@ pub(super) fn lower_try_statement(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
@@ -209,7 +209,7 @@ fn lower_try_operand<'a>(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &'a LayoutRegistry,
 ) -> Result<
@@ -253,7 +253,7 @@ fn emit_try_statement_branches(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &NativeCleanupSchedule,
+    cleanup_schedule: &LoweredCleanupSchedule,
     layouts: &LayoutRegistry,
 ) -> Result<(), BackendEmitError> {
     let discriminant = function.ins().load(

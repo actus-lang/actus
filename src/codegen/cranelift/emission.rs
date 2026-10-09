@@ -6,7 +6,7 @@ use crate::target::TargetSpec;
 use cranelift_module::Module;
 
 use super::super::cranelift::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
-use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
+use super::super::model::{LoweredCleanupSchedule, validate_cleanup_plans};
 use super::super::result_constructors::normalize_program;
 use super::emitter_declarations::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
@@ -44,7 +44,7 @@ pub(crate) fn emit_program_object_for_target(
     if verbs.is_empty() && external_verbs.is_empty() && roots.symbol.is_none() {
         return emit_empty_object(configuration, target);
     }
-    let cleanup_schedule = NativeCleanupSchedule::from_model(&semantic);
+    let cleanup_schedule = LoweredCleanupSchedule::from_model(&semantic);
     let performance_registry = PerformanceRegistry::from_program_in_namespace(
         &program,
         &semantic.reachable_performances,
@@ -179,7 +179,7 @@ struct VerbEmission<'items, 'program> {
     performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
     symbol: Option<&'items str>,
     namespace_prefix: &'items str,
-    cleanup_schedule: &'items NativeCleanupSchedule,
+    cleanup_schedule: &'items LoweredCleanupSchedule,
     bindings: &'items BackendSymbolBindings,
     configuration: &'items NativeBackendConfiguration,
     target: &'items TargetSpec,
@@ -280,7 +280,7 @@ struct EmissionDefinitions<'items, 'program> {
     verbs: &'items [&'program VerbDecl],
     performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
     functions: &'items std::collections::HashMap<String, FunctionMeta>,
-    cleanup_schedule: &'items NativeCleanupSchedule,
+    cleanup_schedule: &'items LoweredCleanupSchedule,
     string_data: &'items super::literals::StringDataIds,
     layouts: &'items LayoutRegistry,
     vtable_data: &'items super::vtable::VtableDataIds,
