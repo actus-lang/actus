@@ -32,6 +32,20 @@ pub enum EntryContract {
     Freestanding,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StartupContract {
+    HostedRuntime,
+    ExplicitEntry,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TargetArtifactContract {
+    pub object_format: BinaryFormat,
+    pub linker_flavor: LinkerFlavor,
+    pub entry_contract: EntryContract,
+    pub startup: StartupContract,
+}
+
 impl LinkerFlavor {
     pub fn from_target(triple: &Triple) -> Result<Self, TargetSpecError> {
         if is_freestanding_target(triple) {
@@ -219,6 +233,19 @@ impl TargetSpec {
         }
     }
 
+    pub fn artifact_contract(&self) -> TargetArtifactContract {
+        let entry_contract = self.entry_contract();
+        TargetArtifactContract {
+            object_format: self.object_format,
+            linker_flavor: self.linker_flavor,
+            entry_contract,
+            startup: match entry_contract {
+                EntryContract::Hosted => StartupContract::HostedRuntime,
+                EntryContract::Freestanding => StartupContract::ExplicitEntry,
+            },
+        }
+    }
+
     pub fn spec_hash(&self) -> String {
         let identity = format!(
             "triple={};architecture={:?};pointer_width={:?};endianness={:?};object_format={:?};abi={:?};linker={:?}",
@@ -254,7 +281,7 @@ fn is_freestanding_target(triple: &Triple) -> bool {
 mod tests {
     use target_lexicon::{CallingConvention, Endianness, PointerWidth};
 
-    use super::{EntryContract, LinkerFlavor, TargetSpec};
+    use super::{EntryContract, LinkerFlavor, StartupContract, TargetSpec};
 
     #[test]
     fn derives_target_contract_fields_from_a_triple() {
@@ -266,7 +293,16 @@ mod tests {
         assert_eq!(spec.linker_flavor(), LinkerFlavor::Gnu);
         assert_eq!(spec.default_linker(), "cc");
         assert_eq!(spec.entry_contract(), EntryContract::Hosted);
+        assert_eq!(spec.artifact_contract().startup, StartupContract::HostedRuntime);
         assert_eq!(spec.triple().to_string(), "x86_64-unknown-linux-gnu");
+    }
+
+    #[test]
+    fn derives_explicit_startup_for_freestanding_targets() {
+        let spec = TargetSpec::parse("thumbv7em-none-eabihf").expect("target should parse");
+        let contract = spec.artifact_contract();
+        assert_eq!(contract.entry_contract, EntryContract::Freestanding);
+        assert_eq!(contract.startup, StartupContract::ExplicitEntry);
     }
 
     #[test]

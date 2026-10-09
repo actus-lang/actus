@@ -1,3 +1,4 @@
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::Command;
 
@@ -14,6 +15,55 @@ impl std::fmt::Display for NativeLinkError {
 
 impl std::error::Error for NativeLinkError {}
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LinkerPlan {
+    linker: OsString,
+    arguments: Vec<OsString>,
+}
+
+impl LinkerPlan {
+    pub fn from_configuration(
+        objects: &[&Path],
+        executable: &Path,
+        configuration: &CompilerConfiguration,
+    ) -> Result<Self, NativeLinkError> {
+        if objects.is_empty() {
+            return Err(NativeLinkError("link requires at least one object".to_owned()));
+        }
+        let linker = configuration.linker().to_os_string();
+        let mut arguments = Vec::new();
+        if configuration.linker_flavor() == crate::configuration::LinkerFlavor::Msvc
+            && is_rust_lld(&linker)
+        {
+            arguments.extend([OsString::from("-flavor"), OsString::from("link")]);
+        }
+        arguments.extend(objects.iter().map(|object| object.as_os_str().to_os_string()));
+        append_link_inputs(&mut arguments, configuration);
+        arguments.extend(
+            configuration
+                .linker_flavor()
+                .output_arguments(executable)
+                .into_iter()
+                .map(OsString::from),
+        );
+        Ok(Self { linker, arguments })
+    }
+
+    pub fn linker(&self) -> &OsStr {
+        &self.linker
+    }
+
+    pub fn arguments(&self) -> &[OsString] {
+        &self.arguments
+    }
+
+    fn command(&self) -> Command {
+        let mut command = Command::new(&self.linker);
+        command.args(&self.arguments);
+        command
+    }
+}
+
 pub fn link_object(
     object: &Path,
     executable: &Path,
@@ -27,13 +77,8 @@ pub fn link_objects(
     executable: &Path,
     configuration: &CompilerConfiguration,
 ) -> Result<(), NativeLinkError> {
-    if objects.is_empty() {
-        return Err(NativeLinkError("link requires at least one object".to_owned()));
-    }
-    let linker = configuration.linker();
-    let mut command = configure_link_command(linker, objects, configuration);
-    append_link_inputs(&mut command, configuration);
-    let output = run_link_command(&mut command, executable, configuration)?;
+    let plan = LinkerPlan::from_configuration(objects, executable, configuration)?;
+    let output = run_link_command(&plan)?;
     if output.status.success() {
         return Ok(());
     }
@@ -43,69 +88,58 @@ pub fn link_objects(
         .status
         .code()
         .map_or_else(|| "terminated without an exit code".to_owned(), |code| code.to_string());
-    let arguments =
-        command.get_args().map(|argument| argument.to_string_lossy()).collect::<Vec<_>>().join(" ");
+    let arguments = plan
+        .arguments
+        .iter()
+        .map(|argument| argument.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
     Err(NativeLinkError(format!(
         "linker `{}` failed with status {status}: stderr=`{}` stdout=`{}` command=`{} {arguments}`",
-        linker.to_string_lossy(),
+        plan.linker.to_string_lossy(),
         stderr.trim(),
         stdout.trim(),
-        linker.to_string_lossy()
+        plan.linker.to_string_lossy()
     )))
 }
 
-fn configure_link_command(
-    linker: &std::ffi::OsStr,
-    objects: &[&Path],
-    configuration: &CompilerConfiguration,
-) -> Command {
-    let mut command = Command::new(linker);
-    if configuration.linker_flavor() == crate::configuration::LinkerFlavor::Msvc
-        && is_rust_lld(linker)
-    {
-        command.args(["-flavor", "link"]);
-    }
-    append_object_inputs(&mut command, objects);
-    command
-}
-
-fn append_object_inputs(command: &mut Command, objects: &[&Path]) {
-    for object in objects {
-        command.arg(object);
-    }
-}
-
-fn append_link_inputs(command: &mut Command, configuration: &CompilerConfiguration) {
-    append_runtime_inputs(command, configuration);
+fn append_link_inputs(arguments: &mut Vec<OsString>, configuration: &CompilerConfiguration) {
+    append_runtime_inputs(arguments, configuration);
     for path in configuration.library_paths() {
-        command.arg(configuration.linker_flavor().library_path_argument(path));
+        arguments.push(OsString::from(configuration.linker_flavor().library_path_argument(path)));
     }
     for library in configuration.libraries() {
-        command.args(configuration.linker_flavor().library_arguments(
-            library.name(),
-            matches!(library.kind(), crate::configuration::LibraryKind::Static),
-        ));
+        arguments.extend(
+            configuration
+                .linker_flavor()
+                .library_arguments(
+                    library.name(),
+                    matches!(library.kind(), crate::configuration::LibraryKind::Static),
+                )
+                .into_iter()
+                .map(OsString::from),
+        );
     }
 }
 
-fn append_runtime_inputs(command: &mut Command, configuration: &CompilerConfiguration) {
+fn append_runtime_inputs(arguments: &mut Vec<OsString>, configuration: &CompilerConfiguration) {
     if configuration.host_runtime_enabled()
         && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
     {
-        command.arg(runtime_archive);
-        command.args(configuration.linker_flavor().runtime_library_arguments());
+        arguments.push(runtime_archive.as_os_str().to_os_string());
+        arguments.extend(
+            configuration
+                .linker_flavor()
+                .runtime_library_arguments()
+                .iter()
+                .map(|argument| OsString::from(argument)),
+        );
     }
 }
 
-fn run_link_command(
-    command: &mut Command,
-    executable: &Path,
-    configuration: &CompilerConfiguration,
-) -> Result<std::process::Output, NativeLinkError> {
-    command
-        .args(configuration.linker_flavor().output_arguments(executable))
-        .output()
-        .map_err(|error| NativeLinkError(format!("cannot execute linker: {error}")))
+fn run_link_command(plan: &LinkerPlan) -> Result<std::process::Output, NativeLinkError> {
+    let mut command = plan.command();
+    command.output().map_err(|error| NativeLinkError(format!("cannot execute linker: {error}")))
 }
 
 fn is_rust_lld(linker: &std::ffi::OsStr) -> bool {
@@ -171,18 +205,5 @@ mod tests {
         assert!(super::is_rust_lld(OsStr::new("rust-lld.exe")));
         assert!(super::is_rust_lld(OsStr::new("C:\\Rust\\rust-lld.exe")));
         assert!(!super::is_rust_lld(OsStr::new("lld-link.exe")));
-    }
-
-    #[test]
-    fn appends_each_module_object_to_one_link_command() {
-        let mut command = std::process::Command::new("linker");
-        let first = Path::new("/tmp/root.o");
-        let second = Path::new("/tmp/module.o");
-        super::append_object_inputs(&mut command, &[first, second]);
-        let arguments = command
-            .get_args()
-            .map(|argument| argument.to_string_lossy().into_owned())
-            .collect::<Vec<_>>();
-        assert_eq!(arguments, ["/tmp/root.o", "/tmp/module.o"]);
     }
 }

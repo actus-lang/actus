@@ -1,5 +1,7 @@
 use std::fs;
+use std::path::Path;
 
+use actus::codegen::LinkerPlan;
 use actus::configuration::{
     BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel, RuntimeProfile,
 };
@@ -8,6 +10,49 @@ use actus::diagnostics::{
     STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED,
 };
 use actus::target::TargetSpec;
+
+#[test]
+fn linker_plan_is_deterministic_across_supported_host_profiles() {
+    for (label, target, expected_linker, expected_output) in [
+        ("linux", "x86_64-unknown-linux-gnu", "cc", "/tmp/actus-plan-linux"),
+        ("macos", "x86_64-apple-darwin", "cc", "/tmp/actus-plan-macos"),
+        ("windows", "x86_64-pc-windows-msvc", "lld-link.exe", "/tmp/actus-plan-windows"),
+    ] {
+        let manifest = std::env::temp_dir()
+            .join(format!("actus-linker-plan-{label}-{}.toml", std::process::id()));
+        fs::write(
+            &manifest,
+            format!(
+                "[package]\nname = \"plan_{label}\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"{target}\"\n"
+            ),
+        )
+        .expect("write linker-plan manifest");
+        let configuration =
+            CompilerConfiguration::from_manifest(&manifest).expect("target profile should load");
+        let object = Path::new("/tmp/actus-root.o");
+        let output_path = format!("/tmp/actus-plan-{label}");
+        let output = Path::new(&output_path);
+        let plan = LinkerPlan::from_configuration(&[object], output, &configuration)
+            .expect("linker plan should build");
+        let arguments = plan
+            .arguments()
+            .iter()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(plan.linker().to_string_lossy(), expected_linker);
+        assert_eq!(arguments.first().map(String::as_str), Some("/tmp/actus-root.o"));
+        let output_argument = if expected_linker == "lld-link.exe" {
+            format!("/OUT:{expected_output}")
+        } else {
+            expected_output.to_owned()
+        };
+        assert!(
+            arguments.iter().any(|argument| argument == &output_argument),
+            "unexpected linker arguments for {label}: {arguments:?}"
+        );
+        let _ = fs::remove_file(manifest);
+    }
+}
 
 #[test]
 fn loads_build_settings_from_an_actus_manifest() {

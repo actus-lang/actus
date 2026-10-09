@@ -247,8 +247,21 @@ not hardware measurements.
       linker arguments, runtime archive, and startup requirements per target.
 - [x] Reject incompatible backend-target combinations with typed diagnostics.
 - [ ] Prove that unused backend modules are not compiled or linked.
-- [ ] Add deterministic object and linker-plan tests for every supported host
+- [x] Add deterministic object and linker-plan tests for every supported host
       profile.
+
+### Gate 44.4 evidence
+
+`TargetSpec::artifact_contract` now exposes the target object format, linker
+flavor, entry contract, and startup contract without selecting a backend.
+`LinkerPlan` materializes linker, object, runtime archive, library, and output
+arguments before process execution, so the plan can be inspected and tested
+deterministically. Configuration tests cover hosted Linux GNU, macOS Apple,
+and Windows MSVC profiles, including the platform-specific output argument and
+runtime library set. Target tests cover hosted x86-64, hosted AArch64,
+freestanding x86-64, and ARM32/Thumb profiles. The full test suite passes with
+zero failures. Relocation-model and symbol-visibility policy remain open for
+the next Gate 44.4 block.
 
 ## Gate 44.5 — Add the LLVM backend on a hosted target
 

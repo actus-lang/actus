@@ -23,7 +23,7 @@ pub use contract::{
     BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
     BackendValueId, BackendValueType, lower_semantic_cleanup,
 };
-pub use linker::{NativeLinkError, link_object, link_objects};
+pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};
 pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
