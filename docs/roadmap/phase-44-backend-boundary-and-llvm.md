@@ -243,7 +243,7 @@ not hardware measurements.
 - [x] Define target profiles for hosted x86-64, hosted AArch64, freestanding
       targets, and ARM32/Thumb targets.
 - [x] Separate target selection from backend selection.
-- [ ] Define object format, relocation, symbol visibility, entry symbol,
+- [x] Define object format, relocation, symbol visibility, entry symbol,
       linker arguments, runtime archive, and startup requirements per target.
 - [x] Reject incompatible backend-target combinations with typed diagnostics.
 - [ ] Prove that unused backend modules are not compiled or linked.
@@ -261,7 +261,10 @@ and Windows MSVC profiles, including the platform-specific output argument and
 runtime library set. Target tests cover hosted x86-64, hosted AArch64,
 freestanding x86-64, and ARM32/Thumb profiles. The full test suite passes with
 zero failures. Relocation-model and symbol-visibility policy remain open for
-the next Gate 44.4 block.
+the next Gate 44.4 block. `RelocationModel` now distinguishes static and
+position-independent artifacts, while `TargetArtifactContract` records
+exported entry symbols and imported runtime symbols explicitly. Configuration
+and target regression tests cover both policies.
 
 ## Gate 44.5 — Add the LLVM backend on a hosted target
 

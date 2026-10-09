@@ -39,11 +39,26 @@ pub enum StartupContract {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RelocationModel {
+    Static,
+    PositionIndependent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SymbolVisibility {
+    Exported,
+    Imported,
+    Hidden,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TargetArtifactContract {
     pub object_format: BinaryFormat,
     pub linker_flavor: LinkerFlavor,
     pub entry_contract: EntryContract,
     pub startup: StartupContract,
+    pub entry_visibility: SymbolVisibility,
+    pub runtime_visibility: SymbolVisibility,
 }
 
 impl LinkerFlavor {
@@ -243,6 +258,8 @@ impl TargetSpec {
                 EntryContract::Hosted => StartupContract::HostedRuntime,
                 EntryContract::Freestanding => StartupContract::ExplicitEntry,
             },
+            entry_visibility: SymbolVisibility::Exported,
+            runtime_visibility: SymbolVisibility::Imported,
         }
     }
 

@@ -5,7 +5,9 @@ use std::path::PathBuf;
 
 use super::manifest;
 use super::manifest::{BuildProfile, LibraryKind, OptimizationLevel, RuntimeProfile};
-use crate::target::{EntryContract, LinkerFlavor, TargetSpec, TimeProviderContract};
+use crate::target::{
+    EntryContract, LinkerFlavor, RelocationModel, TargetSpec, TimeProviderContract,
+};
 
 pub(super) const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 pub(super) const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
@@ -69,6 +71,14 @@ impl NativeBackendConfiguration {
 
     pub fn position_independent(&self) -> bool {
         self.position_independent
+    }
+
+    pub const fn relocation_model(&self) -> RelocationModel {
+        if self.position_independent {
+            RelocationModel::PositionIndependent
+        } else {
+            RelocationModel::Static
+        }
     }
 
     pub fn with_optimization_level(mut self, optimization_level: OptimizationLevel) -> Self {

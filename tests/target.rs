@@ -74,6 +74,14 @@ fn artifact_contract_records_startup_and_linker_requirements() {
         actus::target::StartupContract::ExplicitEntry
     );
     assert_eq!(hosted.artifact_contract().linker_flavor, actus::target::LinkerFlavor::Gnu);
+    assert_eq!(
+        hosted.artifact_contract().entry_visibility,
+        actus::target::SymbolVisibility::Exported
+    );
+    assert_eq!(
+        hosted.artifact_contract().runtime_visibility,
+        actus::target::SymbolVisibility::Imported
+    );
 }
 
 #[test]

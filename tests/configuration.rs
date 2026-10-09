@@ -69,6 +69,10 @@ fn loads_build_settings_from_an_actus_manifest() {
     assert_eq!(configuration.runtime_profile(), RuntimeProfile::Core);
     assert_eq!(configuration.native_backend().module_name(), "sample_native");
     assert!(!configuration.native_backend().position_independent());
+    assert_eq!(
+        configuration.native_backend().relocation_model(),
+        actus::configuration::RelocationModel::Static
+    );
     assert_eq!(configuration.libraries()[0].name(), "m");
     assert_eq!(configuration.libraries()[0].kind(), LibraryKind::Shared);
     assert!(configuration.library_paths().is_empty());
