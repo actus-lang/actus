@@ -34,5 +34,18 @@ profile limit; lower target profiles can select a smaller limit through
 These values are local observations. CPU frequency, compiler revision,
 optimization settings, operating-system scheduling, and memory state can
 change them. Compiler RSS, object size, executable size, and peak resident
-memory require a separate instrumented build measurement and are not claimed
-by this record.
+memory were captured separately with a `/proc/<pid>/status` `VmHWM` poll while
+running the strict compiler on resident-one-byte fixtures:
+
+```text
+REGION_PROFILE logical_bytes=65536 resident_bytes=1 status=0 build_ms=71 peak_rss_kb=22376 executable_bytes=5818568
+REGION_PROFILE logical_bytes=131072 resident_bytes=1 status=0 build_ms=87 peak_rss_kb=22260 executable_bytes=5818568
+REGION_ARTIFACT logical_bytes=65536 emit=obj status=0 build_ms=26 peak_rss_kb=22316 artifact_bytes=2120
+REGION_ARTIFACT logical_bytes=65536 emit=exe status=0 build_ms=76 peak_rss_kb=22320 artifact_bytes=5818568
+REGION_ARTIFACT logical_bytes=131072 emit=obj status=0 build_ms=31 peak_rss_kb=22308 artifact_bytes=2120
+REGION_ARTIFACT logical_bytes=131072 emit=exe status=0 build_ms=92 peak_rss_kb=22028 artifact_bytes=5818568
+```
+
+The equal artifact sizes and near-constant compiler RSS show that these logical
+extents do not materialize one native object per logical element. They remain
+host measurements, not target or embedded guarantees.

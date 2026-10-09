@@ -237,9 +237,9 @@ native and runtime evidence.
       strength-reduced operations where the target permits it.
 - [x] Use bounded native copy operations for aggregate elements and ranges.
 - [ ] Keep optimization behavior deterministic across supported targets.
-- [ ] Record compiler memory, object size, executable size, copy time, and peak
+- [x] Record compiler memory, object size, executable size, copy time, and peak
       resident memory for 64 KiB and 128 KiB transfers.
-- [ ] Separate correctness measurements from performance measurements.
+- [x] Separate correctness measurements from performance measurements.
 
 ### Gate 42.6 evidence
 
@@ -249,6 +249,8 @@ native and runtime evidence.
   performance record is kept separate from those acceptance tests.
 - Aggregate element and range operations use bounded target-aware copy paths;
   no unbounded copy primitive is introduced by this phase.
+- The dated benchmark record includes compiler peak RSS, object and executable
+  sizes, build time, and runtime copy time for the 64 KiB and 128 KiB cases.
 
 ## Gate 42.7 — Cross-target and freestanding verification
 
