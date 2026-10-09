@@ -30,3 +30,15 @@ pub(super) mod types;
 pub(super) mod vtable;
 
 pub(super) use isa::build_isa_with_optimization;
+
+pub use abi::{validate_external_native_signature, validate_native_signature};
+pub use native::{
+    emit_module_object_for_target_in_namespace,
+    emit_module_object_for_target_in_namespace_with_bindings,
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances,
+    emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots,
+    emit_program_object, emit_program_object_for_target,
+    emit_program_object_for_target_in_namespace,
+    emit_program_object_for_target_in_namespace_with_bindings,
+    emit_program_object_with_configuration, emit_zero_return_object,
+};

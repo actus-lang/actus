@@ -62,7 +62,7 @@ fn native_objects_follow_namespace_context_deterministically() {
     let program = parse(tokens).unwrap();
     let target = TargetSpec::host().unwrap();
     let configuration = NativeBackendConfiguration::default();
-    let first = actus::codegen::emit_program_object_for_target_in_namespace(
+    let first = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &program,
         "main",
         "actus_mod_4_left",
@@ -70,7 +70,7 @@ fn native_objects_follow_namespace_context_deterministically() {
         &target,
     )
     .unwrap();
-    let repeat = actus::codegen::emit_program_object_for_target_in_namespace(
+    let repeat = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &program,
         "main",
         "actus_mod_4_left",
@@ -78,7 +78,7 @@ fn native_objects_follow_namespace_context_deterministically() {
         &target,
     )
     .unwrap();
-    let other = actus::codegen::emit_program_object_for_target_in_namespace(
+    let other = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &program,
         "main",
         "actus_mod_5_right",
@@ -96,7 +96,7 @@ fn imported_module_objects_emit_without_an_entry_and_preserve_public_wrappers() 
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
-    let bytes = actus::codegen::emit_module_object_for_target_in_namespace(
+    let bytes = actus::codegen::cranelift::emit_module_object_for_target_in_namespace(
         &program,
         "actus_mod_4_math",
         &NativeBackendConfiguration::default(),
@@ -120,7 +120,7 @@ fn emits_each_reachable_generic_instance_once_in_its_namespace() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
-    let bytes = actus::codegen::emit_program_object_for_target_in_namespace(
+    let bytes = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &program,
         "main",
         "actus_mod_generic",
@@ -142,7 +142,7 @@ fn generic_specializations_are_scoped_by_module_namespace() {
     let program = parse(tokens).unwrap();
     let target = TargetSpec::host().unwrap();
     let configuration = NativeBackendConfiguration::default();
-    let left = actus::codegen::emit_program_object_for_target_in_namespace(
+    let left = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &program,
         "main",
         "actus_mod_4_left",
@@ -150,7 +150,7 @@ fn generic_specializations_are_scoped_by_module_namespace() {
         &target,
     )
     .unwrap();
-    let right = actus::codegen::emit_program_object_for_target_in_namespace(
+    let right = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &program,
         "main",
         "actus_mod_5_right",
@@ -177,7 +177,7 @@ fn failed_specialization_does_not_poison_a_later_emission() {
     assert!(errors.is_empty());
     let invalid_program = parse(tokens).unwrap();
     assert!(
-        actus::codegen::emit_program_object_for_target_in_namespace(
+        actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
             &invalid_program,
             "main",
             "actus_mod_retry",
@@ -191,7 +191,7 @@ fn failed_specialization_does_not_poison_a_later_emission() {
     let (tokens, errors) = scan(valid);
     assert!(errors.is_empty());
     let valid_program = parse(tokens).unwrap();
-    let bytes = actus::codegen::emit_program_object_for_target_in_namespace(
+    let bytes = actus::codegen::cranelift::emit_program_object_for_target_in_namespace(
         &valid_program,
         "main",
         "actus_mod_retry",

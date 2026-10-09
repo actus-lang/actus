@@ -2,7 +2,7 @@ mod bindings;
 mod body;
 mod constants;
 mod contract;
-mod cranelift;
+pub mod cranelift;
 mod linker;
 mod model;
 mod result_constructor_spans;
@@ -20,17 +20,6 @@ pub use contract::{
     BackendInstruction, BackendLayout, BackendModule, BackendParameter, BackendPassingMode,
     BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
     BackendValueId, BackendValueType, lower_semantic_cleanup,
-};
-pub use cranelift::abi::{validate_external_native_signature, validate_native_signature};
-pub use cranelift::native::{
-    emit_module_object_for_target_in_namespace,
-    emit_module_object_for_target_in_namespace_with_bindings,
-    emit_module_object_for_target_in_namespace_with_bindings_and_instances,
-    emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots,
-    emit_program_object, emit_program_object_for_target,
-    emit_program_object_for_target_in_namespace,
-    emit_program_object_for_target_in_namespace_with_bindings,
-    emit_program_object_with_configuration, emit_zero_return_object,
 };
 pub use linker::{NativeLinkError, link_object, link_objects};
 pub use model::{

@@ -4,7 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use actus::codegen::{emit_program_object, link_object};
+use actus::codegen::cranelift::emit_program_object;
+use actus::codegen::link_object;
 use actus::configuration::{CompilerConfiguration, LibraryKind};
 use actus::lexer::scan;
 use actus::parser::parse;

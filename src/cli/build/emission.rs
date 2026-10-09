@@ -138,14 +138,15 @@ pub(crate) fn emit_objects(
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
-    let root_bytes = crate::codegen::emit_program_object_for_target_in_namespace_with_bindings(
-        root.program(),
-        symbol,
-        root.namespace().symbol_prefix(),
-        configuration.native_backend(),
-        configuration.target(),
-        &bindings,
-    )?;
+    let root_bytes =
+        crate::codegen::cranelift::emit_program_object_for_target_in_namespace_with_bindings(
+            root.program(),
+            symbol,
+            root.namespace().symbol_prefix(),
+            configuration.native_backend(),
+            configuration.target(),
+            &bindings,
+        )?;
     let mut objects = vec![EmittedObject {
         name: "root".to_owned(),
         bytes: root_bytes,
@@ -274,7 +275,7 @@ fn emit_module_objects(
             continue;
         }
         let bytes =
-            crate::codegen::emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
+            crate::codegen::cranelift::emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
                 unit.program(),
                 unit.namespace().symbol_prefix(),
                 configuration.native_backend(),

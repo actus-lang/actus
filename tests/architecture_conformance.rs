@@ -162,6 +162,16 @@ fn shared_codegen_facade_uses_neutral_error_contracts() {
 }
 
 #[test]
+fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
+    let facade = fs::read_to_string(repository_path("src/codegen/mod.rs"))
+        .expect("codegen facade should be readable");
+    assert!(facade.contains("pub mod cranelift;"));
+    assert!(!facade.contains("emit_program_object"));
+    assert!(!facade.contains("emit_module_object"));
+    assert!(!facade.contains("validate_native_signature"));
+}
+
+#[test]
 fn cranelift_implementation_stays_inside_its_backend_boundary() {
     let root = repository_path("src/codegen");
     for path in rust_sources(&root) {
