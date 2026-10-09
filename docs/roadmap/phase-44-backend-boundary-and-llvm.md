@@ -121,7 +121,7 @@ optimization and instruction-selection layers.
 - [x] Enforce the filesystem boundary: Cranelift-only files under
       `src/codegen/cranelift/`, LLVM-only files under `src/codegen/llvm/`, and
       backend-independent contracts in shared `src/codegen/` modules.
-- [ ] Add baseline tests that prove current Cranelift behavior before any
+- [x] Add baseline tests that prove current Cranelift behavior before any
       implementation move.
 
 ### Gate 44.1 evidence
@@ -131,8 +131,10 @@ and source inventory, proposed backend boundary, optional LLVM policy, target
 ABI controls, and migration order are recorded in
 `docs/roadmap/adr-0052-backend-boundary-and-llvm.md`.
 
-**Gate status: In progress** — the inventory and architecture decision are
-recorded; responsibility mapping and baseline regression evidence remain open.
+**Gate status: Complete** — the inventory, responsibility mapping, filesystem
+boundary, and baseline regression evidence are recorded. The baseline command
+`cargo test --test codegen --all-features -- --format terse` passes with 66
+tests and 0 failures.
 
 ## Gate 44.2 — Define the backend-neutral lowering contract
 
