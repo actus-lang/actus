@@ -148,14 +148,15 @@ without an LLVM installation, LLVM headers, LLVM libraries, or LLVM Rust
 bindings. Shared semantic lowering, target metadata, runtime contracts, and
 linker planning must not import LLVM types.
 
-The first LLVM implementation will use one explicitly selected LLVM major
-version and one matching Rust binding crate. The version, binding, discovery
-environment, minimum toolchain, and supported host targets will be committed
-together with the first hosted IR emitter. Until that implementation is
-available, the `llvm` feature is an architectural opt-in marker only; it does
-not claim that LLVM lowering is implemented. An LLVM feature build that lacks
-the required toolchain must return a typed setup diagnostic rather than fall
-back to Cranelift or silently emit a different object.
+The selected first binding is `llvm-sys 231.0.0`, matching LLVM 23.1.x, with
+the binding's `strict-versioning` feature enabled. The build discovers LLVM
+through `llvm-config` or `LLVM_SYS_231_PREFIX`; the default build does not
+perform that discovery. The minimum supported host toolchain is LLVM 23.1.x
+and the initial target scope is hosted targets. Until the hosted IR emitter is
+available, the `llvm` feature validates the binding/toolchain boundary only;
+it does not claim that LLVM lowering is implemented. An LLVM feature build
+that lacks the required toolchain must return a typed setup diagnostic rather
+than fall back to Cranelift or silently emit a different object.
 
 ### Dependency isolation
 

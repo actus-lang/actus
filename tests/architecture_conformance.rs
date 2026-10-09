@@ -190,8 +190,10 @@ fn llvm_integration_is_an_explicit_opt_in_feature() {
     let manifest = fs::read_to_string(repository_path("Cargo.toml"))
         .expect("Cargo manifest should be readable");
     assert!(manifest.contains("default = [\"cranelift\"]"));
-    assert!(manifest.contains("llvm = []"));
-    assert!(!manifest.contains("llvm-sys = \""));
+    assert!(manifest.contains("llvm = [\"dep:llvm-sys\"]"));
+    assert!(manifest.contains(
+        "llvm-sys = { version = \"231.0.0\", optional = true, features = [\"strict-versioning\"] }"
+    ));
     assert!(!manifest.contains("inkwell = \""));
 }
 

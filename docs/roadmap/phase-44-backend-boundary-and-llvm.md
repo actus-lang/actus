@@ -275,7 +275,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
 
 - [x] Select and document the supported LLVM integration boundary and version
       policy.
-- [ ] Put the LLVM integration behind an explicit Cargo feature such as
+- [x] Put the LLVM integration behind an explicit Cargo feature such as
       `llvm`; the default Cranelift build must not require LLVM or llvm-sys.
 - [ ] Test the default feature set and the LLVM feature set as independent CI
       configurations.
@@ -303,9 +303,11 @@ Cranelift dependency path. The supported policy is an explicitly selected LLVM
 major version with discovery through the host LLVM toolchain; the exact major
 and binding crate will be accepted together with the first hosted IR emitter,
 after the CI toolchain is available. The manifest now exposes an opt-in
-`llvm` feature while keeping `cranelift` as the only default backend feature.
-Architecture tests verify that LLVM is opt-in and that no LLVM binding crate is
-implicitly added to the default dependency surface.
+`llvm` feature backed by `llvm-sys 231.0.0` with strict versioning, while
+keeping `cranelift` as the only default backend feature. Architecture tests
+verify that LLVM is opt-in and that the binding is absent from the default
+dependency surface. The feature currently validates toolchain availability;
+hosted LLVM IR emission remains open for the next gate.
 
 ## Gate 44.6 — Add ARM32/Thumb target support
 
