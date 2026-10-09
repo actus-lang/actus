@@ -143,8 +143,8 @@ recorded; responsibility mapping and baseline regression evidence remain open.
       to a backend without exposing Cranelift or LLVM types.
 - [x] Define target-neutral ABI metadata for scalar, aggregate, borrowed,
       exclusive, and runtime bridge parameters.
-- [ ] Define deterministic symbol identity independently of backend mangling.
-- [ ] Define error reporting for unsupported backend operations with source
+- [x] Define deterministic symbol identity independently of backend mangling.
+- [x] Define error reporting for unsupported backend operations with source
       spans and target context.
 - [ ] Keep the representation minimal and Actus-oriented; do not reproduce a
       general optimization, instruction-selection, or register-allocation IR.

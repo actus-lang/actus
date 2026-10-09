@@ -171,13 +171,88 @@ fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContrac
     valid.then_some(()).ok_or(BackendContractError::RolePassingMismatch)
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendContractError {
     InvalidLayout(&'static str),
     InvalidFunctionSymbol,
     MissingEntryBlock,
     InvalidCallSymbol,
     RolePassingMismatch,
+    Unsupported(BackendUnsupportedOperation),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendTargetContext {
+    pub backend: String,
+    pub target: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendUnsupportedOperation {
+    pub operation: String,
+    pub span: SourceSpan,
+    pub context: BackendTargetContext,
+    pub reason: String,
+}
+
+impl BackendUnsupportedOperation {
+    pub fn new(
+        operation: impl Into<String>,
+        span: SourceSpan,
+        context: BackendTargetContext,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self { operation: operation.into(), span, context, reason: reason.into() }
+    }
+}
+
+impl std::fmt::Display for BackendContractError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidLayout(reason) => write!(formatter, "invalid backend layout: {reason}"),
+            Self::InvalidFunctionSymbol => formatter.write_str("invalid backend function symbol"),
+            Self::MissingEntryBlock => {
+                formatter.write_str("backend function is missing its entry block")
+            }
+            Self::InvalidCallSymbol => formatter.write_str("backend call has an empty symbol"),
+            Self::RolePassingMismatch => {
+                formatter.write_str("backend parameter role and passing mode disagree")
+            }
+            Self::Unsupported(operation) => write!(
+                formatter,
+                "backend `{}` does not support `{}` for target `{}` at {:?}: {}",
+                operation.context.backend,
+                operation.operation,
+                operation.context.target,
+                operation.span,
+                operation.reason
+            ),
+        }
+    }
+}
+
+impl std::error::Error for BackendContractError {}
+
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::*;
+
+    #[test]
+    fn reports_unsupported_operations_with_target_context() {
+        let error = BackendContractError::Unsupported(BackendUnsupportedOperation::new(
+            "aggregate-return",
+            SourceSpan::new(12, 20),
+            BackendTargetContext {
+                backend: "llvm".to_owned(),
+                target: "thumbv7em-none-eabihf".to_owned(),
+            },
+            "aggregate return lowering is not implemented",
+        ));
+        let rendered = error.to_string();
+        assert!(rendered.contains("aggregate-return"));
+        assert!(rendered.contains("thumbv7em-none-eabihf"));
+        assert!(rendered.contains("12"));
+    }
 }
 
 #[cfg(test)]

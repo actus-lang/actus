@@ -12,7 +12,7 @@ mod symbols;
 pub use contract::{
     BackendBlock, BackendBlockId, BackendContractError, BackendFunction, BackendInstruction,
     BackendLayout, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
-    BackendValueId, BackendValueType,
+    BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
 };
 pub use cranelift::abi::{
     NativeAbiError, validate_external_native_signature, validate_native_signature,

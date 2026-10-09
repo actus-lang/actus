@@ -116,6 +116,10 @@ represented by target-neutral direct, indirect, borrowed, exclusive-loan,
 ownership-transfer, and runtime-bridge modes. Aggregate returns can require an
 explicit validated return slot; register assignment and stack placement remain
 backend responsibilities.
+Unsupported operations use a typed diagnostic carrying the operation name,
+source span, selected backend, target profile, and stable reason text. A
+backend must return this diagnostic instead of approximating an unsupported
+Actus contract.
 
 ## Mandatory contracts
 
