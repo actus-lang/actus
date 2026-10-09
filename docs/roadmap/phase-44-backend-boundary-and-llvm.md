@@ -279,7 +279,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       `llvm`; the default Cranelift build must not require LLVM or llvm-sys.
 - [x] Test the default feature set and the LLVM feature set as independent CI
       configurations.
-- [ ] Report LLVM installation, build-time, dependency, and binary-size
+- [x] Report LLVM installation, build-time, dependency, and binary-size
       requirements separately from the default compiler.
 - [ ] Add LLVM IR generation for the common scalar, control-flow, call, return,
       trap, and cleanup contract.
@@ -321,6 +321,10 @@ separate LLVM-only configuration that checks the compiler library and binary
 surface plus the LLVM integration suite. The LLVM-only configuration does not
 claim that Cranelift-specific native fixtures are supported without the
 Cranelift feature.
+Installation requirements, direct dependency trees, clean debug build times,
+target-directory sizes, and debug executable sizes are recorded in
+`docs/benchmarks/phase-44-backend-build-profile-2026-10-09.md`. The record
+states the host and evidence limits explicitly.
 
 ## Gate 44.6 — Add ARM32/Thumb target support
 
