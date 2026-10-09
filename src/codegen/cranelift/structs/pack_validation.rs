@@ -1,9 +1,9 @@
 use cranelift_codegen::ir::{InstBuilder, Value, condcodes::IntCC, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::cranelift::expressions::coerce_to_ir_type;
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
+use super::super::expressions::coerce_to_ir_type;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 
 pub(super) fn validate_unsigned_byte_value(
     function: &mut FunctionBuilder<'_>,

@@ -11,9 +11,9 @@ use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
+use crate::codegen::cranelift::structs::copy_bytes;
 use crate::codegen::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
-use crate::codegen::structs::copy_bytes;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_array_index(
@@ -209,7 +209,7 @@ fn swap_indexed_pack_element_if_needed(
     local_types: &HashMap<&String, NativeType>,
     layouts: &LayoutRegistry,
 ) -> Value {
-    if crate::codegen::structs::indexed_pack_endianness(target, local_types, layouts)
+    if crate::codegen::cranelift::structs::indexed_pack_endianness(target, local_types, layouts)
         != Some(crate::ast::LayoutEndianness::Big)
     {
         return value;
@@ -257,7 +257,7 @@ pub(crate) fn lower_array_address(
     layouts: &LayoutRegistry,
 ) -> Result<(Value, NativeType), NativeEmitError> {
     let NativeType::Array(id) =
-        crate::codegen::structs::expression_native_type(target, local_types, layouts)
+        crate::codegen::cranelift::structs::expression_native_type(target, local_types, layouts)
             .ok_or_else(|| NativeEmitError("indexed target has no native array type".to_owned()))?
     else {
         return Err(NativeEmitError("indexed target is not a native array".to_owned()));

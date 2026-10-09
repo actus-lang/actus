@@ -5,13 +5,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, StructFieldInit};
 
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::{LayoutRegistry, PackFieldLayout};
-use super::super::model::NativeCleanupSchedule;
+use super::super::expressions::lower_expression;
+use super::super::literals::StringDataValues;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
+use crate::codegen::layout::{LayoutRegistry, PackFieldLayout};
+use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_pack_literal(
@@ -68,7 +68,7 @@ fn lower_pack_storage_value(
         string_data,
         layouts,
     )?;
-    Ok(super::super::cranelift::expressions::coerce_to_ir_type(
+    Ok(super::super::expressions::coerce_to_ir_type(
         function,
         value,
         layouts.ir_type(storage_type)?,
@@ -166,7 +166,7 @@ fn lower_indexed_pack_field_assignment(
     target: &Expr,
     index: &Expr,
 ) -> Result<(), NativeEmitError> {
-    let (address, element) = super::super::cranelift::arrays::lower_array_address(
+    let (address, element) = super::super::arrays::lower_array_address(
         context.function,
         target,
         index,
@@ -336,7 +336,7 @@ pub(crate) fn lower_pack_field(
         storage_bits,
         storage_type,
     );
-    Ok(super::super::cranelift::expressions::coerce_to_ir_type(
+    Ok(super::super::expressions::coerce_to_ir_type(
         function,
         extracted,
         layouts.ir_type(field_layout.ty)?,
@@ -378,8 +378,7 @@ pub(super) fn lower_pack_field_write(
     let shifted_mask = shift_value(function, mask_value, bit_offset, storage_type);
     let inverse_mask = function.ins().bnot(shifted_mask);
     let cleared = function.ins().band(storage, inverse_mask);
-    let value =
-        super::super::cranelift::expressions::coerce_to_ir_type(function, new_value, storage_type);
+    let value = super::super::expressions::coerce_to_ir_type(function, new_value, storage_type);
     let value = function.ins().band(value, mask_value);
     let value = shift_value(function, value, bit_offset, storage_type);
     Ok(function.ins().bor(cleared, value))
@@ -400,7 +399,7 @@ fn shift_value(
 }
 
 pub(super) fn packed_field<'a>(
-    pack: &'a super::super::layout::PackLayout,
+    pack: &'a crate::codegen::layout::PackLayout,
     field: &str,
 ) -> Result<&'a PackFieldLayout, NativeEmitError> {
     pack.fields
@@ -459,7 +458,7 @@ fn packed_storage_bits(
 }
 
 fn mapped_bit_offset(
-    pack: &super::super::layout::PackLayout,
+    pack: &crate::codegen::layout::PackLayout,
     field: &PackFieldLayout,
     layouts: &LayoutRegistry,
 ) -> Result<u16, NativeEmitError> {

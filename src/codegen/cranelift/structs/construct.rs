@@ -5,13 +5,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{StructFieldInit, TypeName};
 
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
-use super::super::model::NativeCleanupSchedule;
+use super::super::expressions::lower_expression;
+use super::super::literals::StringDataValues;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::memory::store_struct_field;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_struct_literal(
@@ -48,7 +48,7 @@ fn resolve_struct_layout<'a>(
     name: &str,
     type_arguments: &[TypeName],
     layouts: &'a LayoutRegistry,
-) -> Result<&'a super::super::layout::StructLayout, NativeEmitError> {
+) -> Result<&'a crate::codegen::layout::StructLayout, NativeEmitError> {
     let type_name = TypeName {
         name: name.to_owned(),
         arguments: type_arguments.to_vec(),
@@ -70,7 +70,7 @@ fn lower_struct_fields(
     function: &mut FunctionBuilder<'_>,
     fields: &[StructFieldInit],
     address: cranelift_codegen::ir::Value,
-    layout: &super::super::layout::StructLayout,
+    layout: &crate::codegen::layout::StructLayout,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,

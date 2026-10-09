@@ -3,11 +3,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Expr, TypeName};
 
-use super::super::super::structs::expression_native_type;
 use super::super::calls::CallLoweringContext;
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::lower_expression;
+use crate::codegen::cranelift::structs::expression_native_type;
 
 pub(super) fn lower_cast(
     function: &mut FunctionBuilder<'_>,

@@ -12,10 +12,10 @@ use super::super::super::cranelift::literals::StringDataValues;
 use super::super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::super::cranelift::types::NativeType;
 use super::super::super::layout::LayoutRegistry;
-use super::super::super::structs::{expression_native_type, lower_field_compound_assignment};
 use super::{Flow, NativeCleanupSchedule};
 use crate::codegen::cranelift::arrays::lower_array_compound_assignment;
 use crate::codegen::cranelift::buffer_index::lower_buffer_compound_assignment;
+use crate::codegen::cranelift::structs::{expression_native_type, lower_field_compound_assignment};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_compound_assignment<'source>(

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::ast::{Expr, LayoutEndianness, TypeName};
 
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
 
 pub(crate) fn expression_native_type(
     expression: &Expr,
@@ -37,9 +37,7 @@ pub(crate) fn expression_native_type(
                 NativeType::Buffer => Some(NativeType::Integer { signed: false, width: 8 }),
                 _ => None,
             }),
-        Expr::MethodCall { .. } => {
-            super::super::cranelift::enums::enum_expression_type(expression, layouts)
-        }
+        Expr::MethodCall { .. } => super::super::enums::enum_expression_type(expression, layouts),
         Expr::Integer { .. } => Some(NativeType::Int),
         Expr::FloatLiteral { suffix, .. } => Some(NativeType::Float {
             width: if suffix.as_deref() == Some("f32") { 32 } else { 64 },

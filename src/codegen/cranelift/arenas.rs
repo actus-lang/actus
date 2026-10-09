@@ -10,9 +10,9 @@ use super::expressions::{initializer_type, lower_expression};
 use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
+use crate::codegen::cranelift::structs::{copy_bytes, expression_native_type};
 use crate::codegen::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
-use crate::codegen::structs::{copy_bytes, expression_native_type};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_place(

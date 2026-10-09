@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::cranelift::expressions::emit_buffer_drop;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
-use super::super::performance::dispatch_key;
+use super::super::expressions::emit_buffer_drop;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::performance::dispatch_key;
 
 pub(crate) fn emit_struct_drop(
     function: &mut FunctionBuilder<'_>,
@@ -38,7 +38,7 @@ fn emit_struct_drop_except(
 fn emit_owned_field_drop(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
-    field: &super::super::layout::FieldLayout,
+    field: &crate::codegen::layout::FieldLayout,
     moved_fields: &[String],
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,

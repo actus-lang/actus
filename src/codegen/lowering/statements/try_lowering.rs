@@ -13,7 +13,7 @@ use super::super::super::enum_layout;
 use super::super::super::layout::LayoutRegistry;
 use super::super::{Flow, NativeCleanupSchedule};
 use crate::ast::Expr;
-use crate::codegen::structs;
+use crate::codegen::cranelift::structs;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_return(

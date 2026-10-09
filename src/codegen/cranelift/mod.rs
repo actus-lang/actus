@@ -16,6 +16,7 @@ pub(super) mod literals;
 pub(super) mod native;
 pub(super) mod object;
 pub(super) mod runtime;
+pub(super) mod structs;
 pub(super) mod types;
 pub(super) mod vtable;
 

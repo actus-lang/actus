@@ -132,7 +132,7 @@ fn lower_index_expression(
     index: &Expr,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, NativeEmitError> {
-    let lower = match super::super::structs::expression_native_type(
+    let lower = match crate::codegen::cranelift::structs::expression_native_type(
         target,
         context.local_types,
         context.layouts,

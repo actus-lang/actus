@@ -12,7 +12,7 @@ use super::cranelift::native::NativeEmitError;
 use super::cranelift::types::NativeType;
 use super::layout::LayoutRegistry;
 use super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
-use super::structs::emit_binding_drop;
+use crate::codegen::cranelift::structs::emit_binding_drop;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_return_cleanup(
@@ -178,7 +178,7 @@ fn emit_partial_binding_cleanup(
     let NativeInstruction::DropBindingFields { name, moved_fields, .. } = instruction else {
         return Ok(());
     };
-    super::structs::emit_partial_binding_drop(
+    crate::codegen::cranelift::structs::emit_partial_binding_drop(
         function,
         name,
         moved_fields,

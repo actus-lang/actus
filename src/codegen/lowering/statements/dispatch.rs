@@ -290,35 +290,36 @@ fn lower_index_assignment_statement(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
-    let result = if super::super::super::structs::expression_native_type(target, types, layouts)
-        == Some(NativeType::Buffer)
-    {
-        crate::codegen::cranelift::buffer_index::lower_buffer_assignment(
-            function,
-            target,
-            index,
-            value,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )
-    } else {
-        crate::codegen::cranelift::arrays::lower_array_assignment(
-            function,
-            target,
-            index,
-            value,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )
-    };
+    let result =
+        if crate::codegen::cranelift::structs::expression_native_type(target, types, layouts)
+            == Some(NativeType::Buffer)
+        {
+            crate::codegen::cranelift::buffer_index::lower_buffer_assignment(
+                function,
+                target,
+                index,
+                value,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+        } else {
+            crate::codegen::cranelift::arrays::lower_array_assignment(
+                function,
+                target,
+                index,
+                value,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+        };
     result.map(|()| Flow::Fallthrough)
 }
 
@@ -335,19 +336,21 @@ fn lower_place_assignment<'source>(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     match place {
-        Place::Field { object, field, .. } => super::super::super::structs::lower_field_assignment(
-            function,
-            &object.to_expr(),
-            field,
-            value,
-            locals,
-            types,
-            functions,
-            cleanup_schedule,
-            string_data,
-            layouts,
-        )
-        .map(|()| Flow::Fallthrough),
+        Place::Field { object, field, .. } => {
+            crate::codegen::cranelift::structs::lower_field_assignment(
+                function,
+                &object.to_expr(),
+                field,
+                value,
+                locals,
+                types,
+                functions,
+                cleanup_schedule,
+                string_data,
+                layouts,
+            )
+            .map(|()| Flow::Fallthrough)
+        }
         Place::Index { target, index, .. } => lower_index_assignment_statement(
             function,
             &target.to_expr(),

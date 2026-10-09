@@ -7,9 +7,9 @@ use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
 use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
+use crate::codegen::cranelift::structs::copy_bytes;
 use crate::codegen::enum_layout::{EnumLayout, EnumVariantLayout};
 use crate::codegen::layout::LayoutRegistry;
-use crate::codegen::structs::copy_bytes;
 
 pub(super) type BranchLocals<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);

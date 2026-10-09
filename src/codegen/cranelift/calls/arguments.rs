@@ -88,7 +88,7 @@ fn lower_indirect_ins_argument(
             Ok(address)
         }
         Expr::FieldAccess { object, field, .. } => {
-            super::super::super::structs::lower_field_address_for_ins(
+            crate::codegen::cranelift::structs::lower_field_address_for_ins(
                 function,
                 object,
                 field,

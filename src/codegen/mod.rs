@@ -15,7 +15,6 @@ mod result_constructor_spans;
 mod result_constructors;
 mod serialization_generation;
 mod serialization_migration;
-mod structs;
 mod symbols;
 
 pub use abi::{NativeAbiError, validate_external_native_signature, validate_native_signature};

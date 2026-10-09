@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use super::super::cranelift::native::NativeEmitError;
 use super::super::cranelift::types::NativeType;
 use super::super::layout::LayoutRegistry;
-use super::super::structs::copy_bytes;
+use crate::codegen::cranelift::structs::copy_bytes;
 
 pub(super) fn emit_flow(
     function: &mut FunctionBuilder<'_>,
@@ -145,7 +145,7 @@ fn emit_borrowed_view_return(
     function.append_block_param(merge, pointer_type);
     function.ins().brif(result, some, &[], none, &[]);
     function.switch_to_block(some);
-    super::super::structs::copy_bytes(function, result, destination, size, layouts)?;
+    crate::codegen::cranelift::structs::copy_bytes(function, result, destination, size, layouts)?;
     let some_argument = cranelift_codegen::ir::BlockArg::Value(destination);
     function.ins().jump(merge, [&some_argument]);
     function.seal_block(some);

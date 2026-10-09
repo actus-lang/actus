@@ -12,8 +12,8 @@ use super::super::cranelift::literals::StringDataValues;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;
 use super::super::layout::LayoutRegistry;
-use super::super::structs::emit_binding_drop;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
+use crate::codegen::cranelift::structs::emit_binding_drop;
 
 mod compound;
 mod control_flow;
@@ -268,10 +268,25 @@ fn lower_assignment<'source>(
             crate::codegen::cranelift::expressions::coerce_to_ir_type(function, value, target)
         });
     if locals.contains_key(name) {
-        super::super::structs::emit_binding_drop(
+        crate::codegen::cranelift::structs::emit_binding_drop(
             function, name, locals, types, functions, layouts,
         )?;
     }
+    if store_assignment_value(function, name, value, locals, types, layouts)? {
+        return Ok(Flow::Fallthrough);
+    }
+    locals.insert(name, value);
+    Ok(Flow::Fallthrough)
+}
+
+fn store_assignment_value(
+    function: &mut FunctionBuilder<'_>,
+    name: &String,
+    value: cranelift_codegen::ir::Value,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    layouts: &LayoutRegistry,
+) -> Result<bool, NativeEmitError> {
     if let Some(destination) = locals.get(name)
         && types
             .get(name)
@@ -280,20 +295,18 @@ fn lower_assignment<'source>(
         && function.func.dfg.value_type(*destination) == layouts.pointer_type
     {
         function.ins().store(cranelift_codegen::ir::MemFlagsData::new(), value, *destination, 0);
-        return Ok(Flow::Fallthrough);
+        return Ok(true);
     }
-    if let Some(NativeType::Struct(id)) = types.get(name).copied()
-        && layouts.is_trivially_copyable_struct(id)
-        && let Some(destination) = locals.get(name).copied()
-    {
-        let size = layouts
-            .type_size(NativeType::Struct(id))
-            .ok_or_else(|| NativeEmitError("aggregate binding has no native size".to_owned()))?;
-        super::super::structs::copy_bytes(function, value, destination, size, layouts)?;
-        return Ok(Flow::Fallthrough);
+    let Some(NativeType::Struct(id)) = types.get(name).copied() else { return Ok(false) };
+    let Some(destination) = locals.get(name).copied() else { return Ok(false) };
+    if !layouts.is_trivially_copyable_struct(id) {
+        return Ok(false);
     }
-    locals.insert(name, value);
-    Ok(Flow::Fallthrough)
+    let size = layouts
+        .type_size(NativeType::Struct(id))
+        .ok_or_else(|| NativeEmitError("aggregate binding has no native size".to_owned()))?;
+    crate::codegen::cranelift::structs::copy_bytes(function, value, destination, size, layouts)?;
+    Ok(true)
 }
 
 fn lower_drop(

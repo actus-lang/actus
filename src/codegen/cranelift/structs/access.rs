@@ -5,14 +5,14 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::literals::StringDataValues;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
-use super::super::model::NativeCleanupSchedule;
+use super::super::expressions::lower_expression;
+use super::super::literals::StringDataValues;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::memory::copy_bytes;
 use super::types::expression_native_type;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_field_access(
@@ -111,7 +111,7 @@ fn lower_struct_field_access(
 fn load_struct_field(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
-    field_layout: &super::super::layout::FieldLayout,
+    field_layout: &crate::codegen::layout::FieldLayout,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     if field_layout.indirect {
@@ -328,12 +328,9 @@ fn lower_struct_compound_value<'source>(
         string_data,
         layouts,
     )?;
-    let right = super::super::cranelift::expressions::coerce_to_ir_type(
-        function,
-        right,
-        layouts.ir_type(field_type)?,
-    );
-    let updated = super::super::cranelift::expressions::lower_compound_integer_operation(
+    let right =
+        super::super::expressions::coerce_to_ir_type(function, right, layouts.ir_type(field_type)?);
+    let updated = super::super::expressions::lower_compound_integer_operation(
         function, current, operator, right, field_type,
     )?;
     Ok(updated)
@@ -402,7 +399,7 @@ fn store_struct_field(
     function: &mut FunctionBuilder<'_>,
     address: cranelift_codegen::ir::Value,
     value: cranelift_codegen::ir::Value,
-    field_layout: &super::super::layout::FieldLayout,
+    field_layout: &crate::codegen::layout::FieldLayout,
     layouts: &LayoutRegistry,
 ) -> Result<(), NativeEmitError> {
     if field_layout.indirect
@@ -434,7 +431,7 @@ fn lower_field_address(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(cranelift_codegen::ir::Value, super::super::layout::FieldLayout), NativeEmitError> {
+) -> Result<(cranelift_codegen::ir::Value, crate::codegen::layout::FieldLayout), NativeEmitError> {
     let object_type = expression_native_type(object, local_types, layouts)
         .ok_or_else(|| NativeEmitError("field access requires a struct value".to_owned()))?;
     let NativeType::Struct(id) = object_type else {
