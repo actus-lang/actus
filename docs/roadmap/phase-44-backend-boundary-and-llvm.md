@@ -164,7 +164,7 @@ recorded; responsibility mapping and baseline regression evidence remain open.
       diagnostics, and zero-float verification.
 - [ ] Run the complete existing test and benchmark suite after each cohesive
       move.
-- [ ] Add an architecture test that prevents new backend-specific imports from
+- [x] Add an architecture test that prevents new backend-specific imports from
       entering shared frontend or semantic modules.
 
 ## Gate 44.4 — Formalize target, object, and linker boundaries

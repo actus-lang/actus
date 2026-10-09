@@ -89,6 +89,26 @@ fn assert_layer_excludes(directory: &str, forbidden: &[&str]) {
     }
 }
 
+fn assert_shared_codegen_excludes_backend_crates() {
+    let root = repository_path("src/codegen");
+    for path in rust_sources(&root) {
+        if path
+            .strip_prefix(&root)
+            .expect("codegen path should be below codegen root")
+            .components()
+            .any(|component| component.as_os_str() == "cranelift")
+        {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("codegen source should be readable");
+        for token in
+            ["cranelift_codegen", "cranelift_frontend", "cranelift_module", "cranelift_object"]
+        {
+            assert!(!source.contains(token), "{} imports backend crate `{token}`", path.display());
+        }
+    }
+}
+
 #[test]
 fn standard_library_directories_have_canonical_facades() {
     assert_canonical_facades(&repository_path("library/std/src"));
@@ -119,4 +139,9 @@ fn compiler_layers_do_not_import_reverse_pipeline_or_backend_logic() {
         "src/codegen",
         &["SemanticErrorKind", "SemanticError", "Analyzer", "render_diagnostic"],
     );
+}
+
+#[test]
+fn shared_codegen_excludes_backend_specific_crates() {
+    assert_shared_codegen_excludes_backend_crates();
 }
