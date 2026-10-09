@@ -164,9 +164,9 @@ The backend-independent contract suite is in `tests/codegen_contract.rs` and
 does not select Cranelift or LLVM. It covers role-aware passing, aggregate
 layouts and return slots, deterministic unsupported-operation diagnostics,
 ownership capability passing, cleanup actions, block identity, and neutral
-control-flow targets. The command
+control-flow targets, and typed failure discriminants. The command
 `cargo test --test codegen_contract --all-features -- --format terse` passes
-with 10 tests and 0 failures.
+with 11 tests and 0 failures.
 
 ## Gate 44.3 — Isolate the existing Cranelift backend
 
