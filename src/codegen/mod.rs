@@ -8,7 +8,6 @@ mod cleanup;
 mod constants;
 mod control_flow;
 mod cranelift;
-mod dynamic_call;
 mod enum_layout;
 mod enums;
 mod expressions;

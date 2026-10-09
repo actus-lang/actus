@@ -1,5 +1,6 @@
 pub(super) mod declarations;
 pub(super) mod dependencies;
+pub(super) mod dynamic_call;
 pub(super) mod emission;
 pub(super) mod emitter_declarations;
 pub(super) mod ir_audit;

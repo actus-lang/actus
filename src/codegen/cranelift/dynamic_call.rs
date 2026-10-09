@@ -1,9 +1,9 @@
 use cranelift_codegen::ir::{AbiParam, InstBuilder, MemFlagsData, Signature, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::cranelift::native::NativeEmitError;
+use super::native::NativeEmitError;
 
-pub(super) fn lower_dynamic_call(
+pub(crate) fn lower_dynamic_call(
     function: &mut FunctionBuilder<'_>,
     fat_pointer: cranelift_codegen::ir::Value,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
