@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::super::calls::CallLoweringContext;
+use super::super::cranelift::calls::CallLoweringContext;
 use super::super::cranelift::expressions::lower_expression;
 use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::cranelift::types::NativeType;

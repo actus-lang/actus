@@ -6,9 +6,9 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Argument, IntrinsicKind, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
 
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::super::layout::LayoutRegistry;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::arguments::lower_call_arguments;
 use super::context::CallLoweringContext;
 use super::returns::allocate_return_address;
@@ -122,7 +122,7 @@ fn resolve_call_target<'a>(
         && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
     {
         let argument_type = arguments.first().and_then(|argument| {
-            super::super::cranelift::expressions::initializer_type(
+            super::super::expressions::initializer_type(
                 &argument.expression,
                 context.local_types,
                 context.functions,

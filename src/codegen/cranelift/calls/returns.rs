@@ -1,9 +1,9 @@
 use cranelift_codegen::ir::{InstBuilder, StackSlotData, StackSlotKind, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::super::layout::LayoutRegistry;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 
 pub(super) fn allocate_return_address(
     function: &mut FunctionBuilder<'_>,

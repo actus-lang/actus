@@ -3,10 +3,10 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Argument, Expr};
 
 use super::super::super::arrays::lower_array_constructor;
-use super::super::super::calls::CallLoweringContext;
-use super::super::super::calls::{lower_call, lower_method_call};
 use super::super::super::enums::{enum_receiver_name, lower_enum_constructor};
 use super::super::super::structs::{lower_field_access, lower_pack_literal, lower_struct_literal};
+use super::super::calls::CallLoweringContext;
+use super::super::calls::{lower_call, lower_method_call};
 use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 

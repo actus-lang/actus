@@ -3,11 +3,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, ArgumentRoleResolution, Expr};
 
-use super::super::cranelift::dynamic_call::lower_dynamic_call;
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
-use super::super::performance::dispatch_key;
+use super::super::super::performance::dispatch_key;
+use super::super::dynamic_call::lower_dynamic_call;
+use super::super::expressions::lower_expression;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 use super::context::CallLoweringContext;
 use super::lower::lower_call;
 
@@ -62,7 +62,7 @@ fn lower_fat_pointer_method(
 fn method_callee(
     receiver_type: NativeType,
     method: &str,
-    functions: &std::collections::HashMap<String, super::super::cranelift::native::FunctionRef>,
+    functions: &std::collections::HashMap<String, super::super::native::FunctionRef>,
 ) -> String {
     let dispatch_name = dispatch_key(receiver_type, method);
     if functions.contains_key(&dispatch_name) { dispatch_name } else { method.to_owned() }
@@ -72,7 +72,7 @@ fn receiver_native_type(
     receiver: &Expr,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<NativeType, NativeEmitError> {
-    super::super::cranelift::expressions::initializer_type(
+    super::super::expressions::initializer_type(
         receiver,
         context.local_types,
         context.functions,

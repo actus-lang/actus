@@ -5,8 +5,8 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::native::NativeEmitError;
+use super::super::expressions::lower_expression;
+use super::super::native::NativeEmitError;
 use super::context::CallLoweringContext;
 
 struct CallArgumentModes<'a> {
@@ -74,7 +74,7 @@ fn lower_indirect_ins_argument(
 ) -> Result<Value, NativeEmitError> {
     match argument {
         Expr::Index { target, index, .. } => {
-            let (address, _) = super::super::arrays::lower_array_address(
+            let (address, _) = super::super::super::arrays::lower_array_address(
                 function,
                 target,
                 index,
@@ -88,7 +88,7 @@ fn lower_indirect_ins_argument(
             Ok(address)
         }
         Expr::FieldAccess { object, field, .. } => {
-            super::super::structs::lower_field_address_for_ins(
+            super::super::super::structs::lower_field_address_for_ins(
                 function,
                 object,
                 field,
@@ -164,7 +164,7 @@ fn dynamic_vtable_value(
     role: &str,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<GlobalValue, NativeEmitError> {
-    let native_type = super::super::cranelift::expressions::initializer_type(
+    let native_type = super::super::expressions::initializer_type(
         argument,
         context.local_types,
         context.functions,
