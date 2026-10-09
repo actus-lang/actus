@@ -7,7 +7,7 @@ use crate::ast::Expr;
 
 use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::literals::StringDataValues;
-use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
 use super::super::Flow;
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -24,7 +24,7 @@ pub(super) fn lower_owner_declaration<'source>(
     cleanup_schedule: &super::super::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let declared_native = declared_native_type(declared_type, layouts);
     let native_type = match declared_native {
         Some(native_type) => native_type,
@@ -84,7 +84,7 @@ fn lower_owner_value(
     cleanup_schedule: &super::super::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let value = lower_initializer_value(
         function,
         declared_native,
@@ -104,7 +104,7 @@ fn coerce_owner_value(
     value: cranelift_codegen::ir::Value,
     declared_native: Option<NativeType>,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match declared_native {
         Some(declared) => Ok(super::super::super::expressions::coerce_to_ir_type(
             function,
@@ -126,7 +126,7 @@ fn lower_initializer_value(
     cleanup_schedule: &super::super::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if let Some(value) = lower_special_initializer(function, declared_native, initializer, layouts)?
     {
         return Ok(value);
@@ -148,16 +148,16 @@ fn lower_special_initializer(
     declared_native: Option<NativeType>,
     initializer: &Expr,
     layouts: &LayoutRegistry,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
     let value = match (declared_native, initializer) {
         (Some(NativeType::Array(id)), Expr::Call { callee, arguments, .. })
             if arguments.is_empty() && layouts.array_id(callee).is_some() =>
         {
             let expected = layouts
                 .array_id(callee)
-                .ok_or_else(|| NativeEmitError(format!("missing array layout for `{callee}`")))?;
+                .ok_or_else(|| BackendEmitError(format!("missing array layout for `{callee}`")))?;
             if expected != id {
-                return Err(NativeEmitError(
+                return Err(BackendEmitError(
                     "array initializer type does not match binding".to_owned(),
                 ));
             }
@@ -182,10 +182,10 @@ fn lower_arena_declaration(
     function: &mut FunctionBuilder<'_>,
     capacity: u32,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let size = capacity
         .checked_add(layouts.pointer_type.bytes())
-        .ok_or_else(|| NativeEmitError("arena storage size overflow".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("arena storage size overflow".to_owned()))?;
     let slot = function.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
         cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
         size,

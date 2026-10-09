@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, TypeName};
 
 use super::super::calls::CallLoweringContext;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::lower_expression;
 use crate::codegen::cranelift::structs::expression_native_type;
@@ -14,7 +14,7 @@ pub(super) fn lower_cast(
     expression: &Expr,
     target: &TypeName,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let source = lower_expression(
         function,
         expression,
@@ -38,7 +38,7 @@ fn checked_integer_value(
     value: Value,
     source: NativeType,
     target: NativeType,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let (target_signed, target_width) = integer_shape(target)?;
     let (source_signed, source_width) = integer_shape(source)?;
     let wide = widen_to_i64(function, value, source_signed);
@@ -122,10 +122,10 @@ fn convert_integer(
     if target_ir == types::I64 { value } else { function.ins().ireduce(target_ir, value) }
 }
 
-fn integer_shape(ty: NativeType) -> Result<(bool, u8), NativeEmitError> {
+fn integer_shape(ty: NativeType) -> Result<(bool, u8), BackendEmitError> {
     match ty {
         NativeType::Int => Ok((true, 32)),
         NativeType::Integer { signed, width } => Ok((signed, width)),
-        other => Err(NativeEmitError(format!("cannot cast non-integer native type {other:?}"))),
+        other => Err(BackendEmitError(format!("cannot cast non-integer native type {other:?}"))),
     }
 }

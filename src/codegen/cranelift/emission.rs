@@ -5,7 +5,7 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
-use super::super::cranelift::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
+use super::super::cranelift::native::{BackendEmitError, FunctionMeta, NativeSymbolBindings};
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
 use super::super::result_constructors::normalize_program;
 use super::emitter_declarations::{
@@ -32,7 +32,7 @@ pub(crate) fn emit_program_object_for_target(
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
     additional_instances: &[GenericInstance],
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     let (program, semantic) = prepare_program(program, target, additional_instances)?;
     let (all_verbs, all_external_verbs) = collect_declarations(&program);
     let (verbs, external_verbs) = super::dependencies::reachable_declarations_with_roots(
@@ -50,7 +50,7 @@ pub(crate) fn emit_program_object_for_target(
         &semantic.reachable_performances,
         namespace_prefix,
     );
-    performance_registry.validate().map_err(NativeEmitError)?;
+    performance_registry.validate().map_err(BackendEmitError)?;
     let performance_definitions = performance_registry.definitions(&program)?;
     validate_entry_verb(&verbs, roots.symbol)?;
     emit_verbs_object(VerbEmission {
@@ -71,22 +71,22 @@ pub(crate) fn emit_program_object_for_target(
 fn emit_empty_object(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     create_module(configuration, target)?
         .finish()
         .emit()
-        .map_err(|error| NativeEmitError(format!("native module emission failed: {error:?}")))
+        .map_err(|error| BackendEmitError(format!("native module emission failed: {error:?}")))
 }
 
 fn prepare_program(
     program: &Program,
     target: &TargetSpec,
     additional_instances: &[GenericInstance],
-) -> Result<(Program, SemanticModel), NativeEmitError> {
+) -> Result<(Program, SemanticModel), BackendEmitError> {
     let targeted_program = filter_program_for_target(program, target);
     let normalized_program = normalize_program(&targeted_program);
     let semantic = analyze(&normalized_program)
-        .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?;
+        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
     let local_instances = semantic.generic_instances.clone();
     let mut generic_instances = local_instances.clone();
     append_generic_instances(
@@ -105,7 +105,7 @@ fn prepare_program(
     let mut semantic = semantic;
     semantic.generic_instances = generic_instances;
     validate_cleanup_plans(&semantic)
-        .map_err(|error| NativeEmitError(format!("invalid cleanup plan: {error}")))?;
+        .map_err(|error| BackendEmitError(format!("invalid cleanup plan: {error}")))?;
     Ok((specialized_program, semantic))
 }
 
@@ -159,14 +159,14 @@ fn collect_declarations(program: &Program) -> (Vec<&VerbDecl>, Vec<&ExternalVerb
     (verbs, external_verbs)
 }
 
-fn validate_entry_verb(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<(), NativeEmitError> {
+fn validate_entry_verb(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<(), BackendEmitError> {
     if verbs.is_empty() {
-        return Err(NativeEmitError("program has no verb declarations".to_owned()));
+        return Err(BackendEmitError("program has no verb declarations".to_owned()));
     }
     if let Some(symbol) = symbol
         && !verbs.iter().any(|verb| verb.name == symbol)
     {
-        return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
+        return Err(BackendEmitError(format!("entry verb `{symbol}` was not found")));
     }
     Ok(())
 }
@@ -185,11 +185,11 @@ struct VerbEmission<'items, 'program> {
     target: &'items TargetSpec,
 }
 
-fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmitError> {
+fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, BackendEmitError> {
     let mut module = create_module(inputs.configuration, inputs.target)?;
     let (layouts, metadata) = build_layouts_and_metadata(&mut module, &inputs)?;
     let string_data = define_string_data(&mut module, inputs.verbs, inputs.namespace_prefix)
-        .map_err(NativeEmitError)?;
+        .map_err(BackendEmitError)?;
     let functions = function_metadata(&metadata);
     let vtable_data = define_vtable_data(
         &mut module,
@@ -215,13 +215,13 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, NativeEmit
     module
         .finish()
         .emit()
-        .map_err(|error| NativeEmitError(format!("native module emission failed: {error:?}")))
+        .map_err(|error| BackendEmitError(format!("native module emission failed: {error:?}")))
 }
 
 fn build_layouts_and_metadata(
     module: &mut cranelift_object::ObjectModule,
     inputs: &VerbEmission<'_, '_>,
-) -> Result<(LayoutRegistry, std::collections::HashMap<String, FunctionMeta>), NativeEmitError> {
+) -> Result<(LayoutRegistry, std::collections::HashMap<String, FunctionMeta>), BackendEmitError> {
     let layouts = build_layouts(module, inputs.program, inputs.generic_instances)?;
     let metadata = declare_emission_functions(
         module,
@@ -243,7 +243,7 @@ fn define_vtable_data(
     functions: &std::collections::HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
-) -> Result<super::vtable::VtableDataIds, NativeEmitError> {
+) -> Result<super::vtable::VtableDataIds, BackendEmitError> {
     super::vtable::define_vtables(
         module,
         performance_definitions,
@@ -264,7 +264,7 @@ fn declare_emission_functions(
     layouts: &LayoutRegistry,
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
-) -> Result<std::collections::HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<std::collections::HashMap<String, FunctionMeta>, BackendEmitError> {
     validate_native_program(verbs, external_verbs, layouts)?;
     declare_all_functions(
         module,
@@ -292,7 +292,7 @@ struct EmissionDefinitions<'items, 'program> {
 
 fn define_emission_functions(
     mut inputs: EmissionDefinitions<'_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let frontend_config = inputs.module.isa().frontend_config();
     define_verb_bodies(&mut inputs, frontend_config)?;
     define_performance_bodies(inputs, frontend_config)
@@ -301,7 +301,7 @@ fn define_emission_functions(
 fn define_verb_bodies(
     inputs: &mut EmissionDefinitions<'_, '_>,
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     define_verbs(
         inputs.module,
         frontend_config,
@@ -321,7 +321,7 @@ fn define_verb_bodies(
 fn define_performance_bodies(
     inputs: EmissionDefinitions<'_, '_>,
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     define_performances(
         inputs.module,
         frontend_config,
@@ -340,7 +340,7 @@ fn build_layouts(
     module: &mut cranelift_object::ObjectModule,
     program: &Program,
     generic_instances: &[GenericInstance],
-) -> Result<LayoutRegistry, NativeEmitError> {
+) -> Result<LayoutRegistry, BackendEmitError> {
     GenericLayoutRegistry::from_program(
         program,
         generic_instances,

@@ -10,7 +10,7 @@ use super::calls::CallLoweringContext;
 use super::case::lower_case;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
-use super::native::{FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 
 mod buffer;
@@ -45,7 +45,7 @@ pub(crate) fn lower_expression(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     lower_expression_with_targets(
         function,
         expression,
@@ -70,7 +70,7 @@ pub(crate) fn lower_expression_with_targets(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     loop_targets: Option<super::lowering::LoopTargets>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let context = CallLoweringContext::new(
         locals,
         local_types,
@@ -87,7 +87,7 @@ fn lower_expression_with_context(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     match expression {
         Expr::BoolLiteral { value, .. } => lower_bool_literal(function, *value),
         Expr::Integer { value, suffix, .. } => {
@@ -122,7 +122,7 @@ fn lower_expression_with_context(
 fn lower_bool_literal(
     function: &mut FunctionBuilder<'_>,
     value: bool,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     Ok(function.ins().iconst(cranelift_codegen::ir::types::I32, i64::from(value)))
 }
 
@@ -131,7 +131,7 @@ fn lower_index_expression(
     target: &Expr,
     index: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let lower = match crate::codegen::cranelift::structs::expression_native_type(
         target,
         context.local_types,
@@ -158,7 +158,7 @@ fn lower_integer_expression(
     value: &str,
     suffix: Option<&str>,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let value = lower_integer(function, value, suffix.is_some())?;
     let Some(suffix) = suffix else { return Ok(value) };
     let Some(native_type) = NativeType::from_name(suffix) else { return Ok(value) };
@@ -169,7 +169,7 @@ fn lower_buffer_literal(
     function: &mut FunctionBuilder<'_>,
     length: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let length = lower_expression_with_context(function, length, context)?;
     let length = if function.func.dfg.value_type(length) == context.layouts.pointer_type {
         length
@@ -179,20 +179,20 @@ fn lower_buffer_literal(
     let allocator = context
         .functions
         .get("__actus_buffer_allocate")
-        .ok_or_else(|| NativeEmitError("native buffer allocator is unavailable".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("native buffer allocator is unavailable".to_owned()))?;
     let call = function.ins().call(allocator.reference, &[length]);
     function
         .inst_results(call)
         .first()
         .copied()
-        .ok_or_else(|| NativeEmitError("native buffer allocator returned no value".to_owned()))
+        .ok_or_else(|| BackendEmitError("native buffer allocator returned no value".to_owned()))
 }
 
 fn lower_complex_expression(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     match expression {
         Expr::Try { expression, span } => {
             lower_try_expression(function, expression, *span, context)
@@ -207,7 +207,7 @@ fn lower_construct_or_case(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     match expression {
         Expr::Call { .. }
         | Expr::MethodCall { .. }
@@ -216,7 +216,7 @@ fn lower_construct_or_case(
         Expr::Case { subject, branches, .. } => {
             lower_case_expression(function, subject, branches, context)
         }
-        _ => Err(NativeEmitError("unsupported native expression".to_owned())),
+        _ => Err(BackendEmitError("unsupported native expression".to_owned())),
     }
 }
 
@@ -225,7 +225,7 @@ fn lower_case_expression(
     subject: &Expr,
     branches: &[crate::ast::CaseBranch],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let mut locals = context.locals.clone();
     lower_case(
         function,

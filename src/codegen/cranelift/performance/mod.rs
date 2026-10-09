@@ -4,7 +4,7 @@ use crate::semantic::ReachablePerformance;
 
 use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
 
-use super::native::{FunctionMeta, NativeEmitError};
+use super::native::{BackendEmitError, FunctionMeta};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::symbols::{SymbolIdentity, SymbolKind};
@@ -99,7 +99,7 @@ impl PerformanceRegistry {
     pub(super) fn definitions<'a>(
         &self,
         program: &'a Program,
-    ) -> Result<Vec<PerformanceDefinition<'a>>, NativeEmitError> {
+    ) -> Result<Vec<PerformanceDefinition<'a>>, BackendEmitError> {
         self.implementations
             .iter()
             .map(|implementation| find_definition(program, implementation))
@@ -115,7 +115,7 @@ impl PerformanceRegistry {
 fn find_definition<'a>(
     program: &'a Program,
     implementation: &PerformanceImplementation,
-) -> Result<PerformanceDefinition<'a>, NativeEmitError> {
+) -> Result<PerformanceDefinition<'a>, BackendEmitError> {
     let definition = program.declarations.iter().find_map(|declaration| {
         let TopLevelDecl::Perform(perform) = declaration else { return None };
         if perform.role_name != implementation.role_name
@@ -133,7 +133,7 @@ fn find_definition<'a>(
         )
     });
     definition.ok_or_else(|| {
-        NativeEmitError(format!(
+        BackendEmitError(format!(
             "reachable performance `{}` has no source definition",
             implementation.symbol
         ))
@@ -144,7 +144,7 @@ pub(super) fn declare_performance_functions(
     module: &mut ObjectModule,
     definitions: &[PerformanceDefinition<'_>],
     layouts: &LayoutRegistry,
-) -> Result<std::collections::HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<std::collections::HashMap<String, FunctionMeta>, BackendEmitError> {
     let mut metadata = std::collections::HashMap::new();
     for definition in definitions {
         let meta = declare_performance_function(module, definition, layouts)?;
@@ -158,12 +158,12 @@ fn declare_performance_function(
     module: &mut ObjectModule,
     definition: &PerformanceDefinition<'_>,
     layouts: &LayoutRegistry,
-) -> Result<FunctionMeta, NativeEmitError> {
+) -> Result<FunctionMeta, BackendEmitError> {
     let signature =
         super::declarations::native_signature_for_definition(module, definition.method, layouts)?;
     let id = module
         .declare_function(&definition.symbol, Linkage::Local, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+        .map_err(|error| BackendEmitError(error.to_string()))?;
     let return_type = NativeType::from_type_name_with_layout(
         definition.method.return_type.as_ref().map(|return_type| &return_type.ty),
         layouts,

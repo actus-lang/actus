@@ -4,7 +4,7 @@ use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::expressions::emit_buffer_drop;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::performance::dispatch_key;
@@ -15,7 +15,7 @@ pub(crate) fn emit_struct_drop(
     id: usize,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     emit_struct_drop_except(function, address, id, &[], functions, layouts)
 }
 
@@ -26,9 +26,9 @@ fn emit_struct_drop_except(
     moved_fields: &[String],
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let layout =
-        layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing drop layout `{id}`")))?;
+        layouts.get(id).ok_or_else(|| BackendEmitError(format!("missing drop layout `{id}`")))?;
     for field in layout.fields.iter().rev().filter(|field| field.owned) {
         emit_owned_field_drop(function, address, field, moved_fields, functions, layouts)?;
     }
@@ -42,7 +42,7 @@ fn emit_owned_field_drop(
     moved_fields: &[String],
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let nested_paths = moved_field_suffixes(moved_fields, &field.name);
     if nested_paths.iter().any(String::is_empty) {
         return Ok(());
@@ -77,10 +77,10 @@ fn emit_buffer_field_drop(
     field_address: cranelift_codegen::ir::Value,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
     let target = functions.get("actus_buffer_drop").ok_or_else(|| {
-        NativeEmitError("native runtime function `actus_buffer_drop` is unavailable".to_owned())
+        BackendEmitError("native runtime function `actus_buffer_drop` is unavailable".to_owned())
     })?;
     function.ins().call(target.reference, &[handle]);
     Ok(())
@@ -91,10 +91,10 @@ fn emit_region_field_drop(
     field_address: cranelift_codegen::ir::Value,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
     let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
-        NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
+        BackendEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
     })?;
     function.ins().call(target.reference, &[handle]);
     Ok(())
@@ -123,7 +123,7 @@ pub(crate) fn emit_partial_binding_drop(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let Some(NativeType::Struct(id)) =
         types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
     else {
@@ -133,7 +133,7 @@ pub(crate) fn emit_partial_binding_drop(
         .iter()
         .find(|(binding, _)| binding.as_str() == name)
         .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
     emit_struct_drop_except(function, address, id, moved_fields, functions, layouts)
 }
 
@@ -145,7 +145,7 @@ pub(crate) fn emit_binding_drop(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if types.iter().any(|(binding, ty)| binding.as_str() == name && *ty == NativeType::Buffer) {
         return emit_buffer_drop(function, name, locals, functions);
     }
@@ -157,7 +157,9 @@ pub(crate) fn emit_binding_drop(
     let address = binding_address(name, locals)?;
     if binding_type == NativeType::Region {
         let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
-            NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
+            BackendEmitError(
+                "native runtime function `actus_region_drop` is unavailable".to_owned(),
+            )
         })?;
         function.ins().call(target.reference, &[address]);
         return Ok(());
@@ -168,12 +170,12 @@ pub(crate) fn emit_binding_drop(
 fn binding_address(
     name: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     locals
         .iter()
         .find(|(binding, _)| binding.as_str() == name)
         .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))
 }
 
 fn emit_typed_binding_drop(
@@ -182,7 +184,7 @@ fn emit_typed_binding_drop(
     binding_type: NativeType,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if let Some(drop_function) = functions.get(&dispatch_key(binding_type, "drop")) {
         function.ins().call(drop_function.reference, &[address]);
         return Ok(());
@@ -201,13 +203,13 @@ fn emit_enum_drop(
     binding_type: NativeType,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let size = layouts
         .type_size(binding_type)
-        .ok_or_else(|| NativeEmitError("missing enum drop layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing enum drop layout".to_owned()))?;
     let target = functions
         .get("actus_enum_drop")
-        .ok_or_else(|| NativeEmitError("native enum drop is unavailable".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("native enum drop is unavailable".to_owned()))?;
     let size = function.ins().iconst(layouts.pointer_type, i64::from(size));
     function.ins().call(target.reference, &[address, size]);
     Ok(())

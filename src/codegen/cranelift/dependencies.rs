@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::ast::{Block, Expr, ExternalVerbDecl, Place, Stmt, VerbDecl, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
 
-use super::native::NativeEmitError;
+use super::native::BackendEmitError;
 
 /// Selects the native declarations reachable from an object root.
 ///
@@ -16,7 +16,7 @@ pub(crate) fn reachable_declarations_with_roots<'a>(
     external_verbs: &[&'a ExternalVerbDecl],
     symbol: Option<&str>,
     exported_roots: Option<&[String]>,
-) -> Result<(Vec<&'a VerbDecl>, Vec<&'a ExternalVerbDecl>), NativeEmitError> {
+) -> Result<(Vec<&'a VerbDecl>, Vec<&'a ExternalVerbDecl>), BackendEmitError> {
     let local = verbs.iter().map(|verb| (verb.name.as_str(), *verb)).collect::<HashMap<_, _>>();
     let external =
         external_verbs.iter().map(|verb| (verb.name.as_str(), *verb)).collect::<HashMap<_, _>>();
@@ -36,7 +36,7 @@ pub(crate) fn reachable_declarations_with_roots<'a>(
                 {
                     queue.push_back(call.name);
                 } else if call.requires_resolution && !is_native_builtin(&call.name) {
-                    return Err(NativeEmitError(format_unresolved_call(&name, &call)));
+                    return Err(BackendEmitError(format_unresolved_call(&name, &call)));
                 }
             }
         }
@@ -54,7 +54,7 @@ pub(super) fn reachable_call_names(
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     symbol: Option<&str>,
-) -> Result<HashSet<String>, NativeEmitError> {
+) -> Result<HashSet<String>, BackendEmitError> {
     let (selected_verbs, _) =
         reachable_declarations_with_roots(verbs, external_verbs, symbol, None)?;
     let mut names = HashSet::new();
@@ -91,10 +91,10 @@ fn root_names(
     verbs: &[&VerbDecl],
     symbol: Option<&str>,
     exported_roots: Option<&[String]>,
-) -> Result<Vec<String>, NativeEmitError> {
+) -> Result<Vec<String>, BackendEmitError> {
     if let Some(symbol) = symbol {
         if !verbs.iter().any(|verb| verb.name == symbol) {
-            return Err(NativeEmitError(format!("entry verb `{symbol}` was not found")));
+            return Err(BackendEmitError(format!("entry verb `{symbol}` was not found")));
         }
         return Ok(vec![symbol.to_owned()]);
     }

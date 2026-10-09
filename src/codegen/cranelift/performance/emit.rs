@@ -4,7 +4,7 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_object::ObjectModule;
 
 use super::super::literals::StringDataIds;
-use super::super::native::{FunctionMeta, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionMeta};
 use super::super::types::NativeType;
 use super::super::vtable::VtableDataIds;
 use super::{PerformanceDefinition, dispatch_key};
@@ -25,12 +25,12 @@ pub(in crate::codegen) fn define_performances(
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for definition in definitions {
         let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
         let key = dispatch_key(target_type, &definition.method.name);
         let meta = functions.get(&key).ok_or_else(|| {
-            NativeEmitError(format!("missing performance function `{}`", definition.symbol))
+            BackendEmitError(format!("missing performance function `{}`", definition.symbol))
         })?;
         define_function(
             module,

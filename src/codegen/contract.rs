@@ -5,6 +5,28 @@ use std::collections::BTreeSet;
 use super::model::NativeInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendEmitError(pub String);
+
+impl std::fmt::Display for BackendEmitError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for BackendEmitError {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendAbiError(pub String);
+
+impl std::fmt::Display for BackendAbiError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for BackendAbiError {}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendValueType {
     Unit,

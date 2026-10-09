@@ -147,6 +147,16 @@ fn shared_codegen_excludes_backend_specific_crates() {
 }
 
 #[test]
+fn shared_codegen_facade_uses_neutral_error_contracts() {
+    let facade = fs::read_to_string(repository_path("src/codegen/mod.rs"))
+        .expect("codegen facade should be readable");
+    assert!(facade.contains("BackendEmitError"));
+    assert!(facade.contains("BackendAbiError"));
+    assert!(!facade.contains("NativeEmitError"));
+    assert!(!facade.contains("NativeAbiError"));
+}
+
+#[test]
 fn cranelift_implementation_stays_inside_its_backend_boundary() {
     let root = repository_path("src/codegen");
     for path in rust_sources(&root) {

@@ -6,7 +6,7 @@ use crate::ast::Expr;
 
 use super::expressions::{initializer_type, lower_expression};
 use super::literals::StringDataValues;
-use super::native::{FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
@@ -33,7 +33,7 @@ pub(crate) fn lower_case(
     layouts: &LayoutRegistry,
     loop_targets: Option<crate::codegen::cranelift::lowering::LoopTargets>,
     value_producing: bool,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let context = case_context(
         locals,
         local_types,
@@ -56,7 +56,7 @@ pub(crate) fn lower_case(
         let ty = local_types
             .get(binding)
             .copied()
-            .ok_or_else(|| NativeEmitError(format!("missing native type for `{binding}`")))?;
+            .ok_or_else(|| BackendEmitError(format!("missing native type for `{binding}`")))?;
         function.append_block_param(merge, layouts.ir_type(ty)?);
     }
     let subject_type = initializer_type(subject, local_types, functions, layouts)?;
@@ -115,7 +115,7 @@ fn lower_case_subject(
     function: &mut FunctionBuilder<'_>,
     subject: &Expr,
     context: &CaseLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     lower_expression(
         function,
         subject,

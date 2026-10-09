@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::build_graph::invalidate_stale_artifact;
-use crate::codegen::NativeEmitError;
+use crate::codegen::BackendEmitError;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
@@ -122,19 +122,19 @@ pub(crate) fn emit_objects(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, NativeEmitError> {
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
     let targeted_caller = crate::codegen::normalize_program(
         &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
     );
     let generic_instances = crate::semantic::analyze(&targeted_caller)
-        .map_err(|error| NativeEmitError(format!("semantic analysis failed: {error:?}")))?
+        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
         .generic_instances;
     let generic_instances =
         crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
     let generic_types = region_generic_types(&generic_instances);
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+        .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
@@ -200,7 +200,7 @@ fn region_generic_types(
 fn reachable_module_roots(
     object_plan: &crate::modules::ModuleObjectPlan,
     symbol: &str,
-) -> Result<std::collections::HashSet<String>, NativeEmitError> {
+) -> Result<std::collections::HashSet<String>, BackendEmitError> {
     let root = &object_plan.units()[0];
     let normalized_root = crate::codegen::normalize_program(root.program());
     let mut roots = crate::codegen::reachable_call_names(&normalized_root, symbol)?;
@@ -251,7 +251,7 @@ fn emit_module_objects(
     bindings: &crate::codegen::NativeSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
     reachable_module_roots: &std::collections::HashSet<String>,
-) -> Result<Vec<EmittedObject>, NativeEmitError> {
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
     let mut objects = Vec::new();
     for unit in &object_plan.units()[1..] {
         let roots = if unit.namespace().module_path().starts_with("std::wire") {
@@ -284,7 +284,7 @@ fn emit_module_objects(
                 Some(&roots),
             )
             .map_err(|error| {
-                NativeEmitError(format!(
+                BackendEmitError(format!(
                     "module `{}` emission failed: {error}",
                     unit.namespace().module_path()
                 ))
@@ -308,7 +308,7 @@ fn declared_symbols(
     namespace: &str,
     entry_symbol: &str,
     bindings: &crate::codegen::NativeSymbolBindings,
-) -> Result<std::collections::BTreeSet<String>, NativeEmitError> {
+) -> Result<std::collections::BTreeSet<String>, BackendEmitError> {
     let mut names = Vec::new();
     for declaration in &program.declarations {
         match declaration {
@@ -321,7 +321,7 @@ fn declared_symbols(
                         crate::codegen::SymbolKind::Verb,
                         &verb.name,
                     )
-                    .map_err(|error| NativeEmitError(error.to_string()))?
+                    .map_err(|error| BackendEmitError(error.to_string()))?
                     .as_str()
                     .to_owned()
                 };
@@ -346,7 +346,7 @@ fn declared_symbols(
 fn module_bindings(
     plan: &crate::modules::ModuleObjectPlan,
     generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<crate::codegen::NativeSymbolBindings, NativeEmitError> {
+) -> Result<crate::codegen::NativeSymbolBindings, BackendEmitError> {
     let mut bindings = Vec::new();
     for unit in &plan.units()[1..] {
         for name in unit.exported_verbs() {
@@ -355,7 +355,7 @@ fn module_bindings(
                 crate::codegen::SymbolKind::Verb,
                 name,
             )
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
             bindings.push((
                 unit.namespace().symbol_prefix().to_owned(),
                 name.clone(),
@@ -368,7 +368,7 @@ fn module_bindings(
                     crate::codegen::SymbolKind::Verb,
                     &specialized_name,
                 )
-                .map_err(|error| NativeEmitError(error.to_string()))?;
+                .map_err(|error| BackendEmitError(error.to_string()))?;
                 bindings.push((
                     unit.namespace().symbol_prefix().to_owned(),
                     specialized_name,

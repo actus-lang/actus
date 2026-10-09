@@ -8,7 +8,7 @@ use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
 use super::super::symbols::{SymbolIdentity, SymbolKind};
 use super::layout::LayoutRegistry;
-use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
+use super::native::{BackendEmitError, FunctionMeta, NativeSymbolBindings};
 use super::types::NativeType;
 
 pub(crate) struct FunctionDeclarationContext<'a> {
@@ -24,7 +24,7 @@ pub(crate) fn declare_functions(
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     context: FunctionDeclarationContext<'_>,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let mut metadata = HashMap::new();
     declare_internal_functions(module, verbs, &context, &mut metadata)?;
     declare_external_functions(
@@ -43,7 +43,7 @@ fn declare_internal_functions(
     verbs: &[&VerbDecl],
     context: &FunctionDeclarationContext<'_>,
     metadata: &mut HashMap<String, FunctionMeta>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for verb in verbs {
         let signature = native_signature_for_entry(
             module,
@@ -54,7 +54,7 @@ fn declare_internal_functions(
         let symbol = internal_symbol(&verb.name, context.entry_symbol, context.namespace_prefix)?;
         let id = module
             .declare_function(&symbol, Linkage::Export, &signature)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
         let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
         metadata.insert(
             verb.name.clone(),
@@ -71,7 +71,7 @@ fn declare_external_functions(
     namespace_prefix: &str,
     bindings: &NativeSymbolBindings,
     metadata: &mut HashMap<String, FunctionMeta>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for verb in verbs {
         let signature = external_native_signature(module, verb, layouts)?;
         let id = module
@@ -83,7 +83,7 @@ fn declare_external_functions(
                 Linkage::Import,
                 &signature,
             )
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
         let return_type = verb.return_type.as_ref().map(|return_type| &return_type.ty);
         metadata.insert(verb.name.clone(), function_meta(id, &verb.params, return_type, layouts)?);
     }
@@ -94,13 +94,13 @@ fn internal_symbol(
     name: &str,
     entry_symbol: Option<&str>,
     namespace_prefix: &str,
-) -> Result<String, NativeEmitError> {
+) -> Result<String, BackendEmitError> {
     if entry_symbol == Some(name) {
         return Ok(name.to_owned());
     }
     SymbolIdentity::new(namespace_prefix, SymbolKind::Verb, name)
         .map(|identity| identity.as_str().to_owned())
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn function_meta(
@@ -108,7 +108,7 @@ fn function_meta(
     params: &[crate::ast::Param],
     return_type: Option<&crate::ast::TypeName>,
     layouts: &LayoutRegistry,
-) -> Result<FunctionMeta, NativeEmitError> {
+) -> Result<FunctionMeta, BackendEmitError> {
     let return_type = NativeType::from_type_name_with_layout(return_type, layouts)?;
     Ok(FunctionMeta {
         id,
@@ -141,7 +141,7 @@ pub(crate) fn native_signature_for_definition(
     module: &mut ObjectModule,
     verb: &VerbDecl,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Signature, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     signature_for(
         module,
         &verb.params,
@@ -156,7 +156,7 @@ pub(crate) fn native_signature_for_entry(
     verb: &VerbDecl,
     layouts: &LayoutRegistry,
     force_return: bool,
-) -> Result<cranelift_codegen::ir::Signature, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     signature_for(
         module,
         &verb.params,
@@ -170,7 +170,7 @@ fn external_native_signature(
     module: &mut ObjectModule,
     verb: &ExternalVerbDecl,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Signature, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     signature_for(
         module,
         &verb.params,
@@ -186,7 +186,7 @@ fn signature_for(
     return_type: Option<&crate::ast::TypeName>,
     layouts: &LayoutRegistry,
     force_return: bool,
-) -> Result<cranelift_codegen::ir::Signature, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     let mut signature = module.make_signature();
     let pointer_type = module.isa().pointer_type();
     let native_return = NativeType::from_type_name_with_layout(return_type, layouts)?;
@@ -213,7 +213,7 @@ fn append_parameter(
     parameter: &crate::ast::Param,
     pointer_type: cranelift_codegen::ir::Type,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let native_type = if parameter.dispatch == DispatchMode::Dynamic {
         NativeType::FatPointer
     } else {
@@ -239,7 +239,7 @@ fn append_return(
     uses_return_slot: bool,
     layouts: &LayoutRegistry,
     force_return: bool,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let returns_value = return_type.is_some()
         && (!uses_return_slot || layouts.returns_borrowed_view(native_return))
         && (!matches!(native_return, NativeType::Void) || force_return);

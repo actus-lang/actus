@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{InstBuilder, Value, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::packs::{field_mask, mapped_bit_offset_for_storage, sign_extend_field};
 use crate::codegen::cranelift::layout::{LayoutRegistry, PackFieldLayout};
@@ -11,14 +11,14 @@ pub(super) fn lower_indexed_pack_field_address(
     storage: Value,
     storage_type: NativeType,
     field: &PackFieldLayout,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     if !matches!(storage_type, NativeType::Array(_)) {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "indexed packed fields require byte-addressable storage".to_owned(),
         ));
     }
     if !field.offset.is_multiple_of(8) || !field.width.is_multiple_of(8) {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "indexed packed fields require byte-aligned elements".to_owned(),
         ));
     }
@@ -32,10 +32,10 @@ pub(super) fn lower_inline_pack_field(
     storage_type: NativeType,
     endianness: crate::ast::LayoutEndianness,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let storage_size = layouts
         .type_size(storage_type)
-        .ok_or_else(|| NativeEmitError("missing inline packed storage size".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing inline packed storage size".to_owned()))?;
     let mapped_offset = mapped_bit_offset_for_storage(field, endianness, storage_size)?;
     let bit_offset = mapped_offset % 8;
     let load_type = inline_container_type(bit_offset, field.width)?;
@@ -70,10 +70,10 @@ pub(super) fn lower_inline_pack_field_write(
     storage_type: NativeType,
     endianness: crate::ast::LayoutEndianness,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let storage_size = layouts
         .type_size(storage_type)
-        .ok_or_else(|| NativeEmitError("missing inline packed storage size".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing inline packed storage size".to_owned()))?;
     let mapped_offset = mapped_bit_offset_for_storage(field, endianness, storage_size)?;
     let bit_offset = mapped_offset % 8;
     let container_type = inline_container_type(bit_offset, field.width)?;
@@ -104,10 +104,10 @@ pub(super) fn lower_inline_pack_field_write(
 fn inline_container_type(
     bit_offset: u16,
     field_width: u8,
-) -> Result<cranelift_codegen::ir::Type, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Type, BackendEmitError> {
     let required_bits = bit_offset
         .checked_add(u16::from(field_width))
-        .ok_or_else(|| NativeEmitError("inline packed field width overflow".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("inline packed field width overflow".to_owned()))?;
     match required_bits {
         0..=8 => Ok(types::I8),
         9..=16 => Ok(types::I16),
@@ -115,7 +115,7 @@ fn inline_container_type(
         33..=64 => Ok(types::I64),
         65..=128 => Ok(types::I128),
         _ => {
-            Err(NativeEmitError("inline packed fields exceed the native integer width".to_owned()))
+            Err(BackendEmitError("inline packed fields exceed the native integer width".to_owned()))
         }
     }
 }

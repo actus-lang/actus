@@ -7,7 +7,7 @@ use crate::ast::{BinaryOp, CompoundAssignmentOp, Expr, Place};
 
 use super::super::super::expressions::{lower_compound_integer_operation, lower_expression};
 use super::super::super::literals::StringDataValues;
-use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
 use crate::codegen::cranelift::arrays::lower_array_compound_assignment;
@@ -27,7 +27,7 @@ pub(crate) fn lower_compound_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let operator = compound_binary_operator(operator);
     match target {
         Place::Binding { name, .. } => lower_identifier(
@@ -85,17 +85,17 @@ fn lower_identifier<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let binding = locals
         .keys()
         .find(|candidate| candidate.as_str() == name)
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
     let destination = locals[&binding];
     let left_type = types
         .get(&binding)
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("native type for `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("native type for `{name}` is unavailable")))?;
     let left = load_indirect_scalar(function, destination, left_type, layouts)?;
     let right = lower_expression(
         function,
@@ -124,7 +124,7 @@ fn load_indirect_scalar(
     destination: Value,
     native_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     if is_indirect_scalar(function, destination, native_type, layouts) {
         let ty = native_type.ir_type(layouts.pointer_type)?;
         return Ok(function.ins().load(ty, MemFlagsData::new(), destination, 0));
@@ -157,7 +157,7 @@ fn lower_index<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if expression_native_type(target, types, layouts) == Some(NativeType::Buffer) {
         lower_buffer_compound_assignment(
             function,

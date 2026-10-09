@@ -7,7 +7,7 @@ use super::super::super::cleanup::emit_return_cleanup;
 use super::super::super::expressions::{coerce_to_ir_type, lower_float_as};
 use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::literals::StringDataValues;
-use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
 use super::super::{Flow, NativeCleanupSchedule};
 use crate::ast::Expr;
@@ -26,7 +26,7 @@ pub(super) fn lower_return(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if let Expr::Try { expression, .. } = expression {
         return lower_try_return(
             function,
@@ -73,7 +73,7 @@ fn lower_return_value(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let return_ir_type = function.func.signature.returns.first().map(|ret| ret.value_type);
     let value =
         if let (Some(target), Expr::FloatLiteral { value, .. }) = (return_ir_type, expression) {
@@ -104,7 +104,7 @@ fn lower_try_return(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let source = lower_expression(
         function,
         expression,
@@ -116,14 +116,14 @@ fn lower_try_return(
         layouts,
     )?;
     let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts)? else {
-        return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
+        return Err(BackendEmitError("try operand is not a native Result value".to_owned()));
     };
     let layout = layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError("try operand has no enum layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("try operand has no enum layout".to_owned()))?;
     let ok = layouts
         .enum_variant(enum_id, "Ok")
-        .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("Result enum has no Ok variant".to_owned()))?;
     let result = allocate_enum(function, layout.size, functions, layouts)?;
     let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts)?;
     emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts, None)?;
@@ -137,7 +137,7 @@ fn emit_try_return_branches(
     layout: &enum_layout::EnumLayout,
     ok: &enum_layout::EnumVariantLayout,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let discriminant = function.ins().load(
         types::I32,
         MemFlagsData::new(),
@@ -176,7 +176,7 @@ pub(super) fn lower_try_statement(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let (source, layout, ok) = lower_try_operand(
         function,
         expression,
@@ -214,11 +214,11 @@ fn lower_try_operand<'a>(
     layouts: &'a LayoutRegistry,
 ) -> Result<
     (cranelift_codegen::ir::Value, &'a enum_layout::EnumLayout, &'a enum_layout::EnumVariantLayout),
-    NativeEmitError,
+    BackendEmitError,
 > {
     let source_expression = match expression {
         Expr::Try { expression, .. } => expression.as_ref(),
-        _ => return Err(NativeEmitError("expected try expression".to_owned())),
+        _ => return Err(BackendEmitError("expected try expression".to_owned())),
     };
     let source = lower_expression(
         function,
@@ -232,14 +232,14 @@ fn lower_try_operand<'a>(
     )?;
     let NativeType::Enum(enum_id) = initializer_type(source_expression, types, functions, layouts)?
     else {
-        return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
+        return Err(BackendEmitError("try operand is not a native Result value".to_owned()));
     };
     let layout = layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError("try operand has no enum layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("try operand has no enum layout".to_owned()))?;
     let ok = layouts
         .enum_variant(enum_id, "Ok")
-        .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("Result enum has no Ok variant".to_owned()))?;
     Ok((source, layout, ok))
 }
 
@@ -255,7 +255,7 @@ fn emit_try_statement_branches(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let discriminant = function.ins().load(
         types::I32,
         MemFlagsData::new(),
@@ -285,7 +285,7 @@ fn copy_enum_bytes(
     destination: cranelift_codegen::ir::Value,
     size: u32,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     structs::copy_bytes(function, source, destination, size, layouts)
 }
 
@@ -294,17 +294,17 @@ fn allocate_enum(
     size: u32,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let allocator = functions
         .get("__actus_enum_allocate")
-        .ok_or_else(|| NativeEmitError("native enum allocator is unavailable".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("native enum allocator is unavailable".to_owned()))?;
     let size = function.ins().iconst(layouts.pointer_type, i64::from(size));
     let call = function.ins().call(allocator.reference, &[size]);
     function
         .inst_results(call)
         .first()
         .copied()
-        .ok_or_else(|| NativeEmitError("native enum allocator returned no value".to_owned()))
+        .ok_or_else(|| BackendEmitError("native enum allocator returned no value".to_owned()))
 }
 
 fn write_ok_result(
@@ -314,7 +314,7 @@ fn write_ok_result(
     layout: &enum_layout::EnumLayout,
     ok: &enum_layout::EnumVariantLayout,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let discriminant = function.ins().iconst(types::I32, i64::from(ok.discriminant));
     function.ins().store(
         MemFlagsData::new(),

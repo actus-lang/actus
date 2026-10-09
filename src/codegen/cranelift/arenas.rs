@@ -8,7 +8,7 @@ use crate::ast::{Argument, Expr};
 use super::expressions::coerce_to_ir_type;
 use super::expressions::{initializer_type, lower_expression};
 use super::literals::StringDataValues;
-use super::native::{FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::{copy_bytes, expression_native_type};
@@ -25,7 +25,7 @@ pub(crate) fn lower_place(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let (argument, capacity, size, alignment) =
         place_inputs(receiver, arguments, local_types, functions, layouts)?;
     let arena = lower_expression(
@@ -57,11 +57,11 @@ fn place_inputs<'a>(
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(&'a Expr, u32, u32, u32), NativeEmitError> {
+) -> Result<(&'a Expr, u32, u32, u32), BackendEmitError> {
     let argument = arguments
         .first()
         .map(|argument| &argument.expression)
-        .ok_or_else(|| NativeEmitError("place requires one value".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("place requires one value".to_owned()))?;
     let (capacity, size, alignment) =
         placement_layout(receiver, argument, local_types, functions, layouts)?;
     Ok((argument, capacity, size, alignment))
@@ -73,16 +73,16 @@ fn placement_layout(
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(u32, u32, u32), NativeEmitError> {
+) -> Result<(u32, u32, u32), BackendEmitError> {
     let NativeType::Arena(capacity) = expression_native_type(receiver, local_types, layouts)
-        .ok_or_else(|| NativeEmitError("place receiver is not an Arena".to_owned()))?
+        .ok_or_else(|| BackendEmitError("place receiver is not an Arena".to_owned()))?
     else {
-        return Err(NativeEmitError("place receiver is not an Arena".to_owned()));
+        return Err(BackendEmitError("place receiver is not an Arena".to_owned()));
     };
     let value_type = initializer_type(argument, local_types, functions, layouts)?;
     let size = layouts
         .type_size(value_type)
-        .ok_or_else(|| NativeEmitError("placed value has no native layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("placed value has no native layout".to_owned()))?;
     Ok((capacity, size, layouts.alignment(value_type)?.max(1)))
 }
 
@@ -94,7 +94,7 @@ fn lower_placed_value(
     size: u32,
     alignment: u32,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let offset_address = function.ins().iadd_imm_s(arena, i64::from(capacity));
     let offset = function.ins().load(layouts.pointer_type, MemFlagsData::new(), offset_address, 0);
     let aligned = aligned_offset(function, offset, alignment, layouts);

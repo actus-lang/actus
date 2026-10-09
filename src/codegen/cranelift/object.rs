@@ -6,21 +6,21 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::cranelift::native::NativeEmitError;
+use super::super::cranelift::native::BackendEmitError;
 use super::build_isa_with_optimization;
 
 pub(crate) fn create_module(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-) -> Result<ObjectModule, NativeEmitError> {
+) -> Result<ObjectModule, BackendEmitError> {
     let isa = build_isa_with_optimization(
         target,
         configuration.position_independent(),
         configuration.optimization_level(),
     )
-    .map_err(|error| NativeEmitError(error.to_string()))?;
+    .map_err(|error| BackendEmitError(error.to_string()))?;
     let builder = ObjectBuilder::new(isa, configuration.module_name(), default_libcall_names())
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+        .map_err(|error| BackendEmitError(error.to_string()))?;
     Ok(ObjectModule::new(builder))
 }
 
@@ -29,14 +29,14 @@ pub(crate) fn emit_i32_object(
     value: i64,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     let mut module = create_module(configuration, target)?;
     let frontend_config = module.isa().frontend_config();
     let mut signature = module.make_signature();
     signature.returns.push(AbiParam::new(types::I32));
     let function_id = module
         .declare_function(symbol, Linkage::Export, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+        .map_err(|error| BackendEmitError(error.to_string()))?;
     let mut context = module.make_context();
     context.func.signature = signature;
     let mut function_context = FunctionBuilderContext::new();
@@ -51,7 +51,7 @@ pub(crate) fn emit_i32_object(
     }
     module
         .define_function(function_id, &mut context)
-        .map_err(|error| NativeEmitError(error.to_string()))?;
+        .map_err(|error| BackendEmitError(error.to_string()))?;
     module.clear_context(&mut context);
-    module.finish().emit().map_err(|error| NativeEmitError(error.to_string()))
+    module.finish().emit().map_err(|error| BackendEmitError(error.to_string()))
 }

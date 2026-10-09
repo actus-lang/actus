@@ -7,7 +7,7 @@ use crate::ast::{Argument, Expr};
 
 use super::super::calls::CallLoweringContext;
 use super::super::expressions::lower_expression;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use crate::codegen::cranelift::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -20,7 +20,7 @@ pub(crate) fn lower_enum_constructor(
     variant: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let (enum_layout, variant_layout) = constructor_layouts(receiver, variant, context.layouts)?;
     if enum_layout.niche_pointer {
         return lower_niche_option_constructor(function, variant, arguments, context);
@@ -32,16 +32,16 @@ fn constructor_layouts<'a>(
     receiver: &Expr,
     variant: &str,
     layouts: &'a LayoutRegistry,
-) -> Result<(&'a EnumLayout, &'a EnumVariantLayout), NativeEmitError> {
+) -> Result<(&'a EnumLayout, &'a EnumVariantLayout), BackendEmitError> {
     let enum_name = super::types::enum_receiver_name(receiver)
-        .ok_or_else(|| NativeEmitError("enum constructor requires a type receiver".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("enum constructor requires a type receiver".to_owned()))?;
     let (enum_id, variant_layout) =
         layouts.enum_constructor(enum_name, variant).ok_or_else(|| {
-            NativeEmitError(format!("unknown enum constructor `{enum_name}.{variant}`"))
+            BackendEmitError(format!("unknown enum constructor `{enum_name}.{variant}`"))
         })?;
     let enum_layout = layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("missing enum layout `{enum_id}`")))?;
     Ok((enum_layout, variant_layout))
 }
 
@@ -52,7 +52,7 @@ fn lower_regular_enum_constructor(
     enum_layout: &EnumLayout,
     variant_layout: &EnumVariantLayout,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let address = allocate_enum(function, context.functions, context.layouts, enum_layout.size)?;
     let discriminant = function.ins().iconst(types::I32, i64::from(variant_layout.discriminant));
     function.ins().store(
@@ -77,17 +77,17 @@ fn allocate_enum(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     size: u32,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let allocator = functions
         .get("__actus_enum_allocate")
-        .ok_or_else(|| NativeEmitError("native enum allocator is unavailable".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("native enum allocator is unavailable".to_owned()))?;
     let size_value = function.ins().iconst(layouts.pointer_type, i64::from(size));
     let allocation = function.ins().call(allocator.reference, &[size_value]);
     function
         .inst_results(allocation)
         .first()
         .copied()
-        .ok_or_else(|| NativeEmitError("native enum allocator returned no value".to_owned()))
+        .ok_or_else(|| BackendEmitError("native enum allocator returned no value".to_owned()))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -98,7 +98,7 @@ fn lower_enum_payload(
     payload_offset: u32,
     variant_layout: &EnumVariantLayout,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for (field, argument) in ordered_arguments(&variant_layout.fields, arguments)? {
         let value = lower_expression(
             function,
@@ -123,7 +123,7 @@ fn lower_niche_option_constructor(
     variant: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match variant {
         "None" if arguments.is_empty() => {
             Ok(function.ins().iconst(context.layouts.pointer_type, 0))
@@ -138,14 +138,14 @@ fn lower_niche_option_constructor(
             context.string_data,
             context.layouts,
         ),
-        _ => Err(NativeEmitError(format!("invalid niche Option constructor `{variant}`"))),
+        _ => Err(BackendEmitError(format!("invalid niche Option constructor `{variant}`"))),
     }
 }
 
 fn ordered_arguments<'a>(
     fields: &'a [EnumFieldLayout],
     arguments: &'a [Argument],
-) -> Result<Vec<(&'a EnumFieldLayout, &'a Argument)>, NativeEmitError> {
+) -> Result<Vec<(&'a EnumFieldLayout, &'a Argument)>, BackendEmitError> {
     if arguments.iter().all(|argument| argument.name.is_none()) {
         return fields.iter().zip(arguments).map(Ok).collect();
     }
@@ -153,12 +153,12 @@ fn ordered_arguments<'a>(
         .iter()
         .map(|field| {
             let name = field.name.as_deref().ok_or_else(|| {
-                NativeEmitError("tuple enum constructors require positional arguments".to_owned())
+                BackendEmitError("tuple enum constructors require positional arguments".to_owned())
             })?;
             let argument = arguments
                 .iter()
                 .find(|argument| argument.name.as_deref() == Some(name))
-                .ok_or_else(|| NativeEmitError(format!("missing enum payload `{name}`")))?;
+                .ok_or_else(|| BackendEmitError(format!("missing enum payload `{name}`")))?;
             Ok((field, argument))
         })
         .collect()
@@ -170,7 +170,7 @@ fn store_payload(
     value: cranelift_codegen::ir::Value,
     ty: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if matches!(ty, NativeType::Void) {
         return Ok(());
     }
@@ -183,7 +183,7 @@ fn store_payload(
     {
         let size = layouts
             .type_size(ty)
-            .ok_or_else(|| NativeEmitError("missing enum payload layout".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("missing enum payload layout".to_owned()))?;
         copy_bytes(function, value, destination, size, layouts)?;
     } else {
         function.ins().store(MemFlagsData::new(), value, destination, 0);

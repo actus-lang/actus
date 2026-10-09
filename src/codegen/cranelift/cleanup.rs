@@ -9,7 +9,7 @@ use crate::semantic::LoopExitKind;
 
 use super::super::model::{NativeCleanupPlan, NativeCleanupSchedule, NativeInstruction};
 use super::layout::LayoutRegistry;
-use super::native::{FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionRef};
 use super::structs::emit_binding_drop;
 use super::types::NativeType;
 
@@ -23,9 +23,9 @@ pub(super) fn emit_return_cleanup(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     returned_expression: Option<&Expr>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let plan = schedule.return_plan(span).ok_or_else(|| {
-        NativeEmitError(format!("missing native return cleanup plan at {span:?}"))
+        BackendEmitError(format!("missing native return cleanup plan at {span:?}"))
     })?;
     let returned_binding = returned_expression.and_then(returned_binding_name);
     for scope in &plan.scopes {
@@ -60,10 +60,10 @@ pub(super) fn emit_loop_cleanup(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let plan = schedule
         .loop_plan(span, &kind)
-        .ok_or_else(|| NativeEmitError(format!("missing native loop cleanup plan at {span:?}")))?;
+        .ok_or_else(|| BackendEmitError(format!("missing native loop cleanup plan at {span:?}")))?;
     for scope in &plan.scopes {
         emit_scope_instructions(function, scope, locals, types, functions, layouts)?;
     }
@@ -78,9 +78,9 @@ pub(super) fn emit_scope_cleanup(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let plan = schedule.scope(span).ok_or_else(|| {
-        NativeEmitError(format!("missing native scope cleanup plan at {:?}", span))
+        BackendEmitError(format!("missing native scope cleanup plan at {:?}", span))
     })?;
     emit_scope_instructions(function, plan, locals, types, functions, layouts)?;
     Ok(())
@@ -93,7 +93,7 @@ fn emit_scope_instructions(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for instruction in &plan.instructions {
         emit_cleanup_instruction(function, instruction, locals, types, functions, layouts)?;
     }
@@ -109,7 +109,7 @@ fn emit_scope_instructions_filtered(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     returned_binding: Option<&str>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for instruction in &plan.instructions {
         if matches!(
             instruction,
@@ -131,7 +131,7 @@ fn emit_cleanup_instruction(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     match instruction {
         NativeInstruction::EndBorrow { .. } => Ok(()),
         NativeInstruction::DropPayloadField { .. } => {
@@ -156,7 +156,7 @@ fn emit_payload_cleanup(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let NativeInstruction::DropPayloadField { name, enum_name, variant, field, .. } = instruction
     else {
         return Ok(());
@@ -173,7 +173,7 @@ fn emit_partial_binding_cleanup(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let NativeInstruction::DropBindingFields { name, moved_fields, .. } = instruction else {
         return Ok(());
     };
@@ -194,17 +194,17 @@ fn reset_arena(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let Some(NativeType::Arena(capacity)) =
         types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
     else {
-        return Err(NativeEmitError(format!("arena binding `{name}` is unavailable")));
+        return Err(BackendEmitError(format!("arena binding `{name}` is unavailable")));
     };
     let address = locals
         .iter()
         .find(|(binding, _)| binding.as_str() == name)
         .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("arena binding `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("arena binding `{name}` is unavailable")))?;
     let offset_address = function.ins().iadd_imm_s(address, i64::from(capacity));
     let zero = function.ins().iconst(layouts.pointer_type, 0);
     function.ins().store(MemFlagsData::new(), zero, offset_address, 0);

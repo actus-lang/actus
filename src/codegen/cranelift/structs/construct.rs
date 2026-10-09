@@ -7,7 +7,7 @@ use crate::ast::{StructFieldInit, TypeName};
 
 use super::super::expressions::lower_expression;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::memory::store_struct_field;
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -25,7 +25,7 @@ pub(crate) fn lower_struct_literal(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let layout = resolve_struct_layout(name, type_arguments, layouts)?;
     let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
     let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
@@ -48,7 +48,7 @@ fn resolve_struct_layout<'a>(
     name: &str,
     type_arguments: &[TypeName],
     layouts: &'a LayoutRegistry,
-) -> Result<&'a crate::codegen::cranelift::layout::StructLayout, NativeEmitError> {
+) -> Result<&'a crate::codegen::cranelift::layout::StructLayout, BackendEmitError> {
     let type_name = TypeName {
         name: name.to_owned(),
         arguments: type_arguments.to_vec(),
@@ -61,8 +61,8 @@ fn resolve_struct_layout<'a>(
             NativeType::Struct(id) => Some(id),
             _ => None,
         })
-        .ok_or_else(|| NativeEmitError(format!("missing layout for struct `{name}`")))?;
-    layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing layout `{id}`")))
+        .ok_or_else(|| BackendEmitError(format!("missing layout for struct `{name}`")))?;
+    layouts.get(id).ok_or_else(|| BackendEmitError(format!("missing layout `{id}`")))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -77,13 +77,12 @@ fn lower_struct_fields(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for field in fields {
-        let field_layout = layout
-            .fields
-            .iter()
-            .find(|candidate| candidate.name == field.name)
-            .ok_or_else(|| NativeEmitError(format!("unknown native field `{}`", field.name)))?;
+        let field_layout =
+            layout.fields.iter().find(|candidate| candidate.name == field.name).ok_or_else(
+                || BackendEmitError(format!("unknown native field `{}`", field.name)),
+            )?;
         let value = lower_expression(
             function,
             &field.value,

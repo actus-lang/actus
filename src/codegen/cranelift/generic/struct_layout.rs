@@ -1,7 +1,7 @@
 use crate::ast::{StructDef, StructFieldRole, TypeName};
 use crate::semantic::TypeSubstitution;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::layout::{
     GenericFieldLayout, GenericLayoutRegistry, GenericStructLayout, align_up, application_key,
     enter_layout,
@@ -13,7 +13,7 @@ impl GenericLayoutRegistry {
         definition: &StructDef,
         arguments: &[TypeName],
         visiting: &mut Vec<String>,
-    ) -> Result<GenericStructLayout, NativeEmitError> {
+    ) -> Result<GenericStructLayout, BackendEmitError> {
         let canonical_key = application_key(&definition.name, arguments);
         enter_layout(&canonical_key, visiting)?;
         let substitution = TypeSubstitution::for_type(
@@ -22,7 +22,7 @@ impl GenericLayoutRegistry {
             arguments,
             definition.span,
         )
-        .map_err(|error| NativeEmitError(format!("generic substitution failed: {error:?}")))?;
+        .map_err(|error| BackendEmitError(format!("generic substitution failed: {error:?}")))?;
         let result = self.layout_struct_fields(definition, &substitution, visiting);
         visiting.pop();
         result.map(|(size, alignment, fields)| GenericStructLayout {
@@ -38,7 +38,7 @@ impl GenericLayoutRegistry {
         definition: &StructDef,
         substitution: &TypeSubstitution,
         visiting: &mut Vec<String>,
-    ) -> Result<(u32, u32, Vec<GenericFieldLayout>), NativeEmitError> {
+    ) -> Result<(u32, u32, Vec<GenericFieldLayout>), BackendEmitError> {
         let mut fields = Vec::new();
         let mut offset = 0;
         let mut alignment = 1;

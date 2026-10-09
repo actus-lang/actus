@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBody, IfBranch, Stmt};
 
-use super::native::NativeEmitError;
+use super::native::BackendEmitError;
 
 pub(super) fn jump_with_values(
     function: &mut FunctionBuilder<'_>,
@@ -69,7 +69,7 @@ fn place_binding_name(place: &crate::ast::Place) -> Option<&String> {
 pub(super) fn carried_values(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     names: &[String],
-) -> Result<Vec<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<Vec<cranelift_codegen::ir::Value>, BackendEmitError> {
     names
         .iter()
         .map(|name| {
@@ -77,7 +77,7 @@ pub(super) fn carried_values(
                 .iter()
                 .find(|(binding, _)| binding.as_str() == name)
                 .map(|(_, value)| *value)
-                .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))
+                .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))
         })
         .collect()
 }

@@ -9,7 +9,7 @@ use crate::semantic::LoopExitKind;
 use super::super::cleanup::emit_loop_cleanup;
 use super::super::expressions::lower_expression;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -35,7 +35,7 @@ pub(crate) fn lower_statements<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     for statement in statements {
         let flow = dispatch::lower_statement(
             function,
@@ -66,7 +66,7 @@ fn lower_return_statement(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match expression {
         Some(expression) => try_lowering::lower_return(
             function,
@@ -93,7 +93,7 @@ fn lower_void_return(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     super::super::cleanup::emit_return_cleanup(
         function,
         cleanup_schedule,
@@ -119,7 +119,7 @@ fn lower_expression_statement(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if matches!(expression, Expr::Try { .. }) {
         return lower_try_expression_statement(
             function,
@@ -157,7 +157,7 @@ fn lower_plain_expression_statement(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if let Expr::Case { subject, branches, .. } = expression {
         super::super::case::lower_case(
             function,
@@ -199,7 +199,7 @@ fn lower_try_expression_statement(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     try_lowering::lower_try_statement(
         function,
         expression,
@@ -224,7 +224,7 @@ fn lower_loop_control(
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
     continue_loop: bool,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let exit_kind = if continue_loop { LoopExitKind::Continue } else { LoopExitKind::Break };
     emit_loop_cleanup(
         function,
@@ -250,7 +250,7 @@ fn lower_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let value = lower_expression(
         function,
         expression,
@@ -286,7 +286,7 @@ fn store_assignment_value(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     layouts: &LayoutRegistry,
-) -> Result<bool, NativeEmitError> {
+) -> Result<bool, BackendEmitError> {
     if let Some(destination) = locals.get(name)
         && types
             .get(name)
@@ -304,7 +304,7 @@ fn store_assignment_value(
     }
     let size = layouts
         .type_size(NativeType::Struct(id))
-        .ok_or_else(|| NativeEmitError("aggregate binding has no native size".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("aggregate binding has no native size".to_owned()))?;
     crate::codegen::cranelift::structs::copy_bytes(function, value, destination, size, layouts)?;
     Ok(true)
 }
@@ -316,7 +316,7 @@ fn lower_drop(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     emit_binding_drop(function, name, locals, types, functions, layouts)?;
     Ok(Flow::Fallthrough)
 }

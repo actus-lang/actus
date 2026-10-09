@@ -8,8 +8,7 @@ use crate::target::TargetSpec;
 
 use super::types::NativeType;
 
-#[derive(Debug)]
-pub struct NativeEmitError(pub String);
+pub use super::super::contract::BackendEmitError;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NativeSymbolBindings {
@@ -63,18 +62,10 @@ pub(crate) struct FunctionRef {
     pub(crate) ins_params: Vec<bool>,
 }
 
-impl std::fmt::Display for NativeEmitError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for NativeEmitError {}
-
 pub(crate) fn reachable_call_names(
     program: &Program,
     symbol: &str,
-) -> Result<std::collections::HashSet<String>, NativeEmitError> {
+) -> Result<std::collections::HashSet<String>, BackendEmitError> {
     let verbs = program
         .declarations
         .iter()
@@ -94,12 +85,12 @@ pub(crate) fn reachable_call_names(
     super::dependencies::reachable_call_names(&verbs, &external_verbs, Some(symbol))
 }
 
-pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
-    let target = TargetSpec::host().map_err(|error| NativeEmitError(error.to_string()))?;
+pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, BackendEmitError> {
+    let target = TargetSpec::host().map_err(|error| BackendEmitError(error.to_string()))?;
     super::object::emit_i32_object(symbol, 0, &NativeBackendConfiguration::default(), &target)
 }
 
-pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
+pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, BackendEmitError> {
     emit_program_object_with_configuration(program, symbol, &NativeBackendConfiguration::default())
 }
 
@@ -107,8 +98,8 @@ pub fn emit_program_object_with_configuration(
     program: &Program,
     symbol: &str,
     configuration: &NativeBackendConfiguration,
-) -> Result<Vec<u8>, NativeEmitError> {
-    let target = TargetSpec::host().map_err(|error| NativeEmitError(error.to_string()))?;
+) -> Result<Vec<u8>, BackendEmitError> {
+    let target = TargetSpec::host().map_err(|error| BackendEmitError(error.to_string()))?;
     emit_program_object_for_target(program, symbol, configuration, &target)
 }
 
@@ -117,7 +108,7 @@ pub fn emit_program_object_for_target(
     symbol: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     super::emission::emit_program_object_for_target(
         program,
         super::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
@@ -135,7 +126,7 @@ pub fn emit_program_object_for_target_in_namespace(
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     emit_program_object_for_target_in_namespace_with_bindings(
         program,
         symbol,
@@ -153,7 +144,7 @@ pub fn emit_program_object_for_target_in_namespace_with_bindings(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     super::emission::emit_program_object_for_target(
         program,
         super::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
@@ -170,7 +161,7 @@ pub fn emit_module_object_for_target_in_namespace(
     namespace_prefix: &str,
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     emit_module_object_for_target_in_namespace_with_bindings(
         program,
         namespace_prefix,
@@ -186,7 +177,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     emit_module_object_for_target_in_namespace_with_bindings_and_instances(
         program,
         namespace_prefix,
@@ -204,7 +195,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances(
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
         program,
         namespace_prefix,
@@ -224,7 +215,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
     bindings: &NativeSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
     exported_roots: Option<&[String]>,
-) -> Result<Vec<u8>, NativeEmitError> {
+) -> Result<Vec<u8>, BackendEmitError> {
     super::emission::emit_program_object_for_target(
         program,
         super::emission::NativeRootSelection { symbol: None, exported: exported_roots },

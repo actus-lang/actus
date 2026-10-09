@@ -7,7 +7,7 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::super::expressions::{lower_compound_integer_operation, lower_expression};
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 use super::packs::{
@@ -31,7 +31,7 @@ pub(crate) fn lower_pack_field_compound_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if let Expr::Index { target, index, .. } = object {
         return lower_indexed_pack_field_compound_assignment(
             function,
@@ -79,10 +79,11 @@ fn lower_direct_pack_field_compound_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let name = binding_name(object)?;
-    let pack =
-        layouts.pack(pack_id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+    let pack = layouts
+        .pack(pack_id)
+        .ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, field)?;
     ensure_pack_field_is_mutable(field_layout, field)?;
     let storage = lower_expression(
@@ -139,7 +140,7 @@ fn lower_indexed_pack_field_compound_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let (address, element) = super::super::arrays::lower_array_address(
         function,
         target,
@@ -152,7 +153,7 @@ fn lower_indexed_pack_field_compound_assignment<'source>(
         layouts,
     )?;
     if element != NativeType::Pack(pack_id) {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "indexed pack layout does not match field assignment".to_owned(),
         ));
     }
@@ -186,9 +187,10 @@ fn lower_indexed_pack_compound_at_address<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
-    let pack =
-        layouts.pack(pack_id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+) -> Result<(), BackendEmitError> {
+    let pack = layouts
+        .pack(pack_id)
+        .ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, field)?;
     ensure_pack_field_is_mutable(field_layout, field)?;
     let storage = load_indexed_pack_storage(function, address, pack.storage, layouts)?;
@@ -232,7 +234,7 @@ fn load_indexed_pack_storage(
     address: Value,
     storage_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     if matches!(storage_type, NativeType::Array(_)) {
         return Ok(address);
     }
@@ -255,7 +257,7 @@ fn lower_pack_compound_rhs(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let value = lower_expression(
         function,
         value,

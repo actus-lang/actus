@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::copy_bytes;
@@ -13,7 +13,7 @@ pub(super) fn emit_flow(
     flow: crate::codegen::cranelift::lowering::Flow,
     layouts: &LayoutRegistry,
     force_void_entry_return: bool,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     match flow {
         crate::codegen::cranelift::lowering::Flow::Return(result, _) => {
             emit_value_return(function, return_type, return_slot, result, layouts)
@@ -26,7 +26,7 @@ pub(super) fn emit_flow(
         }
         crate::codegen::cranelift::lowering::Flow::Break
         | crate::codegen::cranelift::lowering::Flow::Continue => {
-            Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
+            Err(BackendEmitError("loop control escaped its loop during native lowering".to_owned()))
         }
     }
 }
@@ -37,7 +37,7 @@ pub(crate) fn emit_value_return(
     return_slot: Option<cranelift_codegen::ir::Value>,
     result: cranelift_codegen::ir::Value,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     match (return_type, return_slot) {
         (Some(return_type), Some(destination))
             if layouts.uses_return_slot(return_type)
@@ -49,14 +49,14 @@ pub(crate) fn emit_value_return(
             emit_borrowed_slot_return(function, destination, result, return_type, layouts)
         }
         (Some(NativeType::Void), _) => {
-            Err(NativeEmitError("Void native function returned a value".to_owned()))
+            Err(BackendEmitError("Void native function returned a value".to_owned()))
         }
         (Some(_), None) => {
             function.ins().return_(&[result]);
             Ok(())
         }
-        (None, _) => Err(NativeEmitError("void native function returned a value".to_owned())),
-        _ => Err(NativeEmitError("invalid native return ABI state".to_owned())),
+        (None, _) => Err(BackendEmitError("void native function returned a value".to_owned())),
+        _ => Err(BackendEmitError("invalid native return ABI state".to_owned())),
     }
 }
 
@@ -66,10 +66,10 @@ fn emit_sret_return(
     destination: cranelift_codegen::ir::Value,
     return_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let size = layouts
         .type_size(return_type)
-        .ok_or_else(|| NativeEmitError("missing sret return layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing sret return layout".to_owned()))?;
     copy_bytes(function, result, destination, size, layouts)?;
     function.ins().return_(&[]);
     Ok(())
@@ -81,10 +81,10 @@ fn emit_borrowed_slot_return(
     result: cranelift_codegen::ir::Value,
     return_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let size = layouts
         .return_slot_size(return_type)
-        .ok_or_else(|| NativeEmitError("missing borrowed view return layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing borrowed view return layout".to_owned()))?;
     emit_borrowed_view_return(function, destination, result, size, layouts)?;
     Ok(())
 }
@@ -94,7 +94,7 @@ fn emit_fallthrough(
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,
     force_void_entry_return: bool,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if force_void_entry_return {
         let result = function.ins().iconst(cranelift_codegen::ir::types::I32, 0);
         function.ins().return_(&[result]);
@@ -106,9 +106,9 @@ fn emit_fallthrough(
             Ok(())
         }
         (Some(_), None) => {
-            Err(NativeEmitError("native function requires a return value".to_owned()))
+            Err(BackendEmitError("native function requires a return value".to_owned()))
         }
-        _ => Err(NativeEmitError("invalid native return ABI state".to_owned())),
+        _ => Err(BackendEmitError("invalid native return ABI state".to_owned())),
     }
 }
 
@@ -117,7 +117,7 @@ fn emit_void_return(
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,
     force_void_entry_return: bool,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if force_void_entry_return {
         let result = function.ins().iconst(cranelift_codegen::ir::types::I32, 0);
         function.ins().return_(&[result]);
@@ -128,7 +128,7 @@ fn emit_void_return(
             function.ins().return_(&[]);
             Ok(())
         }
-        _ => Err(NativeEmitError("invalid native return ABI state".to_owned())),
+        _ => Err(BackendEmitError("invalid native return ABI state".to_owned())),
     }
 }
 
@@ -138,7 +138,7 @@ fn emit_borrowed_view_return(
     result: cranelift_codegen::ir::Value,
     size: u32,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let some = function.create_block();
     let none = function.create_block();
     let merge = function.create_block();

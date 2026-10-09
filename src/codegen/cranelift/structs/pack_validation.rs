@@ -2,14 +2,14 @@ use cranelift_codegen::ir::{InstBuilder, Value, condcodes::IntCC, types};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::expressions::coerce_to_ir_type;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 
 pub(super) fn validate_unsigned_byte_value(
     function: &mut FunctionBuilder<'_>,
     value: Value,
     field_type: NativeType,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if field_type != (NativeType::Integer { signed: false, width: 8 }) {
         return Ok(());
     }

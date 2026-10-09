@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::Stmt;
 
 use super::super::super::literals::StringDataValues;
-use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
 use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -22,7 +22,7 @@ pub(super) fn lower_structured_control_statement<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match statement {
         Stmt::Block(block) => super::super::scopes::lower_scoped_block(function, block, locals, types, functions, targets, cleanup_schedule, string_data, layouts),
         Stmt::Loop(block) => super::super::loops::lower_loop(function, block, locals, types, functions, cleanup_schedule, string_data, layouts),

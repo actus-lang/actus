@@ -12,7 +12,7 @@ use super::declarations::{FunctionDeclarationContext, declare_functions};
 use super::function_definition::define_function;
 use super::layout::LayoutRegistry;
 use super::literals::StringDataIds;
-use super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
+use super::native::{BackendEmitError, FunctionMeta, NativeSymbolBindings};
 use super::runtime::{
     declare_buffer_cleanup_function, declare_enum_cleanup_function,
     declare_region_cleanup_function, declare_runtime_functions,
@@ -46,7 +46,7 @@ pub(super) fn declare_all_functions(
     external_verbs: &[&ExternalVerbDecl],
     performance_definitions: &[super::performance::PerformanceDefinition<'_>],
     context: DeclarationContext<'_>,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let force_entry_return = target_requires_host_runtime(context.target)
         && verbs.iter().any(|verb| {
             context.entry_symbol == Some(verb.name.as_str())
@@ -146,14 +146,14 @@ pub(super) fn validate_native_program(
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for verb in verbs {
         validate_native_signature(verb, layouts)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
     }
     for verb in external_verbs {
         validate_external_native_signature(verb, layouts)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
     }
     Ok(())
 }
@@ -193,11 +193,11 @@ pub(super) fn define_verbs(
     entry_symbol: Option<&str>,
     target: &TargetSpec,
     configuration: &NativeBackendConfiguration,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for verb in verbs {
         let meta = functions
             .get(&verb.name)
-            .ok_or_else(|| NativeEmitError(format!("missing native function `{}`", verb.name)))?;
+            .ok_or_else(|| BackendEmitError(format!("missing native function `{}`", verb.name)))?;
         let force_entry_return = entry_symbol == Some(verb.name.as_str())
             && matches!(target.entry_contract(), crate::target::EntryContract::Hosted)
             && verb.return_type.as_ref().is_some_and(|return_type| return_type.ty.name == "Void");

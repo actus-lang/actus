@@ -6,7 +6,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Argument, Expr};
 
 use super::super::expressions::lower_expression;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::context::CallLoweringContext;
 
 struct CallArgumentModes<'a> {
@@ -23,7 +23,7 @@ pub(super) fn lower_call_arguments(
     dynamic_roles: &[Option<String>],
     ins_params: &[bool],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Vec<Value>, NativeEmitError> {
+) -> Result<Vec<Value>, BackendEmitError> {
     let ordered = order_arguments(arguments, parameter_names)?;
     let modes = CallArgumentModes { dynamic_params, dynamic_roles, ins_params };
     let mut values = Vec::new();
@@ -40,7 +40,7 @@ fn lower_one_call_argument(
     modes: &CallArgumentModes<'_>,
     context: &CallLoweringContext<'_, '_>,
     values: &mut Vec<Value>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let value = if modes.ins_params.get(index).copied().unwrap_or(false) {
         lower_indirect_ins_argument(function, argument, context)?
     } else {
@@ -71,7 +71,7 @@ fn lower_indirect_ins_argument(
     function: &mut FunctionBuilder<'_>,
     argument: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     match argument {
         Expr::Index { target, index, .. } => {
             let (address, _) = super::super::arrays::lower_array_address(
@@ -101,7 +101,7 @@ fn lower_indirect_ins_argument(
             )
         }
         Expr::Identifier { name, .. } => lower_scalar_ins_identifier(function, name, context),
-        _ => Err(NativeEmitError(
+        _ => Err(BackendEmitError(
             "native `ins` arguments require an addressable scalar or indexed slot".to_owned(),
         )),
     }
@@ -111,18 +111,18 @@ fn lower_scalar_ins_identifier(
     function: &mut FunctionBuilder<'_>,
     name: &str,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let (binding, value) = context
         .locals
         .iter()
         .find(|(binding, _)| binding.as_str() == name)
         .map(|(binding, value)| (*binding, *value))
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
     let native_type = context
         .local_types
         .get(binding)
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` has no type")))?;
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` has no type")))?;
     let ir_type = native_type.ir_type(context.layouts.pointer_type)?;
     if ir_type == context.layouts.pointer_type {
         return Ok(value);
@@ -146,14 +146,14 @@ fn append_dynamic_argument(
     dynamic_roles: &[Option<String>],
     context: &CallLoweringContext<'_, '_>,
     values: &mut Vec<Value>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if !is_dynamic_parameter(dynamic_params, index)? {
         return Ok(());
     }
     let role = dynamic_roles
         .get(index)
         .and_then(Option::as_deref)
-        .ok_or_else(|| NativeEmitError("dynamic parameter has no role".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("dynamic parameter has no role".to_owned()))?;
     let global = dynamic_vtable_value(argument, role, context)?;
     values.push(function.ins().symbol_value(context.layouts.pointer_type, global));
     Ok(())
@@ -163,7 +163,7 @@ fn dynamic_vtable_value(
     argument: &Expr,
     role: &str,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<GlobalValue, NativeEmitError> {
+) -> Result<GlobalValue, BackendEmitError> {
     let native_type = super::super::expressions::initializer_type(
         argument,
         context.local_types,
@@ -175,25 +175,25 @@ fn dynamic_vtable_value(
         .string_data
         .get(&symbol)
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("vtable `{symbol}` has no native data")))
+        .ok_or_else(|| BackendEmitError(format!("vtable `{symbol}` has no native data")))
 }
 
-fn is_dynamic_parameter(dynamic_params: &[bool], index: usize) -> Result<bool, NativeEmitError> {
+fn is_dynamic_parameter(dynamic_params: &[bool], index: usize) -> Result<bool, BackendEmitError> {
     dynamic_params
         .get(index)
         .copied()
-        .ok_or_else(|| NativeEmitError("call metadata is missing parameter mode".to_owned()))
+        .ok_or_else(|| BackendEmitError("call metadata is missing parameter mode".to_owned()))
 }
 
 fn order_arguments<'source>(
     arguments: &'source [Argument],
     parameter_names: &[String],
-) -> Result<Vec<&'source Expr>, NativeEmitError> {
+) -> Result<Vec<&'source Expr>, BackendEmitError> {
     if arguments.iter().all(|argument| argument.name.is_none()) {
         return Ok(arguments.iter().map(|argument| &argument.expression).collect());
     }
     if arguments.iter().any(|argument| argument.name.is_none()) {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "native calls cannot mix named and positional arguments".to_owned(),
         ));
     }
@@ -204,7 +204,7 @@ fn order_arguments<'source>(
                 .iter()
                 .find(|argument| argument.name.as_deref() == Some(parameter))
                 .map(|argument| &argument.expression)
-                .ok_or_else(|| NativeEmitError(format!("missing native argument `{parameter}")))
+                .ok_or_else(|| BackendEmitError(format!("missing native argument `{parameter}")))
         })
         .collect()
 }

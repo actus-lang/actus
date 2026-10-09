@@ -6,7 +6,7 @@ use super::super::arrays::lower_array_constructor;
 use super::super::calls::CallLoweringContext;
 use super::super::calls::{lower_call, lower_method_call};
 use super::super::enums::{enum_receiver_name, lower_enum_constructor};
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use crate::codegen::cranelift::structs::{
     lower_field_access, lower_pack_literal, lower_struct_literal,
@@ -16,7 +16,7 @@ pub(crate) fn lower_construct(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match expression {
         Expr::Call { callee, arguments, .. } => {
             lower_call_or_array_constructor(function, callee, arguments, context)
@@ -27,7 +27,7 @@ pub(crate) fn lower_construct(
         Expr::StructLit { .. } | Expr::FieldAccess { .. } => {
             lower_data_construct(function, expression, context)
         }
-        _ => Err(NativeEmitError("unsupported native construct".to_owned())),
+        _ => Err(BackendEmitError("unsupported native construct".to_owned())),
     }
 }
 
@@ -36,11 +36,11 @@ fn lower_call_or_array_constructor(
     callee: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if callee == "copy" {
         let argument = arguments
             .first()
-            .ok_or_else(|| NativeEmitError("copy requires one value".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("copy requires one value".to_owned()))?;
         return super::lower_expression_with_context(function, &argument.expression, context);
     }
     if arguments.is_empty()
@@ -55,7 +55,7 @@ fn lower_data_construct(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match expression {
         Expr::StructLit { name, fields, .. } if context.layouts.pack_id(name).is_some() => {
             lower_pack_data(function, name, fields, context)
@@ -66,7 +66,7 @@ fn lower_data_construct(
         Expr::FieldAccess { object, field, .. } => {
             lower_field_construct(function, object, field, context)
         }
-        _ => Err(NativeEmitError("unsupported data construct".to_owned())),
+        _ => Err(BackendEmitError("unsupported data construct".to_owned())),
     }
 }
 
@@ -75,7 +75,7 @@ fn lower_pack_data(
     name: &str,
     fields: &[crate::ast::StructFieldInit],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     lower_pack_literal(
         function,
         name,
@@ -95,7 +95,7 @@ fn lower_struct_data(
     type_arguments: &[crate::ast::TypeName],
     fields: &[crate::ast::StructFieldInit],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     lower_struct_literal(
         function,
         name,
@@ -116,7 +116,7 @@ fn lower_method_construct(
     method: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if let Some(value) = lower_arena_method(function, receiver, method, arguments, context) {
         return value;
     }
@@ -136,7 +136,7 @@ fn lower_arena_method(
     method: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Option<Result<cranelift_codegen::ir::Value, NativeEmitError>> {
+) -> Option<Result<cranelift_codegen::ir::Value, BackendEmitError>> {
     if !is_arena_method(receiver, method, context) {
         return None;
     }
@@ -170,7 +170,7 @@ fn lower_field_construct(
     object: &Expr,
     field: &str,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if enum_receiver_name(object)
         .and_then(|name| context.layouts.enum_constructor(name, field))
         .is_some()

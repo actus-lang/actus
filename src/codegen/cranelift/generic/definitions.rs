@@ -6,12 +6,12 @@ use crate::ast::{
 };
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 
 pub(in crate::codegen) fn specialized_structs(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Vec<StructDef>, NativeEmitError> {
+) -> Result<Vec<StructDef>, BackendEmitError> {
     let definitions = struct_definitions(program);
     let generic_names = generic_struct_names(&definitions)
         .into_iter()
@@ -45,7 +45,7 @@ pub(in crate::codegen) fn specialized_structs(
 pub(in crate::codegen) fn specialized_enums(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Vec<EnumDef>, NativeEmitError> {
+) -> Result<Vec<EnumDef>, BackendEmitError> {
     let definitions = enum_definitions(program);
     let generic_names = generic_enum_names(&definitions);
     instances
@@ -257,7 +257,7 @@ fn generic_enum_names(definitions: &HashMap<String, EnumDef>) -> HashSet<String>
 fn substitution_for_instance<T>(
     instance: &GenericInstance,
     definition: &T,
-) -> Result<TypeSubstitution, NativeEmitError>
+) -> Result<TypeSubstitution, BackendEmitError>
 where
     T: GenericDefinition,
 {
@@ -267,7 +267,7 @@ where
         &instance.arguments,
         definition.span(),
     )
-    .map_err(|error| NativeEmitError(format!("generic substitution failed: {error:?}")))
+    .map_err(|error| BackendEmitError(format!("generic substitution failed: {error:?}")))
 }
 
 trait GenericDefinition {
@@ -304,7 +304,7 @@ fn specialize_field(
     field: &StructField,
     substitution: &TypeSubstitution,
     generic_names: &HashSet<String>,
-) -> Result<StructField, NativeEmitError> {
+) -> Result<StructField, BackendEmitError> {
     Ok(StructField {
         doc: field.doc.clone(),
         role: field.role.clone(),
@@ -318,7 +318,7 @@ fn specialize_variant(
     variant: &EnumVariant,
     substitution: &TypeSubstitution,
     generic_names: &HashSet<String>,
-) -> Result<EnumVariant, NativeEmitError> {
+) -> Result<EnumVariant, BackendEmitError> {
     let payload = match &variant.payload {
         EnumPayload::Unit => EnumPayload::Unit,
         EnumPayload::Tuple(types) => EnumPayload::Tuple(

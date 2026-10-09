@@ -7,7 +7,7 @@ use crate::ast::{Expr, StructFieldInit};
 
 use super::super::expressions::lower_expression;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::pack_state::{seal_checked_pack_block, update_pack_binding};
 use crate::codegen::cranelift::layout::{LayoutRegistry, PackFieldLayout};
@@ -24,15 +24,15 @@ pub(crate) fn lower_pack_literal(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let id =
-        layouts.pack_id(name).ok_or_else(|| NativeEmitError(format!("missing pack `{name}`")))?;
+        layouts.pack_id(name).ok_or_else(|| BackendEmitError(format!("missing pack `{name}`")))?;
     let pack =
-        layouts.pack(id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+        layouts.pack(id).ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
     let storage = fields
         .iter()
         .find(|field| field.name == "storage")
-        .ok_or_else(|| NativeEmitError("pack literal is missing storage".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("pack literal is missing storage".to_owned()))?;
     lower_pack_storage_value(
         function,
         storage,
@@ -57,7 +57,7 @@ fn lower_pack_storage_value(
     string_data: &StringDataValues,
     storage_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let value = lower_expression(
         function,
         &storage.value,
@@ -88,7 +88,7 @@ pub(crate) fn lower_pack_field_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     lower_pack_field_assignment_inner(
         PackAssignmentContext {
             function,
@@ -122,7 +122,7 @@ struct PackAssignmentContext<'input, 'source, 'function> {
 fn lower_pack_field_assignment_inner(
     context: PackAssignmentContext<'_, '_, '_>,
     pack_id: usize,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if let Expr::Index { target, index, .. } = context.object {
         return lower_indexed_pack_field_assignment(context, pack_id, target, index);
     }
@@ -130,7 +130,7 @@ fn lower_pack_field_assignment_inner(
     let pack = context
         .layouts
         .pack(pack_id)
-        .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, context.field)?;
     ensure_pack_field_is_mutable(field_layout, context.field)?;
     let (storage, new_value) = lower_pack_assignment_operands(
@@ -165,7 +165,7 @@ fn lower_indexed_pack_field_assignment(
     pack_id: usize,
     target: &Expr,
     index: &Expr,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let (address, element) = super::super::arrays::lower_array_address(
         context.function,
         target,
@@ -178,7 +178,7 @@ fn lower_indexed_pack_field_assignment(
         context.layouts,
     )?;
     if element != NativeType::Pack(pack_id) {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "indexed pack layout does not match field assignment".to_owned(),
         ));
     }
@@ -189,11 +189,11 @@ fn write_indexed_pack_field(
     mut context: PackAssignmentContext<'_, '_, '_>,
     pack_id: usize,
     address: cranelift_codegen::ir::Value,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let pack = context
         .layouts
         .pack(pack_id)
-        .ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, context.field)?;
     ensure_pack_field_is_mutable(field_layout, context.field)?;
     let storage = indexed_pack_storage(&mut context, pack.storage, address)?;
@@ -232,7 +232,7 @@ fn indexed_pack_storage(
     context: &mut PackAssignmentContext<'_, '_, '_>,
     storage_type: NativeType,
     address: cranelift_codegen::ir::Value,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if matches!(storage_type, NativeType::Array(_)) {
         return Ok(address);
     }
@@ -247,9 +247,9 @@ fn indexed_pack_storage(
 pub(super) fn ensure_pack_field_is_mutable(
     field_layout: &PackFieldLayout,
     field: &str,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if !matches!(field_layout.role, crate::ast::StructFieldRole::Erg) {
-        return Err(NativeEmitError(format!("packed field `{field}` is read-only")));
+        return Err(BackendEmitError(format!("packed field `{field}` is read-only")));
     }
     Ok(())
 }
@@ -265,7 +265,7 @@ fn lower_pack_assignment_operands(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), NativeEmitError> {
+) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), BackendEmitError> {
     let storage = lower_expression(
         function,
         object,
@@ -295,9 +295,10 @@ pub(crate) fn lower_pack_field(
     pack_id: usize,
     field: &str,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
-    let pack =
-        layouts.pack(pack_id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    let pack = layouts
+        .pack(pack_id)
+        .ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
     let field_layout = packed_field(pack, field)?;
     if field_layout.indexed_count.is_some() {
         return super::inline_pack::lower_indexed_pack_field_address(
@@ -351,7 +352,7 @@ pub(super) fn lower_pack_field_write(
     storage_native_type: NativeType,
     endianness: crate::ast::LayoutEndianness,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if matches!(storage_native_type, NativeType::Array(_)) {
         super::inline_pack::lower_inline_pack_field_write(
             function,
@@ -373,7 +374,7 @@ pub(super) fn lower_pack_field_write(
         endianness,
         layouts
             .type_size(storage_native_type)
-            .ok_or_else(|| NativeEmitError("missing packed storage size".to_owned()))?,
+            .ok_or_else(|| BackendEmitError("missing packed storage size".to_owned()))?,
     )?;
     let shifted_mask = shift_value(function, mask_value, bit_offset, storage_type);
     let inverse_mask = function.ins().bnot(shifted_mask);
@@ -401,11 +402,11 @@ fn shift_value(
 pub(super) fn packed_field<'a>(
     pack: &'a crate::codegen::cranelift::layout::PackLayout,
     field: &str,
-) -> Result<&'a PackFieldLayout, NativeEmitError> {
+) -> Result<&'a PackFieldLayout, BackendEmitError> {
     pack.fields
         .iter()
         .find(|candidate| candidate.name == field)
-        .ok_or_else(|| NativeEmitError(format!("unknown packed field `{field}`")))
+        .ok_or_else(|| BackendEmitError(format!("unknown packed field `{field}`")))
 }
 
 pub(super) fn field_mask(
@@ -445,26 +446,26 @@ pub(super) fn sign_extend_field(
 fn packed_storage_bits(
     storage: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<u16, NativeEmitError> {
+) -> Result<u16, BackendEmitError> {
     let bytes = layouts
         .type_size(storage)
-        .ok_or_else(|| NativeEmitError("missing packed storage size".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing packed storage size".to_owned()))?;
     u16::try_from(
         bytes
             .checked_mul(8)
-            .ok_or_else(|| NativeEmitError("packed storage bit width overflow".to_owned()))?,
+            .ok_or_else(|| BackendEmitError("packed storage bit width overflow".to_owned()))?,
     )
-    .map_err(|_| NativeEmitError("packed storage bit width exceeds u16".to_owned()))
+    .map_err(|_| BackendEmitError("packed storage bit width exceeds u16".to_owned()))
 }
 
 fn mapped_bit_offset(
     pack: &crate::codegen::cranelift::layout::PackLayout,
     field: &PackFieldLayout,
     layouts: &LayoutRegistry,
-) -> Result<u16, NativeEmitError> {
+) -> Result<u16, BackendEmitError> {
     let size = layouts
         .type_size(pack.storage)
-        .ok_or_else(|| NativeEmitError("missing packed storage size".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing packed storage size".to_owned()))?;
     mapped_bit_offset_for_storage(field, pack.endianness, size)
 }
 
@@ -472,22 +473,22 @@ pub(super) fn mapped_bit_offset_for_storage(
     field: &PackFieldLayout,
     endianness: crate::ast::LayoutEndianness,
     storage_size: u32,
-) -> Result<u16, NativeEmitError> {
+) -> Result<u16, BackendEmitError> {
     let capacity = storage_size
         .checked_mul(8)
-        .ok_or_else(|| NativeEmitError("packed storage size overflow".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("packed storage size overflow".to_owned()))?;
     match endianness {
         crate::ast::LayoutEndianness::Little => Ok(field.offset),
         crate::ast::LayoutEndianness::Big => capacity
             .checked_sub(u32::from(field.offset) + u32::from(field.width))
             .and_then(|offset| u16::try_from(offset).ok())
-            .ok_or_else(|| NativeEmitError("packed field offset exceeds storage".to_owned())),
+            .ok_or_else(|| BackendEmitError("packed field offset exceeds storage".to_owned())),
     }
 }
 
-pub(super) fn binding_name(expression: &Expr) -> Result<&String, NativeEmitError> {
+pub(super) fn binding_name(expression: &Expr) -> Result<&String, BackendEmitError> {
     match expression {
         Expr::Identifier { name, .. } => Ok(name),
-        _ => Err(NativeEmitError("packed assignment requires a direct binding".to_owned())),
+        _ => Err(BackendEmitError("packed assignment requires a direct binding".to_owned())),
     }
 }

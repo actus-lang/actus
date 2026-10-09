@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use crate::codegen::cranelift::enum_layout::{EnumLayout, EnumVariantLayout};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -85,7 +85,7 @@ pub(super) fn bind_payload<'a>(
     local_types: &HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<BranchLocals<'a>, NativeEmitError> {
+) -> Result<BranchLocals<'a>, BackendEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = local_types.clone();
     bind_variant_case(
@@ -111,15 +111,15 @@ fn bind_variant_case<'a>(
     types: &mut HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let Pattern::Variant { variant, payload, .. } = &branch.pattern else { return Ok(()) };
     let NativeType::Enum(enum_id) = subject_type else { return Ok(()) };
     let enum_layout = layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError("missing enum layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing enum layout".to_owned()))?;
     let variant_layout = layouts
         .enum_variant(enum_id, variant)
-        .ok_or_else(|| NativeEmitError("missing case variant layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing case variant layout".to_owned()))?;
     bind_variant_payload(
         function,
         subject,
@@ -159,7 +159,7 @@ fn bind_variant_payload<'a>(
     types: &mut HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if enum_layout.niche_pointer && branch_variant(branch) == Some("Some") {
         return bind_niche_payload(branch, bindings, subject, variant_layout, locals, types);
     }
@@ -189,7 +189,7 @@ fn bind_niche_payload<'a>(
     variant_layout: &EnumVariantLayout,
     locals: &mut HashMap<&'a String, cranelift_codegen::ir::Value>,
     types: &mut HashMap<&'a String, NativeType>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for (index, (_, binding)) in bindings.into_iter().enumerate() {
         if binding == "_" {
             continue;
@@ -197,9 +197,9 @@ fn bind_niche_payload<'a>(
         let field = variant_layout
             .fields
             .get(index)
-            .ok_or_else(|| NativeEmitError("missing niche payload field layout".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("missing niche payload field layout".to_owned()))?;
         let key = branch_binding(branch, binding)
-            .ok_or_else(|| NativeEmitError("missing case binding".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("missing case binding".to_owned()))?;
         locals.insert(key, subject);
         types.insert(key, field.ty);
     }
@@ -218,7 +218,7 @@ fn bind_regular_payload<'a>(
     types: &mut HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for (index, (name, binding)) in bindings.into_iter().enumerate() {
         if binding != "_" {
             load_payload_binding(
@@ -254,13 +254,13 @@ fn load_payload_binding<'a>(
     branch_types: &mut HashMap<&'a String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let field = name
         .and_then(|field_name| {
             variant_layout.fields.iter().find(|field| field.name.as_deref() == Some(field_name))
         })
         .or_else(|| variant_layout.fields.get(index))
-        .ok_or_else(|| NativeEmitError("missing case payload field layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing case payload field layout".to_owned()))?;
     let address = function.ins().iadd_imm_s(subject, i64::from(payload_offset + field.offset));
     let value = match field.ty {
         NativeType::Struct(_) | NativeType::Array(_) => address,
@@ -268,15 +268,15 @@ fn load_payload_binding<'a>(
         NativeType::Enum(id) if !layouts.is_niche_option(id) => {
             let layout = layouts
                 .enum_layout(id)
-                .ok_or_else(|| NativeEmitError("missing enum payload layout".to_owned()))?;
+                .ok_or_else(|| BackendEmitError("missing enum payload layout".to_owned()))?;
             let allocator = functions.get("__actus_enum_allocate").ok_or_else(|| {
-                NativeEmitError("enum payload allocator is unavailable".to_owned())
+                BackendEmitError("enum payload allocator is unavailable".to_owned())
             })?;
             let size = function.ins().iconst(layouts.pointer_type, i64::from(layout.size));
             let allocation = function.ins().call(allocator.reference, &[size]);
             let destination =
                 function.inst_results(allocation).first().copied().ok_or_else(|| {
-                    NativeEmitError("enum payload allocation returned no pointer".to_owned())
+                    BackendEmitError("enum payload allocation returned no pointer".to_owned())
                 })?;
             copy_bytes(function, address, destination, layout.size, layouts)?;
             destination
@@ -284,7 +284,7 @@ fn load_payload_binding<'a>(
         _ => function.ins().load(layouts.ir_type(field.ty)?, MemFlagsData::new(), address, 0),
     };
     let key = branch_binding(branch, binding)
-        .ok_or_else(|| NativeEmitError("missing case binding".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing case binding".to_owned()))?;
     branch_locals.insert(key, value);
     branch_types.insert(key, field.ty);
     Ok(())

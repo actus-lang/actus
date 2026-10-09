@@ -9,8 +9,8 @@ use super::super::super::model::NativeCleanupSchedule;
 use super::super::literals::StringDataValues;
 use super::super::lowering::LoopTargets;
 use super::super::lowering::{Flow, lower_statements};
+use super::super::native::BackendEmitError;
 use super::super::native::FunctionRef;
-use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::CallLoweringContext;
 use super::{coerce_to_ir_type, initializer_type, lower_expression_with_context};
@@ -28,7 +28,7 @@ pub(crate) fn lower_statement_if<'source>(
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     targets: Option<LoopTargets>,
-) -> Result<super::super::lowering::Flow, NativeEmitError> {
+) -> Result<super::super::lowering::Flow, BackendEmitError> {
     let condition = super::lower_expression_with_targets(
         function,
         condition,
@@ -84,7 +84,7 @@ fn lower_statement_if_branches<'source>(
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     lower_statement_if_branch(
         function,
         then_block,
@@ -133,7 +133,7 @@ fn create_statement_if_blocks<'source>(
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
 ) -> Result<
     (cranelift_codegen::ir::Block, cranelift_codegen::ir::Block, cranelift_codegen::ir::Block),
-    NativeEmitError,
+    BackendEmitError,
 > {
     let then_block = function.create_block();
     let else_block = function.create_block();
@@ -142,7 +142,7 @@ fn create_statement_if_blocks<'source>(
         let ty = local_types
             .get(binding)
             .copied()
-            .ok_or_else(|| NativeEmitError(format!("missing native type for `{binding}")))?;
+            .ok_or_else(|| BackendEmitError(format!("missing native type for `{binding}")))?;
         function.append_block_param(merge_block, ty.ir_type(layouts.pointer_type)?);
     }
     Ok((then_block, else_block, merge_block))
@@ -162,7 +162,7 @@ fn lower_statement_if_else_branch<'source>(
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     match else_branch {
         Some(IfBranch::Block(block)) => lower_statement_if_branch(
             function,
@@ -184,7 +184,7 @@ fn lower_statement_if_else_branch<'source>(
             Ok(())
         }
         Some(IfBranch::ElseIf(_)) => {
-            Err(NativeEmitError("statement if lowering requires a block else branch".to_owned()))
+            Err(BackendEmitError("statement if lowering requires a block else branch".to_owned()))
         }
     }
 }
@@ -203,7 +203,7 @@ fn lower_statement_if_branch<'source>(
     string_data: &StringDataValues,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
     merge_block: cranelift_codegen::ir::Block,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     function.switch_to_block(branch_block);
     let mut branch_locals = locals.clone();
     let mut branch_types = local_types.clone();
@@ -219,7 +219,7 @@ fn lower_statement_if_branch<'source>(
         layouts,
     )?;
     if !matches!(flow, Flow::Fallthrough) {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "non-fallthrough control flow requires value-preserving statement lowering".to_owned(),
         ));
     }
@@ -227,7 +227,7 @@ fn lower_statement_if_branch<'source>(
         .iter()
         .map(|binding| {
             branch_locals.get(binding).copied().ok_or_else(|| {
-                NativeEmitError(format!("binding `{binding}` disappeared in if branch"))
+                BackendEmitError(format!("binding `{binding}` disappeared in if branch"))
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -256,7 +256,7 @@ pub(super) fn lower_if(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let Expr::If { condition, then_branch, else_branch, .. } = expression else { unreachable!() };
     let condition = lower_expression_with_context(function, condition, context)?;
     let then_block = function.create_block();
@@ -304,7 +304,7 @@ fn lower_branch(
     context: &CallLoweringContext<'_, '_>,
     merge_block: cranelift_codegen::ir::Block,
     result_type: NativeType,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     function.switch_to_block(branch_block);
     let mut locals = context.locals.clone();
     let mut local_types = context.local_types.clone();
@@ -352,13 +352,13 @@ fn emit_branch_flow(
     flow: Flow,
     result_type: NativeType,
     layouts: &crate::codegen::cranelift::layout::LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     match flow {
         Flow::Return(value, value_type) => {
             let value_type = value_type.unwrap_or(result_type);
             let return_slot = if layouts.uses_return_slot(value_type) {
                 let entry = function.func.layout.entry_block().ok_or_else(|| {
-                    NativeEmitError("native function has no entry block".to_owned())
+                    BackendEmitError("native function has no entry block".to_owned())
                 })?;
                 function.block_params(entry).first().copied()
             } else {
@@ -421,7 +421,7 @@ fn emit_merge_value(
     merge_block: cranelift_codegen::ir::Block,
     result_type: NativeType,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let value = function.ins().iconst(context.layouts.ir_type(result_type)?, 0);
     let argument = cranelift_codegen::ir::BlockArg::Value(value);
     function.ins().jump(merge_block, [&argument]);

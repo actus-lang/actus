@@ -12,7 +12,7 @@ use crate::runtime::{
     PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
-use super::super::cranelift::native::{FunctionMeta, NativeEmitError};
+use super::super::cranelift::native::{BackendEmitError, FunctionMeta};
 use super::types::NativeType;
 
 const SERIALIZATION_I64: NativeType = NativeType::Integer { signed: true, width: 64 };
@@ -31,7 +31,7 @@ const VALIDATE_FIXED_FRAME_PARAMS: &[&str] = &[
 pub(crate) fn declare_runtime_functions(
     module: &mut ObjectModule,
     has_print_definition: bool,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let pointer_type = module.isa().pointer_type();
     let ids = RuntimeFunctionIds {
         allocate: declare_allocate(module, pointer_type)?,
@@ -60,7 +60,7 @@ pub(crate) fn declare_runtime_functions(
 
 pub(crate) fn declare_region_cleanup_function(
     module: &mut ObjectModule,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let region_drop = declare_region_drop(module, module.isa().pointer_type())?;
     Ok(HashMap::from([(
         super::performance::dispatch_key(NativeType::Region, "drop"),
@@ -70,7 +70,7 @@ pub(crate) fn declare_region_cleanup_function(
 
 pub(crate) fn declare_enum_cleanup_function(
     module: &mut ObjectModule,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let enum_drop = declare_enum_drop(module, module.isa().pointer_type())?;
     Ok(HashMap::from([(
         ENUM_DROP_SYMBOL.to_owned(),
@@ -80,7 +80,7 @@ pub(crate) fn declare_enum_cleanup_function(
 
 pub(crate) fn declare_buffer_cleanup_function(
     module: &mut ObjectModule,
-) -> Result<HashMap<String, FunctionMeta>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let buffer_drop = declare_drop(module, module.isa().pointer_type())?;
     Ok(HashMap::from([(
         BUFFER_DROP_SYMBOL.to_owned(),
@@ -160,25 +160,25 @@ fn runtime_metadata(
 fn declare_enum_allocate(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(pointer_type));
     module
         .declare_function(ENUM_ALLOCATE_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_enum_drop(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.params.push(AbiParam::new(pointer_type));
     module
         .declare_function(ENUM_DROP_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn intrinsic_meta(
@@ -207,67 +207,67 @@ fn named_meta(
 fn declare_allocate(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(pointer_type));
     module
         .declare_function(BUFFER_ALLOCATE_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_drop(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     module
         .declare_function(BUFFER_DROP_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_region_drop(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(REGION_DROP_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_append(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.params.push(AbiParam::new(types::I8));
     signature.returns.push(AbiParam::new(types::I8));
     module
         .declare_function(BUFFER_APPEND_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_buffer_length(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(BUFFER_LENGTH_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_crc32(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.params.push(AbiParam::new(types::I64));
@@ -275,13 +275,13 @@ fn declare_crc32(
     signature.returns.push(AbiParam::new(types::I64));
     module
         .declare_function(BUFFER_CRC32_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_crc32_matches(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.params.push(AbiParam::new(types::I64));
@@ -290,13 +290,13 @@ fn declare_crc32_matches(
     signature.returns.push(AbiParam::new(types::I64));
     module
         .declare_function(BUFFER_CRC32_MATCHES_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_validate_fixed_frame(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     for _ in 0..8 {
@@ -305,52 +305,52 @@ fn declare_validate_fixed_frame(
     signature.returns.push(AbiParam::new(types::I64));
     module
         .declare_function(BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_print_int(
     module: &mut ObjectModule,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(types::I32));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(PRINT_INT_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_print_string(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(PRINT_STRING_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_print_buffer(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(PRINT_BUFFER_STDOUT_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }
 
 fn declare_write_string(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, NativeEmitError> {
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(WRITE_STRING_STDOUT_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| NativeEmitError(error.to_string()))
+        .map_err(|error| BackendEmitError(error.to_string()))
 }

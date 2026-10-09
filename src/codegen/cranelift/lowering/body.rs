@@ -6,7 +6,7 @@ use crate::ast::Stmt;
 
 use super::super::cleanup::emit_scope_cleanup;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -28,7 +28,7 @@ pub(crate) fn lower_body(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let mut locals = initial_locals.clone();
     let mut types = initial_types.clone();
     match super::statements::lower_statements(
@@ -44,7 +44,7 @@ pub(crate) fn lower_body(
     )? {
         flow @ (Flow::Return(_, _) | Flow::VoidReturn | Flow::Fallthrough) => Ok(flow),
         Flow::Break | Flow::Continue => {
-            Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
+            Err(BackendEmitError("loop control escaped its loop during native lowering".to_owned()))
         }
     }
 }
@@ -62,7 +62,7 @@ pub(crate) fn lower_case_block<'source>(
     layouts: &LayoutRegistry,
     targets: Option<super::LoopTargets>,
     value_producing: bool,
-) -> Result<CaseBlockState<'source>, NativeEmitError> {
+) -> Result<CaseBlockState<'source>, BackendEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
     let (prefix, tail) = case_block_parts(block, value_producing);
@@ -127,7 +127,7 @@ fn lower_case_tail(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     targets: Option<super::LoopTargets>,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
     if !matches!(flow, Flow::Fallthrough) {
         return Ok(None);
     }
@@ -157,7 +157,7 @@ fn finish_case_block(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if matches!(flow, Flow::Fallthrough) {
         emit_scope_cleanup(
             function,

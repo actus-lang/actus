@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::Value;
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 
 pub(super) fn seal_checked_pack_block(
@@ -21,12 +21,12 @@ pub(super) fn update_pack_binding(
     locals: &mut HashMap<&String, Value>,
     name: &str,
     updated: Value,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let binding = locals
         .keys()
         .find(|candidate| candidate.as_str() == name)
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
     locals.insert(binding, updated);
     Ok(())
 }

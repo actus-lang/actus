@@ -1,12 +1,12 @@
 use crate::ast::{PackDecl, PackField, PrimitiveType, Role, StructFieldRole, primitive_type};
 
 use super::{LayoutRegistry, PackFieldLayout, PackLayout};
-use crate::codegen::cranelift::native::NativeEmitError;
+use crate::codegen::cranelift::native::BackendEmitError;
 
 impl LayoutRegistry {
-    pub(super) fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, NativeEmitError> {
+    pub(super) fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, BackendEmitError> {
         let storage = self.type_for_type_name(pack.storage.type_name()).ok_or_else(|| {
-            NativeEmitError(format!("unknown packed storage `{}`", pack.storage.canonical_key()))
+            BackendEmitError(format!("unknown packed storage `{}`", pack.storage.canonical_key()))
         })?;
         let fields = pack
             .fields
@@ -16,13 +16,13 @@ impl LayoutRegistry {
         Ok(PackLayout { storage, endianness: pack.endianness, fields })
     }
 
-    fn pack_field_layout(&self, field: &PackField) -> Result<PackFieldLayout, NativeEmitError> {
+    fn pack_field_layout(&self, field: &PackField) -> Result<PackFieldLayout, BackendEmitError> {
         let width = packed_field_width(field)?;
         let role = match field.role {
             Role::Erg => StructFieldRole::Erg,
             Role::Abs => StructFieldRole::Value,
             Role::Dat | Role::Ins => {
-                return Err(NativeEmitError(format!(
+                return Err(BackendEmitError(format!(
                     "invalid packed field role for `{}`",
                     field.name
                 )));
@@ -32,7 +32,10 @@ impl LayoutRegistry {
             name: field.name.clone(),
             role,
             ty: self.type_for_type_name(&field.ty).ok_or_else(|| {
-                NativeEmitError(format!("unknown packed field type `{}`", field.ty.canonical_key()))
+                BackendEmitError(format!(
+                    "unknown packed field type `{}`",
+                    field.ty.canonical_key()
+                ))
             })?,
             offset: field.offset,
             width,
@@ -47,7 +50,7 @@ fn indexed_field_count(field: &PackField) -> Option<u32> {
         .flatten()
 }
 
-fn packed_field_width(field: &PackField) -> Result<u8, NativeEmitError> {
+fn packed_field_width(field: &PackField) -> Result<u8, BackendEmitError> {
     let primitive = if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
         &field.ty.arguments[0]
     } else {
@@ -58,5 +61,5 @@ fn packed_field_width(field: &PackField) -> Result<u8, NativeEmitError> {
             PrimitiveType::Integer { width, .. } => Some(width),
             _ => None,
         })
-        .ok_or_else(|| NativeEmitError(format!("invalid packed field `{}`", field.name)))
+        .ok_or_else(|| BackendEmitError(format!("invalid packed field `{}`", field.name)))
 }

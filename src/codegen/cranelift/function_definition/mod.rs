@@ -13,7 +13,7 @@ use crate::configuration::NativeBackendConfiguration;
 
 use super::declarations::{native_signature_for_definition, native_signature_for_entry};
 use super::literals::{StringDataIds, StringDataValues, declare_string_values};
-use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionMeta, FunctionRef};
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -37,7 +37,7 @@ pub(crate) fn define_function(
     namespace_prefix: &str,
     force_entry_return: bool,
     configuration: &NativeBackendConfiguration,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let mut context = module.make_context();
     context.func.signature = if force_entry_return {
         native_signature_for_entry(module, verb, layouts, true)?
@@ -58,19 +58,19 @@ pub(crate) fn define_function(
         force_entry_return,
     )
     .map_err(|error| {
-        NativeEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
+        BackendEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
     })?;
     if configuration.verifies_no_float_ir() {
         let floating = super::ir_audit::floating_point_instructions(&context.func);
         if !floating.is_empty() {
-            return Err(NativeEmitError(format!(
+            return Err(BackendEmitError(format!(
                 "native function `{}` contains floating-point IR instructions: {floating:?}",
                 verb.name
             )));
         }
     }
     module.define_function(metadata.id, &mut context).map_err(|error| {
-        NativeEmitError(format!("native function `{}` verification failed: {error:?}", verb.name))
+        BackendEmitError(format!("native function `{}` verification failed: {error:?}", verb.name))
     })?;
     module.clear_context(&mut context);
     Ok(())
@@ -89,7 +89,7 @@ fn lower_function_body(
     vtable_data: &VtableDataIds,
     namespace_prefix: &str,
     force_entry_return: bool,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let references = declare_function_refs(module, &mut context.func, functions)?;
     let mut string_values =
         declare_string_values(module, &mut context.func, string_data, namespace_prefix);
@@ -127,7 +127,7 @@ fn lower_function_flow(
         Option<cranelift_codegen::ir::Value>,
         crate::codegen::cranelift::lowering::Flow,
     ),
-    NativeEmitError,
+    BackendEmitError,
 > {
     let (return_type, return_slot, (locals, local_types)) =
         setup_function_entry(function, module, verb, layouts, force_entry_return)?;
@@ -152,7 +152,7 @@ fn setup_function_entry<'a>(
     force_entry_return: bool,
 ) -> Result<
     (Option<NativeType>, Option<cranelift_codegen::ir::Value>, BoundParameters<'a>),
-    NativeEmitError,
+    BackendEmitError,
 > {
     let block = function.create_block();
     function.switch_to_block(block);
@@ -176,7 +176,7 @@ fn setup_function_entry<'a>(
 fn declared_return_type(
     verb: &VerbDecl,
     layouts: &LayoutRegistry,
-) -> Result<Option<NativeType>, NativeEmitError> {
+) -> Result<Option<NativeType>, BackendEmitError> {
     verb.return_type
         .as_ref()
         .map(|return_type| NativeType::from_type_name_with_layout(Some(&return_type.ty), layouts))

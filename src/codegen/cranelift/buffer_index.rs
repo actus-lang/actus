@@ -7,7 +7,7 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::expressions::lower_expression;
 use super::literals::StringDataValues;
-use super::native::{FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::model::NativeCleanupSchedule;
@@ -23,7 +23,7 @@ pub(crate) fn lower_buffer_index(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let address = lower_buffer_address(
         function,
         target,
@@ -53,7 +53,7 @@ pub(crate) fn lower_buffer_compound_assignment(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let address = lower_buffer_address(
         function,
         target,
@@ -102,7 +102,7 @@ pub(crate) fn lower_buffer_assignment(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let address = lower_buffer_address(
         function,
         target,
@@ -141,7 +141,7 @@ fn lower_buffer_address(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let handle = lower_expression(
         function,
         target,

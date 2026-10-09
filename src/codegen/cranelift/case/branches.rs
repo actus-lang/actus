@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::CaseBody;
 
 use super::super::expressions::lower_expression;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::context::CaseLoweringContext;
 use super::matching::match_pattern;
@@ -25,7 +25,7 @@ pub(super) fn emit_case_branches(
     bindings: &[&String],
     context: &CaseLoweringContext<'_, '_>,
     value_producing: bool,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let next_blocks =
         (0..branches.len().saturating_sub(1)).map(|_| function.create_block()).collect::<Vec<_>>();
     for (index, branch) in branches.iter().enumerate() {
@@ -62,7 +62,7 @@ fn emit_case_branch(
     context: &CaseLoweringContext<'_, '_>,
     value_producing: bool,
     bindings: &[&String],
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let matched = function.create_block();
     let condition =
         match_pattern(function, subject_value, subject_type, &branch.pattern, context.layouts)?;
@@ -142,7 +142,7 @@ fn lower_case_branch<'a>(
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
     value_producing: bool,
-) -> Result<CaseBranchResult<'a>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
     let branch_locals = bind_branch_payload(function, subject, subject_type, branch, context)?;
     if let Some(guard) = &branch.guard {
         return lower_guarded_case_branch(
@@ -166,7 +166,7 @@ fn bind_branch_payload<'a>(
     subject_type: NativeType,
     branch: &'a crate::ast::CaseBranch,
     context: &CaseLoweringContext<'_, 'a>,
-) -> Result<BranchLocals<'a>, NativeEmitError> {
+) -> Result<BranchLocals<'a>, BackendEmitError> {
     bind_payload(
         function,
         subject,
@@ -190,10 +190,10 @@ fn lower_guarded_case_branch<'a>(
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
     value_producing: bool,
-) -> Result<CaseBranchResult<'a>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
     let guard_block = function
         .current_block()
-        .ok_or_else(|| NativeEmitError("guard lowering has no active block".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("guard lowering has no active block".to_owned()))?;
     let condition = lower_expression(
         function,
         guard,
@@ -220,7 +220,7 @@ fn emit_guard_branch(
     body: cranelift_codegen::ir::Block,
     following: cranelift_codegen::ir::Block,
     merge: cranelift_codegen::ir::Block,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if following == merge {
         let failure = function.create_block();
         function.ins().brif(condition, body, &[], failure, &[]);
@@ -247,7 +247,7 @@ fn lower_case_body<'a>(
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
     value_producing: bool,
-) -> Result<CaseBranchResult<'a>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
     let branch_value = match &branch.body {
         CaseBody::Expression(expression) => Some((
             lower_case_expression(function, expression, branch_locals, context)?,
@@ -271,7 +271,7 @@ fn lower_case_expression<'a>(
     expression: &crate::ast::Expr,
     branch_locals: &BranchLocals<'a>,
     context: &CaseLoweringContext<'_, 'a>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     lower_expression(
         function,
         expression,
@@ -292,7 +292,7 @@ fn lower_case_block_body<'a>(
     result_type: NativeType,
     context: &CaseLoweringContext<'_, 'a>,
     value_producing: bool,
-) -> Result<CaseBranchResult<'a>, NativeEmitError> {
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
     let (flow, locals, types, tail_value) = lower_case_block(
         function,
         block,
@@ -315,7 +315,7 @@ fn finish_case_flow(
     flow: Flow,
     tail_value: Option<cranelift_codegen::ir::Value>,
     result_type: NativeType,
-) -> Result<Option<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
     match flow {
         Flow::Return(value, _) => {
             function.ins().return_(&[value]);
@@ -325,7 +325,7 @@ fn finish_case_flow(
         Flow::Fallthrough if matches!(result_type, NativeType::Void) => {
             Ok(Some(function.ins().iconst(types::I8, 0)))
         }
-        Flow::Fallthrough => Err(NativeEmitError(
+        Flow::Fallthrough => Err(BackendEmitError(
             "case block must return a value in a value-producing case".to_owned(),
         )),
         Flow::VoidReturn => {

@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, Place, Role, Stmt};
 
 use super::super::super::literals::StringDataValues;
-use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
 use super::super::{Flow, LoopTargets, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -21,7 +21,7 @@ pub(super) fn lower_statement<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if let Some(flow) = lower_value_statement(
         function,
         statement,
@@ -59,7 +59,7 @@ fn lower_value_statement<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Option<Flow>, NativeEmitError> {
+) -> Result<Option<Flow>, BackendEmitError> {
     if !matches!(
         statement,
         Stmt::OwnerDecl { role: Role::Erg | Role::Abs | Role::Ins, .. }
@@ -114,7 +114,7 @@ fn lower_owner_or_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match statement {
         Stmt::OwnerDecl {
             role: Role::Erg | Role::Abs | Role::Ins, name, ty, initializer, ..
@@ -170,7 +170,7 @@ fn lower_owner_declaration<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     super::owners::lower_owner_declaration(
         function,
         name,
@@ -196,7 +196,7 @@ fn lower_binding_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     super::lower_assignment(
         function,
         name,
@@ -221,7 +221,7 @@ fn lower_other_value_statement<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Option<Flow>, NativeEmitError> {
+) -> Result<Option<Flow>, BackendEmitError> {
     match statement {
         Stmt::Return { .. } => Ok(Some(lower_field_or_return(
             function,
@@ -260,7 +260,7 @@ fn lower_field_or_return<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match statement {
         Stmt::Return { value, span } => super::lower_return_statement(
             function,
@@ -289,7 +289,7 @@ fn lower_index_assignment_statement(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let result =
         if crate::codegen::cranelift::structs::expression_native_type(target, types, layouts)
             == Some(NativeType::Buffer)
@@ -334,7 +334,7 @@ fn lower_place_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match place {
         Place::Field { object, field, .. } => {
             crate::codegen::cranelift::structs::lower_field_assignment(
@@ -378,7 +378,7 @@ fn lower_expression_or_drop<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match statement {
         Stmt::Expression { expression, span } => super::lower_expression_statement(
             function,
@@ -426,7 +426,7 @@ fn lower_control_statement<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     match statement {
         Stmt::Block(_) | Stmt::Loop(_) | Stmt::ForRange { .. } | Stmt::ForArray { .. } => {
             super::structured_control::lower_structured_control_statement(
@@ -452,7 +452,7 @@ fn lower_control_statement<'source>(
             layouts,
             matches!(statement, Stmt::Continue { .. }),
         ),
-        _ => Err(NativeEmitError(
+        _ => Err(BackendEmitError(
             "native integer slice supports only integer declarations, assignments, expressions, blocks, drops, and returns".to_owned(),
         )),
     }
@@ -469,7 +469,7 @@ fn lower_loop_exit<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
     is_continue: bool,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     super::lower_loop_control(
         function,
         span,

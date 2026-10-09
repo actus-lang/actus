@@ -1,7 +1,7 @@
 use crate::ast::{EnumDef, EnumPayload, TypeName};
 
 use super::layout::{LayoutRegistry, integer_storage_bytes};
-use super::native::NativeEmitError;
+use super::native::BackendEmitError;
 use super::types::NativeType;
 
 #[derive(Clone, Debug)]
@@ -114,9 +114,9 @@ impl LayoutRegistry {
         &self,
         definition: &EnumDef,
         visiting: &mut Vec<String>,
-    ) -> Result<EnumLayout, NativeEmitError> {
+    ) -> Result<EnumLayout, BackendEmitError> {
         if visiting.contains(&definition.name) {
-            return Err(NativeEmitError(format!(
+            return Err(BackendEmitError(format!(
                 "recursive enum layout for `{}` is not supported",
                 definition.name
             )));
@@ -147,7 +147,7 @@ impl LayoutRegistry {
         &self,
         definition: &EnumDef,
         visiting: &mut Vec<String>,
-    ) -> Result<(Vec<EnumVariantLayout>, u32, u32), NativeEmitError> {
+    ) -> Result<(Vec<EnumVariantLayout>, u32, u32), BackendEmitError> {
         let mut variants = Vec::new();
         let mut max_payload_size = 0;
         let mut max_payload_alignment = 1;
@@ -159,7 +159,7 @@ impl LayoutRegistry {
             variants.push(EnumVariantLayout {
                 name: variant.name.clone(),
                 discriminant: u32::try_from(discriminant)
-                    .map_err(|_| NativeEmitError("enum has too many variants".to_owned()))?,
+                    .map_err(|_| BackendEmitError("enum has too many variants".to_owned()))?,
                 fields,
             });
         }
@@ -170,7 +170,7 @@ impl LayoutRegistry {
         &self,
         payload: &EnumPayload,
         visiting: &mut Vec<String>,
-    ) -> Result<(Vec<EnumFieldLayout>, u32, u32), NativeEmitError> {
+    ) -> Result<(Vec<EnumFieldLayout>, u32, u32), BackendEmitError> {
         let mut fields = Vec::new();
         let mut payload_size = 0;
         let mut payload_alignment = 1;

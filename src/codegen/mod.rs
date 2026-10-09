@@ -13,17 +13,15 @@ mod symbols;
 
 pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{
-    BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan, BackendContractError,
-    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
-    BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
-    BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
-    lower_semantic_cleanup,
+    BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan,
+    BackendContractError, BackendEmitError, BackendExternal, BackendFailure, BackendFunction,
+    BackendInstruction, BackendLayout, BackendModule, BackendParameter, BackendPassingMode,
+    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
+    BackendValueId, BackendValueType, lower_semantic_cleanup,
 };
-pub use cranelift::abi::{
-    NativeAbiError, validate_external_native_signature, validate_native_signature,
-};
+pub use cranelift::abi::{validate_external_native_signature, validate_native_signature};
 pub use cranelift::native::{
-    NativeEmitError, NativeSymbolBindings, emit_module_object_for_target_in_namespace,
+    NativeSymbolBindings, emit_module_object_for_target_in_namespace,
     emit_module_object_for_target_in_namespace_with_bindings,
     emit_module_object_for_target_in_namespace_with_bindings_and_instances,
     emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots,

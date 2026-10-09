@@ -8,7 +8,7 @@ use crate::ast::{Block, ForBinding};
 use super::super::control_flow::{assigned_outer_bindings, carried_values, jump_with_values};
 use super::super::expressions::{initializer_type, lower_expression};
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -33,10 +33,10 @@ pub(super) fn emit_loop_jump(
     targets: Option<LoopTargets>,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     continue_loop: bool,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let Some(targets) = targets else {
         let keyword = if continue_loop { "continue" } else { "break" };
-        return Err(NativeEmitError(format!("{keyword} has no native loop target")));
+        return Err(BackendEmitError(format!("{keyword} has no native loop target")));
     };
     let target = if continue_loop { targets.header } else { targets.exit };
     let values = carried_values(locals, &targets.carried)?;
@@ -58,10 +58,10 @@ pub(super) fn lower_for_range<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let index_type =
         NativeType::from_name(binding.ty.as_deref().unwrap_or("u32")).ok_or_else(|| {
-            NativeEmitError("for range binding has no native integer type".to_owned())
+            BackendEmitError("for range binding has no native integer type".to_owned())
         })?;
     let start_value = lower_for_bound(function, start, locals, types, functions, cleanup_schedule, string_data, layouts)?;
     let end_value = lower_for_bound(function, end, locals, types, functions, cleanup_schedule, string_data, layouts)?;
@@ -89,7 +89,7 @@ fn initialize_for_range<'source>(
     locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
     types: &HashMap<&String, NativeType>,
     layouts: &LayoutRegistry,
-) -> Result<ForRangeState, NativeEmitError> {
+) -> Result<ForRangeState, BackendEmitError> {
     let (condition, body, increment, exit) =
         create_for_range_blocks(function, &carried, types, layouts)?;
     let initial_values = initial_for_range_values(&binding.name, start_value, &carried, locals)?;
@@ -133,7 +133,7 @@ fn create_for_range_blocks(
         cranelift_codegen::ir::Block,
         cranelift_codegen::ir::Block,
     ),
-    NativeEmitError,
+    BackendEmitError,
 > {
     let condition = function.create_block();
     let body = function.create_block();
@@ -145,7 +145,7 @@ fn create_for_range_blocks(
             .iter()
             .find(|(candidate, _)| candidate.as_str() == name)
             .map(|(_, native_type)| *native_type)
-            .ok_or_else(|| NativeEmitError(format!("for binding `{name}` has no native type")))?;
+            .ok_or_else(|| BackendEmitError(format!("for binding `{name}` has no native type")))?;
         function.append_block_param(increment, layouts.ir_type(native_type)?);
     }
     Ok((condition, body, increment, exit))
@@ -156,7 +156,7 @@ fn initial_for_range_values(
     start_value: cranelift_codegen::ir::Value,
     carried: &[String],
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
-) -> Result<Vec<cranelift_codegen::ir::Value>, NativeEmitError> {
+) -> Result<Vec<cranelift_codegen::ir::Value>, BackendEmitError> {
     let mut initial_values = Vec::with_capacity(carried.len());
     for name in carried {
         if name == binding_name {
@@ -181,7 +181,7 @@ fn lower_for_range_body<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     function.switch_to_block(state.body);
     let mut body_locals = locals.clone();
     let mut body_types = types.clone();
@@ -237,7 +237,7 @@ fn lower_for_bound(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     lower_expression(
         function,
         expression,
@@ -278,15 +278,15 @@ pub(super) fn lower_for_array<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let array_id = match initializer_type(collection, types, functions, layouts)? {
         NativeType::Array(id) => id,
-        _ => return Err(NativeEmitError("for source is not a fixed array".to_owned())),
+        _ => return Err(BackendEmitError("for source is not a fixed array".to_owned())),
     };
     let capacity = layouts
         .array(array_id)
         .map(|layout| layout.capacity)
-        .ok_or_else(|| NativeEmitError("fixed array layout is unavailable".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("fixed array layout is unavailable".to_owned()))?;
     let _ = lower_expression(
         function,
         collection,
@@ -351,7 +351,7 @@ pub(super) fn lower_loop<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let carried = assigned_outer_bindings(&block.statements, locals);
     let header = function.create_block();
     let body = function.create_block();
@@ -382,7 +382,7 @@ fn initialize_loop<'source>(
     header: cranelift_codegen::ir::Block,
     body: cranelift_codegen::ir::Block,
     exit: cranelift_codegen::ir::Block,
-) -> Result<LoopState<'source>, NativeEmitError> {
+) -> Result<LoopState<'source>, BackendEmitError> {
     append_loop_parameters(function, carried, types, layouts, header, exit)?;
     let initial_values = carried_values(locals, carried)?;
     jump_with_values(function, header, initial_values);
@@ -408,7 +408,7 @@ fn finish_loop<'source>(
     header: cranelift_codegen::ir::Block,
     exit: cranelift_codegen::ir::Block,
     flow: Flow,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if matches!(flow, Flow::Fallthrough) {
         let values = carried_values(loop_locals, carried)?;
         jump_with_values(function, header, values);
@@ -430,12 +430,12 @@ fn finish_loop<'source>(
 fn find_loop_binding<'source>(
     locals: &HashMap<&'source String, cranelift_codegen::ir::Value>,
     name: &str,
-) -> Result<&'source String, NativeEmitError> {
+) -> Result<&'source String, BackendEmitError> {
     locals
         .keys()
         .find(|binding| binding.as_str() == name)
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("loop binding `{name}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("loop binding `{name}` is unavailable")))
 }
 
 fn append_loop_parameters(
@@ -445,13 +445,13 @@ fn append_loop_parameters(
     layouts: &LayoutRegistry,
     header: cranelift_codegen::ir::Block,
     exit: cranelift_codegen::ir::Block,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     for name in carried {
         let native_type = types
             .iter()
             .find(|(binding, _)| binding.as_str() == name)
             .map(|(_, native_type)| *native_type)
-            .ok_or_else(|| NativeEmitError(format!("loop binding `{name}` has no native type")))?;
+            .ok_or_else(|| BackendEmitError(format!("loop binding `{name}` has no native type")))?;
         let ir_type = layouts.ir_type(native_type)?;
         function.append_block_param(header, ir_type);
         function.append_block_param(exit, ir_type);

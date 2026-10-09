@@ -5,7 +5,7 @@ use crate::ast::{Argument, ArgumentRoleResolution, Expr};
 
 use super::super::dynamic_call::lower_dynamic_call;
 use super::super::expressions::lower_expression;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::performance::dispatch_key;
 use super::super::types::NativeType;
 use super::context::CallLoweringContext;
@@ -17,7 +17,7 @@ pub(crate) fn lower_method_call(
     method: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let combined = combine_method_arguments(receiver, arguments);
     let receiver_type = receiver_native_type(receiver, context)?;
     if receiver_type == NativeType::FatPointer {
@@ -45,7 +45,7 @@ fn lower_fat_pointer_method(
     function: &mut FunctionBuilder<'_>,
     receiver: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let fat_pointer = lower_expression(
         function,
         receiver,
@@ -71,7 +71,7 @@ fn method_callee(
 fn receiver_native_type(
     receiver: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     super::super::expressions::initializer_type(
         receiver,
         context.local_types,

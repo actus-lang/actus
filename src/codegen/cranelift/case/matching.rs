@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Pattern;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
@@ -13,7 +13,7 @@ pub(super) fn match_pattern(
     subject_type: NativeType,
     pattern: &Pattern,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match pattern {
         Pattern::Wildcard { .. } => Ok(function.ins().iconst(types::I8, 1)),
         Pattern::Literal { value, .. } => {
@@ -36,16 +36,16 @@ fn match_variant_pattern(
     enum_name: &str,
     variant: &str,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let NativeType::Enum(enum_id) = subject_type else {
-        return Err(NativeEmitError(format!("case subject is not enum `{enum_name}`")));
+        return Err(BackendEmitError(format!("case subject is not enum `{enum_name}`")));
     };
     let enum_layout = layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError("missing enum layout for case subject".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing enum layout for case subject".to_owned()))?;
     let variant_layout = layouts
         .enum_variant(enum_id, variant)
-        .ok_or_else(|| NativeEmitError(format!("unknown case variant `{enum_name}.{variant}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("unknown case variant `{enum_name}.{variant}`")))?;
     Ok(variant_match_value(function, subject, variant, enum_layout, variant_layout))
 }
 
@@ -69,16 +69,16 @@ fn variant_match_value(
     function.ins().icmp_imm_s(IntCC::Equal, discriminant, i64::from(variant_layout.discriminant))
 }
 
-fn parse_integer_pattern(value: &str) -> Result<i64, NativeEmitError> {
+fn parse_integer_pattern(value: &str) -> Result<i64, BackendEmitError> {
     let (negative, digits) =
         value.strip_prefix('-').map_or((false, value), |digits| (true, digits));
     let magnitude = digits
         .strip_prefix("0x")
         .or_else(|| digits.strip_prefix("0X"))
         .map_or_else(|| digits.parse::<i128>(), |hex| i128::from_str_radix(hex, 16))
-        .map_err(|_| NativeEmitError(format!("invalid integer pattern `{value}`")))?;
+        .map_err(|_| BackendEmitError(format!("invalid integer pattern `{value}`")))?;
     let signed = if negative { magnitude.checked_neg() } else { Some(magnitude) }
-        .ok_or_else(|| NativeEmitError(format!("integer pattern `{value}` overflows")))?;
+        .ok_or_else(|| BackendEmitError(format!("integer pattern `{value}` overflows")))?;
     i64::try_from(signed)
-        .map_err(|_| NativeEmitError(format!("integer pattern `{value}` overflows")))
+        .map_err(|_| BackendEmitError(format!("integer pattern `{value}` overflows")))
 }

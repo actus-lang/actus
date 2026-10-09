@@ -7,7 +7,7 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::super::expressions::lower_expression;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::memory::copy_bytes;
 use super::types::expression_native_type;
@@ -25,7 +25,7 @@ pub(crate) fn lower_field_access(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
         return lower_pack_field_access(
             function,
@@ -65,7 +65,7 @@ fn lower_pack_field_access(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let storage = lower_expression(
         function,
         object,
@@ -93,7 +93,7 @@ fn lower_struct_field_access(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let (address, field_layout) = lower_field_address(
         function,
         object,
@@ -113,7 +113,7 @@ fn load_struct_field(
     address: cranelift_codegen::ir::Value,
     field_layout: &crate::codegen::cranelift::layout::FieldLayout,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if field_layout.indirect {
         return Ok(function.ins().load(
             layouts.pointer_type,
@@ -148,7 +148,7 @@ pub(crate) fn lower_field_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let context = FieldAssignmentContext {
         function,
         object,
@@ -180,7 +180,7 @@ pub(crate) fn lower_field_compound_assignment<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if let Some(NativeType::Pack(id)) = expression_native_type(object, local_types, layouts) {
         return super::compound::lower_pack_field_compound_assignment(
             function,
@@ -223,7 +223,7 @@ pub(crate) fn lower_field_address_for_ins<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let (address, field_layout) = lower_field_address(
         function,
         object,
@@ -254,7 +254,7 @@ struct FieldCompoundContext<'input, 'source, 'function> {
 
 fn lower_struct_field_compound_assignment(
     context: FieldCompoundContext<'_, '_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let FieldCompoundContext {
         function,
         object,
@@ -282,7 +282,7 @@ fn lower_struct_field_compound_assignment(
     if field_layout.indirect
         || matches!(field_layout.ty, NativeType::Struct(_) | NativeType::Enum(_))
     {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "compound assignment requires a scalar struct field".to_owned(),
         ));
     }
@@ -317,7 +317,7 @@ fn lower_struct_compound_value<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
     field_type: NativeType,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let right = lower_expression(
         function,
         value,
@@ -352,7 +352,7 @@ struct FieldAssignmentContext<'input, 'source, 'function> {
 fn lower_pack_field_assignment(
     context: FieldAssignmentContext<'_, '_, '_>,
     id: usize,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     super::packs::lower_pack_field_assignment(
         context.function,
         context.object,
@@ -370,7 +370,7 @@ fn lower_pack_field_assignment(
 
 fn lower_struct_field_assignment(
     context: FieldAssignmentContext<'_, '_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let (address, field_layout) = lower_field_address(
         context.function,
         context.object,
@@ -401,7 +401,7 @@ fn store_struct_field(
     value: cranelift_codegen::ir::Value,
     field_layout: &crate::codegen::cranelift::layout::FieldLayout,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if field_layout.indirect
         || matches!(field_layout.ty, NativeType::Enum(id) if layouts.is_niche_option(id))
     {
@@ -411,7 +411,7 @@ fn store_struct_field(
     {
         let size = layouts
             .type_size(field_layout.ty)
-            .ok_or_else(|| NativeEmitError("missing nested field layout".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("missing nested field layout".to_owned()))?;
         let destination = function.ins().iadd_imm_s(address, i64::from(field_layout.offset));
         copy_bytes(function, value, destination, size, layouts)?;
     } else {
@@ -433,21 +433,21 @@ fn lower_field_address(
     layouts: &LayoutRegistry,
 ) -> Result<
     (cranelift_codegen::ir::Value, crate::codegen::cranelift::layout::FieldLayout),
-    NativeEmitError,
+    BackendEmitError,
 > {
     let object_type = expression_native_type(object, local_types, layouts)
-        .ok_or_else(|| NativeEmitError("field access requires a struct value".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("field access requires a struct value".to_owned()))?;
     let NativeType::Struct(id) = object_type else {
-        return Err(NativeEmitError("field access requires a struct value".to_owned()));
+        return Err(BackendEmitError("field access requires a struct value".to_owned()));
     };
     let layout =
-        layouts.get(id).ok_or_else(|| NativeEmitError(format!("missing layout `{id}`")))?;
+        layouts.get(id).ok_or_else(|| BackendEmitError(format!("missing layout `{id}`")))?;
     let field_layout = layout
         .fields
         .iter()
         .find(|candidate| candidate.name == field)
         .cloned()
-        .ok_or_else(|| NativeEmitError(format!("unknown native field `{field}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("unknown native field `{field}`")))?;
     let address = lower_expression(
         function,
         object,

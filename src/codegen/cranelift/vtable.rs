@@ -7,7 +7,7 @@ use cranelift_object::ObjectModule;
 use super::super::symbols::{SymbolIdentity, SymbolKind};
 
 use super::layout::LayoutRegistry;
-use super::native::{FunctionMeta, NativeEmitError};
+use super::native::{BackendEmitError, FunctionMeta};
 use super::performance::{PerformanceDefinition, dispatch_key};
 use super::types::NativeType;
 
@@ -27,27 +27,27 @@ pub(super) fn define_vtables(
     functions: &HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
-) -> Result<VtableDataIds, NativeEmitError> {
+) -> Result<VtableDataIds, BackendEmitError> {
     let mut vtables = group_definitions(definitions, layouts, namespace_prefix)?;
     vtables.sort_by(|left, right| left.symbol.cmp(&right.symbol));
     let mut data_ids = HashMap::new();
     for vtable in &vtables {
         let data_id = module
             .declare_data(&vtable.symbol, Linkage::Local, false, false)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
         let mut description = DataDescription::new();
         let pointer_bytes = module.isa().pointer_type().bytes() as usize;
         description.define(vec![0; pointer_bytes * vtable.method_symbols.len()].into_boxed_slice());
         for (index, method_symbol) in vtable.method_symbols.iter().enumerate() {
             let function = functions.get(method_symbol).ok_or_else(|| {
-                NativeEmitError(format!("missing vtable method `{method_symbol}`"))
+                BackendEmitError(format!("missing vtable method `{method_symbol}`"))
             })?;
             let reference = module.declare_func_in_data(function.id, &mut description);
             description.write_function_addr((index * pointer_bytes) as u32, reference);
         }
         module
             .define_data(data_id, &description)
-            .map_err(|error| NativeEmitError(error.to_string()))?;
+            .map_err(|error| BackendEmitError(error.to_string()))?;
         data_ids.insert(vtable.symbol.clone(), data_id);
     }
     Ok(data_ids)
@@ -68,7 +68,7 @@ fn group_definitions(
     definitions: &[PerformanceDefinition<'_>],
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
-) -> Result<Vec<VtableDefinition>, NativeEmitError> {
+) -> Result<Vec<VtableDefinition>, BackendEmitError> {
     let mut grouped = HashMap::<(String, String), VtableDefinition>::new();
     for definition in definitions {
         let target = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;

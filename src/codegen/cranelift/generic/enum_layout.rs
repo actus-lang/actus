@@ -1,7 +1,7 @@
 use crate::ast::{EnumDef, EnumPayload, EnumVariant, TypeName};
 use crate::semantic::TypeSubstitution;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::layout::{
     GenericEnumLayout, GenericEnumVariantLayout, GenericFieldLayout, GenericLayoutRegistry,
     align_up, application_key, enter_layout,
@@ -13,7 +13,7 @@ impl GenericLayoutRegistry {
         definition: &EnumDef,
         arguments: &[TypeName],
         visiting: &mut Vec<String>,
-    ) -> Result<GenericEnumLayout, NativeEmitError> {
+    ) -> Result<GenericEnumLayout, BackendEmitError> {
         let canonical_key = application_key(&definition.name, arguments);
         enter_layout(&canonical_key, visiting)?;
         let substitution = TypeSubstitution::for_type(
@@ -22,7 +22,7 @@ impl GenericLayoutRegistry {
             arguments,
             definition.span,
         )
-        .map_err(|error| NativeEmitError(format!("generic substitution failed: {error:?}")))?;
+        .map_err(|error| BackendEmitError(format!("generic substitution failed: {error:?}")))?;
         let result = self.layout_enum_variants(definition, &substitution, visiting);
         visiting.pop();
         result.map(|(size, alignment, payload_offset, max_payload_size, variants)| {
@@ -42,7 +42,7 @@ impl GenericLayoutRegistry {
         definition: &EnumDef,
         substitution: &TypeSubstitution,
         visiting: &mut Vec<String>,
-    ) -> Result<(u32, u32, u32, u32, Vec<GenericEnumVariantLayout>), NativeEmitError> {
+    ) -> Result<(u32, u32, u32, u32, Vec<GenericEnumVariantLayout>), BackendEmitError> {
         let mut variants = Vec::new();
         let mut max_payload_size = 0;
         let mut max_payload_alignment = 1;
@@ -65,11 +65,11 @@ impl GenericLayoutRegistry {
         index: usize,
         substitution: &TypeSubstitution,
         visiting: &mut Vec<String>,
-    ) -> Result<(GenericEnumVariantLayout, u32, u32), NativeEmitError> {
+    ) -> Result<(GenericEnumVariantLayout, u32, u32), BackendEmitError> {
         let (fields, payload_size, payload_alignment) =
             self.layout_variant_fields(variant, substitution, visiting)?;
         let discriminant = u32::try_from(index)
-            .map_err(|_| NativeEmitError("enum has too many variants".to_owned()))?;
+            .map_err(|_| BackendEmitError("enum has too many variants".to_owned()))?;
         Ok((
             GenericEnumVariantLayout { name: variant.name.clone(), discriminant, fields },
             payload_size,
@@ -82,7 +82,7 @@ impl GenericLayoutRegistry {
         variant: &EnumVariant,
         substitution: &TypeSubstitution,
         visiting: &mut Vec<String>,
-    ) -> Result<(Vec<GenericFieldLayout>, u32, u32), NativeEmitError> {
+    ) -> Result<(Vec<GenericFieldLayout>, u32, u32), BackendEmitError> {
         let mut fields = Vec::new();
         let mut offset = 0;
         let mut payload_alignment = 1;

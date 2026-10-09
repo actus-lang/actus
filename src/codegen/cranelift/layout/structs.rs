@@ -4,7 +4,7 @@ use crate::ast::{
 };
 
 use super::{FieldLayout, LayoutRegistry, StructLayout, align_up, integer_storage_bytes};
-use crate::codegen::cranelift::native::NativeEmitError;
+use crate::codegen::cranelift::native::BackendEmitError;
 use crate::codegen::cranelift::types::NativeType;
 
 impl LayoutRegistry {
@@ -12,9 +12,9 @@ impl LayoutRegistry {
         &self,
         definition: &StructDef,
         visiting: &mut Vec<String>,
-    ) -> Result<StructLayout, NativeEmitError> {
+    ) -> Result<StructLayout, BackendEmitError> {
         if visiting.contains(&definition.name) {
-            return Err(NativeEmitError(format!(
+            return Err(BackendEmitError(format!(
                 "recursive struct layout for `{}` is not supported",
                 definition.name
             )));
@@ -26,17 +26,17 @@ impl LayoutRegistry {
         for field in &definition.fields {
             let (mut field_layout, size, field_alignment) = self.field_layout(field, visiting)?;
             offset = align_up(offset, field_alignment)
-                .ok_or_else(|| NativeEmitError("struct layout alignment overflow".to_owned()))?;
+                .ok_or_else(|| BackendEmitError("struct layout alignment overflow".to_owned()))?;
             field_layout.offset = offset;
             fields.push(field_layout);
             offset = offset
                 .checked_add(size)
-                .ok_or_else(|| NativeEmitError("struct layout size overflow".to_owned()))?;
+                .ok_or_else(|| BackendEmitError("struct layout size overflow".to_owned()))?;
             alignment = alignment.max(field_alignment);
         }
         visiting.pop();
         let size = align_up(offset, alignment)
-            .ok_or_else(|| NativeEmitError("struct layout alignment overflow".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("struct layout alignment overflow".to_owned()))?;
         Ok(StructLayout { size, alignment, fields })
     }
 
@@ -44,11 +44,11 @@ impl LayoutRegistry {
         &self,
         field: &StructField,
         visiting: &mut Vec<String>,
-    ) -> Result<(FieldLayout, u32, u32), NativeEmitError> {
+    ) -> Result<(FieldLayout, u32, u32), BackendEmitError> {
         let indirect = matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins);
         let ty = if indirect {
             self.type_for_type_name(&field.ty).ok_or_else(|| {
-                NativeEmitError(format!("unknown reference field type `{}`", field.ty.name))
+                BackendEmitError(format!("unknown reference field type `{}`", field.ty.name))
             })?
         } else {
             self.native_type_for_type_name(&field.ty, visiting)?
@@ -75,7 +75,7 @@ impl LayoutRegistry {
         &self,
         name: &str,
         visiting: &mut Vec<String>,
-    ) -> Result<NativeType, NativeEmitError> {
+    ) -> Result<NativeType, BackendEmitError> {
         if let Some(primitive) = primitive_type(name) {
             return Ok(NativeType::from_primitive(primitive));
         }
@@ -91,7 +91,7 @@ impl LayoutRegistry {
         }
         let id = self
             .id_for(name)
-            .ok_or_else(|| NativeEmitError(format!("unknown layout type `{name}`")))?;
+            .ok_or_else(|| BackendEmitError(format!("unknown layout type `{name}`")))?;
         self.struct_native_type(name, id, visiting)
     }
 
@@ -100,16 +100,16 @@ impl LayoutRegistry {
         name: &str,
         id: usize,
         visiting: &mut Vec<String>,
-    ) -> Result<NativeType, NativeEmitError> {
+    ) -> Result<NativeType, BackendEmitError> {
         if visiting.iter().any(|candidate| candidate == name) {
-            return Err(NativeEmitError(format!(
+            return Err(BackendEmitError(format!(
                 "recursive struct layout for `{name}` is not supported"
             )));
         }
         let definition = self
             .definitions
             .get(id)
-            .ok_or_else(|| NativeEmitError(format!("missing layout type `{name}`")));
+            .ok_or_else(|| BackendEmitError(format!("missing layout type `{name}`")));
         self.layout_for(definition?, visiting)?;
         Ok(NativeType::Struct(id))
     }
@@ -119,11 +119,11 @@ impl LayoutRegistry {
         name: &str,
         enum_id: usize,
         visiting: &mut Vec<String>,
-    ) -> Result<(), NativeEmitError> {
+    ) -> Result<(), BackendEmitError> {
         let definition = self
             .enum_definitions
             .get(enum_id)
-            .ok_or_else(|| NativeEmitError(format!("missing enum layout type `{name}`")))?;
+            .ok_or_else(|| BackendEmitError(format!("missing enum layout type `{name}`")))?;
         self.enum_layout_for(definition, visiting).map(|_| ())
     }
 
@@ -131,14 +131,14 @@ impl LayoutRegistry {
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
-    ) -> Result<NativeType, NativeEmitError> {
+    ) -> Result<NativeType, BackendEmitError> {
         if let Some(native_type) = self.type_for_type_name(type_name) {
             return Ok(native_type);
         }
         self.native_type(&type_name.name, visiting)
     }
 
-    pub(crate) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), NativeEmitError> {
+    pub(crate) fn type_layout(&self, ty: NativeType) -> Result<(u32, u32), BackendEmitError> {
         Ok(match ty {
             NativeType::Int => (4, 4),
             NativeType::Integer { width, .. } => integer_layout(width)?,
@@ -148,7 +148,7 @@ impl LayoutRegistry {
             NativeType::Region => (self.pointer_size, self.pointer_size),
             NativeType::FatPointer => (
                 self.pointer_size.checked_mul(2).ok_or_else(|| {
-                    NativeEmitError("fat pointer layout size overflow".to_owned())
+                    BackendEmitError("fat pointer layout size overflow".to_owned())
                 })?,
                 self.pointer_size,
             ),
@@ -158,39 +158,39 @@ impl LayoutRegistry {
             NativeType::Array(id) => self
                 .array_layout_value(id)
                 .map(|layout| (layout.size, layout.alignment))
-                .ok_or_else(|| NativeEmitError("missing array layout".to_owned()))?,
+                .ok_or_else(|| BackendEmitError("missing array layout".to_owned()))?,
             NativeType::Arena(capacity) => (
                 capacity
                     .checked_add(self.pointer_size)
-                    .ok_or_else(|| NativeEmitError("arena layout size overflow".to_owned()))?,
+                    .ok_or_else(|| BackendEmitError("arena layout size overflow".to_owned()))?,
                 self.pointer_size,
             ),
         })
     }
 
-    fn struct_type_layout(&self, id: usize) -> Result<(u32, u32), NativeEmitError> {
+    fn struct_type_layout(&self, id: usize) -> Result<(u32, u32), BackendEmitError> {
         let definition = self
             .definitions
             .get(id)
-            .ok_or_else(|| NativeEmitError(format!("missing nested struct layout `{id}")))?;
+            .ok_or_else(|| BackendEmitError(format!("missing nested struct layout `{id}")))?;
         let layout = self.layout_for(definition, &mut Vec::new())?;
         Ok((layout.size, layout.alignment))
     }
 
-    fn enum_type_layout(&self, id: usize) -> Result<(u32, u32), NativeEmitError> {
+    fn enum_type_layout(&self, id: usize) -> Result<(u32, u32), BackendEmitError> {
         let layout = if let Some(layout) = self.enum_layout(id) {
             layout.clone()
         } else {
             let definition = self
                 .enum_definitions
                 .get(id)
-                .ok_or_else(|| NativeEmitError(format!("missing enum layout `{id}")))?;
+                .ok_or_else(|| BackendEmitError(format!("missing enum layout `{id}")))?;
             self.enum_layout_for(definition, &mut Vec::new())?
         };
         Ok((layout.size, layout.alignment))
     }
 
-    fn pack_type_layout(&self, id: usize) -> Result<(u32, u32), NativeEmitError> {
+    fn pack_type_layout(&self, id: usize) -> Result<(u32, u32), BackendEmitError> {
         if let Some(definition) = self.pack_definitions.get(id)
             && let (Some(size), Some(alignment)) = (
                 definition.storage.byte_capacity().and_then(|size| u32::try_from(size).ok()),
@@ -203,22 +203,22 @@ impl LayoutRegistry {
             return Ok((size, alignment));
         }
         let pack =
-            self.pack(id).ok_or_else(|| NativeEmitError("missing packed layout".to_owned()))?;
+            self.pack(id).ok_or_else(|| BackendEmitError("missing packed layout".to_owned()))?;
         self.type_layout(pack.storage)
     }
 
-    pub(crate) fn alignment(&self, ty: NativeType) -> Result<u32, NativeEmitError> {
+    pub(crate) fn alignment(&self, ty: NativeType) -> Result<u32, BackendEmitError> {
         Ok(match ty {
             NativeType::Struct(id) => self
                 .get(id)
                 .map(|layout| layout.alignment)
-                .ok_or_else(|| NativeEmitError("missing struct alignment".to_owned()))?,
+                .ok_or_else(|| BackendEmitError("missing struct alignment".to_owned()))?,
             NativeType::Enum(id) => self
                 .enum_layout(id)
                 .map(|layout| layout.alignment)
-                .ok_or_else(|| NativeEmitError("missing enum alignment".to_owned()))?,
+                .ok_or_else(|| BackendEmitError("missing enum alignment".to_owned()))?,
             NativeType::Integer { width, .. } => integer_storage_bytes(width).ok_or_else(|| {
-                NativeEmitError(format!("invalid native integer width `{width}`"))
+                BackendEmitError(format!("invalid native integer width `{width}`"))
             })?,
             NativeType::Float { width } => u32::from(width / 8),
             NativeType::Int => 4,
@@ -235,7 +235,7 @@ impl LayoutRegistry {
                     || {
                         self.pack(id)
                             .ok_or_else(|| {
-                                NativeEmitError(format!("missing packed alignment `{id}`"))
+                                BackendEmitError(format!("missing packed alignment `{id}`"))
                             })
                             .and_then(|pack| self.alignment(pack.storage))
                     },
@@ -244,27 +244,27 @@ impl LayoutRegistry {
             NativeType::Array(id) => self
                 .array_layout_value(id)
                 .map(|layout| layout.alignment)
-                .ok_or_else(|| NativeEmitError("missing array alignment".to_owned()))?,
+                .ok_or_else(|| BackendEmitError("missing array alignment".to_owned()))?,
         })
     }
 }
 
-fn builtin_native_type(name: &str) -> Result<Option<NativeType>, NativeEmitError> {
+fn builtin_native_type(name: &str) -> Result<Option<NativeType>, BackendEmitError> {
     let Some(ty) = lookup_builtin_type(name) else { return Ok(None) };
     let native_type = match ty {
         BuiltinType::Int | BuiltinType::Bool => NativeType::Int,
         BuiltinType::String => NativeType::String,
         BuiltinType::Buffer => NativeType::Buffer,
         BuiltinType::Array | BuiltinType::Map => {
-            return Err(NativeEmitError(format!("unsupported layout type `{name}`")));
+            return Err(BackendEmitError(format!("unsupported layout type `{name}`")));
         }
     };
     Ok(Some(native_type))
 }
 
-fn integer_layout(width: u8) -> Result<(u32, u32), NativeEmitError> {
+fn integer_layout(width: u8) -> Result<(u32, u32), BackendEmitError> {
     let bytes = integer_storage_bytes(width)
-        .ok_or_else(|| NativeEmitError(format!("invalid native integer width `{width}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("invalid native integer width `{width}`")))?;
     Ok((bytes, bytes))
 }
 

@@ -6,7 +6,7 @@ use crate::ast::Block;
 
 use super::super::cleanup::emit_scope_cleanup;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -22,7 +22,7 @@ pub(super) fn lower_scoped_block<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     let mut nested_locals = locals.clone();
     let mut nested_types = types.clone();
     let flow = super::statements::lower_statements(
@@ -58,7 +58,7 @@ fn finish_scoped_block(
     functions: &HashMap<String, FunctionRef>,
     cleanup_schedule: &NativeCleanupSchedule,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if matches!(flow, Flow::Fallthrough) {
         emit_scope_cleanup(
             function,

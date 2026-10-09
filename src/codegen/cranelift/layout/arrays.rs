@@ -4,7 +4,7 @@ use crate::ast::{
 
 use super::super::generic::canonical_type_name;
 use super::{ArrayLayout, LayoutRegistry};
-use crate::codegen::cranelift::native::NativeEmitError;
+use crate::codegen::cranelift::native::BackendEmitError;
 use crate::semantic::GenericInstance;
 
 pub(crate) fn array_definitions(
@@ -264,29 +264,29 @@ impl LayoutRegistry {
     pub(super) fn array_layout_for(
         &self,
         type_name: &TypeName,
-    ) -> Result<ArrayLayout, NativeEmitError> {
+    ) -> Result<ArrayLayout, BackendEmitError> {
         let element_name = type_name
             .arguments
             .first()
-            .ok_or_else(|| NativeEmitError("array type has no element type".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("array type has no element type".to_owned()))?;
         let capacity = type_name
             .arguments
             .get(1)
             .and_then(|capacity| capacity.name.parse::<u32>().ok())
             .filter(|capacity| *capacity > 0)
-            .ok_or_else(|| NativeEmitError("array type has no numeric capacity".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("array type has no numeric capacity".to_owned()))?;
         let element = self.type_for_type_name(element_name).ok_or_else(|| {
-            NativeEmitError(format!(
+            BackendEmitError(format!(
                 "unknown array element `{}`",
                 canonical_type_name(element_name)
             ))
         })?;
         let element_size = self
             .type_size(element)
-            .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("array element has no native size".to_owned()))?;
         let size = element_size
             .checked_mul(capacity)
-            .ok_or_else(|| NativeEmitError("array layout size overflow".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("array layout size overflow".to_owned()))?;
         Ok(ArrayLayout { element, capacity, size, alignment: self.alignment(element)? })
     }
 }

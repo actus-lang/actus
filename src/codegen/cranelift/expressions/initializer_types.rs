@@ -4,7 +4,7 @@ use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 
 use super::super::enums::enum_expression_type;
 use super::super::layout::LayoutRegistry;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::performance;
 use super::super::types::NativeType;
 use crate::codegen::cranelift::structs::{expression_native_type, field_type};
@@ -14,11 +14,11 @@ pub(crate) fn initializer_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     match expression {
         Expr::BoolLiteral { .. } => Ok(NativeType::Int),
         Expr::Identifier { name, .. } => types.get(name).copied().ok_or_else(|| {
-            NativeEmitError(format!("native type for binding `{name}` is unavailable"))
+            BackendEmitError(format!("native type for binding `{name}` is unavailable"))
         }),
         Expr::Integer { suffix, .. } => {
             Ok(suffix.as_deref().and_then(NativeType::from_name).unwrap_or(NativeType::Int))
@@ -35,7 +35,7 @@ pub(crate) fn initializer_type(
         Expr::Binary { left, .. } => initializer_type(left, types, functions, layouts),
         Expr::StringLiteral { .. } => Ok(NativeType::String),
         Expr::Index { .. } => expression_native_type(expression, types, layouts)
-            .ok_or_else(|| NativeEmitError("indexed expression has no native type".to_owned())),
+            .ok_or_else(|| BackendEmitError("indexed expression has no native type".to_owned())),
         _ => infer_complex_initializer_type(expression, types, functions, layouts),
     }
 }
@@ -45,7 +45,7 @@ fn infer_complex_initializer_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     match expression {
         Expr::Try { expression, .. } => infer_try_type(expression, types, functions, layouts),
         Expr::Call { callee, arguments, .. } => {
@@ -70,7 +70,7 @@ fn infer_complex_initializer_type(
         Expr::If { then_branch, else_branch, .. } => {
             infer_if_type(then_branch, else_branch.as_ref(), types, functions, layouts)
         }
-        _ => Err(NativeEmitError("unsupported native type expression".to_owned())),
+        _ => Err(BackendEmitError("unsupported native type expression".to_owned())),
     }
 }
 
@@ -80,7 +80,7 @@ fn infer_if_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let then_type = block_tail_type(then_branch, types, functions, layouts)?;
     let else_type = match else_branch {
         Some(crate::ast::IfBranch::Block(block)) => {
@@ -100,7 +100,7 @@ fn infer_if_type(
     if matches!(else_type, NativeType::Void) {
         return Ok(then_type);
     }
-    Err(NativeEmitError("if branches have different native types".to_owned()))
+    Err(BackendEmitError("if branches have different native types".to_owned()))
 }
 
 fn block_tail_type(
@@ -108,7 +108,7 @@ fn block_tail_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     if let Some(crate::ast::Stmt::Expression { expression, span }) = block.statements.last()
         && span.end == expression_end(expression)
     {
@@ -122,7 +122,7 @@ fn block_return_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<Option<NativeType>, NativeEmitError> {
+) -> Result<Option<NativeType>, BackendEmitError> {
     block
         .statements
         .iter()
@@ -165,14 +165,14 @@ fn infer_try_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let NativeType::Enum(enum_id) = initializer_type(expression, types, functions, layouts)? else {
-        return Err(NativeEmitError("try operand is not a native enum value".to_owned()));
+        return Err(BackendEmitError("try operand is not a native enum value".to_owned()));
     };
     layouts
         .enum_variant(enum_id, "Ok")
         .and_then(|variant| variant.fields.first().map(|field| field.ty))
-        .ok_or_else(|| NativeEmitError("try operand has no Result.Ok payload".to_owned()))
+        .ok_or_else(|| BackendEmitError("try operand has no Result.Ok payload".to_owned()))
 }
 
 fn infer_call_type(
@@ -181,11 +181,11 @@ fn infer_call_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     if callee == "copy" {
         let argument = arguments
             .first()
-            .ok_or_else(|| NativeEmitError("copy requires one value".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("copy requires one value".to_owned()))?;
         return initializer_type(&argument.expression, types, functions, layouts);
     }
     if let Some(id) = layouts.array_id(callee) {
@@ -194,7 +194,7 @@ fn infer_call_type(
     functions
         .get(callee)
         .map(|function| function.return_type)
-        .ok_or_else(|| NativeEmitError(format!("native function `{callee}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("native function `{callee}` is unavailable")))
 }
 
 fn infer_method_type(
@@ -202,9 +202,9 @@ fn infer_method_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let Expr::MethodCall { receiver, method, .. } = expression else {
-        return Err(NativeEmitError("native method expression is unavailable".to_owned()));
+        return Err(BackendEmitError("native method expression is unavailable".to_owned()));
     };
     if let Some(enum_type) = enum_expression_type(expression, layouts) {
         return Ok(enum_type);
@@ -218,23 +218,23 @@ fn infer_method_type(
         .get(&dispatch_name)
         .map(|function| function.return_type)
         .or_else(|| functions.get(method).map(|function| function.return_type))
-        .ok_or_else(|| NativeEmitError(format!("native method `{method}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("native method `{method}` is unavailable")))
 }
 
 fn infer_struct_type(
     name: &str,
     type_arguments: &[crate::ast::TypeName],
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let type_name = crate::ast::TypeName {
         name: name.to_owned(),
         arguments: type_arguments.to_vec(),
         reference_role: None,
         span: crate::lexer::SourceSpan::new(0, 0),
     };
-    layouts
-        .type_for_type_name(&type_name)
-        .ok_or_else(|| NativeEmitError(format!("native layout for struct `{name}` is unavailable")))
+    layouts.type_for_type_name(&type_name).ok_or_else(|| {
+        BackendEmitError(format!("native layout for struct `{name}` is unavailable"))
+    })
 }
 
 fn infer_field_type(
@@ -243,11 +243,11 @@ fn infer_field_type(
     field: &str,
     types: &HashMap<&String, NativeType>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     expression_native_type(object, types, layouts)
         .and_then(|ty| field_type(ty, field, layouts))
         .or_else(|| enum_expression_type(expression, layouts))
-        .ok_or_else(|| NativeEmitError(format!("native field `{field}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("native field `{field}` is unavailable")))
 }
 
 fn arena_place_type(
@@ -255,12 +255,12 @@ fn arena_place_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let Expr::MethodCall { arguments, .. } = expression else {
-        return Err(NativeEmitError("arena placement requires a method call".to_owned()));
+        return Err(BackendEmitError("arena placement requires a method call".to_owned()));
     };
     arguments
         .first()
         .map(|argument| initializer_type(&argument.expression, types, functions, layouts))
-        .ok_or_else(|| NativeEmitError("place requires one value".to_owned()))?
+        .ok_or_else(|| BackendEmitError("place requires one value".to_owned()))?
 }

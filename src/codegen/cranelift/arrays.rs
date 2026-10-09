@@ -9,7 +9,7 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::expressions::{coerce_to_ir_type, lower_expression};
 use super::literals::StringDataValues;
-use super::native::{FunctionRef, NativeEmitError};
+use super::native::{BackendEmitError, FunctionRef};
 use super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::copy_bytes;
@@ -26,7 +26,7 @@ pub(crate) fn lower_array_index(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let (address, element) = lower_array_address(
         function,
         target,
@@ -59,7 +59,7 @@ pub(crate) fn lower_array_assignment(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let (address, element) = lower_array_address(
         function,
         target,
@@ -86,7 +86,7 @@ pub(crate) fn lower_array_assignment(
     {
         let size = layouts
             .type_size(element)
-            .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("array element has no native size".to_owned()))?;
         copy_bytes(function, value, address, size, layouts)?;
     } else {
         let value = coerce_to_ir_type(function, value, layouts.ir_type(element)?);
@@ -116,7 +116,7 @@ pub(crate) fn lower_array_compound_assignment(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let (address, element) = lower_array_address(
         function,
         target,
@@ -131,7 +131,7 @@ pub(crate) fn lower_array_compound_assignment(
     if matches!(element, NativeType::Struct(_) | NativeType::Array(_))
         || layouts.is_inline_pack(element)
     {
-        return Err(NativeEmitError(
+        return Err(BackendEmitError(
             "compound assignment requires a scalar array element".to_owned(),
         ));
     }
@@ -167,7 +167,7 @@ fn lower_array_compound_value(
     string_data: &StringDataValues,
     element: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let current = function.ins().load(layouts.ir_type(element)?, MemFlagsData::new(), address, 0);
     let current = swap_indexed_pack_element_if_needed(
         function,
@@ -224,9 +224,9 @@ pub(crate) fn lower_array_constructor(
     function: &mut FunctionBuilder<'_>,
     id: usize,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let layout =
-        layouts.array(id).ok_or_else(|| NativeEmitError(format!("missing array layout `{id}")))?;
+        layouts.array(id).ok_or_else(|| BackendEmitError(format!("missing array layout `{id}")))?;
     let slot = function.func.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,
         layout.size,
@@ -255,15 +255,17 @@ pub(crate) fn lower_array_address(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<(Value, NativeType), NativeEmitError> {
+) -> Result<(Value, NativeType), BackendEmitError> {
     let NativeType::Array(id) =
         crate::codegen::cranelift::structs::expression_native_type(target, local_types, layouts)
-            .ok_or_else(|| NativeEmitError("indexed target has no native array type".to_owned()))?
+            .ok_or_else(|| {
+                BackendEmitError("indexed target has no native array type".to_owned())
+            })?
     else {
-        return Err(NativeEmitError("indexed target is not a native array".to_owned()));
+        return Err(BackendEmitError("indexed target is not a native array".to_owned()));
     };
     let array =
-        layouts.array(id).ok_or_else(|| NativeEmitError("missing array layout".to_owned()))?;
+        layouts.array(id).ok_or_else(|| BackendEmitError("missing array layout".to_owned()))?;
     let base = lower_expression(
         function,
         target,
@@ -296,7 +298,7 @@ pub(crate) fn lower_array_address(
     function.switch_to_block(ok_block);
     let element_size = layouts
         .type_size(array.element)
-        .ok_or_else(|| NativeEmitError("array element has no native size".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("array element has no native size".to_owned()))?;
     let byte_offset = function.ins().imul_imm_u(index, i64::from(element_size));
     let address = function.ins().iadd(base, byte_offset);
     function.seal_block(ok_block);

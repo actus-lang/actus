@@ -11,7 +11,7 @@ use crate::semantic::GenericInstance;
 
 use super::enum_layout::EnumLayout;
 use super::generic::{canonical_type_name, specialized_enums, specialized_structs};
-use super::native::NativeEmitError;
+use super::native::BackendEmitError;
 use super::types::NativeType;
 
 mod arrays;
@@ -85,7 +85,7 @@ impl LayoutRegistry {
     pub(super) fn from_program(
         program: &Program,
         pointer_type: Type,
-    ) -> Result<Self, NativeEmitError> {
+    ) -> Result<Self, BackendEmitError> {
         Self::from_program_with_instances(program, pointer_type, &[])
     }
 
@@ -93,7 +93,7 @@ impl LayoutRegistry {
         program: &Program,
         pointer_type: Type,
         instances: &[GenericInstance],
-    ) -> Result<Self, NativeEmitError> {
+    ) -> Result<Self, BackendEmitError> {
         let (definitions, enum_definitions) = specialized_definitions(program, instances)?;
         let pack_definitions = pack_definitions(program);
         let array_definitions =
@@ -142,15 +142,15 @@ impl LayoutRegistry {
         self.frontend_config = Some(frontend_config);
     }
 
-    pub(super) fn frontend_config(&self) -> Result<TargetFrontendConfig, NativeEmitError> {
+    pub(super) fn frontend_config(&self) -> Result<TargetFrontendConfig, BackendEmitError> {
         self.frontend_config.ok_or_else(|| {
-            NativeEmitError(
+            BackendEmitError(
                 "native layout registry is missing target frontend configuration".to_owned(),
             )
         })
     }
 
-    fn populate_layouts(&mut self) -> Result<(), NativeEmitError> {
+    fn populate_layouts(&mut self) -> Result<(), BackendEmitError> {
         for definition in self.definitions.clone() {
             self.layouts.push(self.layout_for(&definition, &mut Vec::new())?);
         }
@@ -207,11 +207,11 @@ impl LayoutRegistry {
         })
     }
 
-    pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, NativeEmitError> {
+    pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, BackendEmitError> {
         match ty {
             NativeType::Pack(id) => self
                 .pack(id)
-                .ok_or_else(|| NativeEmitError(format!("missing packed layout `{id}`")))
+                .ok_or_else(|| BackendEmitError(format!("missing packed layout `{id}`")))
                 .and_then(|pack| self.ir_type(pack.storage)),
             NativeType::Array(_) => Ok(self.pointer_type),
             NativeType::Arena(_) => Ok(self.pointer_type),
@@ -329,7 +329,7 @@ fn base_definitions(program: &Program) -> (Vec<StructDef>, Vec<EnumDef>) {
 fn specialized_definitions(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<(Vec<StructDef>, Vec<EnumDef>), NativeEmitError> {
+) -> Result<(Vec<StructDef>, Vec<EnumDef>), BackendEmitError> {
     let (mut definitions, mut enum_definitions) = base_definitions(program);
     definitions.extend(specialized_structs(program, instances)?);
     enum_definitions.extend(specialized_enums(program, instances)?);

@@ -7,7 +7,7 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::{DispatchMode, Param, VerbDecl};
 
-use super::super::native::{FunctionMeta, FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionMeta, FunctionRef};
 use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
@@ -20,7 +20,7 @@ pub(super) fn bind_parameters<'a>(
     verb: &'a VerbDecl,
     parameters: &[cranelift_codegen::ir::Value],
     layouts: &LayoutRegistry,
-) -> Result<BoundParameters<'a>, NativeEmitError> {
+) -> Result<BoundParameters<'a>, BackendEmitError> {
     let mut locals = HashMap::new();
     let mut parameter_index = 0;
     for parameter in &verb.params {
@@ -60,7 +60,7 @@ fn bind_parameter(
 fn parameter_types<'a>(
     verb: &'a VerbDecl,
     layouts: &LayoutRegistry,
-) -> Result<HashMap<&'a String, NativeType>, NativeEmitError> {
+) -> Result<HashMap<&'a String, NativeType>, BackendEmitError> {
     verb.params
         .iter()
         .map(|parameter| {
@@ -78,7 +78,7 @@ pub(super) fn declare_function_refs(
     module: &mut ObjectModule,
     function: &mut cranelift_codegen::ir::Function,
     functions: &HashMap<String, FunctionMeta>,
-) -> Result<HashMap<String, FunctionRef>, NativeEmitError> {
+) -> Result<HashMap<String, FunctionRef>, BackendEmitError> {
     functions
         .iter()
         .map(|(name, meta)| {

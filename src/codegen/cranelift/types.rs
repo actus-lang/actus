@@ -2,7 +2,7 @@ use cranelift_codegen::ir::Type;
 
 use crate::ast::{BuiltinType, PrimitiveType, TypeName, lookup_builtin_type, primitive_type};
 
-use super::native::NativeEmitError;
+use super::native::BackendEmitError;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum NativeType {
@@ -81,10 +81,10 @@ impl NativeType {
     pub(crate) fn from_type_name_with_layout(
         type_name: Option<&TypeName>,
         layouts: &super::layout::LayoutRegistry,
-    ) -> Result<Self, NativeEmitError> {
+    ) -> Result<Self, BackendEmitError> {
         let Some(type_name) = type_name else { return Ok(Self::Void) };
         Self::try_from_type_name_with_layout(Some(type_name), layouts)
-            .ok_or_else(|| NativeEmitError(format!("unknown native type `{}`", type_name.name)))
+            .ok_or_else(|| BackendEmitError(format!("unknown native type `{}`", type_name.name)))
     }
 
     pub(crate) fn try_from_type_name_with_layout(
@@ -106,14 +106,14 @@ impl NativeType {
         })
     }
 
-    pub(crate) fn ir_type(self, pointer_type: Type) -> Result<Type, NativeEmitError> {
+    pub(crate) fn ir_type(self, pointer_type: Type) -> Result<Type, BackendEmitError> {
         match self {
             Self::Int => Ok(cranelift_codegen::ir::types::I32),
             Self::Integer { width, .. } => integer_ir_type(width),
             Self::Float { width: 32 } => Ok(cranelift_codegen::ir::types::F32),
             Self::Float { width: 64 } => Ok(cranelift_codegen::ir::types::F64),
             Self::Float { width } => {
-                Err(NativeEmitError(format!("invalid native float width `{width}`")))
+                Err(BackendEmitError(format!("invalid native float width `{width}`")))
             }
             Self::Void => Ok(cranelift_codegen::ir::types::I8),
             Self::String
@@ -129,14 +129,14 @@ impl NativeType {
     }
 }
 
-fn integer_ir_type(width: u8) -> Result<Type, NativeEmitError> {
+fn integer_ir_type(width: u8) -> Result<Type, BackendEmitError> {
     match width {
         1..=8 => Ok(cranelift_codegen::ir::types::I8),
         9..=16 => Ok(cranelift_codegen::ir::types::I16),
         17..=32 => Ok(cranelift_codegen::ir::types::I32),
         33..=64 => Ok(cranelift_codegen::ir::types::I64),
         65..=128 => Ok(cranelift_codegen::ir::types::I128),
-        _ => Err(NativeEmitError(format!("invalid native integer width `{width}`"))),
+        _ => Err(BackendEmitError(format!("invalid native integer width `{width}`"))),
     }
 }
 

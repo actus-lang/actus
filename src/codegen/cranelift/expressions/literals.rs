@@ -4,50 +4,50 @@ use cranelift_codegen::ir::{InstBuilder, MemFlagsData, StackSlotData, StackSlotK
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::literals::StringDataValues;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 
 pub(crate) fn lower_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     typed: bool,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let is_hex = value.starts_with("0x") || value.starts_with("0X");
     let magnitude = value
         .strip_prefix("0x")
         .or_else(|| value.strip_prefix("0X"))
         .map_or_else(|| value.parse::<u128>(), |digits| u128::from_str_radix(digits, 16))
-        .map_err(|error| NativeEmitError(format!("invalid integer literal: {error}")))?;
+        .map_err(|error| BackendEmitError(format!("invalid integer literal: {error}")))?;
     if magnitude <= u64::MAX as u128 {
         if !typed && !is_hex && magnitude > i32::MAX as u128 {
-            return Err(NativeEmitError(
+            return Err(BackendEmitError(
                 "invalid integer literal: exceeds native Int width".to_owned(),
             ));
         }
         let target = if magnitude <= i32::MAX as u128 { types::I32 } else { types::I64 };
         return Ok(function.ins().iconst(target, magnitude as i64));
     }
-    Err(NativeEmitError("integer literal exceeds native lowering width".to_owned()))
+    Err(BackendEmitError("integer literal exceeds native lowering width".to_owned()))
 }
 
 pub(crate) fn lower_float(
     function: &mut FunctionBuilder<'_>,
     value: &str,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     value
         .parse::<f64>()
         .map(|value| function.ins().f64const(value))
-        .map_err(|error| NativeEmitError(format!("invalid floating-point literal: {error}")))
+        .map_err(|error| BackendEmitError(format!("invalid floating-point literal: {error}")))
 }
 
 pub(crate) fn lower_wide_integer(
     function: &mut FunctionBuilder<'_>,
     value: &str,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let magnitude = value
         .strip_prefix("0x")
         .or_else(|| value.strip_prefix("0X"))
         .map_or_else(|| value.parse::<u128>(), |digits| u128::from_str_radix(digits, 16))
-        .map_err(|error| NativeEmitError(format!("invalid wide integer literal: {error}")))?;
+        .map_err(|error| BackendEmitError(format!("invalid wide integer literal: {error}")))?;
     let slot = function.func.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,
         16,
@@ -65,10 +65,10 @@ pub(crate) fn lower_float_as(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     target: Type,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let value = value
         .parse::<f64>()
-        .map_err(|error| NativeEmitError(format!("invalid floating-point literal: {error}")))?;
+        .map_err(|error| BackendEmitError(format!("invalid floating-point literal: {error}")))?;
     Ok(if target == types::F32 {
         function.ins().f32const(value as f32)
     } else {
@@ -99,12 +99,12 @@ pub(crate) fn lower_string(
     function: &mut FunctionBuilder<'_>,
     value: &str,
     string_data: &StringDataValues,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     string_data
         .get(value)
         .copied()
         .map(|global| function.ins().symbol_value(types::I64, global))
-        .ok_or_else(|| NativeEmitError(format!("string literal `{value}` has no native data")))
+        .ok_or_else(|| BackendEmitError(format!("string literal `{value}` has no native data")))
 }
 
 pub(crate) fn lower_identifier(
@@ -113,12 +113,12 @@ pub(crate) fn lower_identifier(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, super::super::types::NativeType>,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let (binding, value) = locals
         .iter()
         .find(|(binding, _)| binding.as_str() == name)
         .map(|(binding, value)| (*binding, *value))
-        .ok_or_else(|| NativeEmitError(format!("native binding `{name}` is unavailable")))?;
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
     let Some(native_type) = local_types.get(binding) else { return Ok(value) };
     let expected = native_type.ir_type(pointer_type)?;
     if !native_type.is_wide_integer()

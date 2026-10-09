@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use crate::codegen::cranelift::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -21,7 +21,7 @@ pub(crate) fn emit_enum_payload_drop(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let address = enum_subject_address(locals, subject)?;
     let (enum_layout, variant_layout) =
         payload_layouts(types, subject, enum_name, variant, layouts)?;
@@ -41,7 +41,7 @@ fn payload_layouts<'a>(
     enum_name: &str,
     variant: &str,
     layouts: &'a LayoutRegistry,
-) -> Result<(&'a EnumLayout, &'a EnumVariantLayout), NativeEmitError> {
+) -> Result<(&'a EnumLayout, &'a EnumVariantLayout), BackendEmitError> {
     let enum_id = types
         .iter()
         .find(|(binding, ty)| binding.as_str() == subject && matches!(ty, NativeType::Enum(_)))
@@ -50,25 +50,25 @@ fn payload_layouts<'a>(
             _ => None,
         })
         .or_else(|| layouts.enum_constructor(enum_name, variant).map(|(id, _)| id))
-        .ok_or_else(|| NativeEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
     let variant_layout = layouts
         .enum_variant(enum_id, variant)
-        .ok_or_else(|| NativeEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("unknown enum payload `{enum_name}.{variant}`")))?;
     let enum_layout = layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError(format!("missing enum layout `{enum_id}`")))?;
+        .ok_or_else(|| BackendEmitError(format!("missing enum layout `{enum_id}`")))?;
     Ok((enum_layout, variant_layout))
 }
 
 fn enum_subject_address(
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     subject: &str,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     locals
         .iter()
         .find(|(binding, _)| binding.as_str() == subject)
         .map(|(_, value)| *value)
-        .ok_or_else(|| NativeEmitError(format!("native binding `{subject}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("native binding `{subject}` is unavailable")))
 }
 
 fn drop_enum_payload_field(
@@ -77,7 +77,7 @@ fn drop_enum_payload_field(
     field_address: cranelift_codegen::ir::Value,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     match field_type {
         NativeType::Buffer => drop_buffer_field(function, field_address, functions, layouts)?,
         NativeType::Region => drop_region_field(function, field_address, functions, layouts)?,
@@ -103,10 +103,10 @@ fn drop_region_field(
     field_address: cranelift_codegen::ir::Value,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
     let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
-        NativeEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
+        BackendEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
     })?;
     function.ins().call(target.reference, &[handle]);
     Ok(())
@@ -117,10 +117,10 @@ fn drop_buffer_field(
     field_address: cranelift_codegen::ir::Value,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
     let target = functions.get("actus_buffer_drop").ok_or_else(|| {
-        NativeEmitError("native runtime function `actus_buffer_drop` is unavailable".to_owned())
+        BackendEmitError("native runtime function `actus_buffer_drop` is unavailable".to_owned())
     })?;
     function.ins().call(target.reference, &[handle]);
     Ok(())
@@ -129,16 +129,16 @@ fn drop_buffer_field(
 fn payload_field<'a>(
     variant: &'a EnumVariantLayout,
     field: &str,
-) -> Result<&'a EnumFieldLayout, NativeEmitError> {
+) -> Result<&'a EnumFieldLayout, BackendEmitError> {
     if let Ok(index) = field.parse::<usize>() {
         return variant
             .fields
             .get(index)
-            .ok_or_else(|| NativeEmitError(format!("unknown tuple payload field `{field}`")));
+            .ok_or_else(|| BackendEmitError(format!("unknown tuple payload field `{field}`")));
     }
     variant
         .fields
         .iter()
         .find(|candidate| candidate.name.as_deref() == Some(field))
-        .ok_or_else(|| NativeEmitError(format!("unknown named payload field `{field}`")))
+        .ok_or_else(|| BackendEmitError(format!("unknown named payload field `{field}`")))
 }

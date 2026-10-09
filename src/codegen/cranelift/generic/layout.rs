@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::semantic::GenericInstance;
 
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GenericFieldLayout {
@@ -62,7 +62,7 @@ impl GenericLayoutRegistry {
         program: &Program,
         instances: &[GenericInstance],
         pointer_size: u32,
-    ) -> Result<Self, NativeEmitError> {
+    ) -> Result<Self, BackendEmitError> {
         let (structs, enums) = definitions(program);
         let mut registry = Self {
             structs,
@@ -88,16 +88,16 @@ impl GenericLayoutRegistry {
         self.enum_layouts.get(key)
     }
 
-    fn layout_instance(&mut self, instance: &GenericInstance) -> Result<(), NativeEmitError> {
+    fn layout_instance(&mut self, instance: &GenericInstance) -> Result<(), BackendEmitError> {
         if self.structs.contains_key(&instance.name) {
             let definition = self.structs.get(&instance.name).cloned().ok_or_else(|| {
-                NativeEmitError(format!("missing generic struct `{}`", instance.name))
+                BackendEmitError(format!("missing generic struct `{}`", instance.name))
             })?;
             let layout = self.layout_struct(&definition, &instance.arguments, &mut Vec::new())?;
             self.struct_layouts.insert(instance.identity(), layout);
         } else if self.enums.contains_key(&instance.name) {
             let definition = self.enums.get(&instance.name).cloned().ok_or_else(|| {
-                NativeEmitError(format!("missing generic enum `{}`", instance.name))
+                BackendEmitError(format!("missing generic enum `{}`", instance.name))
             })?;
             let layout = self.layout_enum(&definition, &instance.arguments, &mut Vec::new())?;
             self.enum_layouts.insert(instance.identity(), layout);
@@ -109,7 +109,7 @@ impl GenericLayoutRegistry {
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
-    ) -> Result<ValueLayout, NativeEmitError> {
+    ) -> Result<ValueLayout, BackendEmitError> {
         if type_name.reference_role.is_some() {
             return Ok(ValueLayout { size: self.pointer_size, alignment: self.pointer_size });
         }
@@ -136,28 +136,28 @@ impl GenericLayoutRegistry {
             let layout = self.layout_enum(definition, &type_name.arguments, visiting)?;
             return Ok(ValueLayout { size: layout.size, alignment: layout.alignment });
         }
-        Err(NativeEmitError(format!("unknown generic layout type `{}`", type_name.name)))
+        Err(BackendEmitError(format!("unknown generic layout type `{}`", type_name.name)))
     }
 
     fn layout_array(
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
-    ) -> Result<ValueLayout, NativeEmitError> {
+    ) -> Result<ValueLayout, BackendEmitError> {
         let [element, capacity] = type_name.arguments.as_slice() else {
-            return Err(NativeEmitError(
+            return Err(BackendEmitError(
                 "array layout requires an element type and capacity".to_owned(),
             ));
         };
         let capacity =
             capacity.name.parse::<u32>().ok().filter(|capacity| *capacity > 0).ok_or_else(
-                || NativeEmitError("array layout requires a positive capacity".to_owned()),
+                || BackendEmitError("array layout requires a positive capacity".to_owned()),
             )?;
         let element_layout = self.layout_type(element, visiting)?;
         let size = element_layout
             .size
             .checked_mul(capacity)
-            .ok_or_else(|| NativeEmitError("array layout size overflow".to_owned()))?;
+            .ok_or_else(|| BackendEmitError("array layout size overflow".to_owned()))?;
         Ok(ValueLayout { size, alignment: element_layout.alignment })
     }
 }
@@ -195,20 +195,23 @@ fn pack_definitions(program: &Program) -> HashMap<String, PackDecl> {
         .collect()
 }
 
-fn builtin_layout(builtin: BuiltinType, pointer_size: u32) -> Result<ValueLayout, NativeEmitError> {
+fn builtin_layout(
+    builtin: BuiltinType,
+    pointer_size: u32,
+) -> Result<ValueLayout, BackendEmitError> {
     match builtin {
         BuiltinType::Int | BuiltinType::Bool => Ok(ValueLayout { size: 4, alignment: 4 }),
         BuiltinType::String | BuiltinType::Buffer => {
             Ok(ValueLayout { size: pointer_size, alignment: pointer_size })
         }
-        BuiltinType::Array | BuiltinType::Map => Err(NativeEmitError(format!(
+        BuiltinType::Array | BuiltinType::Map => Err(BackendEmitError(format!(
             "unsupported generic layout type `{}`",
             builtin.spec().name
         ))),
     }
 }
 
-fn primitive_layout(primitive: crate::ast::PrimitiveType) -> Result<ValueLayout, NativeEmitError> {
+fn primitive_layout(primitive: crate::ast::PrimitiveType) -> Result<ValueLayout, BackendEmitError> {
     let (size, alignment) = match primitive {
         crate::ast::PrimitiveType::Integer { width, .. } => match width {
             1..=8 => (1, 1),
@@ -216,7 +219,7 @@ fn primitive_layout(primitive: crate::ast::PrimitiveType) -> Result<ValueLayout,
             17..=32 => (4, 4),
             33..=64 => (8, 8),
             65..=128 => (16, 16),
-            _ => return Err(NativeEmitError("invalid primitive integer width".to_owned())),
+            _ => return Err(BackendEmitError("invalid primitive integer width".to_owned())),
         },
         crate::ast::PrimitiveType::Float { width } => (u32::from(width / 8), u32::from(width / 8)),
         crate::ast::PrimitiveType::Void => (0, 1),
@@ -235,9 +238,9 @@ fn canonical_type_name(type_name: &TypeName) -> String {
     application_key(&type_name.name, &type_name.arguments)
 }
 
-pub(super) fn enter_layout(key: &str, visiting: &[String]) -> Result<(), NativeEmitError> {
+pub(super) fn enter_layout(key: &str, visiting: &[String]) -> Result<(), BackendEmitError> {
     if visiting.iter().any(|candidate| candidate == key) {
-        return Err(NativeEmitError(format!(
+        return Err(BackendEmitError(format!(
             "recursive generic layout for `{key}` is not supported"
         )));
     }

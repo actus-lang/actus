@@ -213,10 +213,13 @@ linker-facing implementation are contained under `src/codegen/cranelift/`.
 `tests/architecture_conformance.rs` now verifies that shared codegen modules
 cannot contain Cranelift implementation imports or crate tokens; the root
 `src/codegen/mod.rs` remains the explicit public facade. The architecture suite
-passes with 6 tests and 0 failures. Target and runtime source trees are also
-checked for Cranelift implementation imports. Remaining Gate 44.3 work covers
-removing backend-specific types from the shared public API and preserving all
-ABI, symbol, cleanup, and zero-float behavior through the boundary.
+cannot contain Cranelift implementation imports or crate tokens, and the facade
+must expose neutral `BackendEmitError` and `BackendAbiError` contracts rather
+than the former native error names. The architecture suite now covers 7 tests.
+Target and runtime source trees are also checked for Cranelift implementation
+imports. Remaining Gate 44.3 work covers removing the remaining backend-shaped
+symbol-binding and emission entry points from the shared public facade and
+preserving all ABI, symbol, cleanup, and zero-float behavior through that move.
 
 ## Gate 44.4 — Formalize target, object, and linker boundaries
 

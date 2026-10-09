@@ -7,7 +7,7 @@ use crate::lexer::SourceSpan;
 use super::super::calls::CallLoweringContext;
 use super::super::cleanup::emit_return_cleanup;
 use super::super::layout::LayoutRegistry;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::initializer_types::initializer_type;
 
@@ -23,23 +23,23 @@ pub(crate) fn lower_try_expression(
     expression: &Expr,
     span: SourceSpan,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let source = lower_try_source(function, expression, context)?;
     let NativeType::Enum(enum_id) =
         initializer_type(expression, context.local_types, context.functions, context.layouts)?
     else {
-        return Err(NativeEmitError("try operand is not a native Result value".to_owned()));
+        return Err(BackendEmitError("try operand is not a native Result value".to_owned()));
     };
     let layout = context
         .layouts
         .enum_layout(enum_id)
-        .ok_or_else(|| NativeEmitError("try operand has no enum layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("try operand has no enum layout".to_owned()))?;
     let ok = context
         .layouts
         .enum_variant(enum_id, "Ok")
-        .ok_or_else(|| NativeEmitError("Result enum has no Ok variant".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("Result enum has no Ok variant".to_owned()))?;
     let field =
-        ok.fields.first().ok_or_else(|| NativeEmitError("Result.Ok has no payload".to_owned()))?;
+        ok.fields.first().ok_or_else(|| BackendEmitError("Result.Ok has no payload".to_owned()))?;
     let payload_layout = TryPayloadLayout {
         field_type: field.ty,
         discriminant_offset: layout.discriminant_offset,
@@ -53,7 +53,7 @@ fn lower_try_source(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     super::lower_expression(
         function,
         expression,
@@ -72,7 +72,7 @@ fn emit_try_control_flow(
     span: SourceSpan,
     payload_layout: TryPayloadLayout,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let is_ok = try_is_ok(function, source, &payload_layout);
     let ok_block = function.create_block();
     let err_block = function.create_block();
@@ -115,7 +115,7 @@ fn emit_try_success(
     merge: cranelift_codegen::ir::Block,
     payload_layout: TryPayloadLayout,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     function.switch_to_block(ok_block);
     let payload_address =
         function.ins().iadd_imm_s(source, i64::from(payload_layout.payload_offset));
@@ -132,7 +132,7 @@ fn emit_try_error_return(
     source: cranelift_codegen::ir::Value,
     span: SourceSpan,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     emit_return_cleanup(
         function,
         context.cleanup_schedule,
@@ -152,7 +152,7 @@ fn load_try_payload(
     payload_address: cranelift_codegen::ir::Value,
     field_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match field_type {
         NativeType::Struct(_)
         | NativeType::Enum(_)
@@ -174,7 +174,7 @@ fn load_try_payload(
             Ok(load_payload(function, payload_address, layouts.pointer_type))
         }
         NativeType::FatPointer => {
-            Err(NativeEmitError("try does not yet unwrap fat-pointer payloads".to_owned()))
+            Err(BackendEmitError("try does not yet unwrap fat-pointer payloads".to_owned()))
         }
     }
 }
@@ -192,10 +192,10 @@ fn load_pack_payload(
     address: cranelift_codegen::ir::Value,
     id: usize,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let pack = layouts
         .pack(id)
-        .ok_or_else(|| NativeEmitError("missing packed payload layout".to_owned()))?;
+        .ok_or_else(|| BackendEmitError("missing packed payload layout".to_owned()))?;
     let ty = layouts.ir_type(pack.storage)?;
     Ok(load_payload(function, address, ty))
 }
@@ -203,7 +203,7 @@ fn load_pack_payload(
 fn try_payload_ir_type(
     field_type: NativeType,
     layouts: &LayoutRegistry,
-) -> Result<cranelift_codegen::ir::Type, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Type, BackendEmitError> {
     if matches!(field_type, NativeType::Void) {
         Ok(types::I32)
     } else {

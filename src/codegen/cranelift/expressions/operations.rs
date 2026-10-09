@@ -8,7 +8,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{BinaryOp, Expr, UnaryOp};
 
 use super::super::calls::CallLoweringContext;
-use super::super::native::NativeEmitError;
+use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::initializer_type;
 
@@ -16,7 +16,7 @@ pub(crate) fn lower_operation(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match expression {
         Expr::Unary { operator, expression, .. } => {
             lower_unary(function, operator, expression, context)
@@ -24,7 +24,7 @@ pub(crate) fn lower_operation(
         Expr::Binary { left, operator, right, .. } => {
             lower_binary(function, left, operator, right, context)
         }
-        _ => Err(NativeEmitError("unsupported native operation".to_owned())),
+        _ => Err(BackendEmitError("unsupported native operation".to_owned())),
     }
 }
 
@@ -33,7 +33,7 @@ fn lower_unary(
     operator: &UnaryOp,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let value = lower_expression_with_context(function, expression, context)?;
     match operator {
         UnaryOp::Negate => Ok(function.ins().ineg(value)),
@@ -53,7 +53,7 @@ fn lower_binary(
     operator: &BinaryOp,
     right: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if operator.is_relational() || matches!(operator, BinaryOp::Equals | BinaryOp::NotEquals) {
         return lower_comparison(function, left, operator, right, context);
     }
@@ -69,7 +69,7 @@ fn lower_comparison(
     operator: &BinaryOp,
     right_expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let left = lower_expression_with_context(function, left_expression, context)?;
     let right = lower_expression_with_context(function, right_expression, context)?;
     let left_type =
@@ -93,7 +93,7 @@ fn lower_comparison(
             )?;
             function.ins().icmp(integer_condition(operator, left_type)?, left, right)
         }
-        other => return Err(NativeEmitError(format!("cannot compare native type {other:?}"))),
+        other => return Err(BackendEmitError(format!("cannot compare native type {other:?}"))),
     };
     Ok(normalize_bool(function, condition))
 }
@@ -115,7 +115,7 @@ fn lower_integer_operation(
     operator: &BinaryOp,
     right_expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let left_type =
         initializer_type(left_expression, context.local_types, context.functions, context.layouts)?;
     let right_type = initializer_type(
@@ -152,7 +152,7 @@ fn lower_integer_operation(
         BinaryOp::ShiftLeft => function.ins().ishl(left, right),
         BinaryOp::ShiftRight if is_signed(left_type) => function.ins().sshr(left, right),
         BinaryOp::ShiftRight => function.ins().ushr(left, right),
-        _ => return Err(NativeEmitError("unsupported integer operator".to_owned())),
+        _ => return Err(BackendEmitError("unsupported integer operator".to_owned())),
     })
 }
 
@@ -162,7 +162,7 @@ pub(crate) fn lower_compound_integer_operation(
     operator: BinaryOp,
     right: cranelift_codegen::ir::Value,
     left_type: NativeType,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if matches!(operator, BinaryOp::Divide | BinaryOp::Remainder) {
         trap_if_zero(function, right);
     }
@@ -181,7 +181,7 @@ pub(crate) fn lower_compound_integer_operation(
         BinaryOp::ShiftLeft => function.ins().ishl(left, right),
         BinaryOp::ShiftRight if is_signed(left_type) => function.ins().sshr(left, right),
         BinaryOp::ShiftRight => function.ins().ushr(left, right),
-        _ => return Err(NativeEmitError("unsupported compound operator".to_owned())),
+        _ => return Err(BackendEmitError("unsupported compound operator".to_owned())),
     })
 }
 
@@ -251,7 +251,7 @@ fn widen_integer_operands(
     left_type: NativeType,
     right_type: NativeType,
     pointer_type: cranelift_codegen::ir::Type,
-) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), NativeEmitError> {
+) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), BackendEmitError> {
     let left_ir = left_type.ir_type(pointer_type)?;
     let right_ir = right_type.ir_type(pointer_type)?;
     let target = if left_ir.bytes() >= right_ir.bytes() { left_ir } else { right_ir };
@@ -281,7 +281,7 @@ fn is_signed(ty: NativeType) -> bool {
     matches!(ty, NativeType::Int | NativeType::Integer { signed: true, .. })
 }
 
-fn integer_condition(operator: &BinaryOp, ty: NativeType) -> Result<IntCC, NativeEmitError> {
+fn integer_condition(operator: &BinaryOp, ty: NativeType) -> Result<IntCC, BackendEmitError> {
     let signed = matches!(ty, NativeType::Int | NativeType::Integer { signed: true, .. });
     Ok(match (operator, signed) {
         (BinaryOp::Equals, _) => IntCC::Equal,
@@ -295,12 +295,12 @@ fn integer_condition(operator: &BinaryOp, ty: NativeType) -> Result<IntCC, Nativ
         (BinaryOp::GreaterThan, false) => IntCC::UnsignedGreaterThan,
         (BinaryOp::GreaterEquals, false) => IntCC::UnsignedGreaterThanOrEqual,
         _ => {
-            return Err(NativeEmitError("unsupported integer comparison operator".to_owned()));
+            return Err(BackendEmitError("unsupported integer comparison operator".to_owned()));
         }
     })
 }
 
-fn float_condition(operator: &BinaryOp) -> Result<FloatCC, NativeEmitError> {
+fn float_condition(operator: &BinaryOp) -> Result<FloatCC, BackendEmitError> {
     Ok(match operator {
         BinaryOp::Equals => FloatCC::Equal,
         BinaryOp::NotEquals => FloatCC::NotEqual,
@@ -309,7 +309,7 @@ fn float_condition(operator: &BinaryOp) -> Result<FloatCC, NativeEmitError> {
         BinaryOp::GreaterThan => FloatCC::GreaterThan,
         BinaryOp::GreaterEquals => FloatCC::GreaterThanOrEqual,
         _ => {
-            return Err(NativeEmitError("unsupported float comparison operator".to_owned()));
+            return Err(BackendEmitError("unsupported float comparison operator".to_owned()));
         }
     })
 }
@@ -318,7 +318,7 @@ pub(super) fn lower_expression_with_context(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     super::lower_expression_with_targets(
         function,
         expression,

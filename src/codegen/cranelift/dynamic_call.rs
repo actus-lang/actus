@@ -1,12 +1,12 @@
 use cranelift_codegen::ir::{AbiParam, InstBuilder, MemFlagsData, Signature, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::native::NativeEmitError;
+use super::native::BackendEmitError;
 
 pub(crate) fn lower_dynamic_call(
     function: &mut FunctionBuilder<'_>,
     fat_pointer: cranelift_codegen::ir::Value,
-) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let pointer_type = function.func.dfg.value_type(fat_pointer);
     let data_pointer = function.ins().load(pointer_type, MemFlagsData::new(), fat_pointer, 0);
     let vtable_pointer = function.ins().load(
@@ -25,5 +25,5 @@ pub(crate) fn lower_dynamic_call(
         .inst_results(call)
         .first()
         .copied()
-        .ok_or_else(|| NativeEmitError("dynamic call returned no value".to_owned()))
+        .ok_or_else(|| BackendEmitError("dynamic call returned no value".to_owned()))
 }

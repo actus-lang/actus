@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Block, Expr, IfBranch, Stmt};
 
 use super::super::super::literals::StringDataValues;
-use super::super::super::native::{FunctionRef, NativeEmitError};
+use super::super::super::native::{BackendEmitError, FunctionRef};
 use super::super::super::types::NativeType;
 use super::{Flow, LoopTargets, NativeCleanupSchedule};
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -47,7 +47,7 @@ pub(super) fn lower_if_statement<'source>(
     cleanup_schedule: &NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-) -> Result<Flow, NativeEmitError> {
+) -> Result<Flow, BackendEmitError> {
     if statement_if_can_merge(then_branch, else_branch.as_ref()) {
         return super::super::super::expressions::lower_statement_if(
             function,

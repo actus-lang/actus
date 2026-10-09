@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{CaseBody, CaseBranch};
 
 use super::super::expressions::initializer_type;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::payload::add_payload_types;
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -13,7 +13,7 @@ pub(crate) fn infer_case_type(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let mut inferred = None;
     let mut has_block_body = false;
     for branch in branches {
@@ -31,7 +31,7 @@ pub(super) fn branch_type(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     value_producing: bool,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     let mut inferred = None;
     let mut has_block_body = false;
     for branch in branches {
@@ -51,7 +51,7 @@ fn body_type(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     value_producing: bool,
-) -> Result<(Option<NativeType>, bool), NativeEmitError> {
+) -> Result<(Option<NativeType>, bool), BackendEmitError> {
     match body {
         CaseBody::Expression(expression) => {
             Ok((Some(initializer_type(expression, types, functions, layouts)?), false))
@@ -68,7 +68,7 @@ fn block_type(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     value_producing: bool,
-) -> Result<Option<NativeType>, NativeEmitError> {
+) -> Result<Option<NativeType>, BackendEmitError> {
     if value_producing {
         block_type_for_value(block, types, functions, layouts)
     } else {
@@ -81,7 +81,7 @@ fn block_type_for_statement(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<Option<NativeType>, NativeEmitError> {
+) -> Result<Option<NativeType>, BackendEmitError> {
     let Some(statement) = block.statements.last() else { return Ok(None) };
     match statement {
         crate::ast::Stmt::Expression { expression, span }
@@ -102,7 +102,7 @@ fn block_type_for_value(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
-) -> Result<Option<NativeType>, NativeEmitError> {
+) -> Result<Option<NativeType>, BackendEmitError> {
     let Some((statement, prefix)) = block.statements.split_last() else { return Ok(None) };
     let mut block_types = types.clone();
     for statement in prefix {
@@ -150,10 +150,10 @@ fn synthetic_if(
 fn merge_case_type(
     inferred: Option<NativeType>,
     candidate: Option<NativeType>,
-) -> Result<Option<NativeType>, NativeEmitError> {
+) -> Result<Option<NativeType>, BackendEmitError> {
     let Some(candidate) = candidate else { return Ok(inferred) };
     match inferred {
-        Some(expected) if expected != candidate => Err(NativeEmitError(format!(
+        Some(expected) if expected != candidate => Err(BackendEmitError(format!(
             "case branches have different native types (expected {expected:?}, found {candidate:?})"
         ))),
         Some(expected) => Ok(Some(expected)),
@@ -190,10 +190,10 @@ fn expression_end(expression: &crate::ast::Expr) -> usize {
 fn finish_case_type(
     inferred: Option<NativeType>,
     has_block_body: bool,
-) -> Result<NativeType, NativeEmitError> {
+) -> Result<NativeType, BackendEmitError> {
     match (inferred, has_block_body) {
         (Some(result), _) => Ok(result),
         (None, true) => Ok(NativeType::Void),
-        (None, false) => Err(NativeEmitError("case has no value-producing branch".to_owned())),
+        (None, false) => Err(BackendEmitError("case has no value-producing branch".to_owned())),
     }
 }

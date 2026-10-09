@@ -7,7 +7,7 @@ use crate::ast::{Argument, IntrinsicKind, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
 
 use super::super::layout::LayoutRegistry;
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
 use super::arguments::lower_call_arguments;
 use super::context::CallLoweringContext;
@@ -18,7 +18,7 @@ pub(crate) fn lower_call(
     callee: &str,
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let callee_name = callee.split_once('[').map_or(callee, |(name, _)| name);
     match lookup_call_intrinsic(callee) {
         Some(IntrinsicKind::SizeOf) => {
@@ -54,21 +54,21 @@ fn lower_layout_value(
     callee: &str,
     layouts: &LayoutRegistry,
     alignment: bool,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     let prefix = if alignment { "align_of[" } else { "size_of[" };
     let type_name = callee
         .strip_prefix(prefix)
         .and_then(|name| name.strip_suffix(']'))
         .and_then(|name| crate::semantic::parse_type_name_key(name, SourceSpan::new(0, 0)))
         .ok_or_else(|| {
-            NativeEmitError(format!("invalid layout intrinsic type application `{callee}`"))
+            BackendEmitError(format!("invalid layout intrinsic type application `{callee}`"))
         })?;
     let native_type = NativeType::from_type_name_with_layout(Some(&type_name), layouts)?;
     let value = if alignment {
         layouts.alignment(native_type)?
     } else {
         layouts.type_size(native_type).ok_or_else(|| {
-            NativeEmitError(format!("type `{}` has no native size", type_name.name))
+            BackendEmitError(format!("type `{}` has no native size", type_name.name))
         })?
     };
     Ok(function.ins().iconst(types::I64, i64::from(value)))
@@ -77,10 +77,10 @@ fn lower_layout_value(
 fn call_target<'a>(
     functions: &'a HashMap<String, FunctionRef>,
     callee: &str,
-) -> Result<&'a FunctionRef, NativeEmitError> {
+) -> Result<&'a FunctionRef, BackendEmitError> {
     functions
         .get(callee)
-        .ok_or_else(|| NativeEmitError(format!("native function `{callee}` is unavailable")))
+        .ok_or_else(|| BackendEmitError(format!("native function `{callee}` is unavailable")))
 }
 
 fn finish_call(
@@ -90,11 +90,11 @@ fn finish_call(
     return_type: NativeType,
     callee: &str,
     layouts: &LayoutRegistry,
-) -> Result<Value, NativeEmitError> {
+) -> Result<Value, BackendEmitError> {
     if let Some(address) = result_address {
         if layouts.returns_borrowed_view(return_type) {
             return function.inst_results(call).first().copied().ok_or_else(|| {
-                NativeEmitError("borrowed view call returned no pointer".to_owned())
+                BackendEmitError("borrowed view call returned no pointer".to_owned())
             });
         }
         return Ok(address);
@@ -106,7 +106,7 @@ fn finish_call(
         .inst_results(call)
         .first()
         .copied()
-        .ok_or_else(|| NativeEmitError(format!("native function `{callee}` returned no value")))
+        .ok_or_else(|| BackendEmitError(format!("native function `{callee}` returned no value")))
 }
 
 fn resolve_call_target<'a>(
@@ -116,7 +116,7 @@ fn resolve_call_target<'a>(
     target: &'a FunctionRef,
     values: &[Value],
     context: &'a CallLoweringContext<'a, '_>,
-) -> Result<&'a FunctionRef, NativeEmitError> {
+) -> Result<&'a FunctionRef, BackendEmitError> {
     if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print)
         && target.parameter_names == ["value"]
         && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
@@ -136,7 +136,7 @@ fn resolve_call_target<'a>(
             "actus_print_string"
         };
         context.functions.get(symbol).ok_or_else(|| {
-            NativeEmitError(format!("native runtime function `{symbol}` is unavailable"))
+            BackendEmitError(format!("native runtime function `{symbol}` is unavailable"))
         })
     } else {
         Ok(target)
@@ -147,10 +147,10 @@ fn normalize_call_arguments(
     function: &mut FunctionBuilder<'_>,
     callee: &str,
     values: &mut Vec<Value>,
-) -> Result<(), NativeEmitError> {
+) -> Result<(), BackendEmitError> {
     if let Some(IntrinsicKind::Append) = lookup_call_intrinsic(callee) {
         let byte =
-            values.pop().ok_or_else(|| NativeEmitError("append requires a byte".to_owned()))?;
+            values.pop().ok_or_else(|| BackendEmitError("append requires a byte".to_owned()))?;
         values.push(to_byte(function, byte));
     }
     if matches!(
