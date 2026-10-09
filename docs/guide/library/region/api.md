@@ -24,6 +24,20 @@ The owner is created by `region_open` and is released by successful
 All Region operations return typed `Result` values; native status codes and
 runtime pointers are not part of the public API.
 
+### Aggregate elements and byte preservation
+
+For an aggregate element such as `Array[u8, 16]`, `Region[T]` uses the
+compiler-reported fixed size and alignment of the complete `T`. A range copies
+`element_count * size_of[T]()` bytes as one validated operation. It does not
+expand the aggregate into separate public element operations and does not
+materialize the logical Region length as an inline array.
+
+Region copying preserves the byte sequence supplied by the caller. It does not
+perform numeric byte-order conversion, serialization, or field rewriting.
+Interpretation of those bytes remains governed by the declared Actus type and
+target layout contract. This keeps the copy path identical across supported
+pointer-width and byte-order profiles.
+
 ## `RegionError`
 
 | Variant | Meaning |

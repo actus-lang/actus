@@ -1,6 +1,6 @@
 # ADR-0079: Complete Runtime-Backed Logical Regions
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-08
 - **Scope:** `std::region`, compiler lowering, runtime provider contracts, bounded logical storage, and region acceptance evidence
 - **Decision owner:** Actus standard-library and compiler architecture
@@ -465,6 +465,22 @@ The compiler and native backend must support Region descriptors through:
 The native lowering must not materialize logical capacity as an inline
 aggregate. It must not introduce raw pointers into the public Actus value, and
 it must preserve the exact ownership role at every call site.
+
+### 10.1 Aggregate copy contract
+
+For a fully sized aggregate `T`, the compiler supplies one validated native
+stride and alignment. Region element and range access use that layout as one
+copy unit. The native path may lower the operation to a target-aware bounded
+memory copy, including overlap-safe semantics, but it must not lower one
+aggregate into an unbounded sequence of public scalar operations.
+
+The runtime validates logical bounds, resident-window containment, checked
+stride multiplication, checked byte offsets, exact caller-buffer length, and
+the selected bulk profile before the copy begins. A failed validation leaves
+resident bytes, caller buffers, dirty state, accepted bytes, and generation
+unchanged. The hosted profile accepts at most 128 KiB per range operation;
+lower target profiles may select a smaller fixed limit without changing the
+source API.
 
 ## 11. Evidence contract
 

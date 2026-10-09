@@ -298,15 +298,15 @@ while target coverage parses little-endian 32-bit and big-endian 32-bit and
 
 ## Gate 42.8 — Documentation and compatibility
 
-- [ ] Update the Region API guide with aggregate element requirements and
+- [x] Update the Region API guide with aggregate element requirements and
       exact-size copy behavior.
-- [ ] Update the runtime guide with the hosted 128 KiB profile and lower target
+- [x] Update the runtime guide with the hosted 128 KiB profile and lower target
       profile rule.
-- [ ] Update the Region ADR with the aggregate lowering and bulk-copy ABI.
-- [ ] Document failure classes, atomicity, overlap semantics, and cleanup.
+- [x] Update the Region ADR with the aggregate lowering and bulk-copy ABI.
+- [x] Document failure classes, atomicity, overlap semantics, and cleanup.
 - [ ] Record the compiler revision, runtime revision, target, profile, commands,
       output, and known limits in a dated evidence document.
-- [ ] Confirm that public Region operation names and ownership roles remain
+- [x] Confirm that public Region operation names and ownership roles remain
       source-compatible.
 
 ## Gate 42.9 — Final acceptance

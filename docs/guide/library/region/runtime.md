@@ -68,6 +68,21 @@ explicitly. The core queue capacity is zero; a range operation is bounded to
 128 KiB in the hosted profile and returns `BulkLimitExceeded` above that
 limit. Embedded profiles may select a lower bound such as 64 KiB.
 
+## Bulk transfer profiles
+
+The hosted runtime uses a fixed maximum of 128 KiB for one range operation.
+The limit is checked before copying and applies to the complete byte payload,
+not to the number of logical elements. A target profile may select a smaller
+positive limit through `RegionAddressProfile::with_bulk_limit`; 64 KiB is a
+supported deployment choice. The public Region verbs do not change between
+profiles, and a payload above the selected limit returns
+`BulkLimitExceeded` without changing resident bytes or lifecycle state.
+
+The profile is selected when the runtime-backed Region is created and remains
+stable for that Region. Applications that need a larger transfer split it into
+explicit bounded ranges. The core does not grow the limit implicitly, allocate
+a larger temporary buffer, or create an asynchronous queue.
+
 ## Integrity and recovery
 
 The reference provider records a CRC32 checksum for both the accepted snapshot
