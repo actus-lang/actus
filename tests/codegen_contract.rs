@@ -125,19 +125,19 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
             BackendParameter {
                 name: "view".to_owned(),
                 role: Role::Abs,
-                ty: BackendValueType::Aggregate { layout },
+                ty: BackendValueType::Region { layout },
                 passing: BackendPassingMode::Borrowed { layout },
             },
             BackendParameter {
                 name: "loan".to_owned(),
                 role: Role::Ins,
-                ty: BackendValueType::Aggregate { layout },
+                ty: BackendValueType::Region { layout },
                 passing: BackendPassingMode::ExclusiveLoan { layout },
             },
             BackendParameter {
                 name: "resource".to_owned(),
                 role: Role::Dat,
-                ty: BackendValueType::Aggregate { layout },
+                ty: BackendValueType::Region { layout },
                 passing: BackendPassingMode::OwnershipTransfer { layout },
             },
         ],

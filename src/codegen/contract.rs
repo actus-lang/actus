@@ -13,6 +13,7 @@ pub enum BackendValueType {
     Float { width: u8 },
     Pointer,
     Aggregate { layout: BackendLayout },
+    Region { layout: BackendLayout },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -181,7 +182,9 @@ fn validate_return(return_value: &BackendReturn) -> Result<(), BackendContractEr
     if let BackendReturnMode::ReturnSlot { layout } = return_value.passing {
         layout.validate()?;
         match return_value.ty {
-            BackendValueType::Aggregate { layout: value_layout } if value_layout == layout => {}
+            BackendValueType::Aggregate { layout: value_layout }
+            | BackendValueType::Region { layout: value_layout }
+                if value_layout == layout => {}
             _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
         }
     }
@@ -270,7 +273,9 @@ fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError>
         BackendValueType::Integer { width: 0, .. } | BackendValueType::Float { width: 0 } => {
             Err(BackendContractError::InvalidValueType)
         }
-        BackendValueType::Aggregate { layout } => layout.validate(),
+        BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => {
+            layout.validate()
+        }
         BackendValueType::Unit
         | BackendValueType::Bool
         | BackendValueType::Integer { .. }
