@@ -134,7 +134,10 @@ ABI controls, and migration order are recorded in
 **Gate status: Complete** — the inventory, responsibility mapping, filesystem
 boundary, and baseline regression evidence are recorded. The baseline command
 `cargo test --test codegen --all-features -- --format terse` passes with 66
-tests and 0 failures.
+tests and 0 failures. After the neutral contract extension, the complete
+`cargo test --all-features -- --format terse` suite also passes with no
+failures, including native Region, Wire, standard-library, semantic, and
+zero-float checks.
 
 ## Gate 44.2 — Define the backend-neutral lowering contract
 
