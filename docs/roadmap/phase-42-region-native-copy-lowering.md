@@ -153,17 +153,45 @@ fixtures are covered by executable evidence.
 
 ## Gate 42.4 — Bounded bulk copy implementation
 
-- [ ] Route `region_read_range` and `region_write_range` through one checked
+- [x] Route `region_read_range` and `region_write_range` through one checked
       aggregate-aware bulk copy path.
 - [x] Accept an exact 128 KiB hosted payload and reject 128 KiB plus one byte
       with `BulkLimitExceeded` before copying.
-- [ ] Use checked 64-bit arithmetic for element count, stride, byte count,
+- [x] Use checked 64-bit arithmetic for element count, stride, byte count,
       relative offset, and range end.
-- [ ] Keep the source and destination buffers caller-owned and reusable.
-- [ ] Ensure overlapping ranges follow the documented copy semantics.
-- [ ] Ensure failure is atomic: no partial destination, source, dirty-state, or
+- [x] Keep the source and destination buffers caller-owned and reusable.
+- [x] Ensure overlapping ranges follow the documented copy semantics.
+- [x] Ensure failure is atomic: no partial destination, source, dirty-state, or
       generation change is visible after a rejected operation.
-- [ ] Keep lower target profiles configurable without duplicating public APIs.
+- [x] Keep lower target profiles configurable without duplicating public APIs.
+
+### Gate 42.4 evidence
+
+- `RegionView::read_range` and `MutableRegionView::write_range` both validate
+  the same descriptor byte range and exact caller-buffer length before calling
+  the shared `copy_bulk_bytes` primitive in `src/runtime/region.rs`.
+- `runtime::region::tests::bounded_range_access_is_atomic_and_supports_empty_and_full_windows`
+  and the native `std_region_native` range fixtures exercise the shared path;
+  the exact 128 KiB boundary remains covered by the existing hosted test.
+- `RegionDescriptor::byte_range_for` uses checked addition and multiplication
+  for index, stride, offset, byte count, and range end, then applies the target
+  address profile and bulk limit before any copy. The boundary matrix and
+  overflow tests cover the rejected arithmetic paths.
+- The range APIs accept caller-provided slices and do not allocate or retain
+  them; the native fixtures reuse caller-owned buffers across read and write
+  operations.
+- `bulk_copy_preserves_memmove_overlap_semantics` verifies the overlap-safe
+  `ptr::copy` contract used by the shared primitive.
+- `failed_range_validation_preserves_buffers_and_region_state` verifies that
+  rejected writes leave staged bytes and dirty state unchanged, while rejected
+  reads leave the caller destination unchanged.
+- `target_profile_can_lower_the_bulk_limit_without_changing_region_operations`
+  verifies a 64-byte target limit alongside the unchanged public read/write
+  operations; the hosted default remains 128 KiB.
+
+**Gate status: Complete** — bounded range arithmetic, shared copying, caller
+buffer ownership, overlap behavior, atomic failures, and lower target limits
+are covered by runtime and native evidence.
 
 ## Gate 42.5 — Native ABI and cleanup correctness
 
@@ -171,13 +199,35 @@ fixtures are covered by executable evidence.
       returns.
 - [x] Verify `Result[Region[T], RegionError]` with aggregate `T` in nested
       generic calls.
-- [ ] Verify indirect return slots and aggregate temporary cleanup.
-- [ ] Verify compiler-generated Region cleanup on early return, branch exit,
+- [x] Verify indirect return slots and aggregate temporary cleanup.
+- [x] Verify compiler-generated Region cleanup on early return, branch exit,
       nested scope exit, and failure paths.
-- [ ] Verify that no raw pointer or provider handle enters a public aggregate,
+- [x] Verify that no raw pointer or provider handle enters a public aggregate,
       serialized value, or Region descriptor.
-- [ ] Verify descriptor generation, stale handles, double close, and capability
+- [x] Verify descriptor generation, stale handles, double close, and capability
       reuse remain unchanged.
+
+### Gate 42.5 evidence
+
+- `returns_transitive_aggregate_values_through_native_slots` in
+  `tests/arrays_cli.rs` executes struct, pack, fixed array, and const-generic
+  aggregate values through direct and transitive indirect return slots. The
+  same executable consumes the returned temporaries, covering their cleanup
+  path.
+- `hosted_std_region_cleanup_handles_early_return_and_nested_transfer` in
+  `tests/std_region_native.rs` now exercises early return, branch exit, nested
+  ownership transfer, and a typed read failure that unwinds an owned Region.
+- `RegionDescriptor` is a fixed-width `repr(C)` value containing only integer
+  handles, lengths, offsets, generations, flags, and profile widths; the
+  descriptor layout test verifies its 64-byte ABI. Provider state remains
+  behind runtime tables and is never part of the public descriptor.
+- `runtime::region_bridge_tests` and `runtime::capabilities::tests` cover stale
+  generations, failed and repeated close, generation reuse, wraparound, and
+  unknown-handle rejection.
+
+**Gate status: Complete** — aggregate return slots, cleanup paths, descriptor
+representation, generation validation, and capability reuse are covered by
+native and runtime evidence.
 
 ## Gate 42.6 — Optimization and deterministic performance
 
@@ -185,11 +235,20 @@ fixtures are covered by executable evidence.
       same validated range and element layout.
 - [ ] Replace constant-width division and multiplication sequences with safe
       strength-reduced operations where the target permits it.
-- [ ] Use bounded native copy operations for aggregate elements and ranges.
+- [x] Use bounded native copy operations for aggregate elements and ranges.
 - [ ] Keep optimization behavior deterministic across supported targets.
 - [ ] Record compiler memory, object size, executable size, copy time, and peak
       resident memory for 64 KiB and 128 KiB transfers.
 - [ ] Separate correctness measurements from performance measurements.
+
+### Gate 42.6 evidence
+
+- `docs/benchmarks/phase-42-region-performance-2026-10-09.md` records the
+  optimized hosted benchmark for 64 KiB and 128 KiB read/write operations.
+- Correctness remains covered by the runtime and native Region suites; the
+  performance record is kept separate from those acceptance tests.
+- Aggregate element and range operations use bounded target-aware copy paths;
+  no unbounded copy primitive is introduced by this phase.
 
 ## Gate 42.7 — Cross-target and freestanding verification
 

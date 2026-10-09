@@ -1,5 +1,8 @@
 use std::convert::TryFrom;
 
+pub use super::region_profile::RegionAddressProfile;
+use super::region_profile::{HOST_ADDRESS_PROFILE, copy_bulk_bytes, valid_alignment};
+
 /// Target-independent capability identifier for a runtime-backed region.
 pub type RegionHandle = u64;
 
@@ -26,46 +29,6 @@ pub enum RegionError {
     WindowBusy,
     GenerationExhausted,
     BulkLimitExceeded,
-}
-
-/// Checked logical-index and byte-offset widths for one target profile.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct RegionAddressProfile {
-    pub logical_index_bits: u8,
-    pub byte_offset_bits: u8,
-}
-
-impl RegionAddressProfile {
-    /// Creates a profile supported by the bounded region boundary.
-    pub const fn new(logical_index_bits: u8, byte_offset_bits: u8) -> Result<Self, RegionError> {
-        if !supported_width(logical_index_bits) || !supported_width(byte_offset_bits) {
-            return Err(RegionError::UnsupportedAddressWidth);
-        }
-        Ok(Self { logical_index_bits, byte_offset_bits })
-    }
-
-    const fn maximum(bits: u8) -> u64 {
-        if bits == 64 { u64::MAX } else { u32::MAX as u64 }
-    }
-
-    const fn maximum_index(self) -> u64 {
-        Self::maximum(self.logical_index_bits)
-    }
-
-    const fn maximum_offset(self) -> u64 {
-        Self::maximum(self.byte_offset_bits)
-    }
-}
-
-const HOST_ADDRESS_PROFILE: RegionAddressProfile =
-    RegionAddressProfile { logical_index_bits: 64, byte_offset_bits: 64 };
-
-const fn supported_width(bits: u8) -> bool {
-    bits == 32 || bits == 64
-}
-
-const fn valid_alignment(alignment: u64, stride: u64) -> bool {
-    alignment != 0 && alignment.is_power_of_two() && alignment <= stride
 }
 
 /// Fixed-width metadata for a logical region and its resident window.
@@ -137,6 +100,7 @@ impl RegionDescriptor {
         &self,
         start_index: u64,
         element_count: u64,
+        bulk_limit_bytes: u64,
     ) -> Result<std::ops::Range<usize>, RegionError> {
         let end_index =
             start_index.checked_add(element_count).ok_or(RegionError::OffsetOverflow)?;
@@ -156,7 +120,7 @@ impl RegionDescriptor {
             relative_index.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
         let byte_count =
             element_count.checked_mul(self.element_stride).ok_or(RegionError::OffsetOverflow)?;
-        if byte_count > super::contract::REGION_MAX_BULK_BYTES as u64 {
+        if byte_count > bulk_limit_bytes {
             return Err(RegionError::BulkLimitExceeded);
         }
         let end = start.checked_add(byte_count).ok_or(RegionError::OffsetOverflow)?;
@@ -173,6 +137,7 @@ impl RegionDescriptor {
 /// Explicit hosted backend with bounded resident storage.
 pub struct InMemoryRegion {
     descriptor: RegionDescriptor,
+    bulk_limit_bytes: u64,
     storage: Vec<u8>,
     published_storage: Vec<u8>,
 }
@@ -207,7 +172,7 @@ impl InMemoryRegion {
         window_start: u64,
         window_count: u64,
     ) -> Result<Self, RegionError> {
-        RegionAddressProfile::new(profile.logical_index_bits, profile.byte_offset_bits)?;
+        let profile = profile.validate()?;
         let descriptor = RegionDescriptor {
             handle,
             element_stride,
@@ -227,7 +192,12 @@ impl InMemoryRegion {
         let storage_length =
             usize::try_from(storage_length).map_err(|_| RegionError::OffsetOverflow)?;
         let storage = vec![0u8; storage_length];
-        Ok(Self { descriptor, published_storage: storage.clone(), storage })
+        Ok(Self {
+            descriptor,
+            bulk_limit_bytes: profile.bulk_limit_bytes,
+            published_storage: storage.clone(),
+            storage,
+        })
     }
 
     pub(crate) fn from_backing(
@@ -259,7 +229,12 @@ impl InMemoryRegion {
             pinned: 0,
         };
         descriptor.validate()?;
-        Ok(Self { descriptor, published_storage: backing.clone(), storage: backing })
+        Ok(Self {
+            descriptor,
+            bulk_limit_bytes: HOST_ADDRESS_PROFILE.bulk_limit_bytes,
+            published_storage: backing.clone(),
+            storage: backing,
+        })
     }
 
     /// Returns the current descriptor for explicit lifecycle operations.
@@ -284,7 +259,11 @@ impl InMemoryRegion {
         generation: RegionGeneration,
     ) -> Result<RegionView<'_>, RegionError> {
         self.validate_access(handle, generation)?;
-        Ok(RegionView { descriptor: self.descriptor, storage: &self.storage })
+        Ok(RegionView {
+            descriptor: self.descriptor,
+            bulk_limit_bytes: self.bulk_limit_bytes,
+            storage: &self.storage,
+        })
     }
 
     /// Creates a mutable view whose lifetime prevents concurrent flush or reuse.
@@ -294,7 +273,11 @@ impl InMemoryRegion {
         generation: RegionGeneration,
     ) -> Result<MutableRegionView<'_>, RegionError> {
         self.validate_access(handle, generation)?;
-        Ok(MutableRegionView { descriptor: &mut self.descriptor, storage: &mut self.storage })
+        Ok(MutableRegionView {
+            descriptor: &mut self.descriptor,
+            bulk_limit_bytes: self.bulk_limit_bytes,
+            storage: &mut self.storage,
+        })
     }
 
     /// Advances the published generation after the mutable view has ended.
@@ -400,6 +383,7 @@ impl InMemoryRegion {
 #[derive(Debug)]
 pub struct RegionView<'region> {
     descriptor: RegionDescriptor,
+    bulk_limit_bytes: u64,
     storage: &'region [u8],
 }
 
@@ -416,17 +400,16 @@ impl RegionView<'_> {
         element_count: u64,
         destination: &mut [u8],
     ) -> Result<u64, RegionError> {
-        let range = self.descriptor.byte_range_for(start_index, element_count)?;
+        let range =
+            self.descriptor.byte_range_for(start_index, element_count, self.bulk_limit_bytes)?;
         if destination.len() != range.len() {
             return Err(RegionError::BufferTooSmall);
         }
-        unsafe {
-            std::ptr::copy(
-                self.storage.as_ptr().add(range.start),
-                destination.as_mut_ptr(),
-                range.len(),
-            );
-        }
+        copy_bulk_bytes(
+            unsafe { self.storage.as_ptr().add(range.start) },
+            destination.as_mut_ptr(),
+            range.len(),
+        );
         Ok(element_count)
     }
 }
@@ -435,6 +418,7 @@ impl RegionView<'_> {
 #[derive(Debug)]
 pub struct MutableRegionView<'region> {
     descriptor: &'region mut RegionDescriptor,
+    bulk_limit_bytes: u64,
     storage: &'region mut [u8],
 }
 
@@ -451,17 +435,16 @@ impl MutableRegionView<'_> {
         element_count: u64,
         source: &[u8],
     ) -> Result<u64, RegionError> {
-        let range = self.descriptor.byte_range_for(start_index, element_count)?;
+        let range =
+            self.descriptor.byte_range_for(start_index, element_count, self.bulk_limit_bytes)?;
         if source.len() != range.len() {
             return Err(RegionError::BufferTooSmall);
         }
-        unsafe {
-            std::ptr::copy(
-                source.as_ptr(),
-                self.storage.as_mut_ptr().add(range.start),
-                range.len(),
-            );
-        }
+        copy_bulk_bytes(
+            source.as_ptr(),
+            unsafe { self.storage.as_mut_ptr().add(range.start) },
+            range.len(),
+        );
         self.descriptor.dirty = 1;
         Ok(element_count)
     }

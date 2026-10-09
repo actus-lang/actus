@@ -12,6 +12,7 @@ mod region_bridge;
 #[cfg(test)]
 mod region_bridge_tests;
 mod region_pinning_bridge;
+mod region_profile;
 mod region_provider;
 mod region_range_bridge;
 mod serialization;

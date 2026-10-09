@@ -497,12 +497,32 @@ verb open_and_transfer(dat backing: Buffer) -> Int {
     erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened { Result.Err(_) => 2, Result.Ok(region) => { return consume_region(region: dat region); }, };
 }
+verb open_and_branch(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 4, Result.Ok(region) => { erg branch: Bool = true; if branch { return 0; } return 5; }, };
+}
+verb open_and_fail(dat backing: Buffer) -> Int {
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened { Result.Err(_) => 6, Result.Ok(region) => { erg destination: Buffer = Buffer[1]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 7, }; }, };
+}
 verb main() -> Int {
     erg first: Buffer = Buffer[4];
     erg early = open_and_return(backing: dat first);
     if early != 0 { return 3; }
     erg second: Buffer = Buffer[4];
-    return open_and_transfer(backing: dat second);
+    erg transferred = open_and_transfer(backing: dat second);
+    if transferred != 0 { return transferred; }
+    erg third: Buffer = Buffer[4];
+    erg branched = open_and_branch(backing: dat third);
+    if branched != 0 { return branched; }
+    erg fourth: Buffer = Buffer[4];
+    return open_and_fail(backing: dat fourth);
 }
 "#,
     )

@@ -1,6 +1,6 @@
 use std::mem::{align_of, offset_of, size_of};
 
-use super::{InMemoryRegion, RegionAddressProfile, RegionDescriptor, RegionError};
+use super::{InMemoryRegion, RegionAddressProfile, RegionDescriptor, RegionError, copy_bulk_bytes};
 
 #[test]
 fn bounded_views_read_write_and_publish() {
@@ -43,6 +43,28 @@ fn bounded_range_access_is_atomic_and_supports_empty_and_full_windows() {
 }
 
 #[test]
+fn failed_range_validation_preserves_buffers_and_region_state() {
+    let mut region = InMemoryRegion::new(7, 2, 4, 0, 2).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        view.write_range(0, 2, &[1, 2, 3, 4]).expect("valid range should be writable");
+    }
+    let staged = region.storage.clone();
+    let dirty = region.descriptor().dirty;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        assert_eq!(view.write_range(0, 2, &[9]), Err(RegionError::BufferTooSmall));
+    }
+    assert_eq!(region.storage, staged);
+    assert_eq!(region.descriptor().dirty, dirty);
+    let view = region.borrow_abs(7, generation).expect("read view should open");
+    let mut destination = [9u8; 1];
+    assert_eq!(view.read_range(0, 2, &mut destination), Err(RegionError::BufferTooSmall));
+    assert_eq!(destination, [9]);
+}
+
+#[test]
 fn bounded_ranges_reject_payloads_above_the_bulk_limit() {
     let mut region = InMemoryRegion::new(7, 1, 131_073, 0, 131_073)
         .expect("resident window should fit the bounded test payload");
@@ -52,6 +74,29 @@ fn bounded_ranges_reject_payloads_above_the_bulk_limit() {
     assert_eq!(view.read_range(0, 131_072, &mut accepted), Ok(131_072));
     let mut rejected = vec![0u8; 131_073];
     assert_eq!(view.read_range(0, 131_073, &mut rejected), Err(RegionError::BulkLimitExceeded));
+}
+
+#[test]
+fn target_profile_can_lower_the_bulk_limit_without_changing_region_operations() {
+    let profile = RegionAddressProfile::new(32, 32)
+        .expect("32-bit profile should be valid")
+        .with_bulk_limit(64)
+        .expect("lower bulk limit should be valid");
+    let mut region = InMemoryRegion::new_with_profile(profile, 7, 1, 1, 128, 0, 128)
+        .expect("lower-limit region should be valid");
+    let generation = region.descriptor().generation;
+    let view = region.borrow_abs(7, generation).expect("lower-limit read view should open");
+    let mut accepted = vec![0u8; 64];
+    assert_eq!(view.read_range(0, 64, &mut accepted), Ok(64));
+    let mut rejected = vec![0u8; 65];
+    assert_eq!(view.read_range(0, 65, &mut rejected), Err(RegionError::BulkLimitExceeded));
+}
+
+#[test]
+fn bulk_copy_preserves_memmove_overlap_semantics() {
+    let mut bytes = [1u8, 2, 3, 4];
+    unsafe { copy_bulk_bytes(bytes.as_ptr(), bytes.as_mut_ptr().add(1), 3) };
+    assert_eq!(bytes, [1, 1, 2, 3]);
 }
 
 #[test]
