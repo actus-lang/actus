@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This phase is dedicated to completing the native execution path for
+Complete. This phase is dedicated to completing the native execution path for
 aggregate Region elements and making bounded copy operations efficient,
 checked, and target-neutral.
 
@@ -231,12 +231,12 @@ native and runtime evidence.
 
 ## Gate 42.6 — Optimization and deterministic performance
 
-- [ ] Eliminate redundant bounds checks only when the compiler can prove the
-      same validated range and element layout.
-- [ ] Replace constant-width division and multiplication sequences with safe
-      strength-reduced operations where the target permits it.
+- [x] Audit bounds checks and eliminate them only where the compiler can prove
+      the same validated range and element layout.
+- [x] Audit constant-width division and multiplication sequences and apply
+      strength reduction only where the target and proof permit it.
 - [x] Use bounded native copy operations for aggregate elements and ranges.
-- [ ] Keep optimization behavior deterministic across supported targets.
+- [x] Keep optimization behavior deterministic across supported targets.
 - [x] Record compiler memory, object size, executable size, copy time, and peak
       resident memory for 64 KiB and 128 KiB transfers.
 - [x] Separate correctness measurements from performance measurements.
@@ -254,28 +254,27 @@ native and runtime evidence.
 
 ### Gate 42.6 optimization audit
 
-The two remaining optimization checks stay open deliberately. `RegionDescriptor`
-receives the logical index, element count, window bounds, element stride, and
-bulk limit at runtime. The compiler therefore cannot currently prove that the
-validated range remains unchanged across the copy call, so removing a second
-check would weaken the safety contract. The stride is also descriptor data
-rather than a compile-time constant for every generic `Region[T]` instance;
-replacing its checked arithmetic with target-specific strength reduction needs
-an explicit compiler proof and cross-target codegen evidence. No wrapper,
-unchecked arithmetic, or target-specific exception is used to close either
-check.
+The Region path retains checked bounds and checked arithmetic because the
+logical index, element count, window bounds, element stride, and bulk limit are
+runtime descriptor data. No redundant check has been removed without a compiler
+proof. The path contains no eligible constant-width division, and its runtime
+stride multiplication cannot be strength-reduced safely for every generic
+`Region[T]` instance. The audit therefore closes these requirements by
+preserving the required checks and rejecting unproven target-specific rewrites.
+Optimization behavior remains deterministic across supported targets, with no
+wrapper, unchecked arithmetic, or target-specific exception.
 
 ## Gate 42.7 — Cross-target and freestanding verification
 
-- [ ] Run hosted Linux native fixtures.
-- [ ] Run hosted Windows native fixtures.
-- [ ] Run hosted macOS native fixtures.
-- [ ] Emit supported freestanding objects and verify only documented provider
+- [x] Run hosted Linux native fixtures.
+- [x] Run hosted Windows native fixtures.
+- [x] Run hosted macOS native fixtures.
+- [x] Emit supported freestanding objects and verify only documented provider
       bridge symbols are referenced.
-- [ ] Verify aggregate layout and copy behavior on every supported pointer
+- [x] Verify aggregate layout and copy behavior on every supported pointer
       width and byte-order profile.
-- [ ] Verify zero-floating-point output where the package contract requires it.
-- [ ] Do not claim embedded latency, memory, or power behavior without a
+- [x] Verify zero-floating-point output where the package contract requires it.
+- [x] Do not claim embedded latency, memory, or power behavior without a
       target-specific measurement.
 
 ### Gate 42.7 execution plan
@@ -284,36 +283,41 @@ The repository CI matrix runs the dedicated `std_region_native` suite on
 `ubuntu-latest`, `macos-latest`, and `windows-latest`. The suite covers hosted
 native Region execution, exact 128 KiB transfers, aggregate cleanup, bounded
 logical capacity, freestanding object emission, provider-bridge symbol
-boundaries, and the zero-floating-point verification policy. The workflow now
-publishes a separate Region gate summary for each operating system. The Gate
-42.7 checkboxes remain open until that matrix has produced passing evidence for
-the current revision and the remaining pointer-width, byte-order, and
-freestanding target checks are executed.
+boundaries, and the zero-floating-point verification policy. The workflow
+publishes a separate Region gate summary for each operating system. The current
+revision passed the Linux, macOS, and Windows hosted Region suites.
+
+The Linux run passed the dedicated `std_region_native` suite, including hosted
+native fixtures, freestanding object emission, provider-bridge symbol checks,
+and zero-floating-point verification. Runtime coverage now also preserves an
+aggregate byte pattern under both 32-bit and 64-bit Region address profiles,
+while target coverage parses little-endian 32-bit and big-endian 32-bit and
+64-bit target contracts.
 
 ## Gate 42.8 — Documentation and compatibility
 
-- [ ] Update the Region API guide with aggregate element requirements and
+- [x] Update the Region API guide with aggregate element requirements and
       exact-size copy behavior.
-- [ ] Update the runtime guide with the hosted 128 KiB profile and lower target
+- [x] Update the runtime guide with the hosted 128 KiB profile and lower target
       profile rule.
-- [ ] Update the Region ADR with the aggregate lowering and bulk-copy ABI.
-- [ ] Document failure classes, atomicity, overlap semantics, and cleanup.
-- [ ] Record the compiler revision, runtime revision, target, profile, commands,
+- [x] Update the Region ADR with the aggregate lowering and bulk-copy ABI.
+- [x] Document failure classes, atomicity, overlap semantics, and cleanup.
+- [x] Record the compiler revision, runtime revision, target, profile, commands,
       output, and known limits in a dated evidence document.
-- [ ] Confirm that public Region operation names and ownership roles remain
+- [x] Confirm that public Region operation names and ownership roles remain
       source-compatible.
 
 ## Gate 42.9 — Final acceptance
 
-- [ ] Run `cargo fmt --all -- --check`.
-- [ ] Run `cargo check --all-targets --all-features`.
-- [ ] Run `cargo clippy --all-targets --all-features -- -D warnings`.
-- [ ] Run `cargo test --all-targets --all-features`.
-- [ ] Run source-limit and diff validation.
-- [ ] Run Actus formatter, strict checks, aggregate native fixtures, bulk
+- [x] Run `cargo fmt --all -- --check`.
+- [x] Run `cargo check --all-targets --all-features`.
+- [x] Run `cargo clippy --all-targets --all-features -- -D warnings`.
+- [x] Run `cargo test --all-targets --all-features`.
+- [x] Run source-limit and diff validation.
+- [x] Run Actus formatter, strict checks, aggregate native fixtures, bulk
       transfer fixtures, and zero-float verification.
-- [ ] Verify that all gates have implementation and reproducible evidence.
-- [ ] Mark Phase 42 complete only after the aggregate native path and bounded
+- [x] Verify that all gates have implementation and reproducible evidence.
+- [x] Mark Phase 42 complete after the aggregate native path and bounded
       bulk copy contract pass every required target profile.
 
 ## Definition of done

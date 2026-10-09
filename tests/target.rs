@@ -60,6 +60,23 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
 }
 
 #[test]
+fn target_contracts_expose_supported_pointer_widths_and_byte_orders() {
+    let little_32 =
+        TargetSpec::parse("i686-unknown-linux-gnu").expect("32-bit target should parse");
+    let big_32 =
+        TargetSpec::parse("powerpc-unknown-linux-gnu").expect("big-endian target should parse");
+    let big_64 = TargetSpec::parse("powerpc64-unknown-linux-gnu")
+        .expect("64-bit big-endian target should parse");
+
+    assert_eq!(little_32.pointer_width, target_lexicon::PointerWidth::U32);
+    assert_eq!(little_32.endianness, target_lexicon::Endianness::Little);
+    assert_eq!(big_32.pointer_width, target_lexicon::PointerWidth::U32);
+    assert_eq!(big_32.endianness, target_lexicon::Endianness::Big);
+    assert_eq!(big_64.pointer_width, target_lexicon::PointerWidth::U64);
+    assert_eq!(big_64.endianness, target_lexicon::Endianness::Big);
+}
+
+#[test]
 fn hosted_provider_contract_is_explicit_and_cache_stable() {
     let provider = actus::target::TimeProviderContract::hosted_default();
     assert_eq!(provider.clock_unit(), actus::target::ClockUnit::Nanoseconds);
