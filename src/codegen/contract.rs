@@ -128,6 +128,30 @@ pub struct BackendFailure {
     pub payload: Option<BackendValueId>,
 }
 
+pub type BackendCleanupAction = NativeInstruction;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendCleanupPlan {
+    pub depth: usize,
+    pub span: SourceSpan,
+    pub actions: Vec<BackendCleanupAction>,
+}
+
+pub fn lower_semantic_cleanup(
+    model: &crate::semantic::SemanticModel,
+) -> Result<Vec<BackendCleanupPlan>, BackendContractError> {
+    super::model::validate_cleanup_plans(model)
+        .map_err(BackendContractError::InvalidCleanupContract)?;
+    Ok(super::model::lower_cleanup_plans(model)
+        .into_iter()
+        .map(|plan| BackendCleanupPlan {
+            depth: plan.depth,
+            span: plan.span,
+            actions: plan.instructions,
+        })
+        .collect())
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendBlock {
     pub id: BackendBlockId,
@@ -295,6 +319,7 @@ pub enum BackendContractError {
     InvalidBlockReference,
     InvalidValueType,
     InvalidFailureType,
+    InvalidCleanupContract(String),
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
@@ -349,6 +374,9 @@ impl std::fmt::Display for BackendContractError {
             }
             Self::InvalidFailureType => {
                 formatter.write_str("backend typed failure must reference an enum result type")
+            }
+            Self::InvalidCleanupContract(reason) => {
+                write!(formatter, "invalid semantic cleanup contract: {reason}")
             }
             Self::ReturnSlotTypeMismatch => {
                 formatter.write_str("backend return slot must match an aggregate return type")

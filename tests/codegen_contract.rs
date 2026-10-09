@@ -1,11 +1,14 @@
 use actus::ast::Role;
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendFunction,
-    BackendInstruction, BackendLayout, BackendParameter, BackendPassingMode, BackendReturn,
-    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
-    NativeInstruction, SymbolIdentity, SymbolKind,
+    BackendBlock, BackendBlockId, BackendCleanupAction, BackendContractError, BackendFailure,
+    BackendFunction, BackendInstruction, BackendLayout, BackendParameter, BackendPassingMode,
+    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
+    BackendValueType, NativeInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup,
 };
 use actus::lexer::SourceSpan;
+use actus::semantic::{
+    AccessState, Binding, CleanupAction, OwnershipState, ScopeCleanup, SemanticModel,
+};
 
 fn verb_symbol() -> SymbolIdentity {
     SymbolIdentity::new("test", SymbolKind::Verb, "run").expect("valid verb symbol")
@@ -269,4 +272,45 @@ fn preserves_typed_failures_without_a_machine_backend() {
         }],
     );
     assert_eq!(invalid.validate(), Err(BackendContractError::InvalidFailureType));
+}
+
+#[test]
+fn adapts_validated_semantic_cleanup_to_the_neutral_contract() {
+    let mut model = SemanticModel::default();
+    model.bindings.push(Binding {
+        name: "arena".to_owned(),
+        role: Role::Erg,
+        ty: Some(actus::ast::BuiltinType::Int),
+        span: SourceSpan::new(0, 5),
+        ownership: OwnershipState::Active,
+        access: AccessState::Mutable,
+    });
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 5),
+        actions: vec![CleanupAction::DropBinding { binding_index: 0 }],
+    });
+
+    let plans = lower_semantic_cleanup(&model).expect("valid cleanup should lower");
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].depth, 1);
+    assert_eq!(
+        plans[0].actions,
+        vec![BackendCleanupAction::DropBinding { binding_index: 0, name: "arena".to_owned() }]
+    );
+}
+
+#[test]
+fn rejects_invalid_semantic_cleanup_before_backend_lowering() {
+    let mut model = SemanticModel::default();
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 1),
+        actions: vec![CleanupAction::DropBinding { binding_index: 99 }],
+    });
+
+    assert!(matches!(
+        lower_semantic_cleanup(&model),
+        Err(BackendContractError::InvalidCleanupContract(_))
+    ));
 }

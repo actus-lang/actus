@@ -10,10 +10,10 @@ mod serialization_migration;
 mod symbols;
 
 pub use contract::{
-    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendFunction,
-    BackendInstruction, BackendLayout, BackendParameter, BackendPassingMode, BackendReturn,
-    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueId,
-    BackendValueType,
+    BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan, BackendContractError,
+    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendParameter,
+    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
+    BackendUnsupportedOperation, BackendValueId, BackendValueType, lower_semantic_cleanup,
 };
 pub use cranelift::abi::{
     NativeAbiError, validate_external_native_signature, validate_native_signature,
