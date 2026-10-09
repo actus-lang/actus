@@ -186,6 +186,16 @@ fn cranelift_dependencies_are_optional_and_defaulted() {
 }
 
 #[test]
+fn llvm_integration_is_an_explicit_opt_in_feature() {
+    let manifest = fs::read_to_string(repository_path("Cargo.toml"))
+        .expect("Cargo manifest should be readable");
+    assert!(manifest.contains("default = [\"cranelift\"]"));
+    assert!(manifest.contains("llvm = []"));
+    assert!(!manifest.contains("llvm-sys = \""));
+    assert!(!manifest.contains("inkwell = \""));
+}
+
+#[test]
 fn cranelift_implementation_stays_inside_its_backend_boundary() {
     let root = repository_path("src/codegen");
     for path in rust_sources(&root) {

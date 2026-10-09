@@ -12,6 +12,7 @@ cranelift = [
     "dep:cranelift-module",
     "dep:cranelift-object",
 ]
+llvm = []
 
 [dependencies]
 ctrlc = "3.4.6"

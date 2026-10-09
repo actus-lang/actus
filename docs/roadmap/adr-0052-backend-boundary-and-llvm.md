@@ -139,6 +139,24 @@ Actus contract.
 
 ## Mandatory contracts
 
+### Initial LLVM integration policy
+
+LLVM is a hosted optional backend. Its implementation boundary is
+`src/codegen/llvm/`, and its build activation is the Cargo feature `llvm`.
+The default feature set remains `cranelift`; it must compile and operate
+without an LLVM installation, LLVM headers, LLVM libraries, or LLVM Rust
+bindings. Shared semantic lowering, target metadata, runtime contracts, and
+linker planning must not import LLVM types.
+
+The first LLVM implementation will use one explicitly selected LLVM major
+version and one matching Rust binding crate. The version, binding, discovery
+environment, minimum toolchain, and supported host targets will be committed
+together with the first hosted IR emitter. Until that implementation is
+available, the `llvm` feature is an architectural opt-in marker only; it does
+not claim that LLVM lowering is implemented. An LLVM feature build that lacks
+the required toolchain must return a typed setup diagnostic rather than fall
+back to Cranelift or silently emit a different object.
+
 ### Dependency isolation
 
 The default build must not require a system LLVM installation or compile LLVM
