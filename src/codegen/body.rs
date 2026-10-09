@@ -1,0 +1,192 @@
+use crate::ast::{Block, Expr, IfBranch, Stmt, VerbDecl};
+use crate::lexer::SourceSpan;
+
+use super::{
+    BackendBlock, BackendBlockId, BackendContractError, BackendInstruction, BackendTargetContext,
+    BackendValueId, SymbolIdentity,
+};
+
+pub trait BackendBodyProvider {
+    fn value_for(&self, expression: &Expr) -> Result<BackendValueId, BackendContractError>;
+
+    fn callee_for(
+        &self,
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError>;
+}
+
+pub fn lower_verb_body(
+    verb: &VerbDecl,
+    provider: &impl BackendBodyProvider,
+) -> Result<Vec<BackendBlock>, BackendContractError> {
+    let mut lowering = BodyLowering { provider, next_block: 1, blocks: Vec::new() };
+    let entry = BackendBlockId(0);
+    let entry_block = lowering.lower_block(entry, &verb.body)?;
+    lowering.blocks.insert(0, entry_block);
+    Ok(lowering.blocks)
+}
+
+struct BodyLowering<'a, P> {
+    provider: &'a P,
+    next_block: u32,
+    blocks: Vec<BackendBlock>,
+}
+
+impl<P: BackendBodyProvider> BodyLowering<'_, P> {
+    fn lower_block(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let mut instructions = Vec::new();
+        for (index, statement) in block.statements.iter().enumerate() {
+            if matches!(statement, Stmt::If { .. }) && index + 1 < block.statements.len() {
+                return Err(unsupported(
+                    statement_span(statement),
+                    "if statement with following statements",
+                ));
+            }
+            self.lower_statement(statement, &mut instructions)?;
+            if terminates(instructions.last()) {
+                break;
+            }
+        }
+        Ok(BackendBlock { id, instructions })
+    }
+
+    fn lower_statement(
+        &mut self,
+        statement: &Stmt,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        match statement {
+            Stmt::Return { value, span } => {
+                let value = value.as_ref().map(|expr| self.provider.value_for(expr)).transpose()?;
+                instructions.push(BackendInstruction::Return { value, span: *span });
+            }
+            Stmt::Expression {
+                expression: Expr::Call { callee, arguments, span },
+                span: stmt_span,
+            } => {
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.provider.value_for(&argument.expression))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let callee = self.provider.callee_for(callee, *span)?;
+                instructions.push(BackendInstruction::Call {
+                    callee,
+                    arguments,
+                    result: None,
+                    span: *stmt_span,
+                });
+            }
+            Stmt::If { condition, then_branch, else_branch, span } => {
+                self.lower_if(condition, then_branch, else_branch.as_ref(), *span, instructions)?;
+            }
+            _ => return Err(unsupported(statement_span(statement), unsupported_name(statement))),
+        }
+        Ok(())
+    }
+
+    fn lower_if(
+        &mut self,
+        condition: &Expr,
+        then_branch: &Block,
+        else_branch: Option<&IfBranch>,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        let condition = self.provider.value_for(condition)?;
+        let then_id = self.allocate_block();
+        let else_id = self.allocate_block();
+        let continuation_id = self.allocate_block();
+        instructions.push(BackendInstruction::Branch {
+            condition,
+            then_block: then_id,
+            else_block: else_id,
+            span,
+        });
+        let then_block = self.lower_block(then_id, then_branch)?;
+        self.blocks.push(ensure_jump(then_block, continuation_id, span));
+        let else_block = match else_branch {
+            None => BackendBlock { id: else_id, instructions: Vec::new() },
+            Some(IfBranch::Block(block)) => self.lower_block(else_id, block)?,
+            Some(IfBranch::ElseIf(_)) => return Err(unsupported(span, "else-if expression")),
+        };
+        self.blocks.push(ensure_jump(else_block, continuation_id, span));
+        self.blocks.push(BackendBlock { id: continuation_id, instructions: Vec::new() });
+        Ok(())
+    }
+
+    fn allocate_block(&mut self) -> BackendBlockId {
+        let id = BackendBlockId(self.next_block);
+        self.next_block += 1;
+        id
+    }
+}
+
+fn ensure_jump(mut block: BackendBlock, target: BackendBlockId, span: SourceSpan) -> BackendBlock {
+    if !terminates(block.instructions.last()) {
+        block.instructions.push(BackendInstruction::Jump { target, span });
+    }
+    block
+}
+
+fn terminates(instruction: Option<&BackendInstruction>) -> bool {
+    matches!(
+        instruction,
+        Some(BackendInstruction::Branch { .. })
+            | Some(BackendInstruction::Jump { .. })
+            | Some(BackendInstruction::Fail { .. })
+            | Some(BackendInstruction::Return { .. })
+            | Some(BackendInstruction::Trap { .. })
+    )
+}
+
+fn statement_span(statement: &Stmt) -> SourceSpan {
+    match statement {
+        Stmt::OwnerDecl { span, .. }
+        | Stmt::Assignment { span, .. }
+        | Stmt::CompoundAssignment { span, .. }
+        | Stmt::Expression { span, .. }
+        | Stmt::If { span, .. }
+        | Stmt::Return { span, .. }
+        | Stmt::ForRange { span, .. }
+        | Stmt::ForArray { span, .. }
+        | Stmt::Break { span }
+        | Stmt::Continue { span }
+        | Stmt::Drop { span, .. } => *span,
+        Stmt::Loop(block) | Stmt::Block(block) => block.span,
+    }
+}
+
+fn unsupported_name(statement: &Stmt) -> &'static str {
+    match statement {
+        Stmt::OwnerDecl { .. } => "owner declaration",
+        Stmt::Assignment { .. } => "assignment",
+        Stmt::CompoundAssignment { .. } => "compound assignment",
+        Stmt::Expression { .. } => "expression",
+        Stmt::If { .. } => "if statement",
+        Stmt::Return { .. } => "return statement",
+        Stmt::Loop(_) => "loop",
+        Stmt::ForRange { .. } => "range loop",
+        Stmt::ForArray { .. } => "array loop",
+        Stmt::Break { .. } => "break",
+        Stmt::Continue { .. } => "continue",
+        Stmt::Drop { .. } => "drop statement",
+        Stmt::Block(_) => "nested block",
+    }
+}
+
+fn unsupported(span: SourceSpan, name: &str) -> BackendContractError {
+    BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
+        "body-lowering",
+        span,
+        BackendTargetContext {
+            backend: "neutral-contract".to_owned(),
+            target: "semantic-model".to_owned(),
+        },
+        format!("{name} has no neutral lowering contract yet"),
+    ))
+}

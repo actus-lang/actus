@@ -1,3 +1,4 @@
+mod body;
 mod constants;
 mod contract;
 mod cranelift;
@@ -10,6 +11,7 @@ mod serialization_migration;
 mod signature;
 mod symbols;
 
+pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{
     BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan, BackendContractError,
     BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendParameter,

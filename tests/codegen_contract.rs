@@ -1,10 +1,12 @@
-use actus::ast::{Block, DispatchMode, Param, ReturnAccess, ReturnType, Role, TypeName, VerbDecl};
+use actus::ast::{
+    Block, DispatchMode, Expr, Param, ReturnAccess, ReturnType, Role, Stmt, TypeName, VerbDecl,
+};
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendCleanupAction, BackendContractError, BackendFailure,
-    BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider, BackendParameter,
-    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
+    BackendBlock, BackendBlockId, BackendBodyProvider, BackendCleanupAction, BackendContractError,
+    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
+    BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
     BackendUnsupportedOperation, BackendValueType, NativeInstruction, SymbolIdentity, SymbolKind,
-    lower_semantic_cleanup, lower_verb_signature,
+    lower_semantic_cleanup, lower_verb_body, lower_verb_signature,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -16,6 +18,26 @@ fn verb_symbol() -> SymbolIdentity {
 }
 
 struct TestLayouts;
+
+struct TestBodyProvider;
+
+impl BackendBodyProvider for TestBodyProvider {
+    fn value_for(
+        &self,
+        _expression: &Expr,
+    ) -> Result<actus::codegen::BackendValueId, BackendContractError> {
+        Ok(actus::codegen::BackendValueId(7))
+    }
+
+    fn callee_for(
+        &self,
+        callee: &str,
+        _span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError> {
+        SymbolIdentity::new("test", SymbolKind::Verb, callee)
+            .map_err(|_| BackendContractError::InvalidCallSymbol)
+    }
+}
 
 impl BackendLayoutProvider for TestLayouts {
     fn layout_for(&self, type_name: &TypeName) -> Option<actus::codegen::BackendLayout> {
@@ -414,4 +436,67 @@ fn rejects_transferred_scalar_without_a_layout_provider() {
         lower_verb_signature("app", &verb, &TestLayouts),
         Err(BackendContractError::Unsupported(_))
     ));
+}
+
+#[test]
+fn lowers_return_and_direct_calls_through_a_neutral_body_provider() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![
+            Stmt::Expression {
+                expression: Expr::Call {
+                    callee: "emit".to_owned(),
+                    arguments: Vec::new(),
+                    span: SourceSpan::new(40, 44),
+                },
+                span: SourceSpan::new(40, 45),
+            },
+            Stmt::Return { value: None, span: SourceSpan::new(46, 52) },
+        ],
+        span: SourceSpan::new(40, 52),
+    };
+
+    let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("body should lower");
+    assert_eq!(blocks.len(), 1);
+    assert!(matches!(blocks[0].instructions[0], BackendInstruction::Call { .. }));
+    assert!(matches!(blocks[0].instructions[1], BackendInstruction::Return { value: None, .. }));
+}
+
+#[test]
+fn lowers_if_control_flow_with_explicit_value_provider() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::If {
+            condition: Expr::BoolLiteral { value: true, span: SourceSpan::new(0, 4) },
+            then_branch: Block {
+                statements: vec![Stmt::Return { value: None, span: SourceSpan::new(5, 11) }],
+                span: SourceSpan::new(5, 11),
+            },
+            else_branch: Some(actus::ast::IfBranch::Block(Block {
+                statements: vec![Stmt::Return { value: None, span: SourceSpan::new(12, 18) }],
+                span: SourceSpan::new(12, 18),
+            })),
+            span: SourceSpan::new(0, 18),
+        }],
+        span: SourceSpan::new(0, 18),
+    };
+
+    let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("if should lower");
+    assert_eq!(blocks.len(), 4);
+    assert!(matches!(blocks[0].instructions[0], BackendInstruction::Branch { .. }));
+    assert!(matches!(blocks[1].instructions[0], BackendInstruction::Return { .. }));
+    assert!(matches!(blocks[2].instructions[0], BackendInstruction::Return { .. }));
+}
+
+#[test]
+fn rejects_body_constructs_without_a_neutral_lowering_contract() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Loop(Block { statements: Vec::new(), span: SourceSpan::new(0, 4) })],
+        span: SourceSpan::new(0, 4),
+    };
+
+    let error = lower_verb_body(&verb, &TestBodyProvider).expect_err("loop is not supported yet");
+    assert!(matches!(error, BackendContractError::Unsupported(_)));
+    assert!(error.to_string().contains("loop"));
 }
