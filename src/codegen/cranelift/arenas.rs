@@ -5,17 +5,17 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
-use super::cranelift::expressions::coerce_to_ir_type;
-use super::cranelift::expressions::{initializer_type, lower_expression};
-use super::cranelift::literals::StringDataValues;
-use super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
-use super::model::NativeCleanupSchedule;
-use super::structs::{copy_bytes, expression_native_type};
+use super::expressions::coerce_to_ir_type;
+use super::expressions::{initializer_type, lower_expression};
+use super::literals::StringDataValues;
+use super::native::{FunctionRef, NativeEmitError};
+use super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::model::NativeCleanupSchedule;
+use crate::codegen::structs::{copy_bytes, expression_native_type};
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_place(
+pub(crate) fn lower_place(
     function: &mut FunctionBuilder<'_>,
     receiver: &Expr,
     arguments: &[Argument],

@@ -138,7 +138,7 @@ fn lower_arena_method(
     if !is_arena_method(receiver, method, context) {
         return None;
     }
-    Some(super::super::super::arenas::lower_place(
+    Some(super::super::arenas::lower_place(
         function,
         receiver,
         arguments,
