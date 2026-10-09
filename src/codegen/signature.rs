@@ -1,4 +1,4 @@
-use crate::ast::{Param, PrimitiveType, ReturnType, Role, TypeName, VerbDecl};
+use crate::ast::{Param, PrimitiveType, ReturnAccess, ReturnType, Role, TypeName, VerbDecl};
 
 use super::{
     BackendContractError, BackendFunction, BackendLayout, BackendParameter, BackendPassingMode,
@@ -64,6 +64,7 @@ fn lower_return(
 ) -> Result<BackendReturn, BackendContractError> {
     let Some(return_type) = return_type else {
         return Ok(BackendReturn {
+            role: None,
             ty: BackendValueType::Unit,
             passing: BackendReturnMode::Direct,
         });
@@ -71,8 +72,11 @@ fn lower_return(
     let (ty, layout) = lower_type(&return_type.ty, layouts)?;
     let passing =
         layout.map_or(BackendReturnMode::Direct, |layout| BackendReturnMode::ReturnSlot { layout });
-    let _ = return_type.access;
-    Ok(BackendReturn { ty, passing })
+    let role = Some(match return_type.access {
+        ReturnAccess::Owned => Role::Erg,
+        ReturnAccess::Abs => Role::Abs,
+    });
+    Ok(BackendReturn { role, ty, passing })
 }
 
 fn lower_type(

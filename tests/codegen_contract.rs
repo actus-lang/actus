@@ -86,6 +86,7 @@ fn unit_function(parameters: Vec<BackendParameter>, blocks: Vec<BackendBlock>) -
         symbol: verb_symbol(),
         parameters,
         return_value: BackendReturn {
+            role: None,
             ty: BackendValueType::Unit,
             passing: BackendReturnMode::Direct,
         },
@@ -232,6 +233,7 @@ fn validates_aggregate_return_slots_without_a_backend() {
         symbol: verb_symbol(),
         parameters: Vec::new(),
         return_value: BackendReturn {
+            role: None,
             ty: BackendValueType::Aggregate { layout },
             passing: BackendReturnMode::ReturnSlot { layout },
         },
@@ -247,6 +249,7 @@ fn rejects_return_slots_for_non_aggregate_values() {
         symbol: verb_symbol(),
         parameters: Vec::new(),
         return_value: BackendReturn {
+            role: None,
             ty: BackendValueType::Integer { signed: false, width: 32 },
             passing: BackendReturnMode::ReturnSlot {
                 layout: BackendLayout { size: 4, alignment: 4 },
@@ -394,6 +397,13 @@ fn lowers_callable_roles_and_layouts_without_a_machine_backend() {
         BackendPassingMode::OwnershipTransfer { .. }
     ));
     assert!(matches!(signature.return_value.passing, BackendReturnMode::ReturnSlot { .. }));
+    assert_eq!(signature.return_value.role, Some(Role::Erg));
+
+    let mut immutable_return = verb_with_signature();
+    immutable_return.return_type.as_mut().expect("return type").access = ReturnAccess::Abs;
+    let signature = lower_verb_signature("app", &immutable_return, &TestLayouts)
+        .expect("immutable return should lower");
+    assert_eq!(signature.return_value.role, Some(Role::Abs));
 }
 
 #[test]

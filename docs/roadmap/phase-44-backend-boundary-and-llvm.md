@@ -172,7 +172,8 @@ transfer capability modes. `lower_semantic_cleanup` validates semantic cleanup
 plans before converting them into backend-neutral cleanup actions; full
 semantic function and signature lowering now uses `lower_verb_signature` with
 an injected neutral layout provider. Backend-specific layout registries remain
-outside this adapter.
+outside this adapter. Return ownership is preserved as `erg` for `Owned` and
+`abs` for immutable returns.
 
 ## Gate 44.3 — Isolate the existing Cranelift backend
 

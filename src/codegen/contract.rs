@@ -73,8 +73,9 @@ pub enum BackendReturnMode {
     ReturnSlot { layout: BackendLayout },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendReturn {
+    pub role: Option<Role>,
     pub ty: BackendValueType,
     pub passing: BackendReturnMode,
 }
