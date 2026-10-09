@@ -9,9 +9,9 @@ use crate::ast::{
 };
 use crate::semantic::GenericInstance;
 
+use super::cranelift::native::NativeEmitError;
 use super::enum_layout::EnumLayout;
 use super::generic::{canonical_type_name, specialized_enums, specialized_structs};
-use super::native::NativeEmitError;
 use super::types::NativeType;
 
 mod arrays;

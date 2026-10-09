@@ -12,7 +12,7 @@ use crate::runtime::{
     PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
 };
 
-use super::super::native::{FunctionMeta, NativeEmitError};
+use super::super::cranelift::native::{FunctionMeta, NativeEmitError};
 use super::super::types::NativeType;
 
 const SERIALIZATION_I64: NativeType = NativeType::Integer { signed: true, width: 64 };

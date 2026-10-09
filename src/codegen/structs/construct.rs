@@ -5,11 +5,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{StructFieldInit, TypeName};
 
+use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::expressions::lower_expression;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
 use super::super::model::NativeCleanupSchedule;
-use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::memory::store_struct_field;
 

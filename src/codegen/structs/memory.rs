@@ -1,8 +1,8 @@
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
+use super::super::cranelift::native::NativeEmitError;
 use super::super::layout::{FieldLayout, LayoutRegistry};
-use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 
 pub(super) fn store_struct_field(

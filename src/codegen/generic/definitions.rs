@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::native::NativeEmitError;
+use super::super::cranelift::native::NativeEmitError;
 
 pub(in crate::codegen) fn specialized_structs(
     program: &Program,

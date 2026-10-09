@@ -11,12 +11,12 @@ use cranelift_object::ObjectModule;
 use crate::ast::VerbDecl;
 use crate::configuration::NativeBackendConfiguration;
 
+use super::cranelift::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::declarations::{native_signature_for_definition, native_signature_for_entry};
 use super::layout::LayoutRegistry;
 use super::literals::{StringDataIds, StringDataValues, declare_string_values};
 use super::lowering::lower_body;
 use super::model::NativeCleanupSchedule;
-use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::types::NativeType;
 use super::vtable::{VtableDataIds, declare_vtable_values};
 use flow::emit_flow;

@@ -7,6 +7,7 @@ use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
 use super::super::abi::{validate_external_native_signature, validate_native_signature};
+use super::super::cranelift::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::super::cranelift::runtime::{
     declare_buffer_cleanup_function, declare_enum_cleanup_function,
     declare_region_cleanup_function, declare_runtime_functions,
@@ -16,7 +17,6 @@ use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataIds;
 use super::super::model::NativeCleanupSchedule;
-use super::super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 
 pub(super) fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
     match declaration {

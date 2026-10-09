@@ -1,7 +1,7 @@
 use crate::ast::{PackDecl, PackField, PrimitiveType, Role, StructFieldRole, primitive_type};
 
 use super::{LayoutRegistry, PackFieldLayout, PackLayout};
-use crate::codegen::native::NativeEmitError;
+use crate::codegen::cranelift::native::NativeEmitError;
 
 impl LayoutRegistry {
     pub(super) fn pack_layout_for(&self, pack: &PackDecl) -> Result<PackLayout, NativeEmitError> {

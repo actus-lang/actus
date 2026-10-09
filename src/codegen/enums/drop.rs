@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
 use cranelift_frontend::FunctionBuilder;
 
+use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::enum_layout::{EnumFieldLayout, EnumLayout, EnumVariantLayout};
 use super::super::layout::LayoutRegistry;
-use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::performance::dispatch_key;
 use super::super::structs::emit_struct_drop;
 use super::super::types::NativeType;

@@ -4,8 +4,8 @@ use crate::semantic::ReachablePerformance;
 
 use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
 
+use super::cranelift::native::{FunctionMeta, NativeEmitError};
 use super::layout::LayoutRegistry;
-use super::native::{FunctionMeta, NativeEmitError};
 use super::symbols::{SymbolIdentity, SymbolKind};
 use super::types::NativeType;
 use cranelift_module::{Linkage, Module};

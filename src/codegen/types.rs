@@ -2,7 +2,7 @@ use cranelift_codegen::ir::Type;
 
 use crate::ast::{BuiltinType, PrimitiveType, TypeName, lookup_builtin_type, primitive_type};
 
-use super::native::NativeEmitError;
+use super::cranelift::native::NativeEmitError;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NativeType {

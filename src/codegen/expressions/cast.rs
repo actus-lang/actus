@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, TypeName};
 
 use super::super::calls::CallLoweringContext;
-use super::super::native::NativeEmitError;
+use super::super::cranelift::native::NativeEmitError;
 use super::super::structs::expression_native_type;
 use super::super::types::NativeType;
 use super::lower_expression;

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::ast::{Block, Expr, ExternalVerbDecl, Place, Stmt, VerbDecl, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
 
-use super::NativeEmitError;
+use super::native::NativeEmitError;
 
 /// Selects the native declarations reachable from an object root.
 ///

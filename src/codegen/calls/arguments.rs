@@ -5,8 +5,8 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, Expr};
 
+use super::super::cranelift::native::NativeEmitError;
 use super::super::expressions::lower_expression;
-use super::super::native::NativeEmitError;
 use super::context::CallLoweringContext;
 
 struct CallArgumentModes<'a> {

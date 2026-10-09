@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_object::ObjectModule;
 
+use super::super::cranelift::native::{FunctionMeta, NativeEmitError};
 use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataIds;
 use super::super::model::NativeCleanupSchedule;
-use super::super::native::{FunctionMeta, NativeEmitError};
 use super::super::types::NativeType;
 use super::super::vtable::VtableDataIds;
 use super::{PerformanceDefinition, dispatch_key};

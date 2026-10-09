@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeIdentity, TypeName, VerbDecl};
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::native::NativeEmitError;
+use super::super::cranelift::native::NativeEmitError;
 use super::definitions::canonical_type_name;
 use super::verb_body::{specialize_block, specialize_param, specialize_return_type};
 

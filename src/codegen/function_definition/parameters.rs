@@ -7,8 +7,8 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::{DispatchMode, Param, VerbDecl};
 
+use super::super::cranelift::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::super::layout::LayoutRegistry;
-use super::super::native::{FunctionMeta, FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 
 pub(super) type BoundParameters<'a> =

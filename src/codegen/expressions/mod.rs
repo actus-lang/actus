@@ -7,10 +7,10 @@ use crate::ast::Expr;
 
 use super::calls::CallLoweringContext;
 use super::case::lower_case;
+use super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::layout::LayoutRegistry;
 use super::literals::StringDataValues;
 use super::model::NativeCleanupSchedule;
-use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;
 
 mod buffer;

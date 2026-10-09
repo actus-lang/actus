@@ -8,7 +8,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{BinaryOp, Expr, UnaryOp};
 
 use super::super::calls::CallLoweringContext;
-use super::super::native::NativeEmitError;
+use super::super::cranelift::native::NativeEmitError;
 use super::super::types::NativeType;
 use super::initializer_type;
 

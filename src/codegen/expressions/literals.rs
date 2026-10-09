@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, types};
 use cranelift_frontend::FunctionBuilder;
 
+use super::super::cranelift::native::NativeEmitError;
 use super::super::literals::StringDataValues;
-use super::super::native::NativeEmitError;
 
 pub(in crate::codegen) fn lower_integer(
     function: &mut FunctionBuilder<'_>,

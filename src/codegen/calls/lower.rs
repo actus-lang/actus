@@ -6,8 +6,8 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Argument, IntrinsicKind, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
 
+use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::layout::LayoutRegistry;
-use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::arguments::lower_call_arguments;
 use super::context::CallLoweringContext;

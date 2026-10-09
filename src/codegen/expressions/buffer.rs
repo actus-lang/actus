@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 
 pub(crate) fn emit_buffer_drop(
     function: &mut FunctionBuilder<'_>,

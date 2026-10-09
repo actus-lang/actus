@@ -3,8 +3,8 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Pattern;
 
+use super::super::cranelift::native::NativeEmitError;
 use super::super::layout::LayoutRegistry;
-use super::super::native::NativeEmitError;
 use super::super::types::NativeType;
 
 pub(super) fn match_pattern(

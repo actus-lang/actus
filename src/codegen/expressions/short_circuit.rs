@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{BinaryOp, Expr};
 
 use super::super::calls::CallLoweringContext;
-use super::super::native::NativeEmitError;
+use super::super::cranelift::native::NativeEmitError;
 use super::operations::lower_expression_with_context;
 
 pub(super) fn lower_short_circuit(

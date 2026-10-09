@@ -5,9 +5,9 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::Stmt;
 
 use super::super::cleanup::emit_scope_cleanup;
+use super::super::cranelift::native::{FunctionRef, NativeEmitError};
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
-use super::super::native::{FunctionRef, NativeEmitError};
 use super::super::types::NativeType;
 use super::{Flow, NativeCleanupSchedule};
 

@@ -5,7 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBody, IfBranch, Stmt};
 
-use super::native::NativeEmitError;
+use super::cranelift::native::NativeEmitError;
 
 pub(super) fn jump_with_values(
     function: &mut FunctionBuilder<'_>,

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::Value;
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::native::NativeEmitError;
+use super::super::cranelift::native::NativeEmitError;
 use super::super::types::NativeType;
 
 pub(super) fn seal_checked_pack_block(

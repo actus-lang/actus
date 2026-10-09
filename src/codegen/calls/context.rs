@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use cranelift_codegen::ir::Value;
 
+use super::super::cranelift::native::FunctionRef;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::StringDataValues;
 use super::super::lowering::LoopTargets;
 use super::super::model::NativeCleanupSchedule;
-use super::super::native::FunctionRef;
 use super::super::types::NativeType;
 
 pub(crate) struct CallLoweringContext<'maps, 'keys> {

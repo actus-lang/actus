@@ -5,12 +5,12 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
+use super::super::cranelift::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::super::cranelift::object::create_module;
 use super::super::generic::GenericLayoutRegistry;
 use super::super::layout::LayoutRegistry;
 use super::super::literals::define_string_data;
 use super::super::model::{NativeCleanupSchedule, validate_cleanup_plans};
-use super::super::native::{FunctionMeta, NativeEmitError, NativeSymbolBindings};
 use super::super::performance::PerformanceRegistry;
 use super::super::performance::define_performances;
 use super::super::result_constructors::normalize_program;
@@ -35,13 +35,12 @@ pub(crate) fn emit_program_object_for_target(
 ) -> Result<Vec<u8>, NativeEmitError> {
     let (program, semantic) = prepare_program(program, target, additional_instances)?;
     let (all_verbs, all_external_verbs) = collect_declarations(&program);
-    let (verbs, external_verbs) =
-        super::super::native::dependencies::reachable_declarations_with_roots(
-            &all_verbs,
-            &all_external_verbs,
-            roots.symbol,
-            roots.exported,
-        )?;
+    let (verbs, external_verbs) = super::dependencies::reachable_declarations_with_roots(
+        &all_verbs,
+        &all_external_verbs,
+        roots.symbol,
+        roots.exported,
+    )?;
     if verbs.is_empty() && external_verbs.is_empty() && roots.symbol.is_none() {
         return emit_empty_object(configuration, target);
     }

@@ -6,9 +6,7 @@ use crate::ast::Program;
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::types::NativeType;
-
-pub(super) mod dependencies;
+use super::super::types::NativeType;
 
 #[derive(Debug)]
 pub struct NativeEmitError(pub String);
@@ -47,22 +45,22 @@ impl NativeSymbolBindings {
     }
 }
 
-pub(super) struct FunctionMeta {
-    pub(super) id: FuncId,
-    pub(super) parameter_names: Vec<String>,
-    pub(super) return_type: NativeType,
-    pub(super) dynamic_params: Vec<bool>,
-    pub(super) dynamic_roles: Vec<Option<String>>,
-    pub(super) ins_params: Vec<bool>,
+pub(crate) struct FunctionMeta {
+    pub(crate) id: FuncId,
+    pub(crate) parameter_names: Vec<String>,
+    pub(crate) return_type: NativeType,
+    pub(crate) dynamic_params: Vec<bool>,
+    pub(crate) dynamic_roles: Vec<Option<String>>,
+    pub(crate) ins_params: Vec<bool>,
 }
 
-pub(super) struct FunctionRef {
-    pub(super) reference: FuncRef,
-    pub(super) parameter_names: Vec<String>,
-    pub(super) return_type: NativeType,
-    pub(super) dynamic_params: Vec<bool>,
-    pub(super) dynamic_roles: Vec<Option<String>>,
-    pub(super) ins_params: Vec<bool>,
+pub(crate) struct FunctionRef {
+    pub(crate) reference: FuncRef,
+    pub(crate) parameter_names: Vec<String>,
+    pub(crate) return_type: NativeType,
+    pub(crate) dynamic_params: Vec<bool>,
+    pub(crate) dynamic_roles: Vec<Option<String>>,
+    pub(crate) ins_params: Vec<bool>,
 }
 
 impl std::fmt::Display for NativeEmitError {
@@ -93,17 +91,12 @@ pub(crate) fn reachable_call_names(
             _ => None,
         })
         .collect::<Vec<_>>();
-    dependencies::reachable_call_names(&verbs, &external_verbs, Some(symbol))
+    super::dependencies::reachable_call_names(&verbs, &external_verbs, Some(symbol))
 }
 
 pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
     let target = TargetSpec::host().map_err(|error| NativeEmitError(error.to_string()))?;
-    super::cranelift::object::emit_i32_object(
-        symbol,
-        0,
-        &NativeBackendConfiguration::default(),
-        &target,
-    )
+    super::object::emit_i32_object(symbol, 0, &NativeBackendConfiguration::default(), &target)
 }
 
 pub fn emit_program_object(program: &Program, symbol: &str) -> Result<Vec<u8>, NativeEmitError> {
@@ -125,9 +118,9 @@ pub fn emit_program_object_for_target(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    super::cranelift::emission::emit_program_object_for_target(
+    super::emission::emit_program_object_for_target(
         program,
-        super::cranelift::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
+        super::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
         "actus_root",
         configuration,
         target,
@@ -161,9 +154,9 @@ pub fn emit_program_object_for_target_in_namespace_with_bindings(
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    super::cranelift::emission::emit_program_object_for_target(
+    super::emission::emit_program_object_for_target(
         program,
-        super::cranelift::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
+        super::emission::NativeRootSelection { symbol: Some(symbol), exported: None },
         namespace_prefix,
         configuration,
         target,
@@ -210,7 +203,7 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances(
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
-    generic_instances: &[super::super::semantic::GenericInstance],
+    generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<Vec<u8>, NativeEmitError> {
     emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
         program,
@@ -229,12 +222,12 @@ pub fn emit_module_object_for_target_in_namespace_with_bindings_and_instances_an
     configuration: &NativeBackendConfiguration,
     target: &TargetSpec,
     bindings: &NativeSymbolBindings,
-    generic_instances: &[super::super::semantic::GenericInstance],
+    generic_instances: &[crate::semantic::GenericInstance],
     exported_roots: Option<&[String]>,
 ) -> Result<Vec<u8>, NativeEmitError> {
-    super::cranelift::emission::emit_program_object_for_target(
+    super::emission::emit_program_object_for_target(
         program,
-        super::cranelift::emission::NativeRootSelection { symbol: None, exported: exported_roots },
+        super::emission::NativeRootSelection { symbol: None, exported: exported_roots },
         namespace_prefix,
         configuration,
         target,

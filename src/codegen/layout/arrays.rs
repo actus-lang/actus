@@ -4,7 +4,7 @@ use crate::ast::{
 
 use super::super::generic::canonical_type_name;
 use super::{ArrayLayout, LayoutRegistry};
-use crate::codegen::native::NativeEmitError;
+use crate::codegen::cranelift::native::NativeEmitError;
 use crate::semantic::GenericInstance;
 
 pub(crate) fn array_definitions(
