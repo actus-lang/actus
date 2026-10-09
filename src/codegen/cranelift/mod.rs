@@ -10,6 +10,7 @@ pub(super) mod emission;
 pub(super) mod emitter_declarations;
 pub(super) mod enums;
 pub(super) mod expressions;
+pub(super) mod function_definition;
 pub(super) mod ir_audit;
 mod isa;
 pub(super) mod literals;

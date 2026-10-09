@@ -364,7 +364,7 @@ fn emit_branch_flow(
             } else {
                 None
             };
-            crate::codegen::function_definition::emit_value_return(
+            crate::codegen::cranelift::function_definition::emit_value_return(
                 function,
                 Some(value_type),
                 return_slot,

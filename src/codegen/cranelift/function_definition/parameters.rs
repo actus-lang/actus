@@ -7,9 +7,9 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::{DispatchMode, Param, VerbDecl};
 
-use super::super::cranelift::native::{FunctionMeta, FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::native::{FunctionMeta, FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
 
 pub(super) type BoundParameters<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);

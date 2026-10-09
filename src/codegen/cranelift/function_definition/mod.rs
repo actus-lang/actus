@@ -11,20 +11,20 @@ use cranelift_object::ObjectModule;
 use crate::ast::VerbDecl;
 use crate::configuration::NativeBackendConfiguration;
 
-use super::cranelift::declarations::{native_signature_for_definition, native_signature_for_entry};
-use super::cranelift::literals::{StringDataIds, StringDataValues, declare_string_values};
-use super::cranelift::native::{FunctionMeta, FunctionRef, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::cranelift::vtable::{VtableDataIds, declare_vtable_values};
-use super::layout::LayoutRegistry;
-use super::lowering::lower_body;
-use super::model::NativeCleanupSchedule;
+use super::declarations::{native_signature_for_definition, native_signature_for_entry};
+use super::literals::{StringDataIds, StringDataValues, declare_string_values};
+use super::native::{FunctionMeta, FunctionRef, NativeEmitError};
+use super::types::NativeType;
+use super::vtable::{VtableDataIds, declare_vtable_values};
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::lowering::lower_body;
+use crate::codegen::model::NativeCleanupSchedule;
 use flow::emit_flow;
 pub(crate) use flow::emit_value_return;
 use parameters::{BoundParameters, bind_parameters, declare_function_refs};
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn define_function(
+pub(crate) fn define_function(
     module: &mut ObjectModule,
     frontend_config: TargetFrontendConfig,
     verb: &VerbDecl,
@@ -61,7 +61,7 @@ pub(super) fn define_function(
         NativeEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
     })?;
     if configuration.verifies_no_float_ir() {
-        let floating = super::cranelift::ir_audit::floating_point_instructions(&context.func);
+        let floating = super::ir_audit::floating_point_instructions(&context.func);
         if !floating.is_empty() {
             return Err(NativeEmitError(format!(
                 "native function `{}` contains floating-point IR instructions: {floating:?}",
@@ -122,7 +122,7 @@ fn lower_function_flow(
     layouts: &LayoutRegistry,
     force_entry_return: bool,
 ) -> Result<
-    (Option<NativeType>, Option<cranelift_codegen::ir::Value>, super::lowering::Flow),
+    (Option<NativeType>, Option<cranelift_codegen::ir::Value>, crate::codegen::lowering::Flow),
     NativeEmitError,
 > {
     let (return_type, return_slot, (locals, local_types)) =

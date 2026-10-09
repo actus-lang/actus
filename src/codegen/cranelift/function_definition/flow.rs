@@ -1,30 +1,30 @@
 use cranelift_codegen::ir::InstBuilder;
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 use crate::codegen::cranelift::structs::copy_bytes;
+use crate::codegen::layout::LayoutRegistry;
 
 pub(super) fn emit_flow(
     function: &mut FunctionBuilder<'_>,
     return_type: Option<NativeType>,
     return_slot: Option<cranelift_codegen::ir::Value>,
-    flow: super::super::lowering::Flow,
+    flow: crate::codegen::lowering::Flow,
     layouts: &LayoutRegistry,
     force_void_entry_return: bool,
 ) -> Result<(), NativeEmitError> {
     match flow {
-        super::super::lowering::Flow::Return(result, _) => {
+        crate::codegen::lowering::Flow::Return(result, _) => {
             emit_value_return(function, return_type, return_slot, result, layouts)
         }
-        super::super::lowering::Flow::Fallthrough => {
+        crate::codegen::lowering::Flow::Fallthrough => {
             emit_fallthrough(function, return_type, return_slot, force_void_entry_return)
         }
-        super::super::lowering::Flow::VoidReturn => {
+        crate::codegen::lowering::Flow::VoidReturn => {
             emit_void_return(function, return_type, return_slot, force_void_entry_return)
         }
-        super::super::lowering::Flow::Break | super::super::lowering::Flow::Continue => {
+        crate::codegen::lowering::Flow::Break | crate::codegen::lowering::Flow::Continue => {
             Err(NativeEmitError("loop control escaped its loop during native lowering".to_owned()))
         }
     }

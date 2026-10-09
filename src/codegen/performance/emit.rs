@@ -7,10 +7,10 @@ use super::super::cranelift::literals::StringDataIds;
 use super::super::cranelift::native::{FunctionMeta, NativeEmitError};
 use super::super::cranelift::types::NativeType;
 use super::super::cranelift::vtable::VtableDataIds;
-use super::super::function_definition::define_function;
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
 use super::{PerformanceDefinition, dispatch_key};
+use crate::codegen::cranelift::function_definition::define_function;
 use crate::configuration::NativeBackendConfiguration;
 
 #[allow(clippy::too_many_arguments)]

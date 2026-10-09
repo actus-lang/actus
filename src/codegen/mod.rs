@@ -4,7 +4,6 @@ mod constants;
 mod control_flow;
 mod cranelift;
 mod enum_layout;
-mod function_definition;
 mod generic;
 mod layout;
 mod linker;
