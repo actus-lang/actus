@@ -6,17 +6,17 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 ctrlc = "3.4.6"
-cranelift-codegen = "0.135.2"
-cranelift-frontend = "0.135.2"
-cranelift-module = "0.135.2"
-cranelift-object = "0.135.2"
+cranelift-codegen = "0.136.2"
+cranelift-frontend = "0.136.2"
+cranelift-module = "0.136.2"
+cranelift-object = "0.136.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 target-lexicon = "0.13.5"
 toml = "0.9.8"
 
 [dev-dependencies]
-object = "0.39.1"
+object = "0.40.0"
 
 [[bench]]
 name = "frontend"
