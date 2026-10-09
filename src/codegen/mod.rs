@@ -14,9 +14,10 @@ mod symbols;
 pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{
     BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan, BackendContractError,
-    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendParameter,
-    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
-    BackendUnsupportedOperation, BackendValueId, BackendValueType, lower_semantic_cleanup,
+    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
+    BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
+    BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
+    lower_semantic_cleanup,
 };
 pub use cranelift::abi::{
     NativeAbiError, validate_external_native_signature, validate_native_signature,

@@ -3,10 +3,11 @@ use actus::ast::{
 };
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendBodyProvider, BackendCleanupAction, BackendContractError,
-    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
-    BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
-    BackendUnsupportedOperation, BackendValueType, NativeInstruction, SymbolIdentity, SymbolKind,
-    lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_signature,
+    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
+    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
+    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
+    NativeInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb,
+    lower_verb_body, lower_verb_signature,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -436,6 +437,43 @@ fn rejects_transferred_scalar_without_a_layout_provider() {
         lower_verb_signature("app", &verb, &TestLayouts),
         Err(BackendContractError::Unsupported(_))
     ));
+}
+
+#[test]
+fn validates_functions_and_external_symbols_as_one_neutral_module() {
+    let external_symbol =
+        SymbolIdentity::new("runtime", SymbolKind::External, "write_byte").expect("valid symbol");
+    let module = BackendModule {
+        externals: vec![BackendExternal {
+            symbol: external_symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+        }],
+        functions: vec![unit_function(
+            Vec::new(),
+            vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        )],
+    };
+    assert!(module.validate().is_ok());
+
+    let duplicate = BackendModule {
+        externals: Vec::new(),
+        functions: vec![
+            unit_function(
+                Vec::new(),
+                vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            ),
+            unit_function(
+                Vec::new(),
+                vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            ),
+        ],
+    };
+    assert_eq!(duplicate.validate(), Err(BackendContractError::DuplicateModuleSymbol));
 }
 
 #[test]

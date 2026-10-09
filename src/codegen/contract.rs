@@ -168,15 +168,57 @@ pub struct BackendFunction {
     pub blocks: Vec<BackendBlock>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendExternal {
+    pub symbol: SymbolIdentity,
+    pub parameters: Vec<BackendParameter>,
+    pub return_value: BackendReturn,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct BackendModule {
+    pub externals: Vec<BackendExternal>,
+    pub functions: Vec<BackendFunction>,
+}
+
+impl BackendModule {
+    pub fn validate(&self) -> Result<(), BackendContractError> {
+        let mut symbols = BTreeSet::new();
+        for external in &self.externals {
+            if external.symbol.kind() != SymbolKind::External {
+                return Err(BackendContractError::InvalidExternalSymbol);
+            }
+            validate_signature(&external.parameters, &external.return_value)?;
+            if !symbols.insert(external.symbol.clone()) {
+                return Err(BackendContractError::DuplicateModuleSymbol);
+            }
+        }
+        for function in &self.functions {
+            function.validate()?;
+            if !symbols.insert(function.symbol.clone()) {
+                return Err(BackendContractError::DuplicateModuleSymbol);
+            }
+        }
+        Ok(())
+    }
+}
+
 impl BackendFunction {
     pub fn validate(&self) -> Result<(), BackendContractError> {
         validate_function_symbol(&self.symbol)?;
-        validate_parameters(&self.parameters)?;
-        validate_return(&self.return_value)?;
+        validate_signature(&self.parameters, &self.return_value)?;
         let block_ids = validate_blocks(&self.blocks, self.entry)?;
         validate_instructions(&self.blocks, &block_ids)?;
         Ok(())
     }
+}
+
+fn validate_signature(
+    parameters: &[BackendParameter],
+    return_value: &BackendReturn,
+) -> Result<(), BackendContractError> {
+    validate_parameters(parameters)?;
+    validate_return(return_value)
 }
 
 fn validate_function_symbol(symbol: &SymbolIdentity) -> Result<(), BackendContractError> {
@@ -313,6 +355,7 @@ fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError>
 pub enum BackendContractError {
     InvalidLayout(&'static str),
     InvalidFunctionSymbol,
+    InvalidExternalSymbol,
     MissingEntryBlock,
     EmptyParameterName,
     DuplicateParameterName,
@@ -324,6 +367,7 @@ pub enum BackendContractError {
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
+    DuplicateModuleSymbol,
     Unsupported(BackendUnsupportedOperation),
 }
 
@@ -357,6 +401,7 @@ impl std::fmt::Display for BackendContractError {
         match self {
             Self::InvalidLayout(reason) => write!(formatter, "invalid backend layout: {reason}"),
             Self::InvalidFunctionSymbol => formatter.write_str("invalid backend function symbol"),
+            Self::InvalidExternalSymbol => formatter.write_str("invalid backend external symbol"),
             Self::MissingEntryBlock => {
                 formatter.write_str("backend function is missing its entry block")
             }
@@ -385,6 +430,9 @@ impl std::fmt::Display for BackendContractError {
             Self::InvalidCallSymbol => formatter.write_str("backend call has an empty symbol"),
             Self::RolePassingMismatch => {
                 formatter.write_str("backend parameter role and passing mode disagree")
+            }
+            Self::DuplicateModuleSymbol => {
+                formatter.write_str("backend module contains a duplicate symbol")
             }
             Self::Unsupported(operation) => write!(
                 formatter,
