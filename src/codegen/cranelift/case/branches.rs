@@ -3,13 +3,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::CaseBody;
 
-use super::super::cranelift::expressions::lower_expression;
-use super::super::cranelift::native::NativeEmitError;
-use super::super::cranelift::types::NativeType;
-use super::super::lowering::{Flow, lower_case_block};
+use super::super::expressions::lower_expression;
+use super::super::native::NativeEmitError;
+use super::super::types::NativeType;
 use super::context::CaseLoweringContext;
 use super::matching::match_pattern;
 use super::payload::{BranchLocals, bind_payload};
+use crate::codegen::lowering::{Flow, lower_case_block};
 
 const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
 type CaseBranchResult<'a> = Option<(cranelift_codegen::ir::Value, BranchLocals<'a>)>;

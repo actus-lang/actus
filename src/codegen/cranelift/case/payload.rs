@@ -5,11 +5,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{CaseBranch, Pattern, VariantPayload};
 
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::enum_layout::{EnumLayout, EnumVariantLayout};
-use super::super::layout::LayoutRegistry;
-use super::super::structs::copy_bytes;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
+use crate::codegen::enum_layout::{EnumLayout, EnumVariantLayout};
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::structs::copy_bytes;
 
 pub(super) type BranchLocals<'a> =
     (HashMap<&'a String, cranelift_codegen::ir::Value>, HashMap<&'a String, NativeType>);
@@ -39,7 +39,7 @@ pub(super) fn add_payload_types<'a>(
 
 fn add_positional_payload_types<'a>(
     items: &'a [crate::ast::PatternBinding],
-    variant_layout: &super::super::enum_layout::EnumVariantLayout,
+    variant_layout: &crate::codegen::enum_layout::EnumVariantLayout,
     types: &mut HashMap<&'a String, NativeType>,
 ) {
     for (index, item) in items.iter().enumerate() {
@@ -50,7 +50,7 @@ fn add_positional_payload_types<'a>(
 
 fn add_named_payload_types<'a>(
     items: &'a [crate::ast::NamedPattern],
-    variant_layout: &super::super::enum_layout::EnumVariantLayout,
+    variant_layout: &crate::codegen::enum_layout::EnumVariantLayout,
     types: &mut HashMap<&'a String, NativeType>,
 ) {
     for item in items {

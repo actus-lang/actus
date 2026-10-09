@@ -1,4 +1,5 @@
 pub(super) mod calls;
+pub(super) mod case;
 pub(super) mod declarations;
 pub(super) mod dependencies;
 pub(super) mod dynamic_call;

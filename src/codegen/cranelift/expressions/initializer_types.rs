@@ -65,7 +65,7 @@ fn infer_complex_initializer_type(
             infer_field_type(expression, object, field, types, layouts)
         }
         Expr::Case { branches, .. } => {
-            super::super::super::case::infer_case_type(branches, types, functions, layouts)
+            super::super::case::infer_case_type(branches, types, functions, layouts)
         }
         Expr::If { then_branch, else_branch, .. } => {
             infer_if_type(then_branch, else_branch.as_ref(), types, functions, layouts)

@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::ast::{CaseBody, CaseBranch};
 
-use super::super::cranelift::expressions::initializer_type;
-use super::super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::super::cranelift::types::NativeType;
-use super::super::layout::LayoutRegistry;
+use super::super::expressions::initializer_type;
+use super::super::native::{FunctionRef, NativeEmitError};
+use super::super::types::NativeType;
 use super::payload::add_payload_types;
+use crate::codegen::layout::LayoutRegistry;
 
-pub(in crate::codegen) fn infer_case_type(
+pub(crate) fn infer_case_type(
     branches: &[CaseBranch],
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,

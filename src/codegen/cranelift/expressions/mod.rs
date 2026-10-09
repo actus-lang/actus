@@ -5,10 +5,10 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::super::case::lower_case;
 use super::super::layout::LayoutRegistry;
 use super::super::model::NativeCleanupSchedule;
 use super::calls::CallLoweringContext;
+use super::case::lower_case;
 use super::literals::StringDataValues;
 use super::native::{FunctionRef, NativeEmitError};
 use super::types::NativeType;

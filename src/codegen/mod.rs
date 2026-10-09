@@ -2,7 +2,6 @@ mod abi;
 mod arenas;
 mod arrays;
 mod buffer_index;
-mod case;
 mod cleanup;
 mod constants;
 mod control_flow;

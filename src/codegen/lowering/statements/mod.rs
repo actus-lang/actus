@@ -159,7 +159,7 @@ fn lower_plain_expression_statement(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, NativeEmitError> {
     if let Expr::Case { subject, branches, .. } = expression {
-        super::super::case::lower_case(
+        super::super::cranelift::case::lower_case(
             function,
             subject,
             branches,

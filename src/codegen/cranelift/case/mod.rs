@@ -4,11 +4,11 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::cranelift::expressions::{initializer_type, lower_expression};
-use super::cranelift::literals::StringDataValues;
-use super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
+use super::expressions::{initializer_type, lower_expression};
+use super::literals::StringDataValues;
+use super::native::{FunctionRef, NativeEmitError};
+use super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
 
 mod branches;
 mod context;
@@ -18,20 +18,20 @@ mod types;
 
 use self::context::CaseLoweringContext;
 use self::types::branch_type;
-pub(super) use types::infer_case_type;
+pub(crate) use types::infer_case_type;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_case(
+pub(crate) fn lower_case(
     function: &mut FunctionBuilder<'_>,
     subject: &Expr,
     branches: &[crate::ast::CaseBranch],
     locals: &mut HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
-    cleanup_schedule: &super::model::NativeCleanupSchedule,
+    cleanup_schedule: &crate::codegen::model::NativeCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-    loop_targets: Option<super::lowering::LoopTargets>,
+    loop_targets: Option<crate::codegen::lowering::LoopTargets>,
     value_producing: bool,
 ) -> Result<cranelift_codegen::ir::Value, NativeEmitError> {
     let context = case_context(
@@ -95,10 +95,10 @@ fn case_context<'maps, 'keys>(
     locals: &'maps HashMap<&'keys String, cranelift_codegen::ir::Value>,
     local_types: &'maps HashMap<&'keys String, NativeType>,
     functions: &'maps HashMap<String, FunctionRef>,
-    cleanup_schedule: &'maps super::model::NativeCleanupSchedule,
+    cleanup_schedule: &'maps crate::codegen::model::NativeCleanupSchedule,
     string_data: &'maps StringDataValues,
     layouts: &'maps LayoutRegistry,
-    loop_targets: Option<super::lowering::LoopTargets>,
+    loop_targets: Option<crate::codegen::lowering::LoopTargets>,
 ) -> CaseLoweringContext<'maps, 'keys> {
     CaseLoweringContext::new(
         locals,
