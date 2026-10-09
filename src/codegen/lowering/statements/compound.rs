@@ -6,7 +6,6 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{BinaryOp, CompoundAssignmentOp, Expr, Place};
 
 use super::super::super::arrays::lower_array_compound_assignment;
-use super::super::super::buffer_index::lower_buffer_compound_assignment;
 use super::super::super::cranelift::expressions::{
     lower_compound_integer_operation, lower_expression,
 };
@@ -16,6 +15,7 @@ use super::super::super::cranelift::types::NativeType;
 use super::super::super::layout::LayoutRegistry;
 use super::super::super::structs::{expression_native_type, lower_field_compound_assignment};
 use super::{Flow, NativeCleanupSchedule};
+use crate::codegen::cranelift::buffer_index::lower_buffer_compound_assignment;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_compound_assignment<'source>(

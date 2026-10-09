@@ -137,7 +137,7 @@ fn lower_index_expression(
         context.local_types,
         context.layouts,
     ) {
-        Some(NativeType::Buffer) => super::super::buffer_index::lower_buffer_index,
+        Some(NativeType::Buffer) => super::buffer_index::lower_buffer_index,
         _ => super::super::arrays::lower_array_index,
     };
     lower(

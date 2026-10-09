@@ -293,7 +293,7 @@ fn lower_index_assignment_statement(
     let result = if super::super::super::structs::expression_native_type(target, types, layouts)
         == Some(NativeType::Buffer)
     {
-        super::super::super::buffer_index::lower_buffer_assignment(
+        crate::codegen::cranelift::buffer_index::lower_buffer_assignment(
             function,
             target,
             index,

@@ -5,15 +5,15 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{BinaryOp, Expr};
 
-use super::cranelift::expressions::lower_expression;
-use super::cranelift::literals::StringDataValues;
-use super::cranelift::native::{FunctionRef, NativeEmitError};
-use super::cranelift::types::NativeType;
-use super::layout::LayoutRegistry;
-use super::model::NativeCleanupSchedule;
+use super::expressions::lower_expression;
+use super::literals::StringDataValues;
+use super::native::{FunctionRef, NativeEmitError};
+use super::types::NativeType;
+use crate::codegen::layout::LayoutRegistry;
+use crate::codegen::model::NativeCleanupSchedule;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_buffer_index(
+pub(crate) fn lower_buffer_index(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -41,7 +41,7 @@ pub(super) fn lower_buffer_index(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_buffer_compound_assignment(
+pub(crate) fn lower_buffer_compound_assignment(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -77,12 +77,9 @@ pub(super) fn lower_buffer_compound_assignment(
         string_data,
         layouts,
     )?;
-    let right = super::cranelift::expressions::coerce_to_ir_type(
-        function,
-        right,
-        cranelift_codegen::ir::types::I8,
-    );
-    let updated = super::cranelift::expressions::lower_compound_integer_operation(
+    let right =
+        super::expressions::coerce_to_ir_type(function, right, cranelift_codegen::ir::types::I8);
+    let updated = super::expressions::lower_compound_integer_operation(
         function,
         current,
         operator,
@@ -94,7 +91,7 @@ pub(super) fn lower_buffer_compound_assignment(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn lower_buffer_assignment(
+pub(crate) fn lower_buffer_assignment(
     function: &mut FunctionBuilder<'_>,
     target: &Expr,
     index: &Expr,
@@ -127,11 +124,8 @@ pub(super) fn lower_buffer_assignment(
         string_data,
         layouts,
     )?;
-    let value = super::cranelift::expressions::coerce_to_ir_type(
-        function,
-        value,
-        cranelift_codegen::ir::types::I8,
-    );
+    let value =
+        super::expressions::coerce_to_ir_type(function, value, cranelift_codegen::ir::types::I8);
     function.ins().store(MemFlagsData::new(), value, address, 0);
     Ok(())
 }
