@@ -187,3 +187,29 @@ fn emits_fixed_layout_aggregate_parameter_and_return() {
     assert!(ir.contains("define [2 x i64] @test__verb_aggregate([2 x i64] %0)"));
     assert!(ir.contains("ret [2 x i64] %0"));
 }
+
+#[test]
+fn emits_non_direct_aggregate_parameter_as_aligned_pointer() {
+    let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "loan").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "storage".to_owned(),
+            role: Role::Ins,
+            ty: BackendValueType::Aggregate { layout },
+            passing: actus::codegen::BackendPassingMode::ExclusiveLoan { layout },
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("non-direct aggregate parameter should lower to a pointer");
+    assert!(ir.contains("define void @test__verb_loan(ptr align 8 %0)"));
+}

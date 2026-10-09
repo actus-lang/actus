@@ -77,7 +77,7 @@ pub enum BackendPassingMode {
 }
 
 impl BackendPassingMode {
-    fn layout(self) -> Option<BackendLayout> {
+    pub(super) fn layout(self) -> Option<BackendLayout> {
         match self {
             Self::Direct => None,
             Self::Indirect { layout }

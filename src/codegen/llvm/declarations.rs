@@ -1,9 +1,14 @@
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMAddFunction, LLVMFunctionType};
+use llvm_sys::core::{
+    LLVMAddFunction, LLVMFunctionType, LLVMGetParam, LLVMPointerTypeInContext,
+    LLVMSetParamAlignment,
+};
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
 
-use super::super::{BackendEmitError, BackendParameter, BackendReturn, BackendReturnMode};
+use super::super::{
+    BackendEmitError, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
+};
 use super::values::llvm_type;
 
 #[derive(Clone, Copy)]
@@ -27,7 +32,7 @@ pub(super) fn declare_function(
     let return_type = llvm_type(context, return_value.ty)?;
     let mut parameter_types = parameters
         .iter()
-        .map(|parameter| llvm_type(context, parameter.ty))
+        .map(|parameter| parameter_type(context, parameter))
         .collect::<Result<Vec<_>, _>>()?;
     let function_type = unsafe {
         LLVMFunctionType(return_type, parameter_types.as_mut_ptr(), parameter_types.len() as u32, 0)
@@ -38,10 +43,37 @@ pub(super) fn declare_function(
     if value.is_null() {
         return Err(BackendEmitError(format!("LLVM rejected function `{symbol}`")));
     }
+    apply_parameter_alignments(value, parameters);
     Ok(FunctionDeclaration {
         value,
         function_type,
         parameter_count: parameters.len(),
         returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit),
     })
+}
+
+fn parameter_type(
+    context: LLVMContextRef,
+    parameter: &BackendParameter,
+) -> Result<LLVMTypeRef, BackendEmitError> {
+    match parameter.passing {
+        BackendPassingMode::Direct => llvm_type(context, parameter.ty),
+        BackendPassingMode::Indirect { .. }
+        | BackendPassingMode::Borrowed { .. }
+        | BackendPassingMode::ExclusiveLoan { .. }
+        | BackendPassingMode::OwnershipTransfer { .. }
+        | BackendPassingMode::RuntimeBridge { .. } => {
+            Ok(unsafe { LLVMPointerTypeInContext(context, 0) })
+        }
+    }
+}
+
+fn apply_parameter_alignments(function: LLVMValueRef, parameters: &[BackendParameter]) {
+    for (index, parameter) in parameters.iter().enumerate() {
+        let Some(layout) = parameter.passing.layout() else {
+            continue;
+        };
+        let value = unsafe { LLVMGetParam(function, index as u32) };
+        unsafe { LLVMSetParamAlignment(value, layout.alignment) };
+    }
 }
