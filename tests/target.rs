@@ -64,6 +64,18 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
 }
 
 #[test]
+fn arm32_target_profile_declares_the_supported_thumb_mode() {
+    let embedded =
+        TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
+    assert_eq!(embedded.arm32_profile(), Some(actus::target::Arm32TargetProfile::CortexMv7em));
+    assert_eq!(embedded.arm_instruction_mode(), Some(actus::target::ArmInstructionMode::Thumb2));
+
+    let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("host target should parse");
+    assert_eq!(hosted.arm32_profile(), None);
+    assert_eq!(hosted.arm_instruction_mode(), None);
+}
+
+#[test]
 fn artifact_contract_records_startup_and_linker_requirements() {
     let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
     let freestanding = TargetSpec::parse("thumbv7em-none-eabihf").expect("target should parse");

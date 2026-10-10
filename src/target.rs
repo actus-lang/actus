@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 use target_lexicon::{
-    Architecture, BinaryFormat, CallingConvention, Endianness, Environment, OperatingSystem,
-    PointerWidth, Triple,
+    Architecture, ArmArchitecture, BinaryFormat, CallingConvention, Endianness, Environment,
+    OperatingSystem, PointerWidth, Triple,
 };
 
 mod counter;
@@ -49,6 +49,16 @@ pub enum SymbolVisibility {
     Exported,
     Imported,
     Hidden,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArmInstructionMode {
+    Thumb2,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Arm32TargetProfile {
+    CortexMv7em,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -216,6 +226,24 @@ impl TargetSpec {
 
     pub fn triple(&self) -> &Triple {
         &self.triple
+    }
+
+    pub const fn arm32_profile(&self) -> Option<Arm32TargetProfile> {
+        match self.architecture {
+            Architecture::Arm(ArmArchitecture::Thumbv7em)
+                if matches!(self.triple.operating_system, OperatingSystem::None_) =>
+            {
+                Some(Arm32TargetProfile::CortexMv7em)
+            }
+            _ => None,
+        }
+    }
+
+    pub const fn arm_instruction_mode(&self) -> Option<ArmInstructionMode> {
+        match self.arm32_profile() {
+            Some(_) => Some(ArmInstructionMode::Thumb2),
+            None => None,
+        }
     }
 
     pub fn matches_platform(&self, selector: &str) -> bool {

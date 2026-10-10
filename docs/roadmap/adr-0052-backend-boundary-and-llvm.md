@@ -246,6 +246,12 @@ must encode the selected ARM AAPCS rules, including argument registers,
 callee-saved registers, aggregate passing, aggregate returns, and 8-byte stack
 alignment.
 
+The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
+`CortexMv7em` target profile and `Thumb2` instruction mode. This profile
+identifies the Cortex-M v7E-M architecture family; it does not by itself claim
+that the ARM ABI, runtime provider, linker script, or hardware execution path
+is complete.
+
 ### Semantic preservation
 
 Ownership roles, cleanup order, typed failures, enum discriminants, aggregate

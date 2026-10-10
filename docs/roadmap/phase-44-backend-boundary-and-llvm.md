@@ -457,7 +457,7 @@ states the host and evidence limits explicitly.
 
 ## Gate 44.6 — Add ARM32/Thumb target support
 
-- [ ] Define the supported ARM architecture profile and Thumb instruction mode.
+- [x] Define the supported ARM architecture profile and Thumb instruction mode.
 - [ ] Define the Cortex-M ABI, integer widths, alignment, argument and
       callee-saved registers, stack contract, entry point, runtime provider,
       and linker script interface.
@@ -472,6 +472,15 @@ states the host and evidence limits explicitly.
 - [ ] Add emulator or target execution evidence for the minimal image.
 - [ ] Record the exact LLVM, assembler, linker, target triple, and linker-script
       versions used by the acceptance run.
+
+### Gate 44.6 progress
+
+The first ARM target profile is `thumbv7em-none-eabihf`. The compiler records
+this as the Cortex-M v7E-M profile with Thumb-2 instruction mode through the
+typed `TargetSpec` contract. This identifies the supported architecture only;
+the Cortex-M calling convention, register assignment, stack alignment, and
+freestanding image acceptance remain open under the following Gate 44.6
+checks.
 
 ## Gate 44.7 — External C ABI and runtime interoperability
 
