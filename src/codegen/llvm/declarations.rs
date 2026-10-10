@@ -7,7 +7,8 @@ use llvm_sys::core::{
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
 
 use super::super::{
-    BackendEmitError, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
+    BackendCleanupBridge, BackendEmitError, BackendParameter, BackendPassingMode, BackendReturn,
+    BackendReturnMode, BackendValueType,
 };
 use super::values::llvm_type;
 
@@ -58,6 +59,49 @@ pub(super) fn declare_function(
         returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit)
             || return_slot,
     })
+}
+
+pub(super) fn declare_cleanup_bridge(
+    context: LLVMContextRef,
+    module: LLVMModuleRef,
+    bridge: BackendCleanupBridge,
+) -> Result<FunctionDeclaration, BackendEmitError> {
+    let (symbol, parameters, return_value) = match bridge {
+        BackendCleanupBridge::BufferDrop => (
+            crate::runtime::BUFFER_DROP_SYMBOL,
+            vec![BackendParameter {
+                name: "handle".to_owned(),
+                role: crate::ast::Role::Erg,
+                ty: BackendValueType::Pointer,
+                passing: BackendPassingMode::Direct,
+            }],
+            BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+        ),
+        BackendCleanupBridge::RegionDrop => (
+            crate::runtime::REGION_DROP_SYMBOL,
+            vec![BackendParameter {
+                name: "region".to_owned(),
+                role: crate::ast::Role::Erg,
+                ty: BackendValueType::Pointer,
+                passing: BackendPassingMode::Direct,
+            }],
+            BackendReturn {
+                role: None,
+                ty: BackendValueType::Integer { signed: true, width: 32 },
+                passing: BackendReturnMode::Direct,
+            },
+        ),
+        BackendCleanupBridge::EnumDrop { .. } => {
+            return Err(BackendEmitError(
+                "LLVM enum cleanup bridge lowering is not implemented".to_owned(),
+            ));
+        }
+    };
+    declare_function(context, module, symbol, &parameters, &return_value)
 }
 
 fn parameter_type(

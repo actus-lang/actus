@@ -343,17 +343,17 @@ jumps, terminating traps, and fixed-layout direct aggregate/Region values with
 1, 2, 4, or 8-byte alignment. Non-direct aggregate parameters now lower to
 opaque pointers with explicit parameter alignment. Aggregate return slots now
 use a hidden aligned pointer with caller-side stack storage. Memory-copy
-lowering and runtime-backed cleanup actions remain explicit open work.
+lowering remains available through the existing neutral memory-copy contract;
+descriptor-driven Buffer and Region cleanup calls are now emitted, while enum
+cleanup and full semantic cleanup schedule integration remain open.
 Regular enum typed failures with integer payloads now lower through the
 declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
-semantic boundaries, while runtime-backed cleanup actions fail closed until
+semantic boundaries, while unsupported enum cleanup actions fail closed until
 their bridge ABI and storage representation are implemented. The feature build
 and this emitter slice are covered by the LLVM integration test. A dedicated
-LLVM regression test also verifies that a value-bearing runtime cleanup action
-fails with the explicit bridge-lowering diagnostic instead of being silently
-omitted; runtime cleanup execution remains open until its ABI and storage
-representation are implemented. ADR-0053 defines the required neutral bridge
-descriptor and implementation order for that work.
+LLVM regression coverage verifies that a descriptor-driven Region cleanup emits
+the declared runtime call; enum cleanup remains an explicit unsupported
+diagnostic. ADR-0053 defines the remaining neutral bridge and parity work.
 The neutral contract now also validates non-zero, alignment-compatible pointer
 copy extents, and the LLVM slice lowers those extents through overlap-safe
 `llvm.memmove` calls. Full semantic copy propagation and aggregate field copy

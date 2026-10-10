@@ -123,7 +123,9 @@ fn emit_instruction(
             emit_failure(context, builder, function, declaration, failure, values)?;
             Ok(true)
         }
-        BackendInstruction::Cleanup { action, .. } => emit_cleanup(action),
+        BackendInstruction::Cleanup { action, operand, .. } => {
+            emit_cleanup(context, builder, action, *operand, declarations, values)
+        }
         BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
         }

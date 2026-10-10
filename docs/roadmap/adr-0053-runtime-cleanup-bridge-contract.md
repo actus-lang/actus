@@ -76,8 +76,10 @@ width.
 
 ## Consequences
 
-LLVM runtime cleanup is intentionally incomplete until this descriptor exists.
-The current LLVM emitter rejects value-bearing runtime cleanup with an explicit
-diagnostic, and the regression test protects that boundary. The existing
-Cranelift cleanup path remains the behavioral reference for the parity fixtures.
+The descriptor is now present and LLVM emits the `BufferDrop` and `RegionDrop`
+bridge calls for direct cleanup operands. Enum cleanup remains open because
+its `usize` extent argument must be declared with the selected target's pointer
+width before it can be enabled for hosted and freestanding targets. The
+existing Cranelift cleanup path remains the behavioral reference for parity
+fixtures until that target-aware ABI boundary is complete.
 

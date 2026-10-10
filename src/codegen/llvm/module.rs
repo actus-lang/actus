@@ -11,7 +11,8 @@ use super::super::{
 };
 use super::context::{LlvmContext, LlvmModule};
 use super::control_flow::emit_blocks;
-use super::declarations::{FunctionDeclaration, declare_function};
+use super::declarations::{FunctionDeclaration, declare_cleanup_bridge, declare_function};
+use crate::codegen::{BackendCleanupBridge, BackendInstruction};
 pub(super) fn lower_module(
     module: &BackendModule,
 ) -> Result<(LlvmContext, LlvmModule), BackendEmitError> {
@@ -73,6 +74,14 @@ fn declare_module_functions(
         )?;
         declarations.insert(external.symbol.as_str().to_owned(), declaration);
     }
+    for bridge in cleanup_bridges(backend_module) {
+        let symbol = cleanup_bridge_symbol(bridge);
+        if declarations.contains_key(symbol) {
+            continue;
+        }
+        let declaration = declare_cleanup_bridge(context, module, bridge)?;
+        declarations.insert(symbol.to_owned(), declaration);
+    }
     for function in &backend_module.functions {
         let declaration = declare_function(
             context,
@@ -84,6 +93,31 @@ fn declare_module_functions(
         declarations.insert(function.symbol.as_str().to_owned(), declaration);
     }
     Ok(declarations)
+}
+
+fn cleanup_bridges(module: &BackendModule) -> Vec<BackendCleanupBridge> {
+    let mut bridges = Vec::new();
+    for function in &module.functions {
+        for block in &function.blocks {
+            for instruction in &block.instructions {
+                let BackendInstruction::Cleanup { operand: Some(operand), .. } = instruction else {
+                    continue;
+                };
+                if !bridges.contains(&operand.bridge) {
+                    bridges.push(operand.bridge);
+                }
+            }
+        }
+    }
+    bridges
+}
+
+fn cleanup_bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
+    match bridge {
+        BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
+        BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
+        BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+    }
 }
 
 fn emit_function(

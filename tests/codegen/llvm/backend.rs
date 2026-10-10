@@ -356,7 +356,7 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
 }
 
 #[test]
-fn rejects_runtime_cleanup_until_its_bridge_abi_is_lowered() {
+fn emits_region_runtime_cleanup_bridge_call() {
     let symbol =
         SymbolIdentity::new("test", SymbolKind::Verb, "runtime_cleanup").expect("valid symbol");
     let function = BackendFunction {
@@ -400,12 +400,10 @@ fn rejects_runtime_cleanup_until_its_bridge_abi_is_lowered() {
         cleanup: Vec::new(),
     };
 
-    let error = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect_err("runtime-backed cleanup must not be silently omitted");
-    assert_eq!(
-        error.to_string(),
-        "LLVM cleanup action `drop-binding` requires a runtime bridge lowering"
-    );
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("region cleanup bridge should lower to an LLVM call");
+    assert!(ir.contains("declare i32 @actus_region_drop(ptr)"));
+    assert!(ir.contains("call i32 @actus_region_drop(ptr %0)"));
 }
 
 #[test]

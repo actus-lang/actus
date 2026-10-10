@@ -8,9 +8,10 @@ use crate::target::TargetSpec;
 ///
 /// The current slice covers validated scalar and unit signatures, parameter mapping, basic
 /// blocks, direct returns, direct calls, conditional branches, jumps, terminating traps,
-/// compile-time end-borrow cleanup boundaries, and regular enum failures with explicit layout
-/// metadata. Niche-pointer `Option::None` and pointer-payload `Option::Some` failures use the
-/// private pointer representation after semantic lowering. Runtime-backed cleanup actions remain
+/// compile-time end-borrow cleanup boundaries, descriptor-driven Buffer/Region runtime cleanup
+/// calls, and regular enum failures with explicit layout metadata. Niche-pointer `Option::None`
+/// and pointer-payload `Option::Some` failures use the private pointer representation after
+/// semantic lowering. Enum cleanup bridges and full semantic cleanup schedule integration remain
 /// open.
 pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
     let (_context, owned_module) = lower_module(module)?;

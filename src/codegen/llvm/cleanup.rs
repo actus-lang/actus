@@ -1,22 +1,23 @@
-use super::super::BackendEmitError;
-use super::super::model::LoweredCleanupInstruction;
+mod bridge;
 
-pub(super) fn emit_cleanup(action: &LoweredCleanupInstruction) -> Result<bool, BackendEmitError> {
+use super::super::model::LoweredCleanupInstruction;
+use super::super::{BackendCleanupOperand, BackendEmitError, BackendValueId};
+use super::declarations::FunctionDeclaration;
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
+use std::collections::BTreeMap;
+
+pub(super) fn emit_cleanup(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    action: &LoweredCleanupInstruction,
+    operand: Option<BackendCleanupOperand>,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
     if matches!(action, LoweredCleanupInstruction::EndBorrow { .. }) {
         return Ok(false);
     }
-    Err(BackendEmitError(format!(
-        "LLVM cleanup action `{}` requires a runtime bridge lowering",
-        cleanup_name(action)
-    )))
-}
-
-fn cleanup_name(action: &LoweredCleanupInstruction) -> &'static str {
-    match action {
-        LoweredCleanupInstruction::EndBorrow { .. } => "end-borrow",
-        LoweredCleanupInstruction::DropPayloadField { .. } => "drop-payload-field",
-        LoweredCleanupInstruction::DropBinding { .. } => "drop-binding",
-        LoweredCleanupInstruction::DropBindingFields { .. } => "drop-binding-fields",
-        LoweredCleanupInstruction::ResetArena { .. } => "reset-arena",
-    }
+    let operand =
+        operand.ok_or_else(|| BackendEmitError("LLVM cleanup operand is missing".to_owned()))?;
+    bridge::emit_runtime_bridge(context, builder, operand, declarations, values)
 }
