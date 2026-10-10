@@ -276,6 +276,46 @@ fn validates_niche_pointer_layout_boundaries() {
 }
 
 #[test]
+fn accepts_niche_pointer_payload_without_inline_enum_storage() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let failure = BackendFailure {
+        result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Option")
+            .expect("valid option symbol"),
+        discriminant: 1,
+        payload: Some(BackendValueId(1)),
+        layout: BackendEnumLayout {
+            layout,
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset: 0,
+            payload: None,
+            niche_pointer: true,
+        },
+    };
+    let function = BackendFunction {
+        symbol: verb_symbol(),
+        parameters: vec![BackendParameter {
+            name: "payload".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::NichePointerOption { layout },
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail { failure, span: SourceSpan::new(0, 1) }],
+        }],
+        cleanup: Vec::new(),
+    };
+    assert!(function.validate().is_ok());
+}
+
+#[test]
 fn rejects_zero_width_values_and_invalid_parameter_aggregates() {
     let zero_width = unit_function(
         vec![BackendParameter {

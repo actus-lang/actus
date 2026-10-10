@@ -70,7 +70,9 @@ pub(super) fn validate_failure(failure: &BackendFailure) -> Result<(), BackendCo
     failure.layout.validate().map_err(|_| {
         BackendContractError::InvalidEnumLayout("failure carries an invalid enum layout")
     })?;
-    if failure.payload.is_some() != failure.layout.payload.is_some() {
+    if !failure.layout.niche_pointer
+        && failure.payload.is_some() != failure.layout.payload.is_some()
+    {
         return Err(BackendContractError::InvalidEnumLayout(
             "failure payload must match the declared enum payload layout",
         ));

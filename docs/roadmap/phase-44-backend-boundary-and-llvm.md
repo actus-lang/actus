@@ -414,14 +414,18 @@ The same parity suite now also covers an indirect fixed-layout aggregate with
 link against the same C entry shim, and both executables verify the copied
 bytes. Regular enum typed failures with an integer payload are also compared
 through a 16-byte aggregate return slot; both executables verify the
-discriminant and payload offsets. The focused suite contains 18 passing tests.
+discriminant and payload offsets. The focused suite contains 19 passing tests.
 The additional niche-pointer `Option::None` fixture links LLVM and Cranelift
 against the same C entry shim and verifies the private null-pointer sentinel
 from both executables. This sentinel is backend ABI state only: Actus source
 has no `null` literal, and `Option::None` remains the source-level absence
-variant; the semantic suite rejects `null` as an undeclared identifier.
-Direct aggregate register ABI, niche-pointer `Option::Some` payload lowering,
-ownership transitions, and runtime cleanup remain outside this evidence.
+variant; the semantic suite rejects `null` as an undeclared identifier. The
+corresponding `Option::Some` fixture passes a pointer payload through both
+native backends, links both objects against the same C entry shim, and verifies
+that the returned pointer is unchanged. The neutral contract accepts this as a
+niche payload without declaring inline enum storage, while both emitters reject
+non-pointer niche payloads. Direct aggregate register ABI, ownership
+transitions, and runtime cleanup remain outside this evidence.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when
 assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
 slot pointer. This is covered by the hosted parity fixture.

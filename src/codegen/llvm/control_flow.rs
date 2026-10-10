@@ -156,6 +156,11 @@ fn emit_niche_failure(
             LLVMConstNull(super::values::llvm_type(context, function.return_value.ty)?)
         },
     };
+    if unsafe { LLVMGetTypeKind(LLVMTypeOf(value)) } != LLVMPointerTypeKind {
+        return Err(BackendEmitError(
+            "LLVM niche-pointer failure payload must be a pointer".to_owned(),
+        ));
+    }
     unsafe { llvm_sys::core::LLVMBuildRet(builder, value) };
     Ok(())
 }
