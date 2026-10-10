@@ -13,7 +13,7 @@ use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 use super::super::model::LoweredCleanupInstruction;
 use super::super::{
     BackendBlockId, BackendEmitError, BackendEnumLayout, BackendFunction, BackendInstruction,
-    BackendLayout, BackendValueId, BackendValueType,
+    BackendIntegerBinaryOp, BackendLayout, BackendValueId, BackendValueType,
 };
 use super::calls::emit_call;
 use super::declarations::FunctionDeclaration;
@@ -92,6 +92,9 @@ fn emit_instruction(
             values.insert(*result, constant);
             Ok(false)
         }
+        BackendInstruction::IntegerBinary { .. } => {
+            emit_integer_binary(builder, instruction, values)
+        }
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
             Ok(true)
@@ -121,6 +124,41 @@ fn emit_instruction(
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
         }
     }
+}
+
+fn emit_integer_binary(
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::IntegerBinary { result, operation, left, right, .. } = instruction
+    else {
+        return Err(BackendEmitError("LLVM integer operation expected".to_owned()));
+    };
+    let left = values.get(left).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM binary left operand {} is unavailable", left.0))
+    })?;
+    let right = values.get(right).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM binary right operand {} is unavailable", right.0))
+    })?;
+    let value = unsafe {
+        match operation {
+            BackendIntegerBinaryOp::Add => {
+                llvm_sys::core::LLVMBuildAdd(builder, left, right, std::ptr::null())
+            }
+            BackendIntegerBinaryOp::Subtract => {
+                llvm_sys::core::LLVMBuildSub(builder, left, right, std::ptr::null())
+            }
+            BackendIntegerBinaryOp::Multiply => {
+                llvm_sys::core::LLVMBuildMul(builder, left, right, std::ptr::null())
+            }
+        }
+    };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
+    }
+    values.insert(*result, value);
+    Ok(false)
 }
 
 fn emit_failure(

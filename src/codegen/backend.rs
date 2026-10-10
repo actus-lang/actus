@@ -4,6 +4,13 @@ use serde::Deserialize;
 
 use crate::target::TargetSpec;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendIntegerBinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendKind {

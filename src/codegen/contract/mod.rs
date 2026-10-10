@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 
 use super::abi::BackendDirectAggregateAbi;
 use super::abi::BackendEnumLayout;
+pub use super::backend::BackendIntegerBinaryOp;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
@@ -126,6 +127,14 @@ pub enum BackendInstruction {
         result: BackendValueId,
         ty: BackendValueType,
         value: u64,
+        span: SourceSpan,
+    },
+    IntegerBinary {
+        result: BackendValueId,
+        operation: BackendIntegerBinaryOp,
+        left: BackendValueId,
+        right: BackendValueId,
+        ty: BackendValueType,
         span: SourceSpan,
     },
     Call {

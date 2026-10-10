@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
-use crate::ast::{Expr, PrimitiveType, Program, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{BinaryOp, Expr, PrimitiveType, Program, TopLevelDecl, TypeName, VerbDecl};
 use crate::lexer::SourceSpan;
 
 use super::{
     BackendBlockId, BackendContractError, BackendExpressionProvider, BackendInstruction,
-    BackendLayout, BackendLayoutProvider, BackendModule, BackendValueId, BackendValueType,
-    SymbolIdentity, SymbolKind, lower_verb_with_expressions, lower_verb_with_expressions_as,
+    BackendIntegerBinaryOp, BackendLayout, BackendLayoutProvider, BackendModule, BackendValueId,
+    BackendValueType, SymbolIdentity, SymbolKind, lower_verb_with_expressions,
+    lower_verb_with_expressions_as,
 };
 
 struct ScalarLayouts;
@@ -156,21 +157,8 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
                 Ok(result)
             }
             Expr::Grouping { expression, .. } => self.lower_expression(expression, instructions),
-            Expr::Call { callee, arguments, span } => {
-                let arguments = arguments
-                    .iter()
-                    .map(|argument| self.lower_expression(&argument.expression, instructions))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let result_type = self.return_types.get(callee).copied().flatten();
-                let result = result_type.map(|_| self.allocate());
-                instructions.push(BackendInstruction::Call {
-                    callee: self.callee_for(callee, *span)?,
-                    arguments,
-                    result,
-                    span: *span,
-                });
-                result.ok_or_else(|| unsupported(*span, "unit call cannot produce a value"))
-            }
+            Expr::Binary { .. } => self.lower_binary(expression, instructions),
+            Expr::Call { .. } => self.lower_call(expression, instructions),
             _ => Err(unsupported(
                 expression_span(expression),
                 "expression is outside the scalar shared lowering contract",
@@ -185,6 +173,64 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
     ) -> Result<SymbolIdentity, BackendContractError> {
         SymbolIdentity::new(self.namespace, SymbolKind::Verb, callee)
             .map_err(|error| unsupported(span, error.to_string()))
+    }
+}
+
+impl ScalarExpressionProvider<'_> {
+    fn lower_binary(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let Expr::Binary { left, operator, right, span } = expression else {
+            return Err(unsupported(expression_span(expression), "binary expression expected"));
+        };
+        let left = self.lower_expression(left, instructions)?;
+        let right = self.lower_expression(right, instructions)?;
+        let operation = match operator {
+            BinaryOp::Add => BackendIntegerBinaryOp::Add,
+            BinaryOp::Subtract => BackendIntegerBinaryOp::Subtract,
+            BinaryOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            _ => {
+                return Err(unsupported(
+                    *span,
+                    "binary operator is outside the initial scalar lowering contract",
+                ));
+            }
+        };
+        let result = self.allocate();
+        instructions.push(BackendInstruction::IntegerBinary {
+            result,
+            operation,
+            left,
+            right,
+            ty: BackendValueType::Integer { signed: true, width: 32 },
+            span: *span,
+        });
+        Ok(result)
+    }
+
+    fn lower_call(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let Expr::Call { callee, arguments, span } = expression else {
+            return Err(unsupported(expression_span(expression), "call expression expected"));
+        };
+        let arguments = arguments
+            .iter()
+            .map(|argument| self.lower_expression(&argument.expression, instructions))
+            .collect::<Result<Vec<_>, _>>()?;
+        let result_type = self.return_types.get(callee).copied().flatten();
+        let result = result_type.map(|_| self.allocate());
+        instructions.push(BackendInstruction::Call {
+            callee: self.callee_for(callee, *span)?,
+            arguments,
+            result,
+            span: *span,
+        });
+        result.ok_or_else(|| unsupported(*span, "unit call cannot produce a value"))
     }
 }
 
@@ -256,7 +302,7 @@ fn unsupported(span: SourceSpan, reason: impl Into<String>) -> BackendContractEr
 #[cfg(test)]
 mod tests {
     use super::lower_scalar_program;
-    use crate::codegen::BackendInstruction;
+    use crate::codegen::{BackendInstruction, BackendIntegerBinaryOp};
     use crate::lexer::scan;
     use crate::parser::parse;
 
@@ -272,6 +318,22 @@ mod tests {
         assert_eq!(module.functions.len(), 1);
         assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
             |instruction| matches!(instruction, BackendInstruction::Constant { value: 42, .. })
+        ));
+    }
+
+    #[test]
+    fn lowers_scalar_integer_addition_into_neutral_ir() {
+        let source = "verb main() -> Int { return 40 + 2; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("scalar fixture should parse");
+        let module = lower_scalar_program("actus_root", &program, None)
+            .expect("scalar addition should lower");
+        assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(
+                instruction,
+                BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+            )
         ));
     }
 }
