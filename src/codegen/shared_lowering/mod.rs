@@ -31,10 +31,10 @@ pub fn lower_scalar_program(
     program: &Program,
     entry_name: Option<&str>,
 ) -> Result<BackendModule, BackendContractError> {
-    lower_scalar_program_with_bindings(namespace, program, entry_name, None)
+    lower_program_to_backend_module(namespace, program, entry_name, None)
 }
 
-pub(crate) fn lower_scalar_program_with_bindings(
+pub(crate) fn lower_program_to_backend_module(
     namespace: &str,
     program: &Program,
     entry_name: Option<&str>,

@@ -12,7 +12,7 @@ pub(super) fn emit_objects_llvm(
     let bindings = llvm_module_bindings(&object_plan)?;
     let root = &object_plan.units()[0];
     let root_program = crate::codegen::normalize_program(root.program());
-    let root_module = crate::codegen::lower_scalar_program_with_bindings(
+    let root_module = crate::codegen::lower_program_to_backend_module(
         root.namespace().symbol_prefix(),
         &root_program,
         Some(symbol),
@@ -22,7 +22,7 @@ pub(super) fn emit_objects_llvm(
     let mut objects = vec![llvm_object("root", &root_module, configuration.target())?];
     for unit in &object_plan.units()[1..] {
         let program = crate::codegen::normalize_program(unit.program());
-        let module = crate::codegen::lower_scalar_program_with_bindings(
+        let module = crate::codegen::lower_program_to_backend_module(
             unit.namespace().symbol_prefix(),
             &program,
             None,
