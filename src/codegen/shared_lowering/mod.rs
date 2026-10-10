@@ -9,18 +9,67 @@ use expression::SharedExpressionProvider;
 use support::unsupported;
 
 use super::{
-    BackendBlockId, BackendContractError, BackendExternal, BackendLayout, BackendLayoutProvider,
-    BackendModule, BackendSignature, BackendSymbolBindings, BackendValueType, SymbolIdentity,
-    lower_parameter, lower_return, lower_verb_signature, lower_verb_with_expressions,
+    BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
+    BackendCleanupProvider, BackendCleanupResolvedDescriptor, BackendCleanupResult,
+    BackendContractError, BackendExternal, BackendLayout, BackendLayoutProvider, BackendModule,
+    BackendSignature, BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter,
+    lower_return, lower_verb_signature, lower_verb_with_expressions,
     lower_verb_with_expressions_as,
 };
 
-struct ScalarLayouts;
+struct BuiltinLayouts;
 
-impl BackendLayoutProvider for ScalarLayouts {
-    fn layout_for(&self, _type_name: &TypeName) -> Option<BackendLayout> {
-        None
+impl BackendLayoutProvider for BuiltinLayouts {
+    fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout> {
+        matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
+            .then_some(host_pointer_layout())
     }
+}
+
+impl BackendCleanupProvider for BuiltinLayouts {
+    fn resolve_binding(
+        &self,
+        type_name: Option<&TypeName>,
+        builtin: Option<crate::ast::BuiltinType>,
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
+        let bridge = if builtin == Some(crate::ast::BuiltinType::Buffer) {
+            Some(BackendCleanupBridge::BufferDrop)
+        } else if type_name.is_some_and(|name| name.name == "Region") {
+            Some(BackendCleanupBridge::RegionDrop)
+        } else {
+            None
+        };
+        Ok(bridge.map(|bridge| BackendCleanupResolvedDescriptor {
+            descriptor: BackendCleanupBridgeDescriptor {
+                bridge,
+                argument: if bridge == BackendCleanupBridge::BufferDrop {
+                    BackendCleanupArgument::Value
+                } else {
+                    BackendCleanupArgument::Address
+                },
+                result: if bridge == BackendCleanupBridge::RegionDrop {
+                    BackendCleanupResult::Status
+                } else {
+                    BackendCleanupResult::Ignored
+                },
+            },
+            layout: host_pointer_layout(),
+            field: None,
+        }))
+    }
+
+    fn resolve_field(
+        &self,
+        _root_type: &TypeName,
+        _path: &str,
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
+        Ok(None)
+    }
+}
+
+fn host_pointer_layout() -> BackendLayout {
+    let pointer_bytes = (usize::BITS / 8) as u32;
+    BackendLayout { size: pointer_bytes, alignment: pointer_bytes }
 }
 
 #[doc(hidden)]
@@ -43,7 +92,7 @@ pub(crate) fn lower_program_to_backend_module(
         program,
         entry_name,
         bindings,
-        &ScalarLayouts,
+        &BuiltinLayouts,
     )
 }
 
@@ -70,7 +119,8 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             format!("semantic analysis failed: {error:?}"),
         )
     })?;
-    let cleanup_plans = super::lower_semantic_cleanup(&semantic)?;
+    let cleanup_provider = BuiltinLayouts;
+    let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &externals, bindings)?;
     let mut functions = Vec::with_capacity(verbs.len());
     for verb in verbs {
@@ -240,8 +290,8 @@ mod tests {
     }
 
     #[test]
-    fn lowers_region_signature_and_identity_return_through_shared_pipeline() {
-        let source = "verb inspect(abs region: Region[u32]) -> Region[u32] { return region; }";
+    fn lowers_region_signature_and_cleanup_through_shared_pipeline() {
+        let source = "verb inspect(erg region: Region[u32]) { }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty(), "lexer errors: {errors:?}");
         let program = parse(tokens).expect("Region fixture should parse");
@@ -255,8 +305,16 @@ mod tests {
         .expect("Region signature should lower through the shared pipeline");
         let function = &module.functions[0];
         assert!(matches!(function.parameters[0].ty, BackendValueType::Region { .. }));
-        assert!(matches!(function.parameters[0].passing, BackendPassingMode::Borrowed { .. }));
-        assert!(matches!(function.return_value.passing, BackendReturnMode::ReturnSlot { .. }));
+        assert!(matches!(function.parameters[0].passing, BackendPassingMode::Indirect { .. }));
+        assert!(matches!(function.return_value.passing, BackendReturnMode::Direct));
+        assert!(
+            function
+                .cleanup
+                .iter()
+                .flat_map(|plan| plan.resolved_bridges.iter().flatten())
+                .any(|descriptor| descriptor.descriptor.bridge
+                    == super::BackendCleanupBridge::RegionDrop)
+        );
     }
 
     #[test]
