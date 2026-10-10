@@ -82,7 +82,7 @@ The workflow runs the two configurations independently:
 - `cranelift-only` runs `cargo check` and the complete all-target test suite
   without LLVM.
 - `llvm-only` checks the library and CLI compiler surface and runs
-  `tests/llvm_backend.rs` without Cranelift.
+  `tests/codegen/llvm/backend.rs` without Cranelift.
 
 The LLVM-only job intentionally does not run Cranelift-specific native test
 modules. Those tests reference the Cranelift backend API and are outside the

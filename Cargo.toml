@@ -36,3 +36,18 @@ harness = false
 [[bench]]
 name = "region"
 harness = false
+
+[[test]]
+name = "codegen_symbols"
+path = "tests/codegen/cranelift/symbols.rs"
+required-features = ["cranelift"]
+
+[[test]]
+name = "ffi_link"
+path = "tests/codegen/cranelift/ffi_link.rs"
+required-features = ["cranelift"]
+
+[[test]]
+name = "llvm_backend"
+path = "tests/codegen/llvm/backend.rs"
+required-features = ["llvm"]

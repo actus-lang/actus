@@ -161,7 +161,9 @@ zero-float checks.
 ### Gate 44.2 evidence
 
 The backend-independent contract suite is in `tests/codegen_contract.rs` and
-does not select Cranelift or LLVM. It covers role-aware passing, aggregate
+does not select Cranelift or LLVM. Backend-specific tests live under
+`tests/codegen/cranelift/` and `tests/codegen/llvm/`, each with an explicit
+Cargo test target. The shared contract suite covers role-aware passing, aggregate
 layouts and return slots, deterministic unsupported-operation diagnostics,
 ownership capability passing, cleanup actions, block identity, and neutral
 control-flow targets, and typed failure discriminants. The command
