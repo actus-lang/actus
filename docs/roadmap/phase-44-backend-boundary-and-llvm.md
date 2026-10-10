@@ -659,6 +659,12 @@ This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.
 
+The LLVM implementation keeps backend responsibilities behind the canonical
+facade and now separates failure-value lowering into `failures.rs` and memory
+copy lowering into `memory.rs`; `control_flow.rs` coordinates block emission
+without owning those data-layout operations. This is a structural
+maintainability step and does not claim LLVM and Cranelift feature parity.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
