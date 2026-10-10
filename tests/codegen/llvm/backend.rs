@@ -1675,6 +1675,133 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
 
 #[cfg(all(target_os = "linux", feature = "cranelift"))]
 #[test]
+fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-cleanup-parity-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("cleanup parity fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"cleanup_parity_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("cleanup parity manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "#include <stdint.h>\nstatic int order; void actus_buffer_drop(void *value) { if (value != 0) order = order * 10 + 1; } int32_t actus_region_drop(void *value) { if (value != 0) order = order * 10 + 2; return value != 0 ? 0 : -1; } extern void test__verb_cleanup(void *, void *); int main(void) { uint64_t buffer = 1; uint64_t region = 2; test__verb_cleanup(&buffer, &region); return order == 12 ? 0 : 1; }\n",
+    )
+    .expect("cleanup parity entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let pointer_layout = actus::codegen::BackendLayout { size: 8, alignment: 8 };
+    let pointer = BackendValueType::Pointer;
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "cleanup").expect("symbol");
+    let parameter = |name: &str| BackendParameter {
+        name: name.to_owned(),
+        role: Role::Erg,
+        ty: pointer,
+        passing: actus::codegen::BackendPassingMode::Direct,
+    };
+    let cleanup_operand =
+        |value: BackendValueId,
+         bridge: BackendCleanupBridge,
+         argument: actus::codegen::BackendCleanupArgument,
+         result: BackendCleanupResult| BackendCleanupOperand {
+            value,
+            layout: pointer_layout,
+            field: None,
+            bridge,
+            argument,
+            result,
+        };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: vec![parameter("buffer"), parameter("region")],
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![
+                    BackendInstruction::Cleanup {
+                        action: LoweredCleanupInstruction::DropBinding {
+                            binding_index: 0,
+                            name: "buffer".to_owned(),
+                        },
+                        operand: Some(cleanup_operand(
+                            BackendValueId(0),
+                            BackendCleanupBridge::BufferDrop,
+                            actus::codegen::BackendCleanupArgument::Value,
+                            BackendCleanupResult::Ignored,
+                        )),
+                        span: actus::lexer::SourceSpan::new(0, 1),
+                    },
+                    BackendInstruction::Cleanup {
+                        action: LoweredCleanupInstruction::DropBinding {
+                            binding_index: 1,
+                            name: "region".to_owned(),
+                        },
+                        operand: Some(cleanup_operand(
+                            BackendValueId(1),
+                            BackendCleanupBridge::RegionDrop,
+                            actus::codegen::BackendCleanupArgument::Address,
+                            BackendCleanupResult::Status,
+                        )),
+                        span: actus::lexer::SourceSpan::new(1, 2),
+                    },
+                    BackendInstruction::Return {
+                        value: None,
+                        span: actus::lexer::SourceSpan::new(2, 3),
+                    },
+                ],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("cleanup parity configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM cleanup object should be emitted");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift cleanup object should be emitted");
+    fs::write(&cranelift_object, cranelift_bytes)
+        .expect("Cranelift cleanup object should be written");
+
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM cleanup objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift cleanup objects should link");
+    assert_eq!(Command::new(&llvm_executable).status().unwrap().code(), Some(0));
+    assert_eq!(Command::new(&cranelift_executable).status().unwrap().code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
+}
+
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
 fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
     use std::process::Command;
 

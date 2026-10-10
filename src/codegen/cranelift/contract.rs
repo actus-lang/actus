@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+mod cleanup;
+
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, TrapCode, Type, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
@@ -63,6 +65,7 @@ fn declare_functions(
             declaration(id, &function.parameters, &function.return_value)?,
         );
     }
+    cleanup::declare_cleanup_bridges(module, backend_module, &mut declarations)?;
     Ok(declarations)
 }
 
@@ -272,14 +275,9 @@ fn lower_instruction(
             builder.ins().trap(TrapCode::unwrap_user(1));
             Ok(())
         }
-        BackendInstruction::Cleanup { action, .. }
-            if matches!(action, crate::codegen::LoweredCleanupInstruction::EndBorrow { .. }) =>
-        {
-            Ok(())
+        BackendInstruction::Cleanup { action, operand, .. } => {
+            cleanup::lower_cleanup(module, builder, action, *operand, declarations, values)
         }
-        _ => Err(BackendEmitError(
-            "Cranelift neutral contract instruction is not implemented".to_owned(),
-        )),
     }
 }
 

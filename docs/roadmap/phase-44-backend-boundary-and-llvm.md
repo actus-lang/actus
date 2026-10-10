@@ -308,7 +308,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       enum typed-failure `ReturnSlot` fixture.
 - [x] Extend cross-backend semantic comparison to direct aggregate and
       niche-pointer `Option` fixtures.
-- [ ] Extend cross-backend semantic comparison to ownership and runtime-cleanup
+- [x] Extend cross-backend semantic comparison to ownership and runtime-cleanup
       fixtures.
 - [x] Require explicit value-bearing neutral cleanup operands before backend
       lowering.
@@ -352,6 +352,11 @@ semantic boundaries, while incomplete semantic cleanup descriptors fail closed
 until their storage representation is implemented. The feature build
 and this emitter slice are covered by the LLVM integration test. LLVM regression
 coverage verifies descriptor-driven Region and target-width Enum cleanup calls.
+The neutral contract now lowers bounded Buffer and Region cleanup bridges through
+Cranelift as well as LLVM. The hosted parity fixture
+`compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture` links both
+objects against the same runtime shim and verifies identical BufferDrop then
+RegionDrop execution order.
 ADR-0053 defines the remaining semantic bridge and parity work.
 The neutral contract now also validates non-zero, alignment-compatible pointer
 copy extents, and the LLVM slice lowers those extents through overlap-safe
