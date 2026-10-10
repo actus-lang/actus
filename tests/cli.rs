@@ -36,6 +36,43 @@ fn llvm_backend_builds_and_runs_a_scalar_root_program() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_scalar_imported_module() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-module-{}", std::process::id()));
+    let input = root.join("src/main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(root.join("src/math")).expect("create LLVM module fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-module-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM module fixture manifest");
+    fs::write(&input, "import math; verb main() -> Int { return add(); }\n")
+        .expect("write LLVM module root source");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write LLVM module facade");
+    fs::write(root.join("src/math/api.act"), "open verb add() -> Int { return 40; }\n")
+        .expect("write LLVM module implementation");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run LLVM imported module fixture");
+    assert_eq!(status.code(), Some(40));
+    let _ = fs::remove_dir_all(root);
+}
+
 #[test]
 fn build_command_writes_a_native_object() {
     let root = std::env::temp_dir().join(format!("actus-cli-{}", std::process::id()));

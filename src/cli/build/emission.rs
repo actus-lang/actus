@@ -127,7 +127,9 @@ pub(crate) fn emit_objects(
         crate::codegen::BackendKind::Cranelift => {
             emit_objects_cranelift(plan, symbol, configuration)
         }
-        crate::codegen::BackendKind::Llvm => emit_objects_llvm(plan, symbol, configuration),
+        crate::codegen::BackendKind::Llvm => {
+            super::llvm_emission::emit_objects_llvm(plan, symbol, configuration)
+        }
     }
 }
 
@@ -190,40 +192,6 @@ fn emit_objects_cranelift(
     Err(BackendEmitError(
         "backend `cranelift` is not enabled; rebuild with feature `cranelift`".to_owned(),
     ))
-}
-
-#[cfg(feature = "llvm")]
-fn emit_objects_llvm(
-    plan: &crate::modules::ModuleCompilationPlan,
-    symbol: &str,
-    configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    if !plan.units().is_empty() {
-        return Err(BackendEmitError(
-            "LLVM shared lowering currently accepts a root-only compilation; imported module lowering remains unsupported"
-                .to_owned(),
-        ));
-    }
-    let targeted =
-        crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
-    let targeted = crate::codegen::normalize_program(&targeted);
-    let module = crate::codegen::lower_scalar_program("actus_root", &targeted, Some(symbol))
-        .map_err(|error| {
-            BackendEmitError(format!("LLVM shared semantic lowering failed: {error}"))
-        })?;
-    let bytes = crate::codegen::llvm::emit_object_bytes(&module, configuration.target())?;
-    let symbols =
-        module.functions.iter().map(|function| function.symbol.as_str().to_owned()).collect();
-    Ok(vec![EmittedObject { name: "root".to_owned(), bytes, symbols }])
-}
-
-#[cfg(not(feature = "llvm"))]
-fn emit_objects_llvm(
-    _plan: &crate::modules::ModuleCompilationPlan,
-    _symbol: &str,
-    _configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    Err(BackendEmitError("backend `llvm` is not enabled; rebuild with feature `llvm`".to_owned()))
 }
 
 #[cfg(feature = "cranelift")]

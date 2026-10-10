@@ -47,6 +47,13 @@ pub struct SymbolIdentity {
 }
 
 impl SymbolIdentity {
+    pub(crate) fn external_raw(symbol: &str) -> Result<Self, SymbolError> {
+        if symbol.is_empty() {
+            return Err(SymbolError::EmptyName);
+        }
+        Ok(Self { encoded: symbol.to_owned(), kind: SymbolKind::External })
+    }
+
     pub(crate) fn entry(name: &str) -> Result<Self, SymbolError> {
         if name.is_empty() {
             return Err(SymbolError::EmptyName);

@@ -1,5 +1,7 @@
 mod artifacts;
 mod emission;
+#[cfg(feature = "llvm")]
+mod llvm_emission;
 mod loading;
 mod object_manifest;
 mod options;
