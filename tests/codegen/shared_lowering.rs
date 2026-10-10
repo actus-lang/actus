@@ -279,26 +279,36 @@ fn rejects_outer_scalar_assignment_without_a_branch_merge_contract() {
 }
 
 #[test]
-fn lowers_local_region_cleanup_at_function_scope_boundary() {
-    let source = "verb forward(dat region: Region[u32]) -> Region[u32] { return region; } verb inspect(dat region: Region[u32]) -> Int { erg local: Region[u32] = forward(region: dat region); return 0; }";
+fn lowers_local_region_cleanup_at_nested_scope_boundary() {
+    let source = "verb forward(dat region: Region[u32]) -> Region[u32] { return region; } verb inspect(dat region: Region[u32]) -> Int { { erg local: Region[u32] = forward(region: dat region); } return 0; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "lexer errors: {errors:?}");
-    let program = parse(tokens).expect("local Region fixture should parse");
+    let program = parse(tokens).expect("nested Region fixture should parse");
     let module = lower_scalar_program("actus_root", &program, None)
-        .expect("local Region cleanup should lower through the shared pipeline");
+        .expect("nested local Region cleanup should lower through the shared pipeline");
     let inspect = module
         .functions
         .iter()
         .find(|function| function.symbol.as_str().ends_with("inspect"))
         .expect("inspect function should be present");
-    let instructions = &inspect.blocks[0].instructions;
-    let cleanup_index = instructions
+    let nested_block = inspect
+        .blocks
+        .iter()
+        .find(|block| {
+            block
+                .instructions
+                .iter()
+                .any(|instruction| matches!(instruction, BackendInstruction::Cleanup { .. }))
+        })
+        .expect("nested block must contain the local Region cleanup");
+    let cleanup_index = nested_block
+        .instructions
         .iter()
         .position(|instruction| matches!(instruction, BackendInstruction::Cleanup { .. }))
-        .expect("local Region must be cleaned at function scope exit");
-    let return_index = instructions
+        .expect("nested local Region must be cleaned at scope exit");
+    let return_index = nested_block
+        .instructions
         .iter()
-        .position(|instruction| matches!(instruction, BackendInstruction::Return { .. }))
-        .expect("inspect must retain its explicit return");
-    assert!(cleanup_index < return_index);
+        .position(|instruction| matches!(instruction, BackendInstruction::Return { .. }));
+    assert!(return_index.is_none() || cleanup_index < return_index.unwrap());
 }

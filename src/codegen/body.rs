@@ -167,6 +167,20 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<BackendBlock, BackendContractError> {
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
+            if let Stmt::Block(nested) = statement {
+                let nested_id = self.allocate_block();
+                let continuation_id = self.allocate_block();
+                instructions
+                    .push(BackendInstruction::Jump { target: nested_id, span: nested.span });
+                let nested_block = self.lower_block(nested_id, nested, Some(continuation_id))?;
+                let continuation =
+                    Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+                let continuation_block =
+                    self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
+                self.blocks.push(nested_block);
+                self.blocks.push(continuation_block);
+                return Ok(BackendBlock { id, instructions });
+            }
             if let Stmt::If { condition, then_branch, else_branch, span } = statement {
                 let continuation_id = self.allocate_block();
                 let branches_terminate = self.lower_if(
