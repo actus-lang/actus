@@ -369,6 +369,11 @@ cleanup rejects an unknown or malformed path before emitting any runtime drop.
 This is a fail-closed native validation step; the shared semantic cleanup
 descriptor still needs to carry the resolved metadata before the remaining
 cleanup gate can close.
+The neutral contract now has a separate resolved cleanup descriptor that binds
+the bridge ABI to a complete parent layout and optional field sublayout. Its
+validation rejects missing field metadata, misalignment, and out-of-bounds
+field ranges before a backend can consume the descriptor. Provider-based
+semantic population of this descriptor remains the next implementation step.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

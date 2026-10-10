@@ -3,13 +3,14 @@ use actus::ast::{
 };
 use actus::codegen::{
     BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
-    BackendBodyProvider, BackendCleanupAction, BackendContractError, BackendDirectAggregateAbi,
-    BackendEnumLayout, BackendExpressionProvider, BackendExternal, BackendFailure, BackendFunction,
-    BackendInstruction, BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter,
-    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
-    BackendUnsupportedOperation, BackendValueId, BackendValueType, LoweredCleanupInstruction,
-    SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb, lower_verb_body,
-    lower_verb_body_with_expressions, lower_verb_signature, lower_verb_with_cleanup,
+    BackendBodyProvider, BackendCleanupAction, BackendCleanupResolvedDescriptor,
+    BackendContractError, BackendDirectAggregateAbi, BackendEnumLayout, BackendExpressionProvider,
+    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
+    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
+    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueId,
+    BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_body_with_expressions,
+    lower_verb_signature, lower_verb_with_cleanup,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -825,6 +826,28 @@ fn rejects_invalid_semantic_cleanup_before_backend_lowering() {
 }
 
 #[test]
+fn validates_complete_resolved_cleanup_descriptor_metadata() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let descriptor = actus::codegen::BackendCleanupBridgeDescriptor {
+        bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+        argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+        result: actus::codegen::BackendCleanupResult::Status,
+    };
+    let resolved = BackendCleanupResolvedDescriptor {
+        descriptor,
+        layout,
+        field: Some(actus::codegen::BackendCleanupField { offset: 8, size: 8, alignment: 8 }),
+    };
+    assert!(resolved.validate().is_ok());
+
+    let invalid = BackendCleanupResolvedDescriptor {
+        field: Some(actus::codegen::BackendCleanupField { offset: 12, size: 8, alignment: 4 }),
+        ..resolved
+    };
+    assert_eq!(invalid.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
 fn lowers_callable_roles_and_layouts_without_a_machine_backend() {
     let signature = lower_verb_signature("app", &verb_with_signature(), &TestLayouts)
         .expect("signature should lower through the neutral provider");
@@ -1002,6 +1025,7 @@ fn preserves_cleanup_plans_on_the_neutral_function_contract() {
             name: "resource".to_owned(),
         }],
         bridges: vec![None],
+        resolved_bridges: vec![Vec::new()],
     }];
 
     let function = lower_verb_with_cleanup(
@@ -1033,6 +1057,7 @@ fn rejects_cleanup_plans_without_one_bridge_descriptor_per_action() {
                 name: "resource".to_owned(),
             }],
             bridges: Vec::new(),
+            resolved_bridges: vec![Vec::new()],
         }],
     )
     .expect_err("misaligned cleanup plans must be rejected");

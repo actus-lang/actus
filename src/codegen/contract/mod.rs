@@ -17,7 +17,8 @@ use super::symbols::{SymbolIdentity, SymbolKind};
 use cleanup::validate_cleanup_operand;
 pub use cleanup::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
-    BackendCleanupField, BackendCleanupOperand, BackendCleanupResult,
+    BackendCleanupField, BackendCleanupOperand, BackendCleanupResolvedDescriptor,
+    BackendCleanupResult,
 };
 pub use instruction::BackendInstruction;
 
@@ -144,6 +145,7 @@ pub struct BackendCleanupPlan {
     pub span: SourceSpan,
     pub actions: Vec<BackendCleanupAction>,
     pub bridges: Vec<Option<BackendCleanupBridgeDescriptor>>,
+    pub resolved_bridges: Vec<Vec<BackendCleanupResolvedDescriptor>>,
 }
 
 pub fn lower_semantic_cleanup(
@@ -154,6 +156,7 @@ pub fn lower_semantic_cleanup(
     Ok(super::model::lower_cleanup_plans(model)
         .into_iter()
         .map(|plan| {
+            let action_count = plan.instructions.len();
             let bridges = plan
                 .instructions
                 .iter()
@@ -164,6 +167,7 @@ pub fn lower_semantic_cleanup(
                 span: plan.span,
                 actions: plan.instructions,
                 bridges,
+                resolved_bridges: vec![Vec::new(); action_count],
             }
         })
         .collect())
@@ -232,8 +236,16 @@ impl BackendFunction {
 }
 
 fn validate_cleanup_plans(plans: &[BackendCleanupPlan]) -> Result<(), BackendContractError> {
-    if plans.iter().any(|plan| plan.actions.len() != plan.bridges.len()) {
+    if plans.iter().any(|plan| {
+        plan.actions.len() != plan.bridges.len()
+            || plan.actions.len() != plan.resolved_bridges.len()
+    }) {
         return Err(BackendContractError::InvalidCleanupPlan);
+    }
+    for plan in plans {
+        for descriptor in plan.resolved_bridges.iter().flatten() {
+            descriptor.validate()?;
+        }
     }
     Ok(())
 }

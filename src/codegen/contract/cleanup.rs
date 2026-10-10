@@ -35,6 +35,36 @@ pub struct BackendCleanupField {
     pub alignment: u32,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendCleanupResolvedDescriptor {
+    pub descriptor: BackendCleanupBridgeDescriptor,
+    pub layout: BackendLayout,
+    pub field: Option<BackendCleanupField>,
+}
+
+impl BackendCleanupResolvedDescriptor {
+    pub fn validate(&self) -> Result<(), BackendContractError> {
+        self.layout.validate()?;
+        if matches!(self.descriptor.argument, BackendCleanupArgument::FieldAddress)
+            != self.field.is_some()
+        {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        }
+        let Some(field) = self.field else { return Ok(()) };
+        if field.size == 0
+            || field.alignment == 0
+            || !field.alignment.is_power_of_two()
+            || field.offset % field.alignment != 0
+            || field.size % field.alignment != 0
+            || field.offset > self.layout.size
+            || field.size > self.layout.size - field.offset
+        {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendCleanupOperand {
     pub value: BackendValueId,

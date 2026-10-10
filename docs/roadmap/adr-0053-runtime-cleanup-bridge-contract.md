@@ -84,4 +84,8 @@ cleanup schedule integration remain open; the shared descriptor still needs
 to carry the resolved binding and moved-field metadata before those semantic
 paths are complete. The existing Cranelift cleanup path remains the behavioral
 reference for parity fixtures until that integration is complete.
+The neutral contract also defines a resolved descriptor that validates the
+parent layout and optional field sublayout as one unit. Semantic providers have
+not yet populated this descriptor from binding types; that is the next required
+step.
 
