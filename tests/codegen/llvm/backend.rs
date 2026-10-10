@@ -407,6 +407,57 @@ fn emits_region_runtime_cleanup_bridge_call() {
 }
 
 #[test]
+fn emits_target_width_enum_runtime_cleanup_bridge_call() {
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "enum_cleanup").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "value".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Pointer,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Cleanup {
+                    action: LoweredCleanupInstruction::DropBinding {
+                        binding_index: 0,
+                        name: "value".to_owned(),
+                    },
+                    operand: Some(BackendCleanupOperand {
+                        value: BackendValueId(0),
+                        layout: BackendLayout { size: 24, alignment: 8 },
+                        field: None,
+                        bridge: BackendCleanupBridge::EnumDrop { size: 24 },
+                        argument: BackendCleanupArgument::Address,
+                        result: BackendCleanupResult::Ignored,
+                    }),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("enum cleanup bridge should lower to an LLVM call");
+    assert!(ir.contains("declare void @actus_enum_drop(ptr, i64)"));
+    assert!(ir.contains("call void @actus_enum_drop(ptr %0, i64 24)"));
+}
+
+#[test]
 fn lowers_pointer_memory_copy_with_declared_extent_and_alignment() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "copy").expect("valid symbol");
     let pointer = BackendParameter {

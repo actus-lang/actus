@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 pub(super) fn emit_cleanup(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
+    pointer_width: u8,
     action: &LoweredCleanupInstruction,
     operand: Option<BackendCleanupOperand>,
     declarations: &BTreeMap<String, FunctionDeclaration>,
@@ -19,5 +20,5 @@ pub(super) fn emit_cleanup(
     }
     let operand =
         operand.ok_or_else(|| BackendEmitError("LLVM cleanup operand is missing".to_owned()))?;
-    bridge::emit_runtime_bridge(context, builder, operand, declarations, values)
+    bridge::emit_runtime_bridge(context, builder, pointer_width, operand, declarations, values)
 }

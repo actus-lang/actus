@@ -65,8 +65,17 @@ pub(super) fn declare_cleanup_bridge(
     context: LLVMContextRef,
     module: LLVMModuleRef,
     bridge: BackendCleanupBridge,
+    pointer_width: u8,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
-    let (symbol, parameters, return_value) = match bridge {
+    let (symbol, parameters, return_value) = cleanup_signature(bridge, pointer_width);
+    declare_function(context, module, symbol, &parameters, &return_value)
+}
+
+fn cleanup_signature(
+    bridge: BackendCleanupBridge,
+    pointer_width: u8,
+) -> (&'static str, Vec<BackendParameter>, BackendReturn) {
+    match bridge {
         BackendCleanupBridge::BufferDrop => (
             crate::runtime::BUFFER_DROP_SYMBOL,
             vec![BackendParameter {
@@ -95,13 +104,29 @@ pub(super) fn declare_cleanup_bridge(
                 passing: BackendReturnMode::Direct,
             },
         ),
-        BackendCleanupBridge::EnumDrop { .. } => {
-            return Err(BackendEmitError(
-                "LLVM enum cleanup bridge lowering is not implemented".to_owned(),
-            ));
-        }
-    };
-    declare_function(context, module, symbol, &parameters, &return_value)
+        BackendCleanupBridge::EnumDrop { .. } => (
+            crate::runtime::ENUM_DROP_SYMBOL,
+            vec![
+                BackendParameter {
+                    name: "pointer".to_owned(),
+                    role: crate::ast::Role::Erg,
+                    ty: BackendValueType::Pointer,
+                    passing: BackendPassingMode::Direct,
+                },
+                BackendParameter {
+                    name: "size".to_owned(),
+                    role: crate::ast::Role::Erg,
+                    ty: BackendValueType::Integer { signed: false, width: pointer_width },
+                    passing: BackendPassingMode::Direct,
+                },
+            ],
+            BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+        ),
+    }
 }
 
 fn parameter_type(

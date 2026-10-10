@@ -76,10 +76,9 @@ width.
 
 ## Consequences
 
-The descriptor is now present and LLVM emits the `BufferDrop` and `RegionDrop`
-bridge calls for direct cleanup operands. Enum cleanup remains open because
-its `usize` extent argument must be declared with the selected target's pointer
-width before it can be enabled for hosted and freestanding targets. The
+The descriptor is now present and LLVM emits `BufferDrop`, `RegionDrop`, and
+target-width `EnumDrop` bridge calls for direct cleanup operands. Semantic enum
+layout discovery and full cleanup schedule integration remain open. The
 existing Cranelift cleanup path remains the behavioral reference for parity
-fixtures until that target-aware ABI boundary is complete.
+fixtures until those semantic paths are complete.
 

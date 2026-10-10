@@ -23,6 +23,7 @@ use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 pub(super) fn emit_blocks(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
+    pointer_width: u8,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
     declarations: &BTreeMap<String, FunctionDeclaration>,
@@ -42,6 +43,7 @@ pub(super) fn emit_blocks(
             terminated = emit_instruction(
                 context,
                 builder,
+                pointer_width,
                 function,
                 declaration,
                 instruction,
@@ -76,6 +78,7 @@ fn parameter_values(declaration: FunctionDeclaration) -> BTreeMap<BackendValueId
 fn emit_instruction(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
+    pointer_width: u8,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
     instruction: &BackendInstruction,
@@ -124,7 +127,7 @@ fn emit_instruction(
             Ok(true)
         }
         BackendInstruction::Cleanup { action, operand, .. } => {
-            emit_cleanup(context, builder, action, *operand, declarations, values)
+            emit_cleanup(context, builder, pointer_width, action, *operand, declarations, values)
         }
         BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)

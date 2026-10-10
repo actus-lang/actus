@@ -15,6 +15,7 @@ use super::declarations::{FunctionDeclaration, declare_cleanup_bridge, declare_f
 use crate::codegen::{BackendCleanupBridge, BackendInstruction};
 pub(super) fn lower_module(
     module: &BackendModule,
+    pointer_width: u8,
 ) -> Result<(LlvmContext, LlvmModule), BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
     validate_integer_only(module)?;
@@ -22,13 +23,14 @@ pub(super) fn lower_module(
     let module_name = CString::new("actus.module")
         .map_err(|_| BackendEmitError("LLVM module name contains NUL".to_owned()))?;
     let owned_module = LlvmModule::new(context.raw, module_name.as_ptr())?;
-    let declarations = declare_module_functions(context.raw, owned_module.raw, module)?;
+    let declarations =
+        declare_module_functions(context.raw, owned_module.raw, module, pointer_width)?;
     for function in &module.functions {
         let declaration = declarations
             .get(function.symbol.as_str())
             .copied()
             .ok_or_else(|| BackendEmitError("LLVM function declaration is missing".to_owned()))?;
-        emit_function(context.raw, function, declaration, &declarations)?;
+        emit_function(context.raw, pointer_width, function, declaration, &declarations)?;
     }
     Ok((context, owned_module))
 }
@@ -62,6 +64,7 @@ fn declare_module_functions(
     context: LLVMContextRef,
     module: LLVMModuleRef,
     backend_module: &BackendModule,
+    pointer_width: u8,
 ) -> Result<BTreeMap<String, FunctionDeclaration>, BackendEmitError> {
     let mut declarations = BTreeMap::new();
     for external in &backend_module.externals {
@@ -79,7 +82,7 @@ fn declare_module_functions(
         if declarations.contains_key(symbol) {
             continue;
         }
-        let declaration = declare_cleanup_bridge(context, module, bridge)?;
+        let declaration = declare_cleanup_bridge(context, module, bridge, pointer_width)?;
         declarations.insert(symbol.to_owned(), declaration);
     }
     for function in &backend_module.functions {
@@ -122,6 +125,7 @@ fn cleanup_bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
 
 fn emit_function(
     context: LLVMContextRef,
+    pointer_width: u8,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
     declarations: &BTreeMap<String, FunctionDeclaration>,
@@ -131,7 +135,8 @@ fn emit_function(
     if builder.is_null() {
         return Err(BackendEmitError("LLVM failed to create a builder".to_owned()));
     }
-    let result = emit_blocks(context, builder, function, declaration, declarations, &blocks);
+    let result =
+        emit_blocks(context, builder, pointer_width, function, declaration, declarations, &blocks);
     unsafe { LLVMDisposeBuilder(builder) };
     result
 }
