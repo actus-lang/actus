@@ -11,10 +11,10 @@ use support::unsupported;
 use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupProvider, BackendCleanupResolvedDescriptor, BackendCleanupResult,
-    BackendContractError, BackendExternal, BackendLayout, BackendLayoutProvider, BackendModule,
-    BackendSignature, BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter,
-    lower_return, lower_verb_signature, lower_verb_with_expressions,
-    lower_verb_with_expressions_as,
+    BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
+    BackendLayoutProvider, BackendModule, BackendSignature, BackendSymbolBindings,
+    BackendValueType, SymbolIdentity, lower_parameter, lower_return, lower_verb_signature,
+    lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 struct BuiltinLayouts;
@@ -267,8 +267,74 @@ fn lower_shared_verb(
         .filter(|plan| plan.span.start >= verb.span.start && plan.span.end <= verb.span.end)
         .cloned()
         .collect();
+    append_parameter_cleanup(&mut function, &provider);
     function.validate()?;
     Ok(function)
+}
+
+type ParameterCleanup =
+    (String, super::BackendCleanupAction, super::BackendCleanupOperand, crate::lexer::SourceSpan);
+
+fn append_parameter_cleanup(
+    function: &mut super::BackendFunction,
+    provider: &SharedExpressionProvider<'_>,
+) {
+    let cleanup = parameter_cleanup(function, provider);
+    if cleanup.is_empty() {
+        return;
+    }
+    for block in &mut function.blocks {
+        let instructions = std::mem::take(&mut block.instructions);
+        let mut lowered = Vec::with_capacity(instructions.len() + cleanup.len());
+        for instruction in instructions {
+            let returned_value = match &instruction {
+                BackendInstruction::Return { value, .. } => *value,
+                BackendInstruction::Fail { .. } => None,
+                _ => None,
+            };
+            if matches!(
+                instruction,
+                BackendInstruction::Return { .. } | BackendInstruction::Fail { .. }
+            ) {
+                for (name, action, operand, span) in &cleanup {
+                    if returned_value == provider.parameter_value(name) {
+                        continue;
+                    }
+                    lowered.push(BackendInstruction::Cleanup {
+                        action: action.clone(),
+                        operand: Some(*operand),
+                        span: *span,
+                    });
+                }
+            }
+            lowered.push(instruction);
+        }
+        block.instructions = lowered;
+    }
+}
+
+fn parameter_cleanup(
+    function: &super::BackendFunction,
+    provider: &SharedExpressionProvider<'_>,
+) -> Vec<ParameterCleanup> {
+    let mut cleanup = Vec::new();
+    for plan in &function.cleanup {
+        for (index, action) in plan.actions.iter().enumerate() {
+            let super::BackendCleanupAction::DropBinding { name, .. } = action else {
+                continue;
+            };
+            let Some(value) = provider.parameter_value(name) else { continue };
+            let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first())
+            else {
+                continue;
+            };
+            if cleanup.iter().any(|(existing, _, _, _)| existing == name) {
+                continue;
+            }
+            cleanup.push((name.clone(), action.clone(), descriptor.operand(value), plan.span));
+        }
+    }
+    cleanup
 }
 
 #[cfg(test)]
@@ -277,7 +343,9 @@ mod tests {
         BackendLayout, BackendLayoutProvider, lower_program_to_backend_module_with_layouts,
     };
     use crate::ast::TypeName;
-    use crate::codegen::{BackendPassingMode, BackendReturnMode, BackendValueType};
+    use crate::codegen::{
+        BackendInstruction, BackendPassingMode, BackendReturnMode, BackendValueType,
+    };
     use crate::lexer::scan;
     use crate::parser::parse;
 
@@ -291,7 +359,7 @@ mod tests {
 
     #[test]
     fn lowers_region_signature_and_cleanup_through_shared_pipeline() {
-        let source = "verb inspect(erg region: Region[u32]) { }";
+        let source = "verb inspect(erg region: Region[u32]) { return; }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty(), "lexer errors: {errors:?}");
         let program = parse(tokens).expect("Region fixture should parse");
@@ -315,6 +383,10 @@ mod tests {
                 .any(|descriptor| descriptor.descriptor.bridge
                     == super::BackendCleanupBridge::RegionDrop)
         );
+        assert!(matches!(
+            function.blocks[0].instructions.as_slice(),
+            [BackendInstruction::Cleanup { .. }, BackendInstruction::Return { value: None, .. }]
+        ));
     }
 
     #[test]

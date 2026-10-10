@@ -47,6 +47,10 @@ impl<'a> SharedExpressionProvider<'a> {
         self.next_value += 1;
         result
     }
+
+    pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
+        self.parameters.get(name).copied()
+    }
 }
 
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
