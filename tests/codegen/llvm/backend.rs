@@ -632,6 +632,159 @@ fn emits_an_arm32_thumb_object_for_the_cortex_m_profile() {
     std::fs::remove_file(output).expect("ARM test object should be removed");
 }
 
+#[test]
+fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
+    let integer = BackendValueType::Integer { signed: false, width: 32 };
+    let scalar_callee_symbol =
+        SymbolIdentity::new("arm", SymbolKind::Verb, "scalar_callee").expect("scalar symbol");
+    let scalar_caller_symbol =
+        SymbolIdentity::new("arm", SymbolKind::Verb, "scalar_caller").expect("scalar symbol");
+    let scalar_parameter = BackendParameter {
+        name: "input".to_owned(),
+        role: Role::Erg,
+        ty: integer,
+        passing: actus::codegen::BackendPassingMode::Direct,
+    };
+    let scalar_callee = BackendFunction {
+        symbol: scalar_callee_symbol.clone(),
+        parameters: vec![scalar_parameter.clone()],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: Some(BackendValueId(0)),
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let scalar_caller = BackendFunction {
+        symbol: scalar_caller_symbol,
+        parameters: vec![scalar_parameter],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: scalar_callee_symbol,
+                    arguments: vec![BackendValueId(0)],
+                    result: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+
+    let aggregate_layout = actus::codegen::BackendLayout { size: 8, alignment: 4 };
+    let aggregate_abi = actus::codegen::BackendDirectAggregateAbi {
+        layout: aggregate_layout,
+        parameter_fragments: arm_aggregate_register_fragments(),
+        return_fragments: arm_aggregate_register_fragments(),
+    };
+    let aggregate_type = BackendValueType::Aggregate { layout: aggregate_layout };
+    let aggregate_callee_symbol =
+        SymbolIdentity::new("arm", SymbolKind::Verb, "aggregate_callee").expect("aggregate symbol");
+    let aggregate_caller_symbol =
+        SymbolIdentity::new("arm", SymbolKind::Verb, "aggregate_caller").expect("aggregate symbol");
+    let aggregate_callee = BackendFunction {
+        symbol: aggregate_callee_symbol.clone(),
+        parameters: vec![BackendParameter {
+            name: "input".to_owned(),
+            role: Role::Erg,
+            ty: aggregate_type,
+            passing: actus::codegen::BackendPassingMode::DirectAggregate {
+                abi: aggregate_abi.clone(),
+            },
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate_type,
+            passing: BackendReturnMode::DirectAggregate { abi: aggregate_abi.clone() },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: Some(BackendValueId(0)),
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let aggregate_caller = BackendFunction {
+        symbol: aggregate_caller_symbol,
+        parameters: vec![BackendParameter {
+            name: "input".to_owned(),
+            role: Role::Erg,
+            ty: aggregate_type,
+            passing: actus::codegen::BackendPassingMode::DirectAggregate {
+                abi: aggregate_abi.clone(),
+            },
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate_type,
+            passing: BackendReturnMode::DirectAggregate { abi: aggregate_abi },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: aggregate_callee_symbol,
+                    arguments: vec![BackendValueId(0)],
+                    result: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![scalar_callee, scalar_caller, aggregate_callee, aggregate_caller],
+    };
+    let output =
+        std::env::temp_dir().join(format!("actus-llvm-arm-call-fixtures-{}.o", std::process::id()));
+    let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
+        .expect("Cortex-M target should parse");
+    emit_object(&module, &target, &output).expect("ARM call fixture object should be emitted");
+    let bytes = std::fs::read(&output).expect("ARM call fixture object should be readable");
+    let object =
+        object::File::parse(bytes.as_slice()).expect("ARM call fixture object should parse");
+    assert_eq!(object.architecture(), object::Architecture::Arm);
+    assert!(object.section_by_name(".text").is_some());
+    for symbol in [
+        "arm__verb_scalar_5fcallee",
+        "arm__verb_scalar_5fcaller",
+        "arm__verb_aggregate_5fcallee",
+        "arm__verb_aggregate_5fcaller",
+    ] {
+        assert!(object.symbols().any(|candidate| candidate.name() == Ok(symbol)));
+    }
+    std::fs::remove_file(output).expect("ARM call fixture object should be removed");
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn links_and_runs_a_host_object_through_the_shared_linker() {
@@ -1156,6 +1309,7 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
     );
 }
 
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
 fn aggregate_register_fragments() -> Vec<actus::codegen::BackendAggregateFragment> {
     vec![
         actus::codegen::BackendAggregateFragment {
@@ -1168,6 +1322,23 @@ fn aggregate_register_fragments() -> Vec<actus::codegen::BackendAggregateFragmen
             offset: 8,
             size: 8,
             alignment: 8,
+            location: actus::codegen::BackendAggregateLocation::Register { index: 1 },
+        },
+    ]
+}
+
+fn arm_aggregate_register_fragments() -> Vec<actus::codegen::BackendAggregateFragment> {
+    vec![
+        actus::codegen::BackendAggregateFragment {
+            offset: 0,
+            size: 4,
+            alignment: 4,
+            location: actus::codegen::BackendAggregateLocation::Register { index: 0 },
+        },
+        actus::codegen::BackendAggregateFragment {
+            offset: 4,
+            size: 4,
+            alignment: 4,
             location: actus::codegen::BackendAggregateLocation::Register { index: 1 },
         },
     ]

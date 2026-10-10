@@ -264,6 +264,13 @@ ELF object for `thumbv7em-none-eabihf` and checks its `.text` section and Actus
 entry symbol. This remains object-generation evidence; it does not establish
 freestanding linking or target execution.
 
+The ARM ABI fixture also builds scalar and two-word aggregate caller/callee
+pairs using the neutral direct-call and return contract, then emits and parses
+one ARM object containing both directions. The fixture confirms that scalar
+and aggregate argument and return paths reach LLVM ARM object generation with
+stable public symbols. It does not establish exact AAPCS register allocation,
+freestanding linking, or hardware execution.
+
 The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
 `CortexMv7em` target profile and `Thumb2` instruction mode. This profile
 identifies the Cortex-M v7E-M architecture family; it does not by itself claim

@@ -464,7 +464,7 @@ states the host and evidence limits explicitly.
 - [ ] Preserve the required 8-byte stack alignment at every call boundary.
 - [x] Define register and stack representations for scalar and aggregate
       arguments and return values before external C interoperability.
-- [ ] Add ABI fixtures for scalar and aggregate calls in both directions.
+- [x] Add ABI fixtures for scalar and aggregate calls in both directions.
 - [x] Generate ARM32/Thumb objects through the LLVM backend.
 - [ ] Link a minimal freestanding image with the explicit runtime provider.
 - [ ] Add object-level checks for relocations, symbols, sections, alignment,
@@ -499,6 +499,14 @@ ARM ELF object for `thumbv7em-none-eabihf`. The fixture verifies the ARM object
 architecture, `.text` section, and public Actus symbol. This is host-side
 object evidence only; it does not claim linker-script, runtime-provider, or
 hardware execution support.
+
+The ARM call fixture now lowers scalar and two-word aggregate caller/callee
+pairs through the same backend-neutral `Call` and `Return` contract before
+emitting the ARM object. It verifies that both argument flow and return flow
+survive LLVM ARM object emission and that all four public symbols are present
+in the parsed object. This proves fixture coverage through object generation;
+it does not yet prove exact register allocation, freestanding linking, or
+target execution.
 
 ## Gate 44.7 — External C ABI and runtime interoperability
 
