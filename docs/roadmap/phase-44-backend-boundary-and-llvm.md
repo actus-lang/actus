@@ -584,7 +584,7 @@ backend. It closes the current boundary where the CLI build pipeline lowers
 semantic programs directly through Cranelift while LLVM accepts only manually
 constructed backend-neutral contracts.
 
-- [ ] Define one public backend selector with explicit `cranelift` and `llvm`
+- [x] Define one public backend selector with explicit `cranelift` and `llvm`
       variants and a deterministic default.
 - [ ] Add manifest configuration for backend selection with strict parsing,
       validation, inheritance, and a clear error for an unavailable feature.
