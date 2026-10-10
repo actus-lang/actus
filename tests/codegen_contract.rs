@@ -4,12 +4,12 @@ use actus::ast::{
 use actus::codegen::{
     BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
     BackendBodyProvider, BackendCleanupAction, BackendContractError, BackendDirectAggregateAbi,
-    BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
-    BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode,
-    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
-    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
-    lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_signature,
-    lower_verb_with_cleanup,
+    BackendEnumLayout, BackendExpressionProvider, BackendExternal, BackendFailure, BackendFunction,
+    BackendInstruction, BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter,
+    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
+    BackendUnsupportedOperation, BackendValueId, BackendValueType, LoweredCleanupInstruction,
+    SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_verb, lower_verb_body,
+    lower_verb_body_with_expressions, lower_verb_signature, lower_verb_with_cleanup,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -23,6 +23,38 @@ fn verb_symbol() -> SymbolIdentity {
 struct TestLayouts;
 
 struct TestBodyProvider;
+
+struct ConstantExpressionProvider;
+
+impl BackendExpressionProvider for ConstantExpressionProvider {
+    fn lower_expression(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<actus::codegen::BackendValueId, BackendContractError> {
+        let Expr::Integer { value, span, .. } = expression else {
+            return Err(BackendContractError::InvalidValueType);
+        };
+        let value = value.parse::<u64>().map_err(|_| BackendContractError::InvalidValueType)?;
+        let result = actus::codegen::BackendValueId(instructions.len() as u32);
+        instructions.push(BackendInstruction::Constant {
+            result,
+            ty: BackendValueType::Integer { signed: true, width: 32 },
+            value,
+            span: *span,
+        });
+        Ok(result)
+    }
+
+    fn callee_for(
+        &mut self,
+        callee: &str,
+        _span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError> {
+        SymbolIdentity::new("test", SymbolKind::Verb, callee)
+            .map_err(|_| BackendContractError::InvalidCallSymbol)
+    }
+}
 
 impl BackendBodyProvider for TestBodyProvider {
     fn value_for(
@@ -764,6 +796,33 @@ fn lowers_return_and_direct_calls_through_a_neutral_body_provider() {
     assert_eq!(blocks.len(), 1);
     assert!(matches!(blocks[0].instructions[0], BackendInstruction::Call { .. }));
     assert!(matches!(blocks[0].instructions[1], BackendInstruction::Return { value: None, .. }));
+}
+
+#[test]
+fn lowers_expression_values_into_neutral_instructions() {
+    let mut verb = verb_with_signature();
+    verb.params.clear();
+    verb.return_type = Some(ReturnType {
+        access: ReturnAccess::Owned,
+        ty: type_name("u32", None),
+        span: SourceSpan::new(0, 3),
+    });
+    verb.body = Block {
+        statements: vec![Stmt::Return {
+            value: Some(Expr::Integer {
+                value: "42".to_owned(),
+                suffix: Some("u32".to_owned()),
+                span: SourceSpan::new(0, 2),
+            }),
+            span: SourceSpan::new(0, 2),
+        }],
+        span: SourceSpan::new(0, 2),
+    };
+
+    let blocks = lower_verb_body_with_expressions(&verb, &mut ConstantExpressionProvider)
+        .expect("expression provider should lower integer values");
+    assert!(matches!(blocks[0].instructions[0], BackendInstruction::Constant { value: 42, .. }));
+    assert!(matches!(blocks[0].instructions[1], BackendInstruction::Return { value: Some(_), .. }));
 }
 
 #[test]

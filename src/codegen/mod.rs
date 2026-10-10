@@ -19,7 +19,10 @@ pub use abi::{
     BackendEnumLayout,
 };
 pub use backend::{BackendKind, BackendTargetError};
-pub use body::{BackendBodyProvider, lower_verb_body};
+pub use body::{
+    BackendBodyProvider, BackendExpressionProvider, lower_verb_body,
+    lower_verb_body_with_expressions,
+};
 pub use contract::{
     BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupField,
     BackendCleanupOperand, BackendCleanupPlan, BackendContractError, BackendEmitError,

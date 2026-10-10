@@ -23,9 +23,38 @@ pub trait BackendBodyProvider {
     ) -> Result<SymbolIdentity, BackendContractError>;
 }
 
+pub trait BackendExpressionProvider {
+    fn lower_expression(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError>;
+
+    fn failure_for(
+        &mut self,
+        _expression: &Expr,
+    ) -> Result<Option<BackendFailure>, BackendContractError> {
+        Ok(None)
+    }
+
+    fn callee_for(
+        &mut self,
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError>;
+}
+
 pub fn lower_verb_body(
     verb: &VerbDecl,
     provider: &impl BackendBodyProvider,
+) -> Result<Vec<BackendBlock>, BackendContractError> {
+    let mut legacy = LegacyExpressionProvider { provider };
+    lower_verb_body_with_expressions(verb, &mut legacy)
+}
+
+pub fn lower_verb_body_with_expressions(
+    verb: &VerbDecl,
+    provider: &mut impl BackendExpressionProvider,
 ) -> Result<Vec<BackendBlock>, BackendContractError> {
     let mut lowering = BodyLowering { provider, next_block: 1, blocks: Vec::new() };
     let entry = BackendBlockId(0);
@@ -35,12 +64,41 @@ pub fn lower_verb_body(
 }
 
 struct BodyLowering<'a, P> {
-    provider: &'a P,
+    provider: &'a mut P,
     next_block: u32,
     blocks: Vec<BackendBlock>,
 }
 
-impl<P: BackendBodyProvider> BodyLowering<'_, P> {
+struct LegacyExpressionProvider<'a, P> {
+    provider: &'a P,
+}
+
+impl<P: BackendBodyProvider> BackendExpressionProvider for LegacyExpressionProvider<'_, P> {
+    fn lower_expression(
+        &mut self,
+        expression: &Expr,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        self.provider.value_for(expression)
+    }
+
+    fn failure_for(
+        &mut self,
+        expression: &Expr,
+    ) -> Result<Option<BackendFailure>, BackendContractError> {
+        self.provider.failure_for(expression)
+    }
+
+    fn callee_for(
+        &mut self,
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError> {
+        self.provider.callee_for(callee, span)
+    }
+}
+
+impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     fn lower_block(
         &mut self,
         id: BackendBlockId,
@@ -93,7 +151,7 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
                 if let Some(failure) = self.provider.failure_for(expression)? {
                     instructions.push(BackendInstruction::Fail { failure, span: *span });
                 } else {
-                    let value = self.provider.value_for(expression)?;
+                    let value = self.provider.lower_expression(expression, instructions)?;
                     instructions
                         .push(BackendInstruction::Return { value: Some(value), span: *span });
                 }
@@ -104,7 +162,9 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
             } => {
                 let arguments = arguments
                     .iter()
-                    .map(|argument| self.provider.value_for(&argument.expression))
+                    .map(|argument| {
+                        self.provider.lower_expression(&argument.expression, instructions)
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 let callee = self.provider.callee_for(callee, *span)?;
                 instructions.push(BackendInstruction::Call {
@@ -128,7 +188,7 @@ impl<P: BackendBodyProvider> BodyLowering<'_, P> {
         continuation_id: BackendBlockId,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        let condition = self.provider.value_for(condition)?;
+        let condition = self.provider.lower_expression(condition, instructions)?;
         let then_id = self.allocate_block();
         let else_id = self.allocate_block();
         instructions.push(BackendInstruction::Branch {
