@@ -92,7 +92,8 @@ emission adapter resolve nested Buffer and Region fields from the native layout
 registry with a regression test. Cranelift production emission invokes this
 provider after native layouts are built and fails before object emission when
 semantic cleanup metadata is invalid. Non-runtime fields are excluded from the
-runtime descriptor set. The established Cranelift cleanup schedule remains the
-emission path until resolved descriptors replace it and identical
-descriptor-driven fixtures are executed through both backends.
+runtime descriptor set. The semantic descriptor-lowering requirement is
+complete. The established Cranelift cleanup schedule remains the emission path
+until resolved descriptors replace it and identical descriptor-driven fixtures
+are executed through both backends.
 

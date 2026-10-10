@@ -316,7 +316,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
 - [x] Emit and execute runtime bridge calls for ownership cleanup.
 - [x] Define a backend-neutral cleanup bridge descriptor with stable symbol,
       argument mode, layout, and return-status metadata.
-- [ ] Lower semantic binding types and moved-field sublayouts into complete
+- [x] Lower semantic binding types and moved-field sublayouts into complete
       cleanup bridge descriptors before backend emission.
 - [ ] Execute identical descriptor-driven cleanup fixtures through Cranelift
       and LLVM and compare status, call arguments, and cleanup ordering.
