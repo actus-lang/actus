@@ -4,6 +4,7 @@ mod bindings;
 mod body;
 mod constants;
 mod contract;
+mod contract_errors;
 #[cfg(feature = "cranelift")]
 pub mod cranelift;
 mod enum_layout;
