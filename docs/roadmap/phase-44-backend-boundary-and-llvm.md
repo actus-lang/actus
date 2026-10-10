@@ -314,6 +314,12 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       lowering.
 - [x] Define bounds-checked field sublayouts for ownership cleanup operands.
 - [ ] Emit and execute runtime bridge calls for ownership cleanup.
+- [ ] Define a backend-neutral cleanup bridge descriptor with stable symbol,
+      argument mode, layout, and return-status metadata.
+- [ ] Lower semantic binding types and moved-field sublayouts into complete
+      cleanup bridge descriptors before backend emission.
+- [ ] Execute identical descriptor-driven cleanup fixtures through Cranelift
+      and LLVM and compare status, call arguments, and cleanup ordering.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
@@ -346,7 +352,8 @@ and this emitter slice are covered by the LLVM integration test. A dedicated
 LLVM regression test also verifies that a value-bearing runtime cleanup action
 fails with the explicit bridge-lowering diagnostic instead of being silently
 omitted; runtime cleanup execution remains open until its ABI and storage
-representation are implemented.
+representation are implemented. ADR-0053 defines the required neutral bridge
+descriptor and implementation order for that work.
 The neutral contract now also validates non-zero, alignment-compatible pointer
 copy extents, and the LLVM slice lowers those extents through overlap-safe
 `llvm.memmove` calls. Full semantic copy propagation and aggregate field copy
