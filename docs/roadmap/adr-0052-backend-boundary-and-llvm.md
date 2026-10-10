@@ -271,11 +271,11 @@ and aggregate argument and return paths reach LLVM ARM object generation with
 stable public symbols. It does not establish exact AAPCS register allocation,
 freestanding linking, or hardware execution.
 
-The same fixture also checks that the generated `.text` section has at least
-Thumb halfword alignment and that the parsed object has no forbidden hosted
-imports. Target runtime symbols remain explicit unresolved dependencies at
-this stage. Relocation resolution, linker-script validation, and target
-execution remain separate acceptance requirements.
+The linked-image fixture checks the final ELF's vector-table alignment and
+values, Thumb reset-state bit, reset-symbol target, flash placement, absence
+of relocations, absence of undefined symbols, and absence of forbidden hosted
+imports. This provides object-level linker acceptance; instruction-level
+runtime observation remains a separate evidence boundary.
 
 The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
 `CortexMv7em` target profile and `Thumb2` instruction mode. This profile

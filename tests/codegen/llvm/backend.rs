@@ -801,13 +801,13 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let startup = root.join("startup.s");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.word _estack\n.word Reset_Handler + 1\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
     )
     .expect("ARM startup source should be written");
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  .isr_vector : { KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
     )
     .expect("ARM linker script should be written");
     let startup_object = root.join("startup.o");
@@ -855,10 +855,37 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let bytes = fs::read(&image).expect("ARM image should be readable");
     let object = object::File::parse(bytes.as_slice()).expect("ARM image should parse");
     assert_eq!(object.architecture(), object::Architecture::Arm);
-    assert!(object.section_by_name(".isr_vector").is_some());
-    assert!(object.section_by_name(".text").is_some());
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("Reset_Handler")));
+    let vector = object.section_by_name(".isr_vector").expect("vector section should exist");
+    let text = object.section_by_name(".text").expect("text section should exist");
+    assert!(vector.align() >= 4, "vector table must be word aligned");
+    assert!(text.align() >= 2, "Thumb text must be halfword aligned");
+    assert!((0x0800_0000..0x0804_0000).contains(&vector.address()));
+    assert!((0x0800_0000..0x0804_0000).contains(&text.address()));
+    let vector_data = vector.data().expect("vector section should contain bytes");
+    assert_eq!(vector_data.len(), 8, "minimal vector table must contain two words");
+    let initial_stack = u32::from_le_bytes(vector_data[0..4].try_into().expect("stack word"));
+    let reset_vector = u32::from_le_bytes(vector_data[4..8].try_into().expect("reset word"));
+    assert_eq!(initial_stack, 0x2001_0000, "vector table must point at the linker-defined stack");
+    assert_ne!(reset_vector & 1, 0, "Reset_Handler vector must select Thumb state");
+    let reset_address = object
+        .symbols()
+        .find(|symbol| symbol.name() == Ok("Reset_Handler"))
+        .expect("Reset_Handler should be exported")
+        .address();
+    assert_eq!(
+        u64::from(reset_vector & !1),
+        reset_address & !1,
+        "vector must target Reset_Handler"
+    );
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("arm__verb_boot")));
+    let relocation_count =
+        object.sections().map(|section| section.relocations().count()).sum::<usize>();
+    assert_eq!(relocation_count, 0, "linked image must not retain relocations");
+    let hosted_imports = ["abort", "free", "malloc", "memcpy", "printf"];
+    for symbol in object.symbols().filter(|symbol| symbol.is_undefined()) {
+        let name = symbol.name().expect("undefined symbol should have a name");
+        assert!(!hosted_imports.contains(&name), "image imports hosted symbol {name}");
+    }
     assert!(object.symbols().all(|symbol| !symbol.is_undefined()));
     if std::env::var_os("ACTUS_KEEP_ARM_IMAGE").is_none() {
         remove_fixture(&root, [&startup, &linker_script, &startup_object, &actus_object, &image]);

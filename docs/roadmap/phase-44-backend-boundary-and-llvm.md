@@ -467,7 +467,7 @@ states the host and evidence limits explicitly.
 - [x] Add ABI fixtures for scalar and aggregate calls in both directions.
 - [x] Generate ARM32/Thumb objects through the LLVM backend.
 - [x] Link a minimal freestanding image with the explicit runtime provider.
-- [ ] Add object-level checks for relocations, symbols, sections, alignment,
+- [x] Add object-level checks for relocations, symbols, sections, alignment,
       and forbidden hosted imports.
 - [x] Add emulator or target execution evidence for the minimal image.
 - [x] Record the exact LLVM, assembler, linker, target triple, and linker-script
@@ -532,12 +532,14 @@ in the parsed object. This proves fixture coverage through object generation;
 it does not yet prove exact register allocation, freestanding linking, or
 target execution.
 
-The same object fixture performs initial object-level sanity checks: the ARM
-object contains a halfword-aligned `.text` section and has no undefined
-hosted imports. Target runtime symbols remain explicit unresolved dependencies
-until the runtime-provider and linker checks are completed. Relocation
-semantics, the complete linker-script contract, and target-specific execution
-remain open checks.
+The linked-image fixture now performs strict object-level acceptance checks:
+the vector table is word-aligned and points at the linker-defined stack, the
+reset vector selects Thumb state and targets `Reset_Handler`, code sections
+are halfword-aligned and inside the declared flash range, the final ELF has
+no relocations or undefined symbols, and forbidden hosted imports are
+rejected. The linker script therefore has executable acceptance coverage;
+instruction-level runtime observation remains limited to the recorded target
+programming and reset evidence.
 
 Target execution evidence was obtained on the connected STM32H753 target.
 `probe-rs list` found the ST-LINK V3 probe. The generated
