@@ -634,6 +634,9 @@ targets and assignments that would require an outer-scope mutation without an
 explicit branch-merge value contract. The regression coverage is
 `lowers_scalar_local_assignment_into_a_new_value` and
 `lowers_scalar_compound_assignment_into_integer_binary_ir`, and
+`lowers_scalar_parameter_assignment_in_the_function_scope`; top-level `erg`
+parameters use the same value-rebinding model while nested branch mutation
+remains rejected until a merge contract exists. The LLVM CLI fixture
 the LLVM CLI fixture
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.

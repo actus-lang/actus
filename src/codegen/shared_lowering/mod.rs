@@ -259,14 +259,18 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
         let Some(scope) = self.locals.last_mut() else {
             return Err(unsupported(span, "scalar assignment has no active lexical scope"));
         };
-        if !scope.contains_key(name) {
-            return Err(unsupported(
-                span,
-                "scalar assignment requires a local owner in the current lexical scope",
-            ));
+        if scope.contains_key(name) {
+            scope.insert(name.to_owned(), value);
+            return Ok(());
         }
-        scope.insert(name.to_owned(), value);
-        Ok(())
+        if self.locals.len() == 1 && self.parameters.contains_key(name) {
+            self.parameters.insert(name.to_owned(), value);
+            return Ok(());
+        }
+        Err(unsupported(
+            span,
+            "scalar assignment requires a local owner in the current lexical scope",
+        ))
     }
 
     fn lower_integer_binary(
