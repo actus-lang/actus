@@ -76,6 +76,34 @@ fn arm32_target_profile_declares_the_supported_thumb_mode() {
     assert_eq!(abi.argument_registers, [0, 1, 2, 3]);
     assert_eq!(abi.return_registers, [0, 1]);
     assert_eq!(abi.callee_saved_registers, [4, 5, 6, 7, 8, 9, 10, 11]);
+    assert_eq!(
+        actus::target::Arm32AbiContract::scalar_word_representation(),
+        actus::target::Arm32ValueRepresentation {
+            size_bytes: 4,
+            alignment_bytes: 4,
+            argument: actus::target::Arm32ArgumentLocation::CoreRegisters(
+                actus::target::Arm32RegisterWords { first_register: 0, word_count: 1 },
+            ),
+            return_value: actus::target::Arm32ReturnLocation::CoreRegisters(
+                actus::target::Arm32RegisterWords { first_register: 0, word_count: 1 },
+            ),
+        }
+    );
+    assert_eq!(
+        actus::target::Arm32AbiContract::aggregate_stack_representation(12, 4, 16),
+        actus::target::Arm32ValueRepresentation {
+            size_bytes: 12,
+            alignment_bytes: 4,
+            argument: actus::target::Arm32ArgumentLocation::Stack {
+                byte_offset: 16,
+                byte_size: 12,
+                alignment_bytes: 4,
+            },
+            return_value: actus::target::Arm32ReturnLocation::IndirectCoreRegister {
+                address_register: 0,
+            },
+        }
+    );
 
     let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("host target should parse");
     assert_eq!(hosted.arm32_profile(), None);

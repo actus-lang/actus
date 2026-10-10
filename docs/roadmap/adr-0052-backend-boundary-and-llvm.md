@@ -252,6 +252,12 @@ return registers, `r4-r11` callee-saved registers, and 8-byte stack alignment.
 Aggregate classification and freestanding runtime/linker integration require
 their own acceptance evidence before they are considered supported.
 
+The representation contract distinguishes core-register words, explicit stack
+spills with byte size/alignment/offset, and indirect return addresses. The
+current canonical fixtures use one scalar word in `r0` and an aggregate stack
+spill with an indirect return address in `r0`; these are neutral descriptions
+until LLVM ARM lowering and object-level evidence validate them.
+
 The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
 `CortexMv7em` target profile and `Thumb2` instruction mode. This profile
 identifies the Cortex-M v7E-M architecture family; it does not by itself claim

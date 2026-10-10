@@ -462,7 +462,7 @@ states the host and evidence limits explicitly.
       callee-saved registers, stack contract, entry point, runtime provider,
       and linker script interface.
 - [ ] Preserve the required 8-byte stack alignment at every call boundary.
-- [ ] Define register and stack representations for scalar and aggregate
+- [x] Define register and stack representations for scalar and aggregate
       arguments and return values before external C interoperability.
 - [ ] Add ABI fixtures for scalar and aggregate calls in both directions.
 - [ ] Generate ARM32/Thumb objects through the LLVM backend.
@@ -487,6 +487,12 @@ pointers, `r0-r3` argument registers, `r0-r1` return registers, `r4-r11`
 callee-saved registers, and 8-byte stack alignment. Aggregate register/stack
 classification, runtime-provider wiring, and linker-script acceptance remain
 separate checks below.
+
+The representation contract now covers one-word scalar values in `r0` and
+stack-spilled aggregates with explicit byte size, alignment, and offset. An
+aggregate return uses an explicit indirect return address in `r0`. This is a
+neutral ABI description; it does not yet claim that LLVM emits these locations
+for ARM or that a freestanding image links successfully.
 
 ## Gate 44.7 — External C ABI and runtime interoperability
 
