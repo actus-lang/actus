@@ -11,7 +11,8 @@ use super::aggregate::{
     lower_call,
 };
 use super::integer_ops::{
-    lower_integer_binary, lower_integer_compare, lower_integer_unary, lower_trap_if_zero,
+    lower_integer_binary, lower_integer_compare, lower_integer_unary,
+    lower_trap_if_shift_count_out_of_range, lower_trap_if_zero,
 };
 use super::native::BackendEmitError;
 use super::object::create_module;
@@ -237,18 +238,14 @@ fn lower_instruction(
     function: &BackendFunction,
 ) -> Result<(), BackendEmitError> {
     match instruction {
-        BackendInstruction::Constant { result, ty, value, .. } => {
-            let ty = scalar_type(module, *ty)?.ok_or_else(|| {
-                BackendEmitError("Cranelift constant cannot have unit type".to_owned())
-            })?;
-            let value = builder.ins().iconst(ty, *value as i64);
-            values.insert(*result, value);
-            Ok(())
-        }
+        BackendInstruction::Constant { .. } => lower_constant(module, builder, instruction, values),
         BackendInstruction::IntegerBinary { .. } => {
             lower_integer_binary(builder, instruction, values)
         }
-        BackendInstruction::TrapIfZero { .. } => lower_trap_if_zero(builder, instruction, values),
+        BackendInstruction::TrapIfZero { .. }
+        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+            lower_guard(builder, instruction, values)
+        }
         BackendInstruction::IntegerCompare { .. } => {
             lower_integer_compare(builder, instruction, values)
         }
@@ -282,6 +279,35 @@ fn lower_instruction(
             "Cranelift neutral contract instruction is not implemented".to_owned(),
         )),
     }
+}
+
+fn lower_guard(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::TrapIfZero { .. } => lower_trap_if_zero(builder, instruction, values),
+        BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+            lower_trap_if_shift_count_out_of_range(builder, instruction, values)
+        }
+        _ => Err(BackendEmitError("Cranelift guard instruction is not supported".to_owned())),
+    }
+}
+
+fn lower_constant(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::Constant { result, ty, value, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift constant instruction is not supported".to_owned()));
+    };
+    let ty = scalar_type(module, *ty)?
+        .ok_or_else(|| BackendEmitError("Cranelift constant cannot have unit type".to_owned()))?;
+    values.insert(*result, builder.ins().iconst(ty, *value as i64));
+    Ok(())
 }
 
 fn lower_memory_copy(

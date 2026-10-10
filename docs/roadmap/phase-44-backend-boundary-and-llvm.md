@@ -650,8 +650,11 @@ LLVM CLI regression `llvm_backend_builds_and_runs_checked_scalar_division_and_re
 executes `20 / 5 + 17 % 6` and verifies the result. The neutral regression
 `lowers_scalar_division_and_remainder_with_zero_guards` verifies the ordering
 of each guard and its arithmetic operation. Signed division overflow handling,
-shift operations, and short-circuit logical operators remain separate contract
-work and are not implied by this evidence.
+and short-circuit logical operators remain separate contract work and are not
+implied by this evidence. The shared scalar contract now also lowers signed
+left and right shifts with an explicit `TrapIfShiftCountOutOfRange` guard;
+`lowers_scalar_shifts_with_width_guards` checks the neutral ordering and
+`llvm_backend_builds_and_runs_checked_scalar_shifts` executes the LLVM path.
 This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.

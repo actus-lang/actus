@@ -288,6 +288,17 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
                 span,
             });
         }
+        if matches!(
+            operation,
+            BackendIntegerBinaryOp::ShiftLeft | BackendIntegerBinaryOp::ShiftRight
+        ) {
+            instructions.push(BackendInstruction::TrapIfShiftCountOutOfRange {
+                count: right,
+                width: 32,
+                reason: "integer shift count exceeds operand width".to_owned(),
+                span,
+            });
+        }
         let result = self.allocate();
         instructions.push(BackendInstruction::IntegerBinary {
             result,
@@ -402,6 +413,8 @@ impl ScalarExpressionProvider<'_> {
             BinaryOp::Multiply => BackendIntegerBinaryOp::Multiply,
             BinaryOp::Divide => BackendIntegerBinaryOp::Divide,
             BinaryOp::Remainder => BackendIntegerBinaryOp::Remainder,
+            BinaryOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
+            BinaryOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
             BinaryOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
             BinaryOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
             BinaryOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,

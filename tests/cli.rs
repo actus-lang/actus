@@ -240,6 +240,39 @@ fn llvm_backend_builds_and_runs_checked_scalar_division_and_remainder() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_checked_scalar_shifts() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-shift-{}", std::process::id()));
+    let input = root.join("src/main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(root.join("src")).expect("create LLVM shift fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-shift-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM shift fixture manifest");
+    fs::write(&input, "verb main() -> Int { return (1 << 4) + (32 >> 3); }\n")
+        .expect("write LLVM shift fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM shift fixture");
+    assert_eq!(status.code(), Some(20));
+    let _ = fs::remove_dir_all(root);
+}
+
 #[test]
 fn build_command_writes_a_native_object() {
     let root = std::env::temp_dir().join(format!("actus-cli-{}", std::process::id()));

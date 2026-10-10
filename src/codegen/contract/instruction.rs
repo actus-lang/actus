@@ -28,6 +28,12 @@ pub enum BackendInstruction {
         reason: String,
         span: SourceSpan,
     },
+    TrapIfShiftCountOutOfRange {
+        count: super::BackendValueId,
+        width: u8,
+        reason: String,
+        span: SourceSpan,
+    },
     IntegerCompare {
         result: super::BackendValueId,
         operation: BackendIntegerCompareOp,

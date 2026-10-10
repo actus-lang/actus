@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildMul, LLVMBuildOr, LLVMBuildSDiv,
-    LLVMBuildSRem, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildXor,
+    LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildLShr, LLVMBuildMul,
+    LLVMBuildOr, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildSub, LLVMBuildUDiv,
+    LLVMBuildURem, LLVMBuildXor,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -28,7 +29,22 @@ pub(super) fn emit_integer_binary(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM binary right operand {} is unavailable", right.0))
     })?;
-    let value = unsafe {
+    let value = build_integer_binary(builder, *operation, *ty, left, right);
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
+    }
+    values.insert(*result, value);
+    Ok(false)
+}
+
+fn build_integer_binary(
+    builder: LLVMBuilderRef,
+    operation: BackendIntegerBinaryOp,
+    ty: super::super::BackendValueType,
+    left: LLVMValueRef,
+    right: LLVMValueRef,
+) -> LLVMValueRef {
+    unsafe {
         match operation {
             BackendIntegerBinaryOp::Add => {
                 LLVMBuildAdd(builder, left, right, b"actus.add\0".as_ptr().cast())
@@ -39,19 +55,32 @@ pub(super) fn emit_integer_binary(
             BackendIntegerBinaryOp::Multiply => {
                 LLVMBuildMul(builder, left, right, b"actus.mul\0".as_ptr().cast())
             }
+            BackendIntegerBinaryOp::Divide
+                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
+            {
+                LLVMBuildSDiv(builder, left, right, b"actus.sdiv\0".as_ptr().cast())
+            }
             BackendIntegerBinaryOp::Divide => {
-                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) {
-                    LLVMBuildSDiv(builder, left, right, b"actus.sdiv\0".as_ptr().cast())
-                } else {
-                    LLVMBuildUDiv(builder, left, right, b"actus.udiv\0".as_ptr().cast())
-                }
+                LLVMBuildUDiv(builder, left, right, b"actus.udiv\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::Remainder
+                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
+            {
+                LLVMBuildSRem(builder, left, right, b"actus.srem\0".as_ptr().cast())
             }
             BackendIntegerBinaryOp::Remainder => {
-                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) {
-                    LLVMBuildSRem(builder, left, right, b"actus.srem\0".as_ptr().cast())
-                } else {
-                    LLVMBuildURem(builder, left, right, b"actus.urem\0".as_ptr().cast())
-                }
+                LLVMBuildURem(builder, left, right, b"actus.urem\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::ShiftLeft => {
+                LLVMBuildShl(builder, left, right, b"actus.shl\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::ShiftRight
+                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
+            {
+                LLVMBuildAShr(builder, left, right, b"actus.ashr\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::ShiftRight => {
+                LLVMBuildLShr(builder, left, right, b"actus.lshr\0".as_ptr().cast())
             }
             BackendIntegerBinaryOp::BitwiseAnd => {
                 LLVMBuildAnd(builder, left, right, b"actus.and\0".as_ptr().cast())
@@ -63,12 +92,7 @@ pub(super) fn emit_integer_binary(
                 LLVMBuildXor(builder, left, right, b"actus.xor\0".as_ptr().cast())
             }
         }
-    };
-    if value.is_null() {
-        return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
     }
-    values.insert(*result, value);
-    Ok(false)
 }
 
 pub(super) fn emit_integer_compare(

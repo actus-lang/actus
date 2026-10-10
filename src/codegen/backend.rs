@@ -11,6 +11,8 @@ pub enum BackendIntegerBinaryOp {
     Multiply,
     Divide,
     Remainder,
+    ShiftLeft,
+    ShiftRight,
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,

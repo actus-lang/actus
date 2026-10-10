@@ -42,6 +42,9 @@ pub(super) fn lower_integer_binary(
                 builder.ins().urem(left, right)
             }
         }
+        BackendIntegerBinaryOp::ShiftLeft => builder.ins().ishl(left, right),
+        BackendIntegerBinaryOp::ShiftRight if is_signed(*ty) => builder.ins().sshr(left, right),
+        BackendIntegerBinaryOp::ShiftRight => builder.ins().ushr(left, right),
         BackendIntegerBinaryOp::BitwiseAnd => builder.ins().band(left, right),
         BackendIntegerBinaryOp::BitwiseOr => builder.ins().bor(left, right),
         BackendIntegerBinaryOp::BitwiseXor => builder.ins().bxor(left, right),
@@ -69,6 +72,31 @@ pub(super) fn lower_trap_if_zero(
     builder.ins().brif(nonzero, ok_block, &[], trap_block, &[]);
     builder.switch_to_block(trap_block);
     builder.ins().trap(TrapCode::INTEGER_DIVISION_BY_ZERO);
+    builder.seal_block(trap_block);
+    builder.switch_to_block(ok_block);
+    builder.seal_block(ok_block);
+    Ok(())
+}
+
+pub(super) fn lower_trap_if_shift_count_out_of_range(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::TrapIfShiftCountOutOfRange { count, width, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift shift-count guard expected".to_owned()));
+    };
+    let count = values.get(count).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift shift-count value {} is unavailable", count.0))
+    })?;
+    let count_type = builder.func.dfg.value_type(count);
+    let limit = builder.ins().iconst(count_type, i64::from(*width));
+    let valid = builder.ins().icmp(IntCC::UnsignedLessThan, count, limit);
+    let ok_block = builder.create_block();
+    let trap_block = builder.create_block();
+    builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
+    builder.switch_to_block(trap_block);
+    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);

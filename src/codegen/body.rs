@@ -273,10 +273,11 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
             CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
             CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
+            CompoundAssignmentOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
+            CompoundAssignmentOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
             CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
             CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
             CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
-            _ => return Err(unsupported(span, "compound assignment operator")),
         };
         let result =
             self.provider.lower_integer_binary(operation, current, value, span, instructions)?;

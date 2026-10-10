@@ -95,6 +95,46 @@ fn lowers_scalar_division_and_remainder_with_zero_guards() {
 }
 
 #[test]
+fn lowers_scalar_shifts_with_width_guards() {
+    let cases = [
+        ("1 << 4", BackendIntegerBinaryOp::ShiftLeft),
+        ("32 >> 3", BackendIntegerBinaryOp::ShiftRight),
+    ];
+    for (expression, operation) in cases {
+        let source = format!("verb main() -> Int {{ return {expression}; }}");
+        let (tokens, errors) = scan(&source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("scalar shift fixture should parse");
+        let module = lower_scalar_program("actus_root", &program, None)
+            .expect("scalar shift expression should lower");
+        let instructions = module.functions[0]
+            .blocks
+            .iter()
+            .flat_map(|block| block.instructions.iter())
+            .collect::<Vec<_>>();
+        let guard_index = instructions
+            .iter()
+            .position(|instruction| {
+                matches!(
+                    instruction,
+                    BackendInstruction::TrapIfShiftCountOutOfRange { width: 32, .. }
+                )
+            })
+            .expect("shift must have a width guard");
+        let operation_index = instructions
+            .iter()
+            .position(|instruction| {
+                matches!(
+                    instruction,
+                    BackendInstruction::IntegerBinary { operation: actual, .. } if *actual == operation
+                )
+            })
+            .expect("shift operation must be present");
+        assert!(guard_index < operation_index, "width guard must precede shift");
+    }
+}
+
+#[test]
 fn lowers_scalar_integer_comparison_into_neutral_ir() {
     let source = "verb main() -> Bool { return 1 < 2; }";
     let (tokens, errors) = scan(source);

@@ -17,7 +17,7 @@ use super::super::{
 };
 use super::calls::emit_call;
 use super::declarations::FunctionDeclaration;
-use super::guards::emit_trap_if_zero;
+use super::guards::{emit_trap_if_shift_count_out_of_range, emit_trap_if_zero};
 use super::integer_ops::{emit_integer_binary, emit_integer_compare, emit_integer_unary};
 use super::returns::emit_return;
 
@@ -91,8 +91,9 @@ fn emit_instruction(
         BackendInstruction::IntegerBinary { .. } => {
             emit_integer_binary(builder, instruction, values)
         }
-        BackendInstruction::TrapIfZero { .. } => {
-            emit_trap_if_zero(context, builder, declaration.value, instruction, values)
+        BackendInstruction::TrapIfZero { .. }
+        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+            emit_guard(context, builder, declaration.value, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
             emit_integer_compare(builder, instruction, values)
@@ -126,6 +127,24 @@ fn emit_instruction(
         BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
         }
+    }
+}
+
+fn emit_guard(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: LLVMValueRef,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    match instruction {
+        BackendInstruction::TrapIfZero { .. } => {
+            emit_trap_if_zero(context, builder, function, instruction, values)
+        }
+        BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+            emit_trap_if_shift_count_out_of_range(context, builder, function, instruction, values)
+        }
+        _ => Err(BackendEmitError("LLVM guard instruction is not supported".to_owned())),
     }
 }
 
