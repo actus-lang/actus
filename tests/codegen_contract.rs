@@ -260,6 +260,22 @@ fn rejects_zero_or_misaligned_memory_copy_extents() {
 }
 
 #[test]
+fn validates_niche_pointer_layout_boundaries() {
+    let valid = BackendEnumLayout {
+        layout: BackendLayout { size: 8, alignment: 8 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 0,
+        payload: None,
+        niche_pointer: true,
+    };
+    assert!(valid.validate().is_ok());
+
+    let invalid = BackendEnumLayout { discriminant_offset: 4, ..valid };
+    assert!(matches!(invalid.validate(), Err(BackendContractError::InvalidEnumLayout(_))));
+}
+
+#[test]
 fn rejects_zero_width_values_and_invalid_parameter_aggregates() {
     let zero_width = unit_function(
         vec![BackendParameter {

@@ -292,6 +292,8 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
 - [x] Define and validate a target-aware direct aggregate ABI descriptor for
       register fragments, stack fragments, alignment, and complete layout
       coverage.
+- [x] Validate niche-pointer `Option` representation boundaries in the
+      backend-neutral enum contract without claiming native pointer lowering.
 - [ ] Add direct aggregate ABI and niche-pointer `Option` lowering using the
       same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
@@ -359,6 +361,9 @@ parameter and return fragment descriptions. Validation rejects gaps,
 misaligned ranges, duplicate register indices, overlapping stack ranges, and
 descriptors that do not cover the complete aggregate layout. This closes the
 metadata and validation sub-step; it does not claim backend emission support.
+Niche-pointer enum metadata is also restricted to pointer-sized,
+zero-offset layouts with no inline payload. Native pointer-sentinel lowering
+remains open for both backends.
 Neutral `BackendExternal` declarations are emitted with the same validated
 symbol identity and signature contract as internal functions. The LLVM suite
 also covers an external runtime-style declaration and call, including the

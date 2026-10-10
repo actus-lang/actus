@@ -50,6 +50,15 @@ impl BackendEnumLayout {
                 "niche-pointer enums cannot declare an inline payload",
             ));
         }
+        if self.niche_pointer
+            && (self.layout.size != self.layout.alignment
+                || self.discriminant_offset != 0
+                || self.payload_offset != 0)
+        {
+            return Err(BackendContractError::InvalidEnumLayout(
+                "niche-pointer enums must use a pointer-sized zero-offset representation",
+            ));
+        }
         Ok(())
     }
 }
