@@ -89,3 +89,23 @@ fn lowers_scalar_owner_declaration_into_a_scoped_value() {
         )
     ));
 }
+
+#[test]
+fn lowers_scalar_local_assignment_into_a_new_value() {
+    let source = "verb main() -> Int { erg answer = 40; answer = answer + 2; return answer; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("scalar assignment fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("scalar local assignment should lower");
+    let mut instructions =
+        module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter());
+    assert!(instructions.clone().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+    )));
+    assert!(instructions.any(|instruction| matches!(
+        instruction,
+        BackendInstruction::Return { value: Some(_), .. }
+    )));
+}

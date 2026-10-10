@@ -1,4 +1,4 @@
-use crate::ast::{Block, Expr, IfBranch, Stmt, VerbDecl};
+use crate::ast::{Block, Expr, IfBranch, Place, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
 
 use super::{
@@ -35,6 +35,15 @@ pub trait BackendExpressionProvider {
         span: SourceSpan,
     ) -> Result<(), BackendContractError> {
         Err(unsupported(span, "owner declaration"))
+    }
+
+    fn assign_owner(
+        &mut self,
+        _name: &str,
+        _value: BackendValueId,
+        span: SourceSpan,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "assignment"))
     }
 
     fn lower_expression(
@@ -174,6 +183,13 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::OwnerDecl { name, initializer, span, .. } => {
                 let value = self.provider.lower_expression(initializer, instructions)?;
                 self.provider.bind_owner(name, value, *span)?;
+            }
+            Stmt::Assignment { target: Place::Binding { name, .. }, value, span } => {
+                let value = self.provider.lower_expression(value, instructions)?;
+                self.provider.assign_owner(name, value, *span)?;
+            }
+            Stmt::Assignment { span, .. } => {
+                return Err(unsupported(*span, "assignment target"));
             }
             Stmt::Return { value, span } => {
                 let Some(expression) = value else {

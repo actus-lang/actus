@@ -250,6 +250,25 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
         Ok(())
     }
 
+    fn assign_owner(
+        &mut self,
+        name: &str,
+        value: BackendValueId,
+        span: SourceSpan,
+    ) -> Result<(), BackendContractError> {
+        let Some(scope) = self.locals.last_mut() else {
+            return Err(unsupported(span, "scalar assignment has no active lexical scope"));
+        };
+        if !scope.contains_key(name) {
+            return Err(unsupported(
+                span,
+                "scalar assignment requires a local owner in the current lexical scope",
+            ));
+        }
+        scope.insert(name.to_owned(), value);
+        Ok(())
+    }
+
     fn lower_expression(
         &mut self,
         expression: &Expr,

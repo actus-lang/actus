@@ -625,6 +625,20 @@ constructed backend-neutral contracts.
 - [ ] Record exact compiler, LLVM, linker, target, and fixture conditions for
       every completed acceptance test before marking this gate complete.
 
+### Current shared-lowering evidence
+
+The shared semantic lowering boundary now covers scalar owner declarations and
+same-scope scalar reassignment as distinct value bindings. The neutral contract
+rejects non-binding assignment targets and assignments that would require an
+outer-scope mutation without an explicit branch-merge value contract. The
+regression coverage is `lowers_scalar_local_assignment_into_a_new_value`, and
+the LLVM CLI fixture
+`llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
+program that declares, reassigns, branches on, and returns a scalar owner.
+This is incremental shared-pipeline evidence; it does not close the remaining
+aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
+this gate.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

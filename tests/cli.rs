@@ -87,7 +87,7 @@ fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
     .expect("write LLVM control-flow fixture manifest");
     fs::write(
         &input,
-        "verb main() -> Int { erg ready = 1; if ready == 1 { return 42; } else { return 7; }; }\n",
+        "verb main() -> Int { erg ready = 0; ready = 1; if ready == 1 { return 42; } else { return 7; }; }\n",
     )
     .expect("write LLVM control-flow fixture source");
 
