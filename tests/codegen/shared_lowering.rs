@@ -91,6 +91,18 @@ fn lowers_scalar_division_and_remainder_with_zero_guards() {
             })
             .expect("division operation must be present");
         assert!(guard_index < operation_index, "zero guard must precede division");
+        if operation == BackendIntegerBinaryOp::Divide {
+            let overflow_guard_index = instructions
+                .iter()
+                .position(|instruction| {
+                    matches!(
+                        instruction,
+                        BackendInstruction::TrapIfSignedDivisionOverflow { width: 32, .. }
+                    )
+                })
+                .expect("signed division must have an overflow guard");
+            assert!(overflow_guard_index < operation_index);
+        }
     }
 }
 

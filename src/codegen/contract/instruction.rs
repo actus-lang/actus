@@ -28,6 +28,13 @@ pub enum BackendInstruction {
         reason: String,
         span: SourceSpan,
     },
+    TrapIfSignedDivisionOverflow {
+        left: super::BackendValueId,
+        right: super::BackendValueId,
+        width: u8,
+        reason: String,
+        span: SourceSpan,
+    },
     TrapIfShiftCountOutOfRange {
         count: super::BackendValueId,
         width: u8,

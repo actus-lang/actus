@@ -82,6 +82,67 @@ fn emits_a_neutral_integer_constant_and_returns_it() {
 }
 
 #[test]
+fn emits_signed_division_overflow_guard_for_runtime_operands() {
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "checked_division").expect("valid symbol");
+    let parameter = |name: &str| BackendParameter {
+        name: name.to_owned(),
+        role: Role::Erg,
+        ty: integer,
+        passing: actus::codegen::BackendPassingMode::Direct,
+    };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: vec![parameter("left"), parameter("right")],
+            return_value: BackendReturn {
+                role: Some(Role::Erg),
+                ty: integer,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![
+                    BackendInstruction::TrapIfZero {
+                        value: BackendValueId(1),
+                        reason: "division by zero".to_owned(),
+                        span: actus::lexer::SourceSpan::new(0, 1),
+                    },
+                    BackendInstruction::TrapIfSignedDivisionOverflow {
+                        left: BackendValueId(0),
+                        right: BackendValueId(1),
+                        width: 32,
+                        reason: "signed division overflow".to_owned(),
+                        span: actus::lexer::SourceSpan::new(1, 2),
+                    },
+                    BackendInstruction::IntegerBinary {
+                        result: BackendValueId(2),
+                        operation: actus::codegen::BackendIntegerBinaryOp::Divide,
+                        left: BackendValueId(0),
+                        right: BackendValueId(1),
+                        ty: integer,
+                        span: actus::lexer::SourceSpan::new(2, 3),
+                    },
+                    BackendInstruction::Return {
+                        value: Some(BackendValueId(2)),
+                        span: actus::lexer::SourceSpan::new(3, 4),
+                    },
+                ],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+
+    let ir = emit_module(&module).expect("runtime division guard should lower to LLVM IR");
+    assert!(ir.contains("sdiv i32"));
+    assert!(ir.contains("actus.division.trap"));
+    assert!(ir.contains("actus.div.overflow"));
+}
+
+#[test]
 fn emits_scalar_parameter_return_and_direct_call() {
     let integer = BackendValueType::Integer { signed: false, width: 32 };
     let callee_symbol =

@@ -649,9 +649,12 @@ Cranelift and LLVM lower that guard to a terminating zero-divisor path; the
 LLVM CLI regression `llvm_backend_builds_and_runs_checked_scalar_division_and_remainder`
 executes `20 / 5 + 17 % 6` and verifies the result. The neutral regression
 `lowers_scalar_division_and_remainder_with_zero_guards` verifies the ordering
-of each guard and its arithmetic operation. Signed division overflow handling,
-and short-circuit logical operators remain separate contract work and are not
-implied by this evidence. The shared scalar contract now also lowers signed
+of each guard and its arithmetic operation. The shared scalar contract now
+also emits an explicit `TrapIfSignedDivisionOverflow` guard for signed
+division; `emits_signed_division_overflow_guard_for_runtime_operands` verifies
+that LLVM preserves the guard for runtime operands. Short-circuit logical
+operators remain separate contract work and are not implied by this evidence.
+The shared scalar contract now also lowers signed
 left and right shifts with an explicit `TrapIfShiftCountOutOfRange` guard;
 `lowers_scalar_shifts_with_width_guards` checks the neutral ordering and
 `llvm_backend_builds_and_runs_checked_scalar_shifts` executes the LLVM path.

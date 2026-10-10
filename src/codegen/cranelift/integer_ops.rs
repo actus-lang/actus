@@ -103,6 +103,38 @@ pub(super) fn lower_trap_if_shift_count_out_of_range(
     Ok(())
 }
 
+pub(super) fn lower_trap_if_signed_division_overflow(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::TrapIfSignedDivisionOverflow { left, right, width, .. } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift signed-division guard expected".to_owned()));
+    };
+    let left = values.get(left).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift division left operand {} is unavailable", left.0))
+    })?;
+    let right = values.get(right).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift division right operand {} is unavailable", right.0))
+    })?;
+    let value_type = builder.func.dfg.value_type(left);
+    let minimum = builder.ins().iconst(value_type, 1i64 << (u32::from(*width) - 1));
+    let minus_one = builder.ins().iconst(value_type, -1);
+    let minimum_match = builder.ins().icmp(IntCC::Equal, left, minimum);
+    let minus_one_match = builder.ins().icmp(IntCC::Equal, right, minus_one);
+    let overflow = builder.ins().band(minimum_match, minus_one_match);
+    let ok_block = builder.create_block();
+    let trap_block = builder.create_block();
+    builder.ins().brif(overflow, trap_block, &[], ok_block, &[]);
+    builder.switch_to_block(trap_block);
+    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    builder.seal_block(trap_block);
+    builder.switch_to_block(ok_block);
+    builder.seal_block(ok_block);
+    Ok(())
+}
+
 fn is_signed(ty: BackendValueType) -> bool {
     matches!(ty, BackendValueType::Integer { signed: true, .. })
 }

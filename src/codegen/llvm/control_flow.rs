@@ -14,7 +14,9 @@ use super::super::{
 use super::calls::emit_call;
 use super::declarations::FunctionDeclaration;
 use super::failures::emit_failure;
-use super::guards::{emit_trap_if_shift_count_out_of_range, emit_trap_if_zero};
+use super::guards::{
+    emit_trap_if_shift_count_out_of_range, emit_trap_if_signed_division_overflow, emit_trap_if_zero,
+};
 use super::integer_ops::{emit_integer_binary, emit_integer_compare, emit_integer_unary};
 use super::memory::emit_memory_copy;
 use super::returns::emit_return;
@@ -90,6 +92,7 @@ fn emit_instruction(
             emit_integer_binary(builder, instruction, values)
         }
         BackendInstruction::TrapIfZero { .. }
+        | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
             emit_guard(context, builder, declaration.value, instruction, values)
         }
@@ -138,6 +141,9 @@ fn emit_guard(
     match instruction {
         BackendInstruction::TrapIfZero { .. } => {
             emit_trap_if_zero(context, builder, function, instruction, values)
+        }
+        BackendInstruction::TrapIfSignedDivisionOverflow { .. } => {
+            emit_trap_if_signed_division_overflow(context, builder, function, instruction, values)
         }
         BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
             emit_trap_if_shift_count_out_of_range(context, builder, function, instruction, values)

@@ -288,6 +288,15 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
                 span,
             });
         }
+        if matches!(operation, BackendIntegerBinaryOp::Divide) {
+            instructions.push(BackendInstruction::TrapIfSignedDivisionOverflow {
+                left,
+                right,
+                width: 32,
+                reason: "signed integer division overflow".to_owned(),
+                span,
+            });
+        }
         if matches!(
             operation,
             BackendIntegerBinaryOp::ShiftLeft | BackendIntegerBinaryOp::ShiftRight

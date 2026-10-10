@@ -12,7 +12,8 @@ use super::aggregate::{
 };
 use super::integer_ops::{
     lower_integer_binary, lower_integer_compare, lower_integer_unary,
-    lower_trap_if_shift_count_out_of_range, lower_trap_if_zero,
+    lower_trap_if_shift_count_out_of_range, lower_trap_if_signed_division_overflow,
+    lower_trap_if_zero,
 };
 use super::native::BackendEmitError;
 use super::object::create_module;
@@ -243,6 +244,7 @@ fn lower_instruction(
             lower_integer_binary(builder, instruction, values)
         }
         BackendInstruction::TrapIfZero { .. }
+        | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
             lower_guard(builder, instruction, values)
         }
@@ -288,6 +290,9 @@ fn lower_guard(
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::TrapIfZero { .. } => lower_trap_if_zero(builder, instruction, values),
+        BackendInstruction::TrapIfSignedDivisionOverflow { .. } => {
+            lower_trap_if_signed_division_overflow(builder, instruction, values)
+        }
         BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
             lower_trap_if_shift_count_out_of_range(builder, instruction, values)
         }
