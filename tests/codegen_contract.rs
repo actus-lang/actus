@@ -3,14 +3,15 @@ use actus::ast::{
 };
 use actus::codegen::{
     BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
-    BackendBodyProvider, BackendCleanupAction, BackendCleanupResolvedDescriptor,
-    BackendContractError, BackendDirectAggregateAbi, BackendEnumLayout, BackendExpressionProvider,
-    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
-    BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueId,
-    BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
-    lower_semantic_cleanup, lower_verb, lower_verb_body, lower_verb_body_with_expressions,
-    lower_verb_signature, lower_verb_with_cleanup,
+    BackendBodyProvider, BackendCleanupAction, BackendCleanupProvider,
+    BackendCleanupResolvedDescriptor, BackendContractError, BackendDirectAggregateAbi,
+    BackendEnumLayout, BackendExpressionProvider, BackendExternal, BackendFailure, BackendFunction,
+    BackendInstruction, BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter,
+    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
+    BackendUnsupportedOperation, BackendValueId, BackendValueType, LoweredCleanupInstruction,
+    SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_semantic_cleanup_with_provider,
+    lower_verb, lower_verb_body, lower_verb_body_with_expressions, lower_verb_signature,
+    lower_verb_with_cleanup,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -22,6 +23,59 @@ fn verb_symbol() -> SymbolIdentity {
 }
 
 struct TestLayouts;
+
+struct TestCleanupProvider;
+
+impl BackendCleanupProvider for TestCleanupProvider {
+    fn resolve_binding(
+        &self,
+        type_name: Option<&TypeName>,
+        builtin: Option<actus::ast::BuiltinType>,
+    ) -> Result<actus::codegen::BackendCleanupResolvedDescriptor, BackendContractError> {
+        let descriptor = if builtin == Some(actus::ast::BuiltinType::Buffer)
+            || type_name.is_some_and(|name| name.name == "Buffer")
+        {
+            actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
+                argument: actus::codegen::BackendCleanupArgument::Value,
+                result: actus::codegen::BackendCleanupResult::Ignored,
+            }
+        } else if type_name.is_some_and(|name| name.name == "Region") {
+            actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                argument: actus::codegen::BackendCleanupArgument::Address,
+                result: actus::codegen::BackendCleanupResult::Status,
+            }
+        } else {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        };
+        Ok(actus::codegen::BackendCleanupResolvedDescriptor {
+            descriptor,
+            layout: BackendLayout { size: 8, alignment: 8 },
+            field: None,
+        })
+    }
+
+    fn resolve_field(
+        &self,
+        _root_type: &TypeName,
+        path: &str,
+    ) -> Result<actus::codegen::BackendCleanupResolvedDescriptor, BackendContractError> {
+        if !matches!(path, "inner.first" | "inner.second") {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        }
+        let offset = if path == "inner.first" { 0 } else { 8 };
+        Ok(actus::codegen::BackendCleanupResolvedDescriptor {
+            descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
+                argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                result: actus::codegen::BackendCleanupResult::Ignored,
+            },
+            layout: BackendLayout { size: 16, alignment: 8 },
+            field: Some(actus::codegen::BackendCleanupField { offset, size: 8, alignment: 8 }),
+        })
+    }
+}
 
 struct TestBodyProvider;
 
@@ -845,6 +899,41 @@ fn validates_complete_resolved_cleanup_descriptor_metadata() {
         ..resolved
     };
     assert_eq!(invalid.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn lowers_semantic_moved_fields_through_the_cleanup_provider() {
+    let mut model = SemanticModel::default();
+    model.bindings.push(Binding {
+        name: "outer".to_owned(),
+        role: Role::Erg,
+        ty: None,
+        span: SourceSpan::new(0, 5),
+        ownership: OwnershipState::PartiallyMoved {
+            fields: vec!["inner.first".to_owned(), "inner.second".to_owned()],
+        },
+        access: AccessState::Mutable,
+    });
+    model.binding_type_names.insert(
+        0,
+        TypeName {
+            name: "Outer".to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: SourceSpan::new(0, 5),
+        },
+    );
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 5),
+        actions: vec![CleanupAction::DropBinding { binding_index: 0 }],
+    });
+
+    let plans = lower_semantic_cleanup_with_provider(&model, &TestCleanupProvider)
+        .expect("semantic moved fields should resolve through the provider");
+    assert_eq!(plans[0].resolved_bridges[0].len(), 2);
+    assert_eq!(plans[0].resolved_bridges[0][0].field.unwrap().offset, 0);
+    assert_eq!(plans[0].resolved_bridges[0][1].field.unwrap().offset, 8);
 }
 
 #[test]

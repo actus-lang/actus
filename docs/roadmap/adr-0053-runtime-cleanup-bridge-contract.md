@@ -86,6 +86,7 @@ paths are complete. The existing Cranelift cleanup path remains the behavioral
 reference for parity fixtures until that integration is complete.
 The neutral contract also defines a resolved descriptor that validates the
 parent layout and optional field sublayout as one unit. Semantic providers have
-not yet populated this descriptor from binding types; that is the next required
-step.
+now populate it from binding types and each moved-field path through an explicit
+provider interface. The concrete Cranelift layout adapter and backend emission
+integration remain the next required step.
 

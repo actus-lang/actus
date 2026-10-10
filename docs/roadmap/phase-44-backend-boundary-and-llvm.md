@@ -373,7 +373,9 @@ The neutral contract now has a separate resolved cleanup descriptor that binds
 the bridge ABI to a complete parent layout and optional field sublayout. Its
 validation rejects missing field metadata, misalignment, and out-of-bounds
 field ranges before a backend can consume the descriptor. Provider-based
-semantic population of this descriptor remains the next implementation step.
+semantic population of this descriptor is now available through an explicit
+cleanup provider interface. The concrete Cranelift layout adapter and backend
+emission integration remain the next implementation step.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

@@ -1,6 +1,7 @@
 mod cleanup;
 mod errors;
 mod instruction;
+mod semantic_cleanup;
 
 use crate::ast::Role;
 use crate::lexer::SourceSpan;
@@ -17,10 +18,11 @@ use super::symbols::{SymbolIdentity, SymbolKind};
 use cleanup::validate_cleanup_operand;
 pub use cleanup::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
-    BackendCleanupField, BackendCleanupOperand, BackendCleanupResolvedDescriptor,
-    BackendCleanupResult,
+    BackendCleanupField, BackendCleanupOperand, BackendCleanupProvider,
+    BackendCleanupResolvedDescriptor, BackendCleanupResult,
 };
 pub use instruction::BackendInstruction;
+pub use semantic_cleanup::lower_semantic_cleanup_with_provider;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendEmitError(pub String);

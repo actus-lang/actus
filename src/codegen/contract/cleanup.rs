@@ -1,3 +1,5 @@
+use crate::ast::{BuiltinType, TypeName};
+
 use super::super::model::LoweredCleanupInstruction;
 use super::{BackendContractError, BackendLayout, BackendValueId};
 
@@ -40,6 +42,20 @@ pub struct BackendCleanupResolvedDescriptor {
     pub descriptor: BackendCleanupBridgeDescriptor,
     pub layout: BackendLayout,
     pub field: Option<BackendCleanupField>,
+}
+
+pub trait BackendCleanupProvider {
+    fn resolve_binding(
+        &self,
+        type_name: Option<&TypeName>,
+        builtin: Option<BuiltinType>,
+    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError>;
+
+    fn resolve_field(
+        &self,
+        root_type: &TypeName,
+        path: &str,
+    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError>;
 }
 
 impl BackendCleanupResolvedDescriptor {
