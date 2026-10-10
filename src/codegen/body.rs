@@ -24,6 +24,19 @@ pub trait BackendBodyProvider {
 }
 
 pub trait BackendExpressionProvider {
+    fn enter_scope(&mut self) {}
+
+    fn exit_scope(&mut self) {}
+
+    fn bind_owner(
+        &mut self,
+        _name: &str,
+        _value: BackendValueId,
+        span: SourceSpan,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "owner declaration"))
+    }
+
     fn lower_expression(
         &mut self,
         expression: &Expr,
@@ -105,6 +118,18 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         block: &Block,
         fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
+        self.provider.enter_scope();
+        let result = self.lower_block_in_scope(id, block, fallthrough);
+        self.provider.exit_scope();
+        result
+    }
+
+    fn lower_block_in_scope(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        fallthrough: Option<BackendBlockId>,
+    ) -> Result<BackendBlock, BackendContractError> {
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
             if let Stmt::If { condition, then_branch, else_branch, span } = statement {
@@ -146,6 +171,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         match statement {
+            Stmt::OwnerDecl { name, initializer, span, .. } => {
+                let value = self.provider.lower_expression(initializer, instructions)?;
+                self.provider.bind_owner(name, value, *span)?;
+            }
             Stmt::Return { value, span } => {
                 let Some(expression) = value else {
                     instructions.push(BackendInstruction::Return { value: None, span: *span });

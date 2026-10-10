@@ -73,3 +73,19 @@ fn lowers_scalar_integer_unary_into_neutral_ir() {
         )
     ));
 }
+
+#[test]
+fn lowers_scalar_owner_declaration_into_a_scoped_value() {
+    let source = "verb main() -> Int { erg answer = 40; return answer + 2; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("scalar owner fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("scalar owner declaration should lower");
+    assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+        |instruction| matches!(
+            instruction,
+            BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+        )
+    ));
+}

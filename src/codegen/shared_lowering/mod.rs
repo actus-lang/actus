@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
 
 use crate::ast::{
-    BinaryOp, Expr, ExternalVerbDecl, PrimitiveType, Program, TopLevelDecl, TypeName, UnaryOp,
-    VerbDecl,
+    BinaryOp, Expr, ExternalVerbDecl, Program, TopLevelDecl, TypeName, UnaryOp, VerbDecl,
 };
 use crate::lexer::SourceSpan;
+
+mod support;
+
+use support::{expression_span, parse_integer, required_scalar_type, scalar_type, unsupported};
 
 use super::{
     BackendBlockId, BackendContractError, BackendExpressionProvider, BackendExternal,
@@ -189,6 +192,7 @@ fn lower_scalar_verb(
 struct ScalarExpressionProvider<'a> {
     namespace: &'a str,
     parameters: BTreeMap<String, BackendValueId>,
+    locals: Vec<BTreeMap<String, BackendValueId>>,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
     next_value: u32,
@@ -210,6 +214,7 @@ impl<'a> ScalarExpressionProvider<'a> {
         Self {
             namespace,
             parameters,
+            locals: Vec::new(),
             return_types,
             external_symbols,
             next_value: verb.params.len() as u32,
@@ -224,6 +229,27 @@ impl<'a> ScalarExpressionProvider<'a> {
 }
 
 impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
+    fn enter_scope(&mut self) {
+        self.locals.push(BTreeMap::new());
+    }
+
+    fn exit_scope(&mut self) {
+        self.locals.pop();
+    }
+
+    fn bind_owner(
+        &mut self,
+        name: &str,
+        value: BackendValueId,
+        span: SourceSpan,
+    ) -> Result<(), BackendContractError> {
+        let Some(scope) = self.locals.last_mut() else {
+            return Err(unsupported(span, "scalar owner declaration has no active lexical scope"));
+        };
+        scope.insert(name.to_owned(), value);
+        Ok(())
+    }
+
     fn lower_expression(
         &mut self,
         expression: &Expr,
@@ -231,9 +257,11 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
     ) -> Result<BackendValueId, BackendContractError> {
         match expression {
             Expr::Identifier { name, span } => self
-                .parameters
-                .get(name)
-                .copied()
+                .locals
+                .iter()
+                .rev()
+                .find_map(|scope| scope.get(name).copied())
+                .or_else(|| self.parameters.get(name).copied())
                 .ok_or_else(|| unsupported(*span, format!("unknown scalar binding `{name}`"))),
             Expr::Integer { value, span, .. } => {
                 let value = parse_integer(value).ok_or_else(|| {
@@ -400,76 +428,6 @@ impl ScalarExpressionProvider<'_> {
         });
         result.ok_or_else(|| unsupported(*span, "unit call cannot produce a value"))
     }
-}
-
-fn scalar_type(type_name: &TypeName) -> Result<Option<BackendValueType>, BackendContractError> {
-    let ty = match type_name.name.as_str() {
-        "Bool" => BackendValueType::Bool,
-        "Int" => BackendValueType::Integer { signed: true, width: 32 },
-        "Usize" => BackendValueType::Integer { signed: false, width: 64 },
-        _ => match crate::ast::primitive_type(&type_name.name) {
-            Some(PrimitiveType::Integer { signed, width }) => {
-                BackendValueType::Integer { signed, width }
-            }
-            Some(PrimitiveType::Void) => return Ok(None),
-            Some(PrimitiveType::Float { .. }) => {
-                return Err(unsupported(
-                    type_name.span,
-                    "floating-point shared lowering is disabled",
-                ));
-            }
-            None => return Err(unsupported(type_name.span, "non-scalar type in scalar lowering")),
-        },
-    };
-    Ok(Some(ty))
-}
-
-fn required_scalar_type(type_name: &TypeName) -> Result<BackendValueType, BackendContractError> {
-    scalar_type(type_name)?
-        .ok_or_else(|| unsupported(type_name.span, "unit type is not valid here"))
-}
-
-fn parse_integer(value: &str) -> Option<u64> {
-    value
-        .strip_prefix("0x")
-        .map(|hex| u64::from_str_radix(hex, 16).ok())
-        .unwrap_or_else(|| value.parse().ok())
-}
-
-fn expression_span(expression: &Expr) -> SourceSpan {
-    match expression {
-        Expr::Identifier { span, .. }
-        | Expr::Integer { span, .. }
-        | Expr::BoolLiteral { span, .. }
-        | Expr::Grouping { span, .. }
-        | Expr::Call { span, .. }
-        | Expr::Binary { span, .. }
-        | Expr::Unary { span, .. }
-        | Expr::Cast { span, .. }
-        | Expr::Borrow { span, .. }
-        | Expr::Try { span, .. }
-        | Expr::StringLiteral { span, .. }
-        | Expr::BufferLiteral { span, .. }
-        | Expr::FloatLiteral { span, .. }
-        | Expr::MethodCall { span, .. }
-        | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. }
-        | Expr::Index { span, .. }
-        | Expr::Case { span, .. }
-        | Expr::If { span, .. } => *span,
-    }
-}
-
-fn unsupported(span: SourceSpan, reason: impl Into<String>) -> BackendContractError {
-    BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
-        "semantic-lowering",
-        span,
-        super::BackendTargetContext {
-            backend: "neutral-contract".to_owned(),
-            target: "semantic-model".to_owned(),
-        },
-        reason,
-    ))
 }
 
 #[cfg(test)]

@@ -85,8 +85,11 @@ fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
         "[package]\nname = \"llvm-control-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
     )
     .expect("write LLVM control-flow fixture manifest");
-    fs::write(&input, "verb main() -> Int { if true { return 42; } else { return 7; }; }\n")
-        .expect("write LLVM control-flow fixture source");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg ready = 1; if ready == 1 { return 42; } else { return 7; }; }\n",
+    )
+    .expect("write LLVM control-flow fixture source");
 
     let result = run_with_args(
         vec![
