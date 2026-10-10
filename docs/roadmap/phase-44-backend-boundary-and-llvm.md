@@ -290,7 +290,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
 - [ ] Compare LLVM and Cranelift semantic results for shared fixtures.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
-- [ ] Keep LLVM optional so the existing Cranelift build remains usable when
+- [x] Keep LLVM optional so the existing Cranelift build remains usable when
       LLVM is unavailable.
 
 ### Gate 44.5 evidence
@@ -352,6 +352,12 @@ integer-only diagnostic; the supported neutral value model emits only integer,
 pointer, aggregate, and unit types. Instruction-level float auditing remains
 covered by the existing Cranelift audit and will be extended when shared body
 lowering feeds both backends.
+The optional boundary is verified independently with
+`CARGO_TARGET_DIR=/tmp/actus-no-llvm cargo check --no-default-features --lib
+--bin actus` and `cargo check --features cranelift --lib --bin actus`; both
+complete without LLVM. The architecture suite checks the manifest feature
+contract, and CI runs separate Cranelift-only and LLVM-only jobs. No fallback
+from a requested LLVM build to Cranelift is introduced.
 CI now runs a separate Cranelift-only configuration across all targets and a
 separate LLVM-only configuration that checks the compiler library and binary
 surface plus the LLVM integration suite. The LLVM-only configuration does not
