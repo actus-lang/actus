@@ -376,8 +376,12 @@ field ranges before a backend can consume the descriptor. Provider-based
 semantic population of this descriptor is now available through an explicit
 cleanup provider interface. The concrete Cranelift layout adapter and backend
 layout regression now exercise the native registry for nested Buffer and Region
-fields. Wiring this provider into the production semantic-to-backend emission
-pipeline remains the next implementation step.
+fields. Cranelift production emission invokes this provider after native
+layouts are built and rejects invalid semantic cleanup metadata before object
+emission. Non-runtime semantic fields are excluded from the runtime descriptor
+set. The established native cleanup schedule remains the emission path;
+replacing it with the resolved descriptors and executing identical
+descriptor-driven fixtures through both backends remains open.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

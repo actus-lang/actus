@@ -49,13 +49,13 @@ pub trait BackendCleanupProvider {
         &self,
         type_name: Option<&TypeName>,
         builtin: Option<BuiltinType>,
-    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError>;
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError>;
 
     fn resolve_field(
         &self,
         root_type: &TypeName,
         path: &str,
-    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError>;
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError>;
 }
 
 impl BackendCleanupResolvedDescriptor {

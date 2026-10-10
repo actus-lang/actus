@@ -69,7 +69,10 @@ fn resolve_binding(
             "cleanup references invalid binding".to_owned(),
         )
     })?;
-    Ok(vec![provider.resolve_binding(model.binding_type_names.get(&binding_index), binding.ty)?])
+    Ok(provider
+        .resolve_binding(model.binding_type_names.get(&binding_index), binding.ty)?
+        .into_iter()
+        .collect())
 }
 
 fn resolve_fields(
@@ -83,5 +86,12 @@ fn resolve_fields(
             "moved-field cleanup is missing its root type".to_owned(),
         )
     })?;
-    moved_fields.iter().map(|path| provider.resolve_field(root_type, path)).collect()
+    moved_fields
+        .iter()
+        .filter_map(|path| match provider.resolve_field(root_type, path) {
+            Ok(Some(descriptor)) => Some(Ok(descriptor)),
+            Ok(None) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect()
 }

@@ -5,6 +5,7 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
+use super::super::contract::lower_semantic_cleanup_with_provider;
 use super::super::cranelift::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
 use super::super::model::{LoweredCleanupSchedule, validate_cleanup_plans};
 use super::super::result_constructors::normalize_program;
@@ -55,6 +56,7 @@ pub(crate) fn emit_program_object_for_target(
     validate_entry_verb(&verbs, roots.symbol)?;
     emit_verbs_object(VerbEmission {
         program: &program,
+        semantic: &semantic,
         verbs: &verbs,
         external_verbs: &external_verbs,
         generic_instances: &semantic.generic_instances,
@@ -173,6 +175,7 @@ fn validate_entry_verb(verbs: &[&VerbDecl], symbol: Option<&str>) -> Result<(), 
 
 struct VerbEmission<'items, 'program> {
     program: &'program Program,
+    semantic: &'program SemanticModel,
     verbs: &'items [&'program VerbDecl],
     external_verbs: &'items [&'program ExternalVerbDecl],
     generic_instances: &'items [GenericInstance],
@@ -223,6 +226,10 @@ fn build_layouts_and_metadata(
     inputs: &VerbEmission<'_, '_>,
 ) -> Result<(LayoutRegistry, std::collections::HashMap<String, FunctionMeta>), BackendEmitError> {
     let layouts = build_layouts(module, inputs.program, inputs.generic_instances)?;
+    let cleanup_provider = super::contract::LayoutCleanupProvider { layouts: &layouts };
+    lower_semantic_cleanup_with_provider(&inputs.semantic, &cleanup_provider).map_err(|error| {
+        BackendEmitError(format!("cleanup descriptor lowering failed: {error}"))
+    })?;
     let metadata = declare_emission_functions(
         module,
         inputs.verbs,

@@ -31,7 +31,8 @@ impl BackendCleanupProvider for TestCleanupProvider {
         &self,
         type_name: Option<&TypeName>,
         builtin: Option<actus::ast::BuiltinType>,
-    ) -> Result<actus::codegen::BackendCleanupResolvedDescriptor, BackendContractError> {
+    ) -> Result<Option<actus::codegen::BackendCleanupResolvedDescriptor>, BackendContractError>
+    {
         let descriptor = if builtin == Some(actus::ast::BuiltinType::Buffer)
             || type_name.is_some_and(|name| name.name == "Buffer")
         {
@@ -47,25 +48,26 @@ impl BackendCleanupProvider for TestCleanupProvider {
                 result: actus::codegen::BackendCleanupResult::Status,
             }
         } else {
-            return Err(BackendContractError::InvalidCleanupOperand);
+            return Ok(None);
         };
-        Ok(actus::codegen::BackendCleanupResolvedDescriptor {
+        Ok(Some(actus::codegen::BackendCleanupResolvedDescriptor {
             descriptor,
             layout: BackendLayout { size: 8, alignment: 8 },
             field: None,
-        })
+        }))
     }
 
     fn resolve_field(
         &self,
         _root_type: &TypeName,
         path: &str,
-    ) -> Result<actus::codegen::BackendCleanupResolvedDescriptor, BackendContractError> {
+    ) -> Result<Option<actus::codegen::BackendCleanupResolvedDescriptor>, BackendContractError>
+    {
         if !matches!(path, "inner.first" | "inner.second") {
-            return Err(BackendContractError::InvalidCleanupOperand);
+            return Ok(None);
         }
         let offset = if path == "inner.first" { 0 } else { 8 };
-        Ok(actus::codegen::BackendCleanupResolvedDescriptor {
+        Ok(Some(actus::codegen::BackendCleanupResolvedDescriptor {
             descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
                 bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
                 argument: actus::codegen::BackendCleanupArgument::FieldAddress,
@@ -73,7 +75,7 @@ impl BackendCleanupProvider for TestCleanupProvider {
             },
             layout: BackendLayout { size: 16, alignment: 8 },
             field: Some(actus::codegen::BackendCleanupField { offset, size: 8, alignment: 8 }),
-        })
+        }))
     }
 }
 

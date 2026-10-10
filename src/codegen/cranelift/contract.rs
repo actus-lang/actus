@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 mod cleanup;
+pub(super) use cleanup::LayoutCleanupProvider;
 
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, TrapCode, Type, types};

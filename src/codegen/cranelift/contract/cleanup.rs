@@ -19,8 +19,8 @@ use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 
 #[allow(dead_code)]
-pub(super) struct LayoutCleanupProvider<'a> {
-    pub(super) layouts: &'a LayoutRegistry,
+pub(crate) struct LayoutCleanupProvider<'a> {
+    pub(crate) layouts: &'a LayoutRegistry,
 }
 
 impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
@@ -28,13 +28,13 @@ impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
         &self,
         type_name: Option<&TypeName>,
         builtin: Option<BuiltinType>,
-    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError> {
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
         let native_type = if builtin == Some(BuiltinType::Buffer) {
             NativeType::Buffer
         } else if type_name.is_some_and(|name| name.name == "Region") {
             NativeType::Region
         } else {
-            return Err(BackendContractError::InvalidCleanupOperand);
+            return Ok(None);
         };
         let (size, alignment) = self
             .layouts
@@ -51,26 +51,26 @@ impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
                 argument: BackendCleanupArgument::Address,
                 result: crate::codegen::BackendCleanupResult::Status,
             },
-            _ => return Err(BackendContractError::InvalidCleanupOperand),
+            _ => return Ok(None),
         };
-        Ok(BackendCleanupResolvedDescriptor {
+        Ok(Some(BackendCleanupResolvedDescriptor {
             descriptor,
             layout: BackendLayout { size, alignment },
             field: None,
-        })
+        }))
     }
 
     fn resolve_field(
         &self,
         root_type: &TypeName,
         path: &str,
-    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError> {
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
         let native_type = self
             .layouts
             .native_type_for_type_name(root_type, &mut Vec::new())
             .map_err(|_| BackendContractError::InvalidCleanupOperand)?;
         let NativeType::Struct(root_id) = native_type else {
-            return Err(BackendContractError::InvalidCleanupOperand);
+            return Ok(None);
         };
         let (size, alignment) = self
             .layouts
@@ -91,13 +91,13 @@ impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
                 argument: BackendCleanupArgument::FieldAddress,
                 result: crate::codegen::BackendCleanupResult::Status,
             },
-            _ => return Err(BackendContractError::InvalidCleanupOperand),
+            _ => return Ok(None),
         };
-        Ok(BackendCleanupResolvedDescriptor {
+        Ok(Some(BackendCleanupResolvedDescriptor {
             descriptor,
             layout: BackendLayout { size, alignment },
             field: Some(BackendCleanupField { ..field }),
-        })
+        }))
     }
 }
 
@@ -223,10 +223,10 @@ mod tests {
         };
         let first =
             provider.resolve_field(&root, "inner.first").expect("buffer field should resolve");
-        assert_eq!(first.field.expect("field metadata").offset, 0);
+        assert_eq!(first.expect("runtime field").field.expect("field metadata").offset, 0);
         let second =
             provider.resolve_field(&root, "inner.second").expect("region field should resolve");
-        assert_eq!(second.field.expect("field metadata").offset, 8);
+        assert_eq!(second.expect("runtime field").field.expect("field metadata").offset, 8);
         assert!(provider.resolve_field(&root, "inner.missing").is_err());
     }
 }

@@ -86,9 +86,13 @@ paths are complete. The existing Cranelift cleanup path remains the behavioral
 reference for parity fixtures until that integration is complete.
 The neutral contract also defines a resolved descriptor that validates the
 parent layout and optional field sublayout as one unit. Semantic providers have
-now populate it from binding types and each moved-field path through an explicit
-provider interface. The concrete Cranelift layout adapter and backend emission
-adapter now resolves nested Buffer and Region fields from the native layout
-registry with a regression test. Wiring the provider into production semantic
-to-backend emission remains the next required step.
+now populated it from binding types and each moved-field path through an
+explicit provider interface. The concrete Cranelift layout adapter and backend
+emission adapter resolve nested Buffer and Region fields from the native layout
+registry with a regression test. Cranelift production emission invokes this
+provider after native layouts are built and fails before object emission when
+semantic cleanup metadata is invalid. Non-runtime fields are excluded from the
+runtime descriptor set. The established Cranelift cleanup schedule remains the
+emission path until resolved descriptors replace it and identical
+descriptor-driven fixtures are executed through both backends.
 
