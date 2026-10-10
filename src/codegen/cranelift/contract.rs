@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
-use cranelift_codegen::ir::{AbiParam, InstBuilder, Type, types};
+use cranelift_codegen::ir::condcodes::IntCC;
+use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, TrapCode, Type, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
@@ -109,9 +110,9 @@ fn define_function(
     function: &BackendFunction,
     declarations: &BTreeMap<String, Declaration>,
 ) -> Result<(), BackendEmitError> {
-    if function.blocks.len() != 1 {
+    if function.blocks.is_empty() {
         return Err(BackendEmitError(
-            "Cranelift neutral contract slice supports one block per function".to_owned(),
+            "Cranelift neutral contract function requires one or more blocks".to_owned(),
         ));
     }
     let declaration = declarations
@@ -124,41 +125,117 @@ fn define_function(
     let mut function_context = FunctionBuilderContext::new();
     {
         let mut builder = FunctionBuilder::new(&mut context.func, &mut function_context);
-        let block = builder.create_block();
-        builder.switch_to_block(block);
-        builder.append_block_params_for_function_params(block);
-        let block_params = builder.block_params(block).to_vec();
+        let blocks = create_blocks(&mut builder, function);
+        let entry = blocks.get(&function.entry).copied().ok_or_else(|| {
+            BackendEmitError("Cranelift neutral contract entry block is missing".to_owned())
+        })?;
+        builder.switch_to_block(entry);
+        builder.append_block_params_for_function_params(entry);
+        let block_params = builder.block_params(entry).to_vec();
         let mut values = BTreeMap::new();
         for (index, value) in block_params.into_iter().enumerate() {
             values.insert(BackendValueId(index as u32), value);
         }
-        for instruction in &function.blocks[0].instructions {
-            match instruction {
-                BackendInstruction::Call { .. } => {
-                    lower_call(module, &mut builder, instruction, declarations, &mut values)?;
-                }
-                BackendInstruction::Cleanup { action, .. }
-                    if matches!(
-                        action,
-                        crate::codegen::LoweredCleanupInstruction::EndBorrow { .. }
-                    ) => {}
-                BackendInstruction::Return { .. } => {
-                    lower_return(&mut builder, instruction, &values)?
-                }
-                _ => {
-                    return Err(BackendEmitError(
-                        "Cranelift neutral contract instruction is not implemented".to_owned(),
-                    ));
-                }
+        for block in &function.blocks {
+            let native_block = blocks.get(&block.id).copied().ok_or_else(|| {
+                BackendEmitError("Cranelift neutral contract block is missing".to_owned())
+            })?;
+            builder.switch_to_block(native_block);
+            for instruction in &block.instructions {
+                lower_instruction(
+                    module,
+                    &mut builder,
+                    instruction,
+                    declarations,
+                    &blocks,
+                    &mut values,
+                )?;
             }
         }
-        builder.seal_block(block);
+        builder.seal_all_blocks();
         builder.finalize(frontend_config);
     }
     module
         .define_function(declaration.id, &mut context)
         .map_err(|error| BackendEmitError(error.to_string()))?;
     module.clear_context(&mut context);
+    Ok(())
+}
+
+fn create_blocks(
+    builder: &mut FunctionBuilder<'_>,
+    function: &BackendFunction,
+) -> BTreeMap<crate::codegen::BackendBlockId, Block> {
+    function.blocks.iter().map(|block| (block.id, builder.create_block())).collect()
+}
+
+fn lower_instruction(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, Declaration>,
+    blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::Call { .. } => {
+            lower_call(module, builder, instruction, declarations, values)
+        }
+        BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
+        BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
+        BackendInstruction::Return { .. } => lower_return(builder, instruction, values),
+        BackendInstruction::Trap { .. } => {
+            builder.ins().trap(TrapCode::unwrap_user(1));
+            Ok(())
+        }
+        BackendInstruction::Cleanup { action, .. }
+            if matches!(action, crate::codegen::LoweredCleanupInstruction::EndBorrow { .. }) =>
+        {
+            Ok(())
+        }
+        _ => Err(BackendEmitError(
+            "Cranelift neutral contract instruction is not implemented".to_owned(),
+        )),
+    }
+}
+
+fn lower_branch(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::Branch { condition, then_block, else_block, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift branch instruction expected".to_owned()));
+    };
+    let condition = values.get(condition).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift branch value {} is unavailable", condition.0))
+    })?;
+    let condition = builder.ins().icmp_imm_u(IntCC::NotEqual, condition, 0);
+    let then_block = blocks
+        .get(then_block)
+        .copied()
+        .ok_or_else(|| BackendEmitError("Cranelift branch true block is unavailable".to_owned()))?;
+    let else_block = blocks.get(else_block).copied().ok_or_else(|| {
+        BackendEmitError("Cranelift branch false block is unavailable".to_owned())
+    })?;
+    builder.ins().brif(condition, then_block, &[], else_block, &[]);
+    Ok(())
+}
+
+fn lower_jump(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::Jump { target, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift jump instruction expected".to_owned()));
+    };
+    let target = blocks
+        .get(target)
+        .copied()
+        .ok_or_else(|| BackendEmitError("Cranelift jump target block is unavailable".to_owned()))?;
+    builder.ins().jump(target, &[]);
     Ok(())
 }
 

@@ -632,7 +632,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
     let shim_source = root.join("entry.c");
     fs::write(
         &shim_source,
-        "extern int test__verb_entry(int); int main(void) { return test__verb_entry(42) == 42 ? 0 : 1; }\n",
+        "extern int test__verb_entry(int); extern void test__verb_control(unsigned char); int main(void) { if (test__verb_entry(42) != 42) return 1; test__verb_control(1); return 0; }\n",
     )
     .expect("parity entry shim should be written");
     let shim_object = root.join("entry.o");
@@ -645,6 +645,8 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
         SymbolIdentity::new("test", SymbolKind::Verb, "identity").expect("identity symbol");
     let entry_symbol =
         SymbolIdentity::new("test", SymbolKind::Verb, "entry").expect("entry symbol");
+    let control_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "control").expect("control symbol");
     let parameter = BackendParameter {
         name: "input".to_owned(),
         role: Role::Erg,
@@ -695,7 +697,55 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
         }],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![identity, entry] };
+    let control = BackendFunction {
+        symbol: control_symbol,
+        parameters: vec![BackendParameter {
+            name: "condition".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Bool,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![
+            BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![BackendInstruction::Branch {
+                    condition: BackendValueId(0),
+                    then_block: BackendBlockId(1),
+                    else_block: BackendBlockId(2),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                }],
+            },
+            BackendBlock {
+                id: BackendBlockId(1),
+                instructions: vec![BackendInstruction::Jump {
+                    target: BackendBlockId(3),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                }],
+            },
+            BackendBlock {
+                id: BackendBlockId(2),
+                instructions: vec![BackendInstruction::Trap {
+                    reason: "false parity branch".to_owned(),
+                    span: actus::lexer::SourceSpan::new(2, 3),
+                }],
+            },
+            BackendBlock {
+                id: BackendBlockId(3),
+                instructions: vec![BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(3, 4),
+                }],
+            },
+        ],
+        cleanup: Vec::new(),
+    };
+    let module = BackendModule { externals: Vec::new(), functions: vec![identity, entry, control] };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("parity fixture configuration should load");

@@ -288,9 +288,9 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
 - [x] Add runtime bridge declarations and external symbol validation.
 - [x] Emit deterministic object files and link a hosted executable.
 - [x] Compare LLVM and Cranelift semantic results for the supported direct
-      scalar/unit contract slice.
-- [ ] Extend cross-backend semantic comparison to aggregate, control-flow,
-      typed-failure, ownership, and runtime-cleanup fixtures.
+      scalar/unit and control-flow contract slices.
+- [ ] Extend cross-backend semantic comparison to aggregate, typed-failure,
+      ownership, and runtime-cleanup fixtures.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
@@ -367,14 +367,15 @@ surface plus the LLVM integration suite. The LLVM-only configuration does not
 claim that Cranelift-specific native fixtures are supported without the
 Cranelift feature.
 The Cranelift backend now consumes the neutral `BackendModule` contract for a
-bounded first slice: direct scalar and unit signatures, direct calls and
-returns, and compile-time `EndBorrow` cleanup boundaries. The shared parity
-fixture lowers the same two-function identity module through LLVM and Cranelift,
-links each object with the same hosted C entry shim through `LinkerPlan`, and
-executes both programs with the same exit status. The focused command
+bounded slice: direct scalar and unit signatures, direct calls and returns,
+conditional branches, jumps, trap terminators, and compile-time `EndBorrow`
+cleanup boundaries. The shared parity fixture lowers the same identity and
+control-flow functions through LLVM and Cranelift, links each object with the
+same hosted C entry shim through `LinkerPlan`, and executes both programs with
+the same exit status. The focused command
 `LLVM_SYS_231_PREFIX=/usr cargo test --features llvm --test llvm_backend`
 passes with 15 tests and 0 failures. This evidence covers only the stated
-scalar/unit slice; aggregate, control-flow, typed-failure, ownership, and
+scalar/unit and control-flow slices; aggregate, typed-failure, ownership, and
 runtime-cleanup parity remain open.
 Installation requirements, direct dependency trees, clean debug build times,
 target-directory sizes, and debug executable sizes are recorded in
