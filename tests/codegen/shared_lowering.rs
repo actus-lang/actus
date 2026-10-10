@@ -312,3 +312,25 @@ fn lowers_local_region_cleanup_at_nested_scope_boundary() {
         .position(|instruction| matches!(instruction, BackendInstruction::Return { .. }));
     assert!(return_index.is_none() || cleanup_index < return_index.unwrap());
 }
+
+#[test]
+fn lowers_loop_break_with_region_unwind_cleanup() {
+    let source = "verb forward(dat region: Region[u32]) -> Region[u32] { return region; } verb inspect(dat region: Region[u32]) -> Int { loop { erg local: Region[u32] = forward(region: dat region); break; } return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("loop Region fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("loop Region cleanup should lower through the shared pipeline");
+    let inspect = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("inspect"))
+        .expect("inspect function should be present");
+    let cleanup_count = inspect
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .filter(|instruction| matches!(instruction, BackendInstruction::Cleanup { .. }))
+        .count();
+    assert_eq!(cleanup_count, 1, "loop break must clean the Region exactly once");
+}

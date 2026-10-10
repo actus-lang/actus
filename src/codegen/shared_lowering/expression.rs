@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use crate::ast::{BinaryOp, Expr, UnaryOp, VerbDecl};
 use crate::lexer::SourceSpan;
+use crate::semantic::LoopExitKind;
 
 use super::super::{
-    BackendContractError, BackendExpressionProvider, BackendInstruction, BackendIntegerBinaryOp,
-    BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendValueId, BackendValueType,
-    SymbolIdentity, SymbolKind,
+    BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
+    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendValueId,
+    BackendValueType, SymbolIdentity, SymbolKind,
 };
 use super::support::{expression_span, parse_integer, unsupported};
 
@@ -61,7 +62,11 @@ impl<'a> SharedExpressionProvider<'a> {
             _ => None,
         };
         let mut cleanup = Vec::new();
-        for plan in self.cleanup_plans.iter().filter(|plan| plan.span == span) {
+        for plan in self
+            .cleanup_plans
+            .iter()
+            .filter(|plan| plan.span == span && matches!(plan.origin, BackendCleanupOrigin::Scope))
+        {
             for (index, action) in plan.actions.iter().enumerate() {
                 let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
                     continue;
@@ -92,6 +97,42 @@ impl<'a> SharedExpressionProvider<'a> {
         instructions.splice(insertion..insertion, cleanup);
     }
 
+    fn append_loop_cleanup(
+        &self,
+        span: SourceSpan,
+        kind: LoopExitKind,
+        instructions: &mut Vec<BackendInstruction>,
+    ) {
+        for plan in self.cleanup_plans.iter().filter(|plan| {
+            matches!(
+                &plan.origin,
+                BackendCleanupOrigin::Loop { span: boundary, kind: expected }
+                    if *boundary == span && *expected == kind
+            )
+        }) {
+            for (index, action) in plan.actions.iter().enumerate() {
+                let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
+                    continue;
+                };
+                let Some(value) = self.binding_value(name) else { continue };
+                let Some(descriptor) =
+                    plan.resolved_bridges.get(index).and_then(|items| items.first())
+                else {
+                    continue;
+                };
+                instructions.push(BackendInstruction::Cleanup {
+                    action: action.clone(),
+                    operand: Some(descriptor.operand(value)),
+                    span: plan.span,
+                });
+            }
+        }
+    }
+
+    fn binding_value(&self, name: &str) -> Option<BackendValueId> {
+        self.local_value(name).or_else(|| self.parameters.get(name).copied())
+    }
+
     fn local_value(&self, name: &str) -> Option<BackendValueId> {
         self.locals.iter().rev().find_map(|scope| scope.get(name).copied())
     }
@@ -107,8 +148,33 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        self.emit_scope_cleanup(span, instructions);
+        let skip_scope_cleanup = matches!(
+            instructions.last(),
+            Some(BackendInstruction::Jump { span, .. }) if self.is_loop_exit(*span)
+        );
+        if !skip_scope_cleanup {
+            self.emit_scope_cleanup(span, instructions);
+        }
         self.locals.pop();
+        Ok(())
+    }
+
+    fn is_loop_exit(&self, span: SourceSpan) -> bool {
+        self.cleanup_plans.iter().any(|plan| {
+            matches!(
+                plan.origin,
+                BackendCleanupOrigin::Loop { span: boundary, .. } if boundary == span
+            )
+        })
+    }
+
+    fn emit_loop_cleanup(
+        &mut self,
+        span: SourceSpan,
+        kind: LoopExitKind,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        self.append_loop_cleanup(span, kind, instructions);
         Ok(())
     }
 

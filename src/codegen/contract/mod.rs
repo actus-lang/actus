@@ -142,9 +142,17 @@ pub struct BackendFailure {
 pub type BackendCleanupAction = LoweredCleanupInstruction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BackendCleanupOrigin {
+    Scope,
+    Return { span: SourceSpan },
+    Loop { span: SourceSpan, kind: crate::semantic::LoopExitKind },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendCleanupPlan {
     pub depth: usize,
     pub span: SourceSpan,
+    pub origin: BackendCleanupOrigin,
     pub actions: Vec<BackendCleanupAction>,
     pub bridges: Vec<Option<BackendCleanupBridgeDescriptor>>,
     pub resolved_bridges: Vec<Vec<BackendCleanupResolvedDescriptor>>,
@@ -167,6 +175,7 @@ pub fn lower_semantic_cleanup(
             BackendCleanupPlan {
                 depth: plan.depth,
                 span: plan.span,
+                origin: BackendCleanupOrigin::Scope,
                 actions: plan.instructions,
                 bridges,
                 resolved_bridges: vec![Vec::new(); action_count],

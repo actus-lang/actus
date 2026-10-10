@@ -1,5 +1,7 @@
 use super::super::model::LoweredCleanupInstruction;
-use super::{BackendCleanupPlan, BackendCleanupProvider, BackendContractError};
+use super::{
+    BackendCleanupOrigin, BackendCleanupPlan, BackendCleanupProvider, BackendContractError,
+};
 
 pub fn lower_semantic_cleanup_with_provider(
     model: &crate::semantic::SemanticModel,
@@ -7,22 +9,33 @@ pub fn lower_semantic_cleanup_with_provider(
 ) -> Result<Vec<BackendCleanupPlan>, BackendContractError> {
     super::super::model::validate_cleanup_plans(model)
         .map_err(BackendContractError::InvalidCleanupContract)?;
-    let mut plans = super::super::model::lower_cleanup_plans(model);
-    plans.extend(
-        super::super::model::lower_return_unwind_plans(model)
-            .into_iter()
-            .flat_map(|plan| plan.scopes),
-    );
-    plans.extend(
-        super::super::model::lower_loop_unwind_plans(model)
-            .into_iter()
-            .flat_map(|plan| plan.scopes),
-    );
-    plans.into_iter().map(|plan| lower_plan(plan, model, provider)).collect::<Result<Vec<_>, _>>()
+    let plans = super::super::model::lower_cleanup_plans(model)
+        .into_iter()
+        .map(|plan| (plan, BackendCleanupOrigin::Scope))
+        .chain(super::super::model::lower_return_unwind_plans(model).into_iter().flat_map(
+            |unwind| {
+                unwind
+                    .scopes
+                    .into_iter()
+                    .map(move |plan| (plan, BackendCleanupOrigin::Return { span: unwind.span }))
+            },
+        ))
+        .chain(super::super::model::lower_loop_unwind_plans(model).into_iter().flat_map(
+            |unwind| {
+                let kind = unwind.kind.clone();
+                unwind.scopes.into_iter().map(move |plan| {
+                    (plan, BackendCleanupOrigin::Loop { span: unwind.span, kind: kind.clone() })
+                })
+            },
+        ));
+    plans
+        .map(|(plan, origin)| lower_plan(plan, origin, model, provider))
+        .collect::<Result<Vec<_>, _>>()
 }
 
 fn lower_plan(
     plan: super::super::model::LoweredCleanupPlan,
+    origin: BackendCleanupOrigin,
     model: &crate::semantic::SemanticModel,
     provider: &impl BackendCleanupProvider,
 ) -> Result<BackendCleanupPlan, BackendContractError> {
@@ -39,6 +52,7 @@ fn lower_plan(
     Ok(BackendCleanupPlan {
         depth: plan.depth,
         span: plan.span,
+        origin,
         actions: plan.instructions,
         bridges,
         resolved_bridges,

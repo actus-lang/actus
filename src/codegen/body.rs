@@ -1,9 +1,11 @@
 use crate::ast::{Block, CompoundAssignmentOp, Expr, IfBranch, Place, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
+use crate::semantic::LoopExitKind;
 
+use super::body_contract::{statement_span, terminates, unsupported, unsupported_name};
 use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
-    BackendIntegerBinaryOp, BackendTargetContext, BackendValueId, SymbolIdentity,
+    BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
 };
 
 pub trait BackendBodyProvider {
@@ -29,6 +31,19 @@ pub trait BackendExpressionProvider {
     fn exit_scope(
         &mut self,
         _span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Ok(())
+    }
+
+    fn is_loop_exit(&self, _span: SourceSpan) -> bool {
+        false
+    }
+
+    fn emit_loop_cleanup(
+        &mut self,
+        _span: SourceSpan,
+        _kind: LoopExitKind,
         _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         Ok(())
@@ -95,7 +110,8 @@ pub fn lower_verb_body_with_expressions(
     verb: &VerbDecl,
     provider: &mut impl BackendExpressionProvider,
 ) -> Result<Vec<BackendBlock>, BackendContractError> {
-    let mut lowering = BodyLowering { provider, next_block: 1, blocks: Vec::new() };
+    let mut lowering =
+        BodyLowering { provider, next_block: 1, blocks: Vec::new(), loop_targets: Vec::new() };
     let entry = BackendBlockId(0);
     let entry_block = lowering.lower_block(entry, &verb.body, None)?;
     lowering.blocks.insert(0, entry_block);
@@ -106,6 +122,13 @@ struct BodyLowering<'a, P> {
     provider: &'a mut P,
     next_block: u32,
     blocks: Vec<BackendBlock>,
+    loop_targets: Vec<LoopTargets>,
+}
+
+#[derive(Clone, Copy)]
+struct LoopTargets {
+    header: BackendBlockId,
+    exit: BackendBlockId,
 }
 
 struct LegacyExpressionProvider<'a, P> {
@@ -167,19 +190,25 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<BackendBlock, BackendContractError> {
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
+            if let Stmt::Loop(nested) = statement {
+                return self.lower_loop_statement(
+                    id,
+                    block,
+                    index,
+                    nested,
+                    fallthrough,
+                    instructions,
+                );
+            }
             if let Stmt::Block(nested) = statement {
-                let nested_id = self.allocate_block();
-                let continuation_id = self.allocate_block();
-                instructions
-                    .push(BackendInstruction::Jump { target: nested_id, span: nested.span });
-                let nested_block = self.lower_block(nested_id, nested, Some(continuation_id))?;
-                let continuation =
-                    Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
-                let continuation_block =
-                    self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
-                self.blocks.push(nested_block);
-                self.blocks.push(continuation_block);
-                return Ok(BackendBlock { id, instructions });
+                return self.lower_nested_block_statement(
+                    id,
+                    block,
+                    index,
+                    nested,
+                    fallthrough,
+                    instructions,
+                );
             }
             if let Stmt::If { condition, then_branch, else_branch, span } = statement {
                 let continuation_id = self.allocate_block();
@@ -206,11 +235,74 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 break;
             }
         }
+        Ok(self.finish_block(id, block.span, fallthrough, instructions))
+    }
+
+    fn finish_block(
+        &self,
+        id: BackendBlockId,
+        span: SourceSpan,
+        fallthrough: Option<BackendBlockId>,
+        mut instructions: Vec<BackendInstruction>,
+    ) -> BackendBlock {
         if !terminates(instructions.last()) {
             if let Some(target) = fallthrough {
-                instructions.push(BackendInstruction::Jump { target, span: block.span });
+                instructions.push(BackendInstruction::Jump { target, span });
             }
         }
+        BackendBlock { id, instructions }
+    }
+
+    fn lower_nested_block_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        nested: &Block,
+        fallthrough: Option<BackendBlockId>,
+        mut instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let nested_id = self.allocate_block();
+        let continuation_id = self.allocate_block();
+        instructions.push(BackendInstruction::Jump { target: nested_id, span: nested.span });
+        let nested_block = self.lower_block(nested_id, nested, Some(continuation_id))?;
+        let continuation =
+            Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+        let continuation_block =
+            self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
+        self.blocks.push(nested_block);
+        self.blocks.push(continuation_block);
+        Ok(BackendBlock { id, instructions })
+    }
+
+    fn lower_loop_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        nested: &Block,
+        fallthrough: Option<BackendBlockId>,
+        mut instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let header_id = self.allocate_block();
+        let body_id = self.allocate_block();
+        let continuation_id = self.allocate_block();
+        instructions.push(BackendInstruction::Jump { target: header_id, span: nested.span });
+        let header = BackendBlock {
+            id: header_id,
+            instructions: vec![BackendInstruction::Jump { target: body_id, span: nested.span }],
+        };
+        self.loop_targets.push(LoopTargets { header: header_id, exit: continuation_id });
+        let body_result = self.lower_block(body_id, nested, Some(header_id));
+        self.loop_targets.pop();
+        let body = body_result?;
+        let continuation =
+            Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+        let continuation_block =
+            self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
+        self.blocks.push(header);
+        self.blocks.push(body);
+        self.blocks.push(continuation_block);
         Ok(BackendBlock { id, instructions })
     }
 
@@ -261,8 +353,31 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     span: *stmt_span,
                 });
             }
+            Stmt::Break { span } | Stmt::Continue { span } => {
+                self.lower_loop_control(statement, *span, instructions)?;
+            }
             _ => return Err(unsupported(statement_span(statement), unsupported_name(statement))),
         }
+        Ok(())
+    }
+
+    fn lower_loop_control(
+        &mut self,
+        statement: &Stmt,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        let Some(targets) = self.loop_targets.last().copied() else {
+            return Err(unsupported(span, "loop control"));
+        };
+        let kind = if matches!(statement, Stmt::Continue { .. }) {
+            LoopExitKind::Continue
+        } else {
+            LoopExitKind::Break
+        };
+        self.provider.emit_loop_cleanup(span, kind.clone(), instructions)?;
+        let target = if kind == LoopExitKind::Continue { targets.header } else { targets.exit };
+        instructions.push(BackendInstruction::Jump { target, span });
         Ok(())
     }
 
@@ -359,62 +474,4 @@ fn ensure_jump(mut block: BackendBlock, target: BackendBlockId, span: SourceSpan
         block.instructions.push(BackendInstruction::Jump { target, span });
     }
     block
-}
-
-fn terminates(instruction: Option<&BackendInstruction>) -> bool {
-    matches!(
-        instruction,
-        Some(BackendInstruction::Branch { .. })
-            | Some(BackendInstruction::Jump { .. })
-            | Some(BackendInstruction::Fail { .. })
-            | Some(BackendInstruction::Return { .. })
-            | Some(BackendInstruction::Trap { .. })
-    )
-}
-
-fn statement_span(statement: &Stmt) -> SourceSpan {
-    match statement {
-        Stmt::OwnerDecl { span, .. }
-        | Stmt::Assignment { span, .. }
-        | Stmt::CompoundAssignment { span, .. }
-        | Stmt::Expression { span, .. }
-        | Stmt::If { span, .. }
-        | Stmt::Return { span, .. }
-        | Stmt::ForRange { span, .. }
-        | Stmt::ForArray { span, .. }
-        | Stmt::Break { span }
-        | Stmt::Continue { span }
-        | Stmt::Drop { span, .. } => *span,
-        Stmt::Loop(block) | Stmt::Block(block) => block.span,
-    }
-}
-
-fn unsupported_name(statement: &Stmt) -> &'static str {
-    match statement {
-        Stmt::OwnerDecl { .. } => "owner declaration",
-        Stmt::Assignment { .. } => "assignment",
-        Stmt::CompoundAssignment { .. } => "compound assignment",
-        Stmt::Expression { .. } => "expression",
-        Stmt::If { .. } => "if statement",
-        Stmt::Return { .. } => "return statement",
-        Stmt::Loop(_) => "loop",
-        Stmt::ForRange { .. } => "range loop",
-        Stmt::ForArray { .. } => "array loop",
-        Stmt::Break { .. } => "break",
-        Stmt::Continue { .. } => "continue",
-        Stmt::Drop { .. } => "drop statement",
-        Stmt::Block(_) => "nested block",
-    }
-}
-
-fn unsupported(span: SourceSpan, name: &str) -> BackendContractError {
-    BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
-        "body-lowering",
-        span,
-        BackendTargetContext {
-            backend: "neutral-contract".to_owned(),
-            target: "semantic-model".to_owned(),
-        },
-        format!("{name} has no neutral lowering contract yet"),
-    ))
 }

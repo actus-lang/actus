@@ -1118,6 +1118,7 @@ fn preserves_cleanup_plans_on_the_neutral_function_contract() {
     let cleanup = vec![actus::codegen::BackendCleanupPlan {
         depth: 2,
         span: SourceSpan::new(0, 6),
+        origin: actus::codegen::BackendCleanupOrigin::Scope,
         actions: vec![BackendCleanupAction::DropBinding {
             binding_index: 0,
             name: "resource".to_owned(),
@@ -1150,6 +1151,7 @@ fn rejects_cleanup_plans_without_one_bridge_descriptor_per_action() {
         vec![actus::codegen::BackendCleanupPlan {
             depth: 1,
             span: SourceSpan::new(0, 1),
+            origin: actus::codegen::BackendCleanupOrigin::Scope,
             actions: vec![BackendCleanupAction::DropBinding {
                 binding_index: 0,
                 name: "resource".to_owned(),
@@ -1190,11 +1192,11 @@ fn lowers_typed_failures_without_backend_specific_handles() {
 fn rejects_body_constructs_without_a_neutral_lowering_contract() {
     let mut verb = verb_with_signature();
     verb.body = Block {
-        statements: vec![Stmt::Loop(Block { statements: Vec::new(), span: SourceSpan::new(0, 4) })],
+        statements: vec![Stmt::Drop { name: "resource".to_owned(), span: SourceSpan::new(0, 4) }],
         span: SourceSpan::new(0, 4),
     };
 
-    let error = lower_verb_body(&verb, &TestBodyProvider).expect_err("loop is not supported yet");
+    let error = lower_verb_body(&verb, &TestBodyProvider).expect_err("drop is not supported yet");
     assert!(matches!(error, BackendContractError::Unsupported(_)));
-    assert!(error.to_string().contains("loop"));
+    assert!(error.to_string().contains("drop statement"));
 }

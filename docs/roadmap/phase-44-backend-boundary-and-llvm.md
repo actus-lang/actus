@@ -350,9 +350,9 @@ including return and loop unwind plans, with target-neutral builtin cleanup
 descriptors for opaque `Region`, `Buffer`, `String`, and `Arena` layouts. Native
 runtime emission now materializes resolved builtin parameter drops and
 function-scope local builtin drops as neutral `Cleanup` instructions before
-return and typed-failure terminators. Nested block cleanup placement is now
-covered by neutral lowering; loop unwind placement and aggregate field cleanup
-emission remain open.
+return and typed-failure terminators. Nested block cleanup placement and
+loop `break`/`continue` unwind cleanup are now covered by neutral lowering;
+aggregate field cleanup emission remains open.
 Regular enum typed failures with integer payloads now lower through the
 declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while incomplete semantic cleanup descriptors fail closed

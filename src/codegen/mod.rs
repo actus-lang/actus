@@ -1,6 +1,7 @@
 mod abi;
 mod backend;
 mod body;
+mod body_contract;
 mod constants;
 mod contract;
 #[cfg(feature = "cranelift")]
@@ -27,7 +28,7 @@ pub use body::{
 pub use contract::{
     BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupArgument,
     BackendCleanupBridge, BackendCleanupBridgeDescriptor, BackendCleanupField,
-    BackendCleanupOperand, BackendCleanupPlan, BackendCleanupProvider,
+    BackendCleanupOperand, BackendCleanupOrigin, BackendCleanupPlan, BackendCleanupProvider,
     BackendCleanupResolvedDescriptor, BackendCleanupResult, BackendContractError, BackendEmitError,
     BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendIntegerBinaryOp,
     BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendLayout, BackendModule, BackendParameter,
