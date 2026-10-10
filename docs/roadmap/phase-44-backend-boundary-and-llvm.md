@@ -348,9 +348,10 @@ descriptor-driven Buffer, Region, and target-width Enum cleanup calls are now
 emitted. Shared lowering now carries the complete semantic cleanup schedule,
 including return and loop unwind plans, with target-neutral builtin cleanup
 descriptors for opaque `Region`, `Buffer`, `String`, and `Arena` layouts. Native
-runtime emission now materializes resolved builtin parameter drops as neutral
-`Cleanup` instructions before return and typed-failure terminators. Full
-scope/loop unwind placement and aggregate field cleanup emission remain open.
+runtime emission now materializes resolved builtin parameter drops and
+function-scope local builtin drops as neutral `Cleanup` instructions before
+return and typed-failure terminators. Nested block and loop unwind placement,
+as well as aggregate field cleanup emission, remain open.
 Regular enum typed failures with integer payloads now lower through the
 declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while incomplete semantic cleanup descriptors fail closed
