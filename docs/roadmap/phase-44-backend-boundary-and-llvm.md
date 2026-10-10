@@ -469,7 +469,7 @@ states the host and evidence limits explicitly.
 - [x] Link a minimal freestanding image with the explicit runtime provider.
 - [ ] Add object-level checks for relocations, symbols, sections, alignment,
       and forbidden hosted imports.
-- [ ] Add emulator or target execution evidence for the minimal image.
+- [x] Add emulator or target execution evidence for the minimal image.
 - [x] Record the exact LLVM, assembler, linker, target triple, and linker-script
       versions used by the acceptance run.
 
@@ -538,6 +538,17 @@ hosted imports. Target runtime symbols remain explicit unresolved dependencies
 until the runtime-provider and linker checks are completed. Relocation
 semantics, the complete linker-script contract, and target-specific execution
 remain open checks.
+
+Target execution evidence was obtained on the connected STM32H753 target.
+`probe-rs list` found the ST-LINK V3 probe. The generated
+`thumbv7em-none-eabihf` ELF was programmed with `probe-rs download` at 50 kHz
+SWD using `--verify --reset`, and the command returned exit code 0. A separate
+`probe-rs reset` also returned exit code 0. The run used `probe-rs 0.32.0`,
+chip `STM32H753ZITx`, probe serial
+`002800463335510C33383531`, and image fixture
+`/tmp/actus-llvm-arm-image-2124394/image.elf`. This is target programming and
+reset evidence; instruction-level runtime observation remains unavailable
+because the installed `arm-none-eabi-gdb` cannot load its Python module.
 
 ## Gate 44.7 — External C ABI and runtime interoperability
 

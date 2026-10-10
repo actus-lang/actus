@@ -860,7 +860,11 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("Reset_Handler")));
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("arm__verb_boot")));
     assert!(object.symbols().all(|symbol| !symbol.is_undefined()));
-    remove_fixture(&root, [&startup, &linker_script, &startup_object, &actus_object, &image]);
+    if std::env::var_os("ACTUS_KEEP_ARM_IMAGE").is_none() {
+        remove_fixture(&root, [&startup, &linker_script, &startup_object, &actus_object, &image]);
+    } else {
+        eprintln!("kept ARM image fixture at {}", image.display());
+    }
 }
 
 #[cfg(target_os = "linux")]

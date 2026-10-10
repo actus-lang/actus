@@ -301,8 +301,16 @@ Actus-generated `thumbv7em-none-eabihf` object, explicit Thumb startup and
 The resulting ARM ELF is parsed for its vector table, `.text`, startup symbol,
 Actus entry symbol, and absence of undefined symbols. The acceptance record is
 LLVM/Clang 23.1.1, rust-lld LLD 22.1.8, and target triple
-`thumbv7em-none-eabihf`. This proves image linking only; target execution and
-hardware fault evidence remain open.
+`thumbv7em-none-eabihf`.
+
+The connected STM32H753 target was programmed with the generated ELF through
+ST-LINK V3 using `probe-rs 0.32.0`, chip `STM32H753ZITx`, SWD at 50 kHz,
+`--verify`, and `--reset`; the command returned exit code 0. A separate reset
+also returned exit code 0. The target image therefore has programming and
+reset evidence. Instruction-level runtime observation remains open because
+the installed `arm-none-eabi-gdb` cannot load its Python module; no claim is
+made about application-level behavior beyond successful verified programming
+and reset.
 
 ### Semantic preservation
 
