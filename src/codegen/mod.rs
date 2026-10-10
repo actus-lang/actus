@@ -1,3 +1,4 @@
+mod abi;
 mod backend;
 mod bindings;
 mod body;
@@ -17,6 +18,7 @@ mod serialization_migration;
 mod signature;
 mod symbols;
 
+pub use abi::{BackendAggregateFragment, BackendAggregateLocation, BackendDirectAggregateAbi};
 pub use backend::{BackendKind, BackendTargetError};
 pub use bindings::BackendSymbolBindings;
 pub use body::{BackendBodyProvider, lower_verb_body};

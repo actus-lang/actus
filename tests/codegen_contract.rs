@@ -2,7 +2,8 @@ use actus::ast::{
     Block, DispatchMode, Expr, Param, ReturnAccess, ReturnType, Role, Stmt, TypeName, VerbDecl,
 };
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendBodyProvider, BackendCleanupAction, BackendContractError,
+    BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
+    BackendBodyProvider, BackendCleanupAction, BackendContractError, BackendDirectAggregateAbi,
     BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
     BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode,
     BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
@@ -172,6 +173,72 @@ fn validates_aligned_aggregate_layouts() {
     assert!(BackendLayout { size: 16, alignment: 8 }.validate().is_ok());
     assert!(BackendLayout { size: 12, alignment: 8 }.validate().is_err());
     assert!(BackendLayout { size: 16, alignment: 3 }.validate().is_err());
+}
+
+#[test]
+fn validates_direct_aggregate_abi_fragments_for_parameters_and_returns() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let abi = BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![
+            BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Register { index: 0 },
+            },
+            BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Register { index: 1 },
+            },
+        ],
+        return_fragments: vec![
+            BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Register { index: 0 },
+            },
+            BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Stack { offset: 0 },
+            },
+        ],
+    };
+    assert!(abi.validate().is_ok());
+}
+
+#[test]
+fn rejects_direct_aggregate_abi_gaps_and_overlapping_locations() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let abi = BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![BackendAggregateFragment {
+            offset: 8,
+            size: 8,
+            alignment: 8,
+            location: BackendAggregateLocation::Register { index: 0 },
+        }],
+        return_fragments: vec![
+            BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Stack { offset: 0 },
+            },
+            BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Stack { offset: 4 },
+            },
+        ],
+    };
+    assert!(matches!(abi.validate(), Err(BackendContractError::InvalidAggregateAbi(_))));
 }
 
 #[test]

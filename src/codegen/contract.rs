@@ -401,6 +401,7 @@ pub enum BackendContractError {
     InvalidValueType,
     InvalidFailureType,
     InvalidMemoryCopy,
+    InvalidAggregateAbi(&'static str),
     InvalidCleanupContract(String),
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
@@ -464,6 +465,9 @@ impl std::fmt::Display for BackendContractError {
             }
             Self::InvalidMemoryCopy => {
                 formatter.write_str("backend memory copy requires a non-zero aligned extent")
+            }
+            Self::InvalidAggregateAbi(reason) => {
+                write!(formatter, "invalid direct aggregate ABI: {reason}")
             }
             Self::InvalidCleanupContract(reason) => {
                 write!(formatter, "invalid semantic cleanup contract: {reason}")
