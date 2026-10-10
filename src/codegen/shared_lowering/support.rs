@@ -1,40 +1,7 @@
-use crate::ast::{Expr, PrimitiveType, TypeName};
+use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 
-use super::super::{
-    BackendContractError, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
-};
-
-pub(super) fn scalar_type(
-    type_name: &TypeName,
-) -> Result<Option<BackendValueType>, BackendContractError> {
-    let ty = match type_name.name.as_str() {
-        "Bool" => BackendValueType::Bool,
-        "Int" => BackendValueType::Integer { signed: true, width: 32 },
-        "Usize" => BackendValueType::Integer { signed: false, width: 64 },
-        _ => match crate::ast::primitive_type(&type_name.name) {
-            Some(PrimitiveType::Integer { signed, width }) => {
-                BackendValueType::Integer { signed, width }
-            }
-            Some(PrimitiveType::Void) => return Ok(None),
-            Some(PrimitiveType::Float { .. }) => {
-                return Err(unsupported(
-                    type_name.span,
-                    "floating-point shared lowering is disabled",
-                ));
-            }
-            None => return Err(unsupported(type_name.span, "non-scalar type in scalar lowering")),
-        },
-    };
-    Ok(Some(ty))
-}
-
-pub(super) fn required_scalar_type(
-    type_name: &TypeName,
-) -> Result<BackendValueType, BackendContractError> {
-    scalar_type(type_name)?
-        .ok_or_else(|| unsupported(type_name.span, "unit type is not valid here"))
-}
+use super::super::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
 
 pub(super) fn parse_integer(value: &str) -> Option<u64> {
     value

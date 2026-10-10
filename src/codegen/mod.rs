@@ -48,6 +48,7 @@ pub use signature::{
     BackendLayoutProvider, BackendSignature, lower_verb, lower_verb_signature,
     lower_verb_with_cleanup, lower_verb_with_expressions,
 };
+pub(crate) use signature::{lower_parameter, lower_return};
 pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 #[cfg(feature = "cranelift")]

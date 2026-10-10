@@ -124,7 +124,7 @@ fn lower_verb_signature_as(
     Ok(BackendSignature { symbol, parameters, return_value })
 }
 
-fn lower_parameter(
+pub(crate) fn lower_parameter(
     parameter: &Param,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendParameter, BackendContractError> {
@@ -133,7 +133,7 @@ fn lower_parameter(
     Ok(BackendParameter { name: parameter.name.clone(), role: parameter.role.clone(), ty, passing })
 }
 
-fn lower_return(
+pub(crate) fn lower_return(
     return_type: Option<&ReturnType>,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendReturn, BackendContractError> {
