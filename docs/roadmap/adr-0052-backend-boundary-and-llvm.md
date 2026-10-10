@@ -150,9 +150,15 @@ only its type name.
 The LLVM hosted emitter lowers regular aggregate enum failures with an integer
 payload by materializing the declared layout, writing the discriminant and
 payload at their explicit byte offsets, and returning the aggregate directly
-or through the declared return slot. Niche-pointer representations remain an
-explicit unsupported case until their pointer sentinel and ownership rules
-are represented in the shared contract.
+or through the declared return slot. Niche-pointer representations are a
+private backend representation. The source language does not define a `null`
+literal or null-valued expression; source programs represent absence through
+the typed `Option::None` variant. When a target ABI uses a niche pointer, the
+selected backend may encode that typed state with a private pointer sentinel
+after semantic lowering. The sentinel must not appear in Actus source syntax,
+public Actus APIs, serialized state, or ownership rules. The source-level
+semantic suite rejects `null` as an undeclared identifier, while backend tests
+may inspect the private emitted representation.
 
 ### Direct aggregate ABI contract
 

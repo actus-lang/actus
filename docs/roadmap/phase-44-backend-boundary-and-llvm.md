@@ -416,7 +416,10 @@ bytes. Regular enum typed failures with an integer payload are also compared
 through a 16-byte aggregate return slot; both executables verify the
 discriminant and payload offsets. The focused suite contains 18 passing tests.
 The additional niche-pointer `Option::None` fixture links LLVM and Cranelift
-against the same C entry shim and verifies a null pointer from both executables.
+against the same C entry shim and verifies the private null-pointer sentinel
+from both executables. This sentinel is backend ABI state only: Actus source
+has no `null` literal, and `Option::None` remains the source-level absence
+variant; the semantic suite rejects `null` as an undeclared identifier.
 Direct aggregate register ABI, niche-pointer `Option::Some` payload lowering,
 ownership transitions, and runtime cleanup remain outside this evidence.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when

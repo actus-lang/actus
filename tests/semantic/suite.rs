@@ -38,6 +38,15 @@ fn rejects_undeclared_identifiers() {
 }
 
 #[test]
+fn rejects_null_as_a_source_level_value() {
+    let error = analyze_source("verb broken() { erg value = null; }")
+        .expect_err("null must not be a source-level Actus value");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::UndeclaredIdentifier { name } if name == "null")
+    );
+}
+
+#[test]
 fn validates_compound_assignments_as_typed_place_operations() {
     analyze_source("verb update(erg index: u32) { index += 1u32; index <<= 1u32; }")
         .expect("matching integer compound assignments should pass");
