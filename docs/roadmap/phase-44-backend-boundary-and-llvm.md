@@ -318,7 +318,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       argument mode, layout, and return-status metadata.
 - [x] Lower semantic binding types and moved-field sublayouts into complete
       cleanup bridge descriptors before backend emission.
-- [ ] Execute identical descriptor-driven cleanup fixtures through Cranelift
+- [x] Execute identical descriptor-driven cleanup fixtures through Cranelift
       and LLVM and compare status, call arguments, and cleanup ordering.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
@@ -379,9 +379,13 @@ layout regression now exercise the native registry for nested Buffer and Region
 fields. Cranelift production emission invokes this provider after native
 layouts are built and rejects invalid semantic cleanup metadata before object
 emission. Non-runtime semantic fields are excluded from the runtime descriptor
-set. The established native cleanup schedule remains the emission path;
-replacing it with the resolved descriptors and executing identical
-descriptor-driven fixtures through both backends remains open.
+set. The descriptor-driven hosted parity fixture now materializes both backend
+operands from the same resolved descriptors and links both objects against the
+same runtime shim. The shim verifies the exact Buffer and Region pointer
+arguments, the Region status, and Buffer-before-Region cleanup ordering; the
+fixture passes for both backends. Replacing the established native schedule
+with the resolved descriptors in the full semantic emission path remains a
+separate follow-up.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

@@ -93,7 +93,9 @@ registry with a regression test. Cranelift production emission invokes this
 provider after native layouts are built and fails before object emission when
 semantic cleanup metadata is invalid. Non-runtime fields are excluded from the
 runtime descriptor set. The semantic descriptor-lowering requirement is
-complete. The established Cranelift cleanup schedule remains the emission path
-until resolved descriptors replace it and identical descriptor-driven fixtures
-are executed through both backends.
+complete. A hosted parity fixture now materializes both backend operands from
+the same resolved descriptors and verifies exact pointer arguments, Region
+status, and Buffer-before-Region ordering through a shared runtime shim. The
+established Cranelift cleanup schedule remains the emission path until resolved
+descriptors replace it in the full semantic emission path.
 

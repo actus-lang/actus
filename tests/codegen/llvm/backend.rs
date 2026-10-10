@@ -7,10 +7,10 @@ use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendCleanupArgument, BackendCleanupBridge,
-    BackendCleanupOperand, BackendCleanupResult, BackendEnumLayout, BackendExternal,
-    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendModule,
-    BackendParameter, BackendReturn, BackendReturnMode, BackendValueId, BackendValueType,
-    LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    BackendCleanupOperand, BackendCleanupResolvedDescriptor, BackendCleanupResult,
+    BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
+    BackendLayout, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
+    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
 };
 use actus::configuration::CompilerConfiguration;
 use object::{Object, ObjectSection, ObjectSymbol};
@@ -1686,7 +1686,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
     let shim_source = root.join("entry.c");
     fs::write(
         &shim_source,
-        "#include <stdint.h>\nstatic int order; void actus_buffer_drop(void *value) { if (value != 0) order = order * 10 + 1; } int32_t actus_region_drop(void *value) { if (value != 0) order = order * 10 + 2; return value != 0 ? 0 : -1; } extern void test__verb_cleanup(void *, void *); int main(void) { uint64_t buffer = 1; uint64_t region = 2; test__verb_cleanup(&buffer, &region); return order == 12 ? 0 : 1; }\n",
+        "#include <stdint.h>\nstatic int order; static int status; static void *expected_buffer; static void *expected_region; void actus_buffer_drop(void *value) { if (value == expected_buffer) order = order * 10 + 1; else order = -1; } int32_t actus_region_drop(void *value) { if (value == expected_region) { order = order * 10 + 2; status = 0; } else { order = -1; status = -1; } return status; } extern void test__verb_cleanup(void *, void *); int main(void) { uint64_t buffer = 1; uint64_t region = 2; expected_buffer = &buffer; expected_region = &region; test__verb_cleanup(&buffer, &region); return order == 12 && status == 0 ? 0 : 1; }\n",
     )
     .expect("cleanup parity entry shim should be written");
     let shim_object = root.join("entry.o");
@@ -1703,18 +1703,26 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
         ty: pointer,
         passing: actus::codegen::BackendPassingMode::Direct,
     };
-    let cleanup_operand =
-        |value: BackendValueId,
-         bridge: BackendCleanupBridge,
-         argument: actus::codegen::BackendCleanupArgument,
-         result: BackendCleanupResult| BackendCleanupOperand {
-            value,
-            layout: pointer_layout,
-            field: None,
-            bridge,
-            argument,
-            result,
-        };
+    let buffer_descriptor = BackendCleanupResolvedDescriptor {
+        descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
+            bridge: BackendCleanupBridge::BufferDrop,
+            argument: BackendCleanupArgument::Value,
+            result: BackendCleanupResult::Ignored,
+        },
+        layout: pointer_layout,
+        field: None,
+    };
+    let region_descriptor = BackendCleanupResolvedDescriptor {
+        descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
+            bridge: BackendCleanupBridge::RegionDrop,
+            argument: BackendCleanupArgument::Address,
+            result: BackendCleanupResult::Status,
+        },
+        layout: pointer_layout,
+        field: None,
+    };
+    buffer_descriptor.validate().expect("buffer descriptor should validate");
+    region_descriptor.validate().expect("region descriptor should validate");
     let module = BackendModule {
         externals: Vec::new(),
         functions: vec![BackendFunction {
@@ -1734,12 +1742,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
                             binding_index: 0,
                             name: "buffer".to_owned(),
                         },
-                        operand: Some(cleanup_operand(
-                            BackendValueId(0),
-                            BackendCleanupBridge::BufferDrop,
-                            actus::codegen::BackendCleanupArgument::Value,
-                            BackendCleanupResult::Ignored,
-                        )),
+                        operand: Some(buffer_descriptor.operand(BackendValueId(0))),
                         span: actus::lexer::SourceSpan::new(0, 1),
                     },
                     BackendInstruction::Cleanup {
@@ -1747,12 +1750,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
                             binding_index: 1,
                             name: "region".to_owned(),
                         },
-                        operand: Some(cleanup_operand(
-                            BackendValueId(1),
-                            BackendCleanupBridge::RegionDrop,
-                            actus::codegen::BackendCleanupArgument::Address,
-                            BackendCleanupResult::Status,
-                        )),
+                        operand: Some(region_descriptor.operand(BackendValueId(1))),
                         span: actus::lexer::SourceSpan::new(1, 2),
                     },
                     BackendInstruction::Return {
