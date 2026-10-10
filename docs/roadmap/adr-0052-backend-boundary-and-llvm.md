@@ -295,6 +295,15 @@ Other linker flavors reject this option until their script syntax and
 acceptance contract are defined. The configuration and plan test proves only
 argument construction, not successful ARM image linking.
 
+The LLVM fixture now performs a real minimal freestanding link using an
+Actus-generated `thumbv7em-none-eabihf` object, explicit Thumb startup and
+`__aeabi_unwind_cpp_pr0` provider objects, and a pinned `memory.x` script.
+The resulting ARM ELF is parsed for its vector table, `.text`, startup symbol,
+Actus entry symbol, and absence of undefined symbols. The acceptance record is
+LLVM/Clang 23.1.1, rust-lld LLD 22.1.8, and target triple
+`thumbv7em-none-eabihf`. This proves image linking only; target execution and
+hardware fault evidence remain open.
+
 ### Semantic preservation
 
 Ownership roles, cleanup order, typed failures, enum discriminants, aggregate

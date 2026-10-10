@@ -466,11 +466,11 @@ states the host and evidence limits explicitly.
       arguments and return values before external C interoperability.
 - [x] Add ABI fixtures for scalar and aggregate calls in both directions.
 - [x] Generate ARM32/Thumb objects through the LLVM backend.
-- [ ] Link a minimal freestanding image with the explicit runtime provider.
+- [x] Link a minimal freestanding image with the explicit runtime provider.
 - [ ] Add object-level checks for relocations, symbols, sections, alignment,
       and forbidden hosted imports.
 - [ ] Add emulator or target execution evidence for the minimal image.
-- [ ] Record the exact LLVM, assembler, linker, target triple, and linker-script
+- [x] Record the exact LLVM, assembler, linker, target triple, and linker-script
       versions used by the acceptance run.
 
 ### Gate 44.6 progress
@@ -500,6 +500,17 @@ for the GNU linker flavor. Configuration tests verify the resolved path and
 the deterministic linker-plan argument. This provides the configuration
 boundary; it does not claim that the script, startup object, or runtime
 provider links successfully.
+
+The LLVM integration suite now links a minimal freestanding ARM ELF image.
+The fixture combines an Actus-generated `thumbv7em-none-eabihf` object, an
+explicit Thumb startup object, an explicit `__aeabi_unwind_cpp_pr0` provider,
+and a pinned test-local `memory.x` script. The parsed image contains the
+vector table, `.text`, `Reset_Handler`, and the Actus entry symbol, with no
+undefined symbols. The recorded toolchain is LLVM/Clang 23.1.1 for assembly
+and object generation, rust-lld LLD 22.1.8 for linking, and target triple
+`thumbv7em-none-eabihf`; the linker script content is pinned directly in the
+fixture. This is link evidence only and does not claim emulator or hardware
+execution.
 
 The representation contract now covers one-word scalar values in `r0` and
 stack-spilled aggregates with explicit byte size, alignment, and offset. An

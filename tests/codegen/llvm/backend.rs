@@ -793,6 +793,78 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-llvm-arm-image-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("ARM image fixture directory should be created");
+    let startup = root.join("startup.s");
+    fs::write(
+        &startup,
+        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.word _estack\n.word Reset_Handler + 1\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+    )
+    .expect("ARM startup source should be written");
+    let linker_script = root.join("memory.x");
+    fs::write(
+        &linker_script,
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  .isr_vector : { KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+    )
+    .expect("ARM linker script should be written");
+    let startup_object = root.join("startup.o");
+    let actus_object = root.join("boot.o");
+    let image = root.join("image.elf");
+
+    run_native_command(
+        Command::new("clang")
+            .args(["--target=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-mthumb", "-c"])
+            .arg(&startup)
+            .arg("-o")
+            .arg(&startup_object),
+    );
+
+    let symbol = SymbolIdentity::new("arm", SymbolKind::Verb, "boot").expect("valid ARM symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
+        .expect("Cortex-M target should parse");
+    emit_object(&module, &target, &actus_object).expect("ARM Actus object should be emitted");
+
+    run_native_command(
+        Command::new("rust-lld")
+            .args(["-flavor", "gnu", "-T"])
+            .arg(&linker_script)
+            .arg(&startup_object)
+            .arg(&actus_object)
+            .arg("-o")
+            .arg(&image),
+    );
+
+    let bytes = fs::read(&image).expect("ARM image should be readable");
+    let object = object::File::parse(bytes.as_slice()).expect("ARM image should parse");
+    assert_eq!(object.architecture(), object::Architecture::Arm);
+    assert!(object.section_by_name(".isr_vector").is_some());
+    assert!(object.section_by_name(".text").is_some());
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("Reset_Handler")));
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("arm__verb_boot")));
+    assert!(object.symbols().all(|symbol| !symbol.is_undefined()));
+    remove_fixture(&root, [&startup, &linker_script, &startup_object, &actus_object, &image]);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn links_and_runs_a_host_object_through_the_shared_linker() {
     use std::process::Command;
 
