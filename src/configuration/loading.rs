@@ -94,6 +94,7 @@ fn build_from_manifest(
     dependency_graph: super::dependencies::DependencyGraph,
     environment: CompilerConfiguration,
 ) -> Result<CompilerConfiguration, ConfigurationError> {
+    let explicit_backend = manifest.build.backend.is_some();
     let (target, linker_flavor, entry_contract, linker) =
         resolve_manifest_target(&manifest, &environment)?;
     let time_provider = resolve_time_provider(&manifest, entry_contract)?;
@@ -109,10 +110,12 @@ fn build_from_manifest(
     let source_root = validated_source_root(&manifest, manifest_directory)?;
     let (profile, native_backend, libraries, library_paths, linker_script) =
         build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
-    native_backend
-        .backend()
-        .validate_target(&target)
-        .map_err(|error| ConfigurationError(error.to_string()))?;
+    if explicit_backend {
+        native_backend
+            .backend()
+            .validate_target(&target)
+            .map_err(|error| ConfigurationError(error.to_string()))?;
+    }
     Ok(CompilerConfiguration {
         project_root: manifest_directory.to_path_buf(),
         source_root,

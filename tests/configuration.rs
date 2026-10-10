@@ -130,6 +130,39 @@ fn loads_the_explicit_llvm_backend_from_an_actus_manifest() {
     let _ = fs::remove_file(path);
 }
 
+#[test]
+fn rejects_unknown_backend_names() {
+    let path = std::env::temp_dir()
+        .join(format!("actus-config-unknown-backend-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"backend\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"unknown\"\n",
+    )
+    .expect("write backend manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path)
+        .expect_err("unknown backend names must be rejected");
+    assert!(error.to_string().contains("unknown variant"));
+    let _ = fs::remove_file(path);
+}
+
+#[cfg(not(feature = "llvm"))]
+#[test]
+fn rejects_llvm_backend_when_the_feature_is_disabled() {
+    let path = std::env::temp_dir()
+        .join(format!("actus-config-llvm-disabled-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"backend\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write backend manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path)
+        .expect_err("LLVM must be rejected when its feature is disabled");
+    assert!(error.to_string().contains("backend `llvm` is not available"));
+    let _ = fs::remove_file(path);
+}
+
 #[cfg(feature = "cranelift")]
 #[test]
 fn defaults_to_cranelift_as_the_native_backend() {
