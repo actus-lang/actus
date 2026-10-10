@@ -289,6 +289,9 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       same Actus layout rules as Cranelift.
 - [x] Add regular enum discriminant and integer-payload lowering through the
       declared aggregate `ReturnSlot` contract.
+- [x] Define and validate a target-aware direct aggregate ABI descriptor for
+      register fragments, stack fragments, alignment, and complete layout
+      coverage.
 - [ ] Add direct aggregate ABI and niche-pointer `Option` lowering using the
       same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
@@ -351,6 +354,11 @@ descriptor defines register fragments, stack placement, padding, alignment,
 caller/callee lowering, and the matching external C declaration. Aggregate
 size alone is not sufficient to infer this contract, and no direct aggregate
 shape is silently rewritten as an indirect pointer.
+The neutral contract now provides `BackendDirectAggregateAbi` with separate
+parameter and return fragment descriptions. Validation rejects gaps,
+misaligned ranges, duplicate register indices, overlapping stack ranges, and
+descriptors that do not cover the complete aggregate layout. This closes the
+metadata and validation sub-step; it does not claim backend emission support.
 Neutral `BackendExternal` declarations are emitted with the same validated
 symbol identity and signature contract as internal functions. The LLVM suite
 also covers an external runtime-style declaration and call, including the
