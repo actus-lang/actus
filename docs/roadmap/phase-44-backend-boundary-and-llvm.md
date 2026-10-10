@@ -312,7 +312,8 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       fixtures.
 - [x] Require explicit value-bearing neutral cleanup operands before backend
       lowering.
-- [ ] Define field sublayouts and runtime bridge calls for ownership cleanup.
+- [x] Define bounds-checked field sublayouts for ownership cleanup operands.
+- [ ] Emit and execute runtime bridge calls for ownership cleanup.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
