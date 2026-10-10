@@ -59,6 +59,9 @@ fn simple_message(error: &BackendContractError) -> Option<&'static str> {
         BackendContractError::InvalidCleanupOperand => {
             "runtime cleanup requires an explicit lowered value operand"
         }
+        BackendContractError::InvalidCleanupPlan => {
+            "backend cleanup plan actions and bridge descriptors must have equal length"
+        }
         BackendContractError::InvalidCallSymbol => "backend call has an empty symbol",
         BackendContractError::RolePassingMismatch => {
             "backend parameter role and passing mode disagree"

@@ -226,8 +226,16 @@ impl BackendFunction {
         validate_signature(&self.parameters, &self.return_value)?;
         let block_ids = validate_blocks(&self.blocks, self.entry)?;
         validate_instructions(&self.blocks, &block_ids)?;
+        validate_cleanup_plans(&self.cleanup)?;
         Ok(())
     }
+}
+
+fn validate_cleanup_plans(plans: &[BackendCleanupPlan]) -> Result<(), BackendContractError> {
+    if plans.iter().any(|plan| plan.actions.len() != plan.bridges.len()) {
+        return Err(BackendContractError::InvalidCleanupPlan);
+    }
+    Ok(())
 }
 
 fn validate_signature(
@@ -423,6 +431,7 @@ pub enum BackendContractError {
     InvalidMemoryCopy,
     InvalidAggregateAbi(&'static str),
     InvalidCleanupContract(String),
+    InvalidCleanupPlan,
     InvalidCleanupOperand,
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,

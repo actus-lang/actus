@@ -681,6 +681,10 @@ resolution now lives in `branches.rs`, while the explicit unsupported cleanup
 boundary lives in `cleanup.rs`; module construction and function assembly live
 in `module.rs`. This is a structural
 maintainability step and does not claim LLVM and Cranelift feature parity.
+Neutral cleanup plans now also require one bridge descriptor per cleanup action;
+the contract rejects misaligned action and descriptor sequences before backend
+emission. This prevents a backend from silently dropping or reordering a
+runtime cleanup operation.
 
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute

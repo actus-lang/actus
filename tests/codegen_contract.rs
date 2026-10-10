@@ -1018,6 +1018,28 @@ fn preserves_cleanup_plans_on_the_neutral_function_contract() {
 }
 
 #[test]
+fn rejects_cleanup_plans_without_one_bridge_descriptor_per_action() {
+    let error = lower_verb_with_cleanup(
+        "app",
+        &verb_with_signature(),
+        &TestLayouts,
+        &TestBodyProvider,
+        BackendBlockId(0),
+        vec![actus::codegen::BackendCleanupPlan {
+            depth: 1,
+            span: SourceSpan::new(0, 1),
+            actions: vec![BackendCleanupAction::DropBinding {
+                binding_index: 0,
+                name: "resource".to_owned(),
+            }],
+            bridges: Vec::new(),
+        }],
+    )
+    .expect_err("misaligned cleanup plans must be rejected");
+    assert_eq!(error, BackendContractError::InvalidCleanupPlan);
+}
+
+#[test]
 fn lowers_typed_failures_without_backend_specific_handles() {
     let mut verb = verb_with_signature();
     verb.body = Block {
