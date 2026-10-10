@@ -414,5 +414,35 @@ mod tests {
                 crate::codegen::BackendInstruction::Call { result: Some(_), .. }
             )
         ));
+        assert!(
+            main.blocks
+                .iter()
+                .flat_map(|block| block.instructions.iter())
+                .all(|instruction| !matches!(instruction, BackendInstruction::Cleanup { .. }))
+        );
+    }
+
+    #[test]
+    fn lowers_buffer_cleanup_before_shared_return() {
+        let source = "verb inspect(erg buffer: Buffer) { return; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("Buffer fixture should parse");
+        let module =
+            super::super::lower_program_to_backend_module("actus_root", &program, None, None)
+                .expect("Buffer cleanup should lower through the shared pipeline");
+        assert!(matches!(
+            module.functions[0].blocks[0].instructions.as_slice(),
+            [BackendInstruction::Cleanup { .. }, BackendInstruction::Return { value: None, .. }]
+        ));
+        assert!(
+            module.functions[0]
+                .cleanup
+                .iter()
+                .flat_map(|plan| { plan.resolved_bridges.iter().flatten() })
+                .any(|descriptor| {
+                    descriptor.descriptor.bridge == super::BackendCleanupBridge::BufferDrop
+                })
+        );
     }
 }
