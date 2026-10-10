@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildMul, LLVMBuildOr, LLVMBuildSub,
-    LLVMBuildXor,
+    LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildMul, LLVMBuildOr, LLVMBuildSDiv,
+    LLVMBuildSRem, LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildXor,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -18,7 +18,7 @@ pub(super) fn emit_integer_binary(
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let BackendInstruction::IntegerBinary { result, operation, left, right, .. } = instruction
+    let BackendInstruction::IntegerBinary { result, operation, left, right, ty, .. } = instruction
     else {
         return Err(BackendEmitError("LLVM integer operation expected".to_owned()));
     };
@@ -38,6 +38,20 @@ pub(super) fn emit_integer_binary(
             }
             BackendIntegerBinaryOp::Multiply => {
                 LLVMBuildMul(builder, left, right, b"actus.mul\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::Divide => {
+                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) {
+                    LLVMBuildSDiv(builder, left, right, b"actus.sdiv\0".as_ptr().cast())
+                } else {
+                    LLVMBuildUDiv(builder, left, right, b"actus.udiv\0".as_ptr().cast())
+                }
+            }
+            BackendIntegerBinaryOp::Remainder => {
+                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) {
+                    LLVMBuildSRem(builder, left, right, b"actus.srem\0".as_ptr().cast())
+                } else {
+                    LLVMBuildURem(builder, left, right, b"actus.urem\0".as_ptr().cast())
+                }
             }
             BackendIntegerBinaryOp::BitwiseAnd => {
                 LLVMBuildAnd(builder, left, right, b"actus.and\0".as_ptr().cast())

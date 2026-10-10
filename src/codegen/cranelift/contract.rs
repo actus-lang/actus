@@ -10,7 +10,9 @@ use super::aggregate::{
     Declaration, aggregate_fragment_type, declaration, direct_aggregate_types, initialize_values,
     lower_call,
 };
-use super::integer_ops::{lower_integer_binary, lower_integer_compare, lower_integer_unary};
+use super::integer_ops::{
+    lower_integer_binary, lower_integer_compare, lower_integer_unary, lower_trap_if_zero,
+};
 use super::native::BackendEmitError;
 use super::object::create_module;
 use crate::codegen::{
@@ -246,6 +248,7 @@ fn lower_instruction(
         BackendInstruction::IntegerBinary { .. } => {
             lower_integer_binary(builder, instruction, values)
         }
+        BackendInstruction::TrapIfZero { .. } => lower_trap_if_zero(builder, instruction, values),
         BackendInstruction::IntegerCompare { .. } => {
             lower_integer_compare(builder, instruction, values)
         }

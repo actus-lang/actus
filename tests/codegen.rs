@@ -10,3 +10,5 @@ mod model;
 mod native;
 #[path = "codegen/program.rs"]
 mod program;
+#[path = "codegen/shared_lowering.rs"]
+mod shared_lowering;

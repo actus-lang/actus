@@ -37,6 +37,8 @@ pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
+#[doc(hidden)]
+pub use shared_lowering::lower_scalar_program;
 pub(crate) use shared_lowering::lower_scalar_program_with_bindings;
 pub(crate) use signature::lower_verb_with_expressions_as;
 pub use signature::{

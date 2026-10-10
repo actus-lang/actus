@@ -1,9 +1,9 @@
-use super::lower_scalar_program;
-use crate::codegen::{
+use actus::codegen::lower_scalar_program;
+use actus::codegen::{
     BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp,
 };
-use crate::lexer::scan;
-use crate::parser::parse;
+use actus::lexer::scan;
+use actus::parser::parse;
 
 #[test]
 fn lowers_scalar_return_from_parsed_program() {
@@ -58,6 +58,39 @@ fn lowers_scalar_bitwise_operations_into_neutral_ir() {
                 BackendInstruction::IntegerBinary { operation: actual, .. } if *actual == operation
             )
         ));
+    }
+}
+
+#[test]
+fn lowers_scalar_division_and_remainder_with_zero_guards() {
+    let cases =
+        [("20 / 5", BackendIntegerBinaryOp::Divide), ("20 % 6", BackendIntegerBinaryOp::Remainder)];
+    for (expression, operation) in cases {
+        let source = format!("verb main() -> Int {{ return {expression}; }}");
+        let (tokens, errors) = scan(&source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("scalar division fixture should parse");
+        let module = lower_scalar_program("actus_root", &program, None)
+            .expect("scalar division expression should lower");
+        let instructions = module.functions[0]
+            .blocks
+            .iter()
+            .flat_map(|block| block.instructions.iter())
+            .collect::<Vec<_>>();
+        let guard_index = instructions
+            .iter()
+            .position(|instruction| matches!(instruction, BackendInstruction::TrapIfZero { .. }))
+            .expect("division must have a zero guard");
+        let operation_index = instructions
+            .iter()
+            .position(|instruction| {
+                matches!(
+                    instruction,
+                    BackendInstruction::IntegerBinary { operation: actual, .. } if *actual == operation
+                )
+            })
+            .expect("division operation must be present");
+        assert!(guard_index < operation_index, "zero guard must precede division");
     }
 }
 

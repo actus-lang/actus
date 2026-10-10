@@ -643,6 +643,15 @@ boundary explicitly. The LLVM CLI fixture
 the LLVM CLI fixture
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.
+The shared scalar contract now also lowers integer division and remainder with
+an explicit `TrapIfZero` guard before the arithmetic instruction. Both
+Cranelift and LLVM lower that guard to a terminating zero-divisor path; the
+LLVM CLI regression `llvm_backend_builds_and_runs_checked_scalar_division_and_remainder`
+executes `20 / 5 + 17 % 6` and verifies the result. The neutral regression
+`lowers_scalar_division_and_remainder_with_zero_guards` verifies the ordering
+of each guard and its arithmetic operation. Signed division overflow handling,
+shift operations, and short-circuit logical operators remain separate contract
+work and are not implied by this evidence.
 This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.

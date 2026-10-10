@@ -25,8 +25,8 @@ impl BackendLayoutProvider for ScalarLayouts {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn lower_scalar_program(
+#[doc(hidden)]
+pub fn lower_scalar_program(
     namespace: &str,
     program: &Program,
     entry_name: Option<&str>,
@@ -281,6 +281,13 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError> {
+        if matches!(operation, BackendIntegerBinaryOp::Divide | BackendIntegerBinaryOp::Remainder) {
+            instructions.push(BackendInstruction::TrapIfZero {
+                value: right,
+                reason: "integer division or remainder by zero".to_owned(),
+                span,
+            });
+        }
         let result = self.allocate();
         instructions.push(BackendInstruction::IntegerBinary {
             result,
@@ -393,6 +400,8 @@ impl ScalarExpressionProvider<'_> {
             BinaryOp::Add => BackendIntegerBinaryOp::Add,
             BinaryOp::Subtract => BackendIntegerBinaryOp::Subtract,
             BinaryOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            BinaryOp::Divide => BackendIntegerBinaryOp::Divide,
+            BinaryOp::Remainder => BackendIntegerBinaryOp::Remainder,
             BinaryOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
             BinaryOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
             BinaryOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
@@ -411,16 +420,7 @@ impl ScalarExpressionProvider<'_> {
                 ));
             }
         };
-        let result = self.allocate();
-        instructions.push(BackendInstruction::IntegerBinary {
-            result,
-            operation,
-            left,
-            right,
-            ty: BackendValueType::Integer { signed: true, width: 32 },
-            span: *span,
-        });
-        Ok(result)
+        self.lower_integer_binary(operation, left, right, *span, instructions)
     }
 
     fn lower_compare(
@@ -475,6 +475,3 @@ impl ScalarExpressionProvider<'_> {
         result.ok_or_else(|| unsupported(*span, "unit call cannot produce a value"))
     }
 }
-
-#[cfg(test)]
-mod tests;

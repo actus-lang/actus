@@ -271,6 +271,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
             CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
             CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
+            CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
             CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
             CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
             CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,

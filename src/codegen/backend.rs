@@ -9,6 +9,8 @@ pub enum BackendIntegerBinaryOp {
     Add,
     Subtract,
     Multiply,
+    Divide,
+    Remainder,
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,

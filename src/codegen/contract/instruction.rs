@@ -23,6 +23,11 @@ pub enum BackendInstruction {
         ty: BackendValueType,
         span: SourceSpan,
     },
+    TrapIfZero {
+        value: super::BackendValueId,
+        reason: String,
+        span: SourceSpan,
+    },
     IntegerCompare {
         result: super::BackendValueId,
         operation: BackendIntegerCompareOp,

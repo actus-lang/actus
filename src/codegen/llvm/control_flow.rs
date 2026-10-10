@@ -17,6 +17,7 @@ use super::super::{
 };
 use super::calls::emit_call;
 use super::declarations::FunctionDeclaration;
+use super::guards::emit_trap_if_zero;
 use super::integer_ops::{emit_integer_binary, emit_integer_compare, emit_integer_unary};
 use super::returns::emit_return;
 
@@ -85,16 +86,13 @@ fn emit_instruction(
 ) -> Result<bool, BackendEmitError> {
     match instruction {
         BackendInstruction::Constant { result, ty, value, .. } => {
-            let llvm_type = super::values::llvm_type(context, *ty)?;
-            let constant = unsafe { LLVMConstInt(llvm_type, *value, 0) };
-            if constant.is_null() {
-                return Err(BackendEmitError("LLVM failed to create integer constant".to_owned()));
-            }
-            values.insert(*result, constant);
-            Ok(false)
+            emit_constant(context, *result, *ty, *value, values)
         }
         BackendInstruction::IntegerBinary { .. } => {
             emit_integer_binary(builder, instruction, values)
+        }
+        BackendInstruction::TrapIfZero { .. } => {
+            emit_trap_if_zero(context, builder, declaration.value, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
             emit_integer_compare(builder, instruction, values)
@@ -129,6 +127,22 @@ fn emit_instruction(
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
         }
     }
+}
+
+fn emit_constant(
+    context: llvm_sys::prelude::LLVMContextRef,
+    result: BackendValueId,
+    ty: BackendValueType,
+    value: u64,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let llvm_type = super::values::llvm_type(context, ty)?;
+    let constant = unsafe { LLVMConstInt(llvm_type, value, 0) };
+    if constant.is_null() {
+        return Err(BackendEmitError("LLVM failed to create integer constant".to_owned()));
+    }
+    values.insert(result, constant);
+    Ok(false)
 }
 
 fn emit_failure(
