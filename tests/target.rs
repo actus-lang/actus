@@ -69,10 +69,18 @@ fn arm32_target_profile_declares_the_supported_thumb_mode() {
         TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
     assert_eq!(embedded.arm32_profile(), Some(actus::target::Arm32TargetProfile::CortexMv7em));
     assert_eq!(embedded.arm_instruction_mode(), Some(actus::target::ArmInstructionMode::Thumb2));
+    let abi = embedded.arm32_abi_contract().expect("ARM ABI should be defined");
+    assert_eq!(abi.word_bytes, 4);
+    assert_eq!(abi.pointer_width_bits, 32);
+    assert_eq!(abi.stack_alignment_bytes, 8);
+    assert_eq!(abi.argument_registers, [0, 1, 2, 3]);
+    assert_eq!(abi.return_registers, [0, 1]);
+    assert_eq!(abi.callee_saved_registers, [4, 5, 6, 7, 8, 9, 10, 11]);
 
     let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("host target should parse");
     assert_eq!(hosted.arm32_profile(), None);
     assert_eq!(hosted.arm_instruction_mode(), None);
+    assert_eq!(hosted.arm32_abi_contract(), None);
 }
 
 #[test]

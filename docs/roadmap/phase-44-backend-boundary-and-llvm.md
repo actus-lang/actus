@@ -482,6 +482,12 @@ the Cortex-M calling convention, register assignment, stack alignment, and
 freestanding image acceptance remain open under the following Gate 44.6
 checks.
 
+The profile now also exposes the base AAPCS contract: 32-bit words and
+pointers, `r0-r3` argument registers, `r0-r1` return registers, `r4-r11`
+callee-saved registers, and 8-byte stack alignment. Aggregate register/stack
+classification, runtime-provider wiring, and linker-script acceptance remain
+separate checks below.
+
 ## Gate 44.7 — External C ABI and runtime interoperability
 
 - [ ] Define the stable Actus-to-C ABI boundary for external libraries and

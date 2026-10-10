@@ -246,6 +246,12 @@ must encode the selected ARM AAPCS rules, including argument registers,
 callee-saved registers, aggregate passing, aggregate returns, and 8-byte stack
 alignment.
 
+The typed ARM ABI contract currently records the base AAPCS facts used by the
+profile: 32-bit words and pointers, `r0-r3` argument registers, `r0-r1`
+return registers, `r4-r11` callee-saved registers, and 8-byte stack alignment.
+Aggregate classification and freestanding runtime/linker integration require
+their own acceptance evidence before they are considered supported.
+
 The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
 `CortexMv7em` target profile and `Thumb2` instruction mode. This profile
 identifies the Cortex-M v7E-M architecture family; it does not by itself claim

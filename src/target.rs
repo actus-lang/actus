@@ -62,6 +62,29 @@ pub enum Arm32TargetProfile {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Arm32AbiContract {
+    pub word_bytes: u8,
+    pub pointer_width_bits: u8,
+    pub stack_alignment_bytes: u8,
+    pub argument_registers: [u8; 4],
+    pub return_registers: [u8; 2],
+    pub callee_saved_registers: [u8; 8],
+}
+
+impl Arm32AbiContract {
+    pub const fn cortex_mv7em() -> Self {
+        Self {
+            word_bytes: 4,
+            pointer_width_bits: 32,
+            stack_alignment_bytes: 8,
+            argument_registers: [0, 1, 2, 3],
+            return_registers: [0, 1],
+            callee_saved_registers: [4, 5, 6, 7, 8, 9, 10, 11],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TargetArtifactContract {
     pub object_format: BinaryFormat,
     pub linker_flavor: LinkerFlavor,
@@ -242,6 +265,13 @@ impl TargetSpec {
     pub const fn arm_instruction_mode(&self) -> Option<ArmInstructionMode> {
         match self.arm32_profile() {
             Some(_) => Some(ArmInstructionMode::Thumb2),
+            None => None,
+        }
+    }
+
+    pub const fn arm32_abi_contract(&self) -> Option<Arm32AbiContract> {
+        match self.arm32_profile() {
+            Some(Arm32TargetProfile::CortexMv7em) => Some(Arm32AbiContract::cortex_mv7em()),
             None => None,
         }
     }
