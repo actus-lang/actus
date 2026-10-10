@@ -1,4 +1,5 @@
 pub(super) mod abi;
+pub(super) mod aggregate;
 pub(super) mod arenas;
 pub(super) mod arrays;
 pub(super) mod buffer_index;

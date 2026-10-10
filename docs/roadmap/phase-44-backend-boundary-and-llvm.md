@@ -365,9 +365,10 @@ descriptors that do not cover the complete aggregate layout. The descriptor is
 now carried explicitly by `DirectAggregate` parameter and return modes, and a
 scalar cannot use that mode. LLVM hosted lowering accepts the explicit mode
 and preserves the aggregate value type without applying pointer-only alignment
-attributes. Cranelift currently returns a stable unsupported diagnostic for
-this mode until its fragmented aggregate value mapping is implemented; no
-implicit pointer rewrite is used.
+attributes. Cranelift now lowers the hosted contiguous-register slice by
+mapping each declared fragment to one native integer parameter or return value.
+Stack fragments and non-contiguous register assignments return stable
+unsupported diagnostics; no implicit pointer rewrite is used.
 Niche-pointer enum metadata is also restricted to pointer-sized,
 zero-offset layouts with no inline payload. Native pointer-sentinel lowering
 for `Option::None` and pointer payloads for `Option::Some` are covered by the

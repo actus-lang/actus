@@ -6,6 +6,7 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
+use super::aggregate::{aggregate_fragment_type, direct_aggregate_types, initialize_values};
 use super::native::BackendEmitError;
 use super::object::create_module;
 use crate::codegen::{
@@ -63,8 +64,9 @@ fn signature(
 ) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     let mut signature = module.make_signature();
     for parameter in parameters {
-        let ty = parameter_type(module, parameter)?;
-        signature.params.push(AbiParam::new(ty));
+        for ty in parameter_types(module, parameter)? {
+            signature.params.push(AbiParam::new(ty));
+        }
     }
     match &return_value.passing {
         crate::codegen::BackendReturnMode::Direct => {
@@ -72,11 +74,10 @@ fn signature(
                 signature.returns.push(AbiParam::new(ty));
             }
         }
-        crate::codegen::BackendReturnMode::DirectAggregate { .. } => {
-            return Err(BackendEmitError(
-                "Cranelift direct aggregate ABI lowering is not implemented for this target"
-                    .to_owned(),
-            ));
+        crate::codegen::BackendReturnMode::DirectAggregate { abi } => {
+            for ty in direct_aggregate_types(module, abi, false)? {
+                signature.returns.push(AbiParam::new(ty));
+            }
         }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
             if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } if value_layout == *layout)
@@ -92,17 +93,17 @@ fn signature(
     Ok(signature)
 }
 
-fn parameter_type(
+fn parameter_types(
     module: &ObjectModule,
     parameter: &crate::codegen::BackendParameter,
-) -> Result<Type, BackendEmitError> {
+) -> Result<Vec<Type>, BackendEmitError> {
     match &parameter.passing {
-        BackendPassingMode::Direct => scalar_type(module, parameter.ty)?.ok_or_else(|| {
-            BackendEmitError("Cranelift direct unit parameters are not supported".to_owned())
-        }),
-        BackendPassingMode::DirectAggregate { .. } => Err(BackendEmitError(
-            "Cranelift direct aggregate ABI lowering is not implemented for this target".to_owned(),
-        )),
+        BackendPassingMode::Direct => {
+            scalar_type(module, parameter.ty)?.map(|ty| vec![ty]).ok_or_else(|| {
+                BackendEmitError("Cranelift direct unit parameters are not supported".to_owned())
+            })
+        }
+        BackendPassingMode::DirectAggregate { abi } => direct_aggregate_types(module, abi, true),
         BackendPassingMode::Indirect { layout }
         | BackendPassingMode::Borrowed { layout }
         | BackendPassingMode::ExclusiveLoan { layout }
@@ -114,7 +115,7 @@ fn parameter_type(
                 | BackendValueType::Region { layout: value_layout }
                     if value_layout == *layout =>
                 {
-                    Ok(module.isa().pointer_type())
+                    Ok(vec![module.isa().pointer_type()])
                 }
                 BackendValueType::Aggregate { .. }
                 | BackendValueType::Region { .. }
@@ -179,7 +180,8 @@ fn define_function(
             BackendEmitError("Cranelift neutral contract entry block is missing".to_owned())
         })?;
         builder.switch_to_block(entry);
-        let (return_slot, mut values) = initialize_values(&mut builder, entry, function);
+        let (return_slot, mut values, aggregate_values) =
+            initialize_values(&mut builder, entry, function)?;
         for block in &function.blocks {
             let native_block = blocks.get(&block.id).copied().ok_or_else(|| {
                 BackendEmitError("Cranelift neutral contract block is missing".to_owned())
@@ -194,6 +196,8 @@ fn define_function(
                     &blocks,
                     return_slot,
                     &mut values,
+                    &aggregate_values,
+                    function,
                 )?;
             }
         }
@@ -214,30 +218,6 @@ fn create_blocks(
     function.blocks.iter().map(|block| (block.id, builder.create_block())).collect()
 }
 
-fn initialize_values(
-    builder: &mut FunctionBuilder<'_>,
-    entry: Block,
-    function: &BackendFunction,
-) -> (Option<cranelift_codegen::ir::Value>, BTreeMap<BackendValueId, cranelift_codegen::ir::Value>)
-{
-    builder.append_block_params_for_function_params(entry);
-    let block_params = builder.block_params(entry).to_vec();
-    let return_slot = matches!(
-        &function.return_value.passing,
-        crate::codegen::BackendReturnMode::ReturnSlot { .. }
-    )
-    .then(|| block_params.first().copied())
-    .flatten();
-    let parameter_offset = usize::from(return_slot.is_some());
-    let values = block_params
-        .into_iter()
-        .skip(parameter_offset)
-        .enumerate()
-        .map(|(index, value)| (BackendValueId(index as u32), value))
-        .collect();
-    (return_slot, values)
-}
-
 fn lower_instruction(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -246,6 +226,8 @@ fn lower_instruction(
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
     return_slot: Option<cranelift_codegen::ir::Value>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+    function: &BackendFunction,
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::Call { .. } => {
@@ -253,7 +235,9 @@ fn lower_instruction(
         }
         BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
         BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
-        BackendInstruction::Return { .. } => lower_return(builder, instruction, values),
+        BackendInstruction::Return { .. } => {
+            lower_return(builder, instruction, function, values, aggregate_values)
+        }
         BackendInstruction::Fail { .. } => {
             lower_failure(module.isa().pointer_type(), builder, instruction, return_slot, values)
         }
@@ -365,7 +349,7 @@ fn lower_failure(
     let slot = return_slot.ok_or_else(|| {
         BackendEmitError("Cranelift typed failure requires a return slot".to_owned())
     })?;
-    let discriminant_type = integer_type(failure.layout.discriminant_size)?;
+    let discriminant_type = aggregate_fragment_type(failure.layout.discriminant_size)?;
     let discriminant = builder.ins().iconst(discriminant_type, i64::from(failure.discriminant));
     builder.ins().store(
         MemFlagsData::new(),
@@ -420,11 +404,6 @@ fn lower_niche_failure(
     Ok(())
 }
 
-fn integer_type(size: u8) -> Result<Type, BackendEmitError> {
-    Type::int(u16::from(size) * 8)
-        .ok_or_else(|| BackendEmitError("Cranelift integer width is invalid".to_owned()))
-}
-
 fn lower_call(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -461,11 +440,28 @@ fn lower_call(
 fn lower_return(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
+    function: &BackendFunction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::Return { value, .. } = instruction else {
         return Err(BackendEmitError("Cranelift return instruction expected".to_owned()));
     };
+    if let Some(value_id) = value
+        && matches!(
+            function.return_value.passing,
+            crate::codegen::BackendReturnMode::DirectAggregate { .. }
+        )
+    {
+        let fragments = aggregate_values.get(&value_id).ok_or_else(|| {
+            BackendEmitError(format!(
+                "Cranelift aggregate return value {} is unavailable",
+                value_id.0
+            ))
+        })?;
+        builder.ins().return_(fragments);
+        return Ok(());
+    }
     let value = value
         .map(|value| {
             values.get(&value).copied().ok_or_else(|| {

@@ -181,10 +181,11 @@ An implementation must not infer this contract from aggregate size alone or
 silently replace a direct aggregate with an indirect pointer. The neutral
 contract validates that the descriptor matches the aggregate layout and value
 type. The hosted LLVM emitter accepts the explicit mode and emits the declared
-aggregate type; Cranelift currently rejects the mode with a stable unsupported
-diagnostic until its fragmented value mapping is implemented. The first
-acceptance target is hosted x86-64; ARM32/Thumb direct aggregate rules remain
-part of Gate 44.6.
+aggregate type. Cranelift supports the first hosted slice when parameter and
+return fragments are contiguous integer registers; it rejects stack fragments
+and non-contiguous register assignments with stable diagnostics until their
+target-specific placement rules are implemented. The first acceptance target
+is hosted x86-64; ARM32/Thumb direct aggregate rules remain part of Gate 44.6.
 
 ## Mandatory contracts
 

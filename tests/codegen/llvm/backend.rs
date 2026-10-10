@@ -1005,6 +1005,111 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
 
 #[cfg(all(target_os = "linux", feature = "cranelift"))]
 #[test]
+fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-direct-aggregate-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("direct aggregate fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"direct_aggregate_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("direct aggregate manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "#include <stdint.h>\ntypedef struct { uint64_t first; uint64_t second; } Pair; extern Pair test__verb_aggregate(Pair); int main(void) { Pair input = {40, 2}; Pair output = test__verb_aggregate(input); return output.first == 40 && output.second == 2 ? 0 : 1; }\n",
+    )
+    .expect("direct aggregate entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let abi = actus::codegen::BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: aggregate_register_fragments(),
+        return_fragments: aggregate_register_fragments(),
+    };
+    let aggregate = BackendValueType::Aggregate { layout };
+    let function = BackendFunction {
+        symbol: SymbolIdentity::new("test", SymbolKind::Verb, "aggregate").expect("symbol"),
+        parameters: vec![BackendParameter {
+            name: "value".to_owned(),
+            role: Role::Erg,
+            ty: aggregate,
+            passing: actus::codegen::BackendPassingMode::DirectAggregate { abi: abi.clone() },
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate,
+            passing: BackendReturnMode::DirectAggregate { abi },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: Some(BackendValueId(0)),
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("direct aggregate fixture configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM direct aggregate object should emit");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift direct aggregate object should emit");
+    fs::write(&cranelift_object, cranelift_bytes)
+        .expect("Cranelift direct aggregate object should be written");
+
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM direct aggregate objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift direct aggregate objects should link");
+    assert_eq!(Command::new(&llvm_executable).status().unwrap().code(), Some(0));
+    assert_eq!(Command::new(&cranelift_executable).status().unwrap().code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
+}
+
+fn aggregate_register_fragments() -> Vec<actus::codegen::BackendAggregateFragment> {
+    vec![
+        actus::codegen::BackendAggregateFragment {
+            offset: 0,
+            size: 8,
+            alignment: 8,
+            location: actus::codegen::BackendAggregateLocation::Register { index: 0 },
+        },
+        actus::codegen::BackendAggregateFragment {
+            offset: 8,
+            size: 8,
+            alignment: 8,
+            location: actus::codegen::BackendAggregateLocation::Register { index: 1 },
+        },
+    ]
+}
+
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
 fn compares_llvm_and_cranelift_on_the_same_indirect_aggregate_copy_fixture() {
     use std::process::Command;
 
