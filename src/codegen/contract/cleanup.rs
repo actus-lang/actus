@@ -2,6 +2,26 @@ use super::super::model::LoweredCleanupInstruction;
 use super::{BackendContractError, BackendLayout, BackendValueId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendCleanupBridge {
+    BufferDrop,
+    RegionDrop,
+    EnumDrop { size: u32 },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendCleanupArgument {
+    Value,
+    Address,
+    FieldAddress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendCleanupResult {
+    Ignored,
+    Status,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendCleanupField {
     pub offset: u32,
     pub size: u32,
@@ -13,6 +33,9 @@ pub struct BackendCleanupOperand {
     pub value: BackendValueId,
     pub layout: BackendLayout,
     pub field: Option<BackendCleanupField>,
+    pub bridge: BackendCleanupBridge,
+    pub argument: BackendCleanupArgument,
+    pub result: BackendCleanupResult,
 }
 
 pub(super) fn validate_cleanup_operand(
@@ -25,6 +48,12 @@ pub(super) fn validate_cleanup_operand(
     }
     let Some(operand) = operand else { return Ok(()) };
     operand.layout.validate()?;
+    if matches!(operand.bridge, BackendCleanupBridge::EnumDrop { size: 0 }) {
+        return Err(BackendContractError::InvalidCleanupOperand);
+    }
+    if matches!(operand.argument, BackendCleanupArgument::FieldAddress) != operand.field.is_some() {
+        return Err(BackendContractError::InvalidCleanupOperand);
+    }
     let Some(field) = operand.field else { return Ok(()) };
     if field.size == 0
         || field.alignment == 0

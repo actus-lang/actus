@@ -25,12 +25,13 @@ pub use body::{
     lower_verb_body_with_expressions,
 };
 pub use contract::{
-    BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupField,
-    BackendCleanupOperand, BackendCleanupPlan, BackendContractError, BackendEmitError,
-    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendIntegerBinaryOp,
-    BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendLayout, BackendModule, BackendParameter,
-    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
-    BackendUnsupportedOperation, BackendValueId, BackendValueType, lower_semantic_cleanup,
+    BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupArgument,
+    BackendCleanupBridge, BackendCleanupField, BackendCleanupOperand, BackendCleanupPlan,
+    BackendCleanupResult, BackendContractError, BackendEmitError, BackendExternal, BackendFailure,
+    BackendFunction, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
+    BackendIntegerUnaryOp, BackendLayout, BackendModule, BackendParameter, BackendPassingMode,
+    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
+    BackendValueId, BackendValueType, lower_semantic_cleanup,
 };
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};
 pub use model::{

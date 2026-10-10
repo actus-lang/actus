@@ -6,7 +6,8 @@ use actus::codegen::cranelift::emit_contract_module_object;
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendCleanupOperand, BackendEnumLayout, BackendExternal,
+    BackendBlock, BackendBlockId, BackendCleanupArgument, BackendCleanupBridge,
+    BackendCleanupOperand, BackendCleanupResult, BackendEnumLayout, BackendExternal,
     BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendModule,
     BackendParameter, BackendReturn, BackendReturnMode, BackendValueId, BackendValueType,
     LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
@@ -384,6 +385,9 @@ fn rejects_runtime_cleanup_until_its_bridge_abi_is_lowered() {
                         value: BackendValueId(0),
                         layout: BackendLayout { size: 16, alignment: 8 },
                         field: None,
+                        bridge: BackendCleanupBridge::RegionDrop,
+                        argument: BackendCleanupArgument::Address,
+                        result: BackendCleanupResult::Status,
                     }),
                     span: actus::lexer::SourceSpan::new(0, 1),
                 },

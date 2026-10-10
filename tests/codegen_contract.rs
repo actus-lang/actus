@@ -488,6 +488,9 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
                         size: 8,
                         alignment: 8,
                     }),
+                    bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                    result: actus::codegen::BackendCleanupResult::Status,
                 }),
                 span: SourceSpan::new(4, 10),
             }],
@@ -535,6 +538,63 @@ fn rejects_cleanup_field_outside_the_declared_layout() {
                         size: 16,
                         alignment: 8,
                     }),
+                    bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                    result: actus::codegen::BackendCleanupResult::Status,
+                }),
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn rejects_cleanup_bridge_with_zero_enum_extent() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::DropBinding {
+                    binding_index: 0,
+                    name: "value".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: None,
+                    bridge: actus::codegen::BackendCleanupBridge::EnumDrop { size: 0 },
+                    argument: actus::codegen::BackendCleanupArgument::Address,
+                    result: actus::codegen::BackendCleanupResult::Ignored,
+                }),
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn rejects_field_address_bridge_without_a_field_sublayout() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::DropBinding {
+                    binding_index: 0,
+                    name: "value".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: None,
+                    bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                    result: actus::codegen::BackendCleanupResult::Status,
                 }),
                 span: SourceSpan::new(0, 1),
             }],

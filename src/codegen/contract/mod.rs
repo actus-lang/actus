@@ -15,7 +15,10 @@ use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
 use cleanup::validate_cleanup_operand;
-pub use cleanup::{BackendCleanupField, BackendCleanupOperand};
+pub use cleanup::{
+    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupField, BackendCleanupOperand,
+    BackendCleanupResult,
+};
 pub use instruction::BackendInstruction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
