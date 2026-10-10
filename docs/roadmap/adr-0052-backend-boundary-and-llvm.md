@@ -201,7 +201,10 @@ lowering. Until that contract exists, LLVM and the contract Cranelift emitter
 must reject runtime-backed cleanup actions with a stable diagnostic;
 compile-time `EndBorrow` remains a no-op boundary. The full Cranelift language
 lowerer has its own typed cleanup context and does not define the neutral
-contract for the LLVM parity path.
+contract for the LLVM parity path. The neutral instruction contract now
+requires a value operand for every runtime-backed cleanup action and rejects a
+missing operand before backend lowering; field/sublayout mapping and the actual
+runtime bridge call remain subsequent work.
 
 ## Mandatory contracts
 
