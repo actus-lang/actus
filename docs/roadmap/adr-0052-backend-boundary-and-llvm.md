@@ -255,8 +255,10 @@ their own acceptance evidence before they are considered supported.
 The representation contract distinguishes core-register words, explicit stack
 spills with byte size/alignment/offset, and indirect return addresses. The
 current canonical fixtures use one scalar word in `r0` and an aggregate stack
-spill with an indirect return address in `r0`; these are neutral descriptions
-until LLVM ARM lowering and object-level evidence validate them.
+spill with an indirect return address in `r0`. The emitted Thumb call fixture
+also verifies two generated callers with a `bl` instruction and paired
+8-byte stack frames, providing stack-alignment evidence for the supported call
+slice.
 
 The LLVM object emitter initializes LLVM's complete target registry rather than
 only the host-native target. The hosted test suite now emits and parses an ARM

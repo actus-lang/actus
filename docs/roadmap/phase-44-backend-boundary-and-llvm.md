@@ -461,7 +461,7 @@ states the host and evidence limits explicitly.
 - [x] Define the Cortex-M ABI, integer widths, alignment, argument and
       callee-saved registers, stack contract, entry point, runtime provider,
       and linker script interface.
-- [ ] Preserve the required 8-byte stack alignment at every call boundary.
+- [x] Preserve the required 8-byte stack alignment at every call boundary.
 - [x] Define register and stack representations for scalar and aggregate
       arguments and return values before external C interoperability.
 - [x] Add ABI fixtures for scalar and aggregate calls in both directions.
@@ -514,9 +514,10 @@ execution.
 
 The representation contract now covers one-word scalar values in `r0` and
 stack-spilled aggregates with explicit byte size, alignment, and offset. An
-aggregate return uses an explicit indirect return address in `r0`. This is a
-neutral ABI description; it does not yet claim that LLVM emits these locations
-for ARM or that a freestanding image links successfully.
+aggregate return uses an explicit indirect return address in `r0`. The ARM
+call fixture supplements this neutral contract with emitted Thumb disassembly
+evidence: both generated callers contain `bl` and preserve an 8-byte frame
+with paired `push {r7, lr}` and `pop {r7, pc}` instructions.
 
 The LLVM backend now initializes the full target registry and emits a real
 ARM ELF object for `thumbv7em-none-eabihf`. The fixture verifies the ARM object

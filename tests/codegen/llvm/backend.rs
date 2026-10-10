@@ -788,7 +788,39 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     ] {
         assert!(object.symbols().any(|candidate| candidate.name() == Ok(symbol)));
     }
-    std::fs::remove_file(output).expect("ARM call fixture object should be removed");
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+
+        let disassembly = Command::new("llvm-objdump")
+            .args(["-d", "--triple=thumbv7em-none-eabihf"])
+            .arg(&output)
+            .output()
+            .expect("llvm-objdump should be available for ARM stack validation");
+        assert!(disassembly.status.success(), "llvm-objdump failed for ARM call fixture");
+        let disassembly =
+            String::from_utf8(disassembly.stdout).expect("ARM disassembly should be UTF-8");
+        assert_eq!(
+            disassembly.matches("push	{r7, lr}").count(),
+            2,
+            "each ARM caller must preserve an 8-byte aligned call frame"
+        );
+        assert_eq!(
+            disassembly.matches("pop	{r7, pc}").count(),
+            2,
+            "each ARM caller must restore its 8-byte aligned call frame"
+        );
+        assert_eq!(
+            disassembly.matches("	bl	").count(),
+            2,
+            "each ARM caller must contain its direct call"
+        );
+    }
+    if std::env::var_os("ACTUS_KEEP_ARM_CALL_OBJECT").is_none() {
+        std::fs::remove_file(output).expect("ARM call fixture object should be removed");
+    } else {
+        eprintln!("kept ARM call fixture object at {}", output.display());
+    }
 }
 
 #[cfg(target_os = "linux")]
