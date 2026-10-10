@@ -64,6 +64,13 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
         .map(|external| lower_external_signature(external, layouts))
         .collect::<Result<Vec<_>, _>>()?;
     let return_types = shared_return_types(&verbs, &externals, &signatures, &external_signatures);
+    let semantic = crate::semantic::analyze(program).map_err(|error| {
+        unsupported(
+            crate::lexer::SourceSpan::new(0, 0),
+            format!("semantic analysis failed: {error:?}"),
+        )
+    })?;
+    let cleanup_plans = super::lower_semantic_cleanup(&semantic)?;
     let external_symbols = scalar_external_symbols(namespace, &externals, bindings)?;
     let mut functions = Vec::with_capacity(verbs.len());
     for verb in verbs {
@@ -72,6 +79,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             verb,
             entry_name,
             layouts,
+            &cleanup_plans,
             &return_types,
             &external_symbols,
         )?);
@@ -185,12 +193,13 @@ fn lower_shared_verb(
     verb: &VerbDecl,
     entry_name: Option<&str>,
     layouts: &impl BackendLayoutProvider,
+    cleanup_plans: &[super::BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
 ) -> Result<super::BackendFunction, BackendContractError> {
     let mut provider =
         SharedExpressionProvider::new(namespace, verb, return_types, external_symbols);
-    match entry_name.filter(|name| *name == verb.name) {
+    let mut function = match entry_name.filter(|name| *name == verb.name) {
         Some(_) => lower_verb_with_expressions_as(
             SymbolIdentity::entry(&verb.name)
                 .map_err(|error| unsupported(verb.span, error.to_string()))?,
@@ -202,7 +211,14 @@ fn lower_shared_verb(
         None => {
             lower_verb_with_expressions(namespace, verb, layouts, &mut provider, BackendBlockId(0))
         }
-    }
+    }?;
+    function.cleanup = cleanup_plans
+        .iter()
+        .filter(|plan| plan.span.start >= verb.span.start && plan.span.end <= verb.span.end)
+        .cloned()
+        .collect();
+    function.validate()?;
+    Ok(function)
 }
 
 #[cfg(test)]
@@ -245,7 +261,7 @@ mod tests {
 
     #[test]
     fn lowers_region_call_and_return_through_shared_pipeline() {
-        let source = "verb forward(abs region: Region[u32]) -> Region[u32] { return region; } verb main(abs region: Region[u32]) -> Region[u32] { return forward(region: abs region); }";
+        let source = "verb forward(dat region: Region[u32]) -> Region[u32] { return region; } verb main(dat region: Region[u32]) -> Region[u32] { return forward(region: dat region); }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty(), "lexer errors: {errors:?}");
         let program = parse(tokens).expect("Region call fixture should parse");
