@@ -283,6 +283,12 @@ identifies the Cortex-M v7E-M architecture family; it does not by itself claim
 that the ARM ABI, runtime provider, linker script, or hardware execution path
 is complete.
 
+The target contract now records the Cortex-M freestanding link requirements:
+an explicit entry symbol, an explicit runtime provider, a linker script, and
+8-byte stack alignment. These are compiler-facing requirements; the concrete
+startup object, provider symbols, linker script, and link acceptance remain
+implementation work.
+
 ### Semantic preservation
 
 Ownership roles, cleanup order, typed failures, enum discriminants, aggregate

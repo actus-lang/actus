@@ -488,6 +488,12 @@ callee-saved registers, and 8-byte stack alignment. Aggregate register/stack
 classification, runtime-provider wiring, and linker-script acceptance remain
 separate checks below.
 
+The target contract now explicitly identifies the Cortex-M freestanding link
+boundary: a configured entry symbol is required, a linker script is required,
+the runtime provider must be explicit, and the stack contract remains
+8-byte-aligned. This is a typed target requirement only; it does not claim
+that the provider, startup object, or linker script has been supplied yet.
+
 The representation contract now covers one-word scalar values in `r0` and
 stack-spilled aggregates with explicit byte size, alignment, and offset. An
 aggregate return uses an explicit indirect return address in `r0`. This is a

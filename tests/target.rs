@@ -112,6 +112,24 @@ fn arm32_target_profile_declares_the_supported_thumb_mode() {
 }
 
 #[test]
+fn arm32_freestanding_contract_requires_explicit_startup_dependencies() {
+    let embedded =
+        TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
+    assert_eq!(
+        embedded.freestanding_linker_contract(),
+        Some(actus::target::FreestandingLinkerContract {
+            entry_symbol_required: true,
+            linker_script_required: true,
+            runtime_provider: actus::target::RuntimeProviderContract::ExplicitFreestanding,
+            stack_alignment_bytes: 8,
+        })
+    );
+
+    let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("host target should parse");
+    assert_eq!(hosted.freestanding_linker_contract(), None);
+}
+
+#[test]
 fn artifact_contract_records_startup_and_linker_requirements() {
     let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
     let freestanding = TargetSpec::parse("thumbv7em-none-eabihf").expect("target should parse");
