@@ -6,7 +6,7 @@ use crate::lexer::SourceSpan;
 use std::collections::BTreeSet;
 
 use super::abi::BackendDirectAggregateAbi;
-use super::enum_layout::BackendEnumLayout;
+use super::abi::BackendEnumLayout;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
@@ -352,7 +352,7 @@ fn validate_instruction(
         BackendInstruction::Jump { target, .. } if !block_ids.contains(target) => {
             Err(BackendContractError::InvalidBlockReference)
         }
-        BackendInstruction::Fail { failure, .. } => super::enum_layout::validate_failure(failure),
+        BackendInstruction::Fail { failure, .. } => super::abi::validate_failure(failure),
         BackendInstruction::Cleanup { action, operand, .. } => {
             validate_cleanup_operand(action, *operand)
         }

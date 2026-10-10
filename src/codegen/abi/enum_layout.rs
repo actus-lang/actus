@@ -1,5 +1,5 @@
-use super::contract::{BackendContractError, BackendFailure, BackendLayout};
-use super::symbols::SymbolKind;
+use super::super::contract::{BackendContractError, BackendFailure, BackendLayout};
+use super::super::symbols::SymbolKind;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendEnumLayout {
@@ -63,7 +63,7 @@ impl BackendEnumLayout {
     }
 }
 
-pub(super) fn validate_failure(failure: &BackendFailure) -> Result<(), BackendContractError> {
+pub(crate) fn validate_failure(failure: &BackendFailure) -> Result<(), BackendContractError> {
     if failure.result_type.kind() != SymbolKind::Enum {
         return Err(BackendContractError::InvalidFailureType);
     }

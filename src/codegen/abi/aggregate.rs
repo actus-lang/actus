@@ -1,4 +1,4 @@
-use super::contract::{BackendContractError, BackendLayout};
+use super::super::contract::{BackendContractError, BackendLayout};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendAggregateLocation {

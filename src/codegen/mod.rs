@@ -5,7 +5,6 @@ mod constants;
 mod contract;
 #[cfg(feature = "cranelift")]
 pub mod cranelift;
-mod enum_layout;
 mod linker;
 #[cfg(feature = "llvm")]
 pub mod llvm;
@@ -15,7 +14,10 @@ mod serialization;
 mod signature;
 mod symbols;
 
-pub use abi::{BackendAggregateFragment, BackendAggregateLocation, BackendDirectAggregateAbi};
+pub use abi::{
+    BackendAggregateFragment, BackendAggregateLocation, BackendDirectAggregateAbi,
+    BackendEnumLayout,
+};
 pub use backend::{BackendKind, BackendTargetError};
 pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{
@@ -26,7 +28,6 @@ pub use contract::{
     BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
     lower_semantic_cleanup,
 };
-pub use enum_layout::BackendEnumLayout;
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};
 pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,
