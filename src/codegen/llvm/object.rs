@@ -3,7 +3,6 @@ use std::path::Path;
 use std::ptr;
 
 use llvm_sys::core::{LLVMDisposeMessage, LLVMSetTarget};
-use llvm_sys::target::{LLVM_InitializeNativeAsmPrinter, LLVM_InitializeNativeTarget};
 use llvm_sys::target_machine::{
     LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetDataLayout,
     LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetTargetFromTriple, LLVMRelocMode,
@@ -18,7 +17,7 @@ pub(super) fn emit_object(
     target: &TargetSpec,
     output: &Path,
 ) -> Result<(), BackendEmitError> {
-    initialize_native_target()?;
+    initialize_targets()?;
     let triple = CString::new(target.triple().to_string())
         .map_err(|_| BackendEmitError("LLVM target triple contains NUL".to_owned()))?;
     let output = output
@@ -50,11 +49,12 @@ pub(super) fn emit_object(
     Ok(())
 }
 
-fn initialize_native_target() -> Result<(), BackendEmitError> {
-    let target_failed = unsafe { LLVM_InitializeNativeTarget() != 0 };
-    let printer_failed = unsafe { LLVM_InitializeNativeAsmPrinter() != 0 };
-    if target_failed || printer_failed {
-        return Err(BackendEmitError("LLVM native target initialization failed".to_owned()));
+fn initialize_targets() -> Result<(), BackendEmitError> {
+    unsafe {
+        llvm_sys::target::LLVM_InitializeAllTargetInfos();
+        llvm_sys::target::LLVM_InitializeAllTargets();
+        llvm_sys::target::LLVM_InitializeAllTargetMCs();
+        llvm_sys::target::LLVM_InitializeAllAsmPrinters();
     }
     Ok(())
 }

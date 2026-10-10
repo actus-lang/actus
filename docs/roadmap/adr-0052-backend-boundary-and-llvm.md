@@ -258,6 +258,12 @@ current canonical fixtures use one scalar word in `r0` and an aggregate stack
 spill with an indirect return address in `r0`; these are neutral descriptions
 until LLVM ARM lowering and object-level evidence validate them.
 
+The LLVM object emitter initializes LLVM's complete target registry rather than
+only the host-native target. The hosted test suite now emits and parses an ARM
+ELF object for `thumbv7em-none-eabihf` and checks its `.text` section and Actus
+entry symbol. This remains object-generation evidence; it does not establish
+freestanding linking or target execution.
+
 The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
 `CortexMv7em` target profile and `Thumb2` instruction mode. This profile
 identifies the Cortex-M v7E-M architecture family; it does not by itself claim

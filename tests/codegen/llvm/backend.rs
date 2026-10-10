@@ -601,6 +601,37 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
     std::fs::remove_file(second_output).expect("second test object should be removed");
 }
 
+#[test]
+fn emits_an_arm32_thumb_object_for_the_cortex_m_profile() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "main").expect("valid symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let output =
+        std::env::temp_dir().join(format!("actus-llvm-arm-object-{}.o", std::process::id()));
+    let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
+        .expect("Cortex-M target should parse");
+    emit_object(&module, &target, &output).expect("ARM object should be emitted");
+    let bytes = std::fs::read(&output).expect("ARM object should be readable");
+    let object = object::File::parse(bytes.as_slice()).expect("ARM object should parse");
+    assert_eq!(object.architecture(), object::Architecture::Arm);
+    assert!(object.section_by_name(".text").is_some());
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("test__verb_main")));
+    std::fs::remove_file(output).expect("ARM test object should be removed");
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn links_and_runs_a_host_object_through_the_shared_linker() {

@@ -465,7 +465,7 @@ states the host and evidence limits explicitly.
 - [x] Define register and stack representations for scalar and aggregate
       arguments and return values before external C interoperability.
 - [ ] Add ABI fixtures for scalar and aggregate calls in both directions.
-- [ ] Generate ARM32/Thumb objects through the LLVM backend.
+- [x] Generate ARM32/Thumb objects through the LLVM backend.
 - [ ] Link a minimal freestanding image with the explicit runtime provider.
 - [ ] Add object-level checks for relocations, symbols, sections, alignment,
       and forbidden hosted imports.
@@ -493,6 +493,12 @@ stack-spilled aggregates with explicit byte size, alignment, and offset. An
 aggregate return uses an explicit indirect return address in `r0`. This is a
 neutral ABI description; it does not yet claim that LLVM emits these locations
 for ARM or that a freestanding image links successfully.
+
+The LLVM backend now initializes the full target registry and emits a real
+ARM ELF object for `thumbv7em-none-eabihf`. The fixture verifies the ARM object
+architecture, `.text` section, and public Actus symbol. This is host-side
+object evidence only; it does not claim linker-script, runtime-provider, or
+hardware execution support.
 
 ## Gate 44.7 — External C ABI and runtime interoperability
 
