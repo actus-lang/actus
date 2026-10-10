@@ -591,7 +591,7 @@ constructed backend-neutral contracts.
 - [x] Add an explicit build-level override only if it has the same validated
       configuration path as the manifest; do not create a second backend
       selection implementation.
-- [ ] Route the resolved backend selector through `CompilerConfiguration`,
+- [x] Route the resolved backend selector through `CompilerConfiguration`,
       build planning, object emission, executable emission, and run commands.
 - [ ] Move semantic-to-`BackendModule` lowering behind a shared lowering
       boundary so LLVM and Cranelift consume the same roles, layouts, cleanup

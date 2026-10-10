@@ -34,6 +34,8 @@ configuration path used by `Actus.toml`:
 ```sh
 actus build --backend cranelift
 actus build --backend llvm
+actus run --backend cranelift
+actus run --backend llvm
 ```
 
 The selected backend must be enabled in the compiler build and compatible with

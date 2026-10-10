@@ -73,6 +73,35 @@ fn build_backend_override_uses_the_same_validated_llvm_configuration() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn run_backend_override_uses_the_same_validated_llvm_configuration() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-run-llvm-override-{}", std::process::id()));
+    let input = root.join("main.act");
+    fs::create_dir_all(&root).expect("create LLVM run override fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-run-cli-override\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("write LLVM run override fixture manifest");
+    fs::write(&input, "verb main() -> Int { return 44; }\n")
+        .expect("write LLVM run override fixture source");
+
+    let result = run_with_args(
+        vec![
+            "run".to_owned(),
+            input.display().to_string(),
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 44);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn llvm_backend_builds_and_runs_scalar_imported_module() {
     let root = std::env::temp_dir().join(format!("actus-cli-llvm-module-{}", std::process::id()));
     let input = root.join("src/main.act");
