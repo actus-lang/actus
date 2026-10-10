@@ -1,11 +1,155 @@
 use std::collections::BTreeMap;
 
-use cranelift_codegen::ir::{Block, Type};
+use cranelift_codegen::ir::{Block, InstBuilder, Type};
 use cranelift_frontend::FunctionBuilder;
+use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
 use super::native::BackendEmitError;
-use crate::codegen::{BackendFunction, BackendPassingMode, BackendValueId};
+use crate::codegen::{
+    BackendFunction, BackendInstruction, BackendPassingMode, BackendValueId, BackendValueType,
+};
+
+#[derive(Clone, Debug)]
+pub(super) struct Declaration {
+    pub(super) id: cranelift_module::FuncId,
+    pub(super) parameter_fragments: Vec<usize>,
+    pub(super) return_fragments: usize,
+}
+
+pub(super) fn declaration(
+    id: cranelift_module::FuncId,
+    parameters: &[crate::codegen::BackendParameter],
+    return_value: &crate::codegen::BackendReturn,
+) -> Result<Declaration, BackendEmitError> {
+    Ok(Declaration {
+        id,
+        parameter_fragments: parameters
+            .iter()
+            .map(parameter_fragment_count)
+            .collect::<Result<_, _>>()?,
+        return_fragments: return_fragment_count(return_value)?,
+    })
+}
+
+fn parameter_fragment_count(
+    parameter: &crate::codegen::BackendParameter,
+) -> Result<usize, BackendEmitError> {
+    match &parameter.passing {
+        BackendPassingMode::DirectAggregate { abi } => {
+            abi.validate().map_err(|error| BackendEmitError(error.to_string()))?;
+            Ok(abi.parameter_fragments.len())
+        }
+        _ => Ok(1),
+    }
+}
+
+fn return_fragment_count(
+    return_value: &crate::codegen::BackendReturn,
+) -> Result<usize, BackendEmitError> {
+    match &return_value.passing {
+        crate::codegen::BackendReturnMode::DirectAggregate { abi } => {
+            abi.validate().map_err(|error| BackendEmitError(error.to_string()))?;
+            Ok(abi.return_fragments.len())
+        }
+        crate::codegen::BackendReturnMode::Direct => {
+            Ok(usize::from(!matches!(return_value.ty, BackendValueType::Unit)))
+        }
+        crate::codegen::BackendReturnMode::ReturnSlot { .. } => Ok(0),
+    }
+}
+
+pub(super) fn lower_call(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, Declaration>,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::Call { callee, arguments, result, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift call instruction expected".to_owned()));
+    };
+    let declaration = declarations.get(callee.as_str()).ok_or_else(|| {
+        BackendEmitError(format!("Cranelift call `{}` is undeclared", callee.as_str()))
+    })?;
+    let reference = module.declare_func_in_func(declaration.id, builder.func);
+    let native_arguments =
+        collect_call_arguments(callee.as_str(), arguments, declaration, values, aggregate_values)?;
+    let call = builder.ins().call(reference, &native_arguments);
+    record_call_results(builder, call, result, declaration, values, aggregate_values)?;
+    Ok(())
+}
+
+fn collect_call_arguments(
+    callee: &str,
+    arguments: &[BackendValueId],
+    declaration: &Declaration,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+) -> Result<Vec<cranelift_codegen::ir::Value>, BackendEmitError> {
+    if declaration.parameter_fragments.len() != arguments.len() {
+        return Err(BackendEmitError(format!(
+            "Cranelift call `{callee}` expects {} arguments, got {}",
+            declaration.parameter_fragments.len(),
+            arguments.len()
+        )));
+    }
+    let mut native_arguments = Vec::new();
+    for (value, fragment_count) in arguments.iter().zip(&declaration.parameter_fragments) {
+        if *fragment_count > 1 {
+            let fragments = aggregate_values.get(value).ok_or_else(|| {
+                BackendEmitError(format!(
+                    "Cranelift aggregate call value {} is unavailable",
+                    value.0
+                ))
+            })?;
+            if fragments.len() != *fragment_count {
+                return Err(BackendEmitError(
+                    "Cranelift aggregate call fragment count mismatches declaration".to_owned(),
+                ));
+            }
+            native_arguments.extend(fragments.iter().copied());
+        } else if let Some(value) = values.get(value).copied() {
+            native_arguments.push(value);
+        } else {
+            return Err(BackendEmitError(format!(
+                "Cranelift call value {} is unavailable",
+                value.0
+            )));
+        }
+    }
+    Ok(native_arguments)
+}
+
+fn record_call_results(
+    builder: &mut FunctionBuilder<'_>,
+    call: cranelift_codegen::ir::Inst,
+    result: &Option<BackendValueId>,
+    declaration: &Declaration,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+) -> Result<(), BackendEmitError> {
+    let Some(result) = result else { return Ok(()) };
+    let results = builder.inst_results(call).to_vec();
+    if declaration.return_fragments > 1 {
+        if results.len() != declaration.return_fragments {
+            return Err(BackendEmitError(
+                "Cranelift aggregate call result count mismatches declaration".to_owned(),
+            ));
+        }
+        aggregate_values.insert(*result, results);
+    } else if declaration.return_fragments == 1 {
+        let value = results
+            .first()
+            .copied()
+            .ok_or_else(|| BackendEmitError("Cranelift call result is unavailable".to_owned()))?;
+        values.insert(*result, value);
+    } else {
+        return Err(BackendEmitError("Cranelift unit call cannot produce a result".to_owned()));
+    }
+    Ok(())
+}
 
 pub(super) fn direct_aggregate_types(
     _module: &ObjectModule,

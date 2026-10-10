@@ -6,7 +6,10 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
-use super::aggregate::{aggregate_fragment_type, direct_aggregate_types, initialize_values};
+use super::aggregate::{
+    Declaration, aggregate_fragment_type, declaration, direct_aggregate_types, initialize_values,
+    lower_call,
+};
 use super::native::BackendEmitError;
 use super::object::create_module;
 use crate::codegen::{
@@ -30,11 +33,6 @@ pub fn emit_contract_module_object(
     module.finish().emit().map_err(|error| BackendEmitError(error.to_string()))
 }
 
-#[derive(Clone, Copy)]
-struct Declaration {
-    id: cranelift_module::FuncId,
-}
-
 fn declare_functions(
     module: &mut ObjectModule,
     backend_module: &BackendModule,
@@ -45,14 +43,20 @@ fn declare_functions(
         let id = module
             .declare_function(external.symbol.as_str(), Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations.insert(external.symbol.as_str().to_owned(), Declaration { id });
+        declarations.insert(
+            external.symbol.as_str().to_owned(),
+            declaration(id, &external.parameters, &external.return_value)?,
+        );
     }
     for function in &backend_module.functions {
         let signature = signature(module, &function.parameters, &function.return_value)?;
         let id = module
             .declare_function(function.symbol.as_str(), Linkage::Export, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations.insert(function.symbol.as_str().to_owned(), Declaration { id });
+        declarations.insert(
+            function.symbol.as_str().to_owned(),
+            declaration(id, &function.parameters, &function.return_value)?,
+        );
     }
     Ok(declarations)
 }
@@ -167,7 +171,7 @@ fn define_function(
     }
     let declaration = declarations
         .get(function.symbol.as_str())
-        .copied()
+        .cloned()
         .ok_or_else(|| BackendEmitError("Cranelift function declaration is missing".to_owned()))?;
     let mut context = module.make_context();
     context.func.signature = signature(module, &function.parameters, &function.return_value)?;
@@ -180,7 +184,7 @@ fn define_function(
             BackendEmitError("Cranelift neutral contract entry block is missing".to_owned())
         })?;
         builder.switch_to_block(entry);
-        let (return_slot, mut values, aggregate_values) =
+        let (return_slot, mut values, mut aggregate_values) =
             initialize_values(&mut builder, entry, function)?;
         for block in &function.blocks {
             let native_block = blocks.get(&block.id).copied().ok_or_else(|| {
@@ -196,7 +200,7 @@ fn define_function(
                     &blocks,
                     return_slot,
                     &mut values,
-                    &aggregate_values,
+                    &mut aggregate_values,
                     function,
                 )?;
             }
@@ -226,12 +230,12 @@ fn lower_instruction(
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
     return_slot: Option<cranelift_codegen::ir::Value>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+    aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
     function: &BackendFunction,
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::Call { .. } => {
-            lower_call(module, builder, instruction, declarations, values)
+            lower_call(module, builder, instruction, declarations, values, aggregate_values)
         }
         BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
         BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
@@ -401,39 +405,6 @@ fn lower_niche_failure(
         ));
     }
     builder.ins().return_(&[value]);
-    Ok(())
-}
-
-fn lower_call(
-    module: &mut ObjectModule,
-    builder: &mut FunctionBuilder<'_>,
-    instruction: &BackendInstruction,
-    declarations: &BTreeMap<String, Declaration>,
-    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-) -> Result<(), BackendEmitError> {
-    let BackendInstruction::Call { callee, arguments, result, .. } = instruction else {
-        return Err(BackendEmitError("Cranelift call instruction expected".to_owned()));
-    };
-    let declaration = declarations.get(callee.as_str()).ok_or_else(|| {
-        BackendEmitError(format!("Cranelift call `{}` is undeclared", callee.as_str()))
-    })?;
-    let reference = module.declare_func_in_func(declaration.id, builder.func);
-    let arguments = arguments
-        .iter()
-        .map(|value| {
-            values.get(value).copied().ok_or_else(|| {
-                BackendEmitError(format!("Cranelift call value {} is unavailable", value.0))
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let call = builder.ins().call(reference, &arguments);
-    if let Some(result) = result {
-        let value =
-            builder.inst_results(call).first().copied().ok_or_else(|| {
-                BackendEmitError("Cranelift call result is unavailable".to_owned())
-            })?;
-        values.insert(*result, value);
-    }
     Ok(())
 }
 

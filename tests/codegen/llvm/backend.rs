@@ -457,7 +457,7 @@ fn emits_fixed_layout_aggregate_parameter_and_return() {
         return_value: BackendReturn {
             role: Some(Role::Erg),
             ty: aggregate,
-            passing: BackendReturnMode::DirectAggregate { abi },
+            passing: BackendReturnMode::DirectAggregate { abi: abi.clone() },
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
@@ -1016,7 +1016,7 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
     let shim_source = root.join("entry.c");
     fs::write(
         &shim_source,
-        "#include <stdint.h>\ntypedef struct { uint64_t first; uint64_t second; } Pair; extern Pair test__verb_aggregate(Pair); int main(void) { Pair input = {40, 2}; Pair output = test__verb_aggregate(input); return output.first == 40 && output.second == 2 ? 0 : 1; }\n",
+        "#include <stdint.h>\ntypedef struct { uint64_t first; uint64_t second; } Pair; extern Pair test__verb_caller(Pair); int main(void) { Pair input = {40, 2}; Pair output = test__verb_caller(input); return output.first == 40 && output.second == 2 ? 0 : 1; }\n",
     )
     .expect("direct aggregate entry shim should be written");
     let shim_object = root.join("entry.o");
@@ -1030,19 +1030,19 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
         parameter_fragments: aggregate_register_fragments(),
         return_fragments: aggregate_register_fragments(),
     };
-    let aggregate = BackendValueType::Aggregate { layout };
-    let function = BackendFunction {
+    let aggregate_type = BackendValueType::Aggregate { layout };
+    let aggregate_function = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "aggregate").expect("symbol"),
         parameters: vec![BackendParameter {
             name: "value".to_owned(),
             role: Role::Erg,
-            ty: aggregate,
+            ty: aggregate_type,
             passing: actus::codegen::BackendPassingMode::DirectAggregate { abi: abi.clone() },
         }],
         return_value: BackendReturn {
             role: Some(Role::Erg),
-            ty: aggregate,
-            passing: BackendReturnMode::DirectAggregate { abi },
+            ty: aggregate_type,
+            passing: BackendReturnMode::DirectAggregate { abi: abi.clone() },
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
@@ -1054,7 +1054,40 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
         }],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let caller = BackendFunction {
+        symbol: SymbolIdentity::new("test", SymbolKind::Verb, "caller").expect("symbol"),
+        parameters: vec![BackendParameter {
+            name: "value".to_owned(),
+            role: Role::Erg,
+            ty: aggregate_type,
+            passing: actus::codegen::BackendPassingMode::DirectAggregate { abi: abi.clone() },
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: aggregate_type,
+            passing: BackendReturnMode::DirectAggregate { abi },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: SymbolIdentity::new("test", SymbolKind::Verb, "aggregate")
+                        .expect("aggregate callee symbol"),
+                    arguments: vec![BackendValueId(0)],
+                    result: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let module =
+        BackendModule { externals: Vec::new(), functions: vec![aggregate_function, caller] };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("direct aggregate fixture configuration should load");
