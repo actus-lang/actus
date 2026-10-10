@@ -118,8 +118,21 @@ pub(crate) struct EmittedObject {
     pub(crate) symbols: std::collections::BTreeSet<String>,
 }
 
-#[cfg(feature = "cranelift")]
 pub(crate) fn emit_objects(
+    plan: &crate::modules::ModuleCompilationPlan,
+    symbol: &str,
+    configuration: &CompilerConfiguration,
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
+    match configuration.native_backend().backend() {
+        crate::codegen::BackendKind::Cranelift => {
+            emit_objects_cranelift(plan, symbol, configuration)
+        }
+        crate::codegen::BackendKind::Llvm => emit_objects_llvm(plan, symbol, configuration),
+    }
+}
+
+#[cfg(feature = "cranelift")]
+fn emit_objects_cranelift(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
@@ -169,7 +182,7 @@ pub(crate) fn emit_objects(
 }
 
 #[cfg(not(feature = "cranelift"))]
-pub(crate) fn emit_objects(
+fn emit_objects_cranelift(
     _plan: &crate::modules::ModuleCompilationPlan,
     _symbol: &str,
     _configuration: &CompilerConfiguration,
@@ -177,6 +190,26 @@ pub(crate) fn emit_objects(
     Err(BackendEmitError(
         "backend `cranelift` is not enabled; rebuild with feature `cranelift`".to_owned(),
     ))
+}
+
+#[cfg(feature = "llvm")]
+fn emit_objects_llvm(
+    _plan: &crate::modules::ModuleCompilationPlan,
+    _symbol: &str,
+    _configuration: &CompilerConfiguration,
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
+    Err(BackendEmitError(
+        "backend `llvm` is selected, but CLI semantic lowering is not yet connected to the shared BackendModule contract".to_owned(),
+    ))
+}
+
+#[cfg(not(feature = "llvm"))]
+fn emit_objects_llvm(
+    _plan: &crate::modules::ModuleCompilationPlan,
+    _symbol: &str,
+    _configuration: &CompilerConfiguration,
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
+    Err(BackendEmitError("backend `llvm` is not enabled; rebuild with feature `llvm`".to_owned()))
 }
 
 #[cfg(feature = "cranelift")]
