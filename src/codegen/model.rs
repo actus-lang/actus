@@ -1,3 +1,4 @@
+use crate::ast::BuiltinType;
 use crate::lexer::SourceSpan;
 use crate::semantic::{CleanupAction, LoopExitKind, SemanticModel};
 use std::collections::HashSet;
@@ -109,6 +110,36 @@ pub fn lower_loop_unwind_plans(model: &SemanticModel) -> Vec<LoweredLoopUnwindPl
             scopes: plan.scopes.iter().map(|scope| lower_scope(scope, model)).collect(),
         })
         .collect()
+}
+
+pub(super) fn cleanup_bridge_descriptor(
+    action: &LoweredCleanupInstruction,
+    model: &SemanticModel,
+) -> Option<crate::codegen::BackendCleanupBridgeDescriptor> {
+    let binding_index = match action {
+        LoweredCleanupInstruction::DropBinding { binding_index, .. }
+        | LoweredCleanupInstruction::DropBindingFields { binding_index, .. } => *binding_index,
+        LoweredCleanupInstruction::EndBorrow { .. }
+        | LoweredCleanupInstruction::DropPayloadField { .. }
+        | LoweredCleanupInstruction::ResetArena { .. } => return None,
+    };
+    let binding = model.bindings.get(binding_index)?;
+    if binding.ty == Some(BuiltinType::Buffer) {
+        return Some(crate::codegen::BackendCleanupBridgeDescriptor {
+            bridge: crate::codegen::BackendCleanupBridge::BufferDrop,
+            argument: crate::codegen::BackendCleanupArgument::Value,
+            result: crate::codegen::BackendCleanupResult::Ignored,
+        });
+    }
+    let type_name = model.binding_type_names.get(&binding_index)?;
+    if type_name.name == "Region" {
+        return Some(crate::codegen::BackendCleanupBridgeDescriptor {
+            bridge: crate::codegen::BackendCleanupBridge::RegionDrop,
+            argument: crate::codegen::BackendCleanupArgument::Address,
+            result: crate::codegen::BackendCleanupResult::Status,
+        });
+    }
+    None
 }
 
 pub(super) fn validate_cleanup_plans(model: &SemanticModel) -> Result<(), String> {

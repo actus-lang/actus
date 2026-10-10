@@ -22,6 +22,13 @@ pub enum BackendCleanupResult {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BackendCleanupBridgeDescriptor {
+    pub bridge: BackendCleanupBridge,
+    pub argument: BackendCleanupArgument,
+    pub result: BackendCleanupResult,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendCleanupField {
     pub offset: u32,
     pub size: u32,

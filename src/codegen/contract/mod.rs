@@ -16,8 +16,8 @@ use super::symbols::{SymbolIdentity, SymbolKind};
 
 use cleanup::validate_cleanup_operand;
 pub use cleanup::{
-    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupField, BackendCleanupOperand,
-    BackendCleanupResult,
+    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
+    BackendCleanupField, BackendCleanupOperand, BackendCleanupResult,
 };
 pub use instruction::BackendInstruction;
 
@@ -143,6 +143,7 @@ pub struct BackendCleanupPlan {
     pub depth: usize,
     pub span: SourceSpan,
     pub actions: Vec<BackendCleanupAction>,
+    pub bridges: Vec<Option<BackendCleanupBridgeDescriptor>>,
 }
 
 pub fn lower_semantic_cleanup(
@@ -152,10 +153,18 @@ pub fn lower_semantic_cleanup(
         .map_err(BackendContractError::InvalidCleanupContract)?;
     Ok(super::model::lower_cleanup_plans(model)
         .into_iter()
-        .map(|plan| BackendCleanupPlan {
-            depth: plan.depth,
-            span: plan.span,
-            actions: plan.instructions,
+        .map(|plan| {
+            let bridges = plan
+                .instructions
+                .iter()
+                .map(|action| super::model::cleanup_bridge_descriptor(action, model))
+                .collect();
+            BackendCleanupPlan {
+                depth: plan.depth,
+                span: plan.span,
+                actions: plan.instructions,
+                bridges,
+            }
         })
         .collect())
 }

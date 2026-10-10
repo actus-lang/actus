@@ -749,6 +749,64 @@ fn adapts_validated_semantic_cleanup_to_the_neutral_contract() {
         plans[0].actions,
         vec![BackendCleanupAction::DropBinding { binding_index: 0, name: "arena".to_owned() }]
     );
+    assert_eq!(plans[0].bridges, vec![None]);
+}
+
+#[test]
+fn derives_runtime_cleanup_bridges_from_authoritative_binding_types() {
+    let mut model = SemanticModel::default();
+    model.bindings.extend([
+        Binding {
+            name: "buffer".to_owned(),
+            role: Role::Erg,
+            ty: Some(actus::ast::BuiltinType::Buffer),
+            span: SourceSpan::new(0, 6),
+            ownership: OwnershipState::Active,
+            access: AccessState::Mutable,
+        },
+        Binding {
+            name: "region".to_owned(),
+            role: Role::Erg,
+            ty: None,
+            span: SourceSpan::new(7, 13),
+            ownership: OwnershipState::Active,
+            access: AccessState::Mutable,
+        },
+    ]);
+    model.binding_type_names.insert(
+        1,
+        TypeName {
+            name: "Region".to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: SourceSpan::new(7, 13),
+        },
+    );
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 13),
+        actions: vec![
+            CleanupAction::DropBinding { binding_index: 0 },
+            CleanupAction::DropBinding { binding_index: 1 },
+        ],
+    });
+
+    let plans = lower_semantic_cleanup(&model).expect("typed cleanup should lower");
+    assert_eq!(
+        plans[0].bridges,
+        vec![
+            Some(actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
+                argument: actus::codegen::BackendCleanupArgument::Value,
+                result: actus::codegen::BackendCleanupResult::Ignored,
+            }),
+            Some(actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                argument: actus::codegen::BackendCleanupArgument::Address,
+                result: actus::codegen::BackendCleanupResult::Status,
+            }),
+        ]
+    );
 }
 
 #[test]
@@ -943,6 +1001,7 @@ fn preserves_cleanup_plans_on_the_neutral_function_contract() {
             binding_index: 0,
             name: "resource".to_owned(),
         }],
+        bridges: vec![None],
     }];
 
     let function = lower_verb_with_cleanup(
