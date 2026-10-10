@@ -12,7 +12,7 @@ use actus::codegen::{
     SymbolKind,
 };
 use actus::configuration::CompilerConfiguration;
-use object::{Object, ObjectSymbol};
+use object::{Object, ObjectSection, ObjectSymbol};
 
 #[cfg(target_os = "linux")]
 use std::fs;
@@ -773,7 +773,13 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     let object =
         object::File::parse(bytes.as_slice()).expect("ARM call fixture object should parse");
     assert_eq!(object.architecture(), object::Architecture::Arm);
-    assert!(object.section_by_name(".text").is_some());
+    let text = object.section_by_name(".text").expect("ARM call fixture should contain .text");
+    assert!(text.align() >= 2, "Thumb code must have at least halfword alignment");
+    let hosted_imports = ["abort", "free", "malloc", "memcpy", "printf"];
+    for symbol in object.symbols().filter(|symbol| symbol.is_undefined()) {
+        let name = symbol.name().expect("undefined ARM symbol should have a name");
+        assert!(!hosted_imports.contains(&name), "ARM object imports hosted symbol {name}");
+    }
     for symbol in [
         "arm__verb_scalar_5fcallee",
         "arm__verb_scalar_5fcaller",

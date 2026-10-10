@@ -271,6 +271,12 @@ and aggregate argument and return paths reach LLVM ARM object generation with
 stable public symbols. It does not establish exact AAPCS register allocation,
 freestanding linking, or hardware execution.
 
+The same fixture also checks that the generated `.text` section has at least
+Thumb halfword alignment and that the parsed object has no forbidden hosted
+imports. Target runtime symbols remain explicit unresolved dependencies at
+this stage. Relocation resolution, linker-script validation, and target
+execution remain separate acceptance requirements.
+
 The first ARM profile is `thumbv7em-none-eabihf`, represented by the typed
 `CortexMv7em` target profile and `Thumb2` instruction mode. This profile
 identifies the Cortex-M v7E-M architecture family; it does not by itself claim

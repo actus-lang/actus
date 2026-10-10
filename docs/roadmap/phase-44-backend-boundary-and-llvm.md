@@ -508,6 +508,13 @@ in the parsed object. This proves fixture coverage through object generation;
 it does not yet prove exact register allocation, freestanding linking, or
 target execution.
 
+The same object fixture performs initial object-level sanity checks: the ARM
+object contains a halfword-aligned `.text` section and has no undefined
+hosted imports. Target runtime symbols remain explicit unresolved dependencies
+until the runtime-provider and linker checks are completed. Relocation
+semantics, the complete linker-script contract, and target-specific execution
+remain open checks.
+
 ## Gate 44.7 — External C ABI and runtime interoperability
 
 - [ ] Define the stable Actus-to-C ABI boundary for external libraries and
