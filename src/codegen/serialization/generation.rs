@@ -7,7 +7,7 @@ use crate::lexer::SourceSpan;
 
 const GENERATED_DOC: &str = "Compiler-generated fixed-frame serialization wrapper.";
 
-pub(super) fn append_builtin_serialization_error(program: &mut Program) {
+pub(crate) fn append_builtin_serialization_error(program: &mut Program) {
     if program.declarations.iter().any(|declaration| {
         matches!(declaration, TopLevelDecl::Enum(definition) if definition.name == "SerializationError")
     }) {
@@ -34,7 +34,7 @@ pub(super) fn append_builtin_serialization_error(program: &mut Program) {
     }));
 }
 
-pub(super) fn append_generated_serialization_encoders(program: &mut Program) {
+pub(crate) fn append_generated_serialization_encoders(program: &mut Program) {
     let contracts = program
         .declarations
         .iter()
@@ -62,7 +62,7 @@ pub(super) fn append_generated_serialization_encoders(program: &mut Program) {
     }
 }
 
-pub(super) fn append_generated_serialization_decoders(program: &mut Program) {
+pub(crate) fn append_generated_serialization_decoders(program: &mut Program) {
     let contracts = program
         .declarations
         .iter()

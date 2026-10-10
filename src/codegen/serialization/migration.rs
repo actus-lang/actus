@@ -7,7 +7,7 @@ use crate::lexer::SourceSpan;
 
 const GENERATED_DOC: &str = "Compiler-generated fixed-frame serialization wrapper.";
 
-pub(super) fn append_generated_serialization_migrations(program: &mut Program) {
+pub(crate) fn append_generated_serialization_migrations(program: &mut Program) {
     let contracts = program
         .declarations
         .iter()

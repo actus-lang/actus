@@ -13,8 +13,7 @@ pub mod llvm;
 mod model;
 mod result_constructor_spans;
 mod result_constructors;
-mod serialization_generation;
-mod serialization_migration;
+mod serialization;
 mod signature;
 mod symbols;
 

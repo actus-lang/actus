@@ -12,11 +12,11 @@ use super::result_constructor_spans::initializer_span;
 /// the generated code uses the ordinary `Result` enum layout.
 pub(crate) fn normalize_program(program: &Program) -> Program {
     let mut normalized = crate::semantic::normalize_generated_locals(program);
-    super::serialization_generation::append_builtin_serialization_error(&mut normalized);
+    super::serialization::append_builtin_serialization_error(&mut normalized);
     append_generated_serialization_validators(&mut normalized);
-    super::serialization_generation::append_generated_serialization_encoders(&mut normalized);
-    super::serialization_generation::append_generated_serialization_decoders(&mut normalized);
-    super::serialization_migration::append_generated_serialization_migrations(&mut normalized);
+    super::serialization::append_generated_serialization_encoders(&mut normalized);
+    super::serialization::append_generated_serialization_decoders(&mut normalized);
+    super::serialization::append_generated_serialization_migrations(&mut normalized);
     let signatures = collect_signatures(&normalized);
     for declaration in &mut normalized.declarations {
         match declaration {
