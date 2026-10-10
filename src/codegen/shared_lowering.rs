@@ -1,13 +1,15 @@
 use std::collections::BTreeMap;
 
-use crate::ast::{BinaryOp, Expr, PrimitiveType, Program, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{
+    BinaryOp, Expr, PrimitiveType, Program, TopLevelDecl, TypeName, UnaryOp, VerbDecl,
+};
 use crate::lexer::SourceSpan;
 
 use super::{
     BackendBlockId, BackendContractError, BackendExpressionProvider, BackendInstruction,
-    BackendIntegerBinaryOp, BackendLayout, BackendLayoutProvider, BackendModule, BackendValueId,
-    BackendValueType, SymbolIdentity, SymbolKind, lower_verb_with_expressions,
-    lower_verb_with_expressions_as,
+    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendLayout,
+    BackendLayoutProvider, BackendModule, BackendValueId, BackendValueType, SymbolIdentity,
+    SymbolKind, lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 struct ScalarLayouts;
@@ -157,6 +159,7 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
                 Ok(result)
             }
             Expr::Grouping { expression, .. } => self.lower_expression(expression, instructions),
+            Expr::Unary { .. } => self.lower_unary(expression, instructions),
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
             Expr::Call { .. } => self.lower_call(expression, instructions),
             _ => Err(unsupported(
@@ -177,6 +180,31 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
 }
 
 impl ScalarExpressionProvider<'_> {
+    fn lower_unary(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let Expr::Unary { operator, expression, span } = expression else {
+            return Err(unsupported(expression_span(expression), "unary expression expected"));
+        };
+        let operand = self.lower_expression(expression, instructions)?;
+        let operation = match operator {
+            UnaryOp::Negate => BackendIntegerUnaryOp::Negate,
+            UnaryOp::LogicalNot => BackendIntegerUnaryOp::LogicalNot,
+            UnaryOp::BitwiseNot => BackendIntegerUnaryOp::BitwiseNot,
+        };
+        let result = self.allocate();
+        instructions.push(BackendInstruction::IntegerUnary {
+            result,
+            operation,
+            operand,
+            ty: BackendValueType::Integer { signed: true, width: 32 },
+            span: *span,
+        });
+        Ok(result)
+    }
+
     fn lower_binary(
         &mut self,
         expression: &Expr,
@@ -191,6 +219,14 @@ impl ScalarExpressionProvider<'_> {
             BinaryOp::Add => BackendIntegerBinaryOp::Add,
             BinaryOp::Subtract => BackendIntegerBinaryOp::Subtract,
             BinaryOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            BinaryOp::LessThan
+            | BinaryOp::LessEquals
+            | BinaryOp::GreaterThan
+            | BinaryOp::GreaterEquals
+            | BinaryOp::Equals
+            | BinaryOp::NotEquals => {
+                return self.lower_compare(left, right, *operator, *span, instructions);
+            }
             _ => {
                 return Err(unsupported(
                     *span,
@@ -206,6 +242,35 @@ impl ScalarExpressionProvider<'_> {
             right,
             ty: BackendValueType::Integer { signed: true, width: 32 },
             span: *span,
+        });
+        Ok(result)
+    }
+
+    fn lower_compare(
+        &mut self,
+        left: BackendValueId,
+        right: BackendValueId,
+        operator: BinaryOp,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let operation = match operator {
+            BinaryOp::LessThan => BackendIntegerCompareOp::LessThan,
+            BinaryOp::LessEquals => BackendIntegerCompareOp::LessEquals,
+            BinaryOp::GreaterThan => BackendIntegerCompareOp::GreaterThan,
+            BinaryOp::GreaterEquals => BackendIntegerCompareOp::GreaterEquals,
+            BinaryOp::Equals => BackendIntegerCompareOp::Equals,
+            BinaryOp::NotEquals => BackendIntegerCompareOp::NotEquals,
+            _ => return Err(unsupported(span, "comparison operator expected")),
+        };
+        let result = self.allocate();
+        instructions.push(BackendInstruction::IntegerCompare {
+            result,
+            operation,
+            left,
+            right,
+            signed: true,
+            span,
         });
         Ok(result)
     }
@@ -302,7 +367,9 @@ fn unsupported(span: SourceSpan, reason: impl Into<String>) -> BackendContractEr
 #[cfg(test)]
 mod tests {
     use super::lower_scalar_program;
-    use crate::codegen::{BackendInstruction, BackendIntegerBinaryOp};
+    use crate::codegen::{
+        BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp,
+    };
     use crate::lexer::scan;
     use crate::parser::parse;
 
@@ -333,6 +400,42 @@ mod tests {
             |instruction| matches!(
                 instruction,
                 BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+            )
+        ));
+    }
+
+    #[test]
+    fn lowers_scalar_integer_comparison_into_neutral_ir() {
+        let source = "verb main() -> Bool { return 1 < 2; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("scalar fixture should parse");
+        let module = lower_scalar_program("actus_root", &program, None)
+            .expect("scalar comparison should lower");
+        assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(
+                instruction,
+                BackendInstruction::IntegerCompare {
+                    operation: BackendIntegerCompareOp::LessThan,
+                    signed: true,
+                    ..
+                }
+            )
+        ));
+    }
+
+    #[test]
+    fn lowers_scalar_integer_unary_into_neutral_ir() {
+        let source = "verb main() -> Int { return -7; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("scalar fixture should parse");
+        let module =
+            lower_scalar_program("actus_root", &program, None).expect("scalar unary should lower");
+        assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(
+                instruction,
+                BackendInstruction::IntegerUnary { operation: BackendIntegerUnaryOp::Negate, .. }
             )
         ));
     }

@@ -11,6 +11,23 @@ pub enum BackendIntegerBinaryOp {
     Multiply,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendIntegerUnaryOp {
+    Negate,
+    LogicalNot,
+    BitwiseNot,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendIntegerCompareOp {
+    LessThan,
+    LessEquals,
+    GreaterThan,
+    GreaterEquals,
+    Equals,
+    NotEquals,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendKind {

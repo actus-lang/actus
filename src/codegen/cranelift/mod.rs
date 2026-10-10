@@ -18,6 +18,7 @@ pub(super) mod enums;
 pub(super) mod expressions;
 pub(super) mod function_definition;
 pub(super) mod generic;
+mod integer_ops;
 pub(super) mod ir_audit;
 mod isa;
 pub(super) mod layout;

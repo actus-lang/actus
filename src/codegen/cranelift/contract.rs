@@ -10,11 +10,12 @@ use super::aggregate::{
     Declaration, aggregate_fragment_type, declaration, direct_aggregate_types, initialize_values,
     lower_call,
 };
+use super::integer_ops::{lower_integer_binary, lower_integer_compare, lower_integer_unary};
 use super::native::BackendEmitError;
 use super::object::create_module;
 use crate::codegen::{
-    BackendFunction, BackendInstruction, BackendIntegerBinaryOp, BackendModule, BackendPassingMode,
-    BackendValueId, BackendValueType,
+    BackendFunction, BackendInstruction, BackendModule, BackendPassingMode, BackendValueId,
+    BackendValueType,
 };
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
@@ -245,6 +246,12 @@ fn lower_instruction(
         BackendInstruction::IntegerBinary { .. } => {
             lower_integer_binary(builder, instruction, values)
         }
+        BackendInstruction::IntegerCompare { .. } => {
+            lower_integer_compare(builder, instruction, values)
+        }
+        BackendInstruction::IntegerUnary { .. } => {
+            lower_integer_unary(builder, instruction, values)
+        }
         BackendInstruction::Call { .. } => {
             lower_call(module, builder, instruction, declarations, values, aggregate_values)
         }
@@ -272,30 +279,6 @@ fn lower_instruction(
             "Cranelift neutral contract instruction is not implemented".to_owned(),
         )),
     }
-}
-
-fn lower_integer_binary(
-    builder: &mut FunctionBuilder<'_>,
-    instruction: &BackendInstruction,
-    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-) -> Result<(), BackendEmitError> {
-    let BackendInstruction::IntegerBinary { result, operation, left, right, .. } = instruction
-    else {
-        return Err(BackendEmitError("Cranelift integer operation expected".to_owned()));
-    };
-    let left = values.get(left).copied().ok_or_else(|| {
-        BackendEmitError(format!("Cranelift binary left operand {} is unavailable", left.0))
-    })?;
-    let right = values.get(right).copied().ok_or_else(|| {
-        BackendEmitError(format!("Cranelift binary right operand {} is unavailable", right.0))
-    })?;
-    let value = match operation {
-        BackendIntegerBinaryOp::Add => builder.ins().iadd(left, right),
-        BackendIntegerBinaryOp::Subtract => builder.ins().isub(left, right),
-        BackendIntegerBinaryOp::Multiply => builder.ins().imul(left, right),
-    };
-    values.insert(*result, value);
-    Ok(())
 }
 
 fn lower_memory_copy(

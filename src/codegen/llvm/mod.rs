@@ -3,6 +3,7 @@ mod context;
 mod control_flow;
 mod declarations;
 mod emission;
+mod integer_ops;
 mod object;
 mod returns;
 mod values;

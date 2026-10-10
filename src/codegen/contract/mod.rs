@@ -1,5 +1,6 @@
 mod cleanup;
 mod errors;
+mod instruction;
 
 use crate::ast::Role;
 use crate::lexer::SourceSpan;
@@ -8,11 +9,14 @@ use std::collections::BTreeSet;
 use super::abi::BackendDirectAggregateAbi;
 use super::abi::BackendEnumLayout;
 pub use super::backend::BackendIntegerBinaryOp;
+pub use super::backend::BackendIntegerCompareOp;
+pub use super::backend::BackendIntegerUnaryOp;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
 use cleanup::validate_cleanup_operand;
 pub use cleanup::{BackendCleanupField, BackendCleanupOperand};
+pub use instruction::BackendInstruction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendEmitError(pub String);
@@ -120,64 +124,6 @@ pub struct BackendValueId(pub u32);
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BackendBlockId(pub u32);
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum BackendInstruction {
-    Constant {
-        result: BackendValueId,
-        ty: BackendValueType,
-        value: u64,
-        span: SourceSpan,
-    },
-    IntegerBinary {
-        result: BackendValueId,
-        operation: BackendIntegerBinaryOp,
-        left: BackendValueId,
-        right: BackendValueId,
-        ty: BackendValueType,
-        span: SourceSpan,
-    },
-    Call {
-        callee: SymbolIdentity,
-        arguments: Vec<BackendValueId>,
-        result: Option<BackendValueId>,
-        span: SourceSpan,
-    },
-    Branch {
-        condition: BackendValueId,
-        then_block: BackendBlockId,
-        else_block: BackendBlockId,
-        span: SourceSpan,
-    },
-    Jump {
-        target: BackendBlockId,
-        span: SourceSpan,
-    },
-    Fail {
-        failure: BackendFailure,
-        span: SourceSpan,
-    },
-    Return {
-        value: Option<BackendValueId>,
-        span: SourceSpan,
-    },
-    Trap {
-        reason: String,
-        span: SourceSpan,
-    },
-    Cleanup {
-        action: LoweredCleanupInstruction,
-        operand: Option<BackendCleanupOperand>,
-        span: SourceSpan,
-    },
-    MemoryCopy {
-        destination: BackendValueId,
-        source: BackendValueId,
-        size: u32,
-        alignment: u32,
-        span: SourceSpan,
-    },
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendFailure {
