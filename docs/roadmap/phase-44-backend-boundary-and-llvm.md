@@ -636,7 +636,9 @@ explicit branch-merge value contract. The regression coverage is
 `lowers_scalar_compound_assignment_into_integer_binary_ir`, and
 `lowers_scalar_parameter_assignment_in_the_function_scope`; top-level `erg`
 parameters use the same value-rebinding model while nested branch mutation
-remains rejected until a merge contract exists. The LLVM CLI fixture
+remains rejected until a merge contract exists. The negative regression
+`rejects_outer_scalar_assignment_without_a_branch_merge_contract` verifies that
+boundary explicitly. The LLVM CLI fixture
 the LLVM CLI fixture
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.
