@@ -346,6 +346,11 @@ enum failures with integer payloads by constructing the declared byte layout
 and returning it directly or through the declared return slot; the LLVM module
 verifier covers the generated IR. Niche-pointer `Option` lowering remains open
 and is rejected with a stable diagnostic rather than approximated.
+Direct aggregate ABI lowering remains open until a target/backend ABI
+descriptor defines register fragments, stack placement, padding, alignment,
+caller/callee lowering, and the matching external C declaration. Aggregate
+size alone is not sufficient to infer this contract, and no direct aggregate
+shape is silently rewritten as an indirect pointer.
 Neutral `BackendExternal` declarations are emitted with the same validated
 symbol identity and signature contract as internal functions. The LLVM suite
 also covers an external runtime-style declaration and call, including the

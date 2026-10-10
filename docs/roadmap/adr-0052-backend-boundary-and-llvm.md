@@ -154,6 +154,29 @@ or through the declared return slot. Niche-pointer representations remain an
 explicit unsupported case until their pointer sentinel and ownership rules
 are represented in the shared contract.
 
+### Direct aggregate ABI contract
+
+The neutral `BackendLayout` describes memory size and alignment; it does not
+by itself define how a direct aggregate crosses a function boundary. Direct
+aggregate lowering must therefore use an explicit target/backend ABI
+descriptor before it is enabled for a target. That descriptor must define:
+
+- whether the aggregate is returned in registers, through a hidden return
+  address, or through a target-specific mixed rule;
+- how each aggregate fragment maps to integer registers or stack slots;
+- the required register class, byte order, padding, and alignment for every
+  fragment;
+- the caller and callee lowering for direct parameters, direct returns, and
+  direct aggregate calls; and
+- the external C ABI declaration used by the acceptance fixture.
+
+An implementation must not infer this contract from aggregate size alone or
+silently replace a direct aggregate with an indirect pointer. Until the
+descriptor and both backend implementations exist, unsupported direct
+aggregate shapes must fail with a stable diagnostic. The first acceptance
+target is hosted x86-64; ARM32/Thumb direct aggregate rules remain part of
+Gate 44.6.
+
 ## Mandatory contracts
 
 ### Initial LLVM integration policy
