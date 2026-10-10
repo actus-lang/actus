@@ -345,7 +345,10 @@ opaque pointers with explicit parameter alignment. Aggregate return slots now
 use a hidden aligned pointer with caller-side stack storage. Memory-copy
 lowering remains available through the existing neutral memory-copy contract;
 descriptor-driven Buffer, Region, and target-width Enum cleanup calls are now
-emitted, while full semantic cleanup schedule integration remains open.
+emitted. Shared lowering now carries the complete semantic cleanup schedule,
+including return and loop unwind plans, with target-neutral builtin cleanup
+descriptors for opaque `Region`, `Buffer`, `String`, and `Arena` layouts. Native
+runtime emission of those shared plans remains open.
 Regular enum typed failures with integer payloads now lower through the
 declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while incomplete semantic cleanup descriptors fail closed
