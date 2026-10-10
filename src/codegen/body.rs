@@ -109,7 +109,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         for (index, statement) in block.statements.iter().enumerate() {
             if let Stmt::If { condition, then_branch, else_branch, span } = statement {
                 let continuation_id = self.allocate_block();
-                self.lower_if(
+                let branches_terminate = self.lower_if(
                     condition,
                     then_branch,
                     else_branch.as_ref(),
@@ -117,6 +117,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     continuation_id,
                     &mut instructions,
                 )?;
+                if branches_terminate {
+                    return Ok(BackendBlock { id, instructions });
+                }
                 let continuation =
                     Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
                 let continuation_block =
@@ -187,7 +190,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         span: SourceSpan,
         continuation_id: BackendBlockId,
         instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<(), BackendContractError> {
+    ) -> Result<bool, BackendContractError> {
         let condition = self.provider.lower_expression(condition, instructions)?;
         let then_id = self.allocate_block();
         let else_id = self.allocate_block();
@@ -198,6 +201,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             span,
         });
         let then_block = self.lower_block(then_id, then_branch, Some(continuation_id))?;
+        let then_terminates = terminates(then_block.instructions.last());
         self.blocks.push(then_block);
         let else_block = match else_branch {
             None => BackendBlock { id: else_id, instructions: Vec::new() },
@@ -206,8 +210,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             }
             Some(IfBranch::ElseIf(_)) => return Err(unsupported(span, "else-if expression")),
         };
-        self.blocks.push(ensure_jump(else_block, continuation_id, span));
-        Ok(())
+        let else_block = ensure_jump(else_block, continuation_id, span);
+        let branches_terminate = then_terminates && terminates(else_block.instructions.last());
+        self.blocks.push(else_block);
+        Ok(branches_terminate)
     }
 
     fn allocate_block(&mut self) -> BackendBlockId {

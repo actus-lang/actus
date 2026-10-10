@@ -848,11 +848,10 @@ fn lowers_if_control_flow_with_explicit_value_provider() {
     };
 
     let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("if should lower");
-    assert_eq!(blocks.len(), 4);
+    assert_eq!(blocks.len(), 3);
     assert!(matches!(blocks[0].instructions[0], BackendInstruction::Branch { .. }));
     assert!(matches!(blocks[1].instructions[0], BackendInstruction::Return { .. }));
     assert!(matches!(blocks[2].instructions[0], BackendInstruction::Return { .. }));
-    assert!(matches!(blocks[3].instructions[0], BackendInstruction::Return { .. }));
 }
 
 #[test]
