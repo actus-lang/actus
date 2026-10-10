@@ -1,12 +1,17 @@
+mod cleanup;
+mod errors;
+
 use crate::ast::Role;
 use crate::lexer::SourceSpan;
 use std::collections::BTreeSet;
 
 use super::abi::BackendDirectAggregateAbi;
-use super::cleanup_contract::{BackendCleanupOperand, validate_cleanup_operand};
 use super::enum_layout::BackendEnumLayout;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
+
+use cleanup::validate_cleanup_operand;
+pub use cleanup::{BackendCleanupField, BackendCleanupOperand};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendEmitError(pub String);

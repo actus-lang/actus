@@ -2,10 +2,8 @@ mod abi;
 mod backend;
 mod bindings;
 mod body;
-mod cleanup_contract;
 mod constants;
 mod contract;
-mod contract_errors;
 #[cfg(feature = "cranelift")]
 pub mod cranelift;
 mod enum_layout;
@@ -24,13 +22,13 @@ pub use abi::{BackendAggregateFragment, BackendAggregateLocation, BackendDirectA
 pub use backend::{BackendKind, BackendTargetError};
 pub use bindings::BackendSymbolBindings;
 pub use body::{BackendBodyProvider, lower_verb_body};
-pub use cleanup_contract::{BackendCleanupField, BackendCleanupOperand};
 pub use contract::{
-    BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupPlan,
-    BackendContractError, BackendEmitError, BackendExternal, BackendFailure, BackendFunction,
-    BackendInstruction, BackendLayout, BackendModule, BackendParameter, BackendPassingMode,
-    BackendReturn, BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation,
-    BackendValueId, BackendValueType, lower_semantic_cleanup,
+    BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupField,
+    BackendCleanupOperand, BackendCleanupPlan, BackendContractError, BackendEmitError,
+    BackendExternal, BackendFailure, BackendFunction, BackendInstruction, BackendLayout,
+    BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
+    BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
+    lower_semantic_cleanup,
 };
 pub use enum_layout::BackendEnumLayout;
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};

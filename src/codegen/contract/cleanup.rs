@@ -1,5 +1,5 @@
-use super::contract::{BackendContractError, BackendLayout, BackendValueId};
-use super::model::LoweredCleanupInstruction;
+use super::super::model::LoweredCleanupInstruction;
+use super::{BackendContractError, BackendLayout, BackendValueId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendCleanupField {

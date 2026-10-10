@@ -1,4 +1,4 @@
-use super::contract::BackendContractError;
+use super::BackendContractError;
 
 impl std::fmt::Display for BackendContractError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
