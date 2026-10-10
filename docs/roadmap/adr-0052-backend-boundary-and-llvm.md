@@ -346,8 +346,13 @@ compile arbitrary C source.
 
 The fixture proves external object interoperability for a scalar return path.
 Aggregate C ABI interoperability, runtime cleanup calls, and serialized-state
-pointer exclusion remain separate acceptance work and are not implied by this
-fixture.
+pointer exclusion are separate concerns. The semantic pack contract rejects
+`Buffer`, `String`, and `Region[...]` fields from serialized storage, and the
+regression `rejects_pointer_bearing_or_dynamic_pack_fields_from_serialized_state`
+records that boundary. External runtime calls remain explicit because the
+neutral module must contain a declared `BackendExternal` and a matching
+`BackendInstruction::Call`; the LLVM emitter does not discover or inject a
+foreign symbol implicitly.
 
 ### Semantic preservation
 

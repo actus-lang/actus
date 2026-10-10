@@ -561,7 +561,7 @@ because the installed `arm-none-eabi-gdb` cannot load its Python module.
       symbol visibility rules for imported C functions.
 - [x] Add a minimal external-library fixture that links through the LLVM ARM
       path without putting C or foreign code into Actus source modules.
-- [ ] Prove that external runtime calls remain explicit and that serialized
+- [x] Prove that external runtime calls remain explicit and that serialized
       Actus state contains no OS pointer.
 - [x] Document how precompiled or separately compiled C libraries may be linked
       without implying that Actus can compile arbitrary C source itself.
@@ -573,8 +573,9 @@ and the Linux ARM acceptance fixture
 compiles `provider.c` separately with Clang, links its object with an Actus
 LLVM object, and checks the final ELF for explicit symbols, no relocations, and
 no undefined symbols. Aggregate foreign ABI paths, runtime cleanup calls, and
-serialized-state pointer exclusion remain open and must not be marked complete
-from this scalar fixture.
+serialized-state pointer exclusion is covered by the semantic pack regression
+`rejects_pointer_bearing_or_dynamic_pack_fields_from_serialized_state`, while
+external-call explicitness is covered by the LLVM IR and linked-ELF fixtures.
 
 ## Gate 44.8 — Cross-backend acceptance and regression protection
 
