@@ -6,10 +6,10 @@ use actus::codegen::cranelift::emit_contract_module_object;
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendEnumLayout, BackendExternal, BackendFailure,
-    BackendFunction, BackendInstruction, BackendModule, BackendParameter, BackendReturn,
-    BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity,
-    SymbolKind,
+    BackendBlock, BackendBlockId, BackendCleanupOperand, BackendEnumLayout, BackendExternal,
+    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendModule,
+    BackendParameter, BackendReturn, BackendReturnMode, BackendValueId, BackendValueType,
+    LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
 };
 use actus::configuration::CompilerConfiguration;
 use object::{Object, ObjectSection, ObjectSymbol};
@@ -352,6 +352,56 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
         .expect("end-borrow cleanup should lower without a runtime call");
     assert!(ir.contains("define void @test__verb_cleanup()"));
     assert!(ir.contains("ret void"));
+}
+
+#[test]
+fn rejects_runtime_cleanup_until_its_bridge_abi_is_lowered() {
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "runtime_cleanup").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "region".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Pointer,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Cleanup {
+                    action: LoweredCleanupInstruction::DropBinding {
+                        binding_index: 0,
+                        name: "region".to_owned(),
+                    },
+                    operand: Some(BackendCleanupOperand {
+                        value: BackendValueId(0),
+                        layout: BackendLayout { size: 16, alignment: 8 },
+                        field: None,
+                    }),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+
+    let error = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect_err("runtime-backed cleanup must not be silently omitted");
+    assert_eq!(
+        error.to_string(),
+        "LLVM cleanup action `drop-binding` requires a runtime bridge lowering"
+    );
 }
 
 #[test]

@@ -342,7 +342,11 @@ Regular enum typed failures with integer payloads now lower through the
 declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while runtime-backed cleanup actions fail closed until
 their bridge ABI and storage representation are implemented. The feature build
-and this emitter slice are covered by the LLVM integration test.
+and this emitter slice are covered by the LLVM integration test. A dedicated
+LLVM regression test also verifies that a value-bearing runtime cleanup action
+fails with the explicit bridge-lowering diagnostic instead of being silently
+omitted; runtime cleanup execution remains open until its ABI and storage
+representation are implemented.
 The neutral contract now also validates non-zero, alignment-compatible pointer
 copy extents, and the LLVM slice lowers those extents through overlap-safe
 `llvm.memmove` calls. Full semantic copy propagation and aggregate field copy
