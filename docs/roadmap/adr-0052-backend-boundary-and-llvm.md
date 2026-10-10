@@ -289,6 +289,12 @@ an explicit entry symbol, an explicit runtime provider, a linker script, and
 startup object, provider symbols, linker script, and link acceptance remain
 implementation work.
 
+The build configuration now provides an explicit `linker_script` path. Actus
+resolves it relative to `Actus.toml` and adds `-T <path>` to GNU linker plans.
+Other linker flavors reject this option until their script syntax and
+acceptance contract are defined. The configuration and plan test proves only
+argument construction, not successful ARM image linking.
+
 ### Semantic preservation
 
 Ownership roles, cleanup order, typed failures, enum discriminants, aggregate

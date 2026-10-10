@@ -30,6 +30,10 @@ impl CompilerConfiguration {
         &self.linker
     }
 
+    pub fn linker_script(&self) -> Option<&Path> {
+        self.linker_script.as_deref()
+    }
+
     pub const fn linker_flavor(&self) -> LinkerFlavor {
         self.linker_flavor
     }

@@ -52,6 +52,7 @@ pub(crate) struct BuildManifest {
     pub(crate) target: Option<String>,
     pub(crate) profile: Option<BuildProfile>,
     pub(crate) linker: Option<String>,
+    pub(crate) linker_script: Option<String>,
     pub(crate) linker_flavor: Option<crate::target::LinkerFlavor>,
     pub(crate) entry_contract: Option<crate::target::EntryContract>,
     pub(crate) native_module: Option<String>,
@@ -233,6 +234,9 @@ fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> 
 fn validate_build(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError("Actus.toml linker must not be empty".to_owned()));
+    }
+    if manifest.build.linker_script.as_deref().is_some_and(|value| value.trim().is_empty()) {
+        return Err(ConfigurationError("Actus.toml linker_script must not be empty".to_owned()));
     }
     if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError("Actus.toml native_module must not be empty".to_owned()));

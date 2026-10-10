@@ -37,6 +37,14 @@ impl LinkerPlan {
         {
             arguments.extend([OsString::from("-flavor"), OsString::from("link")]);
         }
+        if let Some(linker_script) = configuration.linker_script() {
+            if configuration.linker_flavor() != crate::configuration::LinkerFlavor::Gnu {
+                return Err(NativeLinkError(
+                    "linker_script is currently supported only by the GNU linker flavor".to_owned(),
+                ));
+            }
+            arguments.extend([OsString::from("-T"), linker_script.as_os_str().to_os_string()]);
+        }
         arguments.extend(objects.iter().map(|object| object.as_os_str().to_os_string()));
         append_link_inputs(&mut arguments, configuration);
         arguments.extend(

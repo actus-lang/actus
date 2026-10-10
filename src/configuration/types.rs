@@ -111,6 +111,7 @@ pub struct CompilerConfiguration {
     pub(super) profile: BuildProfile,
     pub(super) profiles: manifest::ProfilesManifest,
     pub(super) linker: OsString,
+    pub(super) linker_script: Option<PathBuf>,
     pub(super) linker_flavor: LinkerFlavor,
     pub(super) entry_contract: EntryContract,
     pub(super) runtime: RuntimeProfile,

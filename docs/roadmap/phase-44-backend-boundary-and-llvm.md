@@ -494,6 +494,13 @@ the runtime provider must be explicit, and the stack contract remains
 8-byte-aligned. This is a typed target requirement only; it does not claim
 that the provider, startup object, or linker script has been supplied yet.
 
+The build manifest now accepts `linker_script = "memory.x"`. The path is
+resolved relative to the project manifest and is emitted as `-T <path>` only
+for the GNU linker flavor. Configuration tests verify the resolved path and
+the deterministic linker-plan argument. This provides the configuration
+boundary; it does not claim that the script, startup object, or runtime
+provider links successfully.
+
 The representation contract now covers one-word scalar values in `r0` and
 stack-spilled aggregates with explicit byte size, alignment, and offset. An
 aggregate return uses an explicit indirect return address in `r0`. This is a

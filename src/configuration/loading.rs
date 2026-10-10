@@ -27,6 +27,7 @@ impl CompilerConfiguration {
             profile: super::BuildProfile::Debug,
             profiles: manifest::ProfilesManifest::default(),
             linker,
+            linker_script: None,
             linker_flavor,
             entry_contract,
             runtime: super::RuntimeProfile::Core,
@@ -106,7 +107,7 @@ fn build_from_manifest(
     let runtime_module_roots = super::resolution::runtime_module_roots(runtime, entry_contract)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let source_root = validated_source_root(&manifest, manifest_directory)?;
-    let (profile, native_backend, libraries, library_paths) =
+    let (profile, native_backend, libraries, library_paths, linker_script) =
         build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
     Ok(CompilerConfiguration {
         project_root: manifest_directory.to_path_buf(),
@@ -122,6 +123,7 @@ fn build_from_manifest(
         profile,
         profiles: manifest.profile,
         linker,
+        linker_script,
         linker_flavor,
         entry_contract,
         runtime,

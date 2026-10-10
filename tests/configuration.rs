@@ -55,6 +55,37 @@ fn linker_plan_is_deterministic_across_supported_host_profiles() {
 }
 
 #[test]
+fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
+    let root = std::env::temp_dir().join(format!("actus-arm-linker-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create ARM linker project directory");
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"arm_linker\"\nversion = \"1.0.0\"\nentry = \"boot\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("write ARM linker manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest(&manifest).expect("ARM manifest should load");
+    assert_eq!(configuration.linker_script(), Some(root.join("memory.x").as_path()));
+    let plan = LinkerPlan::from_configuration(
+        &[Path::new("/tmp/actus-arm-root.o")],
+        Path::new("/tmp/actus-arm-image"),
+        &configuration,
+    )
+    .expect("ARM GNU linker plan should accept a linker script");
+    let arguments = plan
+        .arguments()
+        .iter()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert!(arguments.windows(2).any(|window| {
+        window[0] == "-T" && window[1] == root.join("memory.x").display().to_string()
+    }));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn loads_build_settings_from_an_actus_manifest() {
     let path = std::env::temp_dir().join(format!("actus-config-{}.toml", std::process::id()));
     fs::write(
