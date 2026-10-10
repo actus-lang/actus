@@ -363,6 +363,12 @@ copy extents, and the LLVM slice lowers those extents through overlap-safe
 `llvm.memmove` calls. Full semantic copy propagation and aggregate field copy
 integration remain open until the common body lowering carries pointer values
 for those operations.
+Cranelift's authoritative layout registry now resolves nested moved-field paths
+to checked offset, size, and alignment metadata, and native partial-binding
+cleanup rejects an unknown or malformed path before emitting any runtime drop.
+This is a fail-closed native validation step; the shared semantic cleanup
+descriptor still needs to carry the resolved metadata before the remaining
+cleanup gate can close.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

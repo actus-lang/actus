@@ -7,6 +7,7 @@ use crate::ast::{
     EnumDef, LayoutEndianness, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl,
     TypeName, builtin_enum_definitions,
 };
+use crate::codegen::BackendCleanupField;
 use crate::semantic::GenericInstance;
 
 use super::enum_layout::EnumLayout;
@@ -175,6 +176,56 @@ impl LayoutRegistry {
 
     pub(super) fn get(&self, id: usize) -> Option<&StructLayout> {
         self.layouts.get(id)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn cleanup_field_layout(
+        &self,
+        root_name: &str,
+        path: &str,
+    ) -> Result<(NativeType, BackendCleanupField), BackendEmitError> {
+        let root_id = self
+            .id_for(root_name)
+            .ok_or_else(|| BackendEmitError(format!("unknown cleanup root type `{root_name}`")))?;
+        self.cleanup_field_layout_by_id(root_id, root_name, path)
+    }
+
+    pub(crate) fn cleanup_field_layout_by_id(
+        &self,
+        root_id: usize,
+        root_name: &str,
+        path: &str,
+    ) -> Result<(NativeType, BackendCleanupField), BackendEmitError> {
+        let mut segments = path.split('.').filter(|segment| !segment.is_empty());
+        let first = segments
+            .next()
+            .ok_or_else(|| BackendEmitError("cleanup field path is empty".to_owned()))?;
+        let mut current_id = root_id;
+        let mut offset = 0u32;
+        let mut field_name = first;
+        loop {
+            let layout = self.get(current_id).ok_or_else(|| {
+                BackendEmitError(format!("missing cleanup layout `{current_id}`"))
+            })?;
+            let field =
+                layout.fields.iter().find(|field| field.name == field_name).ok_or_else(|| {
+                    BackendEmitError(format!("unknown cleanup field `{path}` on `{root_name}`"))
+                })?;
+            offset = offset
+                .checked_add(field.offset)
+                .ok_or_else(|| BackendEmitError("cleanup field offset overflow".to_owned()))?;
+            let (size, alignment) = self.type_layout(field.ty)?;
+            let Some(next) = segments.next() else {
+                return Ok((field.ty, BackendCleanupField { offset, size, alignment }));
+            };
+            let NativeType::Struct(next_id) = field.ty else {
+                return Err(BackendEmitError(format!(
+                    "cleanup field `{field_name}` is not a struct in `{path}`"
+                )));
+            };
+            current_id = next_id;
+            field_name = next;
+        }
     }
 
     pub(super) fn pack(&self, id: usize) -> Option<&PackLayout> {
@@ -371,11 +422,41 @@ fn align_up(offset: u32, alignment: u32) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::align_up;
+    use super::{LayoutRegistry, align_up};
+    use crate::codegen::cranelift::types::NativeType;
+    use crate::lexer::scan;
+    use crate::parser::parse;
 
     #[test]
     fn rejects_impossible_alignment_values() {
         assert_eq!(align_up(0, 0), None);
         assert_eq!(align_up(u32::MAX, 2), None);
+    }
+
+    #[test]
+    fn resolves_nested_runtime_cleanup_field_offsets() {
+        let (tokens, errors) = scan(
+            "struct Inner { erg first: Buffer, erg second: Buffer, } struct Outer { erg inner: Inner, } verb main() { }",
+        );
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("nested cleanup layout source should parse");
+        let layouts = LayoutRegistry::from_program(&program, cranelift_codegen::ir::types::I64)
+            .expect("nested cleanup layout should pass");
+
+        let (first_type, first) = layouts
+            .cleanup_field_layout("Outer", "inner.first")
+            .expect("first nested field should resolve");
+        assert_eq!(first_type, NativeType::Buffer);
+        assert_eq!(first.offset, 0);
+        assert_eq!(first.size, 8);
+        assert_eq!(first.alignment, 8);
+
+        let (_, second) = layouts
+            .cleanup_field_layout("Outer", "inner.second")
+            .expect("second nested field should resolve");
+        assert_eq!(second.offset, 8);
+        assert_eq!(second.size, 8);
+        assert_eq!(second.alignment, 8);
+        assert!(layouts.cleanup_field_layout("Outer", "inner.missing").is_err());
     }
 }

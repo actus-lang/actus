@@ -29,8 +29,20 @@ fn emit_struct_drop_except(
 ) -> Result<(), BackendEmitError> {
     let layout =
         layouts.get(id).ok_or_else(|| BackendEmitError(format!("missing drop layout `{id}`")))?;
+    validate_moved_field_paths(id, moved_fields, layouts)?;
     for field in layout.fields.iter().rev().filter(|field| field.owned) {
         emit_owned_field_drop(function, address, field, moved_fields, functions, layouts)?;
+    }
+    Ok(())
+}
+
+fn validate_moved_field_paths(
+    root_id: usize,
+    moved_fields: &[String],
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    for path in moved_fields {
+        layouts.cleanup_field_layout_by_id(root_id, &format!("struct-{root_id}"), path)?;
     }
     Ok(())
 }

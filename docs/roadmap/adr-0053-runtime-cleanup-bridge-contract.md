@@ -77,8 +77,11 @@ width.
 ## Consequences
 
 The descriptor is now present and LLVM emits `BufferDrop`, `RegionDrop`, and
-target-width `EnumDrop` bridge calls for direct cleanup operands. Semantic enum
-layout discovery and full cleanup schedule integration remain open. The
-existing Cranelift cleanup path remains the behavioral reference for parity
-fixtures until those semantic paths are complete.
+target-width `EnumDrop` bridge calls for direct cleanup operands. Cranelift's
+layout registry resolves nested moved-field paths and rejects an unknown path
+before native cleanup emission. Semantic enum layout discovery and full
+cleanup schedule integration remain open; the shared descriptor still needs
+to carry the resolved binding and moved-field metadata before those semantic
+paths are complete. The existing Cranelift cleanup path remains the behavioral
+reference for parity fixtures until that integration is complete.
 
