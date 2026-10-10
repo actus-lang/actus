@@ -66,14 +66,20 @@ fn signature(
         let ty = parameter_type(module, parameter)?;
         signature.params.push(AbiParam::new(ty));
     }
-    match return_value.passing {
+    match &return_value.passing {
         crate::codegen::BackendReturnMode::Direct => {
             if let Some(ty) = scalar_type(module, return_value.ty)? {
                 signature.returns.push(AbiParam::new(ty));
             }
         }
+        crate::codegen::BackendReturnMode::DirectAggregate { .. } => {
+            return Err(BackendEmitError(
+                "Cranelift direct aggregate ABI lowering is not implemented for this target"
+                    .to_owned(),
+            ));
+        }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
-            if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } if value_layout == layout)
+            if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } if value_layout == *layout)
             {
                 return Err(BackendEmitError(
                     "Cranelift return slot layout does not match the aggregate return type"
@@ -90,10 +96,13 @@ fn parameter_type(
     module: &ObjectModule,
     parameter: &crate::codegen::BackendParameter,
 ) -> Result<Type, BackendEmitError> {
-    match parameter.passing {
+    match &parameter.passing {
         BackendPassingMode::Direct => scalar_type(module, parameter.ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift direct unit parameters are not supported".to_owned())
         }),
+        BackendPassingMode::DirectAggregate { .. } => Err(BackendEmitError(
+            "Cranelift direct aggregate ABI lowering is not implemented for this target".to_owned(),
+        )),
         BackendPassingMode::Indirect { layout }
         | BackendPassingMode::Borrowed { layout }
         | BackendPassingMode::ExclusiveLoan { layout }
@@ -103,7 +112,7 @@ fn parameter_type(
             match parameter.ty {
                 BackendValueType::Aggregate { layout: value_layout }
                 | BackendValueType::Region { layout: value_layout }
-                    if value_layout == layout =>
+                    if value_layout == *layout =>
                 {
                     Ok(module.isa().pointer_type())
                 }
@@ -214,7 +223,7 @@ fn initialize_values(
     builder.append_block_params_for_function_params(entry);
     let block_params = builder.block_params(entry).to_vec();
     let return_slot = matches!(
-        function.return_value.passing,
+        &function.return_value.passing,
         crate::codegen::BackendReturnMode::ReturnSlot { .. }
     )
     .then(|| block_params.first().copied())

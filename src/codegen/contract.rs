@@ -2,6 +2,7 @@ use crate::ast::Role;
 use crate::lexer::SourceSpan;
 use std::collections::BTreeSet;
 
+use super::abi::BackendDirectAggregateAbi;
 use super::enum_layout::BackendEnumLayout;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
@@ -68,9 +69,10 @@ pub struct BackendParameter {
     pub passing: BackendPassingMode,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendPassingMode {
     Direct,
+    DirectAggregate { abi: BackendDirectAggregateAbi },
     Indirect { layout: BackendLayout },
     Borrowed { layout: BackendLayout },
     ExclusiveLoan { layout: BackendLayout },
@@ -79,21 +81,23 @@ pub enum BackendPassingMode {
 }
 
 impl BackendPassingMode {
-    pub(super) fn layout(self) -> Option<BackendLayout> {
+    pub(super) fn layout(&self) -> Option<BackendLayout> {
         match self {
             Self::Direct => None,
+            Self::DirectAggregate { abi } => Some(abi.layout),
             Self::Indirect { layout }
             | Self::Borrowed { layout }
             | Self::ExclusiveLoan { layout }
             | Self::OwnershipTransfer { layout }
-            | Self::RuntimeBridge { layout } => Some(layout),
+            | Self::RuntimeBridge { layout } => Some(*layout),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendReturnMode {
     Direct,
+    DirectAggregate { abi: BackendDirectAggregateAbi },
     ReturnSlot { layout: BackendLayout },
 }
 
@@ -279,13 +283,19 @@ fn validate_parameters(parameters: &[BackendParameter]) -> Result<(), BackendCon
 
 fn validate_return(return_value: &BackendReturn) -> Result<(), BackendContractError> {
     validate_value_type(return_value.ty)?;
-    if let BackendReturnMode::ReturnSlot { layout } = return_value.passing {
-        layout.validate()?;
-        match return_value.ty {
-            BackendValueType::Aggregate { layout: value_layout }
-            | BackendValueType::Region { layout: value_layout }
-                if value_layout == layout => {}
-            _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
+    match &return_value.passing {
+        BackendReturnMode::Direct => {}
+        BackendReturnMode::DirectAggregate { abi } => {
+            validate_direct_aggregate_type(return_value.ty, abi)?;
+        }
+        BackendReturnMode::ReturnSlot { layout } => {
+            layout.validate()?;
+            match return_value.ty {
+                BackendValueType::Aggregate { layout: value_layout }
+                | BackendValueType::Region { layout: value_layout }
+                    if value_layout == *layout => {}
+                _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
+            }
         }
     }
     Ok(())
@@ -352,24 +362,44 @@ fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContrac
     if let Some(layout) = parameter.passing.layout() {
         layout.validate()?;
     }
+    if let BackendPassingMode::DirectAggregate { abi } = &parameter.passing {
+        validate_direct_aggregate_type(parameter.ty, abi)?;
+    }
     let valid = match parameter.role {
         Role::Erg => matches!(
-            parameter.passing,
+            &parameter.passing,
             BackendPassingMode::Direct
+                | BackendPassingMode::DirectAggregate { .. }
                 | BackendPassingMode::Indirect { .. }
                 | BackendPassingMode::RuntimeBridge { .. }
         ),
         Role::Abs => matches!(
-            parameter.passing,
+            &parameter.passing,
             BackendPassingMode::Direct
+                | BackendPassingMode::DirectAggregate { .. }
                 | BackendPassingMode::Indirect { .. }
                 | BackendPassingMode::Borrowed { .. }
                 | BackendPassingMode::RuntimeBridge { .. }
         ),
-        Role::Ins => matches!(parameter.passing, BackendPassingMode::ExclusiveLoan { .. }),
-        Role::Dat => matches!(parameter.passing, BackendPassingMode::OwnershipTransfer { .. }),
+        Role::Ins => matches!(&parameter.passing, BackendPassingMode::ExclusiveLoan { .. }),
+        Role::Dat => matches!(&parameter.passing, BackendPassingMode::OwnershipTransfer { .. }),
     };
     valid.then_some(()).ok_or(BackendContractError::RolePassingMismatch)
+}
+
+fn validate_direct_aggregate_type(
+    ty: BackendValueType,
+    abi: &BackendDirectAggregateAbi,
+) -> Result<(), BackendContractError> {
+    abi.validate()?;
+    match ty {
+        BackendValueType::Aggregate { layout } | BackendValueType::Region { layout }
+            if layout == abi.layout =>
+        {
+            Ok(())
+        }
+        _ => Err(BackendContractError::DirectAggregateTypeMismatch),
+    }
 }
 
 fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError> {
@@ -400,6 +430,7 @@ pub enum BackendContractError {
     DuplicateBlockId,
     InvalidBlockReference,
     InvalidValueType,
+    DirectAggregateTypeMismatch,
     InvalidFailureType,
     InvalidMemoryCopy,
     InvalidAggregateAbi(&'static str),
@@ -435,65 +466,3 @@ impl BackendUnsupportedOperation {
         Self { operation: operation.into(), span, context, reason: reason.into() }
     }
 }
-
-impl std::fmt::Display for BackendContractError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidLayout(reason) => write!(formatter, "invalid backend layout: {reason}"),
-            Self::InvalidEnumLayout(reason) => {
-                write!(formatter, "invalid backend enum layout: {reason}")
-            }
-            Self::InvalidFunctionSymbol => formatter.write_str("invalid backend function symbol"),
-            Self::InvalidExternalSymbol => formatter.write_str("invalid backend external symbol"),
-            Self::MissingEntryBlock => {
-                formatter.write_str("backend function is missing its entry block")
-            }
-            Self::EmptyParameterName => formatter.write_str("backend parameter name is empty"),
-            Self::DuplicateParameterName => {
-                formatter.write_str("backend function has duplicate parameter names")
-            }
-            Self::DuplicateBlockId => {
-                formatter.write_str("backend function has duplicate block ids")
-            }
-            Self::InvalidBlockReference => {
-                formatter.write_str("backend control flow references an unknown block")
-            }
-            Self::InvalidValueType => {
-                formatter.write_str("backend value type has an invalid width")
-            }
-            Self::InvalidFailureType => {
-                formatter.write_str("backend typed failure must reference an enum result type")
-            }
-            Self::InvalidMemoryCopy => {
-                formatter.write_str("backend memory copy requires a non-zero aligned extent")
-            }
-            Self::InvalidAggregateAbi(reason) => {
-                write!(formatter, "invalid direct aggregate ABI: {reason}")
-            }
-            Self::InvalidCleanupContract(reason) => {
-                write!(formatter, "invalid semantic cleanup contract: {reason}")
-            }
-            Self::ReturnSlotTypeMismatch => {
-                formatter.write_str("backend return slot must match an aggregate return type")
-            }
-            Self::InvalidCallSymbol => formatter.write_str("backend call has an empty symbol"),
-            Self::RolePassingMismatch => {
-                formatter.write_str("backend parameter role and passing mode disagree")
-            }
-            Self::DuplicateModuleSymbol => {
-                formatter.write_str("backend module contains a duplicate symbol")
-            }
-            Self::Unsupported(operation) => write!(
-                formatter,
-                "backend `{}` does not support `{}` for target `{}` at {:?}: {}",
-                operation.context.backend,
-                operation.operation,
-                operation.context.target,
-                operation.span,
-                operation.reason
-            ),
-        }
-    }
-}
-
-impl std::error::Error for BackendContractError {}

@@ -316,6 +316,39 @@ fn accepts_niche_pointer_payload_without_inline_enum_storage() {
 }
 
 #[test]
+fn rejects_direct_aggregate_descriptor_for_a_scalar() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let abi = BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![BackendAggregateFragment {
+            offset: 0,
+            size: 8,
+            alignment: 8,
+            location: BackendAggregateLocation::Register { index: 0 },
+        }],
+        return_fragments: vec![BackendAggregateFragment {
+            offset: 0,
+            size: 8,
+            alignment: 8,
+            location: BackendAggregateLocation::Register { index: 0 },
+        }],
+    };
+    let function = BackendFunction {
+        symbol: verb_symbol(),
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::Integer { signed: false, width: 64 },
+            passing: BackendReturnMode::DirectAggregate { abi },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        cleanup: Vec::new(),
+    };
+    assert_eq!(function.validate(), Err(BackendContractError::DirectAggregateTypeMismatch));
+}
+
+#[test]
 fn rejects_zero_width_values_and_invalid_parameter_aggregates() {
     let zero_width = unit_function(
         vec![BackendParameter {

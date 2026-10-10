@@ -164,8 +164,9 @@ may inspect the private emitted representation.
 
 The neutral `BackendLayout` describes memory size and alignment; it does not
 by itself define how a direct aggregate crosses a function boundary. Direct
-aggregate lowering must therefore use an explicit target/backend ABI
-descriptor before it is enabled for a target. That descriptor must define:
+aggregate lowering therefore uses an explicit `DirectAggregate` passing or
+return mode carrying a validated target/backend ABI descriptor before it is
+enabled for a target. That descriptor must define:
 
 - whether the aggregate is returned in registers, through a hidden return
   address, or through a target-specific mixed rule;
@@ -177,11 +178,13 @@ descriptor before it is enabled for a target. That descriptor must define:
 - the external C ABI declaration used by the acceptance fixture.
 
 An implementation must not infer this contract from aggregate size alone or
-silently replace a direct aggregate with an indirect pointer. Until the
-descriptor and both backend implementations exist, unsupported direct
-aggregate shapes must fail with a stable diagnostic. The first acceptance
-target is hosted x86-64; ARM32/Thumb direct aggregate rules remain part of
-Gate 44.6.
+silently replace a direct aggregate with an indirect pointer. The neutral
+contract validates that the descriptor matches the aggregate layout and value
+type. The hosted LLVM emitter accepts the explicit mode and emits the declared
+aggregate type; Cranelift currently rejects the mode with a stable unsupported
+diagnostic until its fragmented value mapping is implemented. The first
+acceptance target is hosted x86-64; ARM32/Thumb direct aggregate rules remain
+part of Gate 44.6.
 
 ## Mandatory contracts
 

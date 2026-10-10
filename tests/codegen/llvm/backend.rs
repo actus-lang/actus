@@ -413,6 +413,37 @@ fn rejects_floating_point_types_before_llvm_lowering() {
 #[test]
 fn emits_fixed_layout_aggregate_parameter_and_return() {
     let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let abi = actus::codegen::BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![
+            actus::codegen::BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: actus::codegen::BackendAggregateLocation::Register { index: 0 },
+            },
+            actus::codegen::BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: actus::codegen::BackendAggregateLocation::Register { index: 1 },
+            },
+        ],
+        return_fragments: vec![
+            actus::codegen::BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: actus::codegen::BackendAggregateLocation::Register { index: 0 },
+            },
+            actus::codegen::BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: actus::codegen::BackendAggregateLocation::Register { index: 1 },
+            },
+        ],
+    };
     let aggregate = BackendValueType::Aggregate { layout };
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "aggregate").expect("valid symbol");
     let function = BackendFunction {
@@ -421,12 +452,12 @@ fn emits_fixed_layout_aggregate_parameter_and_return() {
             name: "value".to_owned(),
             role: Role::Erg,
             ty: aggregate,
-            passing: actus::codegen::BackendPassingMode::Direct,
+            passing: actus::codegen::BackendPassingMode::DirectAggregate { abi: abi.clone() },
         }],
         return_value: BackendReturn {
             role: Some(Role::Erg),
             ty: aggregate,
-            passing: BackendReturnMode::Direct,
+            passing: BackendReturnMode::DirectAggregate { abi },
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {

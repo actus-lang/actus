@@ -28,7 +28,7 @@ pub(super) fn declare_function(
     parameters: &[BackendParameter],
     return_value: &BackendReturn,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
-    let return_slot = matches!(return_value.passing, BackendReturnMode::ReturnSlot { .. });
+    let return_slot = matches!(&return_value.passing, BackendReturnMode::ReturnSlot { .. });
     let value_type = llvm_type(context, return_value.ty)?;
     let return_type =
         if return_slot { unsafe { LLVMVoidTypeInContext(context) } } else { value_type };
@@ -64,8 +64,10 @@ fn parameter_type(
     context: LLVMContextRef,
     parameter: &BackendParameter,
 ) -> Result<LLVMTypeRef, BackendEmitError> {
-    match parameter.passing {
-        BackendPassingMode::Direct => llvm_type(context, parameter.ty),
+    match &parameter.passing {
+        BackendPassingMode::Direct | BackendPassingMode::DirectAggregate { .. } => {
+            llvm_type(context, parameter.ty)
+        }
         BackendPassingMode::Indirect { .. }
         | BackendPassingMode::Borrowed { .. }
         | BackendPassingMode::ExclusiveLoan { .. }
@@ -82,12 +84,20 @@ fn apply_parameter_alignments(
     return_value: &BackendReturn,
     return_slot: bool,
 ) {
-    if let BackendReturnMode::ReturnSlot { layout } = return_value.passing {
+    if let BackendReturnMode::ReturnSlot { layout } = &return_value.passing {
         let value = unsafe { LLVMGetParam(function, 0) };
         unsafe { LLVMSetParamAlignment(value, layout.alignment) };
     }
     for (index, parameter) in parameters.iter().enumerate() {
-        let Some(layout) = parameter.passing.layout() else {
+        let layout = match &parameter.passing {
+            BackendPassingMode::Indirect { layout }
+            | BackendPassingMode::Borrowed { layout }
+            | BackendPassingMode::ExclusiveLoan { layout }
+            | BackendPassingMode::OwnershipTransfer { layout }
+            | BackendPassingMode::RuntimeBridge { layout } => Some(*layout),
+            BackendPassingMode::Direct | BackendPassingMode::DirectAggregate { .. } => None,
+        };
+        let Some(layout) = layout else {
             continue;
         };
         let physical_index = index + usize::from(return_slot);

@@ -361,11 +361,18 @@ shape is silently rewritten as an indirect pointer.
 The neutral contract now provides `BackendDirectAggregateAbi` with separate
 parameter and return fragment descriptions. Validation rejects gaps,
 misaligned ranges, duplicate register indices, overlapping stack ranges, and
-descriptors that do not cover the complete aggregate layout. This closes the
-metadata and validation sub-step; it does not claim backend emission support.
+descriptors that do not cover the complete aggregate layout. The descriptor is
+now carried explicitly by `DirectAggregate` parameter and return modes, and a
+scalar cannot use that mode. LLVM hosted lowering accepts the explicit mode
+and preserves the aggregate value type without applying pointer-only alignment
+attributes. Cranelift currently returns a stable unsupported diagnostic for
+this mode until its fragmented aggregate value mapping is implemented; no
+implicit pointer rewrite is used.
 Niche-pointer enum metadata is also restricted to pointer-sized,
 zero-offset layouts with no inline payload. Native pointer-sentinel lowering
-remains open for both backends.
+for `Option::None` and pointer payloads for `Option::Some` are covered by the
+LLVM/Cranelift parity fixtures; the emitted sentinel remains private backend
+ABI state.
 Neutral `BackendExternal` declarations are emitted with the same validated
 symbol identity and signature contract as internal functions. The LLVM suite
 also covers an external runtime-style declaration and call, including the
