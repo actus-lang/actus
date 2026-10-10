@@ -187,6 +187,22 @@ and non-contiguous register assignments with stable diagnostics until their
 target-specific placement rules are implemented. The first acceptance target
 is hosted x86-64; ARM32/Thumb direct aggregate rules remain part of Gate 44.6.
 
+### Cleanup value boundary
+
+Semantic cleanup plans currently identify bindings and borrow records by their
+semantic indexes. A native runtime bridge additionally needs the lowered value
+that carries the resource address or capability handle. A backend must not
+derive that value from a source name, binding index, or hidden global state.
+Runtime cleanup parity therefore requires an explicit neutral mapping from each
+cleanup action to a validated `BackendValueId` and, for partially moved
+aggregates, an explicit field or sublayout descriptor. The mapping must retain
+LIFO ordering, ownership state, and the declared layout through backend
+lowering. Until that contract exists, LLVM and the contract Cranelift emitter
+must reject runtime-backed cleanup actions with a stable diagnostic;
+compile-time `EndBorrow` remains a no-op boundary. The full Cranelift language
+lowerer has its own typed cleanup context and does not define the neutral
+contract for the LLVM parity path.
+
 ## Mandatory contracts
 
 ### Initial LLVM integration policy

@@ -310,6 +310,8 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       niche-pointer `Option` fixtures.
 - [ ] Extend cross-backend semantic comparison to ownership and runtime-cleanup
       fixtures.
+- [ ] Define value-bearing neutral cleanup operands and field sublayouts before
+      enabling runtime bridge calls in either parity backend.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
