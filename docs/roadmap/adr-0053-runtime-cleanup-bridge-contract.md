@@ -102,3 +102,10 @@ Region binding drops now consume the resolved descriptor in Cranelift native
 emission; partial moved-field cleanup still uses the established layout path
 until field-address descriptor emission is integrated.
 
+For a partial ownership plan, a moved-field descriptor describes the field
+that has already transferred out of the parent owner. It is validated for
+layout and bridge compatibility, but it must not be emitted as a second drop.
+The native partial cleanup path therefore drops the remaining owned fields and
+explicitly excludes the moved paths. Any future field-address emission must
+preserve this exclusion rule and prove it with an execution fixture.
+
