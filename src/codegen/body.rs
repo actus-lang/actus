@@ -1,9 +1,9 @@
-use crate::ast::{Block, Expr, IfBranch, Place, Stmt, VerbDecl};
+use crate::ast::{Block, CompoundAssignmentOp, Expr, IfBranch, Place, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
 
 use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
-    BackendTargetContext, BackendValueId, SymbolIdentity,
+    BackendIntegerBinaryOp, BackendTargetContext, BackendValueId, SymbolIdentity,
 };
 
 pub trait BackendBodyProvider {
@@ -44,6 +44,17 @@ pub trait BackendExpressionProvider {
         span: SourceSpan,
     ) -> Result<(), BackendContractError> {
         Err(unsupported(span, "assignment"))
+    }
+
+    fn lower_integer_binary(
+        &mut self,
+        _operation: BackendIntegerBinaryOp,
+        _left: BackendValueId,
+        _right: BackendValueId,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        Err(unsupported(span, "integer binary operation"))
     }
 
     fn lower_expression(
@@ -184,12 +195,11 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 let value = self.provider.lower_expression(initializer, instructions)?;
                 self.provider.bind_owner(name, value, *span)?;
             }
-            Stmt::Assignment { target: Place::Binding { name, .. }, value, span } => {
-                let value = self.provider.lower_expression(value, instructions)?;
-                self.provider.assign_owner(name, value, *span)?;
+            Stmt::Assignment { target, value, span } => {
+                self.lower_assignment(target, value, *span, instructions)?;
             }
-            Stmt::Assignment { span, .. } => {
-                return Err(unsupported(*span, "assignment target"));
+            Stmt::CompoundAssignment { target, operator, value, span } => {
+                self.lower_compound_assignment(target, *operator, value, *span, instructions)?;
             }
             Stmt::Return { value, span } => {
                 let Some(expression) = value else {
@@ -225,6 +235,47 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             _ => return Err(unsupported(statement_span(statement), unsupported_name(statement))),
         }
         Ok(())
+    }
+
+    fn lower_assignment(
+        &mut self,
+        target: &Place,
+        value: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        let Place::Binding { name, .. } = target else {
+            return Err(unsupported(span, "assignment target"));
+        };
+        let value = self.provider.lower_expression(value, instructions)?;
+        self.provider.assign_owner(name, value, span)
+    }
+
+    fn lower_compound_assignment(
+        &mut self,
+        target: &Place,
+        operator: CompoundAssignmentOp,
+        value: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        let Place::Binding { name, span: target_span } = target else {
+            return Err(unsupported(span, "compound assignment target"));
+        };
+        let current = self.provider.lower_expression(
+            &Place::Binding { name: name.clone(), span: *target_span }.to_expr(),
+            instructions,
+        )?;
+        let value = self.provider.lower_expression(value, instructions)?;
+        let operation = match operator {
+            CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
+            CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
+            CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            _ => return Err(unsupported(span, "compound assignment operator")),
+        };
+        let result =
+            self.provider.lower_integer_binary(operation, current, value, span, instructions)?;
+        self.provider.assign_owner(name, result, span)
     }
 
     fn lower_if(

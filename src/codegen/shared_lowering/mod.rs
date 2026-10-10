@@ -269,6 +269,26 @@ impl BackendExpressionProvider for ScalarExpressionProvider<'_> {
         Ok(())
     }
 
+    fn lower_integer_binary(
+        &mut self,
+        operation: BackendIntegerBinaryOp,
+        left: BackendValueId,
+        right: BackendValueId,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let result = self.allocate();
+        instructions.push(BackendInstruction::IntegerBinary {
+            result,
+            operation,
+            left,
+            right,
+            ty: BackendValueType::Integer { signed: true, width: 32 },
+            span,
+        });
+        Ok(result)
+    }
+
     fn lower_expression(
         &mut self,
         expression: &Expr,

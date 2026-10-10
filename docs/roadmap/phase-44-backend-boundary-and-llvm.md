@@ -627,11 +627,13 @@ constructed backend-neutral contracts.
 
 ### Current shared-lowering evidence
 
-The shared semantic lowering boundary now covers scalar owner declarations and
-same-scope scalar reassignment as distinct value bindings. The neutral contract
-rejects non-binding assignment targets and assignments that would require an
-outer-scope mutation without an explicit branch-merge value contract. The
-regression coverage is `lowers_scalar_local_assignment_into_a_new_value`, and
+The shared semantic lowering boundary now covers scalar owner declarations,
+same-scope scalar reassignment, and same-scope scalar compound assignment as
+distinct value bindings. The neutral contract rejects non-binding assignment
+targets and assignments that would require an outer-scope mutation without an
+explicit branch-merge value contract. The regression coverage is
+`lowers_scalar_local_assignment_into_a_new_value` and
+`lowers_scalar_compound_assignment_into_integer_binary_ir`, and
 the LLVM CLI fixture
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.
