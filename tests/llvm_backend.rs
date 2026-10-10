@@ -1,13 +1,14 @@
 #![cfg(feature = "llvm")]
 
 use actus::ast::Role;
-use actus::codegen::llvm::emit_module;
+use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendEnumLayout, BackendExternal, BackendFailure,
     BackendFunction, BackendInstruction, BackendModule, BackendParameter, BackendReturn,
     BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity,
     SymbolKind,
 };
+use object::{Object, ObjectSymbol};
 
 #[test]
 fn emits_a_valid_unit_function_as_llvm_ir() {
@@ -502,4 +503,37 @@ fn lowers_aggregate_return_slot_between_caller_and_callee() {
     assert!(ir.contains("call void @test__verb_make(ptr"));
     assert!(ir.contains("store "));
     assert!(ir.contains("load [2 x i64]"));
+}
+
+#[test]
+fn emits_a_host_object_with_a_stable_public_symbol() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "main").expect("valid symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let output = std::env::temp_dir().join(format!("actus-llvm-object-{}.o", std::process::id()));
+    let second_output =
+        std::env::temp_dir().join(format!("actus-llvm-object-{}-second.o", std::process::id()));
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    emit_object(&module, &target, &output).expect("host object should be emitted");
+    emit_object(&module, &target, &second_output).expect("second host object should be emitted");
+    let bytes = std::fs::read(&output).expect("object should be readable");
+    let second_bytes = std::fs::read(&second_output).expect("second object should be readable");
+    assert_eq!(bytes, second_bytes, "repeated object emission must be deterministic");
+    let object = object::File::parse(bytes.as_slice()).expect("object should parse");
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("test__verb_main")));
+    std::fs::remove_file(output).expect("test object should be removed");
+    std::fs::remove_file(second_output).expect("second test object should be removed");
 }

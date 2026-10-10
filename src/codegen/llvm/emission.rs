@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
+use std::path::Path;
 use std::ptr;
 
 use llvm_sys::analysis::{LLVMVerifierFailureAction, LLVMVerifyModule};
@@ -13,6 +14,7 @@ use super::super::{BackendBlockId, BackendEmitError, BackendFunction, BackendMod
 use super::context::{LlvmContext, LlvmModule};
 use super::control_flow::emit_blocks;
 use super::declarations::{FunctionDeclaration, declare_function};
+use crate::target::TargetSpec;
 
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.
 ///
@@ -21,6 +23,31 @@ use super::declarations::{FunctionDeclaration, declare_function};
 /// compile-time end-borrow cleanup boundaries, and regular enum failures with explicit layout
 /// metadata. Runtime-backed cleanup actions and niche-pointer `Option` lowering remain open.
 pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
+    let (_context, owned_module) = lower_module(module)?;
+    verify_module(owned_module.raw)?;
+    print_module(owned_module.raw)
+}
+
+/// Emits a validated backend module as a target-specific object file.
+///
+/// The target is selected from the compiler's `TargetSpec`; LLVM receives the same triple and
+/// target data layout before code generation. LLVM writes the requested output path directly; a
+/// failed emission returns an error and is never reported as a successful object. This API
+/// currently initializes LLVM's native target registry, so hosted object emission is supported
+/// for the compiler host target while cross-target registration is added by the target backend
+/// boundary.
+pub fn emit_object(
+    module: &BackendModule,
+    target: &TargetSpec,
+    output: &Path,
+) -> Result<(), BackendEmitError> {
+    let (_context, owned_module) = lower_module(module)?;
+    verify_module(owned_module.raw)?;
+    super::object::emit_object(owned_module.raw, target, output)?;
+    Ok(())
+}
+
+fn lower_module(module: &BackendModule) -> Result<(LlvmContext, LlvmModule), BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
     let context = LlvmContext::new()?;
     let module_name = CString::new("actus.module")
@@ -34,8 +61,7 @@ pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
             .ok_or_else(|| BackendEmitError("LLVM function declaration is missing".to_owned()))?;
         emit_function(context.raw, function, declaration, &declarations)?;
     }
-    verify_module(owned_module.raw)?;
-    print_module(owned_module.raw)
+    Ok((context, owned_module))
 }
 
 fn declare_module_functions(

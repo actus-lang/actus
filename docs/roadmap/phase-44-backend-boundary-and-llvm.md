@@ -336,6 +336,14 @@ Neutral `BackendExternal` declarations are emitted with the same validated
 symbol identity and signature contract as internal functions. The LLVM suite
 also covers an external runtime-style declaration and call, including the
 deterministic symbol spelling and typed argument.
+The hosted LLVM emitter now accepts the shared `TargetSpec`, initializes the
+native LLVM target registry, applies the target triple and data layout, and
+emits an object file through `LLVMTargetMachineEmitToFile`. The object test
+emits the same unit module twice, compares the complete bytes for deterministic
+output, parses the result with the object reader, and verifies the exported
+Actus symbol. This closes the LLVM object-emission slice for the host target;
+hosted executable linking, cross-target registration, and target-specific
+runtime/startup integration remain open.
 CI now runs a separate Cranelift-only configuration across all targets and a
 separate LLVM-only configuration that checks the compiler library and binary
 surface plus the LLVM integration suite. The LLVM-only configuration does not
