@@ -448,7 +448,15 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
                     binding_index: 2,
                     name: "region".to_owned(),
                 },
-                value: Some(BackendValueId(0)),
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: Some(actus::codegen::BackendCleanupField {
+                        offset: 0,
+                        size: 8,
+                        alignment: 8,
+                    }),
+                }),
                 span: SourceSpan::new(4, 10),
             }],
         }],
@@ -467,7 +475,35 @@ fn rejects_runtime_cleanup_without_a_lowered_value_operand() {
                     binding_index: 0,
                     name: "region".to_owned(),
                 },
-                value: None,
+                operand: None,
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn rejects_cleanup_field_outside_the_declared_layout() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::ResetArena {
+                    binding_index: 0,
+                    name: "region".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: Some(actus::codegen::BackendCleanupField {
+                        offset: 8,
+                        size: 16,
+                        alignment: 8,
+                    }),
+                }),
                 span: SourceSpan::new(0, 1),
             }],
         }],
