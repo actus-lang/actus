@@ -44,6 +44,44 @@ fn emits_a_valid_unit_function_as_llvm_ir() {
 }
 
 #[test]
+fn emits_a_neutral_integer_constant_and_returns_it() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "constant").expect("valid symbol");
+    let integer = BackendValueType::Integer { signed: false, width: 32 };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: Some(Role::Erg),
+                ty: integer,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![
+                    BackendInstruction::Constant {
+                        result: BackendValueId(0),
+                        ty: integer,
+                        value: 42,
+                        span: actus::lexer::SourceSpan::new(0, 2),
+                    },
+                    BackendInstruction::Return {
+                        value: Some(BackendValueId(0)),
+                        span: actus::lexer::SourceSpan::new(2, 3),
+                    },
+                ],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+
+    let ir = emit_module(&module).expect("constant should lower to LLVM IR");
+    assert!(ir.contains("ret i32 42"));
+}
+
+#[test]
 fn emits_scalar_parameter_return_and_direct_call() {
     let integer = BackendValueType::Integer { signed: false, width: 32 };
     let callee_symbol =

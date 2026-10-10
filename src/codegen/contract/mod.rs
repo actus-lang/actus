@@ -122,6 +122,12 @@ pub struct BackendBlockId(pub u32);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendInstruction {
+    Constant {
+        result: BackendValueId,
+        ty: BackendValueType,
+        value: u64,
+        span: SourceSpan,
+    },
     Call {
         callee: SymbolIdentity,
         arguments: Vec<BackendValueId>,
@@ -341,6 +347,11 @@ fn validate_instruction(
     block_ids: &BTreeSet<BackendBlockId>,
 ) -> Result<(), BackendContractError> {
     match instruction {
+        BackendInstruction::Constant { ty, .. }
+            if !matches!(ty, BackendValueType::Bool | BackendValueType::Integer { .. }) =>
+        {
+            Err(BackendContractError::InvalidValueType)
+        }
         BackendInstruction::Call { callee, .. } if callee.as_str().is_empty() => {
             Err(BackendContractError::InvalidCallSymbol)
         }

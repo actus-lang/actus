@@ -234,6 +234,14 @@ fn lower_instruction(
     function: &BackendFunction,
 ) -> Result<(), BackendEmitError> {
     match instruction {
+        BackendInstruction::Constant { result, ty, value, .. } => {
+            let ty = scalar_type(module, *ty)?.ok_or_else(|| {
+                BackendEmitError("Cranelift constant cannot have unit type".to_owned())
+            })?;
+            let value = builder.ins().iconst(ty, *value as i64);
+            values.insert(*result, value);
+            Ok(())
+        }
         BackendInstruction::Call { .. } => {
             lower_call(module, builder, instruction, declarations, values, aggregate_values)
         }

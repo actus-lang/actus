@@ -83,6 +83,15 @@ fn emit_instruction(
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     match instruction {
+        BackendInstruction::Constant { result, ty, value, .. } => {
+            let llvm_type = super::values::llvm_type(context, *ty)?;
+            let constant = unsafe { LLVMConstInt(llvm_type, *value, 0) };
+            if constant.is_null() {
+                return Err(BackendEmitError("LLVM failed to create integer constant".to_owned()));
+            }
+            values.insert(*result, constant);
+            Ok(false)
+        }
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
             Ok(true)
