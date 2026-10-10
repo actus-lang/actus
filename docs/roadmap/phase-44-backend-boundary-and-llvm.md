@@ -586,7 +586,7 @@ constructed backend-neutral contracts.
 
 - [x] Define one public backend selector with explicit `cranelift` and `llvm`
       variants and a deterministic default.
-- [ ] Add manifest configuration for backend selection with strict parsing,
+- [x] Add manifest configuration for backend selection with strict parsing,
       validation, inheritance, and a clear error for an unavailable feature.
 - [ ] Add an explicit build-level override only if it has the same validated
       configuration path as the manifest; do not create a second backend
