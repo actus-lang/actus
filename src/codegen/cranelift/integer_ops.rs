@@ -28,6 +28,9 @@ pub(super) fn lower_integer_binary(
         BackendIntegerBinaryOp::Add => builder.ins().iadd(left, right),
         BackendIntegerBinaryOp::Subtract => builder.ins().isub(left, right),
         BackendIntegerBinaryOp::Multiply => builder.ins().imul(left, right),
+        BackendIntegerBinaryOp::BitwiseAnd => builder.ins().band(left, right),
+        BackendIntegerBinaryOp::BitwiseOr => builder.ins().bor(left, right),
+        BackendIntegerBinaryOp::BitwiseXor => builder.ins().bxor(left, right),
     };
     values.insert(*result, value);
     Ok(())

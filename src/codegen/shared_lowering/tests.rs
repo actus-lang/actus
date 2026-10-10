@@ -39,6 +39,29 @@ fn lowers_scalar_integer_addition_into_neutral_ir() {
 }
 
 #[test]
+fn lowers_scalar_bitwise_operations_into_neutral_ir() {
+    let cases = [
+        ("12 & 10", BackendIntegerBinaryOp::BitwiseAnd),
+        ("12 | 10", BackendIntegerBinaryOp::BitwiseOr),
+        ("12 ^ 10", BackendIntegerBinaryOp::BitwiseXor),
+    ];
+    for (expression, operation) in cases {
+        let source = format!("verb main() -> Int {{ return {expression}; }}");
+        let (tokens, errors) = scan(&source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("scalar bitwise fixture should parse");
+        let module = lower_scalar_program("actus_root", &program, None)
+            .expect("scalar bitwise expression should lower");
+        assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(
+                instruction,
+                BackendInstruction::IntegerBinary { operation: actual, .. } if *actual == operation
+            )
+        ));
+    }
+}
+
+#[test]
 fn lowers_scalar_integer_comparison_into_neutral_ir() {
     let source = "verb main() -> Bool { return 1 < 2; }";
     let (tokens, errors) = scan(source);
@@ -122,6 +145,22 @@ fn lowers_scalar_compound_assignment_into_integer_binary_ir() {
         |instruction| matches!(
             instruction,
             BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+        )
+    ));
+}
+
+#[test]
+fn lowers_scalar_compound_bitwise_assignment_into_integer_binary_ir() {
+    let source = "verb main() -> Int { erg answer = 8; answer |= 2; return answer; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("scalar compound bitwise fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("scalar compound bitwise assignment should lower");
+    assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+        |instruction| matches!(
+            instruction,
+            BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::BitwiseOr, .. }
         )
     ));
 }

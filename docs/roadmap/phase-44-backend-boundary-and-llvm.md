@@ -629,9 +629,10 @@ constructed backend-neutral contracts.
 
 The shared semantic lowering boundary now covers scalar owner declarations,
 same-scope scalar reassignment, and same-scope scalar compound assignment as
-distinct value bindings. The neutral contract rejects non-binding assignment
-targets and assignments that would require an outer-scope mutation without an
-explicit branch-merge value contract. The regression coverage is
+distinct value bindings, including the safe bitwise operators `&`, `|`, and
+`^`. The neutral contract rejects non-binding assignment targets and
+assignments that would require an outer-scope mutation without an explicit
+branch-merge value contract. The regression coverage is
 `lowers_scalar_local_assignment_into_a_new_value` and
 `lowers_scalar_compound_assignment_into_integer_binary_ir`, and
 `lowers_scalar_parameter_assignment_in_the_function_scope`; top-level `erg`

@@ -1,0 +1,6 @@
+[env]
+# Native integration tests launch compiler and linker subprocesses. Keep the
+# default libtest concurrency bounded so a plain `cargo test` cannot fan out
+# into competing native toolchains. CI commands may still override this with
+# an explicit test-thread setting when a different profile is required.
+RUST_TEST_THREADS = { value = "1", force = false }

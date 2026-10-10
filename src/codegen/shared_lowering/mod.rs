@@ -393,6 +393,9 @@ impl ScalarExpressionProvider<'_> {
             BinaryOp::Add => BackendIntegerBinaryOp::Add,
             BinaryOp::Subtract => BackendIntegerBinaryOp::Subtract,
             BinaryOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            BinaryOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
+            BinaryOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
+            BinaryOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
             BinaryOp::LessThan
             | BinaryOp::LessEquals
             | BinaryOp::GreaterThan

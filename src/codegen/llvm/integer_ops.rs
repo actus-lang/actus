@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
-use llvm_sys::core::{LLVMBuildAdd, LLVMBuildICmp, LLVMBuildMul, LLVMBuildSub, LLVMBuildXor};
+use llvm_sys::core::{
+    LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildMul, LLVMBuildOr, LLVMBuildSub,
+    LLVMBuildXor,
+};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 use super::super::{
@@ -35,6 +38,15 @@ pub(super) fn emit_integer_binary(
             }
             BackendIntegerBinaryOp::Multiply => {
                 LLVMBuildMul(builder, left, right, b"actus.mul\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::BitwiseAnd => {
+                LLVMBuildAnd(builder, left, right, b"actus.and\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::BitwiseOr => {
+                LLVMBuildOr(builder, left, right, b"actus.or\0".as_ptr().cast())
+            }
+            BackendIntegerBinaryOp::BitwiseXor => {
+                LLVMBuildXor(builder, left, right, b"actus.xor\0".as_ptr().cast())
             }
         }
     };

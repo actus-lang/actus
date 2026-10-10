@@ -271,6 +271,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
             CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
             CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
+            CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
+            CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
+            CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
             _ => return Err(unsupported(span, "compound assignment operator")),
         };
         let result =

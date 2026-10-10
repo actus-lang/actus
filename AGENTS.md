@@ -202,7 +202,7 @@ Before a change is considered complete, the following checks must pass:
 cargo fmt --all -- --check
 cargo check --all-targets --all-features
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-targets --all-features
+cargo test --all-targets --all-features -- --test-threads=1
 ```
 
 Additional checks may be required for parser, semantic analyzer, generated code, fuzzing, or release changes.
@@ -323,7 +323,7 @@ repository checks and any relevant native or semantic integration tests:
 cargo fmt --all -- --check
 cargo check --all-targets --all-features
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-targets --all-features
+cargo test --all-targets --all-features -- --test-threads=1
 scripts/check_source_limits.sh
 git diff --check
 ```
