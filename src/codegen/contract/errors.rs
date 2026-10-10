@@ -1,4 +1,69 @@
-use super::BackendContractError;
+use crate::lexer::SourceSpan;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BackendContractError {
+    InvalidLayout(&'static str),
+    InvalidEnumLayout(&'static str),
+    InvalidFunctionSymbol,
+    InvalidExternalSymbol,
+    MissingEntryBlock,
+    EmptyParameterName,
+    DuplicateParameterName,
+    DuplicateBlockId,
+    InvalidBlockReference,
+    InvalidValueType,
+    DirectAggregateTypeMismatch,
+    InvalidFailureType,
+    InvalidMemoryCopy,
+    InvalidAggregateAbi(&'static str),
+    InvalidCleanupContract(String),
+    InvalidCleanupPlan,
+    InvalidCleanupOperand,
+    ReturnSlotTypeMismatch,
+    InvalidCallSymbol,
+    RolePassingMismatch,
+    DuplicateModuleSymbol,
+    Unsupported(BackendUnsupportedOperation),
+}
+
+impl BackendContractError {
+    pub fn with_backend_context(
+        mut self,
+        backend: impl Into<String>,
+        target: impl Into<String>,
+    ) -> Self {
+        if let Self::Unsupported(operation) = &mut self {
+            operation.context =
+                BackendTargetContext { backend: backend.into(), target: target.into() };
+        }
+        self
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendTargetContext {
+    pub backend: String,
+    pub target: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendUnsupportedOperation {
+    pub operation: String,
+    pub span: SourceSpan,
+    pub context: BackendTargetContext,
+    pub reason: String,
+}
+
+impl BackendUnsupportedOperation {
+    pub fn new(
+        operation: impl Into<String>,
+        span: SourceSpan,
+        context: BackendTargetContext,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self { operation: operation.into(), span, context, reason: reason.into() }
+    }
+}
 
 impl std::fmt::Display for BackendContractError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

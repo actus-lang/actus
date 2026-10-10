@@ -258,6 +258,27 @@ fn reports_unsupported_operations_with_target_context() {
 }
 
 #[test]
+fn enriches_neutral_lowering_errors_with_selected_backend_context() {
+    let error = BackendContractError::Unsupported(BackendUnsupportedOperation::new(
+        "body-lowering",
+        SourceSpan::new(4, 9),
+        BackendTargetContext {
+            backend: "neutral-contract".to_owned(),
+            target: "semantic-model".to_owned(),
+        },
+        "drop statement has no neutral lowering contract yet",
+    ))
+    .with_backend_context("cranelift", "x86_64-unknown-linux-gnu");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("backend `cranelift`"));
+    assert!(rendered.contains("target `x86_64-unknown-linux-gnu`"));
+    assert!(rendered.contains("body-lowering"));
+    assert!(rendered.contains("start: 4"));
+    assert!(rendered.contains("end: 9"));
+}
+
+#[test]
 fn validates_aligned_aggregate_layouts() {
     assert!(BackendLayout { size: 16, alignment: 8 }.validate().is_ok());
     assert!(BackendLayout { size: 12, alignment: 8 }.validate().is_err());

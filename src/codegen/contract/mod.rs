@@ -21,6 +21,7 @@ pub use cleanup::{
     BackendCleanupField, BackendCleanupOperand, BackendCleanupProvider,
     BackendCleanupResolvedDescriptor, BackendCleanupResult,
 };
+pub use errors::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
 pub use instruction::BackendInstruction;
 pub use semantic_cleanup::lower_semantic_cleanup_with_provider;
 
@@ -434,56 +435,5 @@ fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError>
         | BackendValueType::Integer { .. }
         | BackendValueType::Float { .. }
         | BackendValueType::Pointer => Ok(()),
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum BackendContractError {
-    InvalidLayout(&'static str),
-    InvalidEnumLayout(&'static str),
-    InvalidFunctionSymbol,
-    InvalidExternalSymbol,
-    MissingEntryBlock,
-    EmptyParameterName,
-    DuplicateParameterName,
-    DuplicateBlockId,
-    InvalidBlockReference,
-    InvalidValueType,
-    DirectAggregateTypeMismatch,
-    InvalidFailureType,
-    InvalidMemoryCopy,
-    InvalidAggregateAbi(&'static str),
-    InvalidCleanupContract(String),
-    InvalidCleanupPlan,
-    InvalidCleanupOperand,
-    ReturnSlotTypeMismatch,
-    InvalidCallSymbol,
-    RolePassingMismatch,
-    DuplicateModuleSymbol,
-    Unsupported(BackendUnsupportedOperation),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BackendTargetContext {
-    pub backend: String,
-    pub target: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BackendUnsupportedOperation {
-    pub operation: String,
-    pub span: SourceSpan,
-    pub context: BackendTargetContext,
-    pub reason: String,
-}
-
-impl BackendUnsupportedOperation {
-    pub fn new(
-        operation: impl Into<String>,
-        span: SourceSpan,
-        context: BackendTargetContext,
-        reason: impl Into<String>,
-    ) -> Self {
-        Self { operation: operation.into(), span, context, reason: reason.into() }
     }
 }

@@ -18,7 +18,10 @@ pub(super) fn emit_objects_llvm(
         Some(symbol),
         Some(&bindings),
     )
-    .map_err(|error| BackendEmitError(format!("LLVM root semantic lowering failed: {error}")))?;
+    .map_err(|error| {
+        let error = error.with_backend_context("llvm", configuration.target().triple().to_string());
+        BackendEmitError(format!("LLVM root semantic lowering failed: {error}"))
+    })?;
     let mut objects = vec![llvm_object("root", &root_module, configuration.target())?];
     for unit in &object_plan.units()[1..] {
         let program = crate::codegen::normalize_program(unit.program());
@@ -29,6 +32,8 @@ pub(super) fn emit_objects_llvm(
             Some(&bindings),
         )
         .map_err(|error| {
+            let error =
+                error.with_backend_context("llvm", configuration.target().triple().to_string());
             BackendEmitError(format!(
                 "LLVM module `{}` semantic lowering failed: {error}",
                 unit.namespace().module_path()
