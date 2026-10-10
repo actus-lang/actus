@@ -375,7 +375,9 @@ validation rejects missing field metadata, misalignment, and out-of-bounds
 field ranges before a backend can consume the descriptor. Provider-based
 semantic population of this descriptor is now available through an explicit
 cleanup provider interface. The concrete Cranelift layout adapter and backend
-emission integration remain the next implementation step.
+layout regression now exercise the native registry for nested Buffer and Region
+fields. Wiring this provider into the production semantic-to-backend emission
+pipeline remains the next implementation step.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and
 LLVM's structural/type invariants.

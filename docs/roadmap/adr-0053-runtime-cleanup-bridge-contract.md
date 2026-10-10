@@ -88,5 +88,7 @@ The neutral contract also defines a resolved descriptor that validates the
 parent layout and optional field sublayout as one unit. Semantic providers have
 now populate it from binding types and each moved-field path through an explicit
 provider interface. The concrete Cranelift layout adapter and backend emission
-integration remain the next required step.
+adapter now resolves nested Buffer and Region fields from the native layout
+registry with a regression test. Wiring the provider into production semantic
+to-backend emission remains the next required step.
 

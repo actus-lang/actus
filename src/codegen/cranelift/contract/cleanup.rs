@@ -5,13 +5,101 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
+use crate::ast::{BuiltinType, TypeName};
 use crate::codegen::{
-    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupOperand, BackendInstruction,
+    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
+    BackendCleanupField, BackendCleanupOperand, BackendCleanupProvider,
+    BackendCleanupResolvedDescriptor, BackendContractError, BackendInstruction, BackendLayout,
     BackendModule, BackendValueId, LoweredCleanupInstruction,
 };
 
 use super::super::aggregate::Declaration;
+use super::super::layout::LayoutRegistry;
 use super::super::native::BackendEmitError;
+use super::super::types::NativeType;
+
+#[allow(dead_code)]
+pub(super) struct LayoutCleanupProvider<'a> {
+    pub(super) layouts: &'a LayoutRegistry,
+}
+
+impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
+    fn resolve_binding(
+        &self,
+        type_name: Option<&TypeName>,
+        builtin: Option<BuiltinType>,
+    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError> {
+        let native_type = if builtin == Some(BuiltinType::Buffer) {
+            NativeType::Buffer
+        } else if type_name.is_some_and(|name| name.name == "Region") {
+            NativeType::Region
+        } else {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        };
+        let (size, alignment) = self
+            .layouts
+            .type_layout(native_type)
+            .map_err(|_| BackendContractError::InvalidCleanupOperand)?;
+        let descriptor = match native_type {
+            NativeType::Buffer => BackendCleanupBridgeDescriptor {
+                bridge: BackendCleanupBridge::BufferDrop,
+                argument: BackendCleanupArgument::Value,
+                result: crate::codegen::BackendCleanupResult::Ignored,
+            },
+            NativeType::Region => BackendCleanupBridgeDescriptor {
+                bridge: BackendCleanupBridge::RegionDrop,
+                argument: BackendCleanupArgument::Address,
+                result: crate::codegen::BackendCleanupResult::Status,
+            },
+            _ => return Err(BackendContractError::InvalidCleanupOperand),
+        };
+        Ok(BackendCleanupResolvedDescriptor {
+            descriptor,
+            layout: BackendLayout { size, alignment },
+            field: None,
+        })
+    }
+
+    fn resolve_field(
+        &self,
+        root_type: &TypeName,
+        path: &str,
+    ) -> Result<BackendCleanupResolvedDescriptor, BackendContractError> {
+        let native_type = self
+            .layouts
+            .native_type_for_type_name(root_type, &mut Vec::new())
+            .map_err(|_| BackendContractError::InvalidCleanupOperand)?;
+        let NativeType::Struct(root_id) = native_type else {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        };
+        let (size, alignment) = self
+            .layouts
+            .type_layout(native_type)
+            .map_err(|_| BackendContractError::InvalidCleanupOperand)?;
+        let (field_type, field) = self
+            .layouts
+            .cleanup_field_layout_by_id(root_id, &root_type.name, path)
+            .map_err(|_| BackendContractError::InvalidCleanupOperand)?;
+        let descriptor = match field_type {
+            NativeType::Buffer => BackendCleanupBridgeDescriptor {
+                bridge: BackendCleanupBridge::BufferDrop,
+                argument: BackendCleanupArgument::FieldAddress,
+                result: crate::codegen::BackendCleanupResult::Ignored,
+            },
+            NativeType::Region => BackendCleanupBridgeDescriptor {
+                bridge: BackendCleanupBridge::RegionDrop,
+                argument: BackendCleanupArgument::FieldAddress,
+                result: crate::codegen::BackendCleanupResult::Status,
+            },
+            _ => return Err(BackendContractError::InvalidCleanupOperand),
+        };
+        Ok(BackendCleanupResolvedDescriptor {
+            descriptor,
+            layout: BackendLayout { size, alignment },
+            field: Some(BackendCleanupField { ..field }),
+        })
+    }
+}
 
 pub(super) fn declare_cleanup_bridges(
     module: &mut ObjectModule,
@@ -106,5 +194,39 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LayoutCleanupProvider;
+    use crate::codegen::BackendCleanupProvider;
+    use crate::codegen::cranelift::layout::LayoutRegistry;
+    use crate::lexer::scan;
+    use crate::parser::parse;
+
+    #[test]
+    fn resolves_nested_runtime_field_through_native_layout_registry() {
+        let (tokens, errors) = scan(
+            "struct Inner { erg first: Buffer, erg second: Region, } struct Outer { erg inner: Inner, } verb main() { }",
+        );
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("cleanup provider source should parse");
+        let layouts = LayoutRegistry::from_program(&program, cranelift_codegen::ir::types::I64)
+            .expect("cleanup provider layout should pass");
+        let provider = LayoutCleanupProvider { layouts: &layouts };
+        let root = crate::ast::TypeName {
+            name: "Outer".to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: crate::lexer::SourceSpan::new(0, 5),
+        };
+        let first =
+            provider.resolve_field(&root, "inner.first").expect("buffer field should resolve");
+        assert_eq!(first.field.expect("field metadata").offset, 0);
+        let second =
+            provider.resolve_field(&root, "inner.second").expect("region field should resolve");
+        assert_eq!(second.field.expect("field metadata").offset, 8);
+        assert!(provider.resolve_field(&root, "inner.missing").is_err());
     }
 }
