@@ -296,7 +296,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       backend-neutral enum contract without claiming native pointer lowering.
 - [x] Lower and execute the niche-pointer `Option::None` direct pointer return
       through both native backends.
-- [ ] Add direct aggregate ABI and niche-pointer `Option` lowering using the
+- [x] Add direct aggregate ABI and niche-pointer `Option` lowering using the
       same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
 - [x] Emit deterministic object files and link a hosted executable.
@@ -306,8 +306,10 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       aggregate and memory-copy contract slice.
 - [x] Compare LLVM and Cranelift semantic results for the supported regular
       enum typed-failure `ReturnSlot` fixture.
-- [ ] Extend cross-backend semantic comparison to direct aggregate,
-      niche-pointer `Option`, ownership, and runtime-cleanup fixtures.
+- [x] Extend cross-backend semantic comparison to direct aggregate and
+      niche-pointer `Option` fixtures.
+- [ ] Extend cross-backend semantic comparison to ownership and runtime-cleanup
+      fixtures.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
@@ -437,6 +439,13 @@ transitions, and runtime cleanup remain outside this evidence.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when
 assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
 slot pointer. This is covered by the hosted parity fixture.
+The direct-register aggregate parity fixture now routes an aggregate value
+through a caller into an aggregate callee and returns the callee result. LLVM
+and Cranelift both lower and execute this cross-function path with the same
+two-register descriptor. The Cranelift implementation expands logical
+aggregate arguments into the declared contiguous integer fragments and records
+multi-result calls as one logical aggregate value; stack fragments and
+non-contiguous registers remain explicit unsupported cases.
 Installation requirements, direct dependency trees, clean debug build times,
 target-directory sizes, and debug executable sizes are recorded in
 `docs/benchmarks/phase-44-backend-build-profile-2026-10-09.md`. The record
