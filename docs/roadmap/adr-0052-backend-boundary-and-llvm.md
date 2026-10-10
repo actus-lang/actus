@@ -314,6 +314,41 @@ the installed `arm-none-eabi-gdb` cannot load its Python module; no claim is
 made about application-level behavior beyond successful verified programming
 and reset.
 
+### External C ABI boundary
+
+External calls use the same validated `SymbolIdentity` and `BackendExternal`
+contract as internal calls. The only foreign calling convention currently
+accepted by the FFI contract is C. Imported signatures must declare every
+parameter and the return type explicitly. Integer widths, pointer-width
+representations, aggregate passing modes, and return modes are validated before
+LLVM lowering; unsupported Actus types or ambiguous return ownership are
+rejected.
+
+The Actus role at each external parameter remains part of the ABI contract:
+`abs` maps to a shared read-only borrow, `ins` and `erg` require an exclusive
+mutable access path, and `dat` consumes ownership. Returned borrowed values do
+not acquire ownership, while owned resource returns acquire an explicit
+ownership path. The C boundary is unsafe and explicit at the source interface;
+it does not infer ownership from a foreign declaration.
+
+External symbols are deterministic Actus symbols. For example,
+`SymbolIdentity::new("runtime", SymbolKind::External, "increment")` emits
+`runtime__extern_increment`. Symbol visibility is explicit in the object
+contract; no host library or operating-system symbol is implicitly imported.
+
+Gate 44.7 acceptance includes a Linux fixture that compiles a standalone C
+provider with Clang for `thumbv7em-none-eabihf`, emits an Actus LLVM object that
+calls the declared provider symbol, and links both objects with an explicit
+startup object and linker script. The fixture checks the final ARM ELF for the
+provider and Actus symbols, zero relocations, and zero undefined symbols. The C
+source is test input compiled by an external tool; Actus does not parse or
+compile arbitrary C source.
+
+The fixture proves external object interoperability for a scalar return path.
+Aggregate C ABI interoperability, runtime cleanup calls, and serialized-state
+pointer exclusion remain separate acceptance work and are not implied by this
+fixture.
+
 ### Semantic preservation
 
 Ownership roles, cleanup order, typed failures, enum discriminants, aggregate

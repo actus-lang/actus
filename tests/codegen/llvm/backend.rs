@@ -928,6 +928,148 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
+    use std::process::Command;
+
+    let root =
+        std::env::temp_dir().join(format!("actus-llvm-arm-c-provider-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("external provider fixture directory should be created");
+    let provider_source = root.join("provider.c");
+    fs::write(&provider_source, "int runtime__extern_increment(void) { return 7; }\n")
+        .expect("external C provider source should be written");
+    let startup = root.join("startup.s");
+    fs::write(
+        &startup,
+        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+    )
+    .expect("external provider startup source should be written");
+    let linker_script = root.join("memory.x");
+    fs::write(
+        &linker_script,
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+    )
+    .expect("external provider linker script should be written");
+    let provider_object = root.join("provider.o");
+    let startup_object = root.join("startup.o");
+    let actus_object = root.join("boot.o");
+    let image = root.join("image.elf");
+
+    run_native_command(
+        Command::new("clang")
+            .args([
+                "--target=thumbv7em-none-eabihf",
+                "-mcpu=cortex-m7",
+                "-mthumb",
+                "-ffreestanding",
+                "-fno-builtin",
+                "-nostdlib",
+                "-c",
+            ])
+            .arg(&provider_source)
+            .arg("-o")
+            .arg(&provider_object),
+    );
+    run_native_command(
+        Command::new("clang")
+            .args(["--target=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-mthumb", "-c"])
+            .arg(&startup)
+            .arg("-o")
+            .arg(&startup_object),
+    );
+
+    let external_symbol = SymbolIdentity::new("runtime", SymbolKind::External, "increment")
+        .expect("valid external symbol");
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let module = BackendModule {
+        externals: vec![BackendExternal {
+            symbol: external_symbol.clone(),
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: integer,
+                passing: BackendReturnMode::Direct,
+            },
+        }],
+        functions: vec![BackendFunction {
+            symbol: SymbolIdentity::new("arm", SymbolKind::Verb, "boot")
+                .expect("valid boot symbol"),
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: Some(Role::Erg),
+                ty: integer,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![
+                    BackendInstruction::Call {
+                        callee: external_symbol,
+                        arguments: Vec::new(),
+                        result: Some(BackendValueId(0)),
+                        span: actus::lexer::SourceSpan::new(0, 1),
+                    },
+                    BackendInstruction::Return {
+                        value: Some(BackendValueId(0)),
+                        span: actus::lexer::SourceSpan::new(1, 2),
+                    },
+                ],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
+        .expect("Cortex-M target should parse");
+    emit_object(&module, &target, &actus_object)
+        .expect("Actus object with an external provider call should be emitted");
+
+    run_native_command(
+        Command::new("rust-lld")
+            .args(["-flavor", "gnu", "-T"])
+            .arg(&linker_script)
+            .arg(&startup_object)
+            .arg(&actus_object)
+            .arg(&provider_object)
+            .arg("-o")
+            .arg(&image),
+    );
+
+    let bytes = fs::read(&image).expect("external provider image should be readable");
+    let object =
+        object::File::parse(bytes.as_slice()).expect("external provider image should parse");
+    assert_eq!(object.architecture(), object::Architecture::Arm);
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("runtime__extern_increment")));
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("arm__verb_boot")));
+    let undefined = object
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .map(|symbol| symbol.name().unwrap_or("<invalid>").to_owned())
+        .collect::<Vec<_>>();
+    assert!(
+        undefined.is_empty(),
+        "linked external provider image has undefined symbols: {undefined:?}"
+    );
+    assert_eq!(
+        object.sections().map(|section| section.relocations().count()).sum::<usize>(),
+        0,
+        "linked external provider image must not retain relocations"
+    );
+    remove_fixture(
+        &root,
+        [
+            &provider_source,
+            &startup,
+            &linker_script,
+            &provider_object,
+            &startup_object,
+            &actus_object,
+            &image,
+        ],
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn links_and_runs_a_host_object_through_the_shared_linker() {
     use std::process::Command;
 

@@ -555,16 +555,26 @@ because the installed `arm-none-eabi-gdb` cannot load its Python module.
 
 ## Gate 44.7 — External C ABI and runtime interoperability
 
-- [ ] Define the stable Actus-to-C ABI boundary for external libraries and
+- [x] Define the stable Actus-to-C ABI boundary for external libraries and
       runtime providers.
-- [ ] Define ownership, lifetime, error, calling convention, alignment, and
+- [x] Define ownership, lifetime, error, calling convention, alignment, and
       symbol visibility rules for imported C functions.
-- [ ] Add a minimal external-library fixture that links through the LLVM ARM
+- [x] Add a minimal external-library fixture that links through the LLVM ARM
       path without putting C or foreign code into Actus source modules.
 - [ ] Prove that external runtime calls remain explicit and that serialized
       Actus state contains no OS pointer.
-- [ ] Document how precompiled or separately compiled C libraries may be linked
+- [x] Document how precompiled or separately compiled C libraries may be linked
       without implying that Actus can compile arbitrary C source itself.
+
+The completed portion is implemented by the typed FFI contract in `src/ffi`,
+the neutral `BackendExternal` validation, the LLVM external-symbol IR fixture,
+and the Linux ARM acceptance fixture
+`links_an_explicit_external_c_provider_through_the_llvm_arm_path`. The fixture
+compiles `provider.c` separately with Clang, links its object with an Actus
+LLVM object, and checks the final ELF for explicit symbols, no relocations, and
+no undefined symbols. Aggregate foreign ABI paths, runtime cleanup calls, and
+serialized-state pointer exclusion remain open and must not be marked complete
+from this scalar fixture.
 
 ## Gate 44.8 — Cross-backend acceptance and regression protection
 
