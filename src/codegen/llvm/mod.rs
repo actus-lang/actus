@@ -9,6 +9,7 @@ mod failures;
 mod guards;
 mod integer_ops;
 mod memory;
+mod module;
 mod object;
 mod returns;
 mod values;
