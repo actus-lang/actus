@@ -383,8 +383,10 @@ set. The descriptor-driven hosted parity fixture now materializes both backend
 operands from the same resolved descriptors and links both objects against the
 same runtime shim. The shim verifies the exact Buffer and Region pointer
 arguments, the Region status, and Buffer-before-Region cleanup ordering; the
-fixture passes for both backends. Replacing the established native schedule
-with the resolved descriptors in the full semantic emission path remains a
+fixture passes for both backends. Production Cranelift emission now attaches
+resolved plans to the native cleanup schedule and uses the descriptor for
+direct Buffer and Region binding drops, while preserving the existing path for
+partial moved-field cleanup. Full moved-field descriptor emission remains a
 separate follow-up.
 Every emitted module is also passed through LLVM's module verifier before IR
 is returned, so the integration tests validate both the generated contract and

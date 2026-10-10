@@ -7,7 +7,18 @@ pub fn lower_semantic_cleanup_with_provider(
 ) -> Result<Vec<BackendCleanupPlan>, BackendContractError> {
     super::super::model::validate_cleanup_plans(model)
         .map_err(BackendContractError::InvalidCleanupContract)?;
-    Ok(super::super::model::lower_cleanup_plans(model)
+    let mut plans = super::super::model::lower_cleanup_plans(model);
+    plans.extend(
+        super::super::model::lower_return_unwind_plans(model)
+            .into_iter()
+            .flat_map(|plan| plan.scopes),
+    );
+    plans.extend(
+        super::super::model::lower_loop_unwind_plans(model)
+            .into_iter()
+            .flat_map(|plan| plan.scopes),
+    );
+    Ok(plans
         .into_iter()
         .map(|plan| lower_plan(plan, model, provider))
         .collect::<Result<Vec<_>, _>>()?)

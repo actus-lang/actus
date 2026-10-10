@@ -7,6 +7,7 @@ use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
+use super::super::contract::BackendCleanupResolvedDescriptor;
 use super::super::model::{LoweredCleanupInstruction, LoweredCleanupPlan, LoweredCleanupSchedule};
 use super::layout::LayoutRegistry;
 use super::native::{BackendEmitError, FunctionRef};
@@ -37,6 +38,7 @@ pub(super) fn emit_return_cleanup(
             functions,
             layouts,
             returned_binding,
+            schedule.resolved_plan(scope),
         )?;
     }
     Ok(())
@@ -65,7 +67,15 @@ pub(super) fn emit_loop_cleanup(
         .loop_plan(span, &kind)
         .ok_or_else(|| BackendEmitError(format!("missing native loop cleanup plan at {span:?}")))?;
     for scope in &plan.scopes {
-        emit_scope_instructions(function, scope, locals, types, functions, layouts)?;
+        emit_scope_instructions(
+            function,
+            scope,
+            locals,
+            types,
+            functions,
+            layouts,
+            schedule.resolved_plan(scope),
+        )?;
     }
     Ok(())
 }
@@ -82,7 +92,15 @@ pub(super) fn emit_scope_cleanup(
     let plan = schedule.scope(span).ok_or_else(|| {
         BackendEmitError(format!("missing native scope cleanup plan at {:?}", span))
     })?;
-    emit_scope_instructions(function, plan, locals, types, functions, layouts)?;
+    emit_scope_instructions(
+        function,
+        plan,
+        locals,
+        types,
+        functions,
+        layouts,
+        schedule.resolved_plan(plan),
+    )?;
     Ok(())
 }
 
@@ -93,9 +111,18 @@ fn emit_scope_instructions(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
+    resolved: Option<&super::super::contract::BackendCleanupPlan>,
 ) -> Result<(), BackendEmitError> {
-    for instruction in &plan.instructions {
-        emit_cleanup_instruction(function, instruction, locals, types, functions, layouts)?;
+    for (index, instruction) in plan.instructions.iter().enumerate() {
+        emit_cleanup_instruction(
+            function,
+            instruction,
+            locals,
+            types,
+            functions,
+            layouts,
+            resolved.and_then(|plan| plan.resolved_bridges.get(index).map(Vec::as_slice)),
+        )?;
     }
     Ok(())
 }
@@ -109,8 +136,9 @@ fn emit_scope_instructions_filtered(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
     returned_binding: Option<&str>,
+    resolved: Option<&super::super::contract::BackendCleanupPlan>,
 ) -> Result<(), BackendEmitError> {
-    for instruction in &plan.instructions {
+    for (index, instruction) in plan.instructions.iter().enumerate() {
         if matches!(
             instruction,
             LoweredCleanupInstruction::DropBinding { name, .. }
@@ -118,7 +146,15 @@ fn emit_scope_instructions_filtered(
         ) {
             continue;
         }
-        emit_cleanup_instruction(function, instruction, locals, types, functions, layouts)?;
+        emit_cleanup_instruction(
+            function,
+            instruction,
+            locals,
+            types,
+            functions,
+            layouts,
+            resolved.and_then(|plan| plan.resolved_bridges.get(index).map(Vec::as_slice)),
+        )?;
     }
     Ok(())
 }
@@ -131,6 +167,7 @@ fn emit_cleanup_instruction(
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
+    resolved: Option<&[BackendCleanupResolvedDescriptor]>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
         LoweredCleanupInstruction::EndBorrow { .. } => Ok(()),
@@ -138,7 +175,12 @@ fn emit_cleanup_instruction(
             emit_payload_cleanup(function, instruction, locals, types, functions, layouts)
         }
         LoweredCleanupInstruction::DropBinding { name, .. } => {
-            emit_binding_drop(function, name, locals, types, functions, layouts)
+            if let Some(descriptor) = resolved.and_then(|descriptors| descriptors.first()) {
+                emit_resolved_binding_drop(function, name, descriptor, locals, functions, layouts)?;
+            } else {
+                emit_binding_drop(function, name, locals, types, functions, layouts)?;
+            }
+            Ok(())
         }
         LoweredCleanupInstruction::DropBindingFields { .. } => {
             emit_partial_binding_cleanup(function, instruction, locals, types, functions, layouts)
@@ -147,6 +189,53 @@ fn emit_cleanup_instruction(
             reset_arena(function, name, locals, types, layouts)
         }
     }
+}
+
+fn emit_resolved_binding_drop(
+    function: &mut FunctionBuilder<'_>,
+    name: &str,
+    descriptor: &BackendCleanupResolvedDescriptor,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    if matches!(
+        descriptor.descriptor.argument,
+        super::super::contract::BackendCleanupArgument::FieldAddress
+    ) || descriptor.field.is_some()
+    {
+        return Err(BackendEmitError(
+            "direct cleanup descriptor unexpectedly contains a field address".to_owned(),
+        ));
+    }
+    let value = locals
+        .iter()
+        .find(|(binding, _)| binding.as_str() == name)
+        .map(|(_, value)| *value)
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
+    let symbol = match descriptor.descriptor.bridge {
+        super::super::contract::BackendCleanupBridge::BufferDrop => {
+            crate::runtime::BUFFER_DROP_SYMBOL.to_owned()
+        }
+        super::super::contract::BackendCleanupBridge::RegionDrop => {
+            super::performance::dispatch_key(NativeType::Region, "drop")
+        }
+        super::super::contract::BackendCleanupBridge::EnumDrop { .. } => {
+            crate::runtime::ENUM_DROP_SYMBOL.to_owned()
+        }
+    };
+    let target = functions.get(&symbol).ok_or_else(|| {
+        BackendEmitError(format!("native runtime function `{symbol}` is unavailable"))
+    })?;
+    let mut arguments = vec![value];
+    if let super::super::contract::BackendCleanupBridge::EnumDrop { .. } =
+        descriptor.descriptor.bridge
+    {
+        arguments
+            .push(function.ins().iconst(layouts.pointer_type, i64::from(descriptor.layout.size)));
+    }
+    function.ins().call(target.reference, &arguments);
+    Ok(())
 }
 
 fn emit_payload_cleanup(

@@ -97,5 +97,8 @@ complete. A hosted parity fixture now materializes both backend operands from
 the same resolved descriptors and verifies exact pointer arguments, Region
 status, and Buffer-before-Region ordering through a shared runtime shim. The
 established Cranelift cleanup schedule remains the emission path until resolved
-descriptors replace it in the full semantic emission path.
+descriptors replace it in the full semantic emission path. Direct Buffer and
+Region binding drops now consume the resolved descriptor in Cranelift native
+emission; partial moved-field cleanup still uses the established layout path
+until field-address descriptor emission is integrated.
 

@@ -54,6 +54,7 @@ pub(super) struct LoweredCleanupSchedule {
     scopes: Vec<LoweredCleanupPlan>,
     returns: Vec<LoweredUnwindPlan>,
     loops: Vec<LoweredLoopUnwindPlan>,
+    resolved_plans: Vec<crate::codegen::BackendCleanupPlan>,
 }
 
 impl LoweredCleanupSchedule {
@@ -62,7 +63,24 @@ impl LoweredCleanupSchedule {
             scopes: lower_cleanup_plans(model),
             returns: lower_return_unwind_plans(model),
             loops: lower_loop_unwind_plans(model),
+            resolved_plans: Vec::new(),
         }
+    }
+
+    pub(super) fn attach_resolved_plans(
+        &mut self,
+        resolved_plans: Vec<crate::codegen::BackendCleanupPlan>,
+    ) {
+        self.resolved_plans = resolved_plans;
+    }
+
+    pub(super) fn resolved_plan(
+        &self,
+        plan: &LoweredCleanupPlan,
+    ) -> Option<&crate::codegen::BackendCleanupPlan> {
+        self.resolved_plans
+            .iter()
+            .find(|resolved| resolved.span == plan.span && resolved.actions == plan.instructions)
     }
 
     pub(super) fn scope(&self, span: SourceSpan) -> Option<&LoweredCleanupPlan> {

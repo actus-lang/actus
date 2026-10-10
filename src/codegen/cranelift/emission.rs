@@ -45,7 +45,6 @@ pub(crate) fn emit_program_object_for_target(
     if verbs.is_empty() && external_verbs.is_empty() && roots.symbol.is_none() {
         return emit_empty_object(configuration, target);
     }
-    let cleanup_schedule = LoweredCleanupSchedule::from_model(&semantic);
     let performance_registry = PerformanceRegistry::from_program_in_namespace(
         &program,
         &semantic.reachable_performances,
@@ -63,7 +62,6 @@ pub(crate) fn emit_program_object_for_target(
         performance_definitions: &performance_definitions,
         symbol: roots.symbol,
         namespace_prefix,
-        cleanup_schedule: &cleanup_schedule,
         configuration,
         target,
         bindings,
@@ -182,7 +180,6 @@ struct VerbEmission<'items, 'program> {
     performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
     symbol: Option<&'items str>,
     namespace_prefix: &'items str,
-    cleanup_schedule: &'items LoweredCleanupSchedule,
     bindings: &'items BackendSymbolBindings,
     configuration: &'items NativeBackendConfiguration,
     target: &'items TargetSpec,
@@ -190,7 +187,9 @@ struct VerbEmission<'items, 'program> {
 
 fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, BackendEmitError> {
     let mut module = create_module(inputs.configuration, inputs.target)?;
-    let (layouts, metadata) = build_layouts_and_metadata(&mut module, &inputs)?;
+    let (layouts, metadata, resolved_plans) = build_layouts_and_metadata(&mut module, &inputs)?;
+    let mut cleanup_schedule = LoweredCleanupSchedule::from_model(inputs.semantic);
+    cleanup_schedule.attach_resolved_plans(resolved_plans);
     let string_data = define_string_data(&mut module, inputs.verbs, inputs.namespace_prefix)
         .map_err(BackendEmitError)?;
     let functions = function_metadata(&metadata);
@@ -206,7 +205,7 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, BackendEmi
         verbs: inputs.verbs,
         performance_definitions: inputs.performance_definitions,
         functions: &functions,
-        cleanup_schedule: inputs.cleanup_schedule,
+        cleanup_schedule: &cleanup_schedule,
         string_data: &string_data,
         layouts: &layouts,
         vtable_data: &vtable_data,
@@ -224,12 +223,20 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, BackendEmi
 fn build_layouts_and_metadata(
     module: &mut cranelift_object::ObjectModule,
     inputs: &VerbEmission<'_, '_>,
-) -> Result<(LayoutRegistry, std::collections::HashMap<String, FunctionMeta>), BackendEmitError> {
+) -> Result<
+    (
+        LayoutRegistry,
+        std::collections::HashMap<String, FunctionMeta>,
+        Vec<crate::codegen::BackendCleanupPlan>,
+    ),
+    BackendEmitError,
+> {
     let layouts = build_layouts(module, inputs.program, inputs.generic_instances)?;
     let cleanup_provider = super::contract::LayoutCleanupProvider { layouts: &layouts };
-    lower_semantic_cleanup_with_provider(&inputs.semantic, &cleanup_provider).map_err(|error| {
-        BackendEmitError(format!("cleanup descriptor lowering failed: {error}"))
-    })?;
+    let resolved_plans = lower_semantic_cleanup_with_provider(&inputs.semantic, &cleanup_provider)
+        .map_err(|error| {
+            BackendEmitError(format!("cleanup descriptor lowering failed: {error}"))
+        })?;
     let metadata = declare_emission_functions(
         module,
         inputs.verbs,
@@ -241,7 +248,7 @@ fn build_layouts_and_metadata(
         inputs.target,
         inputs.bindings,
     )?;
-    Ok((layouts, metadata))
+    Ok((layouts, metadata, resolved_plans))
 }
 
 fn define_vtable_data(
