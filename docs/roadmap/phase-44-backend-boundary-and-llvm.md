@@ -666,7 +666,9 @@ The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory
 copy lowering into `memory.rs`, and LLVM IR printing/module verification into
 `verification.rs`; `control_flow.rs` coordinates block emission without owning
-those data-layout or module-validation operations. This is a structural
+those data-layout or module-validation operations. Branch/jump target
+resolution now lives in `branches.rs`, while the explicit unsupported cleanup
+boundary lives in `cleanup.rs`. This is a structural
 maintainability step and does not claim LLVM and Cranelift feature parity.
 
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
