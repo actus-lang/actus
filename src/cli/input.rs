@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::configuration::BackendKind;
 use crate::configuration::CompilerConfiguration;
 
 use super::conformance::ConformanceMode;
@@ -34,6 +35,14 @@ pub(super) fn entry_path(configuration: &CompilerConfiguration, input: Option<&s
 
 pub(super) fn source_path(path: &Path) -> String {
     path.display().to_string()
+}
+
+pub(super) fn parse_backend(name: &str) -> Result<BackendKind, String> {
+    match name {
+        "cranelift" => Ok(BackendKind::Cranelift),
+        "llvm" => Ok(BackendKind::Llvm),
+        _ => Err(format!("unsupported backend `{name}`; expected `cranelift` or `llvm`")),
+    }
 }
 
 pub(super) fn module_path_for_file(source_root: &Path, file: &Path) -> Option<String> {

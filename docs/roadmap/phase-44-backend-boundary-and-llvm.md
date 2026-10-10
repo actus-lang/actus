@@ -588,7 +588,7 @@ constructed backend-neutral contracts.
       variants and a deterministic default.
 - [x] Add manifest configuration for backend selection with strict parsing,
       validation, inheritance, and a clear error for an unavailable feature.
-- [ ] Add an explicit build-level override only if it has the same validated
+- [x] Add an explicit build-level override only if it has the same validated
       configuration path as the manifest; do not create a second backend
       selection implementation.
 - [ ] Route the resolved backend selector through `CompilerConfiguration`,

@@ -28,5 +28,17 @@ unbounded libtest fan-out can make those processes compete for the same host
 resources. The explicit flag documents the same bounded execution contract in
 CI and review commands.
 
+The backend can be selected for one build through the same validated
+configuration path used by `Actus.toml`:
+
+```sh
+actus build --backend cranelift
+actus build --backend llvm
+```
+
+The selected backend must be enabled in the compiler build and compatible with
+the selected target. The backend name is recorded in native artifact metadata,
+so switching backends invalidates a stale artifact instead of reusing it.
+
 Record exact failures. Do not call a build successful when a later native link,
 execution, target, or hardware step has not run.

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::configuration::CompilerConfiguration;
 
-const ACTMETA_FORMAT_VERSION: u32 = 3;
+const ACTMETA_FORMAT_VERSION: u32 = 4;
 
 #[derive(Debug)]
 pub struct BuildGraphError(String);
@@ -25,6 +25,7 @@ pub struct UnitMetadata {
     pub unit: String,
     pub compiler_version: String,
     pub toolchain_hash: String,
+    pub backend: String,
     pub target_triple: String,
     pub target_spec_hash: String,
     pub profile: String,
@@ -46,6 +47,7 @@ impl UnitMetadata {
             unit: unit.into(),
             compiler_version: env!("CARGO_PKG_VERSION").to_owned(),
             toolchain_hash: option_env!("ACTUS_TOOLCHAIN_HASH").unwrap_or("development").to_owned(),
+            backend: configuration.native_backend().backend().name().to_owned(),
             target_triple: configuration.target().triple().to_string(),
             target_spec_hash: configuration.target_spec_hash().to_owned(),
             profile: configuration.profile().directory_name().to_owned(),
@@ -60,6 +62,7 @@ impl UnitMetadata {
         self.format_version == ACTMETA_FORMAT_VERSION
             && self.compiler_version == env!("CARGO_PKG_VERSION")
             && self.toolchain_hash == option_env!("ACTUS_TOOLCHAIN_HASH").unwrap_or("development")
+            && self.backend == configuration.native_backend().backend().name()
             && self.target_triple == configuration.target().triple().to_string()
             && self.target_spec_hash == configuration.target_spec_hash()
             && self.profile == configuration.profile().directory_name()
@@ -165,6 +168,7 @@ mod tests {
         let configuration = CompilerConfiguration::from_environment();
         let metadata = UnitMetadata::for_configuration("sample", &configuration);
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
+        assert_eq!(metadata.backend, configuration.native_backend().backend().name());
         assert_eq!(metadata.target_triple, configuration.target().triple().to_string());
         assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
         assert_eq!(metadata.source_limits, "enabled");
@@ -185,6 +189,7 @@ mod tests {
         let metadata = UnitMetadata::read(&metadata_path(&artifact)).expect("read metadata");
         assert_eq!(metadata.unit, "metadata");
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
+        assert_eq!(metadata.backend, configuration.native_backend().backend().name());
         assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());
         assert_eq!(metadata.source_limits, "enabled");
         assert_eq!(metadata.runtime_version.as_deref(), configuration.runtime_version());
