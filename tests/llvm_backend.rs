@@ -387,6 +387,28 @@ fn rejects_niche_enum_failure_until_pointer_niche_lowering_exists() {
 }
 
 #[test]
+fn rejects_floating_point_types_before_llvm_lowering() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "float_value").expect("symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Float { width: 32 },
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let error = emit_module(&module).expect_err("LLVM integer-only lowering must reject floats");
+    assert!(error.to_string().contains("integer-only emission"));
+}
+
+#[test]
 fn emits_fixed_layout_aggregate_parameter_and_return() {
     let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
     let aggregate = BackendValueType::Aggregate { layout };
