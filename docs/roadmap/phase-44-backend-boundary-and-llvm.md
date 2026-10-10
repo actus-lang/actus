@@ -285,16 +285,20 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       trap, and cleanup contract.
 - [x] Add indirect aggregate layout and bounded memory-copy lowering using the
       same Actus layout rules as Cranelift.
-- [ ] Add direct aggregate ABI, enum discriminant, and Result/Option lowering
-      using the same Actus layout rules as Cranelift.
+- [x] Add regular enum discriminant and integer-payload lowering through the
+      declared aggregate `ReturnSlot` contract.
+- [ ] Add direct aggregate ABI and niche-pointer `Option` lowering using the
+      same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
 - [x] Emit deterministic object files and link a hosted executable.
 - [x] Compare LLVM and Cranelift semantic results for the supported direct
       scalar/unit and control-flow contract slices.
 - [x] Compare LLVM and Cranelift semantic results for the supported indirect
       aggregate and memory-copy contract slice.
+- [x] Compare LLVM and Cranelift semantic results for the supported regular
+      enum typed-failure `ReturnSlot` fixture.
 - [ ] Extend cross-backend semantic comparison to direct aggregate,
-      typed-failure, ownership, and runtime-cleanup fixtures.
+      niche-pointer `Option`, ownership, and runtime-cleanup fixtures.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
@@ -318,8 +322,9 @@ jumps, terminating traps, and fixed-layout direct aggregate/Region values with
 1, 2, 4, or 8-byte alignment. Non-direct aggregate parameters now lower to
 opaque pointers with explicit parameter alignment. Aggregate return slots now
 use a hidden aligned pointer with caller-side stack storage. Memory-copy
-lowering, runtime-backed cleanup actions, and typed failures remain explicit
-open work. Compile-time `EndBorrow` cleanup boundaries are lowered as no-op
+lowering and runtime-backed cleanup actions remain explicit open work.
+Regular enum typed failures with integer payloads now lower through the
+declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while runtime-backed cleanup actions fail closed until
 their bridge ABI and storage representation are implemented. The feature build
 and this emitter slice are covered by the LLVM integration test.
@@ -378,16 +383,21 @@ control-flow functions through LLVM and Cranelift, links each object with the
 same hosted C entry shim through `LinkerPlan`, and executes both programs with
 the same exit status. The focused command
 `LLVM_SYS_231_PREFIX=/usr cargo test --features llvm --test llvm_backend`
-passes with 15 tests and 0 failures. This evidence covers only the stated
-scalar/unit and control-flow slices; direct aggregate, typed-failure, ownership,
-and runtime-cleanup parity remain open.
+passes with 17 tests and 0 failures. This evidence covers only the stated
+scalar/unit and control-flow slices; direct aggregate, niche-pointer Option,
+ownership, and runtime-cleanup parity remain open.
 The same parity suite now also covers an indirect fixed-layout aggregate with
 16-byte extent and 8-byte alignment. LLVM and Cranelift lower the neutral
 `MemoryCopy` instruction to their respective overlap-safe native copy paths,
 link against the same C entry shim, and both executables verify the copied
-bytes. The focused suite contains 16 passing tests. Direct aggregate register
-ABI, typed failures, ownership transitions, and runtime cleanup remain outside
-this evidence.
+bytes. Regular enum typed failures with an integer payload are also compared
+through a 16-byte aggregate return slot; both executables verify the
+discriminant and payload offsets. The focused suite contains 17 passing tests.
+Direct aggregate register ABI, niche-pointer Option, ownership transitions,
+and runtime cleanup remain outside this evidence.
+The LLVM parameter-value mapper skips the hidden return-slot parameter when
+assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
+slot pointer. This is covered by the hosted parity fixture.
 Installation requirements, direct dependency trees, clean debug build times,
 target-directory sizes, and debug executable sizes are recorded in
 `docs/benchmarks/phase-44-backend-build-profile-2026-10-09.md`. The record

@@ -40,14 +40,14 @@ fn declare_functions(
 ) -> Result<BTreeMap<String, Declaration>, BackendEmitError> {
     let mut declarations = BTreeMap::new();
     for external in &backend_module.externals {
-        let signature = signature(module, &external.parameters, external.return_value.ty)?;
+        let signature = signature(module, &external.parameters, &external.return_value)?;
         let id = module
             .declare_function(external.symbol.as_str(), Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
         declarations.insert(external.symbol.as_str().to_owned(), Declaration { id });
     }
     for function in &backend_module.functions {
-        let signature = signature(module, &function.parameters, function.return_value.ty)?;
+        let signature = signature(module, &function.parameters, &function.return_value)?;
         let id = module
             .declare_function(function.symbol.as_str(), Linkage::Export, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -59,15 +59,29 @@ fn declare_functions(
 fn signature(
     module: &ObjectModule,
     parameters: &[crate::codegen::BackendParameter],
-    return_value: BackendValueType,
+    return_value: &crate::codegen::BackendReturn,
 ) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     let mut signature = module.make_signature();
     for parameter in parameters {
         let ty = parameter_type(module, parameter)?;
         signature.params.push(AbiParam::new(ty));
     }
-    if let Some(ty) = scalar_type(module, return_value)? {
-        signature.returns.push(AbiParam::new(ty));
+    match return_value.passing {
+        crate::codegen::BackendReturnMode::Direct => {
+            if let Some(ty) = scalar_type(module, return_value.ty)? {
+                signature.returns.push(AbiParam::new(ty));
+            }
+        }
+        crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
+            if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } if value_layout == layout)
+            {
+                return Err(BackendEmitError(
+                    "Cranelift return slot layout does not match the aggregate return type"
+                        .to_owned(),
+                ));
+            }
+            signature.params.insert(0, AbiParam::new(module.isa().pointer_type()));
+        }
     }
     Ok(signature)
 }
@@ -146,7 +160,7 @@ fn define_function(
         .copied()
         .ok_or_else(|| BackendEmitError("Cranelift function declaration is missing".to_owned()))?;
     let mut context = module.make_context();
-    context.func.signature = signature(module, &function.parameters, function.return_value.ty)?;
+    context.func.signature = signature(module, &function.parameters, &function.return_value)?;
     let frontend_config = module.isa().frontend_config();
     let mut function_context = FunctionBuilderContext::new();
     {
@@ -156,12 +170,7 @@ fn define_function(
             BackendEmitError("Cranelift neutral contract entry block is missing".to_owned())
         })?;
         builder.switch_to_block(entry);
-        builder.append_block_params_for_function_params(entry);
-        let block_params = builder.block_params(entry).to_vec();
-        let mut values = BTreeMap::new();
-        for (index, value) in block_params.into_iter().enumerate() {
-            values.insert(BackendValueId(index as u32), value);
-        }
+        let (return_slot, mut values) = initialize_values(&mut builder, entry, function);
         for block in &function.blocks {
             let native_block = blocks.get(&block.id).copied().ok_or_else(|| {
                 BackendEmitError("Cranelift neutral contract block is missing".to_owned())
@@ -174,6 +183,7 @@ fn define_function(
                     instruction,
                     declarations,
                     &blocks,
+                    return_slot,
                     &mut values,
                 )?;
             }
@@ -195,12 +205,37 @@ fn create_blocks(
     function.blocks.iter().map(|block| (block.id, builder.create_block())).collect()
 }
 
+fn initialize_values(
+    builder: &mut FunctionBuilder<'_>,
+    entry: Block,
+    function: &BackendFunction,
+) -> (Option<cranelift_codegen::ir::Value>, BTreeMap<BackendValueId, cranelift_codegen::ir::Value>)
+{
+    builder.append_block_params_for_function_params(entry);
+    let block_params = builder.block_params(entry).to_vec();
+    let return_slot = matches!(
+        function.return_value.passing,
+        crate::codegen::BackendReturnMode::ReturnSlot { .. }
+    )
+    .then(|| block_params.first().copied())
+    .flatten();
+    let parameter_offset = usize::from(return_slot.is_some());
+    let values = block_params
+        .into_iter()
+        .skip(parameter_offset)
+        .enumerate()
+        .map(|(index, value)| (BackendValueId(index as u32), value))
+        .collect();
+    (return_slot, values)
+}
+
 fn lower_instruction(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, Declaration>,
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
@@ -210,6 +245,7 @@ fn lower_instruction(
         BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
         BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
         BackendInstruction::Return { .. } => lower_return(builder, instruction, values),
+        BackendInstruction::Fail { .. } => lower_failure(builder, instruction, return_slot, values),
         BackendInstruction::MemoryCopy { .. } => {
             lower_memory_copy(module, builder, instruction, values)
         }
@@ -300,6 +336,58 @@ fn lower_jump(
         .ok_or_else(|| BackendEmitError("Cranelift jump target block is unavailable".to_owned()))?;
     builder.ins().jump(target, &[]);
     Ok(())
+}
+
+fn lower_failure(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::Fail { failure, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift failure instruction expected".to_owned()));
+    };
+    let slot = return_slot.ok_or_else(|| {
+        BackendEmitError("Cranelift typed failure requires a return slot".to_owned())
+    })?;
+    if failure.layout.niche_pointer {
+        return Err(BackendEmitError(
+            "Cranelift niche-pointer failure lowering is not implemented".to_owned(),
+        ));
+    }
+    let discriminant_type = integer_type(failure.layout.discriminant_size)?;
+    let discriminant = builder.ins().iconst(discriminant_type, i64::from(failure.discriminant));
+    builder.ins().store(
+        MemFlagsData::new(),
+        discriminant,
+        slot,
+        failure.layout.discriminant_offset as i32,
+    );
+    if let (Some(payload_id), Some(payload_layout)) = (failure.payload, failure.layout.payload) {
+        let payload = values.get(&payload_id).copied().ok_or_else(|| {
+            BackendEmitError(format!("Cranelift failure payload {} is unavailable", payload_id.0))
+        })?;
+        if !builder.func.dfg.value_type(payload).is_int()
+            || builder.func.dfg.value_type(payload).bytes() > payload_layout.size
+        {
+            return Err(BackendEmitError(
+                "Cranelift typed failure currently requires a fitting integer payload".to_owned(),
+            ));
+        }
+        builder.ins().store(
+            MemFlagsData::new(),
+            payload,
+            slot,
+            failure.layout.payload_offset as i32,
+        );
+    }
+    builder.ins().return_(&[]);
+    Ok(())
+}
+
+fn integer_type(size: u8) -> Result<Type, BackendEmitError> {
+    Type::int(u16::from(size) * 8)
+        .ok_or_else(|| BackendEmitError("Cranelift integer width is invalid".to_owned()))
 }
 
 fn lower_call(

@@ -65,7 +65,8 @@ pub(super) fn emit_blocks(
 fn parameter_values(declaration: FunctionDeclaration) -> BTreeMap<BackendValueId, LLVMValueRef> {
     (0..declaration.parameter_count)
         .map(|index| {
-            let value = unsafe { LLVMGetParam(declaration.value, index as u32) };
+            let physical_index = index + usize::from(declaration.return_slot);
+            let value = unsafe { LLVMGetParam(declaration.value, physical_index as u32) };
             (BackendValueId(index as u32), value)
         })
         .collect()

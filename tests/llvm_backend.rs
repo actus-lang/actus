@@ -893,6 +893,110 @@ fn compares_llvm_and_cranelift_on_the_same_indirect_aggregate_copy_fixture() {
     );
 }
 
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
+fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-failure-parity-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("failure parity fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"failure_parity_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("failure parity manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "#include <stdint.h>\nextern void test__verb_fail(void *, int32_t); int main(void) { uint64_t slot[2] = { 0, 0 }; test__verb_fail(slot, 0x12345678); uint32_t *words = (uint32_t *)slot; return words[0] == 7U && words[2] == 0x12345678U ? 0 : 1; }\n",
+    )
+    .expect("failure parity entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let aggregate_layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let enum_layout = BackendEnumLayout {
+        layout: aggregate_layout,
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 8,
+        payload: Some(actus::codegen::BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
+    };
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "fail").expect("fail symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: vec![BackendParameter {
+                name: "payload".to_owned(),
+                role: Role::Erg,
+                ty: BackendValueType::Integer { signed: true, width: 32 },
+                passing: actus::codegen::BackendPassingMode::Direct,
+            }],
+            return_value: BackendReturn {
+                role: Some(Role::Erg),
+                ty: BackendValueType::Aggregate { layout: aggregate_layout },
+                passing: BackendReturnMode::ReturnSlot { layout: aggregate_layout },
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![BackendInstruction::Fail {
+                    failure: BackendFailure {
+                        result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Result")
+                            .expect("result symbol"),
+                        discriminant: 7,
+                        payload: Some(BackendValueId(0)),
+                        layout: enum_layout,
+                    },
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                }],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("failure parity configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM failure object should be emitted");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift failure object should be emitted");
+    fs::write(&cranelift_object, cranelift_bytes)
+        .expect("Cranelift failure object should be written");
+
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM failure objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift failure objects should link");
+    let llvm_status =
+        Command::new(&llvm_executable).status().expect("LLVM failure executable should run");
+    let cranelift_status = Command::new(&cranelift_executable)
+        .status()
+        .expect("Cranelift failure executable should run");
+    assert_eq!(llvm_status.code(), Some(0));
+    assert_eq!(cranelift_status.code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
+}
+
 #[cfg(target_os = "linux")]
 fn run_native_command(command: &mut std::process::Command) {
     let status = command.status().expect("native compiler should start");
