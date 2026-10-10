@@ -107,12 +107,11 @@ fn parameter_type(
                 {
                     Ok(module.isa().pointer_type())
                 }
-                BackendValueType::Aggregate { .. } | BackendValueType::Region { .. } => {
-                    Err(BackendEmitError(
-                        "Cranelift aggregate parameter layout does not match passing layout"
-                            .to_owned(),
-                    ))
-                }
+                BackendValueType::Aggregate { .. }
+                | BackendValueType::Region { .. }
+                | BackendValueType::NichePointerOption { .. } => Err(BackendEmitError(
+                    "Cranelift aggregate parameter layout does not match passing layout".to_owned(),
+                )),
                 _ => Err(BackendEmitError(
                     "Cranelift indirect parameter must have an aggregate or Region type".to_owned(),
                 )),
@@ -133,6 +132,7 @@ fn scalar_type(
         BackendValueType::Integer { width: 32, .. } => Some(types::I32),
         BackendValueType::Integer { width: 64, .. } => Some(types::I64),
         BackendValueType::Pointer => Some(module.isa().pointer_type()),
+        BackendValueType::NichePointerOption { .. } => Some(module.isa().pointer_type()),
         BackendValueType::Integer { .. }
         | BackendValueType::Float { .. }
         | BackendValueType::Aggregate { .. }
@@ -245,7 +245,9 @@ fn lower_instruction(
         BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
         BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
         BackendInstruction::Return { .. } => lower_return(builder, instruction, values),
-        BackendInstruction::Fail { .. } => lower_failure(builder, instruction, return_slot, values),
+        BackendInstruction::Fail { .. } => {
+            lower_failure(module.isa().pointer_type(), builder, instruction, return_slot, values)
+        }
         BackendInstruction::MemoryCopy { .. } => {
             lower_memory_copy(module, builder, instruction, values)
         }
@@ -339,6 +341,7 @@ fn lower_jump(
 }
 
 fn lower_failure(
+    pointer_type: Type,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     return_slot: Option<cranelift_codegen::ir::Value>,
@@ -347,14 +350,12 @@ fn lower_failure(
     let BackendInstruction::Fail { failure, .. } = instruction else {
         return Err(BackendEmitError("Cranelift failure instruction expected".to_owned()));
     };
+    if failure.layout.niche_pointer {
+        return lower_niche_failure(pointer_type, builder, failure, return_slot, values);
+    }
     let slot = return_slot.ok_or_else(|| {
         BackendEmitError("Cranelift typed failure requires a return slot".to_owned())
     })?;
-    if failure.layout.niche_pointer {
-        return Err(BackendEmitError(
-            "Cranelift niche-pointer failure lowering is not implemented".to_owned(),
-        ));
-    }
     let discriminant_type = integer_type(failure.layout.discriminant_size)?;
     let discriminant = builder.ins().iconst(discriminant_type, i64::from(failure.discriminant));
     builder.ins().store(
@@ -382,6 +383,31 @@ fn lower_failure(
         );
     }
     builder.ins().return_(&[]);
+    Ok(())
+}
+
+fn lower_niche_failure(
+    pointer_type: Type,
+    builder: &mut FunctionBuilder<'_>,
+    failure: &crate::codegen::BackendFailure,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    if return_slot.is_some() {
+        return Err(BackendEmitError(
+            "Cranelift niche-pointer failure cannot use an aggregate return slot".to_owned(),
+        ));
+    }
+    let value = failure
+        .payload
+        .and_then(|payload_id| values.get(&payload_id).copied())
+        .unwrap_or_else(|| builder.ins().iconst(pointer_type, 0));
+    if builder.func.dfg.value_type(value) != pointer_type {
+        return Err(BackendEmitError(
+            "Cranelift niche-pointer failure payload must be a pointer".to_owned(),
+        ));
+    }
+    builder.ins().return_(&[value]);
     Ok(())
 }
 

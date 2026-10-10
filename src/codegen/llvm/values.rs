@@ -19,6 +19,9 @@ pub(super) fn llvm_type(
         BackendValueType::Integer { width: 32, .. } => unsafe { LLVMInt32TypeInContext(context) },
         BackendValueType::Integer { width: 64, .. } => unsafe { LLVMInt64TypeInContext(context) },
         BackendValueType::Pointer => unsafe { LLVMPointerTypeInContext(context, 0) },
+        BackendValueType::NichePointerOption { .. } => unsafe {
+            LLVMPointerTypeInContext(context, 0)
+        },
         BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => {
             return aggregate_type(context, layout);
         }

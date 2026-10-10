@@ -75,5 +75,10 @@ pub(super) fn validate_failure(failure: &BackendFailure) -> Result<(), BackendCo
             "failure payload must match the declared enum payload layout",
         ));
     }
+    if failure.layout.niche_pointer && (failure.discriminant != 0) == failure.payload.is_none() {
+        return Err(BackendContractError::InvalidEnumLayout(
+            "niche-pointer failure discriminant must match its null payload state",
+        ));
+    }
     Ok(())
 }

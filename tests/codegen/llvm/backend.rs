@@ -348,7 +348,7 @@ fn lowers_regular_enum_failure_with_discriminant_and_integer_payload() {
 }
 
 #[test]
-fn rejects_niche_enum_failure_until_pointer_niche_lowering_exists() {
+fn lowers_niche_option_failure_to_a_null_pointer() {
     let layout = actus::codegen::BackendLayout { size: 8, alignment: 8 };
     let symbol =
         SymbolIdentity::new("test", SymbolKind::Verb, "niche_failure").expect("valid symbol");
@@ -357,7 +357,7 @@ fn rejects_niche_enum_failure_until_pointer_niche_lowering_exists() {
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
-            ty: BackendValueType::Aggregate { layout },
+            ty: BackendValueType::NichePointerOption { layout },
             passing: BackendReturnMode::Direct,
         },
         entry: BackendBlockId(0),
@@ -367,7 +367,7 @@ fn rejects_niche_enum_failure_until_pointer_niche_lowering_exists() {
                 failure: BackendFailure {
                     result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Option")
                         .expect("valid option symbol"),
-                    discriminant: 1,
+                    discriminant: 0,
                     payload: None,
                     layout: BackendEnumLayout {
                         layout,
@@ -383,9 +383,9 @@ fn rejects_niche_enum_failure_until_pointer_niche_lowering_exists() {
         }],
         cleanup: Vec::new(),
     };
-    let error = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect_err("niche enum lowering is intentionally not approximated");
-    assert!(error.0.contains("niche-pointer failure lowering is not implemented"));
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("niche None should lower to a null pointer");
+    assert!(ir.contains("ret ptr null"));
 }
 
 #[test]
@@ -617,6 +617,96 @@ fn links_and_runs_a_host_object_through_the_shared_linker() {
     let status = Command::new(&executable).status().expect("linked executable should run");
     assert_eq!(status.code(), Some(0));
     remove_fixture(&root, [&manifest, &shim_source, &shim_object, &llvm_object, &executable]);
+}
+
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
+fn compares_llvm_and_cranelift_on_niche_option_none_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-niche-parity-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("niche parity fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"niche_parity_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("niche parity manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "extern void *test__verb_none(void); int main(void) { return test__verb_none() == 0 ? 0 : 1; }\n",
+    )
+    .expect("niche parity entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let layout = actus::codegen::BackendLayout { size: 8, alignment: 8 };
+    let function = BackendFunction {
+        symbol: SymbolIdentity::new("test", SymbolKind::Verb, "none").expect("valid symbol"),
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::NichePointerOption { layout },
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Option")
+                        .expect("valid option symbol"),
+                    discriminant: 0,
+                    payload: None,
+                    layout: BackendEnumLayout {
+                        layout,
+                        discriminant_offset: 0,
+                        discriminant_size: 4,
+                        payload_offset: 0,
+                        payload: None,
+                        niche_pointer: true,
+                    },
+                },
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("niche parity fixture configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM niche object should be emitted");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift niche object should be emitted");
+    fs::write(&cranelift_object, cranelift_bytes)
+        .expect("Cranelift niche object should be written");
+
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM niche objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift niche objects should link");
+    assert_eq!(Command::new(&llvm_executable).status().unwrap().code(), Some(0));
+    assert_eq!(Command::new(&cranelift_executable).status().unwrap().code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
 }
 
 #[cfg(all(target_os = "linux", feature = "cranelift"))]

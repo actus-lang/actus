@@ -37,6 +37,7 @@ pub enum BackendValueType {
     Pointer,
     Aggregate { layout: BackendLayout },
     Region { layout: BackendLayout },
+    NichePointerOption { layout: BackendLayout },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -376,9 +377,9 @@ fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError>
         BackendValueType::Integer { width: 0, .. } | BackendValueType::Float { width: 0 } => {
             Err(BackendContractError::InvalidValueType)
         }
-        BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => {
-            layout.validate()
-        }
+        BackendValueType::Aggregate { layout }
+        | BackendValueType::Region { layout }
+        | BackendValueType::NichePointerOption { layout } => layout.validate(),
         BackendValueType::Unit
         | BackendValueType::Bool
         | BackendValueType::Integer { .. }

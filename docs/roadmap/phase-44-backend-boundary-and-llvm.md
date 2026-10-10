@@ -294,6 +294,8 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       coverage.
 - [x] Validate niche-pointer `Option` representation boundaries in the
       backend-neutral enum contract without claiming native pointer lowering.
+- [x] Lower and execute the niche-pointer `Option::None` direct pointer return
+      through both native backends.
 - [ ] Add direct aggregate ABI and niche-pointer `Option` lowering using the
       same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
@@ -403,18 +405,20 @@ control-flow functions through LLVM and Cranelift, links each object with the
 same hosted C entry shim through `LinkerPlan`, and executes both programs with
 the same exit status. The focused command
 `LLVM_SYS_231_PREFIX=/usr cargo test --features llvm --test llvm_backend`
-passes with 17 tests and 0 failures. This evidence covers only the stated
-scalar/unit and control-flow slices; direct aggregate, niche-pointer Option,
-ownership, and runtime-cleanup parity remain open.
+passes with 18 tests and 0 failures. This evidence covers only the stated
+scalar/unit and control-flow slices; direct aggregate, remaining niche-pointer
+`Option` payload cases, ownership, and runtime-cleanup parity remain open.
 The same parity suite now also covers an indirect fixed-layout aggregate with
 16-byte extent and 8-byte alignment. LLVM and Cranelift lower the neutral
 `MemoryCopy` instruction to their respective overlap-safe native copy paths,
 link against the same C entry shim, and both executables verify the copied
 bytes. Regular enum typed failures with an integer payload are also compared
 through a 16-byte aggregate return slot; both executables verify the
-discriminant and payload offsets. The focused suite contains 17 passing tests.
-Direct aggregate register ABI, niche-pointer Option, ownership transitions,
-and runtime cleanup remain outside this evidence.
+discriminant and payload offsets. The focused suite contains 18 passing tests.
+The additional niche-pointer `Option::None` fixture links LLVM and Cranelift
+against the same C entry shim and verifies a null pointer from both executables.
+Direct aggregate register ABI, niche-pointer `Option::Some` payload lowering,
+ownership transitions, and runtime cleanup remain outside this evidence.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when
 assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
 slot pointer. This is covered by the hosted parity fixture.

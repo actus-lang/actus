@@ -123,6 +123,9 @@ fn emit_failure(
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
     validate_failure_return(function, failure.layout)?;
+    if failure.layout.niche_pointer {
+        return emit_niche_failure(context, builder, function, declaration, failure, values);
+    }
     let enum_type = super::values::llvm_type(context, function.return_value.ty)?;
     let temporary = allocate_failure_storage(builder, enum_type, failure.layout.layout)?;
     store_discriminant(context, builder, temporary, failure)?;
@@ -132,12 +135,39 @@ fn emit_failure(
     Ok(())
 }
 
+fn emit_niche_failure(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: &BackendFunction,
+    declaration: FunctionDeclaration,
+    failure: &super::super::BackendFailure,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    if declaration.return_slot {
+        return Err(BackendEmitError(
+            "LLVM niche-pointer failure cannot use an aggregate return slot".to_owned(),
+        ));
+    }
+    let value = match failure.payload {
+        Some(payload_id) => values.get(&payload_id).copied().ok_or_else(|| {
+            BackendEmitError(format!("LLVM niche failure payload {} is unavailable", payload_id.0))
+        })?,
+        None => unsafe {
+            LLVMConstNull(super::values::llvm_type(context, function.return_value.ty)?)
+        },
+    };
+    unsafe { llvm_sys::core::LLVMBuildRet(builder, value) };
+    Ok(())
+}
+
 fn validate_failure_return(
     function: &BackendFunction,
     layout: BackendEnumLayout,
 ) -> Result<(), BackendEmitError> {
     let return_layout = match function.return_value.ty {
-        BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => layout,
+        BackendValueType::Aggregate { layout }
+        | BackendValueType::Region { layout }
+        | BackendValueType::NichePointerOption { layout } => layout,
         _ => {
             return Err(BackendEmitError(
                 "LLVM typed failure requires an aggregate enum return type".to_owned(),
@@ -147,11 +177,6 @@ fn validate_failure_return(
     if return_layout != layout.layout {
         return Err(BackendEmitError(
             "LLVM typed failure enum layout does not match the function return layout".to_owned(),
-        ));
-    }
-    if layout.niche_pointer {
-        return Err(BackendEmitError(
-            "LLVM niche-pointer failure lowering is not implemented".to_owned(),
         ));
     }
     Ok(())
