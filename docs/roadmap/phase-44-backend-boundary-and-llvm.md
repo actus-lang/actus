@@ -577,6 +577,58 @@ serialized-state pointer exclusion is covered by the semantic pack regression
 `rejects_pointer_bearing_or_dynamic_pack_fields_from_serialized_state`, while
 external-call explicitness is covered by the LLVM IR and linked-ELF fixtures.
 
+## Gate 44.7.1 — Complete backend selection and semantic-to-backend pipeline
+
+This gate is required before claiming that LLVM is a selectable application
+backend. It closes the current boundary where the CLI build pipeline lowers
+semantic programs directly through Cranelift while LLVM accepts only manually
+constructed backend-neutral contracts.
+
+- [ ] Define one public backend selector with explicit `cranelift` and `llvm`
+      variants and a deterministic default.
+- [ ] Add manifest configuration for backend selection with strict parsing,
+      validation, inheritance, and a clear error for an unavailable feature.
+- [ ] Add an explicit build-level override only if it has the same validated
+      configuration path as the manifest; do not create a second backend
+      selection implementation.
+- [ ] Route the resolved backend selector through `CompilerConfiguration`,
+      build planning, object emission, executable emission, and run commands.
+- [ ] Move semantic-to-`BackendModule` lowering behind a shared lowering
+      boundary so LLVM and Cranelift consume the same roles, layouts, cleanup
+      plans, calls, returns, failures, and external symbols.
+- [ ] Preserve the complete current Cranelift lowering behavior while adding
+      the shared path; no backend-specific semantic rewrite or duplicate
+      lowering implementation is allowed.
+- [ ] Implement the LLVM CLI emission path for the supported shared contract,
+      including module units, generic specializations, runtime bridges, entry
+      selection, object merging, and linker integration.
+- [ ] Make unsupported operations fail with the typed backend diagnostic that
+      names the operation, source span, selected backend, and target; never
+      silently fall back to the other backend.
+- [ ] Add configuration tests for default selection, manifest selection,
+      feature-disabled selection, target/backend incompatibility, and invalid
+      backend names.
+- [ ] Add hosted and freestanding CLI fixtures that build the same source with
+      both backends and compare exit status, exported symbols, failure class,
+      ownership behavior, runtime bridge resolution, and zero-float evidence.
+- [ ] Run the standard-library Region and aggregate fixtures through LLVM as
+      well as Cranelift, including hosted execution and freestanding object
+      acceptance where the target contract permits it.
+- [ ] Verify that the selected backend is included in build metadata, artifact
+      invalidation, diagnostics, and reproducibility records.
+- [ ] Verify architecture boundaries: shared semantic/codegen modules contain
+      no Cranelift or LLVM imports, and backend implementations remain inside
+      their canonical directories.
+- [ ] Update the handbook, ADR, and troubleshooting documentation with the
+      final selection syntax, feature requirements, supported combinations,
+      failure behavior, and rollback procedure.
+- [ ] Record exact compiler, LLVM, linker, target, and fixture conditions for
+      every completed acceptance test before marking this gate complete.
+
+No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
+fixtures until this gate proves that a real CLI build can select and execute
+the corresponding backend through the shared semantic pipeline.
+
 ## Gate 44.8 — Cross-backend acceptance and regression protection
 
 - [ ] Run semantic, ownership, cleanup, layout, ABI, serialization, and
