@@ -48,6 +48,7 @@ pub enum SourceLimitMode {
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BuildManifest {
+    pub(crate) backend: Option<crate::codegen::BackendKind>,
     pub(crate) runtime: Option<RuntimeProfile>,
     pub(crate) target: Option<String>,
     pub(crate) profile: Option<BuildProfile>,

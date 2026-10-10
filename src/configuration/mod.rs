@@ -9,6 +9,7 @@ mod strict;
 mod types;
 mod version;
 
+pub use crate::codegen::BackendKind;
 pub use crate::target::{EntryContract, LinkerFlavor, RelocationModel, SymbolVisibility};
 pub use loading::package_identity;
 pub use lockfile::{ActusLock, LockedPackage, LockfileError};

@@ -20,6 +20,7 @@ pub(super) fn build_settings(
         build.native_module.unwrap_or_else(|| environment.native_backend.module_name().to_owned()),
         build.position_independent.unwrap_or(environment.native_backend.position_independent()),
     )
+    .with_backend(build.backend.unwrap_or(environment.native_backend.backend()))
     .with_optimization_level(optimization_level(profile, profiles));
     let native_backend = if verify_no_float_ir {
         native_backend.with_no_float_ir_verification()

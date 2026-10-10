@@ -1,11 +1,33 @@
 use std::fmt::{Display, Formatter};
 
+use serde::Deserialize;
+
 use crate::target::TargetSpec;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum BackendKind {
     Cranelift,
     Llvm,
+}
+
+impl Default for BackendKind {
+    fn default() -> Self {
+        #[cfg(feature = "cranelift")]
+        {
+            return Self::Cranelift;
+        }
+
+        #[cfg(all(not(feature = "cranelift"), feature = "llvm"))]
+        {
+            return Self::Llvm;
+        }
+
+        #[cfg(not(any(feature = "cranelift", feature = "llvm")))]
+        {
+            Self::Cranelift
+        }
+    }
 }
 
 impl BackendKind {

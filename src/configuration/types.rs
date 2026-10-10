@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use super::manifest;
 use super::manifest::{BuildProfile, LibraryKind, OptimizationLevel, RuntimeProfile};
+use crate::codegen::BackendKind;
 use crate::target::{
     EntryContract, LinkerFlavor, RelocationModel, TargetSpec, TimeProviderContract,
 };
@@ -38,6 +39,7 @@ pub struct LinkLibrary {
 
 #[derive(Clone, Debug)]
 pub struct NativeBackendConfiguration {
+    backend: BackendKind,
     module_name: String,
     position_independent: bool,
     optimization_level: OptimizationLevel,
@@ -47,6 +49,7 @@ pub struct NativeBackendConfiguration {
 impl Default for NativeBackendConfiguration {
     fn default() -> Self {
         Self {
+            backend: BackendKind::default(),
             module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(),
             position_independent: true,
             optimization_level: OptimizationLevel::None,
@@ -58,11 +61,21 @@ impl Default for NativeBackendConfiguration {
 impl NativeBackendConfiguration {
     pub fn new(module_name: impl Into<String>, position_independent: bool) -> Self {
         Self {
+            backend: BackendKind::default(),
             module_name: module_name.into(),
             position_independent,
             optimization_level: OptimizationLevel::None,
             verify_no_float_ir: false,
         }
+    }
+
+    pub const fn backend(&self) -> BackendKind {
+        self.backend
+    }
+
+    pub const fn with_backend(mut self, backend: BackendKind) -> Self {
+        self.backend = backend;
+        self
     }
 
     pub fn module_name(&self) -> &str {

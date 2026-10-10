@@ -3,7 +3,8 @@ use std::path::Path;
 
 use actus::codegen::LinkerPlan;
 use actus::configuration::{
-    BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel, RuntimeProfile,
+    BackendKind, BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel,
+    RuntimeProfile,
 };
 use actus::diagnostics::{
     DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST,
@@ -110,6 +111,37 @@ fn loads_build_settings_from_an_actus_manifest() {
     let expected_linker = TargetSpec::host().expect("host target should parse").linker_flavor();
     assert_eq!(configuration.linker_flavor(), expected_linker);
     let _ = fs::remove_file(path);
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn loads_the_explicit_llvm_backend_from_an_actus_manifest() {
+    let path =
+        std::env::temp_dir().join(format!("actus-config-backend-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"backend\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write backend manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest(&path).expect("LLVM backend manifest should load");
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Llvm);
+    let _ = fs::remove_file(path);
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn defaults_to_cranelift_as_the_native_backend() {
+    let configuration = CompilerConfiguration::from_environment();
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Cranelift);
+}
+
+#[cfg(all(not(feature = "cranelift"), feature = "llvm"))]
+#[test]
+fn defaults_to_llvm_when_cranelift_is_not_compiled() {
+    let configuration = CompilerConfiguration::from_environment();
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Llvm);
 }
 
 #[test]
