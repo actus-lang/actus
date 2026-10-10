@@ -1,3 +1,7 @@
+mod bindings;
+
+pub use bindings::BackendSymbolBindings;
+
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 

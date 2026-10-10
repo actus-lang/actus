@@ -1,6 +1,5 @@
 mod abi;
 mod backend;
-mod bindings;
 mod body;
 mod constants;
 mod contract;
@@ -18,7 +17,6 @@ mod symbols;
 
 pub use abi::{BackendAggregateFragment, BackendAggregateLocation, BackendDirectAggregateAbi};
 pub use backend::{BackendKind, BackendTargetError};
-pub use bindings::BackendSymbolBindings;
 pub use body::{BackendBodyProvider, lower_verb_body};
 pub use contract::{
     BackendAbiError, BackendBlock, BackendBlockId, BackendCleanupAction, BackendCleanupField,
@@ -38,7 +36,7 @@ pub use signature::{
     BackendLayoutProvider, BackendSignature, lower_verb, lower_verb_signature,
     lower_verb_with_cleanup,
 };
-pub use symbols::{SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
+pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 #[cfg(feature = "cranelift")]
 pub(crate) use cranelift::generic::expand_generic_instances;

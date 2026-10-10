@@ -7,8 +7,8 @@ use crate::target::TargetSpec;
 
 use super::types::NativeType;
 
-pub use super::super::bindings::BackendSymbolBindings;
 pub use super::super::contract::BackendEmitError;
+pub use super::super::symbols::BackendSymbolBindings;
 
 pub(crate) struct FunctionMeta {
     pub(crate) id: FuncId,
