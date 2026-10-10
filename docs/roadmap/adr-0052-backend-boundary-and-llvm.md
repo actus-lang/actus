@@ -170,9 +170,10 @@ the binding's `strict-versioning` feature enabled. The build discovers LLVM
 through `llvm-config` or `LLVM_SYS_231_PREFIX`; the default build does not
 perform that discovery. The minimum supported host toolchain is LLVM 23.1.x
 and the initial target scope is hosted targets. The LLVM implementation now
-includes validated hosted IR lowering and native host object emission. Hosted
-executable linking, cross-target target registration, and freestanding startup
-remain separate acceptance steps. An LLVM feature build
+includes validated hosted IR lowering, native host object emission, and host
+object-to-executable linking through the shared linker plan. Cross-target
+target registration and freestanding startup remain separate acceptance steps.
+An LLVM feature build
 that lacks the required toolchain must return a typed setup diagnostic rather
 than fall back to Cranelift or silently emit a different object.
 

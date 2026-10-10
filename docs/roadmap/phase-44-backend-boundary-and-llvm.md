@@ -286,7 +286,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
 - [ ] Add aggregate layout, memory-copy, enum discriminant, and Result/Option
       lowering using the same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
-- [ ] Emit deterministic object files and link a hosted executable.
+- [x] Emit deterministic object files and link a hosted executable.
 - [ ] Compare LLVM and Cranelift semantic results for shared fixtures.
 - [ ] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
@@ -341,8 +341,10 @@ native LLVM target registry, applies the target triple and data layout, and
 emits an object file through `LLVMTargetMachineEmitToFile`. The object test
 emits the same unit module twice, compares the complete bytes for deterministic
 output, parses the result with the object reader, and verifies the exported
-Actus symbol. This closes the LLVM object-emission slice for the host target;
-hosted executable linking, cross-target registration, and target-specific
+Actus symbol. A Linux hosted integration fixture then combines that LLVM object
+with a C entry shim through the shared `LinkerPlan`, links an executable, and
+executes it successfully. This closes the host object-to-executable slice;
+cross-target registration, CLI backend selection, and target-specific
 runtime/startup integration remain open.
 CI now runs a separate Cranelift-only configuration across all targets and a
 separate LLVM-only configuration that checks the compiler library and binary

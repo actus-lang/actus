@@ -1,6 +1,7 @@
 #![cfg(feature = "llvm")]
 
 use actus::ast::Role;
+use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendEnumLayout, BackendExternal, BackendFailure,
@@ -8,7 +9,13 @@ use actus::codegen::{
     BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity,
     SymbolKind,
 };
+use actus::configuration::CompilerConfiguration;
 use object::{Object, ObjectSymbol};
+
+#[cfg(target_os = "linux")]
+use std::fs;
+#[cfg(target_os = "linux")]
+use std::path::{Path, PathBuf};
 
 #[test]
 fn emits_a_valid_unit_function_as_llvm_ir() {
@@ -536,4 +543,69 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("test__verb_main")));
     std::fs::remove_file(output).expect("test object should be removed");
     std::fs::remove_file(second_output).expect("second test object should be removed");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn links_and_runs_a_host_object_through_the_shared_linker() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-llvm-link-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("link fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"llvm_link_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("link fixture manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "extern void test__verb_main(void); int main(void) { test__verb_main(); return 0; }\n",
+    )
+    .expect("entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "main").expect("valid symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let llvm_object = root.join("module.o");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    emit_object(&module, &target, &llvm_object).expect("LLVM object should be emitted");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("link fixture configuration should load");
+    let executable = root.join("linked");
+    let objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    link_objects(&objects, &executable, &configuration).expect("host objects should link");
+    let status = Command::new(&executable).status().expect("linked executable should run");
+    assert_eq!(status.code(), Some(0));
+    remove_fixture(&root, [&manifest, &shim_source, &shim_object, &llvm_object, &executable]);
+}
+
+#[cfg(target_os = "linux")]
+fn run_native_command(command: &mut std::process::Command) {
+    let status = command.status().expect("native compiler should start");
+    assert!(status.success(), "native compiler should succeed: {command:?}");
+}
+
+#[cfg(target_os = "linux")]
+fn remove_fixture<const N: usize>(root: &Path, files: [&PathBuf; N]) {
+    for file in files {
+        let _ = fs::remove_file(file);
+    }
+    let _ = fs::remove_file(root.join("Actus.lock"));
+    let _ = fs::remove_dir(root);
 }
