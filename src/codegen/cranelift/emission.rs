@@ -25,6 +25,12 @@ pub(crate) struct NativeRootSelection<'a> {
     pub(crate) exported: Option<&'a [String]>,
 }
 
+type LayoutMetadata = (
+    LayoutRegistry,
+    std::collections::HashMap<String, FunctionMeta>,
+    Vec<crate::codegen::BackendCleanupPlan>,
+);
+
 pub(crate) fn emit_program_object_for_target(
     program: &Program,
     roots: NativeRootSelection<'_>,
@@ -223,20 +229,13 @@ fn emit_verbs_object(inputs: VerbEmission<'_, '_>) -> Result<Vec<u8>, BackendEmi
 fn build_layouts_and_metadata(
     module: &mut cranelift_object::ObjectModule,
     inputs: &VerbEmission<'_, '_>,
-) -> Result<
-    (
-        LayoutRegistry,
-        std::collections::HashMap<String, FunctionMeta>,
-        Vec<crate::codegen::BackendCleanupPlan>,
-    ),
-    BackendEmitError,
-> {
+) -> Result<LayoutMetadata, BackendEmitError> {
     let layouts = build_layouts(module, inputs.program, inputs.generic_instances)?;
     let cleanup_provider = super::contract::LayoutCleanupProvider { layouts: &layouts };
-    let resolved_plans = lower_semantic_cleanup_with_provider(&inputs.semantic, &cleanup_provider)
+    let resolved_plans = lower_semantic_cleanup_with_provider(inputs.semantic, &cleanup_provider)
         .map_err(|error| {
-            BackendEmitError(format!("cleanup descriptor lowering failed: {error}"))
-        })?;
+        BackendEmitError(format!("cleanup descriptor lowering failed: {error}"))
+    })?;
     let metadata = declare_emission_functions(
         module,
         inputs.verbs,

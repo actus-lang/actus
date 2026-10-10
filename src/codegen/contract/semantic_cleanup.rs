@@ -18,10 +18,7 @@ pub fn lower_semantic_cleanup_with_provider(
             .into_iter()
             .flat_map(|plan| plan.scopes),
     );
-    Ok(plans
-        .into_iter()
-        .map(|plan| lower_plan(plan, model, provider))
-        .collect::<Result<Vec<_>, _>>()?)
+    plans.into_iter().map(|plan| lower_plan(plan, model, provider)).collect::<Result<Vec<_>, _>>()
 }
 
 fn lower_plan(
