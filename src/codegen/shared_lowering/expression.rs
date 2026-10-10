@@ -16,6 +16,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     locals: Vec<BTreeMap<String, BackendValueId>>,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
+    cleanup_plans: &'a [super::super::BackendCleanupPlan],
     next_value: u32,
 }
 
@@ -25,6 +26,7 @@ impl<'a> SharedExpressionProvider<'a> {
         verb: &VerbDecl,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
+        cleanup_plans: &'a [super::super::BackendCleanupPlan],
     ) -> Self {
         let parameter_bindings = verb
             .params
@@ -38,6 +40,7 @@ impl<'a> SharedExpressionProvider<'a> {
             locals: Vec::new(),
             return_types,
             external_symbols,
+            cleanup_plans,
             next_value: verb.params.len() as u32,
         }
     }
@@ -51,15 +54,62 @@ impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
         self.parameters.get(name).copied()
     }
+
+    fn emit_scope_cleanup(&self, span: SourceSpan, instructions: &mut Vec<BackendInstruction>) {
+        let returned_value = match instructions.last() {
+            Some(BackendInstruction::Return { value, .. }) => *value,
+            _ => None,
+        };
+        let mut cleanup = Vec::new();
+        for plan in self.cleanup_plans.iter().filter(|plan| plan.span == span) {
+            for (index, action) in plan.actions.iter().enumerate() {
+                let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
+                    continue;
+                };
+                let Some(value) = self.local_value(name) else { continue };
+                if returned_value == Some(value) {
+                    continue;
+                }
+                let Some(descriptor) =
+                    plan.resolved_bridges.get(index).and_then(|items| items.first())
+                else {
+                    continue;
+                };
+                cleanup.push(BackendInstruction::Cleanup {
+                    action: action.clone(),
+                    operand: Some(descriptor.operand(value)),
+                    span: plan.span,
+                });
+            }
+        }
+        let terminates = matches!(
+            instructions.last(),
+            Some(BackendInstruction::Return { .. })
+                | Some(BackendInstruction::Fail { .. })
+                | Some(BackendInstruction::Jump { .. })
+        );
+        let insertion = instructions.len().saturating_sub(if terminates { 1 } else { 0 });
+        instructions.splice(insertion..insertion, cleanup);
+    }
+
+    fn local_value(&self, name: &str) -> Option<BackendValueId> {
+        self.locals.iter().rev().find_map(|scope| scope.get(name).copied())
+    }
 }
 
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
-    fn enter_scope(&mut self) {
+    fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }
 
-    fn exit_scope(&mut self) {
+    fn exit_scope(
+        &mut self,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        self.emit_scope_cleanup(span, instructions);
         self.locals.pop();
+        Ok(())
     }
 
     fn bind_owner(

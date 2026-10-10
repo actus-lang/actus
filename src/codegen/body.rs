@@ -24,9 +24,15 @@ pub trait BackendBodyProvider {
 }
 
 pub trait BackendExpressionProvider {
-    fn enter_scope(&mut self) {}
+    fn enter_scope(&mut self, _span: SourceSpan) {}
 
-    fn exit_scope(&mut self) {}
+    fn exit_scope(
+        &mut self,
+        _span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Ok(())
+    }
 
     fn bind_owner(
         &mut self,
@@ -138,10 +144,19 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         block: &Block,
         fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
-        self.provider.enter_scope();
+        self.provider.enter_scope(block.span);
         let result = self.lower_block_in_scope(id, block, fallthrough);
-        self.provider.exit_scope();
-        result
+        match result {
+            Ok(mut lowered) => {
+                self.provider.exit_scope(block.span, &mut lowered.instructions)?;
+                Ok(lowered)
+            }
+            Err(error) => {
+                let mut discarded = Vec::new();
+                let _ = self.provider.exit_scope(block.span, &mut discarded);
+                Err(error)
+            }
+        }
     }
 
     fn lower_block_in_scope(

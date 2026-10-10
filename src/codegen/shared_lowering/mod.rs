@@ -247,8 +247,13 @@ fn lower_shared_verb(
     return_types: &BTreeMap<String, Option<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
 ) -> Result<super::BackendFunction, BackendContractError> {
-    let mut provider =
-        SharedExpressionProvider::new(namespace, verb, return_types, external_symbols);
+    let mut provider = SharedExpressionProvider::new(
+        namespace,
+        verb,
+        return_types,
+        external_symbols,
+        cleanup_plans,
+    );
     let mut function = match entry_name.filter(|name| *name == verb.name) {
         Some(_) => lower_verb_with_expressions_as(
             SymbolIdentity::entry(&verb.name)

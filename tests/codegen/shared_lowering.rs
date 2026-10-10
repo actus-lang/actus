@@ -277,3 +277,28 @@ fn rejects_outer_scalar_assignment_without_a_branch_merge_contract() {
     let message = error.to_string();
     assert!(message.contains("current lexical scope"), "unexpected error: {message}");
 }
+
+#[test]
+fn lowers_local_region_cleanup_at_function_scope_boundary() {
+    let source = "verb forward(dat region: Region[u32]) -> Region[u32] { return region; } verb inspect(dat region: Region[u32]) -> Int { erg local: Region[u32] = forward(region: dat region); return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("local Region fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("local Region cleanup should lower through the shared pipeline");
+    let inspect = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("inspect"))
+        .expect("inspect function should be present");
+    let instructions = &inspect.blocks[0].instructions;
+    let cleanup_index = instructions
+        .iter()
+        .position(|instruction| matches!(instruction, BackendInstruction::Cleanup { .. }))
+        .expect("local Region must be cleaned at function scope exit");
+    let return_index = instructions
+        .iter()
+        .position(|instruction| matches!(instruction, BackendInstruction::Return { .. }))
+        .expect("inspect must retain its explicit return");
+    assert!(cleanup_index < return_index);
+}
