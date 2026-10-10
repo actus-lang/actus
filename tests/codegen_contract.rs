@@ -448,11 +448,31 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
                     binding_index: 2,
                     name: "region".to_owned(),
                 },
+                value: Some(BackendValueId(0)),
                 span: SourceSpan::new(4, 10),
             }],
         }],
     );
     assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_runtime_cleanup_without_a_lowered_value_operand() {
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::ResetArena {
+                    binding_index: 0,
+                    name: "region".to_owned(),
+                },
+                value: None,
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
 }
 
 #[test]

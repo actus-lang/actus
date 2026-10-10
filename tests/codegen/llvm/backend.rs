@@ -238,6 +238,7 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
             instructions: vec![
                 BackendInstruction::Cleanup {
                     action: LoweredCleanupInstruction::EndBorrow { borrow_id: 3 },
+                    value: None,
                     span: actus::lexer::SourceSpan::new(0, 1),
                 },
                 BackendInstruction::Return {

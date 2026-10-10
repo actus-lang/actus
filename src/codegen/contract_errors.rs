@@ -56,6 +56,9 @@ fn simple_message(error: &BackendContractError) -> Option<&'static str> {
         BackendContractError::ReturnSlotTypeMismatch => {
             "backend return slot must match an aggregate return type"
         }
+        BackendContractError::InvalidCleanupOperand => {
+            "runtime cleanup requires an explicit lowered value operand"
+        }
         BackendContractError::InvalidCallSymbol => "backend call has an empty symbol",
         BackendContractError::RolePassingMismatch => {
             "backend parameter role and passing mode disagree"

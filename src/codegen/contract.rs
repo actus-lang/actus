@@ -146,6 +146,7 @@ pub enum BackendInstruction {
     },
     Cleanup {
         action: LoweredCleanupInstruction,
+        value: Option<BackendValueId>,
         span: SourceSpan,
     },
     MemoryCopy {
@@ -346,6 +347,9 @@ fn validate_instruction(
             Err(BackendContractError::InvalidBlockReference)
         }
         BackendInstruction::Fail { failure, .. } => super::enum_layout::validate_failure(failure),
+        BackendInstruction::Cleanup { action, value, .. } => {
+            validate_cleanup_operand(action, *value)
+        }
         BackendInstruction::MemoryCopy { size, alignment, .. }
             if *size == 0
                 || *alignment == 0
@@ -356,6 +360,16 @@ fn validate_instruction(
         }
         _ => Ok(()),
     }
+}
+
+fn validate_cleanup_operand(
+    action: &LoweredCleanupInstruction,
+    value: Option<BackendValueId>,
+) -> Result<(), BackendContractError> {
+    let requires_value = !matches!(action, LoweredCleanupInstruction::EndBorrow { .. });
+    (requires_value == value.is_some())
+        .then_some(())
+        .ok_or(BackendContractError::InvalidCleanupOperand)
 }
 
 fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContractError> {
@@ -435,6 +449,7 @@ pub enum BackendContractError {
     InvalidMemoryCopy,
     InvalidAggregateAbi(&'static str),
     InvalidCleanupContract(String),
+    InvalidCleanupOperand,
     ReturnSlotTypeMismatch,
     InvalidCallSymbol,
     RolePassingMismatch,
