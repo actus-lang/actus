@@ -11,6 +11,7 @@ pub mod llvm;
 mod model;
 mod result_constructors;
 mod serialization;
+mod shared_lowering;
 mod signature;
 mod symbols;
 
@@ -36,9 +37,11 @@ pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
+pub(crate) use shared_lowering::lower_scalar_program;
+pub(crate) use signature::lower_verb_with_expressions_as;
 pub use signature::{
     BackendLayoutProvider, BackendSignature, lower_verb, lower_verb_signature,
-    lower_verb_with_cleanup,
+    lower_verb_with_cleanup, lower_verb_with_expressions,
 };
 pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 

@@ -57,6 +57,34 @@ pub fn lower_verb(
     Ok(function)
 }
 
+pub fn lower_verb_with_expressions(
+    namespace: &str,
+    verb: &VerbDecl,
+    layouts: &impl BackendLayoutProvider,
+    body_provider: &mut impl super::BackendExpressionProvider,
+    entry: super::BackendBlockId,
+) -> Result<BackendFunction, BackendContractError> {
+    let signature = lower_verb_signature(namespace, verb, layouts)?;
+    let blocks = super::lower_verb_body_with_expressions(verb, body_provider)?;
+    let function = signature.into_function(entry, blocks);
+    function.validate()?;
+    Ok(function)
+}
+
+pub(crate) fn lower_verb_with_expressions_as(
+    symbol: SymbolIdentity,
+    verb: &VerbDecl,
+    layouts: &impl BackendLayoutProvider,
+    body_provider: &mut impl super::BackendExpressionProvider,
+    entry: super::BackendBlockId,
+) -> Result<BackendFunction, BackendContractError> {
+    let signature = lower_verb_signature_as(symbol, verb, layouts)?;
+    let blocks = super::lower_verb_body_with_expressions(verb, body_provider)?;
+    let function = signature.into_function(entry, blocks);
+    function.validate()?;
+    Ok(function)
+}
+
 pub fn lower_verb_with_cleanup(
     namespace: &str,
     verb: &VerbDecl,
@@ -79,6 +107,14 @@ pub fn lower_verb_signature(
 ) -> Result<BackendSignature, BackendContractError> {
     let symbol = SymbolIdentity::new(namespace, SymbolKind::Verb, &verb.name)
         .map_err(|error| unsupported(verb.span, error.to_string()))?;
+    lower_verb_signature_as(symbol, verb, layouts)
+}
+
+fn lower_verb_signature_as(
+    symbol: SymbolIdentity,
+    verb: &VerbDecl,
+    layouts: &impl BackendLayoutProvider,
+) -> Result<BackendSignature, BackendContractError> {
     let parameters = verb
         .params
         .iter()

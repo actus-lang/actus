@@ -47,6 +47,13 @@ pub struct SymbolIdentity {
 }
 
 impl SymbolIdentity {
+    pub(crate) fn entry(name: &str) -> Result<Self, SymbolError> {
+        if name.is_empty() {
+            return Err(SymbolError::EmptyName);
+        }
+        Ok(Self { encoded: name.to_owned(), kind: SymbolKind::Verb })
+    }
+
     pub fn new(namespace_prefix: &str, kind: SymbolKind, name: &str) -> Result<Self, SymbolError> {
         Self::specialized(namespace_prefix, kind, name, &[])
     }

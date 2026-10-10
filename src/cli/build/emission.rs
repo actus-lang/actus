@@ -194,13 +194,27 @@ fn emit_objects_cranelift(
 
 #[cfg(feature = "llvm")]
 fn emit_objects_llvm(
-    _plan: &crate::modules::ModuleCompilationPlan,
-    _symbol: &str,
-    _configuration: &CompilerConfiguration,
+    plan: &crate::modules::ModuleCompilationPlan,
+    symbol: &str,
+    configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    Err(BackendEmitError(
-        "backend `llvm` is selected, but CLI semantic lowering is not yet connected to the shared BackendModule contract".to_owned(),
-    ))
+    if !plan.units().is_empty() {
+        return Err(BackendEmitError(
+            "LLVM shared lowering currently accepts a root-only compilation; imported module lowering remains unsupported"
+                .to_owned(),
+        ));
+    }
+    let targeted =
+        crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
+    let targeted = crate::codegen::normalize_program(&targeted);
+    let module = crate::codegen::lower_scalar_program("actus_root", &targeted, Some(symbol))
+        .map_err(|error| {
+            BackendEmitError(format!("LLVM shared semantic lowering failed: {error}"))
+        })?;
+    let bytes = crate::codegen::llvm::emit_object_bytes(&module, configuration.target())?;
+    let symbols =
+        module.functions.iter().map(|function| function.symbol.as_str().to_owned()).collect();
+    Ok(vec![EmittedObject { name: "root".to_owned(), bytes, symbols }])
 }
 
 #[cfg(not(feature = "llvm"))]

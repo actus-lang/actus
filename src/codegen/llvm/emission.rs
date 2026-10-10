@@ -51,6 +51,16 @@ pub fn emit_object(
     Ok(())
 }
 
+/// Emits a validated backend module as an owned target-specific object buffer.
+pub fn emit_object_bytes(
+    module: &BackendModule,
+    target: &TargetSpec,
+) -> Result<Vec<u8>, BackendEmitError> {
+    let (_context, owned_module) = lower_module(module)?;
+    verify_module(owned_module.raw)?;
+    super::object::emit_object_bytes(owned_module.raw, target)
+}
+
 fn lower_module(module: &BackendModule) -> Result<(LlvmContext, LlvmModule), BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
     validate_integer_only(module)?;

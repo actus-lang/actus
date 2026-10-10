@@ -7,4 +7,4 @@ mod object;
 mod returns;
 mod values;
 
-pub use emission::{emit_module, emit_object};
+pub use emission::{emit_module, emit_object, emit_object_bytes};
