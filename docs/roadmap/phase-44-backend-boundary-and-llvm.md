@@ -283,7 +283,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       configurations.
 - [x] Report LLVM installation, build-time, dependency, and binary-size
       requirements separately from the default compiler.
-- [ ] Add LLVM IR generation for the common scalar, control-flow, call, return,
+- [x] Add LLVM IR generation for the common scalar, control-flow, call, return,
       trap, and cleanup contract.
 - [x] Add indirect aggregate layout and bounded memory-copy lowering using the
       same Actus layout rules as Cranelift.
