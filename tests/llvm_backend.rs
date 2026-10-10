@@ -1,6 +1,8 @@
 #![cfg(feature = "llvm")]
 
 use actus::ast::Role;
+#[cfg(feature = "cranelift")]
+use actus::codegen::cranelift::emit_contract_module_object;
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
@@ -615,6 +617,123 @@ fn links_and_runs_a_host_object_through_the_shared_linker() {
     let status = Command::new(&executable).status().expect("linked executable should run");
     assert_eq!(status.code(), Some(0));
     remove_fixture(&root, [&manifest, &shim_source, &shim_object, &llvm_object, &executable]);
+}
+
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
+fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-backend-parity-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("parity fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"backend_parity_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("parity fixture manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "extern int test__verb_entry(int); int main(void) { return test__verb_entry(42) == 42 ? 0 : 1; }\n",
+    )
+    .expect("parity entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let identity_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "identity").expect("identity symbol");
+    let entry_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "entry").expect("entry symbol");
+    let parameter = BackendParameter {
+        name: "input".to_owned(),
+        role: Role::Erg,
+        ty: integer,
+        passing: actus::codegen::BackendPassingMode::Direct,
+    };
+    let identity = BackendFunction {
+        symbol: identity_symbol.clone(),
+        parameters: vec![parameter.clone()],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: Some(BackendValueId(0)),
+                span: actus::lexer::SourceSpan::new(0, 1),
+            }],
+        }],
+        cleanup: Vec::new(),
+    };
+    let entry = BackendFunction {
+        symbol: entry_symbol,
+        parameters: vec![parameter],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: identity_symbol,
+                    arguments: vec![BackendValueId(0)],
+                    result: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let module = BackendModule { externals: Vec::new(), functions: vec![identity, entry] };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("parity fixture configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM parity object should be emitted");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift parity object should be emitted");
+    fs::write(&cranelift_object, cranelift_bytes).expect("Cranelift object should be written");
+
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM parity objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift parity objects should link");
+    let llvm_status =
+        Command::new(&llvm_executable).status().expect("LLVM parity executable should run");
+    let cranelift_status = Command::new(&cranelift_executable)
+        .status()
+        .expect("Cranelift parity executable should run");
+    assert_eq!(llvm_status.code(), Some(0));
+    assert_eq!(cranelift_status.code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
 }
 
 #[cfg(target_os = "linux")]

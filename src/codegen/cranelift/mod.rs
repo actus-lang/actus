@@ -5,6 +5,7 @@ pub(super) mod buffer_index;
 pub(super) mod calls;
 pub(super) mod case;
 pub(super) mod cleanup;
+pub(super) mod contract;
 pub(super) mod control_flow;
 pub(super) mod declarations;
 pub(super) mod dependencies;
@@ -32,6 +33,7 @@ pub(super) mod vtable;
 pub(super) use isa::build_isa_with_optimization;
 
 pub use abi::{validate_external_native_signature, validate_native_signature};
+pub use contract::emit_contract_module_object;
 pub use native::{
     emit_module_object_for_target_in_namespace,
     emit_module_object_for_target_in_namespace_with_bindings,
