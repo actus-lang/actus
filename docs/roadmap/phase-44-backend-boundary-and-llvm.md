@@ -314,7 +314,7 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       lowering.
 - [x] Define bounds-checked field sublayouts for ownership cleanup operands.
 - [x] Emit and execute runtime bridge calls for ownership cleanup.
-- [ ] Define a backend-neutral cleanup bridge descriptor with stable symbol,
+- [x] Define a backend-neutral cleanup bridge descriptor with stable symbol,
       argument mode, layout, and return-status metadata.
 - [ ] Lower semantic binding types and moved-field sublayouts into complete
       cleanup bridge descriptors before backend emission.
