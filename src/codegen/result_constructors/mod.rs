@@ -1,3 +1,5 @@
+mod spans;
+
 use crate::ast::{
     Argument, ArgumentRoleResolution, Block, CaseBody, DispatchMode, Expr, Param, Program,
     ReturnAccess, ReturnType, Role, SerializeDecl, SerializeSection, Stmt, TopLevelDecl, TypeName,
@@ -6,7 +8,7 @@ use crate::ast::{
 use crate::lexer::SourceSpan;
 use std::collections::HashMap;
 
-use super::result_constructor_spans::initializer_span;
+use self::spans::initializer_span;
 /// Rewrites contextual `Ok` and `Err` calls into the existing enum-constructor
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.

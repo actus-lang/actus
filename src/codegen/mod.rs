@@ -11,7 +11,6 @@ mod linker;
 #[cfg(feature = "llvm")]
 pub mod llvm;
 mod model;
-mod result_constructor_spans;
 mod result_constructors;
 mod serialization;
 mod signature;
