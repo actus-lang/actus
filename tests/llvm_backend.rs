@@ -786,6 +786,113 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
     );
 }
 
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
+fn compares_llvm_and_cranelift_on_the_same_indirect_aggregate_copy_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-aggregate-parity-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("aggregate parity fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"aggregate_parity_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("aggregate parity manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "#include <stdint.h>\nextern void test__verb_copy(void *, const void *); int main(void) { uint64_t source[2] = { 0x1122334455667788ULL, 0x99aabbccddeeff00ULL }; uint64_t destination[2] = { 0, 0 }; test__verb_copy(destination, source); return destination[0] == source[0] && destination[1] == source[1] ? 0 : 1; }\n",
+    )
+    .expect("aggregate parity entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let layout = actus::codegen::BackendLayout { size: 16, alignment: 8 };
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "copy").expect("copy symbol");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: vec![
+                BackendParameter {
+                    name: "destination".to_owned(),
+                    role: Role::Ins,
+                    ty: BackendValueType::Aggregate { layout },
+                    passing: actus::codegen::BackendPassingMode::ExclusiveLoan { layout },
+                },
+                BackendParameter {
+                    name: "source".to_owned(),
+                    role: Role::Abs,
+                    ty: BackendValueType::Aggregate { layout },
+                    passing: actus::codegen::BackendPassingMode::Borrowed { layout },
+                },
+            ],
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                instructions: vec![
+                    BackendInstruction::MemoryCopy {
+                        destination: BackendValueId(0),
+                        source: BackendValueId(1),
+                        size: 16,
+                        alignment: 8,
+                        span: actus::lexer::SourceSpan::new(0, 1),
+                    },
+                    BackendInstruction::Return {
+                        value: None,
+                        span: actus::lexer::SourceSpan::new(1, 2),
+                    },
+                ],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("aggregate parity configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM aggregate object should be emitted");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift aggregate object should be emitted");
+    fs::write(&cranelift_object, cranelift_bytes)
+        .expect("Cranelift aggregate object should be written");
+
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM aggregate objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift aggregate objects should link");
+    let llvm_status =
+        Command::new(&llvm_executable).status().expect("LLVM aggregate executable should run");
+    let cranelift_status = Command::new(&cranelift_executable)
+        .status()
+        .expect("Cranelift aggregate executable should run");
+    assert_eq!(llvm_status.code(), Some(0));
+    assert_eq!(cranelift_status.code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
+}
+
 #[cfg(target_os = "linux")]
 fn run_native_command(command: &mut std::process::Command) {
     let status = command.status().expect("native compiler should start");

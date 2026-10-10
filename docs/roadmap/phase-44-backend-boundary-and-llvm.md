@@ -283,14 +283,18 @@ crates; the no-feature CLI retains a typed unavailable-backend error path.
       requirements separately from the default compiler.
 - [ ] Add LLVM IR generation for the common scalar, control-flow, call, return,
       trap, and cleanup contract.
-- [ ] Add aggregate layout, memory-copy, enum discriminant, and Result/Option
-      lowering using the same Actus layout rules as Cranelift.
+- [x] Add indirect aggregate layout and bounded memory-copy lowering using the
+      same Actus layout rules as Cranelift.
+- [ ] Add direct aggregate ABI, enum discriminant, and Result/Option lowering
+      using the same Actus layout rules as Cranelift.
 - [x] Add runtime bridge declarations and external symbol validation.
 - [x] Emit deterministic object files and link a hosted executable.
 - [x] Compare LLVM and Cranelift semantic results for the supported direct
       scalar/unit and control-flow contract slices.
-- [ ] Extend cross-backend semantic comparison to aggregate, typed-failure,
-      ownership, and runtime-cleanup fixtures.
+- [x] Compare LLVM and Cranelift semantic results for the supported indirect
+      aggregate and memory-copy contract slice.
+- [ ] Extend cross-backend semantic comparison to direct aggregate,
+      typed-failure, ownership, and runtime-cleanup fixtures.
 - [x] Verify integer-only programs do not acquire floating-point instructions
       through the LLVM lowering path.
 - [x] Keep LLVM optional so the existing Cranelift build remains usable when
@@ -375,8 +379,15 @@ same hosted C entry shim through `LinkerPlan`, and executes both programs with
 the same exit status. The focused command
 `LLVM_SYS_231_PREFIX=/usr cargo test --features llvm --test llvm_backend`
 passes with 15 tests and 0 failures. This evidence covers only the stated
-scalar/unit and control-flow slices; aggregate, typed-failure, ownership, and
-runtime-cleanup parity remain open.
+scalar/unit and control-flow slices; direct aggregate, typed-failure, ownership,
+and runtime-cleanup parity remain open.
+The same parity suite now also covers an indirect fixed-layout aggregate with
+16-byte extent and 8-byte alignment. LLVM and Cranelift lower the neutral
+`MemoryCopy` instruction to their respective overlap-safe native copy paths,
+link against the same C entry shim, and both executables verify the copied
+bytes. The focused suite contains 16 passing tests. Direct aggregate register
+ABI, typed failures, ownership transitions, and runtime cleanup remain outside
+this evidence.
 Installation requirements, direct dependency trees, clean debug build times,
 target-directory sizes, and debug executable sizes are recorded in
 `docs/benchmarks/phase-44-backend-build-profile-2026-10-09.md`. The record

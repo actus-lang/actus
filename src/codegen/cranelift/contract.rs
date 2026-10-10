@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::condcodes::IntCC;
-use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, TrapCode, Type, types};
+use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, TrapCode, Type, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
@@ -61,24 +61,50 @@ fn signature(
     parameters: &[crate::codegen::BackendParameter],
     return_value: BackendValueType,
 ) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
-    if parameters.iter().any(|parameter| !matches!(parameter.passing, BackendPassingMode::Direct)) {
-        return Err(BackendEmitError(
-            "Cranelift neutral contract slice supports direct parameters only".to_owned(),
-        ));
-    }
     let mut signature = module.make_signature();
     for parameter in parameters {
-        let Some(ty) = scalar_type(module, parameter.ty)? else {
-            return Err(BackendEmitError(
-                "Cranelift neutral contract slice supports scalar parameters only".to_owned(),
-            ));
-        };
+        let ty = parameter_type(module, parameter)?;
         signature.params.push(AbiParam::new(ty));
     }
     if let Some(ty) = scalar_type(module, return_value)? {
         signature.returns.push(AbiParam::new(ty));
     }
     Ok(signature)
+}
+
+fn parameter_type(
+    module: &ObjectModule,
+    parameter: &crate::codegen::BackendParameter,
+) -> Result<Type, BackendEmitError> {
+    match parameter.passing {
+        BackendPassingMode::Direct => scalar_type(module, parameter.ty)?.ok_or_else(|| {
+            BackendEmitError("Cranelift direct unit parameters are not supported".to_owned())
+        }),
+        BackendPassingMode::Indirect { layout }
+        | BackendPassingMode::Borrowed { layout }
+        | BackendPassingMode::ExclusiveLoan { layout }
+        | BackendPassingMode::OwnershipTransfer { layout }
+        | BackendPassingMode::RuntimeBridge { layout } => {
+            layout.validate().map_err(|error| BackendEmitError(error.to_string()))?;
+            match parameter.ty {
+                BackendValueType::Aggregate { layout: value_layout }
+                | BackendValueType::Region { layout: value_layout }
+                    if value_layout == layout =>
+                {
+                    Ok(module.isa().pointer_type())
+                }
+                BackendValueType::Aggregate { .. } | BackendValueType::Region { .. } => {
+                    Err(BackendEmitError(
+                        "Cranelift aggregate parameter layout does not match passing layout"
+                            .to_owned(),
+                    ))
+                }
+                _ => Err(BackendEmitError(
+                    "Cranelift indirect parameter must have an aggregate or Region type".to_owned(),
+                )),
+            }
+        }
+    }
 }
 
 fn scalar_type(
@@ -184,6 +210,9 @@ fn lower_instruction(
         BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
         BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
         BackendInstruction::Return { .. } => lower_return(builder, instruction, values),
+        BackendInstruction::MemoryCopy { .. } => {
+            lower_memory_copy(module, builder, instruction, values)
+        }
         BackendInstruction::Trap { .. } => {
             builder.ins().trap(TrapCode::unwrap_user(1));
             Ok(())
@@ -197,6 +226,40 @@ fn lower_instruction(
             "Cranelift neutral contract instruction is not implemented".to_owned(),
         )),
     }
+}
+
+fn lower_memory_copy(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift memory-copy instruction expected".to_owned()));
+    };
+    let destination = values.get(destination).copied().ok_or_else(|| {
+        BackendEmitError(format!(
+            "Cranelift memory-copy destination {} is unavailable",
+            destination.0
+        ))
+    })?;
+    let source = values.get(source).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift memory-copy source {} is unavailable", source.0))
+    })?;
+    let alignment = u8::try_from(*alignment)
+        .map_err(|_| BackendEmitError("Cranelift memory-copy alignment exceeds u8".to_owned()))?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        destination,
+        source,
+        u64::from(*size),
+        alignment,
+        alignment,
+        false,
+        MemFlagsData::new(),
+    );
+    Ok(())
 }
 
 fn lower_branch(
