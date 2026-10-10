@@ -895,6 +895,13 @@ fn validates_complete_resolved_cleanup_descriptor_metadata() {
         field: Some(actus::codegen::BackendCleanupField { offset: 8, size: 8, alignment: 8 }),
     };
     assert!(resolved.validate().is_ok());
+    let operand = resolved.operand(BackendValueId(7));
+    assert_eq!(operand.value, BackendValueId(7));
+    assert_eq!(operand.layout, resolved.layout);
+    assert_eq!(operand.field, resolved.field);
+    assert_eq!(operand.bridge, resolved.descriptor.bridge);
+    assert_eq!(operand.argument, resolved.descriptor.argument);
+    assert_eq!(operand.result, resolved.descriptor.result);
 
     let invalid = BackendCleanupResolvedDescriptor {
         field: Some(actus::codegen::BackendCleanupField { offset: 12, size: 8, alignment: 4 }),

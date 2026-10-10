@@ -59,6 +59,18 @@ pub trait BackendCleanupProvider {
 }
 
 impl BackendCleanupResolvedDescriptor {
+    /// Materialize the validated bridge metadata as the operand consumed by a backend.
+    pub fn operand(&self, value: BackendValueId) -> BackendCleanupOperand {
+        BackendCleanupOperand {
+            value,
+            layout: self.layout,
+            field: self.field,
+            bridge: self.descriptor.bridge,
+            argument: self.descriptor.argument,
+            result: self.descriptor.result,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), BackendContractError> {
         self.layout.validate()?;
         if matches!(self.descriptor.argument, BackendCleanupArgument::FieldAddress)
