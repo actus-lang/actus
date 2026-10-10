@@ -242,4 +242,31 @@ mod tests {
         assert!(matches!(function.parameters[0].passing, BackendPassingMode::Borrowed { .. }));
         assert!(matches!(function.return_value.passing, BackendReturnMode::ReturnSlot { .. }));
     }
+
+    #[test]
+    fn lowers_region_call_and_return_through_shared_pipeline() {
+        let source = "verb forward(abs region: Region[u32]) -> Region[u32] { return region; } verb main(abs region: Region[u32]) -> Region[u32] { return forward(region: abs region); }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("Region call fixture should parse");
+        let module = lower_program_to_backend_module_with_layouts(
+            "actus_root",
+            &program,
+            None,
+            None,
+            &RegionLayouts,
+        )
+        .expect("Region call should lower through the shared pipeline");
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.symbol.as_str().ends_with("main"))
+            .expect("main function should be present");
+        assert!(main.blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(
+                instruction,
+                crate::codegen::BackendInstruction::Call { result: Some(_), .. }
+            )
+        ));
+    }
 }
