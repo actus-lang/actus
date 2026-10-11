@@ -32,15 +32,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 else_block,
                 span: branch.span,
             });
-            let body = lower_case_branch_body(
-                self,
-                matched_id,
-                branch,
-                span,
-                subject_value,
-                *mode,
-                &mut instructions,
-            )?;
+            let body =
+                lower_case_branch_body(self, matched_id, branch, span, subject_value, *mode)?;
             self.blocks.push(body);
             if let Some(following_id) = following_id {
                 if entry_instructions.is_none() {
@@ -95,9 +88,9 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
     span: SourceSpan,
     subject: BackendValueId,
     mode: CaseMode,
-    instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendBlock, BackendContractError> {
     lowering.provider.enter_scope(branch.span);
+    let mut body_prefix = Vec::new();
     let binding_result = if matches!(branch.pattern, Pattern::Variant { .. }) {
         lowering.provider.bind_enum_variant_payload(
             subject,
@@ -105,13 +98,14 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
             branch_payload(branch),
             mode,
             branch.span,
-            instructions,
+            &mut body_prefix,
         )
     } else {
         Ok(())
     };
     match binding_result.and_then(|_| case_return_block(lowering, id, branch, span)) {
         Ok(mut body) => {
+            body.instructions.splice(0..0, body_prefix);
             lowering.provider.exit_scope(branch.span, &mut body.instructions)?;
             Ok(body)
         }

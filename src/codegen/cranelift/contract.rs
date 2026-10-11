@@ -257,7 +257,7 @@ fn lower_instruction(
         | BackendInstruction::EnumPayload { .. }
         | BackendInstruction::EnumPayloadBinding { .. }
         | BackendInstruction::EnumConstruct { .. } => {
-            Err(BackendEmitError("Cranelift neutral enum extraction is not implemented".to_owned()))
+            super::contract_enums::lower(module, builder, instruction, values)
         }
         BackendInstruction::Call { .. } => {
             lower_call(module, builder, instruction, declarations, values, aggregate_values)

@@ -750,9 +750,13 @@ regressions. The shared regression
 `preserves_result_payload_types_for_call_results`, and the LLVM
 regressions `emits_plain_result_case_from_shared_lowering` and
 `emits_region_payload_result_constructor_from_shared_lowering` cover this
-slice. Guards, aggregate and Region values obtained from unsupported
-call-result metadata, Cranelift consumption, and complete CLI execution remain
-open.
+slice. Cranelift now consumes discriminant extraction and scalar payload
+bindings from indirect enum storage; the backend regression
+`cranelift_consumes_scalar_result_case_from_shared_lowering` covers this
+boundary, and shared case lowering keeps payload extraction inside the target
+branch block before its terminator. Enum construction, aggregate and Region
+payload execution, unsupported call-result metadata, and complete CLI
+execution remain open.
 
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
