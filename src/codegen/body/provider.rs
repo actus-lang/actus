@@ -73,7 +73,9 @@ pub trait BackendExpressionProvider {
         &mut self,
         _name: &str,
         _value: BackendValueId,
+        _declared_type: Option<&str>,
         span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         Err(unsupported(span, "owner declaration"))
     }
@@ -126,6 +128,15 @@ pub trait BackendExpressionProvider {
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError>;
+
+    fn coerce_return_value(
+        &mut self,
+        value: BackendValueId,
+        _span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        Ok(value)
+    }
 
     fn lower_enum_variant_condition_value(
         &mut self,

@@ -23,6 +23,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,
     locals: Vec<BTreeMap<String, BackendValueId>>,
+    verb_name: String,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
@@ -59,6 +60,7 @@ impl<'a> SharedExpressionProvider<'a> {
             layouts,
             parameters: parameter_bindings,
             locals: Vec::new(),
+            verb_name: verb.name.clone(),
             return_types,
             return_payload_types,
             external_symbols,
@@ -183,8 +185,11 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         &mut self,
         name: &str,
         value: BackendValueId,
+        declared_type: Option<&str>,
         span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
+        let value = state::coerce_owner_value(self, value, declared_type, span, instructions)?;
         let Some(scope) = self.locals.last_mut() else {
             return Err(unsupported(span, "scalar owner declaration has no active lexical scope"));
         };
@@ -297,6 +302,16 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 "expression is outside the scalar shared lowering contract",
             )),
         }
+    }
+
+    fn coerce_return_value(
+        &mut self,
+        value: BackendValueId,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let return_type = self.return_types.get(&self.verb_name).copied().flatten();
+        state::coerce_value_to_type(self, value, return_type, span, instructions)
     }
 
     fn lower_enum_variant_condition_value(

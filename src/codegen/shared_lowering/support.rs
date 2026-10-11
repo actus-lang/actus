@@ -30,6 +30,16 @@ pub(super) fn scalar_backend_type(type_name: &TypeName) -> Option<super::super::
     Some(super::super::BackendValueType::Integer { signed, width })
 }
 
+pub(super) fn scalar_backend_type_name(name: &str) -> Option<super::super::BackendValueType> {
+    let type_name = TypeName {
+        name: name.to_owned(),
+        arguments: Vec::new(),
+        reference_role: None,
+        span: crate::lexer::SourceSpan::new(0, 0),
+    };
+    scalar_backend_type(&type_name)
+}
+
 pub(super) fn backend_value_type(
     layouts: &(impl super::super::BackendLayoutProvider + ?Sized),
     type_name: &TypeName,

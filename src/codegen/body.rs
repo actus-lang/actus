@@ -229,9 +229,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         match statement {
-            Stmt::OwnerDecl { name, initializer, span, .. } => {
+            Stmt::OwnerDecl { name, ty, initializer, span, .. } => {
                 let value = self.provider.lower_expression(initializer, instructions)?;
-                self.provider.bind_owner(name, value, *span)?;
+                self.provider.bind_owner(name, value, ty.as_deref(), *span, instructions)?;
             }
             Stmt::Assignment { target, value, span } => {
                 self.lower_assignment(target, value, *span, instructions)?;
@@ -248,6 +248,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     instructions.push(BackendInstruction::Fail { failure, span: *span });
                 } else {
                     let value = self.provider.lower_expression(expression, instructions)?;
+                    let value = self.provider.coerce_return_value(value, *span, instructions)?;
                     instructions
                         .push(BackendInstruction::Return { value: Some(value), span: *span });
                 }

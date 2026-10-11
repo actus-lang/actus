@@ -69,5 +69,5 @@ pub(super) fn bind_enum_variant_payload(
         },
         span,
     });
-    provider.bind_owner(binding, result, span)
+    provider.bind_owner(binding, result, None, span, instructions)
 }

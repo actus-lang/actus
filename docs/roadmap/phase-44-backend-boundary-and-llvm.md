@@ -1025,6 +1025,16 @@ branch-merge contract and remains rejected. The Cranelift CLI fixture executes
 a loop with an explicit `break` and returns 42, while the existing shared
 lowering regression continues to reject unsupported outer branch mutation.
 
+The shared scalar contract now preserves declared integer widths for owner
+initializers and binary operations. Return lowering inserts a checked integer
+cast when a narrow scalar expression is returned through a wider declared
+integer result, while aggregate and enum return values retain their existing
+neutral representations. The Cranelift regression for an unsuffixed `u8`
+initializer and an out-of-range shift now traps as required. The complete
+all-targets/all-features suite passed with zero failures, including 137 library
+tests, 49 CLI tests, 92 codegen tests, 44 LLVM backend tests, and the existing
+standard-library, runtime, target, and semantic suites.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
