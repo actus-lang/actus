@@ -39,6 +39,7 @@ pub(super) fn lower_method_call(
     let layout = result_layout(payload_type);
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Enum { layout });
+    provider.remember_enum_payload(result, payload_type);
     instructions.push(BackendInstruction::EnumConstruct {
         result,
         discriminant,
@@ -50,14 +51,13 @@ pub(super) fn lower_method_call(
     Ok(result)
 }
 
-pub(super) fn lower_enum_variant_condition(
+pub(super) fn lower_enum_variant_condition_value(
     provider: &mut SharedExpressionProvider<'_>,
-    subject: &Expr,
+    subject_value: BackendValueId,
     variant: &str,
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let subject_value = provider.lower_expression(subject, instructions)?;
     let Some(BackendValueType::Enum { layout }) = provider.value_type(subject_value) else {
         return Err(unsupported(span, "enum case subject is not a neutral enum value"));
     };

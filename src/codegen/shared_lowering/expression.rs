@@ -1,8 +1,10 @@
-use crate::ast::{BinaryOp, Expr, UnaryOp, VerbDecl};
+use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
+mod case;
 mod cast;
+mod cleanup;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
@@ -18,6 +20,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
     value_types: BTreeMap<BackendValueId, BackendValueType>,
+    enum_payload_types: BTreeMap<BackendValueId, BackendValueType>,
     next_value: u32,
 }
 impl<'a> SharedExpressionProvider<'a> {
@@ -52,6 +55,7 @@ impl<'a> SharedExpressionProvider<'a> {
             bindings,
             cleanup_plans,
             value_types: parameter_types,
+            enum_payload_types: BTreeMap::new(),
             next_value: verb.params.len() as u32,
         }
     }
@@ -63,88 +67,14 @@ impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
         self.parameters.get(name).copied()
     }
-    fn emit_scope_cleanup(&self, span: SourceSpan, instructions: &mut Vec<BackendInstruction>) {
-        let returned_value = match instructions.last() {
-            Some(BackendInstruction::Return { value, .. }) => *value,
-            _ => None,
-        };
-        let mut cleanup = Vec::new();
-        for plan in self
-            .cleanup_plans
-            .iter()
-            .filter(|plan| plan.span == span && matches!(plan.origin, BackendCleanupOrigin::Scope))
-        {
-            for (index, action) in plan.actions.iter().enumerate() {
-                let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
-                    continue;
-                };
-                let Some(value) = self.local_value(name) else { continue };
-                if returned_value == Some(value) {
-                    continue;
-                }
-                let Some(descriptor) =
-                    plan.resolved_bridges.get(index).and_then(|items| items.first())
-                else {
-                    continue;
-                };
-                cleanup.push(BackendInstruction::Cleanup {
-                    action: action.clone(),
-                    operand: Some(descriptor.operand(value)),
-                    span: plan.span,
-                });
-            }
-        }
-        let terminates = matches!(
-            instructions.last(),
-            Some(BackendInstruction::Return { .. })
-                | Some(BackendInstruction::Fail { .. })
-                | Some(BackendInstruction::Jump { .. })
-        );
-        let insertion = instructions.len().saturating_sub(if terminates { 1 } else { 0 });
-        instructions.splice(insertion..insertion, cleanup);
-    }
-    fn append_loop_cleanup(
-        &self,
-        span: SourceSpan,
-        kind: LoopExitKind,
-        instructions: &mut Vec<BackendInstruction>,
-    ) {
-        for plan in self.cleanup_plans.iter().filter(|plan| {
-            matches!(
-                &plan.origin,
-                BackendCleanupOrigin::Loop { span: boundary, kind: expected }
-                    if *boundary == span && *expected == kind
-            )
-        }) {
-            for (index, action) in plan.actions.iter().enumerate() {
-                let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
-                    continue;
-                };
-                let Some(value) = self.binding_value(name) else { continue };
-                let Some(descriptor) =
-                    plan.resolved_bridges.get(index).and_then(|items| items.first())
-                else {
-                    continue;
-                };
-                instructions.push(BackendInstruction::Cleanup {
-                    action: action.clone(),
-                    operand: Some(descriptor.operand(value)),
-                    span: plan.span,
-                });
-            }
-        }
-    }
-    fn binding_value(&self, name: &str) -> Option<BackendValueId> {
-        self.local_value(name).or_else(|| self.parameters.get(name).copied())
-    }
-    fn local_value(&self, name: &str) -> Option<BackendValueId> {
-        self.locals.iter().rev().find_map(|scope| scope.get(name).copied())
-    }
     pub(super) fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
         self.value_types.get(&value).copied()
     }
     pub(super) fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
         self.value_types.insert(value, ty);
+    }
+    pub(super) fn remember_enum_payload(&mut self, value: BackendValueId, ty: BackendValueType) {
+        self.enum_payload_types.insert(value, ty);
     }
 }
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
@@ -161,7 +91,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             Some(BackendInstruction::Jump { span, .. }) if self.is_loop_exit(*span)
         );
         if !skip_scope_cleanup {
-            self.emit_scope_cleanup(span, instructions);
+            cleanup::emit_scope_cleanup(self, span, instructions);
         }
         self.locals.pop();
         Ok(())
@@ -182,7 +112,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         kind: LoopExitKind,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        self.append_loop_cleanup(span, kind, instructions);
+        cleanup::append_loop_cleanup(self, span, kind, instructions);
         Ok(())
     }
 
@@ -327,20 +257,26 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         }
     }
 
-    fn lower_enum_variant_condition(
+    fn lower_enum_variant_condition_value(
         &mut self,
-        subject: &Expr,
+        subject: BackendValueId,
         variant: &str,
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError> {
-        super::constructors::lower_enum_variant_condition(
-            self,
-            subject,
-            variant,
-            span,
-            instructions,
-        )
+        case::lower_enum_variant_condition_value(self, subject, variant, span, instructions)
+    }
+
+    fn bind_enum_variant_payload(
+        &mut self,
+        subject: BackendValueId,
+        _variant: &str,
+        payload: Option<&VariantPayload>,
+        mode: CaseMode,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        case::bind_enum_variant_payload(self, subject, payload, mode, span, instructions)
     }
 
     fn callee_for(

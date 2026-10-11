@@ -2,6 +2,26 @@ use actus::codegen::lower_scalar_program;
 use actus::codegen::{
     BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp,
 };
+
+#[test]
+fn lowers_dat_and_abs_result_payload_bindings_with_explicit_modes() {
+    for (mode, expected) in [
+        ("dat", actus::codegen::BackendCaseMode::Dat),
+        ("abs", actus::codegen::BackendCaseMode::Abs),
+    ] {
+        let source = format!(
+            "verb main() -> Int {{ erg result = Result[Int, Int].Ok(7); return case {mode} result {{ Result.Ok(value) => value, Result.Err(_) => 0, }}; }}"
+        );
+        let (tokens, errors) = actus::lexer::scan(&source);
+        assert!(errors.is_empty(), "Result {mode} fixture should lex: {errors:?}");
+        let program = actus::parser::parse(tokens).expect("Result binding fixture should parse");
+        let module = actus::codegen::lower_scalar_program("actus_root", &program, None)
+            .expect("Result payload binding should lower through the neutral contract");
+        assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(instruction, BackendInstruction::EnumPayloadBinding { mode, .. } if *mode == expected)
+        ));
+    }
+}
 use actus::lexer::scan;
 use actus::parser::parse;
 

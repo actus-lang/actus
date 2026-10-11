@@ -1,18 +1,14 @@
-use crate::ast::{Block, CompoundAssignmentOp, Expr, IfBranch, Place, Stmt, VerbDecl};
-use crate::lexer::SourceSpan;
-use crate::semantic::LoopExitKind;
-
 use super::body_contract::{statement_span, terminates, unsupported, unsupported_name};
 use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
     BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
 };
-
+use crate::ast::{Block, CompoundAssignmentOp, Expr, IfBranch, Place, Stmt, VerbDecl};
+use crate::lexer::SourceSpan;
+use crate::semantic::LoopExitKind;
 mod case;
-
 pub trait BackendBodyProvider {
     fn value_for(&self, expression: &Expr) -> Result<BackendValueId, BackendContractError>;
-
     fn failure_for(
         &self,
         _expression: &Expr,
@@ -86,15 +82,26 @@ pub trait BackendExpressionProvider {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError>;
 
-    fn lower_enum_variant_condition(
+    fn lower_enum_variant_condition_value(
         &mut self,
-        subject: &Expr,
-        variant: &str,
+        _subject: BackendValueId,
+        _variant: &str,
         span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
+        _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError> {
-        let _ = (subject, variant, instructions);
         Err(unsupported(span, "enum case matching"))
+    }
+
+    fn bind_enum_variant_payload(
+        &mut self,
+        _subject: BackendValueId,
+        _variant: &str,
+        _payload: Option<&crate::ast::VariantPayload>,
+        _mode: crate::ast::CaseMode,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "enum case payload binding"))
     }
 
     fn failure_for(

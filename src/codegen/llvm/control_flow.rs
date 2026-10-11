@@ -160,6 +160,9 @@ fn emit_scalar_instruction(
         BackendInstruction::EnumPayload { .. } => {
             emit_enum_payload(context, builder, instruction, values)
         }
+        BackendInstruction::EnumPayloadBinding { .. } => {
+            emit_enum_payload(context, builder, instruction, values)
+        }
         BackendInstruction::EnumConstruct { .. } => {
             emit_enum_construct(context, builder, instruction, values)
         }

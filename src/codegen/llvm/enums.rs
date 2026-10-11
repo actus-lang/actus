@@ -36,9 +36,12 @@ pub(super) fn emit_enum_payload(
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let BackendInstruction::EnumPayload { result, subject, layout, payload_type, .. } = instruction
-    else {
-        return Err(BackendEmitError("LLVM enum payload instruction expected".to_owned()));
+    let (result, subject, layout, payload_type) = match instruction {
+        BackendInstruction::EnumPayload { result, subject, layout, payload_type, .. }
+        | BackendInstruction::EnumPayloadBinding {
+            result, subject, layout, payload_type, ..
+        } => (result, subject, layout, payload_type),
+        _ => return Err(BackendEmitError("LLVM enum payload instruction expected".to_owned())),
     };
     let temporary = enum_temporary(context, builder, *subject, *layout, values)?;
     let address = enum_field_address(context, builder, temporary, layout.payload_offset)?;

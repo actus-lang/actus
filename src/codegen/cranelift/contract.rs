@@ -99,7 +99,6 @@ fn signature(
     }
     Ok(signature)
 }
-
 fn parameter_types(
     module: &ObjectModule,
     parameter: &crate::codegen::BackendParameter,
@@ -256,6 +255,7 @@ fn lower_instruction(
         }
         BackendInstruction::EnumDiscriminant { .. }
         | BackendInstruction::EnumPayload { .. }
+        | BackendInstruction::EnumPayloadBinding { .. }
         | BackendInstruction::EnumConstruct { .. } => {
             Err(BackendEmitError("Cranelift neutral enum extraction is not implemented".to_owned()))
         }

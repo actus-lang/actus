@@ -61,6 +61,13 @@ pub enum BackendValueType {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendCaseMode {
+    Plain,
+    Abs,
+    Dat,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendLayout {
     pub size: u32,
     pub alignment: u32,
@@ -368,6 +375,10 @@ fn validate_instruction(
         BackendInstruction::Fail { failure, .. } => super::abi::validate_failure(failure),
         BackendInstruction::EnumDiscriminant { layout, .. } => layout.validate(),
         BackendInstruction::EnumPayload { layout, payload_type, .. } => {
+            layout.validate()?;
+            validate_value_type(*payload_type)
+        }
+        BackendInstruction::EnumPayloadBinding { layout, payload_type, .. } => {
             layout.validate()?;
             validate_value_type(*payload_type)
         }

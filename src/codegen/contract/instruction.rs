@@ -69,6 +69,14 @@ pub enum BackendInstruction {
         payload_type: BackendValueType,
         span: SourceSpan,
     },
+    EnumPayloadBinding {
+        result: super::BackendValueId,
+        subject: super::BackendValueId,
+        layout: super::BackendEnumLayout,
+        payload_type: BackendValueType,
+        mode: super::BackendCaseMode,
+        span: SourceSpan,
+    },
     EnumConstruct {
         result: super::BackendValueId,
         discriminant: u32,
