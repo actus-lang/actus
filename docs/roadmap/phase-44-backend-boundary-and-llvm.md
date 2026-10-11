@@ -709,6 +709,12 @@ This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.
 
+The regression `shared_lowered_module_is_consumed_by_llvm_and_cranelift` now
+parses one scalar Actus source, lowers it once into `BackendModule`, and sends
+that same neutral module through both LLVM IR emission and Cranelift object
+emission. This proves shared-contract consumption for the covered scalar slice;
+it does not yet prove complete CLI routing for all language features.
+
 The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory
 copy lowering into `memory.rs`, and LLVM IR printing/module verification into
