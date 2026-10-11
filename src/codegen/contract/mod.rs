@@ -214,6 +214,7 @@ pub struct BackendExternal {
     pub symbol: SymbolIdentity,
     pub parameters: Vec<BackendParameter>,
     pub return_value: BackendReturn,
+    pub runtime_pointer_return: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]

@@ -41,11 +41,13 @@ pub(super) fn backend_value_type(
         return Some(scalar);
     }
     let layout = layouts.layout_for(type_name)?;
-    Some(if type_name.name == "Region" {
-        super::super::BackendValueType::Region { layout }
-    } else {
-        super::super::BackendValueType::Aggregate { layout }
-    })
+    if type_name.name == "Region" {
+        return Some(super::super::BackendValueType::Region { layout });
+    }
+    if matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String") {
+        return Some(super::super::BackendValueType::Pointer);
+    }
+    Some(super::super::BackendValueType::Aggregate { layout })
 }
 
 pub(super) fn integer_value_fits(value: u64, signed: bool, width: u8) -> bool {

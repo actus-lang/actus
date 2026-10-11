@@ -99,7 +99,7 @@ fn emit_instruction(
             Ok(true)
         }
         BackendInstruction::Call { callee, arguments, result, .. } => {
-            emit_call(builder, callee.as_str(), arguments, *result, declarations, values)?;
+            emit_call(context, builder, callee.as_str(), arguments, *result, declarations, values)?;
             Ok(false)
         }
         BackendInstruction::Branch { condition, then_block, else_block, .. } => {

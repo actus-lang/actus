@@ -12,7 +12,7 @@ pub(super) fn emit_objects_llvm(
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
-    let bindings = llvm_module_bindings(&object_plan)?;
+    let bindings = llvm_module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let root_program = specialize_llvm_program(root.program(), configuration, &generic_instances)?;
     let root_module = crate::codegen::lower_program_to_backend_module(
@@ -59,11 +59,33 @@ fn llvm_generic_inputs(
     let targeted_caller = crate::codegen::normalize_program(
         &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
     );
-    let generic_instances = crate::semantic::analyze(&targeted_caller)
+    let mut generic_instances = crate::semantic::analyze(&targeted_caller)
         .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
         .generic_instances;
+    for unit in plan.units() {
+        let targeted_unit =
+            crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
+                unit.implementation(),
+                configuration.target(),
+            ));
+        let unit_instances = crate::semantic::analyze(&targeted_unit)
+            .map_err(|error| {
+                BackendEmitError(format!("module semantic analysis failed: {error:?}"))
+            })?
+            .generic_instances;
+        for instance in unit_instances {
+            if !generic_instances.iter().any(|known| {
+                known.identity() == instance.identity() && known.caller == instance.caller
+            }) {
+                generic_instances.push(instance);
+            }
+        }
+    }
+    let expansion_program = crate::codegen::normalize_program(
+        &crate::semantic::filter_program_for_target(&plan.implementation(), configuration.target()),
+    );
     let generic_instances =
-        crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
+        crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
     let generic_types =
         generic_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
     Ok((generic_types, generic_instances))
@@ -111,6 +133,7 @@ fn llvm_object(
 
 fn llvm_module_bindings(
     plan: &ModuleObjectPlan,
+    generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<BackendSymbolBindings, BackendEmitError> {
     let mut bindings = Vec::new();
     for unit in &plan.units()[1..] {
@@ -123,6 +146,21 @@ fn llvm_module_bindings(
                 name.clone(),
                 symbol.as_str().to_owned(),
             ));
+            #[cfg(feature = "cranelift")]
+            for instance in generic_instances.iter().filter(|instance| &instance.name == name) {
+                let specialized = crate::codegen::specialized_generic_name(instance);
+                let symbol = SymbolIdentity::new(
+                    unit.namespace().symbol_prefix(),
+                    SymbolKind::Verb,
+                    &specialized,
+                )
+                .map_err(|error| BackendEmitError(error.to_string()))?;
+                bindings.push((
+                    unit.namespace().symbol_prefix().to_owned(),
+                    specialized,
+                    symbol.as_str().to_owned(),
+                ));
+            }
         }
     }
     Ok(BackendSymbolBindings::new(bindings))

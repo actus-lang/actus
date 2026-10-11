@@ -19,6 +19,8 @@ pub(super) struct FunctionDeclaration {
     pub(super) return_type: LLVMTypeRef,
     pub(super) parameter_count: usize,
     pub(super) return_slot: bool,
+    pub(super) runtime_pointer_return: bool,
+    pub(super) runtime_return_size: Option<u32>,
     pub(super) returns_void: bool,
 }
 
@@ -28,11 +30,18 @@ pub(super) fn declare_function(
     symbol: &str,
     parameters: &[BackendParameter],
     return_value: &BackendReturn,
+    runtime_pointer_return: bool,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
-    let return_slot = matches!(&return_value.passing, BackendReturnMode::ReturnSlot { .. });
+    let return_slot = !runtime_pointer_return
+        && matches!(&return_value.passing, BackendReturnMode::ReturnSlot { .. });
     let value_type = llvm_type(context, return_value.ty)?;
-    let return_type =
-        if return_slot { unsafe { LLVMVoidTypeInContext(context) } } else { value_type };
+    let return_type = if return_slot {
+        unsafe { LLVMVoidTypeInContext(context) }
+    } else if runtime_pointer_return {
+        unsafe { LLVMPointerTypeInContext(context, 0) }
+    } else {
+        value_type
+    };
     let mut parameter_types = parameters
         .iter()
         .map(|parameter| parameter_type(context, parameter))
@@ -56,6 +65,11 @@ pub(super) fn declare_function(
         return_type: value_type,
         parameter_count: parameters.len(),
         return_slot,
+        runtime_pointer_return,
+        runtime_return_size: match &return_value.passing {
+            BackendReturnMode::ReturnSlot { layout } => Some(layout.size),
+            _ => None,
+        },
         returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit)
             || return_slot,
     })
@@ -68,7 +82,7 @@ pub(super) fn declare_cleanup_bridge(
     pointer_width: u8,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
     let (symbol, parameters, return_value) = cleanup_signature(bridge, pointer_width);
-    declare_function(context, module, symbol, &parameters, &return_value)
+    declare_function(context, module, symbol, &parameters, &return_value, false)
 }
 
 fn cleanup_signature(

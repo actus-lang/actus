@@ -225,6 +225,7 @@ fn buffer_allocate_external() -> Result<BackendExternal, BackendContractError> {
             ty: BackendValueType::Pointer,
             passing: super::BackendReturnMode::Direct,
         },
+        runtime_pointer_return: false,
     })
 }
 
@@ -276,6 +277,11 @@ fn scalar_external(
         symbol,
         parameters: signature.parameters,
         return_value: signature.return_value,
+        runtime_pointer_return: !external.module_import
+            && matches!(
+                external.return_type.as_ref().map(|return_type| return_type.ty.name.as_str()),
+                Some("Result" | "Array" | "Pack" | "Struct" | "Region")
+            ),
     })
 }
 

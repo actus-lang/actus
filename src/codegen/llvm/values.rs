@@ -22,8 +22,8 @@ pub(super) fn llvm_type(
         BackendValueType::NichePointerOption { .. } => unsafe {
             LLVMPointerTypeInContext(context, 0)
         },
+        BackendValueType::Region { .. } => unsafe { LLVMPointerTypeInContext(context, 0) },
         BackendValueType::Aggregate { layout }
-        | BackendValueType::Region { layout }
         | BackendValueType::Enum { layout: super::super::BackendEnumLayout { layout, .. } } => {
             return aggregate_type(context, layout);
         }

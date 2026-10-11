@@ -862,6 +862,19 @@ Region and aggregate portion of the shared pipeline; Gate 44.7.1 remains open
 until the remaining backend-selection, unsupported-diagnostic, freestanding
 parity, metadata, and documentation requirements are completed.
 
+The LLVM CLI path now collects generic instances from module implementation
+units as well as the root caller, emits the corresponding specialized module
+symbols, and resolves the standard-library Region runtime bridge without a
+missing specialization. Runtime externals that return composite values now use
+an explicit pointer result ABI: LLVM loads the declared aggregate from the
+returned storage and releases that storage through the typed runtime cleanup
+bridge. The regression
+`aggregate_region_lifecycle_builds_and_runs_through_llvm_cli` builds and runs
+`Region[Array[u8,16]]` through the real LLVM CLI path. The focused evidence is
+9 aggregate Region tests, 12 standard-library Region tests, and 41 LLVM
+backend tests with zero failures; this closes the tested aggregate Region ABI
+slice while the complete gate remains open.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

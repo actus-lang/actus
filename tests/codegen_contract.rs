@@ -1010,6 +1010,7 @@ fn validates_functions_and_external_symbols_as_one_neutral_module() {
                 ty: BackendValueType::Unit,
                 passing: BackendReturnMode::Direct,
             },
+            runtime_pointer_return: false,
         }],
         functions: vec![unit_function(
             Vec::new(),

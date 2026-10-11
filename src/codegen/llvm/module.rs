@@ -74,8 +74,20 @@ fn declare_module_functions(
             external.symbol.as_str(),
             &external.parameters,
             &external.return_value,
+            external.runtime_pointer_return,
         )?;
         declarations.insert(external.symbol.as_str().to_owned(), declaration);
+    }
+    if backend_module.externals.iter().any(|external| external.runtime_pointer_return)
+        && !declarations.contains_key(crate::runtime::ENUM_DROP_SYMBOL)
+    {
+        let declaration = declare_cleanup_bridge(
+            context,
+            module,
+            BackendCleanupBridge::EnumDrop { size: 0 },
+            pointer_width,
+        )?;
+        declarations.insert(crate::runtime::ENUM_DROP_SYMBOL.to_owned(), declaration);
     }
     for bridge in cleanup_bridges(backend_module) {
         let symbol = cleanup_bridge_symbol(bridge);
@@ -92,6 +104,7 @@ fn declare_module_functions(
             function.symbol.as_str(),
             &function.parameters,
             &function.return_value,
+            false,
         )?;
         declarations.insert(function.symbol.as_str().to_owned(), declaration);
     }

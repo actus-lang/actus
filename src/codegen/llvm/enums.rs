@@ -51,7 +51,6 @@ pub(super) fn emit_enum_payload(
     let value = if matches!(
         payload_type,
         super::super::BackendValueType::Aggregate { .. }
-            | super::super::BackendValueType::Region { .. }
             | super::super::BackendValueType::Enum { .. }
     ) {
         address
@@ -92,12 +91,7 @@ pub(super) fn emit_enum_construct(
     let Some(payload_layout) = layout.payload else {
         return Err(BackendEmitError("LLVM enum constructor payload layout is missing".to_owned()));
     };
-    if matches!(
-        payload_type,
-        BackendValueType::Aggregate { .. }
-            | BackendValueType::Region { .. }
-            | BackendValueType::Enum { .. }
-    ) {
+    if matches!(payload_type, BackendValueType::Aggregate { .. } | BackendValueType::Enum { .. }) {
         emit_aggregate_payload_copy(
             context,
             builder,

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 mod case;
 mod cast;
 mod cleanup;
+mod layout;
 mod literals;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
@@ -14,6 +15,7 @@ use super::super::{
 use super::support::{backend_value_type, expression_span, parse_integer, unsupported};
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
+    layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,
     locals: Vec<BTreeMap<String, BackendValueId>>,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
@@ -71,6 +73,7 @@ impl<'a> SharedExpressionProvider<'a> {
             .collect::<BTreeMap<_, _>>();
         Self {
             namespace,
+            layouts,
             parameters: parameter_bindings,
             locals: Vec::new(),
             return_types,
@@ -463,6 +466,9 @@ impl SharedExpressionProvider<'_> {
         let Expr::Call { callee, arguments, span } = expression else {
             return Err(unsupported(expression_span(expression), "call expression expected"));
         };
+        if let Some(value) = layout::lower_intrinsic(self, callee, *span, instructions)? {
+            return Ok(value);
+        }
         let arguments = arguments
             .iter()
             .map(|argument| self.lower_expression(&argument.expression, instructions))

@@ -59,6 +59,38 @@ fn build_object(root: &std::path::Path) -> Vec<u8> {
     fs::read(output).expect("Region object should be readable")
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn aggregate_region_lifecycle_builds_and_runs_through_llvm_cli() {
+    let root = std::env::temp_dir().join(format!("actus-llvm-region-{}", std::process::id()));
+    let source = r#"import std::region;
+verb main() -> Int {
+    erg backing: Buffer = Buffer[16];
+    erg logical_length: u64 = 1u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 1u64;
+    erg opened = region_open[Array[u8, 16]](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(region) => { return 0; },
+    };
+}
+"#;
+    let source_root = root.join("src");
+    fs::create_dir_all(&source_root).expect("LLVM Region source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm_region_aggregate_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nbackend = \"llvm\"\nverify_no_float_ir = true\n",
+    )
+    .expect("LLVM Region manifest should be written");
+    fs::write(source_root.join("main.act"), source).expect("LLVM Region source should be written");
+    let output = build_and_run(&root);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
 #[test]
 fn aggregate_region_fixture_passes_semantic_analysis_separately() {
     let source = "verb inspect(abs values: Region[Array[u8, 16]]) { }";

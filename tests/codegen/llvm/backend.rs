@@ -520,6 +520,7 @@ fn declares_and_calls_a_neutral_external_runtime_symbol() {
             ty: BackendValueType::Unit,
             passing: BackendReturnMode::Direct,
         },
+        runtime_pointer_return: false,
     };
     let function = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "runtime_call")
@@ -1487,6 +1488,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
                 ty: integer,
                 passing: BackendReturnMode::Direct,
             },
+            runtime_pointer_return: false,
         }],
         functions: vec![BackendFunction {
             symbol: SymbolIdentity::new("arm", SymbolKind::Verb, "boot")
