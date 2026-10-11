@@ -1035,6 +1035,13 @@ all-targets/all-features suite passed with zero failures, including 137 library
 tests, 49 CLI tests, 92 codegen tests, 44 LLVM backend tests, and the existing
 standard-library, runtime, target, and semantic suites.
 
+The neutral contract now has an explicit regression for bounded range loops:
+until loop-carried block values and jump arguments are part of the shared IR,
+the construct produces a typed `body-lowering` unsupported-operation diagnostic
+with its source span instead of being admitted by the shared candidate or
+silently rewritten. Array iteration remains under the same boundary. This is
+an intentional implementation boundary, not a closed backend-parity result.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
