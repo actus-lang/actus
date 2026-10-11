@@ -767,23 +767,23 @@ overflowing layouts by withholding the unsupported layout. The regression
 `derives_nested_struct_layouts_in_the_neutral_signature_contract` verifies the
 same deterministic layout metadata and indirect aggregate passing mode without
 importing Cranelift or LLVM types. This is layout groundwork only; user-defined
-`Drop` performance discovery, bridge identity, body lowering, and backend
-emission remain open.
+`Drop` performance body lowering and backend emission remain open.
 
 The neutral cleanup provider now uses the same program-backed layout source for
 builtin cleanup bridges and nested owned `Buffer` or `Region` field descriptors.
 Field addresses carry the complete root aggregate layout plus checked offset,
 size, and alignment metadata, and traversal stops at borrowed or exclusive
 reference fields. Backend-specific layout registries are no longer required to
-describe this cleanup operand contract; user-defined `Drop` bridge discovery
-and emission remain open.
+describe this cleanup operand contract; user-defined `Drop` body lowering and
+emission remain open.
 
 User-defined `Drop` is now detected from the program declarations during
-neutral cleanup resolution. Until a backend performance bridge exists, the
-shared path returns a typed `cleanup-performance` unsupported diagnostic naming
-the declared type and source span instead of silently omitting cleanup. The
-regression `rejects_user_defined_drop_until_a_neutral_performance_bridge_exists`
-covers this boundary; it does not close user-defined `Drop` lowering.
+neutral cleanup resolution. The shared descriptor carries a validated
+`PerformanceDrop` bridge and deterministic `SymbolIdentity` for the declared
+performance, while the backend emitters reject the bridge until performance
+body emission is available. The regression
+`records_user_defined_drop_with_a_neutral_performance_bridge_symbol` covers
+the symbol and layout contract; it does not close user-defined `Drop` lowering.
 
 Build metadata now has an integration regression,
 `backend_change_invalidates_generated_artifacts`, proving that an artifact

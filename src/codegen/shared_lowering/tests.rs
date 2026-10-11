@@ -19,7 +19,7 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
             crate::ast::TopLevelDecl::Verb(verb) => verb,
             _ => unreachable!(),
         },
-        &ProgramLayouts::new(&program),
+        &ProgramLayouts::new(&program, "test"),
     )
     .expect("scalar Result signature should lower");
     let region = super::super::signature::lower_verb_signature(
@@ -28,7 +28,7 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
             crate::ast::TopLevelDecl::Verb(verb) => verb,
             _ => unreachable!(),
         },
-        &ProgramLayouts::new(&program),
+        &ProgramLayouts::new(&program, "test"),
     )
     .expect("Region Result signature should lower");
 

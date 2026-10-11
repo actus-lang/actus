@@ -121,7 +121,7 @@ fn lower_termination(
             Ok(())
         }
         BackendInstruction::Cleanup { action, operand, .. } => {
-            cleanup::lower_cleanup(module, builder, action, *operand, declarations, values)
+            cleanup::lower_cleanup(module, builder, action, operand.clone(), declarations, values)
         }
         _ => Err(BackendEmitError("Cranelift termination instruction expected".to_owned())),
     }

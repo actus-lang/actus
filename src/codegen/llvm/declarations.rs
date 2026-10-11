@@ -140,7 +140,25 @@ fn cleanup_signature(
                 passing: BackendReturnMode::Direct,
             },
         ),
+        BackendCleanupBridge::PerformanceDrop => performance_cleanup_signature(),
     }
+}
+
+fn performance_cleanup_signature() -> (&'static str, Vec<BackendParameter>, BackendReturn) {
+    (
+        "",
+        vec![BackendParameter {
+            name: "value".to_owned(),
+            role: crate::ast::Role::Erg,
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Direct,
+        }],
+        BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+    )
 }
 
 fn parameter_type(

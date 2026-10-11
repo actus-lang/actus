@@ -66,20 +66,25 @@ fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
 }
 
 #[test]
-fn rejects_user_defined_drop_until_a_neutral_performance_bridge_exists() {
+fn records_user_defined_drop_with_a_neutral_performance_bridge_symbol() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect(erg value: Counter) { return; }";
     let (tokens, errors) = actus::lexer::scan(source);
     assert!(errors.is_empty(), "Drop performance fixture should lex: {errors:?}");
     let program = actus::parser::parse(tokens).expect("Drop performance fixture should parse");
-    let error = lower_scalar_program("actus_root", &program, None)
-        .expect_err("user-defined Drop must not silently disappear from neutral lowering");
-    match error {
-        actus::codegen::BackendContractError::Unsupported(operation) => {
-            assert_eq!(operation.operation, "cleanup-performance");
-            assert!(operation.reason.contains("Counter"));
-        }
-        other => panic!("expected typed unsupported diagnostic, got {other:?}"),
-    }
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("user-defined Drop should lower to a typed performance bridge descriptor");
+    let descriptor = module.functions[0]
+        .cleanup
+        .iter()
+        .flat_map(|plan| plan.resolved_bridges.iter().flatten())
+        .next()
+        .expect("Drop cleanup should have a resolved descriptor");
+    assert_eq!(descriptor.descriptor.bridge, actus::codegen::BackendCleanupBridge::PerformanceDrop);
+    assert_eq!(descriptor.layout.size, 4);
+    assert_eq!(
+        descriptor.performance_symbol.as_ref().map(|symbol| symbol.as_str()),
+        Some("actus_root__performance_drop__Drop_Counter")
+    );
 }
 
 #[test]

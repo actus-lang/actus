@@ -54,6 +54,7 @@ impl BackendCleanupProvider for TestCleanupProvider {
             descriptor,
             layout: BackendLayout { size: 8, alignment: 8 },
             field: None,
+            performance_symbol: None,
         }))
     }
 
@@ -75,6 +76,7 @@ impl BackendCleanupProvider for TestCleanupProvider {
             },
             layout: BackendLayout { size: 16, alignment: 8 },
             field: Some(actus::codegen::BackendCleanupField { offset, size: 8, alignment: 8 }),
+            performance_symbol: None,
         }))
     }
 }
@@ -566,6 +568,7 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
                         size: 8,
                         alignment: 8,
                     }),
+                    performance_symbol: None,
                     bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
                     argument: actus::codegen::BackendCleanupArgument::FieldAddress,
                     result: actus::codegen::BackendCleanupResult::Status,
@@ -616,6 +619,7 @@ fn rejects_cleanup_field_outside_the_declared_layout() {
                         size: 16,
                         alignment: 8,
                     }),
+                    performance_symbol: None,
                     bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
                     argument: actus::codegen::BackendCleanupArgument::FieldAddress,
                     result: actus::codegen::BackendCleanupResult::Status,
@@ -644,6 +648,7 @@ fn rejects_cleanup_bridge_with_zero_enum_extent() {
                     layout,
                     field: None,
                     bridge: actus::codegen::BackendCleanupBridge::EnumDrop { size: 0 },
+                    performance_symbol: None,
                     argument: actus::codegen::BackendCleanupArgument::Address,
                     result: actus::codegen::BackendCleanupResult::Ignored,
                 }),
@@ -671,6 +676,7 @@ fn rejects_field_address_bridge_without_a_field_sublayout() {
                     layout,
                     field: None,
                     bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    performance_symbol: None,
                     argument: actus::codegen::BackendCleanupArgument::FieldAddress,
                     result: actus::codegen::BackendCleanupResult::Status,
                 }),
@@ -914,6 +920,7 @@ fn validates_complete_resolved_cleanup_descriptor_metadata() {
         descriptor,
         layout,
         field: Some(actus::codegen::BackendCleanupField { offset: 8, size: 8, alignment: 8 }),
+        performance_symbol: None,
     };
     assert!(resolved.validate().is_ok());
     let operand = resolved.operand(BackendValueId(7));
@@ -926,6 +933,7 @@ fn validates_complete_resolved_cleanup_descriptor_metadata() {
 
     let invalid = BackendCleanupResolvedDescriptor {
         field: Some(actus::codegen::BackendCleanupField { offset: 12, size: 8, alignment: 4 }),
+        performance_symbol: None,
         ..resolved
     };
     assert_eq!(invalid.validate(), Err(BackendContractError::InvalidCleanupOperand));

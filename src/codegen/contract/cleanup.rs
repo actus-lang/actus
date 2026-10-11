@@ -1,6 +1,7 @@
 use crate::ast::{BuiltinType, TypeName};
 
 use super::super::model::LoweredCleanupInstruction;
+use super::super::symbols::{SymbolIdentity, SymbolKind};
 use super::{BackendContractError, BackendLayout, BackendValueId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -8,6 +9,7 @@ pub enum BackendCleanupBridge {
     BufferDrop,
     RegionDrop,
     EnumDrop { size: u32 },
+    PerformanceDrop,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,6 +44,7 @@ pub struct BackendCleanupResolvedDescriptor {
     pub descriptor: BackendCleanupBridgeDescriptor,
     pub layout: BackendLayout,
     pub field: Option<BackendCleanupField>,
+    pub performance_symbol: Option<SymbolIdentity>,
 }
 
 pub trait BackendCleanupProvider {
@@ -68,11 +71,24 @@ impl BackendCleanupResolvedDescriptor {
             bridge: self.descriptor.bridge,
             argument: self.descriptor.argument,
             result: self.descriptor.result,
+            performance_symbol: self.performance_symbol.clone(),
         }
     }
 
     pub fn validate(&self) -> Result<(), BackendContractError> {
         self.layout.validate()?;
+        if matches!(self.descriptor.bridge, BackendCleanupBridge::PerformanceDrop)
+            != self.performance_symbol.is_some()
+        {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        }
+        if self
+            .performance_symbol
+            .as_ref()
+            .is_some_and(|symbol| symbol.kind() != SymbolKind::Performance)
+        {
+            return Err(BackendContractError::InvalidCleanupOperand);
+        }
         if matches!(self.descriptor.argument, BackendCleanupArgument::FieldAddress)
             != self.field.is_some()
         {
@@ -93,7 +109,7 @@ impl BackendCleanupResolvedDescriptor {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendCleanupOperand {
     pub value: BackendValueId,
     pub layout: BackendLayout,
@@ -101,6 +117,7 @@ pub struct BackendCleanupOperand {
     pub bridge: BackendCleanupBridge,
     pub argument: BackendCleanupArgument,
     pub result: BackendCleanupResult,
+    pub performance_symbol: Option<SymbolIdentity>,
 }
 
 pub(super) fn validate_cleanup_operand(
@@ -113,6 +130,11 @@ pub(super) fn validate_cleanup_operand(
     }
     let Some(operand) = operand else { return Ok(()) };
     operand.layout.validate()?;
+    if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop)
+        != operand.performance_symbol.is_some()
+    {
+        return Err(BackendContractError::InvalidCleanupOperand);
+    }
     if matches!(operand.bridge, BackendCleanupBridge::EnumDrop { size: 0 }) {
         return Err(BackendContractError::InvalidCleanupOperand);
     }

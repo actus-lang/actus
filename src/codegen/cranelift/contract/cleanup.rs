@@ -57,6 +57,7 @@ impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
             descriptor,
             layout: BackendLayout { size, alignment },
             field: None,
+            performance_symbol: None,
         }))
     }
 
@@ -97,6 +98,7 @@ impl BackendCleanupProvider for LayoutCleanupProvider<'_> {
             descriptor,
             layout: BackendLayout { size, alignment },
             field: Some(BackendCleanupField { ..field }),
+            performance_symbol: None,
         }))
     }
 }
@@ -121,6 +123,11 @@ pub(super) fn declare_cleanup_bridges(
     }
 
     for bridge in bridges {
+        if matches!(bridge, BackendCleanupBridge::PerformanceDrop) {
+            return Err(BackendEmitError(
+                "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
+            ));
+        }
         let symbol = bridge_symbol(bridge);
         if declarations.contains_key(symbol) {
             continue;
@@ -164,6 +171,11 @@ pub(super) fn lower_cleanup(
     }
     let operand = operand
         .ok_or_else(|| BackendEmitError("Cranelift cleanup operand is missing".to_owned()))?;
+    if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop) {
+        return Err(BackendEmitError(
+            "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
+        ));
+    }
     let value = values.get(&operand.value).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift cleanup value {} is unavailable", operand.value.0))
     })?;
@@ -196,6 +208,7 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+        BackendCleanupBridge::PerformanceDrop => "",
     }
 }
 

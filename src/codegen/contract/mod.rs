@@ -399,7 +399,7 @@ fn validate_instruction(
             validate_value_type(*payload_type)
         }
         BackendInstruction::Cleanup { action, operand, .. } => {
-            validate_cleanup_operand(action, *operand)
+            validate_cleanup_operand(action, operand.clone())
         }
         BackendInstruction::MemoryCopy { size, alignment, .. }
             if *size == 0

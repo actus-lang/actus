@@ -16,6 +16,11 @@ pub(super) fn emit_runtime_bridge(
     declarations: &BTreeMap<String, FunctionDeclaration>,
     values: &BTreeMap<super::super::super::BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
+    if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop) {
+        return Err(BackendEmitError(
+            "LLVM user-defined Drop performance emission is not implemented".to_owned(),
+        ));
+    }
     let symbol = bridge_symbol(operand.bridge);
     let declaration = declarations.get(symbol).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM cleanup bridge `{symbol}` is unavailable"))
@@ -23,7 +28,7 @@ pub(super) fn emit_runtime_bridge(
     let value = values.get(&operand.value).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM cleanup value {} is unavailable", operand.value.0))
     })?;
-    let value = address::cleanup_argument(context, builder, operand, value)?;
+    let value = address::cleanup_argument(context, builder, operand.clone(), value)?;
     let mut arguments = vec![value];
     if let BackendCleanupBridge::EnumDrop { size } = operand.bridge {
         let integer_type = match pointer_width {
@@ -60,5 +65,6 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+        BackendCleanupBridge::PerformanceDrop => "",
     }
 }

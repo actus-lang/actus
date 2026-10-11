@@ -1,14 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::ast::{
     BuiltinType, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName, primitive_type,
 };
 
+use super::super::symbols::{SymbolIdentity, SymbolKind};
 use super::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendLayout, BackendLayoutProvider,
-    BackendTargetContext, BackendUnsupportedOperation,
 };
 
 /// Program-backed layouts used by the backend-neutral signature contract.
@@ -18,12 +18,12 @@ use super::{
 /// reference roles and runtime handles, matching the existing neutral ABI.
 pub(super) struct ProgramLayouts<'program> {
     structs: BTreeMap<&'program str, &'program StructDef>,
-    drop_types: BTreeSet<String>,
+    drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
 }
 
 impl<'program> ProgramLayouts<'program> {
-    pub(super) fn new(program: &'program Program) -> Self {
+    pub(super) fn new(program: &'program Program, namespace: &str) -> Self {
         let structs = program
             .declarations
             .iter()
@@ -34,17 +34,25 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
-        let drop_types = program
+        let drop_symbols = program
             .declarations
             .iter()
             .filter_map(|declaration| match declaration {
                 TopLevelDecl::Perform(perform) if perform.role_name == "Drop" => {
-                    Some(perform.target.canonical_key())
+                    let target = perform.target.canonical_key();
+                    let symbol = SymbolIdentity::specialized(
+                        namespace,
+                        SymbolKind::Performance,
+                        "drop",
+                        &["Drop", &target],
+                    )
+                    .ok()?;
+                    Some((target, symbol))
                 }
                 _ => None,
             })
             .collect();
-        Self { structs, drop_types, pointer_bytes: (usize::BITS / 8) as u32 }
+        Self { structs, drop_symbols, pointer_bytes: (usize::BITS / 8) as u32 }
     }
 
     fn type_layout(
@@ -221,6 +229,7 @@ impl<'program> ProgramLayouts<'program> {
             },
             layout,
             field,
+            performance_symbol: None,
         }
     }
 }
@@ -280,20 +289,21 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
             )));
         }
         if let Some(type_name) = type_name
-            && self.drop_types.contains(&type_name.canonical_key())
+            && let Some(symbol) = self.drop_symbols.get(&type_name.canonical_key())
         {
-            return Err(BackendContractError::Unsupported(BackendUnsupportedOperation::new(
-                "cleanup-performance",
-                type_name.span,
-                BackendTargetContext {
-                    backend: "neutral-contract".to_owned(),
-                    target: "semantic-model".to_owned(),
+            let Some(layout) = self.type_layout(type_name, &mut Vec::new()) else {
+                return Ok(None);
+            };
+            return Ok(Some(BackendCleanupResolvedDescriptor {
+                descriptor: BackendCleanupBridgeDescriptor {
+                    bridge: BackendCleanupBridge::PerformanceDrop,
+                    argument: BackendCleanupArgument::Address,
+                    result: BackendCleanupResult::Ignored,
                 },
-                format!(
-                    "user-defined Drop performance for `{}` requires a backend performance bridge",
-                    type_name.canonical_key()
-                ),
-            )));
+                layout,
+                field: None,
+                performance_symbol: Some(symbol.clone()),
+            }));
         }
         Ok(None)
     }

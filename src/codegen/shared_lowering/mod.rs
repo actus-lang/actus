@@ -16,9 +16,8 @@ use super::{
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
     BackendLayoutProvider, BackendModule, BackendParameter, BackendSignature,
-    BackendSymbolBindings, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
-    SymbolIdentity, lower_parameter, lower_return, lower_verb_signature,
-    lower_verb_with_expressions, lower_verb_with_expressions_as,
+    BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter, lower_return,
+    lower_verb_signature, lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 #[doc(hidden)]
@@ -36,7 +35,7 @@ pub(crate) fn lower_program_to_backend_module(
     entry_name: Option<&str>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendModule, BackendContractError> {
-    let layouts = ProgramLayouts::new(program);
+    let layouts = ProgramLayouts::new(program, namespace);
     lower_program_to_backend_module_with_layouts(namespace, program, entry_name, bindings, &layouts)
 }
 
@@ -64,7 +63,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             format!("semantic analysis failed: {error:?}"),
         )
     })?;
-    let cleanup_provider = ProgramLayouts::new(program);
+    let cleanup_provider = ProgramLayouts::new(program, namespace);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &externals, bindings)?;
     let mut functions = Vec::with_capacity(verbs.len());
@@ -342,7 +341,7 @@ fn append_parameter_cleanup(
                     }
                     lowered.push(BackendInstruction::Cleanup {
                         action: action.clone(),
-                        operand: Some(*operand),
+                        operand: Some(operand.clone()),
                         span: *span,
                     });
                 }

@@ -682,6 +682,7 @@ fn emits_region_runtime_cleanup_bridge_call() {
                         value: BackendValueId(0),
                         layout: BackendLayout { size: 16, alignment: 8 },
                         field: None,
+                        performance_symbol: None,
                         bridge: BackendCleanupBridge::RegionDrop,
                         argument: BackendCleanupArgument::Address,
                         result: BackendCleanupResult::Status,
@@ -733,6 +734,7 @@ fn emits_target_width_enum_runtime_cleanup_bridge_call() {
                         value: BackendValueId(0),
                         layout: BackendLayout { size: 24, alignment: 8 },
                         field: None,
+                        performance_symbol: None,
                         bridge: BackendCleanupBridge::EnumDrop { size: 24 },
                         argument: BackendCleanupArgument::Address,
                         result: BackendCleanupResult::Ignored,
@@ -2009,6 +2011,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
         },
         layout: pointer_layout,
         field: None,
+        performance_symbol: None,
     };
     let region_descriptor = BackendCleanupResolvedDescriptor {
         descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
@@ -2018,6 +2021,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
         },
         layout: pointer_layout,
         field: None,
+        performance_symbol: None,
     };
     let enum_descriptor = BackendCleanupResolvedDescriptor {
         descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
@@ -2027,6 +2031,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
         },
         layout: actus::codegen::BackendLayout { size: 16, alignment: 8 },
         field: None,
+        performance_symbol: None,
     };
     buffer_descriptor.validate().expect("buffer descriptor should validate");
     region_descriptor.validate().expect("region descriptor should validate");

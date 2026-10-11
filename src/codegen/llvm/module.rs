@@ -119,6 +119,9 @@ fn cleanup_bridges(module: &BackendModule) -> Vec<BackendCleanupBridge> {
                 let BackendInstruction::Cleanup { operand: Some(operand), .. } = instruction else {
                     continue;
                 };
+                if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop) {
+                    continue;
+                }
                 if !bridges.contains(&operand.bridge) {
                     bridges.push(operand.bridge);
                 }
@@ -133,6 +136,7 @@ fn cleanup_bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+        BackendCleanupBridge::PerformanceDrop => "",
     }
 }
 

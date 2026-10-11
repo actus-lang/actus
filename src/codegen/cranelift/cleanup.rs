@@ -223,6 +223,11 @@ fn emit_resolved_binding_drop(
         super::super::contract::BackendCleanupBridge::EnumDrop { .. } => {
             crate::runtime::ENUM_DROP_SYMBOL.to_owned()
         }
+        super::super::contract::BackendCleanupBridge::PerformanceDrop => {
+            return Err(BackendEmitError(
+                "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
+            ));
+        }
     };
     let target = functions.get(&symbol).ok_or_else(|| {
         BackendEmitError(format!("native runtime function `{symbol}` is unavailable"))
