@@ -7,7 +7,7 @@ mod expression;
 mod support;
 
 use expression::SharedExpressionProvider;
-use support::unsupported;
+use support::{backend_value_type, unsupported};
 
 use super::abi::BackendEnumLayout;
 use super::{
@@ -152,6 +152,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
         .map(|external| lower_external_signature(external, layouts))
         .collect::<Result<Vec<_>, _>>()?;
     let return_types = shared_return_types(&verbs, &externals, &signatures, &external_signatures);
+    let return_payload_types = shared_return_payload_types(&verbs, &externals, layouts);
     let semantic = crate::semantic::analyze(program).map_err(|error| {
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),
@@ -170,6 +171,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             layouts,
             &cleanup_plans,
             &return_types,
+            &return_payload_types,
             &external_symbols,
             bindings,
         )?);
@@ -278,6 +280,43 @@ fn shared_return_types(
         .collect()
 }
 
+fn shared_return_payload_types(
+    verbs: &[&VerbDecl],
+    externals: &[&ExternalVerbDecl],
+    layouts: &impl BackendLayoutProvider,
+) -> BTreeMap<String, [Option<BackendValueType>; 2]> {
+    verbs
+        .iter()
+        .filter_map(|verb| {
+            result_payload_types(
+                verb.return_type.as_ref().map(|return_type| &return_type.ty),
+                layouts,
+            )
+            .map(|types| (verb.name.clone(), types))
+        })
+        .chain(externals.iter().filter_map(|external| {
+            result_payload_types(
+                external.return_type.as_ref().map(|return_type| &return_type.ty),
+                layouts,
+            )
+            .map(|types| (external.name.clone(), types))
+        }))
+        .collect()
+}
+
+fn result_payload_types(
+    type_name: Option<&TypeName>,
+    layouts: &impl BackendLayoutProvider,
+) -> Option<[Option<BackendValueType>; 2]> {
+    let type_name = type_name?;
+    (type_name.name == "Result" && type_name.arguments.len() == 2).then(|| {
+        [
+            backend_value_type(layouts, &type_name.arguments[0]),
+            backend_value_type(layouts, &type_name.arguments[1]),
+        ]
+    })
+}
+
 fn lower_shared_verb(
     namespace: &str,
     verb: &VerbDecl,
@@ -285,6 +324,7 @@ fn lower_shared_verb(
     layouts: &impl BackendLayoutProvider,
     cleanup_plans: &[super::BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
+    return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
@@ -293,6 +333,7 @@ fn lower_shared_verb(
         verb,
         layouts,
         return_types,
+        return_payload_types,
         external_symbols,
         bindings,
         cleanup_plans,

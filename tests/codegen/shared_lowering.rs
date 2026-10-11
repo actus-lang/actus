@@ -69,6 +69,39 @@ fn preserves_distinct_result_payload_types_for_case_bindings() {
         )
     }));
 }
+
+#[test]
+fn preserves_result_payload_types_for_call_results() {
+    let source = "verb produce() -> Result[Region[u32], Int] { return Result[Region[u32], Int].Err(7); } verb inspect() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => 0, Result.Err(error) => error, }; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "call Result fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("call Result fixture should parse");
+    let module = actus::codegen::lower_scalar_program("actus_root", &program, None)
+        .expect("call Result case should lower through the neutral contract");
+    let inspect = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("inspect"))
+        .expect("inspect function should be present");
+    let bindings = inspect
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            BackendInstruction::EnumPayloadBinding { payload_type, .. } => Some(payload_type),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(bindings.iter().any(|payload_type| {
+        matches!(payload_type, actus::codegen::BackendValueType::Region { .. })
+    }));
+    assert!(bindings.iter().any(|payload_type| {
+        matches!(
+            payload_type,
+            actus::codegen::BackendValueType::Integer { signed: true, width: 32 }
+        )
+    }));
+}
 use actus::lexer::scan;
 use actus::parser::parse;
 

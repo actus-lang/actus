@@ -16,6 +16,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     parameters: BTreeMap<String, BackendValueId>,
     locals: Vec<BTreeMap<String, BackendValueId>>,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
+    return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
@@ -29,6 +30,7 @@ impl<'a> SharedExpressionProvider<'a> {
         verb: &VerbDecl,
         layouts: &'a impl super::super::BackendLayoutProvider,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
+        return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
         bindings: Option<&'a BackendSymbolBindings>,
         cleanup_plans: &'a [super::super::BackendCleanupPlan],
@@ -71,6 +73,7 @@ impl<'a> SharedExpressionProvider<'a> {
             parameters: parameter_bindings,
             locals: Vec::new(),
             return_types,
+            return_payload_types,
             external_symbols,
             bindings,
             cleanup_plans,
@@ -449,6 +452,13 @@ impl SharedExpressionProvider<'_> {
         let result = result_type.map(|_| self.allocate());
         if let (Some(result), Some(result_type)) = (result, result_type) {
             self.remember_value(result, result_type);
+            if let Some(payload_types) = self.return_payload_types.get(callee) {
+                for (discriminant, payload_type) in payload_types.iter().enumerate() {
+                    if let Some(payload_type) = payload_type {
+                        self.remember_enum_payload(result, discriminant as u32, *payload_type);
+                    }
+                }
+            }
         }
         instructions.push(BackendInstruction::Call {
             callee: self.callee_for(callee, *span)?,

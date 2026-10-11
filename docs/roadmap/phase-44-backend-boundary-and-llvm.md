@@ -740,12 +740,14 @@ explicit `EnumPayloadBinding` instruction, which records `plain`, `abs`, or
 Wildcard payload patterns are accepted without creating a binding. Result
 payload metadata is keyed by both the subject value and discriminant, so an
 `Ok` payload and an `Err` payload may have different types. Direct Region
-payload construction and a mixed `Result[Region[u32], Int]` case binding are
-covered by integration regressions. The shared regression
+payload construction, a mixed `Result[Region[u32], Int]` case binding, and a
+call result carrying that mixed payload shape are covered by integration
+regressions. The shared regression
 `lowers_plain_result_case_into_neutral_branches`, the integration regressions
 `lowers_dat_and_abs_result_payload_bindings_with_explicit_modes`,
 `lowers_result_constructor_with_region_payload_layout`, and
-`preserves_distinct_result_payload_types_for_case_bindings`, and the LLVM
+`preserves_distinct_result_payload_types_for_case_bindings`,
+`preserves_result_payload_types_for_call_results`, and the LLVM
 regressions `emits_plain_result_case_from_shared_lowering` and
 `emits_region_payload_result_constructor_from_shared_lowering` cover this
 slice. Guards, aggregate and Region values obtained from unsupported
