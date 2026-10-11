@@ -11,12 +11,13 @@ mod cleanup;
 mod drop;
 mod layout;
 mod literals;
+mod state;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
     BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
 };
-use super::support::{backend_value_type, expression_span, parse_integer, unsupported};
+use super::support::{expression_span, parse_integer, unsupported};
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     layouts: &'a dyn super::super::BackendLayoutProvider,
@@ -31,6 +32,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
     next_value: u32,
+    loop_depth: usize,
 }
 impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
@@ -49,34 +51,9 @@ impl<'a> SharedExpressionProvider<'a> {
             .enumerate()
             .map(|(index, parameter)| (parameter.name.clone(), BackendValueId(index as u32)))
             .collect::<BTreeMap<_, _>>();
-        let parameter_types = verb
-            .params
-            .iter()
-            .enumerate()
-            .filter_map(|(index, parameter)| {
-                super::super::signature::lower_parameter(parameter, layouts)
-                    .ok()
-                    .map(|parameter| (BackendValueId(index as u32), parameter.ty))
-            })
-            .collect::<BTreeMap<_, _>>();
+        let parameter_types = state::parameter_types(verb, layouts);
         let nominal_types = aggregate::parameter_nominal_types(verb, layouts);
-        let enum_payload_types = verb
-            .params
-            .iter()
-            .enumerate()
-            .filter(|(_, parameter)| {
-                parameter.ty.name == "Result" && parameter.ty.arguments.len() == 2
-            })
-            .flat_map(|(index, parameter)| {
-                parameter.ty.arguments.iter().enumerate().filter_map(
-                    move |(discriminant, payload)| {
-                        backend_value_type(layouts, payload).map(|payload_type| {
-                            ((BackendValueId(index as u32), discriminant as u32), payload_type)
-                        })
-                    },
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
+        let enum_payload_types = state::enum_payload_types(verb, layouts);
         Self {
             namespace,
             layouts,
@@ -91,6 +68,7 @@ impl<'a> SharedExpressionProvider<'a> {
             nominal_types,
             enum_payload_types,
             next_value: verb.params.len() as u32,
+            loop_depth: 0,
         }
     }
     pub(super) fn allocate(&mut self) -> BackendValueId {
@@ -127,6 +105,14 @@ impl<'a> SharedExpressionProvider<'a> {
     }
 }
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
+    fn enter_loop(&mut self) {
+        self.loop_depth += 1;
+    }
+
+    fn exit_loop(&mut self) {
+        self.loop_depth = self.loop_depth.saturating_sub(1);
+    }
+
     fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }
@@ -212,12 +198,26 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         value: BackendValueId,
         span: SourceSpan,
     ) -> Result<(), BackendContractError> {
-        let Some(scope) = self.locals.last_mut() else {
+        if self.locals.is_empty() {
             return Err(unsupported(span, "scalar assignment has no active lexical scope"));
-        };
-        if scope.contains_key(name) {
-            scope.insert(name.to_owned(), value);
+        }
+        if self.locals.last().is_some_and(|scope| scope.contains_key(name)) {
+            let scope_index = self.locals.len() - 1;
+            self.locals[scope_index].insert(name.to_owned(), value);
             return Ok(());
+        }
+        if self.loop_depth > 0 {
+            if let Some(scope_index) = self
+                .locals
+                .iter()
+                .enumerate()
+                .rev()
+                .skip(1)
+                .find_map(|(index, scope)| scope.contains_key(name).then_some(index))
+            {
+                self.locals[scope_index].insert(name.to_owned(), value);
+                return Ok(());
+            }
         }
         if self.locals.len() == 1 && self.parameters.contains_key(name) {
             self.parameters.insert(name.to_owned(), value);

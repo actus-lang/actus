@@ -1018,6 +1018,13 @@ path and returns 42. The LLVM CLI suite continues to cover the corresponding
 checked operations. This expands shared scalar parity without changing the
 legacy fallback path or closing the broader backend-pipeline gate.
 
+The shared candidate now admits loop bodies as well. Loop-scoped owner
+assignment updates an enclosing owner only while the body is inside an active
+loop context; ordinary branch assignment still requires the not-yet-available
+branch-merge contract and remains rejected. The Cranelift CLI fixture executes
+a loop with an explicit `break` and returns 42, while the existing shared
+lowering regression continues to reject unsupported outer branch mutation.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

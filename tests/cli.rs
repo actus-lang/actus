@@ -543,6 +543,37 @@ fn cranelift_backend_builds_and_runs_checked_scalar_division_remainder_and_shift
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_shared_scalar_loop() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-loop-shared-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg value: Int = 41; loop { value += 1; break; } return value; }\n",
+    )
+    .expect("write Cranelift shared loop fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run Cranelift shared loop fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {

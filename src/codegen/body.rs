@@ -208,7 +208,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             instructions: vec![BackendInstruction::Jump { target: body_id, span: nested.span }],
         };
         self.loop_targets.push(LoopTargets { header: header_id, exit: continuation_id });
+        self.provider.enter_loop();
         let body_result = self.lower_block(body_id, nested, Some(header_id));
+        self.provider.exit_loop();
         self.loop_targets.pop();
         let body = body_result?;
         let continuation =

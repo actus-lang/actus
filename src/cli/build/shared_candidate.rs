@@ -157,7 +157,7 @@ fn scalar_statement(
             scalar_expression(value, returns_value)
                 || result_case_expression(value, returns_value, unit_enums)
         }),
-        Stmt::Loop(_) => false,
+        Stmt::Loop(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::ForRange { .. } | Stmt::ForArray { .. } => false,

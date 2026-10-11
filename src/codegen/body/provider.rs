@@ -24,6 +24,10 @@ pub trait BackendBodyProvider {
 }
 
 pub trait BackendExpressionProvider {
+    fn enter_loop(&mut self) {}
+
+    fn exit_loop(&mut self) {}
+
     fn enter_scope(&mut self, _span: SourceSpan) {}
 
     fn exit_scope(
