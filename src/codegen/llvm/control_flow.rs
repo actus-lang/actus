@@ -117,6 +117,9 @@ fn emit_non_scalar_instruction(
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
+    if let Some(result) = emit_control_transfer(builder, instruction, blocks, values)? {
+        return Ok(result);
+    }
     match instruction {
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
@@ -125,14 +128,6 @@ fn emit_non_scalar_instruction(
         BackendInstruction::Call { callee, arguments, result, .. } => {
             emit_call(context, builder, callee.as_str(), arguments, *result, declarations, values)?;
             Ok(false)
-        }
-        BackendInstruction::Branch { condition, then_block, else_block, .. } => {
-            emit_branch(builder, *condition, *then_block, *else_block, blocks, values)?;
-            Ok(true)
-        }
-        BackendInstruction::Jump { target, .. } => {
-            emit_jump(builder, *target, blocks)?;
-            Ok(true)
         }
         BackendInstruction::Trap { .. } => {
             unsafe { LLVMBuildUnreachable(builder) };
@@ -162,6 +157,33 @@ fn emit_non_scalar_instruction(
             super::aggregates::emit_aggregate_field_store(context, builder, instruction, values)
         }
         _ => unreachable!("scalar instruction was not dispatched"),
+    }
+}
+
+fn emit_control_transfer(
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<Option<bool>, BackendEmitError> {
+    match instruction {
+        BackendInstruction::Branch { condition, then_block, else_block, .. } => {
+            emit_branch(
+                builder,
+                instruction,
+                *condition,
+                *then_block,
+                *else_block,
+                blocks,
+                values,
+            )?;
+            Ok(Some(true))
+        }
+        BackendInstruction::Jump { target, .. } => {
+            emit_jump(builder, instruction, *target, blocks)?;
+            Ok(Some(true))
+        }
+        _ => Ok(None),
     }
 }
 

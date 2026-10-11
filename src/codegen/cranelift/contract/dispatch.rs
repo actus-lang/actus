@@ -44,7 +44,7 @@ pub(super) fn lower_instruction(
         BackendInstruction::Branch { .. } => {
             super::lower_branch(builder, instruction, blocks, values)
         }
-        BackendInstruction::Jump { .. } => super::lower_jump(builder, instruction, blocks),
+        BackendInstruction::Jump { .. } => super::lower_jump(builder, instruction, blocks, values),
         BackendInstruction::Return { .. }
         | BackendInstruction::Fail { .. }
         | BackendInstruction::Trap { .. }
