@@ -1,7 +1,26 @@
-use crate::ast::{BinaryOp, Block, DispatchMode, Expr, IfBranch, Place, Program, Role, Stmt};
-use std::collections::BTreeMap;
+use crate::ast::{
+    BinaryOp, Block, CaseBody, DispatchMode, EnumPayload, Expr, IfBranch, Pattern, Place, Program,
+    Role, Stmt,
+};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
+    let unit_enums = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Enum(definition)
+                if definition.generic_parameters.is_empty()
+                    && definition
+                        .variants
+                        .iter()
+                        .all(|variant| matches!(variant.payload, EnumPayload::Unit)) =>
+            {
+                Some(definition.name.clone())
+            }
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
     let returns_value = program
         .declarations
         .iter()
@@ -18,23 +37,36 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
             verb.generic_parameters.is_empty()
-                && verb.params.iter().all(scalar_parameter)
-                && verb.return_type.as_ref().is_none_or(|return_type| scalar_type(&return_type.ty))
-                && scalar_block(&verb.body, &returns_value, true)
+                && verb.params.iter().all(|parameter| scalar_parameter(parameter, &unit_enums))
+                && verb
+                    .return_type
+                    .as_ref()
+                    .is_none_or(|return_type| scalar_or_result_type(&return_type.ty, &unit_enums))
+                && scalar_block(&verb.body, &returns_value, true, &unit_enums)
         }
         crate::ast::TopLevelDecl::ExternalVerb(verb) => {
             verb.generic_parameters.is_empty()
-                && verb.params.iter().all(scalar_parameter)
-                && verb.return_type.as_ref().is_none_or(|return_type| scalar_type(&return_type.ty))
+                && verb.params.iter().all(|parameter| scalar_parameter(parameter, &unit_enums))
+                && verb
+                    .return_type
+                    .as_ref()
+                    .is_none_or(|return_type| scalar_or_result_type(&return_type.ty, &unit_enums))
+        }
+        crate::ast::TopLevelDecl::Enum(definition) => {
+            definition.generic_parameters.is_empty()
+                && definition
+                    .variants
+                    .iter()
+                    .all(|variant| matches!(variant.payload, EnumPayload::Unit))
         }
         _ => false,
     })
 }
 
-fn scalar_parameter(parameter: &crate::ast::Param) -> bool {
+fn scalar_parameter(parameter: &crate::ast::Param, unit_enums: &BTreeSet<String>) -> bool {
     matches!(parameter.role, Role::Erg | Role::Abs)
         && parameter.dispatch == DispatchMode::Static
-        && scalar_type(&parameter.ty)
+        && scalar_or_result_type(&parameter.ty, unit_enums)
 }
 
 fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
@@ -45,21 +77,32 @@ fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
         )
 }
 
+fn scalar_or_result_type(type_name: &crate::ast::TypeName, unit_enums: &BTreeSet<String>) -> bool {
+    scalar_type(type_name)
+        || (type_name.name == "Result"
+            && type_name.arguments.len() == 2
+            && scalar_type(&type_name.arguments[0])
+            && (scalar_type(&type_name.arguments[1])
+                || unit_enums.contains(&type_name.arguments[1].name)))
+}
+
 fn scalar_block(
     block: &Block,
     returns_value: &BTreeMap<String, bool>,
     allow_assignment: bool,
+    unit_enums: &BTreeSet<String>,
 ) -> bool {
     block
         .statements
         .iter()
-        .all(|statement| scalar_statement(statement, returns_value, allow_assignment))
+        .all(|statement| scalar_statement(statement, returns_value, allow_assignment, unit_enums))
 }
 
 fn scalar_statement(
     statement: &Stmt,
     returns_value: &BTreeMap<String, bool>,
     allow_assignment: bool,
+    unit_enums: &BTreeSet<String>,
 ) -> bool {
     match statement {
         Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, returns_value),
@@ -76,24 +119,29 @@ fn scalar_statement(
         }
         Stmt::If { condition, then_branch, else_branch, .. } => {
             scalar_expression(condition, returns_value)
-                && scalar_return_block(then_branch, returns_value)
+                && scalar_return_block(then_branch, returns_value, unit_enums)
                 && matches!(
                     else_branch,
-                    Some(IfBranch::Block(block)) if scalar_return_block(block, returns_value)
+                    Some(IfBranch::Block(block))
+                        if scalar_return_block(block, returns_value, unit_enums)
                 )
         }
-        Stmt::Return { value, .. } => {
-            value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
-        }
+        Stmt::Return { value, .. } => value.as_ref().is_none_or(|value| {
+            scalar_expression(value, returns_value) || result_case_expression(value, returns_value)
+        }),
         Stmt::Loop(_) => false,
-        Stmt::Block(block) => scalar_block(block, returns_value, true),
+        Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::ForRange { .. } | Stmt::ForArray { .. } | Stmt::Drop { .. } => false,
     }
 }
 
-fn scalar_return_block(block: &Block, returns_value: &BTreeMap<String, bool>) -> bool {
-    scalar_block(block, returns_value, false)
+fn scalar_return_block(
+    block: &Block,
+    returns_value: &BTreeMap<String, bool>,
+    unit_enums: &BTreeSet<String>,
+) -> bool {
+    scalar_block(block, returns_value, false, unit_enums)
         && matches!(
             block.statements.last(),
             Some(Stmt::Return { value, .. })
@@ -138,8 +186,36 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
                     .iter()
                     .all(|argument| scalar_expression(&argument.expression, returns_value))
         }
+        Expr::MethodCall { receiver, method, arguments, .. } => {
+            let Expr::Identifier { name, .. } = receiver.as_ref() else { return false };
+            name.starts_with("Result[")
+                && matches!(method.as_str(), "Ok" | "Err")
+                && arguments.len() == 1
+                && scalar_expression(&arguments[0].expression, returns_value)
+        }
         _ => false,
     }
+}
+
+fn result_case_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+    let Expr::Case { subject, branches, .. } = expression else { return false };
+    if branches.is_empty() || !scalar_expression(subject, returns_value) {
+        return false;
+    }
+    branches.iter().enumerate().all(|(index, branch)| {
+        if branch.guard.is_some() {
+            return false;
+        }
+        let CaseBody::Expression(body) = &branch.body else { return false };
+        if !scalar_expression(body, returns_value) {
+            return false;
+        }
+        match &branch.pattern {
+            Pattern::Variant { variant, .. } => matches!(variant.as_str(), "Ok" | "Err"),
+            Pattern::Wildcard { .. } => index + 1 == branches.len(),
+            Pattern::Literal { .. } => false,
+        }
+    })
 }
 
 fn scalar_statement_call(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
@@ -171,6 +247,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("assignment fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_scalar_result_construction_and_case_return() {
+        let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value + 1, Result.Err(_) => 0, }; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("Result fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 

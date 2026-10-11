@@ -694,6 +694,15 @@ The LLVM CLI regression
 builds and executes same-scope compound assignment through the shared scalar
 contract. This confirms the assignment slice at the real LLVM CLI boundary;
 branch-merge mutation and aggregate assignment remain outside this evidence.
+The shared CLI candidate boundary now also admits a bounded non-generic Result
+slice: primitive success payloads, unit-only user error enums, explicit Ok/Err
+constructors, and expression-bodied case returns without guards or block
+branches. The LLVM and Cranelift CLI regressions
+`llvm_backend_builds_and_runs_a_scalar_result_program` and
+`cranelift_backend_builds_and_runs_a_scalar_result_through_shared_lowering`
+build the same Actus source and verify exit status 42 from both executables.
+This does not claim Region, aggregate assignment, generic Result, or block-
+branch CLI parity.
 The shared scalar contract now also lowers integer division and remainder with
 an explicit `TrapIfZero` guard before the arithmetic instruction. Both
 Cranelift and LLVM lower that guard to a terminating zero-divisor path; the

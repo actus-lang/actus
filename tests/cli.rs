@@ -38,6 +38,42 @@ fn llvm_backend_builds_and_runs_a_scalar_root_program() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn llvm_backend_builds_and_runs_a_scalar_result_program() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-result-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create LLVM Result fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-result-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM Result fixture manifest");
+    fs::write(
+        &input,
+        "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value + 1, Result.Err(_) => 0, }; }\n",
+    )
+    .expect("write LLVM Result fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM Result fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn build_backend_override_uses_the_same_validated_llvm_configuration() {
     let root = std::env::temp_dir().join(format!("actus-cli-llvm-override-{}", std::process::id()));
     let input = root.join("main.act");
@@ -240,6 +276,39 @@ fn cranelift_backend_builds_and_runs_scalar_if_through_shared_lowering() {
     assert_eq!(status.code(), Some(42));
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_scalar_result_through_shared_lowering() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-cranelift-result-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create Cranelift Result fixture directory");
+    fs::write(
+        &input,
+        "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value + 1, Result.Err(_) => 0, }; }\n",
+    )
+    .expect("write Cranelift Result fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run Cranelift Result fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
 }
 
 #[cfg(all(unix, feature = "cranelift"))]
