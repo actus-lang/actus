@@ -14,6 +14,28 @@ pub(super) fn supports_shared_scalar_units(
     })
 }
 
+pub(super) fn supports_shared_specialized_units(
+    object_plan: &ModuleObjectPlan,
+    configuration: &CompilerConfiguration,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<bool, BackendEmitError> {
+    if generic_instances.is_empty() {
+        return Ok(false);
+    }
+    object_plan
+        .units()
+        .iter()
+        .map(|unit| {
+            let targeted = crate::codegen::normalize_program(
+                &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
+            );
+            let specialized = crate::codegen::specialize_program(&targeted, generic_instances)?;
+            Ok(super::shared_candidate::supports_scalar_shared_lowering(&specialized))
+        })
+        .collect::<Result<Vec<_>, BackendEmitError>>()
+        .map(|results| results.into_iter().all(|supported| supported))
+}
+
 pub(super) fn emit_shared_scalar_units(
     object_plan: &ModuleObjectPlan,
     symbol: &str,
@@ -35,6 +57,43 @@ pub(super) fn emit_shared_scalar_units(
         } else {
             emit_shared_scalar_unit(
                 &targeted,
+                unit.namespace().symbol_prefix(),
+                None,
+                unit.namespace().symbol_prefix(),
+                configuration,
+                bindings,
+            )?
+        };
+        objects.push(object);
+    }
+    Ok(objects)
+}
+
+pub(super) fn emit_shared_specialized_units(
+    object_plan: &ModuleObjectPlan,
+    symbol: &str,
+    configuration: &CompilerConfiguration,
+    bindings: &BackendSymbolBindings,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
+    let mut objects = Vec::with_capacity(object_plan.units().len());
+    for (index, unit) in object_plan.units().iter().enumerate() {
+        let targeted = crate::codegen::normalize_program(
+            &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
+        );
+        let specialized = crate::codegen::specialize_program(&targeted, generic_instances)?;
+        let object = if index == 0 {
+            emit_shared_scalar_unit(
+                &specialized,
+                unit.namespace().symbol_prefix(),
+                Some(symbol),
+                "root",
+                configuration,
+                bindings,
+            )?
+        } else {
+            emit_shared_scalar_unit(
+                &specialized,
                 unit.namespace().symbol_prefix(),
                 None,
                 unit.namespace().symbol_prefix(),

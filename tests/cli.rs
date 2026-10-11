@@ -211,6 +211,44 @@ fn llvm_backend_builds_and_runs_a_scalar_const_generic() {
 
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
+fn cranelift_backend_builds_and_runs_a_scalar_const_generic_through_shared_lowering() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-cranelift-generic-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create Cranelift generic fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"cranelift-generic-cli\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("write Cranelift generic fixture manifest");
+    fs::write(
+        &input,
+        "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> u32 { return read_capacity[4](); }\n",
+    )
+    .expect("write Cranelift generic fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run Cranelift generic fixture");
+    assert_eq!(status.code(), Some(4));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
 fn cranelift_backend_builds_and_runs_scalar_imported_module_through_shared_lowering() {
     let root =
         std::env::temp_dir().join(format!("actus-cli-cranelift-module-{}", std::process::id()));

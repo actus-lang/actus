@@ -162,15 +162,10 @@ fn emit_objects_cranelift(
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
-    if generic_instances.is_empty()
-        && super::cranelift_shared::supports_shared_scalar_units(&object_plan, configuration)
+    if let Some(objects) =
+        emit_shared_cranelift(&object_plan, symbol, configuration, &bindings, &generic_instances)?
     {
-        return super::cranelift_shared::emit_shared_scalar_units(
-            &object_plan,
-            symbol,
-            configuration,
-            &bindings,
-        );
+        return Ok(objects);
     }
     let root = &object_plan.units()[0];
     let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
@@ -189,6 +184,42 @@ fn emit_objects_cranelift(
         &reachable_module_roots,
     )?);
     Ok(objects)
+}
+
+#[cfg(feature = "cranelift")]
+fn emit_shared_cranelift(
+    object_plan: &crate::modules::ModuleObjectPlan,
+    symbol: &str,
+    configuration: &CompilerConfiguration,
+    bindings: &crate::codegen::BackendSymbolBindings,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<Option<Vec<EmittedObject>>, BackendEmitError> {
+    if generic_instances.is_empty()
+        && super::cranelift_shared::supports_shared_scalar_units(object_plan, configuration)
+    {
+        return super::cranelift_shared::emit_shared_scalar_units(
+            object_plan,
+            symbol,
+            configuration,
+            bindings,
+        )
+        .map(Some);
+    }
+    if super::cranelift_shared::supports_shared_specialized_units(
+        object_plan,
+        configuration,
+        generic_instances,
+    )? {
+        return super::cranelift_shared::emit_shared_specialized_units(
+            object_plan,
+            symbol,
+            configuration,
+            bindings,
+            generic_instances,
+        )
+        .map(Some);
+    }
+    Ok(None)
 }
 
 #[cfg(not(feature = "cranelift"))]

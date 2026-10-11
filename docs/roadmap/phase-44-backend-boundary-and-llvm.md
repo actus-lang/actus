@@ -822,6 +822,14 @@ of the declaration and call symbol; generic compile-time expression lowering,
 aggregate specialization, ownership-bearing generic values, cleanup bridges,
 and cross-backend parity remain open work.
 
+The Cranelift CLI now sends the same bounded scalar const-generic slice through
+the shared neutral route after specialization. The regression
+`cranelift_backend_builds_and_runs_a_scalar_const_generic_through_shared_lowering`
+builds and executes `read_capacity[4]()` and verifies exit status 4. This
+extends shared generic coverage to both native backends for scalar values. It
+does not claim generic aggregate or Region support, runtime bridge parity, or
+complete standard-library CLI execution.
+
 The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory
 copy lowering into `memory.rs`, and LLVM IR printing/module verification into
