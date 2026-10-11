@@ -574,6 +574,38 @@ fn cranelift_backend_builds_and_runs_a_shared_scalar_loop() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_shared_range_loop() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-cranelift-range-loop-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { total += index; } return total as Int; }\n",
+    )
+    .expect("write Cranelift shared range loop fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift shared range loop fixture");
+    assert_eq!(status.code(), Some(6));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
@@ -639,6 +671,42 @@ fn llvm_backend_builds_and_runs_scalar_assignment_through_shared_lowering() {
     assert_eq!(status.code(), Some(42));
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_range_loop() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-range-loop-{}", std::process::id()));
+    let input = root.join("src/main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(root.join("src")).expect("create LLVM range loop fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-range-loop-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM range loop fixture manifest");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { total += index; } return total as Int; }\n",
+    )
+    .expect("write LLVM shared range loop fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run LLVM shared range loop fixture");
+    assert_eq!(status.code(), Some(6));
+    let _ = fs::remove_dir_all(root);
 }
 
 #[cfg(all(unix, feature = "llvm"))]

@@ -658,8 +658,12 @@ non-entry block parameter and records incoming values at each predecessor
 terminator. `codegen_contract` covers neutral arity and type rejection, while
 `llvm_backend::emits_block_parameter_phi_from_typed_edge_arguments` exercises
 the same fixture through LLVM and Cranelift object emission.
-- [ ] Route bounded range and fixed-array iteration through that shared loop
-      contract and add hosted CLI fixtures for both backends.
+
+- [x] Route bounded range iteration through the shared loop contract, including
+      carried owner values, typed loop block parameters, typed back-edge
+      arguments, and hosted CLI fixtures for both backends.
+- [ ] Route fixed-array iteration through the shared loop contract and add its
+      hosted CLI fixtures for both backends.
 - [ ] Preserve the complete current Cranelift lowering behavior while adding
       the shared path; no backend-specific semantic rewrite or duplicate
       lowering implementation is allowed.
@@ -1052,12 +1056,13 @@ all-targets/all-features suite passed with zero failures, including 137 library
 tests, 49 CLI tests, 92 codegen tests, 44 LLVM backend tests, and the existing
 standard-library, runtime, target, and semantic suites.
 
-The neutral contract now has an explicit regression for bounded range loops:
-until loop-carried block values and jump arguments are part of the shared IR,
-the construct produces a typed `body-lowering` unsupported-operation diagnostic
-with its source span instead of being admitted by the shared candidate or
-silently rewritten. Array iteration remains under the same boundary. This is
-an intentional implementation boundary, not a closed backend-parity result.
+The neutral contract now lowers bounded range loops through typed loop block
+parameters and edge arguments. Loop-carried owner values are preserved across
+the header, body, increment, and continuation blocks; the codegen contract
+tests validate both side-effect-free and carried-owner loops. Hosted CLI
+fixtures build and execute the same carried-owner range program through both
+Cranelift and LLVM and return the expected result. Fixed-array iteration
+remains under the same boundary and is still open.
 
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute

@@ -1,12 +1,13 @@
 use super::body_contract::{statement_span, terminates, unsupported, unsupported_name};
 use super::{
-    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
-    BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
+    BackendBlock, BackendBlockId, BackendContractError, BackendEdgeArgument, BackendFailure,
+    BackendInstruction, BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
 };
 use crate::ast::{Block, CompoundAssignmentOp, Expr, IfBranch, Place, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 mod case;
+mod loops;
 mod provider;
 pub use provider::{BackendBodyProvider, BackendExpressionProvider};
 
@@ -37,10 +38,12 @@ pub(super) struct BodyLowering<'a, P> {
     loop_targets: Vec<LoopTargets>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct LoopTargets {
-    header: BackendBlockId,
-    exit: BackendBlockId,
+    continue_target: BackendBlockId,
+    break_target: BackendBlockId,
+    continue_values: Vec<String>,
+    break_values: Vec<String>,
 }
 
 struct LegacyExpressionProvider<'a, P> {
@@ -102,28 +105,66 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<BackendBlock, BackendContractError> {
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
-            if let Stmt::Loop(nested) = statement {
-                return self.lower_loop_statement(
+            if matches!(
+                statement,
+                Stmt::Loop(_)
+                    | Stmt::ForRange { .. }
+                    | Stmt::Block(_)
+                    | Stmt::If { .. }
+                    | Stmt::Return { value: Some(Expr::Case { .. }), .. }
+            ) {
+                if let Some(result) = self.lower_structured_statement(
                     id,
                     block,
                     index,
-                    nested,
+                    statement,
                     fallthrough,
-                    instructions,
-                );
+                    std::mem::take(&mut instructions),
+                )? {
+                    return Ok(result);
+                }
             }
-            if let Stmt::Block(nested) = statement {
-                return self.lower_nested_block_statement(
+            self.lower_statement(statement, &mut instructions)?;
+            if terminates(instructions.last()) {
+                break;
+            }
+        }
+        Ok(self.finish_block(id, block.span, fallthrough, instructions))
+    }
+
+    fn lower_structured_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        statement: &Stmt,
+        fallthrough: Option<BackendBlockId>,
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<Option<BackendBlock>, BackendContractError> {
+        match statement {
+            Stmt::Loop(nested) => self
+                .lower_loop_statement(id, block, index, nested, fallthrough, instructions)
+                .map(Some),
+            Stmt::ForRange { binding, start, end, body, span } => self
+                .lower_for_range_statement(
                     id,
                     block,
                     index,
-                    nested,
+                    binding,
+                    start,
+                    end,
+                    body,
+                    *span,
                     fallthrough,
                     instructions,
-                );
-            }
-            if let Stmt::If { condition, then_branch, else_branch, span } = statement {
+                )
+                .map(Some),
+            Stmt::Block(nested) => self
+                .lower_nested_block_statement(id, block, index, nested, fallthrough, instructions)
+                .map(Some),
+            Stmt::If { condition, then_branch, else_branch, span } => {
                 let continuation_id = self.allocate_block();
+                let mut instructions = instructions;
                 let branches_terminate = self.lower_if(
                     condition,
                     then_branch,
@@ -133,24 +174,20 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     &mut instructions,
                 )?;
                 if branches_terminate {
-                    return Ok(BackendBlock { parameters: Vec::new(), id, instructions });
+                    return Ok(Some(BackendBlock { parameters: Vec::new(), id, instructions }));
                 }
                 let continuation =
                     Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
                 let continuation_block =
                     self.lower_block(continuation_id, &continuation, fallthrough)?;
                 self.blocks.push(continuation_block);
-                return Ok(BackendBlock { parameters: Vec::new(), id, instructions });
+                Ok(Some(BackendBlock { parameters: Vec::new(), id, instructions }))
             }
-            if let Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } = statement {
-                return self.lower_case_return(id, expression, *span, instructions);
+            Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } => {
+                self.lower_case_return(id, expression, *span, instructions).map(Some)
             }
-            self.lower_statement(statement, &mut instructions)?;
-            if terminates(instructions.last()) {
-                break;
-            }
+            _ => Ok(None),
         }
-        Ok(self.finish_block(id, block.span, fallthrough, instructions))
     }
 
     fn finish_block(
@@ -220,7 +257,12 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 span: nested.span,
             }],
         };
-        self.loop_targets.push(LoopTargets { header: header_id, exit: continuation_id });
+        self.loop_targets.push(LoopTargets {
+            continue_target: header_id,
+            break_target: continuation_id,
+            continue_values: Vec::new(),
+            break_values: Vec::new(),
+        });
         self.provider.enter_loop();
         let body_result = self.lower_block(body_id, nested, Some(header_id));
         self.provider.exit_loop();
@@ -301,7 +343,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        let Some(targets) = self.loop_targets.last().copied() else {
+        let Some(targets) = self.loop_targets.last().cloned() else {
             return Err(unsupported(span, "loop control"));
         };
         let kind = if matches!(statement, Stmt::Continue { .. }) {
@@ -310,9 +352,33 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             LoopExitKind::Break
         };
         self.provider.emit_loop_cleanup(span, kind.clone(), instructions)?;
-        let target = if kind == LoopExitKind::Continue { targets.header } else { targets.exit };
-        instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
+        let (target, names) = if kind == LoopExitKind::Continue {
+            (targets.continue_target, targets.continue_values)
+        } else {
+            (targets.break_target, targets.break_values)
+        };
+        let arguments = self.loop_edge_arguments(&names, span)?;
+        instructions.push(BackendInstruction::Jump { target, arguments, span });
         Ok(())
+    }
+
+    fn loop_edge_arguments(
+        &mut self,
+        names: &[String],
+        span: SourceSpan,
+    ) -> Result<Vec<BackendEdgeArgument>, BackendContractError> {
+        names
+            .iter()
+            .map(|name| {
+                let expression = Expr::Identifier { name: name.clone(), span };
+                let value = self.provider.lower_expression(&expression, &mut Vec::new())?;
+                let ty = self
+                    .provider
+                    .value_type(value)
+                    .ok_or_else(|| unsupported(span, "loop binding has no value type"))?;
+                Ok(BackendEdgeArgument { value, ty, span })
+            })
+            .collect()
     }
 
     fn lower_assignment(

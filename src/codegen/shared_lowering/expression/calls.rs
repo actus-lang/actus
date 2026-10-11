@@ -4,6 +4,35 @@ use super::super::super::{
 use super::super::support::expression_span;
 use super::SharedExpressionProvider;
 use crate::ast::Expr;
+use crate::codegen::{SymbolIdentity, SymbolKind};
+use crate::lexer::SourceSpan;
+
+pub(super) fn callee_for(
+    provider: &SharedExpressionProvider<'_>,
+    callee: &str,
+    span: SourceSpan,
+) -> Result<SymbolIdentity, BackendContractError> {
+    provider
+        .external_symbols
+        .get(callee)
+        .cloned()
+        .or_else(|| {
+            provider
+                .return_types
+                .contains_key(callee)
+                .then(|| SymbolIdentity::new(provider.namespace, SymbolKind::Verb, callee))
+                .and_then(Result::ok)
+        })
+        .or_else(|| {
+            provider
+                .bindings
+                .map(|bindings| bindings.external_symbol(provider.namespace, callee))
+                .filter(|symbol| *symbol != callee)
+                .and_then(|symbol| SymbolIdentity::external_raw(symbol).ok())
+        })
+        .map_or_else(|| SymbolIdentity::new(provider.namespace, SymbolKind::Verb, callee), Ok)
+        .map_err(|error| super::super::support::unsupported(span, error.to_string()))
+}
 
 pub(super) fn lower_call(
     provider: &mut SharedExpressionProvider<'_>,

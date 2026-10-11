@@ -10,12 +10,13 @@ use actus::codegen::{
     BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
     BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
     BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
-    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup,
-    lower_semantic_cleanup_with_provider, lower_verb, lower_verb_body,
+    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_scalar_program,
+    lower_semantic_cleanup, lower_semantic_cleanup_with_provider, lower_verb, lower_verb_body,
     lower_verb_body_with_expressions, lower_verb_signature, lower_verb_with_cleanup,
     validate_edge_arguments,
 };
-use actus::lexer::SourceSpan;
+use actus::lexer::{SourceSpan, scan};
+use actus::parser::parse;
 use actus::semantic::{
     AccessState, Binding, CleanupAction, OwnershipState, ScopeCleanup, SemanticModel,
 };
@@ -1363,6 +1364,40 @@ fn reports_range_loop_as_a_typed_neutral_contract_gap() {
     assert_eq!(operation.context.backend, "neutral-contract");
     assert_eq!(operation.context.target, "semantic-model");
     assert!(operation.reason.contains("range loop"));
+}
+
+#[test]
+fn lowers_a_side_effect_free_range_loop_into_typed_blocks() {
+    let source = "verb main() -> Int { for erg index: u32 in 0u32 .. 4u32 { } return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "range fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("range fixture should parse");
+    let module = lower_scalar_program("test", &program, Some("main"))
+        .expect("side-effect-free range loop should lower through the neutral contract");
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("main"))
+        .expect("main function should be present");
+    assert!(function.blocks.iter().any(|block| !block.parameters.is_empty()));
+    module.validate().expect("range loop contract should validate");
+}
+
+#[test]
+fn lowers_range_loop_with_a_carried_owner() {
+    let source = "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { total += index; } return total as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "carried range fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("carried range fixture should parse");
+    let module = lower_scalar_program("test", &program, Some("main"))
+        .expect("carried owner should use typed loop edge arguments");
+    assert!(
+        module
+            .functions
+            .iter()
+            .any(|function| { function.blocks.iter().any(|block| block.parameters.len() >= 2) })
+    );
+    module.validate().expect("carried range loop contract should validate");
 }
 
 #[test]

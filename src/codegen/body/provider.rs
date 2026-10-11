@@ -4,6 +4,7 @@ use super::{
     BackendValueId, SymbolIdentity,
 };
 use crate::ast::{CompoundAssignmentOp, Expr};
+use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
@@ -27,6 +28,20 @@ pub trait BackendExpressionProvider {
     fn enter_loop(&mut self) {}
 
     fn exit_loop(&mut self) {}
+
+    fn supports_range_loops(&self) -> bool {
+        false
+    }
+
+    fn value_type(&self, _value: BackendValueId) -> Option<BackendValueType> {
+        None
+    }
+
+    fn allocate_value(&mut self, _ty: BackendValueType) -> BackendValueId {
+        BackendValueId(u32::MAX)
+    }
+
+    fn set_binding_value(&mut self, _name: &str, _value: BackendValueId) {}
 
     fn enter_scope(&mut self, _span: SourceSpan) {}
 

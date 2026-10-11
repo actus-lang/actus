@@ -8,6 +8,24 @@ use super::super::super::{
 use super::super::support::{backend_value_type, scalar_backend_type_name, unsupported};
 use super::SharedExpressionProvider;
 
+pub(super) fn set_binding_value(
+    provider: &mut SharedExpressionProvider<'_>,
+    name: &str,
+    value: super::super::super::BackendValueId,
+) {
+    if let Some(scope_index) = provider
+        .locals
+        .iter()
+        .enumerate()
+        .rev()
+        .find_map(|(index, scope)| scope.contains_key(name).then_some(index))
+    {
+        provider.locals[scope_index].insert(name.to_owned(), value);
+    } else if provider.parameters.contains_key(name) {
+        provider.parameters.insert(name.to_owned(), value);
+    }
+}
+
 pub(super) fn parameter_types(
     verb: &VerbDecl,
     layouts: &impl super::super::super::BackendLayoutProvider,

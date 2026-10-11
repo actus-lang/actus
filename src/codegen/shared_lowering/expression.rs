@@ -15,7 +15,7 @@ mod state;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
-    BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
+    BackendValueId, BackendValueType, SymbolIdentity,
 };
 use super::support::{expression_span, parse_integer, unsupported};
 pub(super) struct SharedExpressionProvider<'a> {
@@ -107,12 +107,30 @@ impl<'a> SharedExpressionProvider<'a> {
     }
 }
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
+    fn supports_range_loops(&self) -> bool {
+        true
+    }
+
     fn enter_loop(&mut self) {
         self.loop_depth += 1;
     }
 
     fn exit_loop(&mut self) {
         self.loop_depth = self.loop_depth.saturating_sub(1);
+    }
+
+    fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
+        self.value_type(value)
+    }
+
+    fn allocate_value(&mut self, ty: BackendValueType) -> BackendValueId {
+        let value = self.allocate();
+        self.remember_value(value, ty);
+        value
+    }
+
+    fn set_binding_value(&mut self, name: &str, value: BackendValueId) {
+        state::set_binding_value(self, name, value);
     }
 
     fn enter_scope(&mut self, _span: SourceSpan) {
@@ -341,23 +359,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         callee: &str,
         span: SourceSpan,
     ) -> Result<SymbolIdentity, BackendContractError> {
-        self.external_symbols
-            .get(callee)
-            .cloned()
-            .or_else(|| {
-                self.return_types
-                    .contains_key(callee)
-                    .then(|| SymbolIdentity::new(self.namespace, SymbolKind::Verb, callee))
-                    .and_then(Result::ok)
-            })
-            .or_else(|| {
-                self.bindings
-                    .map(|bindings| bindings.external_symbol(self.namespace, callee))
-                    .filter(|symbol| *symbol != callee)
-                    .and_then(|symbol| SymbolIdentity::external_raw(symbol).ok())
-            })
-            .map_or_else(|| SymbolIdentity::new(self.namespace, SymbolKind::Verb, callee), Ok)
-            .map_err(|error| unsupported(span, error.to_string()))
+        calls::callee_for(self, callee, span)
     }
 
     fn assign_field(
