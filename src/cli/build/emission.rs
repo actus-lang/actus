@@ -153,26 +153,26 @@ fn emit_objects_cranelift(
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
+    if generic_instances.is_empty()
+        && object_plan.units().len() == 1
+        && super::shared_candidate::supports_scalar_shared_lowering(root.program())
+    {
+        return Ok(vec![super::cranelift_shared::emit_shared_scalar_root(
+            root.program(),
+            root.namespace().symbol_prefix(),
+            symbol,
+            configuration,
+            &bindings,
+        )?]);
+    }
     let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
-    let root_bytes =
-        crate::codegen::cranelift::emit_program_object_for_target_in_namespace_with_bindings(
-            root.program(),
-            symbol,
-            root.namespace().symbol_prefix(),
-            configuration.native_backend(),
-            configuration.target(),
-            &bindings,
-        )?;
-    let mut objects = vec![EmittedObject {
-        name: "root".to_owned(),
-        bytes: root_bytes,
-        symbols: declared_symbols(
-            root.program(),
-            root.namespace().symbol_prefix(),
-            symbol,
-            &bindings,
-        )?,
-    }];
+    let mut objects = vec![super::cranelift_shared::emit_cranelift_root(
+        root.program(),
+        root.namespace().symbol_prefix(),
+        symbol,
+        configuration,
+        &bindings,
+    )?];
     objects.extend(emit_module_objects(
         &object_plan,
         configuration,
@@ -336,7 +336,7 @@ fn emit_module_objects(
 }
 
 #[cfg(feature = "cranelift")]
-fn declared_symbols(
+pub(super) fn declared_symbols(
     program: &crate::ast::Program,
     namespace: &str,
     entry_symbol: &str,

@@ -715,6 +715,12 @@ that same neutral module through both LLVM IR emission and Cranelift object
 emission. This proves shared-contract consumption for the covered scalar slice;
 it does not yet prove complete CLI routing for all language features.
 
+The Cranelift CLI now uses the same shared route for the explicitly eligible
+single-unit, non-generic, straight-line scalar slice. Programs outside that
+contract continue through the established Cranelift lowering until their
+constructs receive shared lowering support; this staged route preserves the
+existing behavior while the remaining semantic surface is migrated.
+
 The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory
 copy lowering into `memory.rs`, and LLVM IR printing/module verification into
