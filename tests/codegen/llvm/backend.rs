@@ -2216,6 +2216,151 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
 }
 
 #[cfg(all(target_os = "linux", feature = "cranelift"))]
+#[test]
+fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
+    use std::process::Command;
+
+    let root = std::env::temp_dir().join(format!("actus-result-call-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("Result call fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"result_call_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("Result call manifest should be written");
+    let shim_source = root.join("entry.c");
+    fs::write(
+        &shim_source,
+        "#include <stdint.h>\nextern int32_t test__verb_caller(void); int main(void) { return test__verb_caller() == 0 ? 0 : 1; }\n",
+    )
+    .expect("Result call entry shim should be written");
+    let shim_object = root.join("entry.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let result_layout = BackendLayout { size: 16, alignment: 8 };
+    let payload_type = BackendValueType::Integer { signed: true, width: 32 };
+    let result_type = BackendValueType::Enum {
+        layout: BackendEnumLayout {
+            layout: result_layout,
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset: 8,
+            payload: Some(BackendLayout { size: 4, alignment: 4 }),
+            niche_pointer: false,
+        },
+    };
+    let callee_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "produce").expect("callee symbol");
+    let caller_symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "caller").expect("caller symbol");
+    let callee = BackendFunction {
+        symbol: callee_symbol.clone(),
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: result_type,
+            passing: BackendReturnMode::ReturnSlot { layout: result_layout },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Constant {
+                    result: BackendValueId(0),
+                    ty: payload_type,
+                    value: 7,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::EnumConstruct {
+                    result: BackendValueId(1),
+                    discriminant: 0,
+                    payload: BackendValueId(0),
+                    layout: match result_type {
+                        BackendValueType::Enum { layout } => layout,
+                        _ => unreachable!(),
+                    },
+                    payload_type,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(2, 3),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let caller = BackendFunction {
+        symbol: caller_symbol,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: payload_type,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Call {
+                    callee: callee_symbol,
+                    arguments: Vec::new(),
+                    result: Some(BackendValueId(2)),
+                    span: actus::lexer::SourceSpan::new(3, 4),
+                },
+                BackendInstruction::EnumDiscriminant {
+                    result: BackendValueId(3),
+                    subject: BackendValueId(2),
+                    layout: match result_type {
+                        BackendValueType::Enum { layout } => layout,
+                        _ => unreachable!(),
+                    },
+                    span: actus::lexer::SourceSpan::new(4, 5),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(3)),
+                    span: actus::lexer::SourceSpan::new(5, 6),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let module = BackendModule { externals: Vec::new(), functions: vec![callee, caller] };
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("Result call fixture configuration should load");
+    let llvm_object = root.join("llvm.o");
+    let cranelift_object = root.join("cranelift.o");
+    emit_object(&module, &target, &llvm_object).expect("LLVM Result call object should emit");
+    let cranelift_bytes =
+        emit_contract_module_object(&module, configuration.native_backend(), &target)
+            .expect("Cranelift Result call object should emit");
+    fs::write(&cranelift_object, cranelift_bytes)
+        .expect("Cranelift Result call object should be written");
+    let llvm_executable = root.join("llvm-linked");
+    let cranelift_executable = root.join("cranelift-linked");
+    let llvm_objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    let cranelift_objects: [&Path; 2] = [cranelift_object.as_path(), shim_object.as_path()];
+    link_objects(&llvm_objects, &llvm_executable, &configuration)
+        .expect("LLVM Result call objects should link");
+    link_objects(&cranelift_objects, &cranelift_executable, &configuration)
+        .expect("Cranelift Result call objects should link");
+    assert_eq!(Command::new(&llvm_executable).status().unwrap().code(), Some(0));
+    assert_eq!(Command::new(&cranelift_executable).status().unwrap().code(), Some(0));
+    remove_fixture(
+        &root,
+        [
+            &manifest,
+            &shim_source,
+            &shim_object,
+            &llvm_object,
+            &cranelift_object,
+            &llvm_executable,
+            &cranelift_executable,
+        ],
+    );
+}
+
+#[cfg(all(target_os = "linux", feature = "cranelift"))]
 fn aggregate_register_fragments() -> Vec<actus::codegen::BackendAggregateFragment> {
     vec![
         actus::codegen::BackendAggregateFragment {

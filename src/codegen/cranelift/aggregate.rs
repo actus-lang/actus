@@ -15,6 +15,7 @@ pub(super) struct Declaration {
     pub(super) id: cranelift_module::FuncId,
     pub(super) parameter_fragments: Vec<usize>,
     pub(super) return_fragments: usize,
+    pub(super) return_slot: Option<crate::codegen::BackendLayout>,
 }
 
 pub(super) fn declaration(
@@ -22,6 +23,13 @@ pub(super) fn declaration(
     parameters: &[crate::codegen::BackendParameter],
     return_value: &crate::codegen::BackendReturn,
 ) -> Result<Declaration, BackendEmitError> {
+    let return_slot = match &return_value.passing {
+        crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
+            layout.validate().map_err(|error| BackendEmitError(error.to_string()))?;
+            Some(*layout)
+        }
+        _ => None,
+    };
     Ok(Declaration {
         id,
         parameter_fragments: parameters
@@ -29,6 +37,7 @@ pub(super) fn declaration(
             .map(parameter_fragment_count)
             .collect::<Result<_, _>>()?,
         return_fragments: return_fragment_count(return_value)?,
+        return_slot,
     })
 }
 
@@ -76,9 +85,35 @@ pub(super) fn lower_call(
     let reference = module.declare_func_in_func(declaration.id, builder.func);
     let native_arguments =
         collect_call_arguments(callee.as_str(), arguments, declaration, values, aggregate_values)?;
+    let (return_slot, native_arguments) = if let Some(layout) = declaration.return_slot {
+        let slot = create_return_slot(builder, layout)?;
+        let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+        (Some(address), {
+            let mut arguments = Vec::with_capacity(native_arguments.len() + 1);
+            arguments.push(address);
+            arguments.extend(native_arguments);
+            arguments
+        })
+    } else {
+        (None, native_arguments)
+    };
     let call = builder.ins().call(reference, &native_arguments);
-    record_call_results(builder, call, result, declaration, values, aggregate_values)?;
+    record_call_results(builder, call, result, return_slot, declaration, values, aggregate_values)?;
     Ok(())
+}
+
+fn create_return_slot(
+    builder: &mut FunctionBuilder<'_>,
+    layout: crate::codegen::BackendLayout,
+) -> Result<cranelift_codegen::ir::StackSlot, BackendEmitError> {
+    let alignment = u8::try_from(layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift return slot alignment exceeds u8".to_owned()))?;
+    let align_shift = alignment.trailing_zeros() as u8;
+    Ok(builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        layout.size,
+        align_shift,
+    )))
 }
 
 fn collect_call_arguments(
@@ -126,11 +161,23 @@ fn record_call_results(
     builder: &mut FunctionBuilder<'_>,
     call: cranelift_codegen::ir::Inst,
     result: &Option<BackendValueId>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
     declaration: &Declaration,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
     aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
 ) -> Result<(), BackendEmitError> {
-    let Some(result) = result else { return Ok(()) };
+    let Some(result) = result else {
+        if return_slot.is_some() {
+            return Err(BackendEmitError(
+                "Cranelift return-slot call requires a result value".to_owned(),
+            ));
+        }
+        return Ok(());
+    };
+    if let Some(return_slot) = return_slot {
+        values.insert(*result, return_slot);
+        return Ok(());
+    }
     let results = builder.inst_results(call).to_vec();
     if declaration.return_fragments > 1 {
         if results.len() != declaration.return_fragments {

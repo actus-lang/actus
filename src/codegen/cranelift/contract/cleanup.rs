@@ -143,8 +143,10 @@ pub(super) fn declare_cleanup_bridges(
         let id = module
             .declare_function(symbol, Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations
-            .insert(symbol.to_owned(), Declaration { id, parameter_fragments, return_fragments });
+        declarations.insert(
+            symbol.to_owned(),
+            Declaration { id, parameter_fragments, return_fragments, return_slot: None },
+        );
     }
     Ok(())
 }

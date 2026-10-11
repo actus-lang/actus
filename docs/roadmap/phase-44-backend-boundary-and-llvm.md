@@ -758,9 +758,13 @@ return slot; the backend regressions
 boundary. Shared case lowering keeps payload extraction inside the target
 branch block before its terminator. Cranelift also emits Region payload
 construction by bounded memory copy into the enum return slot and exposes
-Region case payloads as bounded payload pointers. Full aggregate runtime and
-cleanup parity, unsupported call-result metadata, and complete CLI execution
-remain open.
+Region case payloads as bounded payload pointers. Return-slot calls now use
+the same explicit ABI as LLVM: the caller allocates a validated bounded stack
+slot, passes its pointer as the hidden first argument, and retains that pointer
+as the neutral aggregate or enum value. A hosted parity regression executes a
+callee that constructs a Result, a caller that extracts its discriminant, and
+the same C entry shim through both backends. Full aggregate runtime and
+cleanup parity and complete CLI execution remain open.
 
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
