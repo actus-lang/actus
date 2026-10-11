@@ -132,6 +132,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             &cleanup_plans,
             &return_types,
             &external_symbols,
+            bindings,
         )?);
     }
     let module = BackendModule {
@@ -246,12 +247,14 @@ fn lower_shared_verb(
     cleanup_plans: &[super::BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
+    bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
     let mut provider = SharedExpressionProvider::new(
         namespace,
         verb,
         return_types,
         external_symbols,
+        bindings,
         cleanup_plans,
     );
     let mut function = match entry_name.filter(|name| *name == verb.name) {

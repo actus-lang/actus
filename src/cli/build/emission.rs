@@ -162,21 +162,17 @@ fn emit_objects_cranelift(
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
-    let root = &object_plan.units()[0];
-    let targeted_root =
-        crate::semantic::filter_program_for_target(root.program(), configuration.target());
     if generic_instances.is_empty()
-        && object_plan.units().len() == 1
-        && super::shared_candidate::supports_scalar_shared_lowering(&targeted_root)
+        && super::cranelift_shared::supports_shared_scalar_units(&object_plan, configuration)
     {
-        return Ok(vec![super::cranelift_shared::emit_shared_scalar_root(
-            &targeted_root,
-            root.namespace().symbol_prefix(),
+        return super::cranelift_shared::emit_shared_scalar_units(
+            &object_plan,
             symbol,
             configuration,
             &bindings,
-        )?]);
+        );
     }
+    let root = &object_plan.units()[0];
     let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
     let mut objects = vec![super::cranelift_shared::emit_cranelift_root(
         root.program(),

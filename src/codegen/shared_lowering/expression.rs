@@ -6,8 +6,8 @@ use crate::semantic::LoopExitKind;
 
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
-    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendValueId,
-    BackendValueType, SymbolIdentity, SymbolKind,
+    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
+    BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
 };
 use super::support::{expression_span, parse_integer, unsupported};
 
@@ -17,6 +17,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     locals: Vec<BTreeMap<String, BackendValueId>>,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
+    bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
     next_value: u32,
 }
@@ -27,6 +28,7 @@ impl<'a> SharedExpressionProvider<'a> {
         verb: &VerbDecl,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
+        bindings: Option<&'a BackendSymbolBindings>,
         cleanup_plans: &'a [super::super::BackendCleanupPlan],
     ) -> Self {
         let parameter_bindings = verb
@@ -41,6 +43,7 @@ impl<'a> SharedExpressionProvider<'a> {
             locals: Vec::new(),
             return_types,
             external_symbols,
+            bindings,
             cleanup_plans,
             next_value: verb.params.len() as u32,
         }
@@ -316,6 +319,18 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.external_symbols
             .get(callee)
             .cloned()
+            .or_else(|| {
+                self.return_types
+                    .contains_key(callee)
+                    .then(|| SymbolIdentity::new(self.namespace, SymbolKind::Verb, callee))
+                    .and_then(Result::ok)
+            })
+            .or_else(|| {
+                self.bindings
+                    .map(|bindings| bindings.external_symbol(self.namespace, callee))
+                    .filter(|symbol| *symbol != callee)
+                    .and_then(|symbol| SymbolIdentity::external_raw(symbol).ok())
+            })
             .map_or_else(|| SymbolIdentity::new(self.namespace, SymbolKind::Verb, callee), Ok)
             .map_err(|error| unsupported(span, error.to_string()))
     }

@@ -137,6 +137,46 @@ fn llvm_backend_builds_and_runs_scalar_imported_module() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_scalar_imported_module_through_shared_lowering() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-cranelift-module-{}", std::process::id()));
+    let input = root.join("src/main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(root.join("src/math")).expect("create Cranelift module fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"cranelift-module-cli\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("write Cranelift module fixture manifest");
+    fs::write(&input, "import math; verb main() -> Int { return add(); }\n")
+        .expect("write Cranelift module root source");
+    fs::write(root.join("src/math/math.act"), "open api;\n")
+        .expect("write Cranelift module facade");
+    fs::write(root.join("src/math/api.act"), "open verb add() -> Int { return 40; }\n")
+        .expect("write Cranelift module implementation");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift imported module fixture");
+    assert_eq!(status.code(), Some(40));
+    let _ = fs::remove_dir_all(root);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
