@@ -4,13 +4,16 @@ use std::ffi::CString;
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
 };
-use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMContextRef, LLVMModuleRef, LLVMValueRef};
+use llvm_sys::prelude::{
+    LLVMBasicBlockRef, LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMValueRef,
+};
 
 use super::super::{
-    BackendBlockId, BackendEmitError, BackendFunction, BackendModule, BackendValueType,
+    BackendBlockId, BackendBlockParameter, BackendEmitError, BackendFunction, BackendModule,
+    BackendValueId, BackendValueType,
 };
 use super::context::{LlvmContext, LlvmModule};
-use super::control_flow::emit_blocks;
+use super::control_flow::{BlockParameters, emit_blocks};
 use super::declarations::{FunctionDeclaration, declare_cleanup_bridge, declare_function};
 use crate::codegen::{BackendCleanupBridge, BackendInstruction};
 pub(super) fn lower_module(
@@ -156,6 +159,49 @@ fn emit_function(
         emit_blocks(context, builder, pointer_width, function, declaration, declarations, &blocks);
     unsafe { LLVMDisposeBuilder(builder) };
     result
+}
+
+pub(super) fn block_parameters(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: &BackendFunction,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+) -> Result<BlockParameters, BackendEmitError> {
+    let mut parameters = BTreeMap::new();
+    for block in &function.blocks {
+        if block.id == function.entry && !block.parameters.is_empty() {
+            return Err(BackendEmitError(
+                "LLVM entry block parameters are not supported yet".to_owned(),
+            ));
+        }
+        let llvm_block = blocks
+            .get(&block.id)
+            .copied()
+            .ok_or_else(|| BackendEmitError(format!("LLVM block {} is unavailable", block.id.0)))?;
+        unsafe { llvm_sys::core::LLVMPositionBuilderAtEnd(builder, llvm_block) };
+        let values = block
+            .parameters
+            .iter()
+            .map(|parameter| create_phi(context, builder, parameter))
+            .collect::<Result<Vec<_>, _>>()?;
+        parameters.insert(block.id, values);
+    }
+    Ok(parameters)
+}
+
+fn create_phi(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    parameter: &BackendBlockParameter,
+) -> Result<(BackendValueId, LLVMValueRef), BackendEmitError> {
+    let ty = super::values::llvm_type(context, parameter.ty)?;
+    let name = CString::new(format!("block_param_{}", parameter.value.0))
+        .map_err(|_| BackendEmitError("LLVM block parameter name contains NUL".to_owned()))?;
+    let value = unsafe { llvm_sys::core::LLVMBuildPhi(builder, ty, name.as_ptr()) };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to create block parameter PHI".to_owned()));
+    }
+    Ok((parameter.value, value))
 }
 
 fn append_blocks(

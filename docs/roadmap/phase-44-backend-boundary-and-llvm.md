@@ -643,13 +643,21 @@ constructed backend-neutral contracts.
 - [ ] Move semantic-to-`BackendModule` lowering behind a shared lowering
       boundary so LLVM and Cranelift consume the same roles, layouts, cleanup
       plans, calls, returns, failures, and external symbols.
-- [ ] Define neutral block parameters and typed edge arguments for values that
+- [x] Define neutral block parameters and typed edge arguments for values that
       cross branch and loop back-edges, including source spans and ownership
       transitions.
-- [ ] Validate block-parameter arity, value types, and predecessor arguments at
+- [x] Validate block-parameter arity, value types, and predecessor arguments at
       the neutral contract before either backend emits control flow.
-- [ ] Lower the neutral block-parameter contract to Cranelift block parameters
+- [x] Lower the neutral block-parameter contract to Cranelift block parameters
       and LLVM PHI values without changing the existing ABI or cleanup model.
+
+Evidence: `BackendBlockParameter` and `BackendEdgeArgument` are validated in
+the neutral contract before emission. Cranelift appends typed block parameters
+and passes typed edge values on `brif` and `jump`; LLVM creates one PHI per
+non-entry block parameter and records incoming values at each predecessor
+terminator. `codegen_contract` covers neutral arity and type rejection, while
+`llvm_backend::emits_block_parameter_phi_from_typed_edge_arguments` exercises
+the same fixture through LLVM and Cranelift object emission.
 - [ ] Route bounded range and fixed-array iteration through that shared loop
       contract and add hosted CLI fixtures for both backends.
 - [ ] Preserve the complete current Cranelift lowering behavior while adding
@@ -788,7 +796,7 @@ emission remain open.
 
 User-defined `Drop` is now detected from the program declarations during
 neutral cleanup resolution. The shared descriptor carries a validated
-`PerformanceDrop` bridge and deterministic `SymbolIdentity` for the declared
+      `PerformanceDrop` bridge and deterministic `SymbolIdentity` for the declared
 performance. The declared performance method is also lowered into the shared
 `BackendModule` as a typed `SymbolKind::Performance` function, and both LLVM
 and Cranelift resolve cleanup calls to that local function symbol. The

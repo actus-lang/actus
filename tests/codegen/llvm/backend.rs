@@ -6,12 +6,12 @@ use actus::codegen::cranelift::emit_contract_module_object;
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendCaseMode, BackendCleanupArgument, BackendCleanupBridge,
-    BackendCleanupOperand, BackendCleanupResolvedDescriptor, BackendCleanupResult,
-    BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
-    BackendLayout, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
-    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
-    lower_scalar_program,
+    BackendBlock, BackendBlockId, BackendBlockParameter, BackendCaseMode, BackendCleanupArgument,
+    BackendCleanupBridge, BackendCleanupOperand, BackendCleanupResolvedDescriptor,
+    BackendCleanupResult, BackendEdgeArgument, BackendEnumLayout, BackendExternal, BackendFailure,
+    BackendFunction, BackendInstruction, BackendLayout, BackendModule, BackendParameter,
+    BackendReturn, BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction,
+    SymbolIdentity, SymbolKind, lower_scalar_program,
 };
 use actus::configuration::{CompilerConfiguration, NativeBackendConfiguration};
 use actus::lexer::scan;
@@ -640,6 +640,102 @@ fn declares_and_calls_a_neutral_external_runtime_symbol() {
         .expect("neutral external should be declared and called");
     assert!(ir.contains("declare void @runtime__extern_write_5fbyte(i32)"));
     assert!(ir.contains("call void @runtime__extern_write_5fbyte(i32 %0)"));
+}
+
+#[test]
+fn emits_block_parameter_phi_from_typed_edge_arguments() {
+    let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "phi").expect("valid symbol");
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "condition".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Bool,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: vec![
+                    BackendInstruction::Constant {
+                        result: BackendValueId(1),
+                        ty: integer,
+                        value: 41,
+                        span: actus::lexer::SourceSpan::new(0, 1),
+                    },
+                    BackendInstruction::Branch {
+                        condition: BackendValueId(0),
+                        then_block: BackendBlockId(1),
+                        else_block: BackendBlockId(2),
+                        then_arguments: Vec::new(),
+                        else_arguments: Vec::new(),
+                        span: actus::lexer::SourceSpan::new(1, 2),
+                    },
+                ],
+            },
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(1),
+                instructions: vec![BackendInstruction::Jump {
+                    target: BackendBlockId(3),
+                    arguments: vec![BackendEdgeArgument {
+                        value: BackendValueId(1),
+                        ty: integer,
+                        span: actus::lexer::SourceSpan::new(2, 3),
+                    }],
+                    span: actus::lexer::SourceSpan::new(2, 3),
+                }],
+            },
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(2),
+                instructions: vec![BackendInstruction::Jump {
+                    target: BackendBlockId(3),
+                    arguments: vec![BackendEdgeArgument {
+                        value: BackendValueId(1),
+                        ty: integer,
+                        span: actus::lexer::SourceSpan::new(3, 4),
+                    }],
+                    span: actus::lexer::SourceSpan::new(3, 4),
+                }],
+            },
+            BackendBlock {
+                parameters: vec![BackendBlockParameter {
+                    value: BackendValueId(2),
+                    ty: integer,
+                    span: actus::lexer::SourceSpan::new(4, 5),
+                }],
+                id: BackendBlockId(3),
+                instructions: vec![BackendInstruction::Return {
+                    value: Some(BackendValueId(2)),
+                    span: actus::lexer::SourceSpan::new(5, 6),
+                }],
+            },
+        ],
+        cleanup: Vec::new(),
+    };
+    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let ir = emit_module(&module).expect("LLVM should lower typed edge arguments to PHI");
+    assert!(ir.contains("phi i32"));
+    assert!(ir.contains("[ 41, %bb1 ]"));
+    assert!(ir.contains("[ 41, %bb2 ]"));
+    #[cfg(feature = "cranelift")]
+    {
+        let target = actus::target::TargetSpec::host().expect("host target should parse");
+        let bytes =
+            emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+                .expect("Cranelift should lower typed edge arguments to block parameters");
+        let object = object::File::parse(bytes.as_slice()).expect("object should parse");
+        assert!(object.symbols().any(|symbol| symbol.name().is_ok()));
+    }
 }
 
 #[test]

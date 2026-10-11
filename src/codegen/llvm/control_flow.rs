@@ -22,6 +22,8 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
+pub(super) type BlockParameters = BTreeMap<BackendBlockId, Vec<(BackendValueId, LLVMValueRef)>>;
+
 pub(super) fn emit_blocks(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
@@ -32,6 +34,8 @@ pub(super) fn emit_blocks(
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
 ) -> Result<(), BackendEmitError> {
     let mut values = parameter_values(declaration);
+    let block_parameters = super::module::block_parameters(context, builder, function, blocks)?;
+    values.extend(block_parameters.values().flatten().copied());
     for block in &function.blocks {
         let llvm_block = block_value(blocks, block.id)?;
         unsafe { LLVMPositionBuilderAtEnd(builder, llvm_block) };
@@ -51,6 +55,8 @@ pub(super) fn emit_blocks(
                 instruction,
                 declarations,
                 blocks,
+                &block_parameters,
+                block.id,
                 &mut values,
             )?;
         }
@@ -86,6 +92,8 @@ fn emit_instruction(
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, FunctionDeclaration>,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    block_parameters: &BlockParameters,
+    current_block: BackendBlockId,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     if let Some(result) =
@@ -102,6 +110,8 @@ fn emit_instruction(
         instruction,
         declarations,
         blocks,
+        block_parameters,
+        current_block,
         values,
     )
 }
@@ -115,11 +125,42 @@ fn emit_non_scalar_instruction(
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, FunctionDeclaration>,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    block_parameters: &BlockParameters,
+    current_block: BackendBlockId,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    if let Some(result) = emit_control_transfer(builder, instruction, blocks, values)? {
+    if let Some(result) = emit_control_transfer(
+        builder,
+        instruction,
+        blocks,
+        block_parameters,
+        current_block,
+        values,
+    )? {
         return Ok(result);
     }
+    emit_non_control_instruction(
+        context,
+        builder,
+        pointer_width,
+        function,
+        declaration,
+        instruction,
+        declarations,
+        values,
+    )
+}
+
+fn emit_non_control_instruction(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    pointer_width: u8,
+    function: &BackendFunction,
+    declaration: FunctionDeclaration,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
     match instruction {
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
@@ -164,6 +205,8 @@ fn emit_control_transfer(
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    block_parameters: &BlockParameters,
+    current_block: BackendBlockId,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<Option<bool>, BackendEmitError> {
     match instruction {
@@ -175,12 +218,22 @@ fn emit_control_transfer(
                 *then_block,
                 *else_block,
                 blocks,
+                block_parameters,
+                current_block,
                 values,
             )?;
             Ok(Some(true))
         }
         BackendInstruction::Jump { target, .. } => {
-            emit_jump(builder, instruction, *target, blocks)?;
+            emit_jump(
+                builder,
+                instruction,
+                *target,
+                blocks,
+                block_parameters,
+                current_block,
+                values,
+            )?;
             Ok(Some(true))
         }
         _ => Ok(None),
