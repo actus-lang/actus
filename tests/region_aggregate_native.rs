@@ -92,7 +92,7 @@ verb main() -> Int {
     erg opened = region_open[Array[u8, 16]](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened {
         Result.Err(_) => 1,
-        Result.Ok(region) => { return 0; },
+        Result.Ok(region) => { drop(region); return 0; },
     };
 }
 "#;
@@ -123,7 +123,7 @@ verb main() -> Int {
     erg opened = region_open[Array[u8, 16]](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened {
         Result.Err(_) => 1,
-        Result.Ok(region) => { return 0; },
+        Result.Ok(region) => { drop(region); return 0; },
     };
 }
 "#;

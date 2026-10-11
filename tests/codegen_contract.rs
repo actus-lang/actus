@@ -988,13 +988,12 @@ fn lowers_callable_roles_and_layouts_without_a_machine_backend() {
 }
 
 #[test]
-fn rejects_transferred_scalar_without_a_layout_provider() {
+fn lowers_transferred_scalar_without_an_aggregate_layout() {
     let mut verb = verb_with_signature();
     verb.params[2].ty = type_name("u32", Some(Role::Dat));
-    assert!(matches!(
-        lower_verb_signature("app", &verb, &TestLayouts),
-        Err(BackendContractError::Unsupported(_))
-    ));
+    let signature = lower_verb_signature("app", &verb, &TestLayouts)
+        .expect("scalar ownership transfer should use direct ABI passing");
+    assert!(matches!(signature.parameters[2].passing, BackendPassingMode::Direct));
 }
 
 #[test]
@@ -1218,7 +1217,8 @@ fn rejects_body_constructs_without_a_neutral_lowering_contract() {
         span: SourceSpan::new(0, 4),
     };
 
-    let error = lower_verb_body(&verb, &TestBodyProvider).expect_err("drop is not supported yet");
+    let error =
+        lower_verb_body(&verb, &TestBodyProvider).expect_err("legacy provider has no drop hook");
     assert!(matches!(error, BackendContractError::Unsupported(_)));
-    assert!(error.to_string().contains("drop statement"));
+    assert!(error.to_string().contains("explicit drop"));
 }

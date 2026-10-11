@@ -31,6 +31,24 @@ fn rejects_invalid_drop_contract() {
 }
 
 #[test]
+fn records_explicit_drop_for_backend_lowering() {
+    let source = "verb main() { erg buffer: Buffer = Buffer[4]; drop(buffer); }";
+    let model = analyze_source(source).expect("explicit drop should be valid");
+    let buffer_index = model
+        .bindings
+        .iter()
+        .position(|binding| binding.name == "buffer")
+        .expect("buffer binding should be registered");
+    assert_eq!(model.explicit_drops.len(), 1);
+    assert_eq!(model.explicit_drops[0].binding_index, buffer_index);
+    assert!(model.cleanup_plans.iter().all(|plan| {
+        plan.actions.iter().all(|action| {
+            !matches!(action, CleanupAction::DropBinding { binding_index } if *binding_index == buffer_index)
+        })
+    }));
+}
+
+#[test]
 fn rejects_drop_while_owner_is_frozen_or_exclusively_loaned() {
     let frozen = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { } } verb main() -> Int { erg counter = Counter { value: 7, }; { abs view = ref counter; drop(counter); } return 0; }";
     let error = analyze_source(frozen).expect_err("a frozen owner must not be dropped");

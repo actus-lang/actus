@@ -213,7 +213,10 @@ impl Analyzer {
         self.ensure_arena_references_inactive(index, name, span)?;
         match binding.ownership {
             OwnershipState::Active => {
-                self.model.bindings[index].ownership = OwnershipState::Dropped
+                self.model.bindings[index].ownership = OwnershipState::Dropped;
+                self.model
+                    .explicit_drops
+                    .push(crate::semantic::model::ExplicitDrop { binding_index: index, span });
             }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved

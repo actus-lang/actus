@@ -750,9 +750,14 @@ the same standard-library Region source as x86_64 UEFI objects with both
 backends. After excluding optional cleanup bridges and the LLVM target helper
 `__chkstk`, both objects expose the same Region generic-open and Region-drop
 runtime symbols, with no unexpected non-Actus imports. Explicit `drop`
-statements remain outside the neutral lowering contract and are reported with
-the typed backend diagnostic; this fixture intentionally exercises the
-automatic ownership cleanup boundary.
+statements are now represented as semantic facts and lowered through the same
+validated cleanup bridge as automatic ownership cleanup. The hosted parity
+fixture `aggregate_region_lifecycle_has_matching_hosted_backend_results`
+exercises an explicit `Region[Array[u8, 16]]` drop on both selected backends,
+while the semantic regression `records_explicit_drop_for_backend_lowering`
+verifies that the explicit action is removed from the later scope cleanup
+plan. Scalar drops remain valid no-op cleanup operations; custom user-defined
+Drop performance lowering remains outside the shared builtin bridge contract.
 
 Build metadata now has an integration regression,
 `backend_change_invalidates_generated_artifacts`, proving that an artifact

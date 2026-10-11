@@ -197,7 +197,7 @@ fn lower_type(
 fn passing_for(
     role: Role,
     layout: Option<BackendLayout>,
-    span: crate::lexer::SourceSpan,
+    _span: crate::lexer::SourceSpan,
 ) -> Result<BackendPassingMode, BackendContractError> {
     match (role, layout) {
         (Role::Erg, Some(layout)) => Ok(BackendPassingMode::Indirect { layout }),
@@ -205,9 +205,7 @@ fn passing_for(
         (Role::Abs, Some(layout)) => Ok(BackendPassingMode::Borrowed { layout }),
         (Role::Ins, Some(layout)) => Ok(BackendPassingMode::ExclusiveLoan { layout }),
         (Role::Dat, Some(layout)) => Ok(BackendPassingMode::OwnershipTransfer { layout }),
-        (Role::Ins | Role::Dat, None) => {
-            Err(unsupported(span, "exclusive or transferred values require a layout"))
-        }
+        (Role::Ins | Role::Dat, None) => Ok(BackendPassingMode::Direct),
     }
 }
 

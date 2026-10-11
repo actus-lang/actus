@@ -2,9 +2,11 @@ use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
+mod arithmetic;
 mod case;
 mod cast;
 mod cleanup;
+mod drop;
 mod layout;
 mod literals;
 use super::super::{
@@ -167,6 +169,15 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         Ok(())
     }
 
+    fn drop_binding(
+        &mut self,
+        name: &str,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        drop::lower_binding(self, name, span, instructions)
+    }
+
     fn bind_owner(
         &mut self,
         name: &str,
@@ -211,44 +222,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError> {
-        if matches!(operation, BackendIntegerBinaryOp::Divide | BackendIntegerBinaryOp::Remainder) {
-            instructions.push(BackendInstruction::TrapIfZero {
-                value: right,
-                reason: "integer division or remainder by zero".to_owned(),
-                span,
-            });
-        }
-        if matches!(operation, BackendIntegerBinaryOp::Divide) {
-            instructions.push(BackendInstruction::TrapIfSignedDivisionOverflow {
-                left,
-                right,
-                width: 32,
-                reason: "signed integer division overflow".to_owned(),
-                span,
-            });
-        }
-        if matches!(
-            operation,
-            BackendIntegerBinaryOp::ShiftLeft | BackendIntegerBinaryOp::ShiftRight
-        ) {
-            instructions.push(BackendInstruction::TrapIfShiftCountOutOfRange {
-                count: right,
-                width: 32,
-                reason: "integer shift count exceeds operand width".to_owned(),
-                span,
-            });
-        }
-        let result = self.allocate();
-        self.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
-        instructions.push(BackendInstruction::IntegerBinary {
-            result,
-            operation,
-            left,
-            right,
-            ty: BackendValueType::Integer { signed: true, width: 32 },
-            span,
-        });
-        Ok(result)
+        self.lower_integer_binary_impl(operation, left, right, span, instructions)
     }
 
     fn lower_expression(

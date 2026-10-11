@@ -153,6 +153,7 @@ pub type BackendCleanupAction = LoweredCleanupInstruction;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendCleanupOrigin {
     Scope,
+    Explicit { span: SourceSpan },
     Return { span: SourceSpan },
     Loop { span: SourceSpan, kind: crate::semantic::LoopExitKind },
 }
@@ -435,10 +436,28 @@ fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContrac
                 | BackendPassingMode::Borrowed { .. }
                 | BackendPassingMode::RuntimeBridge { .. }
         ),
-        Role::Ins => matches!(&parameter.passing, BackendPassingMode::ExclusiveLoan { .. }),
-        Role::Dat => matches!(&parameter.passing, BackendPassingMode::OwnershipTransfer { .. }),
+        Role::Ins => {
+            matches!(&parameter.passing, BackendPassingMode::ExclusiveLoan { .. })
+                || (matches!(&parameter.passing, BackendPassingMode::Direct)
+                    && is_direct_role_value(parameter.ty))
+        }
+        Role::Dat => {
+            matches!(&parameter.passing, BackendPassingMode::OwnershipTransfer { .. })
+                || (matches!(&parameter.passing, BackendPassingMode::Direct)
+                    && is_direct_role_value(parameter.ty))
+        }
     };
     valid.then_some(()).ok_or(BackendContractError::RolePassingMismatch)
+}
+
+fn is_direct_role_value(ty: BackendValueType) -> bool {
+    matches!(
+        ty,
+        BackendValueType::Unit
+            | BackendValueType::Bool
+            | BackendValueType::Integer { .. }
+            | BackendValueType::Float { .. }
+    )
 }
 
 fn validate_direct_aggregate_type(

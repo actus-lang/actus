@@ -271,6 +271,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::Break { span } | Stmt::Continue { span } => {
                 self.lower_loop_control(statement, *span, instructions)?;
             }
+            Stmt::Drop { name, span } => {
+                self.provider.drop_binding(name, *span, instructions)?;
+            }
             _ => return Err(unsupported(statement_span(statement), unsupported_name(statement))),
         }
         Ok(())

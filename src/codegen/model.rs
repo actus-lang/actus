@@ -160,6 +160,14 @@ pub(super) fn cleanup_bridge_descriptor(
     None
 }
 
+pub(crate) fn lower_explicit_drop(
+    binding_index: usize,
+    model: &SemanticModel,
+) -> Option<LoweredCleanupInstruction> {
+    model.bindings.get(binding_index)?;
+    Some(lower_binding_drop(binding_index, model))
+}
+
 pub(super) fn validate_cleanup_plans(model: &SemanticModel) -> Result<(), String> {
     for plan in &model.cleanup_plans {
         validate_scope(plan, model)?;
@@ -324,6 +332,7 @@ mod tests {
                 span: SourceSpan::new(0, 1),
                 actions: vec![action],
             }],
+            explicit_drops: Vec::new(),
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
@@ -371,6 +380,7 @@ mod tests {
                     CleanupAction::DropBinding { binding_index: 0 },
                 ],
             }],
+            explicit_drops: Vec::new(),
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),

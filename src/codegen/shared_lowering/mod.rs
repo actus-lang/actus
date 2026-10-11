@@ -453,7 +453,11 @@ fn parameter_cleanup(
     provider: &SharedExpressionProvider<'_>,
 ) -> Vec<ParameterCleanup> {
     let mut cleanup = Vec::new();
-    for plan in &function.cleanup {
+    for plan in function
+        .cleanup
+        .iter()
+        .filter(|plan| !matches!(plan.origin, super::BackendCleanupOrigin::Explicit { .. }))
+    {
         for (index, action) in plan.actions.iter().enumerate() {
             let super::BackendCleanupAction::DropBinding { name, .. } = action else {
                 continue;

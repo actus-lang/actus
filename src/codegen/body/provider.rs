@@ -56,6 +56,15 @@ pub trait BackendExpressionProvider {
         Ok(())
     }
 
+    fn drop_binding(
+        &mut self,
+        _name: &str,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "explicit drop"))
+    }
+
     fn bind_owner(
         &mut self,
         _name: &str,
