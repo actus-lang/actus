@@ -658,12 +658,12 @@ constructed backend-neutral contracts.
 - [ ] Add hosted and freestanding CLI fixtures that build the same source with
       both backends and compare exit status, exported symbols, failure class,
       ownership behavior, runtime bridge resolution, and zero-float evidence.
-- [ ] Run the standard-library Region and aggregate fixtures through LLVM as
+- [x] Run the standard-library Region and aggregate fixtures through LLVM as
       well as Cranelift, including hosted execution and freestanding object
       acceptance where the target contract permits it.
 - [ ] Verify that the selected backend is included in build metadata, artifact
       invalidation, diagnostics, and reproducibility records.
-- [ ] Verify architecture boundaries: shared semantic/codegen modules contain
+- [x] Verify architecture boundaries: shared semantic/codegen modules contain
       no Cranelift or LLVM imports, and backend implementations remain inside
       their canonical directories.
 - [ ] Update the handbook, ADR, and troubleshooting documentation with the
@@ -831,6 +831,15 @@ scalar no-op contract, and the existing hosted Region parity fixtures cover
 explicit Region cleanup through both native backends. User-defined `Drop`
 performances remain outside this candidate until neutral aggregate layout,
 performance declarations, and performance-call lowering are available.
+
+The Region acceptance slice is now closed by the hosted LLVM/Cranelift parity
+fixture, the LLVM CLI aggregate lifecycle fixture, and the freestanding object
+fixture that compares the selected backend runtime symbols. The same validation
+run also passed the architecture conformance suite, including the checks that
+shared codegen contains no backend-specific imports and that backend
+implementations remain inside their canonical directories. These results close
+only the two corresponding checklist items; complete backend selection and
+semantic-to-backend migration remain open.
 
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
