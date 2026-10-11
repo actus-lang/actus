@@ -22,6 +22,7 @@ pub(super) fn lower_enum_variant_condition_value(
 pub(super) fn bind_enum_variant_payload(
     provider: &mut SharedExpressionProvider<'_>,
     subject: BackendValueId,
+    variant: &str,
     payload: Option<&VariantPayload>,
     mode: CaseMode,
     span: SourceSpan,
@@ -37,7 +38,13 @@ pub(super) fn bind_enum_variant_payload(
         _ => return Err(unsupported(span, "enum case payload shape")),
     };
     let Some(binding) = binding.filter(|name| *name != "_") else { return Ok(()) };
-    let Some(payload_type) = provider.enum_payload_types.get(&subject).copied() else {
+    let discriminant = match variant {
+        "Ok" => 0,
+        "Err" => 1,
+        _ => return Err(unsupported(span, "unknown Result case variant")),
+    };
+    let Some(payload_type) = provider.enum_payload_types.get(&(subject, discriminant)).copied()
+    else {
         return Err(unsupported(span, "enum case payload source type"));
     };
     let layout = provider

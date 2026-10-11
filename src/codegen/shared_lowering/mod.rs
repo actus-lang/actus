@@ -291,6 +291,7 @@ fn lower_shared_verb(
     let mut provider = SharedExpressionProvider::new(
         namespace,
         verb,
+        layouts,
         return_types,
         external_symbols,
         bindings,

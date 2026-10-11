@@ -218,6 +218,17 @@ fn emits_neutral_enum_payload_binding_with_ownership_mode() {
 }
 
 #[test]
+fn emits_region_payload_result_constructor_from_shared_lowering() {
+    let source = "verb wrap(dat region: Region[u32]) -> Result[Region[u32], Int] { return Result[Region[u32], Int].Ok(region); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Region Result fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("Region Result fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("Region Result source should lower through the neutral contract");
+    emit_module(&module).expect("LLVM should consume the Region Result contract");
+}
+
+#[test]
 fn emits_neutral_result_constructor_with_payload() {
     let enum_layout = BackendEnumLayout {
         layout: BackendLayout { size: 8, alignment: 4 },

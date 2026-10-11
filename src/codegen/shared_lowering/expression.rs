@@ -10,7 +10,7 @@ use super::super::{
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
     BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
 };
-use super::support::{expression_span, parse_integer, scalar_backend_type, unsupported};
+use super::support::{backend_value_type, expression_span, parse_integer, unsupported};
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     parameters: BTreeMap<String, BackendValueId>,
@@ -20,13 +20,14 @@ pub(super) struct SharedExpressionProvider<'a> {
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
     value_types: BTreeMap<BackendValueId, BackendValueType>,
-    enum_payload_types: BTreeMap<BackendValueId, BackendValueType>,
+    enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
     next_value: u32,
 }
 impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
         namespace: &'a str,
         verb: &VerbDecl,
+        layouts: &'a impl super::super::BackendLayoutProvider,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
         bindings: Option<&'a BackendSymbolBindings>,
@@ -43,7 +44,26 @@ impl<'a> SharedExpressionProvider<'a> {
             .iter()
             .enumerate()
             .filter_map(|(index, parameter)| {
-                scalar_backend_type(&parameter.ty).map(|ty| (BackendValueId(index as u32), ty))
+                super::super::signature::lower_parameter(parameter, layouts)
+                    .ok()
+                    .map(|parameter| (BackendValueId(index as u32), parameter.ty))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let enum_payload_types = verb
+            .params
+            .iter()
+            .enumerate()
+            .filter(|(_, parameter)| {
+                parameter.ty.name == "Result" && parameter.ty.arguments.len() == 2
+            })
+            .flat_map(|(index, parameter)| {
+                parameter.ty.arguments.iter().enumerate().filter_map(
+                    move |(discriminant, payload)| {
+                        backend_value_type(layouts, payload).map(|payload_type| {
+                            ((BackendValueId(index as u32), discriminant as u32), payload_type)
+                        })
+                    },
+                )
             })
             .collect::<BTreeMap<_, _>>();
         Self {
@@ -55,7 +75,7 @@ impl<'a> SharedExpressionProvider<'a> {
             bindings,
             cleanup_plans,
             value_types: parameter_types,
-            enum_payload_types: BTreeMap::new(),
+            enum_payload_types,
             next_value: verb.params.len() as u32,
         }
     }
@@ -73,8 +93,13 @@ impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
         self.value_types.insert(value, ty);
     }
-    pub(super) fn remember_enum_payload(&mut self, value: BackendValueId, ty: BackendValueType) {
-        self.enum_payload_types.insert(value, ty);
+    pub(super) fn remember_enum_payload(
+        &mut self,
+        value: BackendValueId,
+        discriminant: u32,
+        ty: BackendValueType,
+    ) {
+        self.enum_payload_types.insert((value, discriminant), ty);
     }
 }
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
@@ -270,13 +295,13 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn bind_enum_variant_payload(
         &mut self,
         subject: BackendValueId,
-        _variant: &str,
+        variant: &str,
         payload: Option<&VariantPayload>,
         mode: CaseMode,
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        case::bind_enum_variant_payload(self, subject, payload, mode, span, instructions)
+        case::bind_enum_variant_payload(self, subject, variant, payload, mode, span, instructions)
     }
 
     fn callee_for(

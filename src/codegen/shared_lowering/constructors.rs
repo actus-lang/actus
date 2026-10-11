@@ -6,7 +6,7 @@ use super::super::{
     BackendLayout, BackendValueId, BackendValueType,
 };
 use super::expression::SharedExpressionProvider;
-use super::support::{expression_span, scalar_backend_type, unsupported};
+use super::support::{expression_span, unsupported};
 
 pub(super) fn lower_method_call(
     provider: &mut SharedExpressionProvider<'_>,
@@ -33,13 +33,15 @@ pub(super) fn lower_method_call(
     if arguments.len() != 1 {
         return Err(unsupported(*span, "Result constructors require exactly one payload"));
     }
-    let payload_type = constructor_payload_type(&result_type.arguments[discriminant as usize])
-        .ok_or_else(|| unsupported(*span, "Result payload is outside the scalar contract"))?;
     let payload = provider.lower_expression(&arguments[0].expression, instructions)?;
-    let layout = result_layout(payload_type);
+    let payload_type = provider
+        .value_type(payload)
+        .ok_or_else(|| unsupported(*span, "Result payload type is unavailable"))?;
+    let layout = result_layout(payload_type)
+        .ok_or_else(|| unsupported(*span, "Result payload layout is unavailable"))?;
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Enum { layout });
-    provider.remember_enum_payload(result, payload_type);
+    provider.remember_enum_payload(result, discriminant, payload_type);
     instructions.push(BackendInstruction::EnumConstruct {
         result,
         discriminant,
@@ -115,15 +117,7 @@ fn parse_type_name(input: &str, span: SourceSpan) -> Option<TypeName> {
     Some(TypeName { name: input[..open].to_owned(), arguments, reference_role: None, span })
 }
 
-fn constructor_payload_type(type_name: &TypeName) -> Option<BackendValueType> {
-    if type_name.name == "Bool" {
-        Some(BackendValueType::Bool)
-    } else {
-        scalar_backend_type(type_name)
-    }
-}
-
-fn result_layout(payload_type: BackendValueType) -> super::super::BackendEnumLayout {
+fn result_layout(payload_type: BackendValueType) -> Option<super::super::BackendEnumLayout> {
     let payload = match payload_type {
         BackendValueType::Bool | BackendValueType::Integer { width: 8, .. } => {
             BackendLayout { size: 1, alignment: 1 }
@@ -131,17 +125,22 @@ fn result_layout(payload_type: BackendValueType) -> super::super::BackendEnumLay
         BackendValueType::Integer { width: 16, .. } => BackendLayout { size: 2, alignment: 2 },
         BackendValueType::Integer { width: 32, .. } => BackendLayout { size: 4, alignment: 4 },
         BackendValueType::Integer { width: 64, .. } => BackendLayout { size: 8, alignment: 8 },
-        _ => unreachable!("constructor payload types are scalar by contract"),
+        BackendValueType::Aggregate { layout }
+        | BackendValueType::Region { layout }
+        | BackendValueType::Enum { layout: super::super::BackendEnumLayout { layout, .. } } => {
+            layout
+        }
+        _ => return None,
     };
     let payload_offset = 4u32.max(payload.alignment);
     let alignment = 4u32.max(payload.alignment);
     let size = (payload_offset + payload.size).div_ceil(alignment) * alignment;
-    super::super::BackendEnumLayout {
+    Some(super::super::BackendEnumLayout {
         layout: BackendLayout { size, alignment },
         discriminant_offset: 0,
         discriminant_size: 4,
         payload_offset,
         payload: Some(payload),
         niche_pointer: false,
-    }
+    })
 }

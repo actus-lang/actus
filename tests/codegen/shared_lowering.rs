@@ -22,6 +22,53 @@ fn lowers_dat_and_abs_result_payload_bindings_with_explicit_modes() {
         ));
     }
 }
+
+#[test]
+fn lowers_result_constructor_with_region_payload_layout() {
+    let source = "verb wrap(dat region: Region[u32]) -> Result[Region[u32], Int] { return Result[Region[u32], Int].Ok(region); }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "Region Result fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("Region Result fixture should parse");
+    let module = actus::codegen::lower_scalar_program("actus_root", &program, None)
+        .expect("Region Result constructor should lower through the neutral contract");
+    assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+        |instruction| matches!(
+            instruction,
+            BackendInstruction::EnumConstruct {
+                payload_type: actus::codegen::BackendValueType::Region { .. },
+                ..
+            }
+        )
+    ));
+}
+
+#[test]
+fn preserves_distinct_result_payload_types_for_case_bindings() {
+    let source = "verb inspect(dat result: Result[Region[u32], Int]) -> Int { return case dat result { Result.Ok(value) => 0, Result.Err(error) => error, }; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "mixed Result fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("mixed Result fixture should parse");
+    let module = actus::codegen::lower_scalar_program("actus_root", &program, None)
+        .expect("mixed Result case should lower through the neutral contract");
+    let bindings = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            BackendInstruction::EnumPayloadBinding { payload_type, .. } => Some(payload_type),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(bindings.iter().any(|payload_type| {
+        matches!(payload_type, actus::codegen::BackendValueType::Region { .. })
+    }));
+    assert!(bindings.iter().any(|payload_type| {
+        matches!(
+            payload_type,
+            actus::codegen::BackendValueType::Integer { signed: true, width: 32 }
+        )
+    }));
+}
 use actus::lexer::scan;
 use actus::parser::parse;
 

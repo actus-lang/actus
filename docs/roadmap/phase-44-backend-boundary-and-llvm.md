@@ -737,13 +737,20 @@ tests into discriminant extraction, integer comparison, explicit branch blocks,
 and scalar return paths. Scalar payload bindings are represented by the
 explicit `EnumPayloadBinding` instruction, which records `plain`, `abs`, or
 `dat` ownership mode; LLVM consumes the same payload extraction contract.
-Wildcard payload patterns are accepted without creating a binding. The shared
-regression `lowers_plain_result_case_into_neutral_branches`, the integration
-regression `lowers_dat_and_abs_result_payload_bindings_with_explicit_modes`,
-and the LLVM regression `emits_plain_result_case_from_shared_lowering` cover
-this slice. Guards, aggregate and Region branch values, payloads obtained from
-unsupported call-result metadata, Cranelift consumption, and complete CLI
-execution remain open.
+Wildcard payload patterns are accepted without creating a binding. Result
+payload metadata is keyed by both the subject value and discriminant, so an
+`Ok` payload and an `Err` payload may have different types. Direct Region
+payload construction and a mixed `Result[Region[u32], Int]` case binding are
+covered by integration regressions. The shared regression
+`lowers_plain_result_case_into_neutral_branches`, the integration regressions
+`lowers_dat_and_abs_result_payload_bindings_with_explicit_modes`,
+`lowers_result_constructor_with_region_payload_layout`, and
+`preserves_distinct_result_payload_types_for_case_bindings`, and the LLVM
+regressions `emits_plain_result_case_from_shared_lowering` and
+`emits_region_payload_result_constructor_from_shared_lowering` cover this
+slice. Guards, aggregate and Region values obtained from unsupported
+call-result metadata, Cranelift consumption, and complete CLI execution remain
+open.
 
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
