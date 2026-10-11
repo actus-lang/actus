@@ -126,7 +126,8 @@ fn scalar_statement(
                 )
         }
         Stmt::Return { value, .. } => value.as_ref().is_none_or(|value| {
-            scalar_expression(value, returns_value) || result_case_expression(value, returns_value)
+            scalar_expression(value, returns_value)
+                || result_case_expression(value, returns_value, unit_enums)
         }),
         Stmt::Loop(_) => false,
         Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
@@ -144,7 +145,10 @@ fn scalar_return_block(
         && matches!(
             block.statements.last(),
             Some(Stmt::Return { value, .. })
-                if value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
+                if value.as_ref().is_none_or(|value| {
+                    scalar_expression(value, returns_value)
+                    || result_case_expression(value, returns_value, unit_enums)
+                })
         )
 }
 
@@ -199,7 +203,11 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
     }
 }
 
-fn result_case_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+fn result_case_expression(
+    expression: &Expr,
+    returns_value: &BTreeMap<String, bool>,
+    unit_enums: &BTreeSet<String>,
+) -> bool {
     let Expr::Case { subject, branches, .. } = expression else { return false };
     if branches.is_empty() || !scalar_expression(subject, returns_value) {
         return false;
@@ -208,9 +216,10 @@ fn result_case_expression(expression: &Expr, returns_value: &BTreeMap<String, bo
         if branch.guard.is_some() {
             return false;
         }
-        let CaseBody::Expression(body) = &branch.body else { return false };
-        if !scalar_expression(body, returns_value) {
-            return false;
+        match &branch.body {
+            CaseBody::Expression(body) if scalar_expression(body, returns_value) => {}
+            CaseBody::Block(block) if scalar_return_block(block, returns_value, unit_enums) => {}
+            _ => return false,
         }
         match &branch.pattern {
             Pattern::Variant { variant, .. } => matches!(variant.as_str(), "Ok" | "Err"),
@@ -267,6 +276,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("Buffer and Region fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_block_bodied_result_cases_in_the_shared_contract() {
+        let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Err(_) => { return 0; }, Result.Ok(value) => { return value + 1; }, }; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("block-bodied Result fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 

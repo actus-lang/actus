@@ -729,6 +729,13 @@ the native aggregate Region fixture both pass. This expands the candidate
 boundary for the next shared-lowering slices; it does not claim complete
 Cranelift migration or full backend parity.
 
+The classifier also admits block-bodied `Result` cases whose terminal paths
+return supported shared values. The regression
+`accepts_block_bodied_result_cases_in_the_shared_contract` covers this shape,
+and the aggregate Region suite remains green after the expansion. Nested
+ownership cleanup and generic runtime calls still require backend execution
+evidence before this boundary can be considered complete.
+
 An exploratory LLVM CLI build of the existing aggregate Region lifecycle
 fixture reached the shared signature boundary and was rejected with the typed
 diagnostic `backend llvm does not support semantic-signature ... no neutral
