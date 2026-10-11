@@ -643,6 +643,15 @@ constructed backend-neutral contracts.
 - [ ] Move semantic-to-`BackendModule` lowering behind a shared lowering
       boundary so LLVM and Cranelift consume the same roles, layouts, cleanup
       plans, calls, returns, failures, and external symbols.
+- [ ] Define neutral block parameters and typed edge arguments for values that
+      cross branch and loop back-edges, including source spans and ownership
+      transitions.
+- [ ] Validate block-parameter arity, value types, and predecessor arguments at
+      the neutral contract before either backend emits control flow.
+- [ ] Lower the neutral block-parameter contract to Cranelift block parameters
+      and LLVM PHI values without changing the existing ABI or cleanup model.
+- [ ] Route bounded range and fixed-array iteration through that shared loop
+      contract and add hosted CLI fixtures for both backends.
 - [ ] Preserve the complete current Cranelift lowering behavior while adding
       the shared path; no backend-specific semantic rewrite or duplicate
       lowering implementation is allowed.
