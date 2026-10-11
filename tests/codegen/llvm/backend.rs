@@ -11,14 +11,38 @@ use actus::codegen::{
     BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
     BackendLayout, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
     BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    lower_scalar_program,
 };
-use actus::configuration::CompilerConfiguration;
+use actus::configuration::{CompilerConfiguration, NativeBackendConfiguration};
+use actus::lexer::scan;
+use actus::parser::parse;
 use object::{Object, ObjectSection, ObjectSymbol};
 
 #[cfg(target_os = "linux")]
 use std::fs;
 #[cfg(target_os = "linux")]
 use std::path::{Path, PathBuf};
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
+    let source = "verb main() -> Int { return 40 + 2; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("shared backend fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("source should lower through the shared contract");
+
+    let llvm_ir = emit_module(&module).expect("LLVM should consume the shared module");
+    assert!(llvm_ir.contains("define i32 @main()"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let cranelift_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should consume the shared module");
+    let object = object::File::parse(cranelift_bytes.as_slice()).expect("object should parse");
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+}
 
 #[test]
 fn emits_a_valid_unit_function_as_llvm_ir() {
