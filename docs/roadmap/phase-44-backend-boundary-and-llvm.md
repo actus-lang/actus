@@ -736,6 +736,14 @@ and the aggregate Region suite remains green after the expansion. Nested
 ownership cleanup and generic runtime calls still require backend execution
 evidence before this boundary can be considered complete.
 
+The hosted parity fixture
+`aggregate_region_lifecycle_has_matching_hosted_backend_results` now builds
+the same `Region[Array[u8,16]]` source with explicit `cranelift` and `llvm`
+selection and verifies exit status 0, empty stdout, and empty stderr from both
+executables. This is hosted result parity evidence for the covered lifecycle;
+it does not yet prove identical generated symbols, freestanding acceptance, or
+complete shared lowering for every ownership path.
+
 An exploratory LLVM CLI build of the existing aggregate Region lifecycle
 fixture reached the shared signature boundary and was rejected with the typed
 diagnostic `backend llvm does not support semantic-signature ... no neutral
