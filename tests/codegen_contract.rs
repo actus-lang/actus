@@ -4,15 +4,16 @@ use actus::ast::{
 };
 use actus::codegen::{
     BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
-    BackendBodyProvider, BackendCleanupAction, BackendCleanupProvider,
+    BackendBlockParameter, BackendBodyProvider, BackendCleanupAction, BackendCleanupProvider,
     BackendCleanupResolvedDescriptor, BackendContractError, BackendDirectAggregateAbi,
-    BackendEnumLayout, BackendExpressionProvider, BackendExternal, BackendFailure, BackendFunction,
-    BackendInstruction, BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter,
-    BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext,
-    BackendUnsupportedOperation, BackendValueId, BackendValueType, LoweredCleanupInstruction,
-    SymbolIdentity, SymbolKind, lower_semantic_cleanup, lower_semantic_cleanup_with_provider,
-    lower_verb, lower_verb_body, lower_verb_body_with_expressions, lower_verb_signature,
-    lower_verb_with_cleanup,
+    BackendEdgeArgument, BackendEnumLayout, BackendExpressionProvider, BackendExternal,
+    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
+    BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
+    BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
+    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_semantic_cleanup,
+    lower_semantic_cleanup_with_provider, lower_verb, lower_verb_body,
+    lower_verb_body_with_expressions, lower_verb_signature, lower_verb_with_cleanup,
+    validate_edge_arguments,
 };
 use actus::lexer::SourceSpan;
 use actus::semantic::{
@@ -1282,4 +1283,25 @@ fn reports_range_loop_as_a_typed_neutral_contract_gap() {
     assert_eq!(operation.context.backend, "neutral-contract");
     assert_eq!(operation.context.target, "semantic-model");
     assert!(operation.reason.contains("range loop"));
+}
+
+#[test]
+fn validates_loop_edge_argument_shape_before_backend_lowering() {
+    let span = SourceSpan::new(10, 18);
+    let parameters = [BackendBlockParameter {
+        value: BackendValueId(7),
+        ty: BackendValueType::Integer { signed: false, width: 32 },
+        span,
+    }];
+    let arguments = [BackendEdgeArgument {
+        value: BackendValueId(9),
+        ty: BackendValueType::Integer { signed: false, width: 32 },
+        span,
+    }];
+
+    assert!(validate_edge_arguments(&parameters, &arguments).is_ok());
+    assert!(matches!(
+        validate_edge_arguments(&parameters, &[]),
+        Err(BackendContractError::InvalidBlockArguments(_))
+    ));
 }

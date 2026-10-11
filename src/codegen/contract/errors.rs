@@ -11,6 +11,7 @@ pub enum BackendContractError {
     DuplicateParameterName,
     DuplicateBlockId,
     InvalidBlockReference,
+    InvalidBlockArguments(&'static str),
     InvalidValueType,
     DirectAggregateTypeMismatch,
     InvalidFailureType,
@@ -110,6 +111,7 @@ fn simple_message(error: &BackendContractError) -> Option<&'static str> {
         BackendContractError::InvalidBlockReference => {
             "backend control flow references an unknown block"
         }
+        BackendContractError::InvalidBlockArguments(reason) => reason,
         BackendContractError::InvalidValueType => "backend value type has an invalid width",
         BackendContractError::DirectAggregateTypeMismatch => {
             "direct aggregate ABI descriptor does not match the value type"

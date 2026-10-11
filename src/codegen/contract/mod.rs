@@ -1,5 +1,6 @@
 mod cleanup;
 mod errors;
+mod flow;
 mod instruction;
 mod semantic_cleanup;
 mod validation;
@@ -22,6 +23,7 @@ pub use cleanup::{
     BackendCleanupResolvedDescriptor, BackendCleanupResult,
 };
 pub use errors::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
+pub use flow::{BackendBlockParameter, BackendEdgeArgument, validate_edge_arguments};
 pub use instruction::{BackendAggregateField, BackendInstruction};
 pub use semantic_cleanup::lower_semantic_cleanup_with_provider;
 
