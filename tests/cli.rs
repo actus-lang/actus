@@ -38,6 +38,42 @@ fn llvm_backend_builds_and_runs_a_scalar_root_program() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn llvm_backend_builds_and_runs_a_user_defined_drop_performance() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-drop-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create LLVM Drop fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-drop-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM Drop fixture manifest");
+    fs::write(
+        &input,
+        "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb main() -> Int { return 42; }\n",
+    )
+    .expect("write LLVM Drop fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM Drop fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn llvm_backend_builds_and_runs_a_scalar_result_program() {
     let root = std::env::temp_dir().join(format!("actus-cli-llvm-result-{}", std::process::id()));
     let input = root.join("main.act");

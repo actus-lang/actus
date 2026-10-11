@@ -969,6 +969,15 @@ bridge. The regression
 backend tests with zero failures; this closes the tested aggregate Region ABI
 slice while the complete gate remains open.
 
+The real LLVM CLI path now also builds and runs a source unit that declares a
+user-defined `Drop` performance alongside the selected entry verb. The
+regression `llvm_backend_builds_and_runs_a_user_defined_drop_performance`
+verifies manifest backend selection, executable emission, linking, and exit
+status 42. This confirms CLI admission and function emission for the declared
+performance; aggregate owner construction and an executed aggregate cleanup
+call remain separate shared-expression work and are not implied by this
+fixture.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
