@@ -281,7 +281,7 @@ fn validate_signature(
 }
 
 fn validate_function_symbol(symbol: &SymbolIdentity) -> Result<(), BackendContractError> {
-    if matches!(symbol.kind(), SymbolKind::Verb | SymbolKind::External) {
+    if matches!(symbol.kind(), SymbolKind::Verb | SymbolKind::External | SymbolKind::Performance) {
         Ok(())
     } else {
         Err(BackendContractError::InvalidFunctionSymbol)

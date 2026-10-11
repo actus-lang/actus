@@ -16,13 +16,11 @@ pub(super) fn emit_runtime_bridge(
     declarations: &BTreeMap<String, FunctionDeclaration>,
     values: &BTreeMap<super::super::super::BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop) {
-        return Err(BackendEmitError(
-            "LLVM user-defined Drop performance emission is not implemented".to_owned(),
-        ));
-    }
-    let symbol = bridge_symbol(operand.bridge);
-    let declaration = declarations.get(symbol).copied().ok_or_else(|| {
+    let symbol = operand.performance_symbol.as_ref().map_or_else(
+        || bridge_symbol(operand.bridge).to_owned(),
+        |symbol| symbol.as_str().to_owned(),
+    );
+    let declaration = declarations.get(&symbol).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM cleanup bridge `{symbol}` is unavailable"))
     })?;
     let value = values.get(&operand.value).copied().ok_or_else(|| {

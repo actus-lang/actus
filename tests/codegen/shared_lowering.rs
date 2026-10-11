@@ -73,6 +73,12 @@ fn records_user_defined_drop_with_a_neutral_performance_bridge_symbol() {
     let program = actus::parser::parse(tokens).expect("Drop performance fixture should parse");
     let module = lower_scalar_program("actus_root", &program, None)
         .expect("user-defined Drop should lower to a typed performance bridge descriptor");
+    assert_eq!(module.functions.len(), 2);
+    assert!(
+        module.functions.iter().any(
+            |function| function.symbol.as_str() == "actus_root__performance_drop__Drop_Counter"
+        )
+    );
     let descriptor = module.functions[0]
         .cleanup
         .iter()

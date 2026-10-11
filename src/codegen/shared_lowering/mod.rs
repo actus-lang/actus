@@ -1,23 +1,26 @@
 use std::collections::BTreeMap;
 
-use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{ExternalVerbDecl, PerformDecl, Program, TopLevelDecl, TypeName, VerbDecl};
 
 mod constructors;
 mod expression;
 mod layout;
+mod performance;
 mod support;
 
 use expression::SharedExpressionProvider;
 use layout::ProgramLayouts;
+use performance::lower_shared_functions;
 use support::{backend_value_type, unsupported};
 
 use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
-    BackendCleanupResult, BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
+    BackendCleanupResult, BackendContractError, BackendExternal, BackendLayout,
     BackendLayoutProvider, BackendModule, BackendParameter, BackendSignature,
-    BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter, lower_return,
-    lower_verb_signature, lower_verb_with_expressions, lower_verb_with_expressions_as,
+    BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind, lower_parameter,
+    lower_return, lower_verb_signature, lower_verb_with_expressions,
+    lower_verb_with_expressions_as,
 };
 
 #[doc(hidden)]
@@ -46,17 +49,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
     bindings: Option<&BackendSymbolBindings>,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendModule, BackendContractError> {
-    let (verbs, externals) = scalar_declarations(program)?;
-    let signatures = verbs
-        .iter()
-        .map(|verb| lower_verb_signature(namespace, verb, layouts))
-        .collect::<Result<Vec<_>, _>>()?;
-    let external_signatures = externals
-        .iter()
-        .map(|external| lower_external_signature(external, layouts))
-        .collect::<Result<Vec<_>, _>>()?;
-    let return_types = shared_return_types(&verbs, &externals, &signatures, &external_signatures);
-    let return_payload_types = shared_return_payload_types(&verbs, &externals, layouts);
+    let declarations = SharedDeclarations::new(namespace, program, layouts)?;
     let semantic = crate::semantic::analyze(program).map_err(|error| {
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),
@@ -65,28 +58,81 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
     })?;
     let cleanup_provider = ProgramLayouts::new(program, namespace);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
-    let external_symbols = scalar_external_symbols(namespace, &externals, bindings)?;
-    let mut functions = Vec::with_capacity(verbs.len());
-    for verb in verbs {
-        functions.push(lower_shared_verb(
-            namespace,
-            verb,
-            entry_name,
-            layouts,
-            &cleanup_plans,
-            &return_types,
-            &return_payload_types,
-            &external_symbols,
-            bindings,
-        )?);
-    }
+    let external_symbols = scalar_external_symbols(namespace, &declarations.externals, bindings)?;
+    let functions = lower_shared_functions(
+        namespace,
+        entry_name,
+        layouts,
+        &declarations,
+        &cleanup_plans,
+        &external_symbols,
+        bindings,
+    )?;
     let mut module = BackendModule {
-        externals: build_backend_externals(&externals, external_signatures, &external_symbols)?,
+        externals: build_backend_externals(
+            &declarations.externals,
+            declarations.external_signatures,
+            &external_symbols,
+        )?,
         functions,
     };
     append_buffer_allocate_external(&mut module.externals)?;
     module.validate()?;
     Ok(module)
+}
+
+pub(super) struct SharedDeclarations<'program> {
+    verbs: Vec<&'program VerbDecl>,
+    externals: Vec<&'program ExternalVerbDecl>,
+    performances: Vec<(&'program PerformDecl, &'program VerbDecl)>,
+    performance_signatures: Vec<BackendSignature>,
+    external_signatures: Vec<BackendSignature>,
+    return_types: BTreeMap<String, Option<BackendValueType>>,
+    return_payload_types: BTreeMap<String, [Option<BackendValueType>; 2]>,
+}
+
+impl<'program> SharedDeclarations<'program> {
+    fn new(
+        namespace: &str,
+        program: &'program Program,
+        layouts: &impl BackendLayoutProvider,
+    ) -> Result<Self, BackendContractError> {
+        let (verbs, externals) = scalar_declarations(program)?;
+        let performances = scalar_performances(program);
+        let signatures = verbs
+            .iter()
+            .map(|verb| lower_verb_signature(namespace, verb, layouts))
+            .collect::<Result<Vec<_>, _>>()?;
+        let performance_signatures = performances
+            .iter()
+            .map(|(perform, method)| {
+                lower_performance_signature(namespace, perform, method, layouts)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let external_signatures = externals
+            .iter()
+            .map(|external| lower_external_signature(external, layouts))
+            .collect::<Result<Vec<_>, _>>()?;
+        let return_types = shared_return_types(
+            &verbs,
+            &externals,
+            &signatures,
+            &external_signatures,
+            &performances,
+            &performance_signatures,
+        );
+        let return_payload_types =
+            shared_return_payload_types(&verbs, &externals, layouts, &performances);
+        Ok(Self {
+            verbs,
+            externals,
+            performances,
+            performance_signatures,
+            external_signatures,
+            return_types,
+            return_payload_types,
+        })
+    }
 }
 
 fn build_backend_externals(
@@ -146,6 +192,41 @@ fn scalar_declarations(
         }
     }
     Ok((verbs, externals))
+}
+
+fn scalar_performances(program: &Program) -> Vec<(&PerformDecl, &VerbDecl)> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Perform(perform) => Some(perform),
+            _ => None,
+        })
+        .flat_map(|perform| perform.methods.iter().map(move |method| (perform, method)))
+        .collect()
+}
+
+fn lower_performance_signature(
+    namespace: &str,
+    perform: &PerformDecl,
+    method: &VerbDecl,
+    layouts: &impl BackendLayoutProvider,
+) -> Result<BackendSignature, BackendContractError> {
+    let target = perform.target.canonical_key();
+    let symbol = SymbolIdentity::specialized(
+        namespace,
+        SymbolKind::Performance,
+        &method.name,
+        &[&perform.role_name, &target],
+    )
+    .map_err(|error| unsupported(method.span, error.to_string()))?;
+    let parameters = method
+        .params
+        .iter()
+        .map(|parameter| lower_parameter(parameter, layouts))
+        .collect::<Result<Vec<_>, _>>()?;
+    let return_value = lower_return(method.return_type.as_ref(), layouts)?;
+    Ok(BackendSignature { symbol, parameters, return_value })
 }
 
 fn scalar_external_symbols(
@@ -209,6 +290,8 @@ fn shared_return_types(
     externals: &[&ExternalVerbDecl],
     signatures: &[BackendSignature],
     external_signatures: &[BackendSignature],
+    performances: &[(&PerformDecl, &VerbDecl)],
+    performance_signatures: &[BackendSignature],
 ) -> BTreeMap<String, Option<BackendValueType>> {
     verbs
         .iter()
@@ -227,6 +310,13 @@ fn shared_return_types(
                     .then_some(signature.return_value.ty),
             )
         }))
+        .chain(performances.iter().zip(performance_signatures).map(|((_, method), signature)| {
+            (
+                method.name.clone(),
+                (signature.return_value.ty != BackendValueType::Unit)
+                    .then_some(signature.return_value.ty),
+            )
+        }))
         .collect()
 }
 
@@ -234,6 +324,7 @@ fn shared_return_payload_types(
     verbs: &[&VerbDecl],
     externals: &[&ExternalVerbDecl],
     layouts: &impl BackendLayoutProvider,
+    performances: &[(&PerformDecl, &VerbDecl)],
 ) -> BTreeMap<String, [Option<BackendValueType>; 2]> {
     verbs
         .iter()
@@ -251,6 +342,13 @@ fn shared_return_payload_types(
             )
             .map(|types| (external.name.clone(), types))
         }))
+        .chain(performances.iter().filter_map(|(_, method)| {
+            result_payload_types(
+                method.return_type.as_ref().map(|return_type| &return_type.ty),
+                layouts,
+            )
+            .map(|types| (method.name.clone(), types))
+        }))
         .collect()
 }
 
@@ -267,7 +365,7 @@ fn result_payload_types(
     })
 }
 
-fn lower_shared_verb(
+pub(super) fn lower_shared_verb(
     namespace: &str,
     verb: &VerbDecl,
     entry_name: Option<&str>,
@@ -306,78 +404,9 @@ fn lower_shared_verb(
         .filter(|plan| plan.span.start >= verb.span.start && plan.span.end <= verb.span.end)
         .cloned()
         .collect();
-    append_parameter_cleanup(&mut function, &provider);
+    performance::append_parameter_cleanup(&mut function, &provider);
     function.validate()?;
     Ok(function)
-}
-
-type ParameterCleanup =
-    (String, super::BackendCleanupAction, super::BackendCleanupOperand, crate::lexer::SourceSpan);
-
-fn append_parameter_cleanup(
-    function: &mut super::BackendFunction,
-    provider: &SharedExpressionProvider<'_>,
-) {
-    let cleanup = parameter_cleanup(function, provider);
-    if cleanup.is_empty() {
-        return;
-    }
-    for block in &mut function.blocks {
-        let instructions = std::mem::take(&mut block.instructions);
-        let mut lowered = Vec::with_capacity(instructions.len() + cleanup.len());
-        for instruction in instructions {
-            let returned_value = match &instruction {
-                BackendInstruction::Return { value, .. } => *value,
-                BackendInstruction::Fail { .. } => None,
-                _ => None,
-            };
-            if matches!(
-                instruction,
-                BackendInstruction::Return { .. } | BackendInstruction::Fail { .. }
-            ) {
-                for (name, action, operand, span) in &cleanup {
-                    if returned_value == provider.parameter_value(name) {
-                        continue;
-                    }
-                    lowered.push(BackendInstruction::Cleanup {
-                        action: action.clone(),
-                        operand: Some(operand.clone()),
-                        span: *span,
-                    });
-                }
-            }
-            lowered.push(instruction);
-        }
-        block.instructions = lowered;
-    }
-}
-
-fn parameter_cleanup(
-    function: &super::BackendFunction,
-    provider: &SharedExpressionProvider<'_>,
-) -> Vec<ParameterCleanup> {
-    let mut cleanup = Vec::new();
-    for plan in function
-        .cleanup
-        .iter()
-        .filter(|plan| !matches!(plan.origin, super::BackendCleanupOrigin::Explicit { .. }))
-    {
-        for (index, action) in plan.actions.iter().enumerate() {
-            let super::BackendCleanupAction::DropBinding { name, .. } = action else {
-                continue;
-            };
-            let Some(value) = provider.parameter_value(name) else { continue };
-            let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first())
-            else {
-                continue;
-            };
-            if cleanup.iter().any(|(existing, _, _, _)| existing == name) {
-                continue;
-            }
-            cleanup.push((name.clone(), action.clone(), descriptor.operand(value), plan.span));
-        }
-    }
-    cleanup
 }
 
 #[cfg(test)]

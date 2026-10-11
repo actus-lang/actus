@@ -124,9 +124,7 @@ pub(super) fn declare_cleanup_bridges(
 
     for bridge in bridges {
         if matches!(bridge, BackendCleanupBridge::PerformanceDrop) {
-            return Err(BackendEmitError(
-                "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
-            ));
+            continue;
         }
         let symbol = bridge_symbol(bridge);
         if declarations.contains_key(symbol) {
@@ -171,11 +169,6 @@ pub(super) fn lower_cleanup(
     }
     let operand = operand
         .ok_or_else(|| BackendEmitError("Cranelift cleanup operand is missing".to_owned()))?;
-    if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop) {
-        return Err(BackendEmitError(
-            "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
-        ));
-    }
     let value = values.get(&operand.value).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift cleanup value {} is unavailable", operand.value.0))
     })?;
@@ -188,11 +181,12 @@ pub(super) fn lower_cleanup(
             builder.ins().iadd_imm_s(value, i64::from(field.offset))
         }
     };
-    let declaration = declarations.get(bridge_symbol(operand.bridge)).ok_or_else(|| {
-        BackendEmitError(format!(
-            "Cranelift cleanup bridge `{}` is unavailable",
-            bridge_symbol(operand.bridge)
-        ))
+    let symbol = operand.performance_symbol.as_ref().map_or_else(
+        || bridge_symbol(operand.bridge).to_owned(),
+        |symbol| symbol.as_str().to_owned(),
+    );
+    let declaration = declarations.get(&symbol).ok_or_else(|| {
+        BackendEmitError(format!("Cranelift cleanup bridge `{}` is unavailable", symbol))
     })?;
     let reference = module.declare_func_in_func(declaration.id, builder.func);
     let mut arguments = vec![argument];

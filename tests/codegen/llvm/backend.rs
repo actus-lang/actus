@@ -46,6 +46,32 @@ fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
 
 #[cfg(feature = "cranelift")]
 #[test]
+fn both_backends_emit_user_defined_drop_performance_calls() {
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect(erg value: Counter) { return; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Drop performance fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("Drop performance fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("inspect"))
+        .expect("Drop performance fixture should lower through the shared contract");
+
+    let llvm_ir = emit_module(&module).expect("LLVM should emit the user-defined Drop call");
+    assert!(llvm_ir.contains("define void @actus_root__performance_drop__Drop_Counter"));
+    assert!(llvm_ir.contains("call void @actus_root__performance_drop__Drop_Counter"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should emit the user-defined Drop call");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(
+        object
+            .symbols()
+            .any(|symbol| symbol.name() == Ok("actus_root__performance_drop__Drop_Counter"))
+    );
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
 fn cranelift_consumes_scalar_result_case_from_shared_lowering() {
     let source = "verb inspect(dat result: Result[Int, Int]) -> Int { return case dat result { Result.Ok(value) => value, Result.Err(error) => error, }; }";
     let (tokens, errors) = scan(source);

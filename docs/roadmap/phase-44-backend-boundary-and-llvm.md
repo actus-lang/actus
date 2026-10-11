@@ -780,10 +780,15 @@ emission remain open.
 User-defined `Drop` is now detected from the program declarations during
 neutral cleanup resolution. The shared descriptor carries a validated
 `PerformanceDrop` bridge and deterministic `SymbolIdentity` for the declared
-performance, while the backend emitters reject the bridge until performance
-body emission is available. The regression
-`records_user_defined_drop_with_a_neutral_performance_bridge_symbol` covers
-the symbol and layout contract; it does not close user-defined `Drop` lowering.
+performance. The declared performance method is also lowered into the shared
+`BackendModule` as a typed `SymbolKind::Performance` function, and both LLVM
+and Cranelift resolve cleanup calls to that local function symbol. The
+regressions `records_user_defined_drop_with_a_neutral_performance_bridge_symbol`
+and `both_backends_emit_user_defined_drop_performance_calls` cover the neutral
+function contract and hosted backend emission. This closes the user-defined
+`Drop` body and local-call slice only; generic performance dispatch, complete
+CLI candidate admission, freestanding runtime integration, and the complete
+Gate 44.7.1 remain open.
 
 Build metadata now has an integration regression,
 `backend_change_invalidates_generated_artifacts`, proving that an artifact
