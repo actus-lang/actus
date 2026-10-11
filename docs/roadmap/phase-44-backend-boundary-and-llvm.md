@@ -689,6 +689,11 @@ remains rejected until a merge contract exists. The negative regression
 boundary explicitly. The LLVM CLI fixture
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.
+The LLVM CLI regression
+`llvm_backend_builds_and_runs_scalar_assignment_through_shared_lowering` also
+builds and executes same-scope compound assignment through the shared scalar
+contract. This confirms the assignment slice at the real LLVM CLI boundary;
+branch-merge mutation and aggregate assignment remain outside this evidence.
 The shared scalar contract now also lowers integer division and remainder with
 an explicit `TrapIfZero` guard before the arithmetic instruction. Both
 Cranelift and LLVM lower that guard to a terminating zero-divisor path; the

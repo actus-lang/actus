@@ -312,6 +312,36 @@ fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn llvm_backend_builds_and_runs_scalar_assignment_through_shared_lowering() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-assignment-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(&input, "verb main() -> Int { erg value = 40; value += 2; return value; }\n")
+        .expect("write LLVM shared assignment fixture");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run LLVM shared assignment fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn llvm_backend_builds_and_runs_shared_scalar_bitwise_operations() {
     let root = std::env::temp_dir().join(format!("actus-cli-llvm-bitwise-{}", std::process::id()));
     let input = root.join("src/main.act");
