@@ -1982,7 +1982,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
     let shim_source = root.join("entry.c");
     fs::write(
         &shim_source,
-        "#include <stdint.h>\nstatic int order; static int status; static void *expected_buffer; static void *expected_region; void actus_buffer_drop(void *value) { if (value == expected_buffer) order = order * 10 + 1; else order = -1; } int32_t actus_region_drop(void *value) { if (value == expected_region) { order = order * 10 + 2; status = 0; } else { order = -1; status = -1; } return status; } extern void test__verb_cleanup(void *, void *); int main(void) { uint64_t buffer = 1; uint64_t region = 2; expected_buffer = &buffer; expected_region = &region; test__verb_cleanup(&buffer, &region); return order == 12 && status == 0 ? 0 : 1; }\n",
+        "#include <stdint.h>\nstatic int order; static int status; static void *expected_buffer; static void *expected_region; static void *expected_enum; static uint64_t expected_enum_size; void actus_buffer_drop(void *value) { if (value == expected_buffer) order = order * 10 + 1; else order = -1; } int32_t actus_region_drop(void *value) { if (value == expected_region) { order = order * 10 + 2; status = 0; } else { order = -1; status = -1; } return status; } void actus_enum_drop(void *value, uint64_t size) { if (value == expected_enum && size == expected_enum_size) order = order * 10 + 3; else order = -1; } extern void test__verb_cleanup(void *, void *, void *); int main(void) { uint64_t buffer = 1; uint64_t region = 2; uint64_t enum_value[2] = { 3, 4 }; expected_buffer = &buffer; expected_region = &region; expected_enum = enum_value; expected_enum_size = sizeof(enum_value); test__verb_cleanup(&buffer, &region, enum_value); return order == 123 && status == 0 ? 0 : 1; }\n",
     )
     .expect("cleanup parity entry shim should be written");
     let shim_object = root.join("entry.o");
@@ -2017,13 +2017,23 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
         layout: pointer_layout,
         field: None,
     };
+    let enum_descriptor = BackendCleanupResolvedDescriptor {
+        descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
+            bridge: BackendCleanupBridge::EnumDrop { size: 16 },
+            argument: BackendCleanupArgument::Address,
+            result: BackendCleanupResult::Ignored,
+        },
+        layout: actus::codegen::BackendLayout { size: 16, alignment: 8 },
+        field: None,
+    };
     buffer_descriptor.validate().expect("buffer descriptor should validate");
     region_descriptor.validate().expect("region descriptor should validate");
+    enum_descriptor.validate().expect("enum descriptor should validate");
     let module = BackendModule {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
-            parameters: vec![parameter("buffer"), parameter("region")],
+            parameters: vec![parameter("buffer"), parameter("region"), parameter("enum_value")],
             return_value: BackendReturn {
                 role: None,
                 ty: BackendValueType::Unit,
@@ -2049,9 +2059,17 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
                         operand: Some(region_descriptor.operand(BackendValueId(1))),
                         span: actus::lexer::SourceSpan::new(1, 2),
                     },
+                    BackendInstruction::Cleanup {
+                        action: LoweredCleanupInstruction::DropBinding {
+                            binding_index: 2,
+                            name: "enum_value".to_owned(),
+                        },
+                        operand: Some(enum_descriptor.operand(BackendValueId(2))),
+                        span: actus::lexer::SourceSpan::new(2, 3),
+                    },
                     BackendInstruction::Return {
                         value: None,
-                        span: actus::lexer::SourceSpan::new(2, 3),
+                        span: actus::lexer::SourceSpan::new(3, 4),
                     },
                 ],
             }],
