@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ast::{
     BuiltinType, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName, primitive_type,
@@ -8,6 +8,7 @@ use super::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendLayout, BackendLayoutProvider,
+    BackendTargetContext, BackendUnsupportedOperation,
 };
 
 /// Program-backed layouts used by the backend-neutral signature contract.
@@ -17,6 +18,7 @@ use super::{
 /// reference roles and runtime handles, matching the existing neutral ABI.
 pub(super) struct ProgramLayouts<'program> {
     structs: BTreeMap<&'program str, &'program StructDef>,
+    drop_types: BTreeSet<String>,
     pointer_bytes: u32,
 }
 
@@ -32,7 +34,17 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
-        Self { structs, pointer_bytes: (usize::BITS / 8) as u32 }
+        let drop_types = program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Perform(perform) if perform.role_name == "Drop" => {
+                    Some(perform.target.canonical_key())
+                }
+                _ => None,
+            })
+            .collect();
+        Self { structs, drop_types, pointer_bytes: (usize::BITS / 8) as u32 }
     }
 
     fn type_layout(
@@ -265,6 +277,22 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
                 BackendCleanupBridge::RegionDrop,
                 self.pointer_layout(),
                 None,
+            )));
+        }
+        if let Some(type_name) = type_name
+            && self.drop_types.contains(&type_name.canonical_key())
+        {
+            return Err(BackendContractError::Unsupported(BackendUnsupportedOperation::new(
+                "cleanup-performance",
+                type_name.span,
+                BackendTargetContext {
+                    backend: "neutral-contract".to_owned(),
+                    target: "semantic-model".to_owned(),
+                },
+                format!(
+                    "user-defined Drop performance for `{}` requires a backend performance bridge",
+                    type_name.canonical_key()
+                ),
             )));
         }
         Ok(None)

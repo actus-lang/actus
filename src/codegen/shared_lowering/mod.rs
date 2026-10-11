@@ -16,8 +16,9 @@ use super::{
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
     BackendLayoutProvider, BackendModule, BackendParameter, BackendSignature,
-    BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter, lower_return,
-    lower_verb_signature, lower_verb_with_expressions, lower_verb_with_expressions_as,
+    BackendSymbolBindings, BackendTargetContext, BackendUnsupportedOperation, BackendValueType,
+    SymbolIdentity, lower_parameter, lower_return, lower_verb_signature,
+    lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 #[doc(hidden)]

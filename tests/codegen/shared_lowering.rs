@@ -66,6 +66,23 @@ fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
 }
 
 #[test]
+fn rejects_user_defined_drop_until_a_neutral_performance_bridge_exists() {
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect(erg value: Counter) { return; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "Drop performance fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("Drop performance fixture should parse");
+    let error = lower_scalar_program("actus_root", &program, None)
+        .expect_err("user-defined Drop must not silently disappear from neutral lowering");
+    match error {
+        actus::codegen::BackendContractError::Unsupported(operation) => {
+            assert_eq!(operation.operation, "cleanup-performance");
+            assert!(operation.reason.contains("Counter"));
+        }
+        other => panic!("expected typed unsupported diagnostic, got {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_explicit_scalar_drop_without_backend_cleanup() {
     let source = "verb main() -> Int { erg value = 41; drop(value); return 42; }";
     let (tokens, errors) = actus::lexer::scan(source);
