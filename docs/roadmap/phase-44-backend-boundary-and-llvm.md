@@ -717,15 +717,17 @@ it does not yet prove complete CLI routing for all language features.
 
 The Cranelift CLI now uses the same shared route for the explicitly eligible
 non-generic scalar slice across the root unit and imported module units. The
-slice includes straight-line scalar expressions and calls to declared scalar
-verbs or external verbs; imported verb bindings resolve to their namespaced
+slice includes straight-line scalar expressions, direct-return branch-local
+`if/else` control flow, and calls to declared scalar verbs or external verbs;
+imported verb bindings resolve to their namespaced
 symbols, and local declarations retain precedence. Target-annotated
 declarations are filtered before eligibility and lowering. Programs outside
 that contract continue through the established Cranelift lowering until their
 constructs receive shared lowering support; this staged route preserves the
 existing behavior while the remaining semantic surface is migrated. The
-hosted regression `cranelift_backend_builds_and_runs_scalar_imported_module_through_shared_lowering`
-builds and executes a root program calling an imported scalar verb.
+hosted regressions `cranelift_backend_builds_and_runs_scalar_imported_module_through_shared_lowering`
+and `cranelift_backend_builds_and_runs_scalar_if_through_shared_lowering` build
+and execute imported-call and branch-local scalar programs.
 
 The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory

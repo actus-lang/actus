@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Block, DispatchMode, Expr, Program, Role, Stmt};
+use crate::ast::{BinaryOp, Block, DispatchMode, Expr, IfBranch, Program, Role, Stmt};
 use std::collections::BTreeMap;
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
@@ -57,7 +57,14 @@ fn scalar_statement(statement: &Stmt, returns_value: &BTreeMap<String, bool>) ->
             matches!(expression, Expr::Call { .. })
                 && scalar_statement_call(expression, returns_value)
         }
-        Stmt::If { .. } => false,
+        Stmt::If { condition, then_branch, else_branch, .. } => {
+            scalar_expression(condition, returns_value)
+                && scalar_return_block(then_branch, returns_value)
+                && matches!(
+                    else_branch,
+                    Some(IfBranch::Block(block)) if scalar_return_block(block, returns_value)
+                )
+        }
         Stmt::Return { value, .. } => {
             value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
         }
@@ -66,6 +73,15 @@ fn scalar_statement(statement: &Stmt, returns_value: &BTreeMap<String, bool>) ->
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::ForRange { .. } | Stmt::ForArray { .. } | Stmt::Drop { .. } => false,
     }
+}
+
+fn scalar_return_block(block: &Block, returns_value: &BTreeMap<String, bool>) -> bool {
+    scalar_block(block, returns_value)
+        && matches!(
+            block.statements.last(),
+            Some(Stmt::Return { value, .. })
+                if value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
+        )
 }
 
 fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
