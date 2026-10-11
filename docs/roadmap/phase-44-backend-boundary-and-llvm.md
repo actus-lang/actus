@@ -1010,6 +1010,14 @@ load-operation-store order, while the Cranelift and LLVM CLI fixtures execute
 scalar and pointer fields; nested aggregate values, generic aggregate values,
 and branch-merge mutation remain open.
 
+The Cranelift shared candidate now also admits checked scalar division,
+remainder, and left/right shift expressions. These operations already emit
+the neutral trap contracts for zero divisors, signed division overflow, and
+out-of-range shift counts; the CLI regression executes the shared Cranelift
+path and returns 42. The LLVM CLI suite continues to cover the corresponding
+checked operations. This expands shared scalar parity without changing the
+legacy fallback path or closing the broader backend-pipeline gate.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

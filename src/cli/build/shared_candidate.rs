@@ -203,6 +203,10 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
                 BinaryOp::Add
                     | BinaryOp::Subtract
                     | BinaryOp::Multiply
+                    | BinaryOp::Divide
+                    | BinaryOp::Remainder
+                    | BinaryOp::ShiftLeft
+                    | BinaryOp::ShiftRight
                     | BinaryOp::BitwiseAnd
                     | BinaryOp::BitwiseOr
                     | BinaryOp::BitwiseXor
