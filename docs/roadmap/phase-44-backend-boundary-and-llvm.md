@@ -744,6 +744,23 @@ executables. This is hosted result parity evidence for the covered lifecycle;
 it does not yet prove identical generated symbols, freestanding acceptance, or
 complete shared lowering for every ownership path.
 
+The freestanding fixture
+`freestanding_region_objects_have_compatible_backend_runtime_symbols` builds
+the same standard-library Region source as x86_64 UEFI objects with both
+backends. After excluding optional cleanup bridges and the LLVM target helper
+`__chkstk`, both objects expose the same Region generic-open and Region-drop
+runtime symbols, with no unexpected non-Actus imports. Explicit `drop`
+statements remain outside the neutral lowering contract and are reported with
+the typed backend diagnostic; this fixture intentionally exercises the
+automatic ownership cleanup boundary.
+
+Build metadata now has an integration regression,
+`backend_change_invalidates_generated_artifacts`, proving that an artifact
+written under the Cranelift configuration is invalidated when the selected
+backend changes to LLVM. Backend metadata and target metadata are preserved in
+the artifact contract; reproducibility and diagnostic record coverage remain
+open.
+
 An exploratory LLVM CLI build of the existing aggregate Region lifecycle
 fixture reached the shared signature boundary and was rejected with the typed
 diagnostic `backend llvm does not support semantic-signature ... no neutral

@@ -58,6 +58,38 @@ fn build_region_object(root: &std::path::Path) -> Vec<u8> {
     fs::read(output).expect("read generated Region object")
 }
 
+#[cfg(all(not(target_os = "macos"), feature = "llvm"))]
+fn write_freestanding_region_fixture(root: &std::path::Path, backend: &str) {
+    let source_root = root.join("src");
+    fs::create_dir_all(&source_root)
+        .expect("freestanding parity source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        format!(
+            "[package]\nname = \"freestanding_region_parity\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nsource_root = \"src\"\nentry = \"boot\"\n\n[build]\nruntime = \"std\"\ntarget = \"x86_64-unknown-uefi\"\nentry_contract = \"freestanding\"\nbackend = \"{backend}\"\nverify_no_float_ir = true\n"
+        ),
+    )
+    .expect("freestanding parity manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import std::region; verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(_region) => { return 0; }, }; }\n",
+    )
+    .expect("freestanding parity source should be written");
+}
+
+#[cfg(all(not(target_os = "macos"), feature = "llvm"))]
+fn freestanding_undefined_symbols(object_bytes: &[u8]) -> Vec<String> {
+    let file = object::File::parse(object_bytes).expect("freestanding parity object should parse");
+    let mut symbols = file
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok().map(str::to_owned))
+        .collect::<Vec<_>>();
+    symbols.sort();
+    symbols.dedup();
+    symbols
+}
+
 fn build_object(root: &std::path::Path) -> Vec<u8> {
     let input = root.join("src/main.act");
     let output = root.join("main.o");
@@ -117,6 +149,45 @@ fn hosted_std_region_operations_build_and_run() {
     assert!(execution.stdout.is_empty());
     assert!(execution.stderr.is_empty());
     let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(not(target_os = "macos"), feature = "llvm"))]
+#[test]
+fn freestanding_region_objects_have_compatible_backend_runtime_symbols() {
+    let cranelift_root =
+        std::env::temp_dir().join(format!("actus-freestanding-region-clif-{}", std::process::id()));
+    let llvm_root =
+        std::env::temp_dir().join(format!("actus-freestanding-region-llvm-{}", std::process::id()));
+    write_freestanding_region_fixture(&cranelift_root, "cranelift");
+    write_freestanding_region_fixture(&llvm_root, "llvm");
+    let cranelift_symbols = freestanding_undefined_symbols(&build_region_object(&cranelift_root));
+    let llvm_symbols = freestanding_undefined_symbols(&build_region_object(&llvm_root));
+    let optional_cleanup = ["actus_buffer_drop", "actus_enum_drop"];
+    let mut cranelift_semantic = cranelift_symbols
+        .iter()
+        .filter(|symbol| {
+            symbol.starts_with("actus_") && !optional_cleanup.contains(&symbol.as_str())
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut llvm_semantic = llvm_symbols
+        .iter()
+        .filter(|symbol| {
+            symbol.starts_with("actus_") && !optional_cleanup.contains(&symbol.as_str())
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    cranelift_semantic.sort();
+    llvm_semantic.sort();
+    assert_eq!(cranelift_semantic, llvm_semantic);
+    assert_eq!(
+        llvm_semantic,
+        ["actus_mod_3_std_6_region__verb_region_5fopen_5f_5fu8", "actus_region_drop"]
+    );
+    assert!(cranelift_symbols.iter().all(|symbol| symbol.starts_with("actus_")));
+    assert!(llvm_symbols.iter().all(|symbol| symbol.starts_with("actus_") || symbol == "__chkstk"));
+    let _ = fs::remove_dir_all(cranelift_root);
+    let _ = fs::remove_dir_all(llvm_root);
 }
 
 #[test]
