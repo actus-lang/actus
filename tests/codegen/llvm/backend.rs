@@ -6,7 +6,7 @@ use actus::codegen::cranelift::emit_contract_module_object;
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
-    BackendBlock, BackendBlockId, BackendCleanupArgument, BackendCleanupBridge,
+    BackendBlock, BackendBlockId, BackendCaseMode, BackendCleanupArgument, BackendCleanupBridge,
     BackendCleanupOperand, BackendCleanupResolvedDescriptor, BackendCleanupResult,
     BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
     BackendLayout, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
@@ -160,6 +160,59 @@ fn emits_neutral_enum_discriminant_and_payload_extraction() {
     };
     let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
         .expect("LLVM should emit neutral enum extraction");
+    assert!(ir.contains("load i32"));
+    assert!(ir.contains("getelementptr i8"));
+}
+
+#[test]
+fn emits_neutral_enum_payload_binding_with_ownership_mode() {
+    let enum_layout = BackendEnumLayout {
+        layout: BackendLayout { size: 8, alignment: 4 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 4,
+        payload: Some(BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
+    };
+    let enum_type = BackendValueType::Enum { layout: enum_layout };
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "enum_binding").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "result".to_owned(),
+            role: Role::Erg,
+            ty: enum_type,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::EnumPayloadBinding {
+                    result: BackendValueId(1),
+                    subject: BackendValueId(0),
+                    layout: enum_layout,
+                    payload_type: integer,
+                    mode: BackendCaseMode::Dat,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("LLVM should emit enum payload binding");
     assert!(ir.contains("load i32"));
     assert!(ir.contains("getelementptr i8"));
 }
