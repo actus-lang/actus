@@ -722,6 +722,13 @@ This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.
 
+The shared capability classifier now admits bounded `Buffer` and `Region`
+values, including `ins` and `dat` parameter roles and bounded Buffer literals.
+The classifier regression `accepts_bounded_buffer_and_region_signatures` and
+the native aggregate Region fixture both pass. This expands the candidate
+boundary for the next shared-lowering slices; it does not claim complete
+Cranelift migration or full backend parity.
+
 An exploratory LLVM CLI build of the existing aggregate Region lifecycle
 fixture reached the shared signature boundary and was rejected with the typed
 diagnostic `backend llvm does not support semantic-signature ... no neutral

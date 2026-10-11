@@ -64,17 +64,16 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
 }
 
 fn scalar_parameter(parameter: &crate::ast::Param, unit_enums: &BTreeSet<String>) -> bool {
-    matches!(parameter.role, Role::Erg | Role::Abs)
+    matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
         && scalar_or_result_type(&parameter.ty, unit_enums)
 }
 
 fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
-    type_name.arguments.is_empty()
-        && matches!(
-            type_name.name.as_str(),
-            "Bool" | "Int" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
-        )
+    matches!(
+        type_name.name.as_str(),
+        "Bool" | "Int" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
+    ) || matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
 }
 
 fn scalar_or_result_type(type_name: &crate::ast::TypeName, unit_enums: &BTreeSet<String>) -> bool {
@@ -155,7 +154,10 @@ fn scalar_place(place: &Place) -> bool {
 
 fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
     match expression {
-        Expr::Identifier { .. } | Expr::Integer { .. } | Expr::BoolLiteral { .. } => true,
+        Expr::Identifier { .. }
+        | Expr::Integer { .. }
+        | Expr::BoolLiteral { .. }
+        | Expr::BufferLiteral { .. } => true,
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
             scalar_expression(expression, returns_value)
         }
@@ -256,6 +258,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("Result fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_bounded_buffer_and_region_signatures() {
+        let source = "verb create() -> Buffer { return Buffer[16]; } verb inspect(abs region: Region[u8]) { return; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("Buffer and Region fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 
