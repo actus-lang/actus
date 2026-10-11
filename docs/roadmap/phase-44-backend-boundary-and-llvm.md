@@ -983,6 +983,17 @@ scalar-field aggregate construction slice; nested aggregate fields, aggregate
 field access and assignment, generic aggregate values, and full ownership
 mutation parity remain open.
 
+The next aggregate slice adds scalar and pointer field reads from a neutral
+aggregate value. `AggregateFieldLoad` carries the complete root layout, checked
+field offset, field layout, and value type; the contract rejects out-of-bounds,
+misaligned, and aggregate-valued loads until a dedicated aggregate-copy result
+contract exists. Both Cranelift and LLVM consume the same instruction, and
+hosted CLI fixtures build and execute the same `Counter.value` program with
+exit status 42 through each backend. The neutral regression and malformed
+layout regression cover instruction construction and rejection. Aggregate
+field mutation, nested aggregate field reads, and generic aggregate values
+remain open.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

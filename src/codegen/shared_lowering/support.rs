@@ -31,7 +31,7 @@ pub(super) fn scalar_backend_type(type_name: &TypeName) -> Option<super::super::
 }
 
 pub(super) fn backend_value_type(
-    layouts: &impl super::super::BackendLayoutProvider,
+    layouts: &(impl super::super::BackendLayoutProvider + ?Sized),
     type_name: &TypeName,
 ) -> Option<super::super::BackendValueType> {
     if type_name.name == "Bool" {

@@ -27,6 +27,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
     value_types: BTreeMap<BackendValueId, BackendValueType>,
+    nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
     next_value: u32,
 }
@@ -57,6 +58,7 @@ impl<'a> SharedExpressionProvider<'a> {
                     .map(|parameter| (BackendValueId(index as u32), parameter.ty))
             })
             .collect::<BTreeMap<_, _>>();
+        let nominal_types = aggregate::parameter_nominal_types(verb, layouts);
         let enum_payload_types = verb
             .params
             .iter()
@@ -85,6 +87,7 @@ impl<'a> SharedExpressionProvider<'a> {
             bindings,
             cleanup_plans,
             value_types: parameter_types,
+            nominal_types,
             enum_payload_types,
             next_value: verb.params.len() as u32,
         }
@@ -102,6 +105,16 @@ impl<'a> SharedExpressionProvider<'a> {
     }
     pub(super) fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
         self.value_types.insert(value, ty);
+    }
+    pub(super) fn nominal_type(&self, value: BackendValueId) -> Option<&crate::ast::TypeName> {
+        self.nominal_types.get(&value)
+    }
+    pub(super) fn remember_nominal_type(
+        &mut self,
+        value: BackendValueId,
+        type_name: crate::ast::TypeName,
+    ) {
+        self.nominal_types.insert(value, type_name);
     }
     pub(super) fn remember_enum_payload(
         &mut self,
@@ -275,8 +288,8 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
             Expr::Call { .. } => self.lower_call(expression, instructions),
             Expr::MethodCall { .. } => self.lower_method_call(expression, instructions),
-            Expr::StructLit { .. } => {
-                aggregate::lower_struct_literal_expression(self, expression, instructions)
+            Expr::StructLit { .. } | Expr::FieldAccess { .. } => {
+                aggregate::lower_aggregate_expression(self, expression, instructions)
             }
             _ => Err(unsupported(
                 expression_span(expression),

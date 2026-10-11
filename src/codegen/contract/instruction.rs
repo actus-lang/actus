@@ -146,4 +146,13 @@ pub enum BackendInstruction {
         fields: Vec<BackendAggregateField>,
         span: SourceSpan,
     },
+    AggregateFieldLoad {
+        result: super::BackendValueId,
+        base: super::BackendValueId,
+        aggregate_layout: super::BackendLayout,
+        offset: u32,
+        field_layout: super::BackendLayout,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
 }

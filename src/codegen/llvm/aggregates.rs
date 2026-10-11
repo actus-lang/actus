@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
+    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
     LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
@@ -19,9 +19,8 @@ pub(super) fn emit_aggregate_construct(
     };
     let aggregate_type =
         super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
-    let address = unsafe {
-        LLVMBuildAlloca(builder, aggregate_type, b"aggregate.construct\0".as_ptr().cast())
-    };
+    let address =
+        unsafe { LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast()) };
     if address.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
     }
@@ -57,6 +56,48 @@ pub(super) fn emit_aggregate_construct(
     Ok(false)
 }
 
+pub(super) fn emit_aggregate_instruction(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    match instruction {
+        BackendInstruction::AggregateConstruct { .. } => {
+            emit_aggregate_construct(context, builder, instruction, values)
+        }
+        BackendInstruction::AggregateFieldLoad { .. } => {
+            emit_aggregate_field_load(context, builder, instruction, values)
+        }
+        _ => Err(BackendEmitError("LLVM aggregate instruction expected".to_owned())),
+    }
+}
+
+pub(super) fn emit_aggregate_field_load(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::AggregateFieldLoad { result, base, offset, ty, .. } = instruction
+    else {
+        return Err(BackendEmitError("LLVM aggregate field load expected".to_owned()));
+    };
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM aggregate base {} is unavailable", base.0))
+    })?;
+    let address = field_address(context, builder, base, *offset)?;
+    let value_type = super::values::llvm_type(context, *ty)?;
+    let value = unsafe {
+        LLVMBuildLoad2(builder, value_type, address, c"aggregate.field.load".as_ptr().cast())
+    };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to load aggregate field".to_owned()));
+    }
+    values.insert(*result, value);
+    Ok(false)
+}
+
 fn field_address(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
@@ -71,7 +112,7 @@ fn field_address(
             base,
             &index as *const _ as *mut _,
             1,
-            b"aggregate.field\0".as_ptr().cast(),
+            c"aggregate.field".as_ptr().cast(),
         )
     };
     (!address.is_null())

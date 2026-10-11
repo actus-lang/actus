@@ -372,6 +372,26 @@ fn rejects_zero_or_misaligned_memory_copy_extents() {
 }
 
 #[test]
+fn rejects_aggregate_field_loads_outside_declared_layout() {
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::AggregateFieldLoad {
+                result: BackendValueId(0),
+                base: BackendValueId(1),
+                aggregate_layout: BackendLayout { size: 4, alignment: 4 },
+                offset: 4,
+                field_layout: BackendLayout { size: 4, alignment: 4 },
+                ty: BackendValueType::Integer { signed: true, width: 32 },
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidAggregateFieldAccess));
+}
+
+#[test]
 fn validates_niche_pointer_layout_boundaries() {
     let valid = BackendEnumLayout {
         layout: BackendLayout { size: 8, alignment: 8 },

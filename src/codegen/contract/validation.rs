@@ -64,6 +64,13 @@ fn validate_instruction(
         BackendInstruction::AggregateConstruct { layout, fields, .. } => {
             validate_aggregate_construct(*layout, fields)
         }
+        BackendInstruction::AggregateFieldLoad {
+            aggregate_layout,
+            offset,
+            field_layout,
+            ty,
+            ..
+        } => validate_aggregate_field_load(*aggregate_layout, *offset, *field_layout, *ty),
         _ => Ok(()),
     }
 }
@@ -104,6 +111,32 @@ fn validate_aggregate_construct(
         }
         validate_value_type(field.ty)?;
         previous_end = field.offset + field.layout.size;
+    }
+    Ok(())
+}
+
+fn validate_aggregate_field_load(
+    aggregate_layout: super::BackendLayout,
+    offset: u32,
+    field_layout: super::BackendLayout,
+    ty: super::BackendValueType,
+) -> Result<(), BackendContractError> {
+    aggregate_layout.validate()?;
+    field_layout.validate()?;
+    let unsupported_type = matches!(
+        ty,
+        super::BackendValueType::Unit
+            | super::BackendValueType::Float { .. }
+            | super::BackendValueType::Aggregate { .. }
+            | super::BackendValueType::Region { .. }
+            | super::BackendValueType::Enum { .. }
+    );
+    if unsupported_type
+        || offset % field_layout.alignment != 0
+        || offset > aggregate_layout.size
+        || field_layout.size > aggregate_layout.size - offset
+    {
+        return Err(BackendContractError::InvalidAggregateFieldAccess);
     }
     Ok(())
 }

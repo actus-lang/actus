@@ -4,7 +4,6 @@ use super::super::{
     BackendBlockId, BackendEmitError, BackendFunction, BackendInstruction, BackendValueId,
     BackendValueType,
 };
-use super::aggregates::emit_aggregate_construct;
 use super::branches::{block_value, emit_branch, emit_jump};
 use super::calls::emit_call;
 use super::cleanup::emit_cleanup;
@@ -94,6 +93,30 @@ fn emit_instruction(
     {
         return result;
     }
+    emit_non_scalar_instruction(
+        context,
+        builder,
+        pointer_width,
+        function,
+        declaration,
+        instruction,
+        declarations,
+        blocks,
+        values,
+    )
+}
+
+fn emit_non_scalar_instruction(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    pointer_width: u8,
+    function: &BackendFunction,
+    declaration: FunctionDeclaration,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
     match instruction {
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
@@ -128,14 +151,28 @@ fn emit_instruction(
             declarations,
             values,
         ),
-        BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
-            emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
+        BackendInstruction::MemoryCopy { .. } => {
+            emit_memory_copy_instruction(context, builder, instruction, values)
         }
-        BackendInstruction::AggregateConstruct { .. } => {
-            emit_aggregate_construct(context, builder, instruction, values)
+        BackendInstruction::AggregateConstruct { .. }
+        | BackendInstruction::AggregateFieldLoad { .. } => {
+            super::aggregates::emit_aggregate_instruction(context, builder, instruction, values)
         }
         _ => unreachable!("scalar instruction was not dispatched"),
     }
+}
+
+fn emit_memory_copy_instruction(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } = instruction
+    else {
+        return Err(BackendEmitError("LLVM memory-copy instruction expected".to_owned()));
+    };
+    emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
 }
 
 fn emit_scalar_instruction(

@@ -232,6 +232,7 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
             !name.is_empty()
                 && fields.iter().all(|field| scalar_expression(&field.value, returns_value))
         }
+        Expr::FieldAccess { object, .. } => scalar_expression(object, returns_value),
         _ => false,
     }
 }

@@ -126,6 +126,31 @@ fn lowers_aggregate_owner_construction_into_scoped_drop_cleanup() {
 }
 
 #[test]
+fn lowers_scalar_aggregate_field_access_into_neutral_load() {
+    let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return counter.value + 1; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "aggregate field fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("aggregate field fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("aggregate field access should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(instructions.iter().any(|instruction| {
+        matches!(
+            instruction,
+            BackendInstruction::AggregateFieldLoad {
+                offset: 0,
+                ty: actus::codegen::BackendValueType::Integer { signed: true, width: 32 },
+                ..
+            }
+        )
+    }));
+}
+
+#[test]
 fn lowers_explicit_scalar_drop_without_backend_cleanup() {
     let source = "verb main() -> Int { erg value = 41; drop(value); return 42; }";
     let (tokens, errors) = actus::lexer::scan(source);

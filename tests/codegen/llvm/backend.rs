@@ -70,6 +70,29 @@ fn both_backends_emit_user_defined_drop_performance_calls() {
     );
 }
 
+#[test]
+fn both_backends_emit_scalar_aggregate_field_access() {
+    let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return counter.value + 1; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "aggregate field fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("aggregate field fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("aggregate field access should lower through the shared contract");
+
+    let llvm_ir = emit_module(&module).expect("LLVM should emit aggregate field access");
+    assert!(llvm_ir.contains("aggregate.field.load"));
+
+    #[cfg(feature = "cranelift")]
+    {
+        let target = actus::target::TargetSpec::host().expect("host target should parse");
+        let configuration = NativeBackendConfiguration::default();
+        let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+            .expect("Cranelift should emit aggregate field access");
+        let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+        assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+    }
+}
+
 #[cfg(feature = "cranelift")]
 #[test]
 fn cranelift_consumes_scalar_result_case_from_shared_lowering() {

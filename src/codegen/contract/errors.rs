@@ -16,6 +16,7 @@ pub enum BackendContractError {
     InvalidFailureType,
     InvalidMemoryCopy,
     InvalidAggregateInstruction,
+    InvalidAggregateFieldAccess,
     InvalidAggregateAbi(&'static str),
     InvalidCleanupContract(String),
     InvalidCleanupPlan,
@@ -121,6 +122,9 @@ fn simple_message(error: &BackendContractError) -> Option<&'static str> {
         }
         BackendContractError::InvalidAggregateInstruction => {
             "backend aggregate construction has invalid field layout"
+        }
+        BackendContractError::InvalidAggregateFieldAccess => {
+            "backend aggregate field access has invalid layout or value type"
         }
         BackendContractError::ReturnSlotTypeMismatch => {
             "backend return slot must match an aggregate return type"

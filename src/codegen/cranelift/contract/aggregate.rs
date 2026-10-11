@@ -65,3 +65,25 @@ pub(super) fn lower_aggregate_construct(
     values.insert(*result, address);
     Ok(())
 }
+
+pub(super) fn lower_aggregate_field_load(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::AggregateFieldLoad { result, base, offset, ty, .. } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift aggregate field load expected".to_owned()));
+    };
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift aggregate base {} is unavailable", base.0))
+    })?;
+    let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
+        BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
+    })?;
+    let offset = i32::try_from(*offset)
+        .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
+    values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), base, offset));
+    Ok(())
+}
