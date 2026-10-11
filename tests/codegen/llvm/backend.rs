@@ -61,6 +61,23 @@ fn cranelift_consumes_scalar_result_case_from_shared_lowering() {
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
 }
 
+#[cfg(feature = "cranelift")]
+#[test]
+fn cranelift_emits_scalar_result_constructor_to_return_slot() {
+    let source = "verb main() -> Result[Int, Int] { return Result[Int, Int].Ok(7); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Cranelift Result constructor should lex: {errors:?}");
+    let program = parse(tokens).expect("Cranelift Result constructor should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("Result constructor should lower through the shared contract");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should emit scalar Result construction");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+}
+
 #[test]
 fn emits_a_valid_unit_function_as_llvm_ir() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "main").expect("valid symbol");

@@ -5,13 +5,14 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
-use super::native::BackendEmitError;
+use super::super::native::BackendEmitError;
 use crate::codegen::{BackendInstruction, BackendValueId, BackendValueType};
 
 pub(super) fn lower(
     module: &ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
+    return_slot: Option<cranelift_codegen::ir::Value>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
@@ -21,11 +22,66 @@ pub(super) fn lower(
         BackendInstruction::EnumPayload { .. } | BackendInstruction::EnumPayloadBinding { .. } => {
             lower_payload(module, builder, instruction, values)
         }
-        BackendInstruction::EnumConstruct { .. } => Err(BackendEmitError(
-            "Cranelift neutral enum construction is not implemented".to_owned(),
-        )),
+        BackendInstruction::EnumConstruct { .. } => {
+            lower_construct(module, builder, instruction, return_slot, values)
+        }
         _ => Err(BackendEmitError("Cranelift enum instruction expected".to_owned())),
     }
+}
+
+fn lower_construct(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::EnumConstruct { discriminant, payload, layout, payload_type, .. } =
+        instruction
+    else {
+        return Err(BackendEmitError("Cranelift enum constructor instruction expected".to_owned()));
+    };
+    let slot = return_slot.ok_or_else(|| {
+        BackendEmitError("Cranelift enum construction requires a return slot".to_owned())
+    })?;
+    let discriminant_type = integer_type_for(layout.discriminant_size)?;
+    let discriminant_value = builder.ins().iconst(discriminant_type, i64::from(*discriminant));
+    builder.ins().store(
+        MemFlagsData::new(),
+        discriminant_value,
+        slot,
+        layout.discriminant_offset as i32,
+    );
+    let payload_value = values.get(payload).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift enum payload {} is unavailable", payload.0))
+    })?;
+    let payload_layout = layout.payload.ok_or_else(|| {
+        BackendEmitError("Cranelift enum constructor payload layout is missing".to_owned())
+    })?;
+    let payload_address = builder.ins().iadd_imm_s(slot, i64::from(layout.payload_offset));
+    if is_scalar_payload(*payload_type) {
+        builder.ins().store(MemFlagsData::new(), payload_value, slot, layout.payload_offset as i32);
+    } else {
+        if builder.func.dfg.value_type(payload_value) != module.isa().pointer_type() {
+            return Err(BackendEmitError(
+                "Cranelift aggregate enum payload must be a pointer".to_owned(),
+            ));
+        }
+        let alignment = u8::try_from(payload_layout.alignment).map_err(|_| {
+            BackendEmitError("Cranelift enum payload alignment is invalid".to_owned())
+        })?;
+        builder.emit_small_memory_copy(
+            module.isa().frontend_config(),
+            payload_address,
+            payload_value,
+            u64::from(payload_layout.size),
+            alignment,
+            alignment,
+            false,
+            MemFlagsData::new(),
+        );
+    }
+    Ok(())
 }
 
 pub(super) fn lower_discriminant(
@@ -40,7 +96,7 @@ pub(super) fn lower_discriminant(
         ));
     };
     let subject = enum_storage_pointer(builder, module.isa().pointer_type(), *subject, values)?;
-    let ty = integer_type(layout.discriminant_size)?;
+    let ty = integer_type_for(layout.discriminant_size)?;
     let value =
         builder.ins().load(ty, MemFlagsData::new(), subject, layout.discriminant_offset as i32);
     values.insert(*result, value);
@@ -108,7 +164,11 @@ fn scalar_type(ty: BackendValueType) -> Result<Type, BackendEmitError> {
     }
 }
 
-fn integer_type(size: u8) -> Result<Type, BackendEmitError> {
+fn is_scalar_payload(ty: BackendValueType) -> bool {
+    matches!(ty, BackendValueType::Bool | BackendValueType::Integer { .. })
+}
+
+pub(super) fn integer_type_for(size: u8) -> Result<Type, BackendEmitError> {
     match size {
         1 => Ok(types::I8),
         2 => Ok(types::I16),

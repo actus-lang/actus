@@ -7,7 +7,6 @@ pub(super) mod calls;
 pub(super) mod case;
 pub(super) mod cleanup;
 pub(super) mod contract;
-pub(super) mod contract_enums;
 pub(super) mod control_flow;
 pub(super) mod declarations;
 pub(super) mod dependencies;

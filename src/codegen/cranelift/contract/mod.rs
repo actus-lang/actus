@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 mod cleanup;
-use super::aggregate::{
-    Declaration, aggregate_fragment_type, declaration, direct_aggregate_types, initialize_values,
-    lower_call,
-};
+mod dispatch;
+mod enums;
+mod returns;
+use super::aggregate::{Declaration, declaration, direct_aggregate_types, initialize_values};
 use super::integer_ops::{
     lower_integer_binary, lower_integer_cast, lower_integer_compare, lower_integer_unary,
     lower_trap_if_shift_count_out_of_range, lower_trap_if_signed_division_overflow,
@@ -19,7 +19,7 @@ use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 pub(super) use cleanup::LayoutCleanupProvider;
 use cranelift_codegen::ir::condcodes::IntCC;
-use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, TrapCode, Type, types};
+use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, Type, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
@@ -87,7 +87,7 @@ fn signature(
             }
         }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
-            if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } if value_layout == *layout)
+            if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } | BackendValueType::Enum { layout: crate::codegen::BackendEnumLayout { layout: value_layout, .. } } if value_layout == *layout)
             {
                 return Err(BackendEmitError(
                     "Cranelift return slot layout does not match the aggregate return type"
@@ -195,7 +195,7 @@ fn define_function(
             })?;
             builder.switch_to_block(native_block);
             for instruction in &block.instructions {
-                lower_instruction(
+                dispatch::lower_instruction(
                     module,
                     &mut builder,
                     instruction,
@@ -225,65 +225,7 @@ fn create_blocks(
     function.blocks.iter().map(|block| (block.id, builder.create_block())).collect()
 }
 
-fn lower_instruction(
-    module: &mut ObjectModule,
-    builder: &mut FunctionBuilder<'_>,
-    instruction: &BackendInstruction,
-    declarations: &BTreeMap<String, Declaration>,
-    blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
-    return_slot: Option<cranelift_codegen::ir::Value>,
-    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-    aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
-    function: &BackendFunction,
-) -> Result<(), BackendEmitError> {
-    match instruction {
-        BackendInstruction::Constant { .. } => lower_constant(module, builder, instruction, values),
-        BackendInstruction::IntegerBinary { .. } => {
-            lower_integer_binary(builder, instruction, values)
-        }
-        BackendInstruction::IntegerCast { .. } => lower_integer_cast(builder, instruction, values),
-        BackendInstruction::TrapIfZero { .. }
-        | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
-        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
-            lower_guard(builder, instruction, values)
-        }
-        BackendInstruction::IntegerCompare { .. } => {
-            lower_integer_compare(builder, instruction, values)
-        }
-        BackendInstruction::IntegerUnary { .. } => {
-            lower_integer_unary(builder, instruction, values)
-        }
-        BackendInstruction::EnumDiscriminant { .. }
-        | BackendInstruction::EnumPayload { .. }
-        | BackendInstruction::EnumPayloadBinding { .. }
-        | BackendInstruction::EnumConstruct { .. } => {
-            super::contract_enums::lower(module, builder, instruction, values)
-        }
-        BackendInstruction::Call { .. } => {
-            lower_call(module, builder, instruction, declarations, values, aggregate_values)
-        }
-        BackendInstruction::Branch { .. } => lower_branch(builder, instruction, blocks, values),
-        BackendInstruction::Jump { .. } => lower_jump(builder, instruction, blocks),
-        BackendInstruction::Return { .. } => {
-            lower_return(builder, instruction, function, values, aggregate_values)
-        }
-        BackendInstruction::Fail { .. } => {
-            lower_failure(module.isa().pointer_type(), builder, instruction, return_slot, values)
-        }
-        BackendInstruction::MemoryCopy { .. } => {
-            lower_memory_copy(module, builder, instruction, values)
-        }
-        BackendInstruction::Trap { .. } => {
-            builder.ins().trap(TrapCode::unwrap_user(1));
-            Ok(())
-        }
-        BackendInstruction::Cleanup { action, operand, .. } => {
-            cleanup::lower_cleanup(module, builder, action, *operand, declarations, values)
-        }
-    }
-}
-
-fn lower_guard(
+pub(super) fn lower_guard(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -300,7 +242,7 @@ fn lower_guard(
     }
 }
 
-fn lower_constant(
+pub(super) fn lower_constant(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
@@ -315,7 +257,7 @@ fn lower_constant(
     Ok(())
 }
 
-fn lower_memory_copy(
+pub(super) fn lower_memory_copy(
     module: &ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
@@ -349,7 +291,7 @@ fn lower_memory_copy(
     Ok(())
 }
 
-fn lower_branch(
+pub(super) fn lower_branch(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
@@ -373,7 +315,7 @@ fn lower_branch(
     Ok(())
 }
 
-fn lower_jump(
+pub(super) fn lower_jump(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
@@ -386,115 +328,5 @@ fn lower_jump(
         .copied()
         .ok_or_else(|| BackendEmitError("Cranelift jump target block is unavailable".to_owned()))?;
     builder.ins().jump(target, &[]);
-    Ok(())
-}
-
-fn lower_failure(
-    pointer_type: Type,
-    builder: &mut FunctionBuilder<'_>,
-    instruction: &BackendInstruction,
-    return_slot: Option<cranelift_codegen::ir::Value>,
-    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-) -> Result<(), BackendEmitError> {
-    let BackendInstruction::Fail { failure, .. } = instruction else {
-        return Err(BackendEmitError("Cranelift failure instruction expected".to_owned()));
-    };
-    if failure.layout.niche_pointer {
-        return lower_niche_failure(pointer_type, builder, failure, return_slot, values);
-    }
-    let slot = return_slot.ok_or_else(|| {
-        BackendEmitError("Cranelift typed failure requires a return slot".to_owned())
-    })?;
-    let discriminant_type = aggregate_fragment_type(failure.layout.discriminant_size)?;
-    let discriminant = builder.ins().iconst(discriminant_type, i64::from(failure.discriminant));
-    builder.ins().store(
-        MemFlagsData::new(),
-        discriminant,
-        slot,
-        failure.layout.discriminant_offset as i32,
-    );
-    if let (Some(payload_id), Some(payload_layout)) = (failure.payload, failure.layout.payload) {
-        let payload = values.get(&payload_id).copied().ok_or_else(|| {
-            BackendEmitError(format!("Cranelift failure payload {} is unavailable", payload_id.0))
-        })?;
-        if !builder.func.dfg.value_type(payload).is_int()
-            || builder.func.dfg.value_type(payload).bytes() > payload_layout.size
-        {
-            return Err(BackendEmitError(
-                "Cranelift typed failure currently requires a fitting integer payload".to_owned(),
-            ));
-        }
-        builder.ins().store(
-            MemFlagsData::new(),
-            payload,
-            slot,
-            failure.layout.payload_offset as i32,
-        );
-    }
-    builder.ins().return_(&[]);
-    Ok(())
-}
-
-fn lower_niche_failure(
-    pointer_type: Type,
-    builder: &mut FunctionBuilder<'_>,
-    failure: &crate::codegen::BackendFailure,
-    return_slot: Option<cranelift_codegen::ir::Value>,
-    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-) -> Result<(), BackendEmitError> {
-    if return_slot.is_some() {
-        return Err(BackendEmitError(
-            "Cranelift niche-pointer failure cannot use an aggregate return slot".to_owned(),
-        ));
-    }
-    let value = failure
-        .payload
-        .and_then(|payload_id| values.get(&payload_id).copied())
-        .unwrap_or_else(|| builder.ins().iconst(pointer_type, 0));
-    if builder.func.dfg.value_type(value) != pointer_type {
-        return Err(BackendEmitError(
-            "Cranelift niche-pointer failure payload must be a pointer".to_owned(),
-        ));
-    }
-    builder.ins().return_(&[value]);
-    Ok(())
-}
-
-fn lower_return(
-    builder: &mut FunctionBuilder<'_>,
-    instruction: &BackendInstruction,
-    function: &BackendFunction,
-    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
-) -> Result<(), BackendEmitError> {
-    let BackendInstruction::Return { value, .. } = instruction else {
-        return Err(BackendEmitError("Cranelift return instruction expected".to_owned()));
-    };
-    if let Some(value_id) = value
-        && matches!(
-            function.return_value.passing,
-            crate::codegen::BackendReturnMode::DirectAggregate { .. }
-        )
-    {
-        let fragments = aggregate_values.get(&value_id).ok_or_else(|| {
-            BackendEmitError(format!(
-                "Cranelift aggregate return value {} is unavailable",
-                value_id.0
-            ))
-        })?;
-        builder.ins().return_(fragments);
-        return Ok(());
-    }
-    let value = value
-        .map(|value| {
-            values.get(&value).copied().ok_or_else(|| {
-                BackendEmitError(format!("Cranelift return value {} is unavailable", value.0))
-            })
-        })
-        .transpose()?;
-    match value {
-        Some(value) => builder.ins().return_(&[value]),
-        None => builder.ins().return_(&[]),
-    };
     Ok(())
 }
