@@ -128,7 +128,17 @@ pub(crate) fn emit_objects(
             emit_objects_cranelift(plan, symbol, configuration)
         }
         crate::codegen::BackendKind::Llvm => {
-            super::llvm_emission::emit_objects_llvm(plan, symbol, configuration)
+            #[cfg(feature = "llvm")]
+            {
+                super::llvm_emission::emit_objects_llvm(plan, symbol, configuration)
+            }
+            #[cfg(not(feature = "llvm"))]
+            {
+                let _ = (plan, symbol, configuration);
+                Err(BackendEmitError(
+                    "backend `llvm` is not enabled; rebuild with feature `llvm`".to_owned(),
+                ))
+            }
         }
     }
 }
