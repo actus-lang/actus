@@ -770,6 +770,14 @@ importing Cranelift or LLVM types. This is layout groundwork only; user-defined
 `Drop` performance discovery, bridge identity, body lowering, and backend
 emission remain open.
 
+The neutral cleanup provider now uses the same program-backed layout source for
+builtin cleanup bridges and nested owned `Buffer` or `Region` field descriptors.
+Field addresses carry the complete root aggregate layout plus checked offset,
+size, and alignment metadata, and traversal stops at borrowed or exclusive
+reference fields. Backend-specific layout registries are no longer required to
+describe this cleanup operand contract; user-defined `Drop` bridge discovery
+and emission remain open.
+
 Build metadata now has an integration regression,
 `backend_change_invalidates_generated_artifacts`, proving that an artifact
 written under the Cranelift configuration is invalidated when the selected

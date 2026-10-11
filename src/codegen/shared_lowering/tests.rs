@@ -1,5 +1,5 @@
 use super::{
-    BackendLayout, BackendLayoutProvider, BuiltinLayouts,
+    BackendLayout, BackendLayoutProvider, ProgramLayouts,
     lower_program_to_backend_module_with_layouts,
 };
 use crate::ast::TypeName;
@@ -19,7 +19,7 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
             crate::ast::TopLevelDecl::Verb(verb) => verb,
             _ => unreachable!(),
         },
-        &BuiltinLayouts,
+        &ProgramLayouts::new(&program),
     )
     .expect("scalar Result signature should lower");
     let region = super::super::signature::lower_verb_signature(
@@ -28,7 +28,7 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
             crate::ast::TopLevelDecl::Verb(verb) => verb,
             _ => unreachable!(),
         },
-        &BuiltinLayouts,
+        &ProgramLayouts::new(&program),
     )
     .expect("Region Result signature should lower");
 

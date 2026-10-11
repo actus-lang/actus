@@ -11,107 +11,14 @@ use expression::SharedExpressionProvider;
 use layout::ProgramLayouts;
 use support::{backend_value_type, unsupported};
 
-use super::abi::BackendEnumLayout;
 use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
-    BackendCleanupProvider, BackendCleanupResolvedDescriptor, BackendCleanupResult,
-    BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
+    BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
+    BackendCleanupResult, BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
     BackendLayoutProvider, BackendModule, BackendParameter, BackendSignature,
     BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter, lower_return,
     lower_verb_signature, lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
-
-struct BuiltinLayouts;
-
-impl BackendLayoutProvider for BuiltinLayouts {
-    fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout> {
-        matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
-            .then_some(host_pointer_layout())
-    }
-
-    fn enum_layout_for(&self, type_name: &TypeName) -> Option<BackendEnumLayout> {
-        (type_name.name == "Result" && type_name.arguments.len() == 2)
-            .then(|| result_layout(self, type_name.arguments.first()?))
-            .flatten()
-    }
-}
-
-impl BackendCleanupProvider for BuiltinLayouts {
-    fn resolve_binding(
-        &self,
-        type_name: Option<&TypeName>,
-        builtin: Option<crate::ast::BuiltinType>,
-    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
-        let bridge = if builtin == Some(crate::ast::BuiltinType::Buffer) {
-            Some(BackendCleanupBridge::BufferDrop)
-        } else if type_name.is_some_and(|name| name.name == "Region") {
-            Some(BackendCleanupBridge::RegionDrop)
-        } else {
-            None
-        };
-        Ok(bridge.map(|bridge| BackendCleanupResolvedDescriptor {
-            descriptor: BackendCleanupBridgeDescriptor {
-                bridge,
-                argument: if bridge == BackendCleanupBridge::BufferDrop {
-                    BackendCleanupArgument::Value
-                } else {
-                    BackendCleanupArgument::Address
-                },
-                result: if bridge == BackendCleanupBridge::RegionDrop {
-                    BackendCleanupResult::Status
-                } else {
-                    BackendCleanupResult::Ignored
-                },
-            },
-            layout: host_pointer_layout(),
-            field: None,
-        }))
-    }
-
-    fn resolve_field(
-        &self,
-        _root_type: &TypeName,
-        _path: &str,
-    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
-        Ok(None)
-    }
-}
-
-fn host_pointer_layout() -> BackendLayout {
-    let pointer_bytes = (usize::BITS / 8) as u32;
-    BackendLayout { size: pointer_bytes, alignment: pointer_bytes }
-}
-
-fn result_layout(layouts: &BuiltinLayouts, payload: &TypeName) -> Option<BackendEnumLayout> {
-    let payload = builtin_value_layout(layouts, payload)?;
-    let payload_offset = align_up(4, payload.alignment);
-    let alignment = 4u32.max(payload.alignment);
-    let size = align_up(payload_offset.checked_add(payload.size)?, alignment);
-    Some(BackendEnumLayout {
-        layout: BackendLayout { size, alignment },
-        discriminant_offset: 0,
-        discriminant_size: 4,
-        payload_offset,
-        payload: Some(payload),
-        niche_pointer: false,
-    })
-}
-
-fn builtin_value_layout(layouts: &BuiltinLayouts, type_name: &TypeName) -> Option<BackendLayout> {
-    match type_name.name.as_str() {
-        "Bool" | "u8" | "i8" => Some(BackendLayout { size: 1, alignment: 1 }),
-        "u16" | "i16" => Some(BackendLayout { size: 2, alignment: 2 }),
-        "Int" | "u32" | "i32" => Some(BackendLayout { size: 4, alignment: 4 }),
-        "Usize" | "u64" | "i64" => Some(BackendLayout { size: 8, alignment: 8 }),
-        "Buffer" | "String" | "Arena" | "Region" => Some(host_pointer_layout()),
-        _ => layouts.layout_for(type_name),
-    }
-}
-
-fn align_up(value: u32, alignment: u32) -> u32 {
-    let remainder = value % alignment;
-    if remainder == 0 { value } else { value + alignment - remainder }
-}
 
 #[doc(hidden)]
 pub fn lower_scalar_program(
@@ -156,7 +63,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             format!("semantic analysis failed: {error:?}"),
         )
     })?;
-    let cleanup_provider = BuiltinLayouts;
+    let cleanup_provider = ProgramLayouts::new(program);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &externals, bindings)?;
     let mut functions = Vec::with_capacity(verbs.len());
