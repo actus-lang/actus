@@ -1,5 +1,6 @@
 use actus::ast::{
-    Block, DispatchMode, Expr, Param, ReturnAccess, ReturnType, Role, Stmt, TypeName, VerbDecl,
+    Block, DispatchMode, Expr, ForBinding, Param, ReturnAccess, ReturnType, Role, Stmt, TypeName,
+    VerbDecl,
 };
 use actus::codegen::{
     BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
@@ -1249,4 +1250,36 @@ fn rejects_body_constructs_without_a_neutral_lowering_contract() {
         lower_verb_body(&verb, &TestBodyProvider).expect_err("legacy provider has no drop hook");
     assert!(matches!(error, BackendContractError::Unsupported(_)));
     assert!(error.to_string().contains("explicit drop"));
+}
+
+#[test]
+fn reports_range_loop_as_a_typed_neutral_contract_gap() {
+    let mut verb = verb_with_signature();
+    let span = SourceSpan::new(40, 72);
+    verb.body = Block {
+        statements: vec![Stmt::ForRange {
+            binding: ForBinding {
+                role: Role::Erg,
+                name: "index".to_owned(),
+                ty: Some("u32".to_owned()),
+                span,
+            },
+            start: Expr::Integer { value: "0".to_owned(), suffix: Some("u32".to_owned()), span },
+            end: Expr::Integer { value: "4".to_owned(), suffix: Some("u32".to_owned()), span },
+            body: Block { statements: Vec::new(), span },
+            span,
+        }],
+        span,
+    };
+
+    let error = lower_verb_body(&verb, &TestBodyProvider)
+        .expect_err("range loops must not bypass the neutral lowering contract");
+    let BackendContractError::Unsupported(operation) = error else {
+        panic!("expected a typed unsupported-operation diagnostic");
+    };
+    assert_eq!(operation.operation, "body-lowering");
+    assert_eq!(operation.span, span);
+    assert_eq!(operation.context.backend, "neutral-contract");
+    assert_eq!(operation.context.target, "semantic-model");
+    assert!(operation.reason.contains("range loop"));
 }
