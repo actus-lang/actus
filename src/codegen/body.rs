@@ -327,7 +327,17 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         let Place::Binding { name, span: target_span } = target else {
-            return Err(unsupported(span, "compound assignment target"));
+            let Place::Field { object, field, .. } = target else {
+                return Err(unsupported(span, "compound assignment target"));
+            };
+            return self.provider.compound_assign_field(
+                &object.to_expr(),
+                field,
+                operator,
+                value,
+                span,
+                instructions,
+            );
         };
         let current = self.provider.lower_expression(
             &Place::Binding { name: name.clone(), span: *target_span }.to_expr(),

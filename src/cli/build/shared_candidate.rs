@@ -137,7 +137,7 @@ fn scalar_statement(
             scalar_place(target) && scalar_expression(value, returns_value)
         }
         Stmt::CompoundAssignment { target, value, .. } if allow_assignment => {
-            scalar_binding_place(target) && scalar_expression(value, returns_value)
+            scalar_place(target) && scalar_expression(value, returns_value)
         }
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
         Stmt::Expression { expression, .. } => {
@@ -183,10 +183,6 @@ fn scalar_return_block(
 
 fn scalar_place(place: &Place) -> bool {
     matches!(place, Place::Binding { .. } | Place::Field { .. })
-}
-
-fn scalar_binding_place(place: &Place) -> bool {
-    matches!(place, Place::Binding { .. })
 }
 
 fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {

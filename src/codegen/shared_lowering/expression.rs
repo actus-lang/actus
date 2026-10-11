@@ -4,6 +4,7 @@ use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
 mod aggregate;
 mod arithmetic;
+mod calls;
 mod case;
 mod cast;
 mod cleanup;
@@ -286,7 +287,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             }
             Expr::Unary { .. } => self.lower_unary(expression, instructions),
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
-            Expr::Call { .. } => self.lower_call(expression, instructions),
+            Expr::Call { .. } => calls::lower_call(self, expression, instructions),
             Expr::MethodCall { .. } => self.lower_method_call(expression, instructions),
             Expr::StructLit { .. } | Expr::FieldAccess { .. } => {
                 aggregate::lower_aggregate_expression(self, expression, instructions)
@@ -353,6 +354,26 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         aggregate::lower_field_assignment(self, object, field, value, span, instructions)
+    }
+
+    fn compound_assign_field(
+        &mut self,
+        object: &Expr,
+        field: &str,
+        operator: crate::ast::CompoundAssignmentOp,
+        value: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        aggregate::lower_field_compound_assignment(
+            self,
+            object,
+            field,
+            operator,
+            value,
+            span,
+            instructions,
+        )
     }
 }
 
@@ -458,41 +479,5 @@ impl SharedExpressionProvider<'_> {
             span,
         });
         Ok(result)
-    }
-
-    fn lower_call(
-        &mut self,
-        expression: &Expr,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<BackendValueId, BackendContractError> {
-        let Expr::Call { callee, arguments, span } = expression else {
-            return Err(unsupported(expression_span(expression), "call expression expected"));
-        };
-        if let Some(value) = layout::lower_intrinsic(self, callee, *span, instructions)? {
-            return Ok(value);
-        }
-        let arguments = arguments
-            .iter()
-            .map(|argument| self.lower_expression(&argument.expression, instructions))
-            .collect::<Result<Vec<_>, _>>()?;
-        let result_type = self.return_types.get(callee).copied().flatten();
-        let result = result_type.map(|_| self.allocate());
-        if let (Some(result), Some(result_type)) = (result, result_type) {
-            self.remember_value(result, result_type);
-            if let Some(payload_types) = self.return_payload_types.get(callee) {
-                for (discriminant, payload_type) in payload_types.iter().enumerate() {
-                    if let Some(payload_type) = payload_type {
-                        self.remember_enum_payload(result, discriminant as u32, *payload_type);
-                    }
-                }
-            }
-        }
-        instructions.push(BackendInstruction::Call {
-            callee: self.callee_for(callee, *span)?,
-            arguments,
-            result,
-            span: *span,
-        });
-        result.ok_or_else(|| unsupported(*span, "unit call cannot produce a value"))
     }
 }

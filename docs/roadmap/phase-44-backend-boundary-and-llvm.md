@@ -1002,6 +1002,14 @@ either backend emits code. Cranelift and LLVM execute the same `Counter.value`
 assignment fixture and return 42 through the CLI. Compound field assignment,
 nested aggregate field reads, and generic aggregate values remain open.
 
+The compound field-assignment slice now reuses the same neutral contract as
+ordinary field assignment: `AggregateFieldLoad`, one checked integer binary
+operation, and `AggregateFieldStore`. The shared regression verifies the
+load-operation-store order, while the Cranelift and LLVM CLI fixtures execute
+`counter.value += 1` and return 42. Compound assignment remains limited to
+scalar and pointer fields; nested aggregate values, generic aggregate values,
+and branch-merge mutation remain open.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

@@ -176,6 +176,38 @@ fn lowers_scalar_aggregate_field_assignment_into_neutral_store() {
 }
 
 #[test]
+fn lowers_scalar_aggregate_field_compound_assignment_into_load_binary_store() {
+    let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value += 1; return counter.value; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "aggregate field compound fixture should lex: {errors:?}");
+    let program =
+        actus::parser::parse(tokens).expect("aggregate field compound fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("aggregate field compound assignment should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(
+        instructions.iter().any(|instruction| matches!(
+            instruction,
+            BackendInstruction::AggregateFieldLoad { .. }
+        ))
+    );
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+    )));
+    assert!(
+        instructions.iter().any(|instruction| matches!(
+            instruction,
+            BackendInstruction::AggregateFieldStore { .. }
+        ))
+    );
+}
+
+#[test]
 fn lowers_explicit_scalar_drop_without_backend_cleanup() {
     let source = "verb main() -> Int { erg value = 41; drop(value); return 42; }";
     let (tokens, errors) = actus::lexer::scan(source);

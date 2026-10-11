@@ -3,7 +3,7 @@ use super::{
     BackendBlock, BackendContractError, BackendFailure, BackendInstruction, BackendIntegerBinaryOp,
     BackendValueId, SymbolIdentity,
 };
-use crate::ast::Expr;
+use crate::ast::{CompoundAssignmentOp, Expr};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
@@ -92,6 +92,18 @@ pub trait BackendExpressionProvider {
         _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         Err(unsupported(span, "aggregate field assignment"))
+    }
+
+    fn compound_assign_field(
+        &mut self,
+        _object: &Expr,
+        _field: &str,
+        _operator: CompoundAssignmentOp,
+        _value: &Expr,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "aggregate field compound assignment"))
     }
 
     fn lower_integer_binary(
