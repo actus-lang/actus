@@ -360,6 +360,7 @@ fn rejects_zero_or_misaligned_memory_copy_extents() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::MemoryCopy {
                 destination: BackendValueId(0),
@@ -378,6 +379,7 @@ fn rejects_aggregate_field_loads_outside_declared_layout() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::AggregateFieldLoad {
                 result: BackendValueId(0),
@@ -441,6 +443,7 @@ fn accepts_niche_pointer_payload_without_inline_enum_storage() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail { failure, span: SourceSpan::new(0, 1) }],
         }],
@@ -476,7 +479,11 @@ fn rejects_direct_aggregate_descriptor_for_a_scalar() {
             passing: BackendReturnMode::DirectAggregate { abi },
         },
         entry: BackendBlockId(0),
-        blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
         cleanup: Vec::new(),
     };
     assert_eq!(function.validate(), Err(BackendContractError::DirectAggregateTypeMismatch));
@@ -491,7 +498,11 @@ fn rejects_zero_width_values_and_invalid_parameter_aggregates() {
             ty: BackendValueType::Integer { signed: false, width: 0 },
             passing: BackendPassingMode::Direct,
         }],
-        vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
     );
     assert_eq!(zero_width.validate(), Err(BackendContractError::InvalidValueType));
 
@@ -502,7 +513,11 @@ fn rejects_zero_width_values_and_invalid_parameter_aggregates() {
             ty: BackendValueType::Aggregate { layout: BackendLayout { size: 12, alignment: 8 } },
             passing: BackendPassingMode::Direct,
         }],
-        vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
     );
     assert_eq!(
         invalid_aggregate.validate(),
@@ -524,6 +539,7 @@ fn preserves_role_metadata_without_a_machine_backend() {
             },
         }],
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: None,
@@ -546,7 +562,11 @@ fn rejects_role_and_passing_mode_mismatches() {
                 layout: BackendLayout { size: 8, alignment: 8 },
             },
         }],
-        vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
     );
     assert_eq!(function.validate(), Err(BackendContractError::RolePassingMismatch));
 }
@@ -576,6 +596,7 @@ fn preserves_capability_passing_modes_and_cleanup_actions() {
             },
         ],
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Cleanup {
                 action: LoweredCleanupInstruction::ResetArena {
@@ -607,6 +628,7 @@ fn rejects_runtime_cleanup_without_a_lowered_value_operand() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Cleanup {
                 action: LoweredCleanupInstruction::ResetArena {
@@ -627,6 +649,7 @@ fn rejects_cleanup_field_outside_the_declared_layout() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Cleanup {
                 action: LoweredCleanupInstruction::ResetArena {
@@ -659,6 +682,7 @@ fn rejects_cleanup_bridge_with_zero_enum_extent() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Cleanup {
                 action: LoweredCleanupInstruction::DropBinding {
@@ -687,6 +711,7 @@ fn rejects_field_address_bridge_without_a_field_sublayout() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Cleanup {
                 action: LoweredCleanupInstruction::DropBinding {
@@ -721,7 +746,11 @@ fn validates_aggregate_return_slots_without_a_backend() {
             passing: BackendReturnMode::ReturnSlot { layout },
         },
         entry: BackendBlockId(0),
-        blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
         cleanup: Vec::new(),
     };
     assert!(function.validate().is_ok());
@@ -740,7 +769,11 @@ fn rejects_return_slots_for_non_aggregate_values() {
             },
         },
         entry: BackendBlockId(0),
-        blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
         cleanup: Vec::new(),
     };
     assert_eq!(function.validate(), Err(BackendContractError::ReturnSlotTypeMismatch));
@@ -757,8 +790,16 @@ fn rejects_duplicate_parameters_and_blocks() {
     let function = unit_function(
         vec![parameter.clone(), parameter],
         vec![
-            BackendBlock { id: BackendBlockId(0), instructions: Vec::new() },
-            BackendBlock { id: BackendBlockId(1), instructions: Vec::new() },
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            },
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(1),
+                instructions: Vec::new(),
+            },
         ],
     );
     assert_eq!(function.validate(), Err(BackendContractError::DuplicateParameterName));
@@ -775,13 +816,18 @@ fn validates_control_flow_targets_without_a_machine_backend() {
         Vec::new(),
         vec![
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![BackendInstruction::Jump {
                     target: BackendBlockId(1),
                     span: SourceSpan::new(0, 1),
                 }],
             },
-            BackendBlock { id: BackendBlockId(1), instructions: Vec::new() },
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(1),
+                instructions: Vec::new(),
+            },
         ],
     );
     assert!(valid.validate().is_ok());
@@ -799,6 +845,7 @@ fn preserves_typed_failures_without_a_machine_backend() {
     let function = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail {
                 failure: BackendFailure {
@@ -816,6 +863,7 @@ fn preserves_typed_failures_without_a_machine_backend() {
     let invalid = unit_function(
         Vec::new(),
         vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail {
                 failure: BackendFailure {
@@ -1043,7 +1091,11 @@ fn validates_functions_and_external_symbols_as_one_neutral_module() {
         }],
         functions: vec![unit_function(
             Vec::new(),
-            vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
         )],
     };
     assert!(module.validate().is_ok());
@@ -1053,11 +1105,19 @@ fn validates_functions_and_external_symbols_as_one_neutral_module() {
         functions: vec![
             unit_function(
                 Vec::new(),
-                vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+                vec![BackendBlock {
+                    parameters: Vec::new(),
+                    id: BackendBlockId(0),
+                    instructions: Vec::new(),
+                }],
             ),
             unit_function(
                 Vec::new(),
-                vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+                vec![BackendBlock {
+                    parameters: Vec::new(),
+                    id: BackendBlockId(0),
+                    instructions: Vec::new(),
+                }],
             ),
         ],
     };

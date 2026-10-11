@@ -199,6 +199,7 @@ pub fn lower_semantic_cleanup(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendBlock {
     pub id: BackendBlockId,
+    pub parameters: Vec<BackendBlockParameter>,
     pub instructions: Vec<BackendInstruction>,
 }
 
@@ -335,6 +336,15 @@ fn validate_blocks(
     for block in blocks {
         if !ids.insert(block.id) {
             return Err(BackendContractError::DuplicateBlockId);
+        }
+        let mut parameter_values = BTreeSet::new();
+        for parameter in &block.parameters {
+            validate_value_type(parameter.ty)?;
+            if !parameter_values.insert(parameter.value) {
+                return Err(BackendContractError::InvalidBlockArguments(
+                    "block parameters contain a duplicate value identifier",
+                ));
+            }
         }
     }
     if !ids.contains(&entry) {

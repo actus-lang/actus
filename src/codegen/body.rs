@@ -133,14 +133,14 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     &mut instructions,
                 )?;
                 if branches_terminate {
-                    return Ok(BackendBlock { id, instructions });
+                    return Ok(BackendBlock { parameters: Vec::new(), id, instructions });
                 }
                 let continuation =
                     Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
                 let continuation_block =
                     self.lower_block(continuation_id, &continuation, fallthrough)?;
                 self.blocks.push(continuation_block);
-                return Ok(BackendBlock { id, instructions });
+                return Ok(BackendBlock { parameters: Vec::new(), id, instructions });
             }
             if let Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } = statement {
                 return self.lower_case_return(id, expression, *span, instructions);
@@ -165,7 +165,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 instructions.push(BackendInstruction::Jump { target, span });
             }
         }
-        BackendBlock { id, instructions }
+        BackendBlock { parameters: Vec::new(), id, instructions }
     }
 
     fn lower_nested_block_statement(
@@ -187,7 +187,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
         self.blocks.push(nested_block);
         self.blocks.push(continuation_block);
-        Ok(BackendBlock { id, instructions })
+        Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
     fn lower_loop_statement(
@@ -204,6 +204,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let continuation_id = self.allocate_block();
         instructions.push(BackendInstruction::Jump { target: header_id, span: nested.span });
         let header = BackendBlock {
+            parameters: Vec::new(),
             id: header_id,
             instructions: vec![BackendInstruction::Jump { target: body_id, span: nested.span }],
         };
@@ -220,7 +221,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(header);
         self.blocks.push(body);
         self.blocks.push(continuation_block);
-        Ok(BackendBlock { id, instructions })
+        Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
     fn lower_statement(
@@ -386,7 +387,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let then_terminates = terminates(then_block.instructions.last());
         self.blocks.push(then_block);
         let else_block = match else_branch {
-            None => BackendBlock { id: else_id, instructions: Vec::new() },
+            None => BackendBlock { parameters: Vec::new(), id: else_id, instructions: Vec::new() },
             Some(IfBranch::Block(block)) => {
                 self.lower_block(else_id, block, Some(continuation_id))?
             }

@@ -40,12 +40,17 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 if entry_instructions.is_none() {
                     entry_instructions = Some(std::mem::take(&mut instructions));
                 } else {
-                    self.blocks.push(BackendBlock { id: current_id, instructions });
+                    self.blocks.push(BackendBlock {
+                        parameters: Vec::new(),
+                        id: current_id,
+                        instructions,
+                    });
                     instructions = Vec::new();
                 }
                 current_id = following_id;
             } else {
                 self.blocks.push(BackendBlock {
+                    parameters: Vec::new(),
                     id: else_block,
                     instructions: vec![BackendInstruction::Trap {
                         reason: "non-exhaustive enum case".to_owned(),
@@ -77,10 +82,14 @@ fn finish_case_blocks<P: BackendExpressionProvider>(
     entry_instructions: Option<Vec<BackendInstruction>>,
 ) -> Result<BackendBlock, BackendContractError> {
     if let Some(entry_instructions) = entry_instructions {
-        lowering.blocks.push(BackendBlock { id: current, instructions });
-        return Ok(BackendBlock { id: entry, instructions: entry_instructions });
+        lowering.blocks.push(BackendBlock { parameters: Vec::new(), id: current, instructions });
+        return Ok(BackendBlock {
+            parameters: Vec::new(),
+            id: entry,
+            instructions: entry_instructions,
+        });
     }
-    Ok(BackendBlock { id: current, instructions })
+    Ok(BackendBlock { parameters: Vec::new(), id: current, instructions })
 }
 fn lower_case_branch_body<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,

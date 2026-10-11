@@ -196,7 +196,11 @@ fn emits_a_valid_unit_function_as_llvm_ir() {
                 passing: BackendReturnMode::Direct,
             },
             entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            blocks: vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
             cleanup: Vec::new(),
         }],
     };
@@ -222,6 +226,7 @@ fn emits_a_neutral_integer_constant_and_returns_it() {
             },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![
                     BackendInstruction::Constant {
@@ -273,6 +278,7 @@ fn emits_neutral_enum_discriminant_and_payload_extraction() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::EnumDiscriminant {
@@ -331,6 +337,7 @@ fn emits_neutral_enum_payload_binding_with_ownership_mode() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::EnumPayloadBinding {
@@ -390,6 +397,7 @@ fn emits_neutral_result_constructor_with_payload() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Constant {
@@ -471,6 +479,7 @@ fn emits_signed_division_overflow_guard_for_runtime_operands() {
             },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![
                     BackendInstruction::TrapIfZero {
@@ -532,6 +541,7 @@ fn emits_scalar_parameter_return_and_direct_call() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -550,6 +560,7 @@ fn emits_scalar_parameter_return_and_direct_call() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -608,6 +619,7 @@ fn declares_and_calls_a_neutral_external_runtime_symbol() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -649,6 +661,7 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
         entry: BackendBlockId(0),
         blocks: vec![
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![BackendInstruction::Branch {
                     condition: BackendValueId(0),
@@ -658,6 +671,7 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
                 }],
             },
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(1),
                 instructions: vec![BackendInstruction::Jump {
                     target: BackendBlockId(3),
@@ -665,6 +679,7 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
                 }],
             },
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(2),
                 instructions: vec![BackendInstruction::Trap {
                     reason: "false branch".to_owned(),
@@ -672,6 +687,7 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
                 }],
             },
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(3),
                 instructions: vec![BackendInstruction::Return {
                     value: None,
@@ -701,6 +717,7 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Cleanup {
@@ -741,6 +758,7 @@ fn emits_region_runtime_cleanup_bridge_call() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Cleanup {
@@ -793,6 +811,7 @@ fn emits_target_width_enum_runtime_cleanup_bridge_call() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Cleanup {
@@ -848,6 +867,7 @@ fn lowers_pointer_memory_copy_with_declared_extent_and_alignment() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::MemoryCopy {
@@ -898,6 +918,7 @@ fn lowers_regular_enum_failure_with_discriminant_and_integer_payload() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail {
                 failure: BackendFailure {
@@ -934,6 +955,7 @@ fn lowers_niche_option_failure_to_a_null_pointer() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail {
                 failure: BackendFailure {
@@ -974,7 +996,11 @@ fn rejects_floating_point_types_before_llvm_lowering() {
                 passing: BackendReturnMode::Direct,
             },
             entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            blocks: vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
             cleanup: Vec::new(),
         }],
     };
@@ -1033,6 +1059,7 @@ fn emits_fixed_layout_aggregate_parameter_and_return() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -1065,7 +1092,11 @@ fn emits_non_direct_aggregate_parameter_as_aligned_pointer() {
             passing: BackendReturnMode::Direct,
         },
         entry: BackendBlockId(0),
-        blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
         cleanup: Vec::new(),
     };
     let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
@@ -1097,6 +1128,7 @@ fn lowers_aggregate_return_slot_between_caller_and_callee() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -1115,6 +1147,7 @@ fn lowers_aggregate_return_slot_between_caller_and_callee() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -1153,7 +1186,11 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
                 passing: BackendReturnMode::Direct,
             },
             entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            blocks: vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
             cleanup: Vec::new(),
         }],
     };
@@ -1186,7 +1223,11 @@ fn emits_an_arm32_thumb_object_for_the_cortex_m_profile() {
                 passing: BackendReturnMode::Direct,
             },
             entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            blocks: vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
             cleanup: Vec::new(),
         }],
     };
@@ -1226,6 +1267,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -1244,6 +1286,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -1289,6 +1332,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -1314,6 +1358,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -1437,7 +1482,11 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
                 passing: BackendReturnMode::Direct,
             },
             entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            blocks: vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
             cleanup: Vec::new(),
         }],
     };
@@ -1573,6 +1622,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
             },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![
                     BackendInstruction::Call {
@@ -1673,7 +1723,11 @@ fn links_and_runs_a_host_object_through_the_shared_linker() {
                 passing: BackendReturnMode::Direct,
             },
             entry: BackendBlockId(0),
-            blocks: vec![BackendBlock { id: BackendBlockId(0), instructions: Vec::new() }],
+            blocks: vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
             cleanup: Vec::new(),
         }],
     };
@@ -1722,6 +1776,7 @@ fn compares_llvm_and_cranelift_on_niche_option_none_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail {
                 failure: BackendFailure {
@@ -1818,6 +1873,7 @@ fn compares_llvm_and_cranelift_on_niche_option_some_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Fail {
                 failure: BackendFailure {
@@ -1920,6 +1976,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -1938,6 +1995,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -1970,6 +2028,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
         entry: BackendBlockId(0),
         blocks: vec![
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![BackendInstruction::Branch {
                     condition: BackendValueId(0),
@@ -1979,6 +2038,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
                 }],
             },
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(1),
                 instructions: vec![BackendInstruction::Jump {
                     target: BackendBlockId(3),
@@ -1986,6 +2046,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
                 }],
             },
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(2),
                 instructions: vec![BackendInstruction::Trap {
                     reason: "false parity branch".to_owned(),
@@ -1993,6 +2054,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
                 }],
             },
             BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(3),
                 instructions: vec![BackendInstruction::Return {
                     value: None,
@@ -2118,6 +2180,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
             },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![
                     BackendInstruction::Cleanup {
@@ -2232,6 +2295,7 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![BackendInstruction::Return {
                 value: Some(BackendValueId(0)),
@@ -2255,6 +2319,7 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -2357,6 +2422,7 @@ fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Constant {
@@ -2394,6 +2460,7 @@ fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
         },
         entry: BackendBlockId(0),
         blocks: vec![BackendBlock {
+            parameters: Vec::new(),
             id: BackendBlockId(0),
             instructions: vec![
                 BackendInstruction::Call {
@@ -2538,6 +2605,7 @@ fn compares_llvm_and_cranelift_on_the_same_indirect_aggregate_copy_fixture() {
             },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![
                     BackendInstruction::MemoryCopy {
@@ -2645,6 +2713,7 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
             },
             entry: BackendBlockId(0),
             blocks: vec![BackendBlock {
+                parameters: Vec::new(),
                 id: BackendBlockId(0),
                 instructions: vec![BackendInstruction::Fail {
                     failure: BackendFailure {
