@@ -9,8 +9,8 @@ use super::verb_body::{specialize_block, specialize_param, specialize_return_typ
 
 /// Materializes generic verbs for concrete type applications discovered by the
 /// semantic pass. The resulting declarations have no generic parameters and
-/// can therefore enter the ordinary Cranelift declaration pipeline.
-pub(in crate::codegen) fn specialize_program(
+/// can therefore enter a backend declaration pipeline that consumes specialized programs.
+pub(crate) fn specialize_program(
     program: &Program,
     instances: &[GenericInstance],
 ) -> Result<Program, BackendEmitError> {

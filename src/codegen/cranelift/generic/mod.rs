@@ -10,5 +10,5 @@ pub(super) use definitions::{
 };
 pub(super) use layout::GenericLayoutRegistry;
 pub(crate) use verbs::expand_generic_instances;
-pub(super) use verbs::specialize_program;
+pub(crate) use verbs::specialize_program;
 pub(crate) use verbs::specialized_generic_name;

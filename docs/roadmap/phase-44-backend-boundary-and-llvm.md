@@ -729,6 +729,16 @@ hosted regressions `cranelift_backend_builds_and_runs_scalar_imported_module_thr
 and `cranelift_backend_builds_and_runs_scalar_if_through_shared_lowering` build
 and execute imported-call and branch-local scalar programs.
 
+The LLVM CLI now follows the existing generic-instance discovery and
+specialization pipeline before neutral lowering, applies target filtering to
+each object unit, and preserves the object-plan generic type support needed by
+specialized declarations. The hosted regression
+`llvm_backend_builds_and_runs_a_scalar_const_generic` builds and executes a
+scalar const-generic call through LLVM. This evidence covers specialization
+of the declaration and call symbol; generic compile-time expression lowering,
+aggregate specialization, ownership-bearing generic values, cleanup bridges,
+and cross-backend parity remain open work.
+
 The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory
 copy lowering into `memory.rs`, and LLVM IR printing/module verification into

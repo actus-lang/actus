@@ -8,10 +8,13 @@ pub(super) fn emit_objects_llvm(
     symbol: &str,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let object_plan = plan.object_plan().map_err(|error| BackendEmitError(error.to_string()))?;
+    let (generic_types, generic_instances) = llvm_generic_inputs(plan, configuration)?;
+    let object_plan = plan
+        .object_plan_with_generic_types(&generic_types)
+        .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = llvm_module_bindings(&object_plan)?;
     let root = &object_plan.units()[0];
-    let root_program = crate::codegen::normalize_program(root.program());
+    let root_program = specialize_llvm_program(root.program(), configuration, &generic_instances)?;
     let root_module = crate::codegen::lower_program_to_backend_module(
         root.namespace().symbol_prefix(),
         &root_program,
@@ -24,7 +27,7 @@ pub(super) fn emit_objects_llvm(
     })?;
     let mut objects = vec![llvm_object("root", &root_module, configuration.target())?];
     for unit in &object_plan.units()[1..] {
-        let program = crate::codegen::normalize_program(unit.program());
+        let program = specialize_llvm_program(unit.program(), configuration, &generic_instances)?;
         let module = crate::codegen::lower_program_to_backend_module(
             unit.namespace().symbol_prefix(),
             &program,
@@ -46,6 +49,53 @@ pub(super) fn emit_objects_llvm(
         )?);
     }
     Ok(objects)
+}
+
+#[cfg(feature = "cranelift")]
+fn llvm_generic_inputs(
+    plan: &ModuleCompilationPlan,
+    configuration: &CompilerConfiguration,
+) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
+    let targeted_caller = crate::codegen::normalize_program(
+        &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
+    );
+    let generic_instances = crate::semantic::analyze(&targeted_caller)
+        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
+        .generic_instances;
+    let generic_instances =
+        crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
+    let generic_types =
+        generic_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
+    Ok((generic_types, generic_instances))
+}
+
+#[cfg(not(feature = "cranelift"))]
+fn llvm_generic_inputs(
+    _plan: &ModuleCompilationPlan,
+    _configuration: &CompilerConfiguration,
+) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
+    Ok((Vec::new(), Vec::new()))
+}
+
+#[cfg(feature = "cranelift")]
+fn specialize_llvm_program(
+    program: &crate::ast::Program,
+    configuration: &CompilerConfiguration,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<crate::ast::Program, BackendEmitError> {
+    let targeted = crate::semantic::filter_program_for_target(program, configuration.target());
+    let normalized = crate::codegen::normalize_program(&targeted);
+    crate::codegen::specialize_program(&normalized, generic_instances)
+}
+
+#[cfg(not(feature = "cranelift"))]
+fn specialize_llvm_program(
+    program: &crate::ast::Program,
+    configuration: &CompilerConfiguration,
+    _generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<crate::ast::Program, BackendEmitError> {
+    let targeted = crate::semantic::filter_program_for_target(program, configuration.target());
+    Ok(crate::codegen::normalize_program(&targeted))
 }
 
 fn llvm_object(

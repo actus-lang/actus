@@ -137,6 +137,42 @@ fn llvm_backend_builds_and_runs_scalar_imported_module() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(all(unix, feature = "llvm", feature = "cranelift"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_scalar_const_generic() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-generic-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create LLVM generic fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-generic-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM generic fixture manifest");
+    fs::write(
+        &input,
+        "verb read_capacity[N: Usize]() -> Int { return 4; } verb main() -> Int { return read_capacity[4](); }\n",
+    )
+    .expect("write LLVM generic fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM generic fixture");
+    assert_eq!(status.code(), Some(4));
+    let _ = fs::remove_dir_all(root);
+}
+
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
 fn cranelift_backend_builds_and_runs_scalar_imported_module_through_shared_lowering() {

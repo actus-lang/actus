@@ -55,6 +55,8 @@ pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind
 #[cfg(feature = "cranelift")]
 pub(crate) use cranelift::generic::expand_generic_instances;
 #[cfg(feature = "cranelift")]
+pub(crate) use cranelift::generic::specialize_program;
+#[cfg(feature = "cranelift")]
 pub(crate) use cranelift::generic::specialized_generic_name;
 #[cfg(feature = "cranelift")]
 pub(crate) use cranelift::native::reachable_call_names;
