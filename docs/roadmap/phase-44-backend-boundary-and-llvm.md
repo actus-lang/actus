@@ -756,9 +756,11 @@ return slot; the backend regressions
 `cranelift_consumes_scalar_result_case_from_shared_lowering` and
 `cranelift_emits_scalar_result_constructor_to_return_slot` cover this
 boundary. Shared case lowering keeps payload extraction inside the target
-branch block before its terminator. Enum construction, aggregate and Region
-payload execution, unsupported call-result metadata, and complete CLI
-execution remain open.
+branch block before its terminator. Cranelift also emits Region payload
+construction by bounded memory copy into the enum return slot and exposes
+Region case payloads as bounded payload pointers. Full aggregate runtime and
+cleanup parity, unsupported call-result metadata, and complete CLI execution
+remain open.
 
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime

@@ -78,6 +78,40 @@ fn cranelift_emits_scalar_result_constructor_to_return_slot() {
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
 }
 
+#[cfg(feature = "cranelift")]
+#[test]
+fn cranelift_emits_region_result_constructor_to_return_slot() {
+    let source = "verb wrap(dat region: Region[u32]) -> Result[Region[u32], Int] { return Result[Region[u32], Int].Ok(region); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Cranelift Region Result fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("Cranelift Region Result fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("wrap"))
+        .expect("Region Result constructor should lower through the shared contract");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should emit a Region Result constructor");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("wrap")));
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn cranelift_consumes_region_result_case_from_shared_lowering() {
+    let source = "verb inspect(dat result: Result[Region[u32], Int]) -> Int { return case dat result { Result.Ok(value) => 0, Result.Err(error) => error, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Cranelift Region case fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("Cranelift Region case fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("inspect"))
+        .expect("Region Result case should lower through the shared contract");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should consume a Region Result case");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
+}
+
 #[test]
 fn emits_a_valid_unit_function_as_llvm_ir() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "main").expect("valid symbol");
