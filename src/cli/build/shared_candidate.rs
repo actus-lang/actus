@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Block, DispatchMode, Expr, IfBranch, Program, Role, Stmt};
+use crate::ast::{BinaryOp, Block, DispatchMode, Expr, IfBranch, Place, Program, Role, Stmt};
 use std::collections::BTreeMap;
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
@@ -20,7 +20,7 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
             verb.generic_parameters.is_empty()
                 && verb.params.iter().all(scalar_parameter)
                 && verb.return_type.as_ref().is_none_or(|return_type| scalar_type(&return_type.ty))
-                && scalar_block(&verb.body, &returns_value)
+                && scalar_block(&verb.body, &returns_value, true)
         }
         crate::ast::TopLevelDecl::ExternalVerb(verb) => {
             verb.generic_parameters.is_empty()
@@ -45,13 +45,30 @@ fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
         )
 }
 
-fn scalar_block(block: &Block, returns_value: &BTreeMap<String, bool>) -> bool {
-    block.statements.iter().all(|statement| scalar_statement(statement, returns_value))
+fn scalar_block(
+    block: &Block,
+    returns_value: &BTreeMap<String, bool>,
+    allow_assignment: bool,
+) -> bool {
+    block
+        .statements
+        .iter()
+        .all(|statement| scalar_statement(statement, returns_value, allow_assignment))
 }
 
-fn scalar_statement(statement: &Stmt, returns_value: &BTreeMap<String, bool>) -> bool {
+fn scalar_statement(
+    statement: &Stmt,
+    returns_value: &BTreeMap<String, bool>,
+    allow_assignment: bool,
+) -> bool {
     match statement {
         Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, returns_value),
+        Stmt::Assignment { target, value, .. } if allow_assignment => {
+            scalar_place(target) && scalar_expression(value, returns_value)
+        }
+        Stmt::CompoundAssignment { target, value, .. } if allow_assignment => {
+            scalar_place(target) && scalar_expression(value, returns_value)
+        }
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
         Stmt::Expression { expression, .. } => {
             matches!(expression, Expr::Call { .. })
@@ -69,19 +86,23 @@ fn scalar_statement(statement: &Stmt, returns_value: &BTreeMap<String, bool>) ->
             value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
         }
         Stmt::Loop(_) => false,
-        Stmt::Block(block) => scalar_block(block, returns_value),
+        Stmt::Block(block) => scalar_block(block, returns_value, true),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::ForRange { .. } | Stmt::ForArray { .. } | Stmt::Drop { .. } => false,
     }
 }
 
 fn scalar_return_block(block: &Block, returns_value: &BTreeMap<String, bool>) -> bool {
-    scalar_block(block, returns_value)
+    scalar_block(block, returns_value, false)
         && matches!(
             block.statements.last(),
             Some(Stmt::Return { value, .. })
                 if value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
         )
+}
+
+fn scalar_place(place: &Place) -> bool {
+    matches!(place, Place::Binding { .. })
 }
 
 fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
@@ -141,6 +162,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("scalar fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_scalar_assignment_in_the_function_scope() {
+        let source = "verb main() -> Int { erg value = 40; value += 2; return value; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("assignment fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 

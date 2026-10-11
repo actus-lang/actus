@@ -730,7 +730,8 @@ it does not yet prove complete CLI routing for all language features.
 The Cranelift CLI now uses the same shared route for the explicitly eligible
 non-generic scalar slice across the root unit and imported module units. The
 slice includes straight-line scalar expressions, direct-return branch-local
-`if/else` control flow, and calls to declared scalar verbs or external verbs;
+`if/else` control flow, same-scope scalar reassignment and compound assignment,
+and calls to declared scalar verbs or external verbs;
 imported verb bindings resolve to their namespaced
 symbols, and local declarations retain precedence. Target-annotated
 declarations are filtered before eligibility and lowering. Programs outside
