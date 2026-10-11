@@ -713,6 +713,15 @@ This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.
 
+An exploratory LLVM CLI build of the existing aggregate Region lifecycle
+fixture reached the shared signature boundary and was rejected with the typed
+diagnostic `backend llvm does not support semantic-signature ... no neutral
+layout is registered for Result`. The fixture was not accepted as evidence:
+supporting `Region[Array[...]]` through LLVM requires a complete neutral generic
+`Result` enum contract, including its layout, constructors, case/failure
+lowering, return ABI, and runtime bridge compatibility. A partial layout entry
+must not be used as a workaround.
+
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
 integer casts as a checked `IntegerCast` instruction carrying both source and
