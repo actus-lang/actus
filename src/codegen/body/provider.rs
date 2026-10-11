@@ -83,6 +83,17 @@ pub trait BackendExpressionProvider {
         Err(unsupported(span, "assignment"))
     }
 
+    fn assign_field(
+        &mut self,
+        _object: &Expr,
+        _field: &str,
+        _value: &Expr,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "aggregate field assignment"))
+    }
+
     fn lower_integer_binary(
         &mut self,
         _operation: BackendIntegerBinaryOp,

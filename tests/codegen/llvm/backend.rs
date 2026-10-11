@@ -93,6 +93,27 @@ fn both_backends_emit_scalar_aggregate_field_access() {
     }
 }
 
+#[test]
+fn both_backends_emit_scalar_aggregate_field_assignment() {
+    let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "aggregate field assignment should lex: {errors:?}");
+    let program = parse(tokens).expect("aggregate field assignment should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("aggregate field assignment should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should emit aggregate field assignment");
+    assert!(llvm_ir.contains("aggregate.field.load"));
+    #[cfg(feature = "cranelift")]
+    {
+        let target = actus::target::TargetSpec::host().expect("host target should parse");
+        let configuration = NativeBackendConfiguration::default();
+        let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+            .expect("Cranelift should emit aggregate field assignment");
+        let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+        assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+    }
+}
+
 #[cfg(feature = "cranelift")]
 #[test]
 fn cranelift_consumes_scalar_result_case_from_shared_lowering() {

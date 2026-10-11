@@ -104,7 +104,7 @@ pub(super) fn lower_field_access_expression(
         .layouts
         .layout_for(type_name)
         .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
-    let metadata = provider.layouts.field_for(type_name, field).ok_or_else(|| {
+    let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
     let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
@@ -121,6 +121,46 @@ pub(super) fn lower_field_access_expression(
         span,
     });
     Ok(result)
+}
+
+pub(super) fn lower_field_assignment(
+    provider: &mut SharedExpressionProvider<'_>,
+    object: &Expr,
+    field: &str,
+    value: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let base = provider.lower_expression(object, instructions)?;
+    let type_name = provider
+        .nominal_type(base)
+        .cloned()
+        .ok_or_else(|| unsupported(span, "aggregate field assignment has no nominal type"))?;
+    let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
+        unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
+    })?;
+    let value = provider.lower_expression(value, instructions)?;
+    let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+        .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?;
+    let value_ty = provider
+        .value_type(value)
+        .ok_or_else(|| unsupported(span, "aggregate field value type is unavailable"))?;
+    if value_ty != ty {
+        return Err(unsupported(span, "aggregate field assignment type mismatch"));
+    }
+    instructions.push(BackendInstruction::AggregateFieldStore {
+        base,
+        aggregate_layout: provider
+            .layouts
+            .layout_for(&type_name)
+            .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?,
+        offset: metadata.offset,
+        field_layout: metadata.layout,
+        value,
+        ty,
+        span,
+    });
+    Ok(())
 }
 
 pub(super) fn lower_struct_literal_expression(

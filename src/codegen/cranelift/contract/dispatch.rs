@@ -61,11 +61,10 @@ pub(super) fn lower_instruction(
         BackendInstruction::MemoryCopy { .. } => {
             super::lower_memory_copy(module, builder, instruction, values)
         }
-        BackendInstruction::AggregateConstruct { .. } => {
-            aggregate::lower_aggregate_construct(module, builder, instruction, values)
-        }
-        BackendInstruction::AggregateFieldLoad { .. } => {
-            aggregate::lower_aggregate_field_load(module, builder, instruction, values)
+        BackendInstruction::AggregateConstruct { .. }
+        | BackendInstruction::AggregateFieldLoad { .. }
+        | BackendInstruction::AggregateFieldStore { .. } => {
+            aggregate::lower_aggregate_instruction(module, builder, instruction, values)
         }
     }
 }

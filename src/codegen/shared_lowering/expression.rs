@@ -343,6 +343,17 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             .map_or_else(|| SymbolIdentity::new(self.namespace, SymbolKind::Verb, callee), Ok)
             .map_err(|error| unsupported(span, error.to_string()))
     }
+
+    fn assign_field(
+        &mut self,
+        object: &Expr,
+        field: &str,
+        value: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        aggregate::lower_field_assignment(self, object, field, value, span, instructions)
+    }
 }
 
 impl SharedExpressionProvider<'_> {

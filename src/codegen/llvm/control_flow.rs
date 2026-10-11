@@ -158,6 +158,9 @@ fn emit_non_scalar_instruction(
         | BackendInstruction::AggregateFieldLoad { .. } => {
             super::aggregates::emit_aggregate_instruction(context, builder, instruction, values)
         }
+        BackendInstruction::AggregateFieldStore { .. } => {
+            super::aggregates::emit_aggregate_field_store(context, builder, instruction, values)
+        }
         _ => unreachable!("scalar instruction was not dispatched"),
     }
 }

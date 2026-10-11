@@ -155,4 +155,13 @@ pub enum BackendInstruction {
         ty: BackendValueType,
         span: SourceSpan,
     },
+    AggregateFieldStore {
+        base: super::BackendValueId,
+        aggregate_layout: super::BackendLayout,
+        offset: u32,
+        field_layout: super::BackendLayout,
+        value: super::BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
 }

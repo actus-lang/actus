@@ -98,6 +98,30 @@ pub(super) fn emit_aggregate_field_load(
     Ok(false)
 }
 
+pub(super) fn emit_aggregate_field_store(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::AggregateFieldStore { base, offset, value, ty, .. } = instruction
+    else {
+        return Err(BackendEmitError("LLVM aggregate field store expected".to_owned()));
+    };
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM aggregate base {} is unavailable", base.0))
+    })?;
+    let value = values.get(value).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM aggregate field value {} is unavailable", value.0))
+    })?;
+    let address = field_address(context, builder, base, *offset)?;
+    if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
+    }
+    let _ = ty;
+    Ok(false)
+}
+
 fn field_address(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,

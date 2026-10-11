@@ -450,6 +450,38 @@ fn cranelift_backend_builds_and_runs_scalar_aggregate_field_access() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_scalar_aggregate_field_assignment() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-field-store-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }\n",
+    )
+    .expect("write Cranelift aggregate field assignment fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift aggregate field assignment fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
@@ -544,6 +576,38 @@ fn llvm_backend_builds_and_runs_scalar_aggregate_field_access() {
     assert_eq!(result, 0);
     let status =
         std::process::Command::new(&output).status().expect("run LLVM aggregate field fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_scalar_aggregate_field_assignment() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-field-store-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }\n",
+    )
+    .expect("write LLVM aggregate field assignment fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run LLVM aggregate field assignment fixture");
     assert_eq!(status.code(), Some(42));
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);

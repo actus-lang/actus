@@ -87,3 +87,66 @@ pub(super) fn lower_aggregate_field_load(
     values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), base, offset));
     Ok(())
 }
+
+pub(super) fn lower_aggregate_field_store(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::AggregateFieldStore { base, offset, value, ty, .. } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift aggregate field store expected".to_owned()));
+    };
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift aggregate base {} is unavailable", base.0))
+    })?;
+    let value = values.get(value).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift aggregate field value {} is unavailable", value.0))
+    })?;
+    let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
+        BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
+    })?;
+    if builder.func.dfg.value_type(value) != value_type {
+        return Err(BackendEmitError("Cranelift aggregate field store type mismatch".to_owned()));
+    }
+    let offset = i32::try_from(*offset)
+        .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
+    builder.ins().store(MemFlagsData::new(), value, base, offset);
+    Ok(())
+}
+
+pub(super) fn lower_aggregate_field_instruction(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::AggregateFieldLoad { .. } => {
+            lower_aggregate_field_load(module, builder, instruction, values)
+        }
+        BackendInstruction::AggregateFieldStore { .. } => {
+            lower_aggregate_field_store(module, builder, instruction, values)
+        }
+        _ => Err(BackendEmitError("Cranelift aggregate field instruction expected".to_owned())),
+    }
+}
+
+pub(super) fn lower_aggregate_instruction(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::AggregateConstruct { .. } => {
+            lower_aggregate_construct(module, builder, instruction, values)
+        }
+        BackendInstruction::AggregateFieldLoad { .. }
+        | BackendInstruction::AggregateFieldStore { .. } => {
+            lower_aggregate_field_instruction(module, builder, instruction, values)
+        }
+        _ => Err(BackendEmitError("Cranelift aggregate instruction expected".to_owned())),
+    }
+}
