@@ -453,4 +453,37 @@ mod tests {
                 })
         );
     }
+
+    #[test]
+    fn lowers_compile_time_integer_casts_as_typed_constants() {
+        let source = "verb main() -> u32 { return 4 as u32; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("cast fixture should parse");
+        let module =
+            super::super::lower_program_to_backend_module("actus_root", &program, None, None)
+                .expect("compile-time cast should lower through the shared pipeline");
+        assert!(matches!(
+            module.functions[0].blocks[0].instructions.as_slice(),
+            [
+                BackendInstruction::Constant {
+                    ty: BackendValueType::Integer { signed: false, width: 32 },
+                    ..
+                },
+                BackendInstruction::Return { value: Some(_), .. }
+            ]
+        ));
+    }
+
+    #[test]
+    fn rejects_runtime_integer_casts_at_the_shared_boundary() {
+        let source = "verb identity(erg value: Int) -> u32 { return value as u32; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "lexer errors: {errors:?}");
+        let program = parse(tokens).expect("runtime cast fixture should parse");
+        let error =
+            super::super::lower_program_to_backend_module("actus_root", &program, None, None)
+                .expect_err("runtime cast should remain outside this staged contract");
+        assert!(error.to_string().contains("runtime integer casts"));
+    }
 }

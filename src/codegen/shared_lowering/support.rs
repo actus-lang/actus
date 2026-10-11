@@ -1,4 +1,4 @@
-use crate::ast::Expr;
+use crate::ast::{Expr, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::super::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
@@ -8,6 +8,29 @@ pub(super) fn parse_integer(value: &str) -> Option<u64> {
         .strip_prefix("0x")
         .map(|hex| u64::from_str_radix(hex, 16).ok())
         .unwrap_or_else(|| value.parse().ok())
+}
+
+pub(super) fn scalar_integer_type(type_name: &TypeName) -> Option<(bool, u8)> {
+    match type_name.name.as_str() {
+        "Int" => Some((true, 32)),
+        "i8" => Some((true, 8)),
+        "i16" => Some((true, 16)),
+        "i32" => Some((true, 32)),
+        "i64" => Some((true, 64)),
+        "u8" => Some((false, 8)),
+        "u16" => Some((false, 16)),
+        "u32" => Some((false, 32)),
+        "u64" => Some((false, 64)),
+        _ => None,
+    }
+}
+
+pub(super) fn integer_value_fits(value: u64, signed: bool, width: u8) -> bool {
+    if signed {
+        width == 64 || value <= ((1u64 << (width - 1)) - 1)
+    } else {
+        width == 64 || value <= ((1u64 << width) - 1)
+    }
 }
 
 pub(super) fn expression_span(expression: &Expr) -> SourceSpan {

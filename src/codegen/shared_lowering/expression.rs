@@ -9,7 +9,9 @@ use super::super::{
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
     BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
 };
-use super::support::{expression_span, parse_integer, unsupported};
+use super::support::{
+    expression_span, integer_value_fits, parse_integer, scalar_integer_type, unsupported,
+};
 
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
@@ -301,6 +303,9 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 Ok(result)
             }
             Expr::Grouping { expression, .. } => self.lower_expression(expression, instructions),
+            Expr::Cast { expression, target, span } => {
+                self.lower_constant_cast(expression, target, *span, instructions)
+            }
             Expr::Unary { .. } => self.lower_unary(expression, instructions),
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
             Expr::Call { .. } => self.lower_call(expression, instructions),
@@ -337,6 +342,35 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
 }
 
 impl SharedExpressionProvider<'_> {
+    fn lower_constant_cast(
+        &mut self,
+        expression: &Expr,
+        target: &crate::ast::TypeName,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let Expr::Integer { value, .. } = expression else {
+            return Err(unsupported(span, "runtime integer casts are outside the shared contract"));
+        };
+        let Some((signed, width)) = scalar_integer_type(target) else {
+            return Err(unsupported(span, "cast target is not a supported scalar integer"));
+        };
+        let Some(value) = parse_integer(value) else {
+            return Err(unsupported(span, "cast source is not a valid integer literal"));
+        };
+        if !integer_value_fits(value, signed, width) {
+            return Err(unsupported(span, "constant integer cast overflows its target type"));
+        }
+        let result = self.allocate();
+        instructions.push(BackendInstruction::Constant {
+            result,
+            ty: BackendValueType::Integer { signed, width },
+            value,
+            span,
+        });
+        Ok(result)
+    }
+
     fn lower_unary(
         &mut self,
         expression: &Expr,

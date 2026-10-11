@@ -709,6 +709,14 @@ This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.
 
+The neutral lowering boundary now also materializes a compile-time integer
+cast as a typed constant when specialization has reduced the source to an
+integer literal and the target range is validated before emission. This
+enables the LLVM const-generic regression to execute `N as u32` after `N` is
+specialized. The Cranelift shared-candidate predicate intentionally excludes
+casts until the neutral contract defines checked overflow behavior; existing
+Cranelift runtime casts therefore remain on their established lowering path.
+
 The regression `shared_lowered_module_is_consumed_by_llvm_and_cranelift` now
 parses one scalar Actus source, lowers it once into `BackendModule`, and sends
 that same neutral module through both LLVM IR emission and Cranelift object

@@ -151,7 +151,7 @@ fn llvm_backend_builds_and_runs_a_scalar_const_generic() {
     .expect("write LLVM generic fixture manifest");
     fs::write(
         &input,
-        "verb read_capacity[N: Usize]() -> Int { return 4; } verb main() -> Int { return read_capacity[4](); }\n",
+        "verb read_capacity[N: Usize]() -> u32 { return N as u32; } verb main() -> u32 { return read_capacity[4](); }\n",
     )
     .expect("write LLVM generic fixture source");
 
