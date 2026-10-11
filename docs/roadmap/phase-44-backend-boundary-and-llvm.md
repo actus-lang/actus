@@ -687,7 +687,6 @@ parameters use the same value-rebinding model while nested branch mutation
 remains rejected until a merge contract exists. The negative regression
 `rejects_outer_scalar_assignment_without_a_branch_merge_contract` verifies that
 boundary explicitly. The LLVM CLI fixture
-the LLVM CLI fixture
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.
 The shared scalar contract now also lowers integer division and remainder with
@@ -709,13 +708,18 @@ This is incremental shared-pipeline evidence; it does not close the remaining
 aggregate, cleanup, runtime-bridge, generic, target, or cross-backend items in
 this gate.
 
-The neutral lowering boundary now also materializes a compile-time integer
-cast as a typed constant when specialization has reduced the source to an
-integer literal and the target range is validated before emission. This
-enables the LLVM const-generic regression to execute `N as u32` after `N` is
-specialized. The Cranelift shared-candidate predicate intentionally excludes
-casts until the neutral contract defines checked overflow behavior; existing
-Cranelift runtime casts therefore remain on their established lowering path.
+The neutral lowering boundary now materializes compile-time integer casts as
+typed constants after validating the target range. It also lowers runtime
+integer casts as a checked `IntegerCast` instruction carrying both source and
+target integer shapes. Cranelift and LLVM widen the source, validate signed or
+unsigned bounds, branch to a native integer-overflow trap on failure, and only
+then narrow to the target width. The neutral regression
+`lowers_runtime_integer_casts_with_checked_neutral_instruction`, the existing
+Cranelift execution regression `executes_checked_integer_casts`, and the LLVM
+regression `emits_checked_runtime_integer_cast_from_shared_contract` cover this
+contract. The LLVM const-generic regression still verifies `N as u32` after
+specialization. This is incremental shared-pipeline evidence; the complete
+backend-selection and CLI integration gate remains open.
 
 The regression `shared_lowered_module_is_consumed_by_llvm_and_cranelift` now
 parses one scalar Actus source, lowers it once into `BackendModule`, and sends

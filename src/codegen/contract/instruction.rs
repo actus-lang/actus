@@ -23,6 +23,13 @@ pub enum BackendInstruction {
         ty: BackendValueType,
         span: SourceSpan,
     },
+    IntegerCast {
+        result: super::BackendValueId,
+        source: super::BackendValueId,
+        source_type: BackendValueType,
+        target_type: BackendValueType,
+        span: SourceSpan,
+    },
     TrapIfZero {
         value: super::BackendValueId,
         reason: String,

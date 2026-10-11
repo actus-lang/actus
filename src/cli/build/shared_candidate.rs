@@ -90,6 +90,9 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
             scalar_expression(expression, returns_value)
         }
+        Expr::Cast { expression, target, .. } => {
+            scalar_type(target) && scalar_expression(expression, returns_value)
+        }
         Expr::Binary { left, operator, right, .. } => {
             matches!(
                 operator,

@@ -4,14 +4,14 @@ use crate::ast::{BinaryOp, Expr, UnaryOp, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 
+mod cast;
+
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
     BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
 };
-use super::support::{
-    expression_span, integer_value_fits, parse_integer, scalar_integer_type, unsupported,
-};
+use super::support::{expression_span, parse_integer, scalar_backend_type, unsupported};
 
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
@@ -21,6 +21,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
+    value_types: BTreeMap<BackendValueId, BackendValueType>,
     next_value: u32,
 }
 
@@ -39,6 +40,14 @@ impl<'a> SharedExpressionProvider<'a> {
             .enumerate()
             .map(|(index, parameter)| (parameter.name.clone(), BackendValueId(index as u32)))
             .collect::<BTreeMap<_, _>>();
+        let parameter_types = verb
+            .params
+            .iter()
+            .enumerate()
+            .filter_map(|(index, parameter)| {
+                scalar_backend_type(&parameter.ty).map(|ty| (BackendValueId(index as u32), ty))
+            })
+            .collect::<BTreeMap<_, _>>();
         Self {
             namespace,
             parameters: parameter_bindings,
@@ -47,6 +56,7 @@ impl<'a> SharedExpressionProvider<'a> {
             external_symbols,
             bindings,
             cleanup_plans,
+            value_types: parameter_types,
             next_value: verb.params.len() as u32,
         }
     }
@@ -140,6 +150,14 @@ impl<'a> SharedExpressionProvider<'a> {
 
     fn local_value(&self, name: &str) -> Option<BackendValueId> {
         self.locals.iter().rev().find_map(|scope| scope.get(name).copied())
+    }
+
+    fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
+        self.value_types.get(&value).copied()
+    }
+
+    fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
+        self.value_types.insert(value, ty);
     }
 }
 
@@ -255,6 +273,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             });
         }
         let result = self.allocate();
+        self.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
         instructions.push(BackendInstruction::IntegerBinary {
             result,
             operation,
@@ -290,6 +309,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                     value,
                     span: *span,
                 });
+                self.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
                 Ok(result)
             }
             Expr::BoolLiteral { value, span } => {
@@ -300,11 +320,16 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                     value: u64::from(*value),
                     span: *span,
                 });
+                self.remember_value(result, BackendValueType::Bool);
                 Ok(result)
             }
             Expr::Grouping { expression, .. } => self.lower_expression(expression, instructions),
             Expr::Cast { expression, target, span } => {
-                self.lower_constant_cast(expression, target, *span, instructions)
+                if matches!(expression.as_ref(), Expr::Integer { .. }) {
+                    self.lower_constant_cast(expression, target, *span, instructions)
+                } else {
+                    self.lower_runtime_cast(expression, target, *span, instructions)
+                }
             }
             Expr::Unary { .. } => self.lower_unary(expression, instructions),
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
@@ -342,35 +367,6 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
 }
 
 impl SharedExpressionProvider<'_> {
-    fn lower_constant_cast(
-        &mut self,
-        expression: &Expr,
-        target: &crate::ast::TypeName,
-        span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<BackendValueId, BackendContractError> {
-        let Expr::Integer { value, .. } = expression else {
-            return Err(unsupported(span, "runtime integer casts are outside the shared contract"));
-        };
-        let Some((signed, width)) = scalar_integer_type(target) else {
-            return Err(unsupported(span, "cast target is not a supported scalar integer"));
-        };
-        let Some(value) = parse_integer(value) else {
-            return Err(unsupported(span, "cast source is not a valid integer literal"));
-        };
-        if !integer_value_fits(value, signed, width) {
-            return Err(unsupported(span, "constant integer cast overflows its target type"));
-        }
-        let result = self.allocate();
-        instructions.push(BackendInstruction::Constant {
-            result,
-            ty: BackendValueType::Integer { signed, width },
-            value,
-            span,
-        });
-        Ok(result)
-    }
-
     fn lower_unary(
         &mut self,
         expression: &Expr,
@@ -386,6 +382,7 @@ impl SharedExpressionProvider<'_> {
             UnaryOp::BitwiseNot => BackendIntegerUnaryOp::BitwiseNot,
         };
         let result = self.allocate();
+        self.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
         instructions.push(BackendInstruction::IntegerUnary {
             result,
             operation,
@@ -453,6 +450,7 @@ impl SharedExpressionProvider<'_> {
             _ => return Err(unsupported(span, "comparison operator expected")),
         };
         let result = self.allocate();
+        self.remember_value(result, BackendValueType::Bool);
         instructions.push(BackendInstruction::IntegerCompare {
             result,
             operation,
@@ -478,6 +476,9 @@ impl SharedExpressionProvider<'_> {
             .collect::<Result<Vec<_>, _>>()?;
         let result_type = self.return_types.get(callee).copied().flatten();
         let result = result_type.map(|_| self.allocate());
+        if let (Some(result), Some(result_type)) = (result, result_type) {
+            self.remember_value(result, result_type);
+        }
         instructions.push(BackendInstruction::Call {
             callee: self.callee_for(callee, *span)?,
             arguments,

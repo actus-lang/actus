@@ -25,6 +25,11 @@ pub(super) fn scalar_integer_type(type_name: &TypeName) -> Option<(bool, u8)> {
     }
 }
 
+pub(super) fn scalar_backend_type(type_name: &TypeName) -> Option<super::super::BackendValueType> {
+    let (signed, width) = scalar_integer_type(type_name)?;
+    Some(super::super::BackendValueType::Integer { signed, width })
+}
+
 pub(super) fn integer_value_fits(value: u64, signed: bool, width: u8) -> bool {
     if signed {
         width == 64 || value <= ((1u64 << (width - 1)) - 1)

@@ -53,6 +53,103 @@ pub(super) fn lower_integer_binary(
     Ok(())
 }
 
+pub(super) fn lower_integer_cast(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::IntegerCast { result, source, source_type, target_type, .. } =
+        instruction
+    else {
+        return Err(BackendEmitError("Cranelift integer cast expected".to_owned()));
+    };
+    let source_value = values.get(source).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift cast source {} is unavailable", source.0))
+    })?;
+    let wide = widen_integer(builder, source_value, *source_type)?;
+    let valid = cast_validity(builder, wide, *source_type, *target_type)?;
+    let ok_block = builder.create_block();
+    let trap_block = builder.create_block();
+    builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
+    builder.switch_to_block(trap_block);
+    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    builder.seal_block(trap_block);
+    builder.switch_to_block(ok_block);
+    builder.seal_block(ok_block);
+    let target_ir = integer_ir_type(*target_type)?;
+    let converted =
+        if target_ir == types::I64 { wide } else { builder.ins().ireduce(target_ir, wide) };
+    values.insert(*result, converted);
+    Ok(())
+}
+
+fn widen_integer(
+    builder: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    ty: BackendValueType,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    let BackendValueType::Integer { signed, .. } = ty else {
+        return Err(BackendEmitError("integer cast source must be an integer".to_owned()));
+    };
+    Ok(if builder.func.dfg.value_type(value) == types::I64 {
+        value
+    } else if signed {
+        builder.ins().sextend(types::I64, value)
+    } else {
+        builder.ins().uextend(types::I64, value)
+    })
+}
+
+fn cast_validity(
+    builder: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    source: BackendValueType,
+    target: BackendValueType,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    let (
+        BackendValueType::Integer { signed: source_signed, .. },
+        BackendValueType::Integer { signed: target_signed, width: target_width },
+    ) = (source, target)
+    else {
+        return Err(BackendEmitError("integer cast types are invalid".to_owned()));
+    };
+    let zero = builder.ins().iconst(types::I64, 0);
+    let lower = if source_signed && !target_signed {
+        builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, value, zero)
+    } else {
+        builder.ins().iconst(types::I8, 1)
+    };
+    let maximum = if target_signed {
+        if target_width == 64 { i64::MAX } else { (1i64 << (target_width - 1)) - 1 }
+    } else if target_width == 64 {
+        i64::MAX
+    } else {
+        (1i64 << target_width) - 1
+    };
+    let limit = builder.ins().iconst(types::I64, maximum);
+    let upper = if !target_signed && target_width == 64 && !source_signed {
+        builder.ins().iconst(types::I8, 1)
+    } else {
+        let predicate = if source_signed {
+            IntCC::SignedLessThanOrEqual
+        } else {
+            IntCC::UnsignedLessThanOrEqual
+        };
+        builder.ins().icmp(predicate, value, limit)
+    };
+    Ok(builder.ins().band(lower, upper))
+}
+
+fn integer_ir_type(ty: BackendValueType) -> Result<types::Type, BackendEmitError> {
+    match ty {
+        BackendValueType::Integer { width: 8, .. } => Ok(types::I8),
+        BackendValueType::Integer { width: 16, .. } => Ok(types::I16),
+        BackendValueType::Integer { width: 32, .. } => Ok(types::I32),
+        BackendValueType::Integer { width: 64, .. } => Ok(types::I64),
+        _ => Err(BackendEmitError("integer cast target must be an integer".to_owned())),
+    }
+}
+
 pub(super) fn lower_trap_if_zero(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,

@@ -476,14 +476,24 @@ mod tests {
     }
 
     #[test]
-    fn rejects_runtime_integer_casts_at_the_shared_boundary() {
+    fn lowers_runtime_integer_casts_with_checked_neutral_instruction() {
         let source = "verb identity(erg value: Int) -> u32 { return value as u32; }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty(), "lexer errors: {errors:?}");
         let program = parse(tokens).expect("runtime cast fixture should parse");
-        let error =
+        let module =
             super::super::lower_program_to_backend_module("actus_root", &program, None, None)
-                .expect_err("runtime cast should remain outside this staged contract");
-        assert!(error.to_string().contains("runtime integer casts"));
+                .expect("runtime cast should lower through the shared contract");
+        assert!(matches!(
+            module.functions[0].blocks[0].instructions.as_slice(),
+            [
+                BackendInstruction::IntegerCast {
+                    source_type: BackendValueType::Integer { signed: true, width: 32 },
+                    target_type: BackendValueType::Integer { signed: false, width: 32 },
+                    ..
+                },
+                BackendInstruction::Return { value: Some(_), .. }
+            ]
+        ));
     }
 }

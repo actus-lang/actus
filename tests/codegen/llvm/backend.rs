@@ -107,6 +107,19 @@ fn emits_a_neutral_integer_constant_and_returns_it() {
 }
 
 #[test]
+fn emits_checked_runtime_integer_cast_from_shared_contract() {
+    let source = "verb identity(erg value: Int) -> u32 { return value as u32; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("runtime cast fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("runtime cast should lower through the shared contract");
+    let ir = emit_module(&module).expect("LLVM should emit checked runtime cast");
+    assert!(ir.contains("actus.cast.trap"));
+    assert!(ir.contains("trunc i64"));
+}
+
+#[test]
 fn emits_signed_division_overflow_guard_for_runtime_operands() {
     let integer = BackendValueType::Integer { signed: true, width: 32 };
     let symbol =

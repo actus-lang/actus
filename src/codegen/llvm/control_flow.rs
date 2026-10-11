@@ -12,6 +12,7 @@ use super::failures::emit_failure;
 use super::guards::{
     emit_trap_if_shift_count_out_of_range, emit_trap_if_signed_division_overflow, emit_trap_if_zero,
 };
+use super::integer_cast::emit_integer_cast;
 use super::integer_ops::{emit_integer_binary, emit_integer_compare, emit_integer_unary};
 use super::memory::emit_memory_copy;
 use super::returns::emit_return;
@@ -86,22 +87,12 @@ fn emit_instruction(
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
+    if let Some(result) =
+        emit_scalar_instruction(context, builder, declaration.value, instruction, values)
+    {
+        return result;
+    }
     match instruction {
-        BackendInstruction::Constant { result, ty, value, .. } => {
-            emit_constant(context, *result, *ty, *value, values)
-        }
-        BackendInstruction::IntegerBinary { .. } => {
-            emit_integer_binary(builder, instruction, values)
-        }
-        BackendInstruction::TrapIfZero { .. }
-        | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
-        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
-            emit_guard(context, builder, declaration.value, instruction, values)
-        }
-        BackendInstruction::IntegerCompare { .. } => {
-            emit_integer_compare(builder, instruction, values)
-        }
-        BackendInstruction::IntegerUnary { .. } => emit_integer_unary(builder, instruction, values),
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
             Ok(true)
@@ -132,7 +123,39 @@ fn emit_instruction(
         BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
         }
+        _ => unreachable!("scalar instruction was not dispatched"),
     }
+}
+
+fn emit_scalar_instruction(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: LLVMValueRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Option<Result<bool, BackendEmitError>> {
+    let result = match instruction {
+        BackendInstruction::Constant { result, ty, value, .. } => {
+            emit_constant(context, *result, *ty, *value, values)
+        }
+        BackendInstruction::IntegerBinary { .. } => {
+            emit_integer_binary(builder, instruction, values)
+        }
+        BackendInstruction::IntegerCast { .. } => {
+            emit_integer_cast(context, builder, function, instruction, values)
+        }
+        BackendInstruction::TrapIfZero { .. }
+        | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
+        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+            emit_guard(context, builder, function, instruction, values)
+        }
+        BackendInstruction::IntegerCompare { .. } => {
+            emit_integer_compare(builder, instruction, values)
+        }
+        BackendInstruction::IntegerUnary { .. } => emit_integer_unary(builder, instruction, values),
+        _ => return None,
+    };
+    Some(result)
 }
 
 fn emit_guard(

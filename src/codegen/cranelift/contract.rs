@@ -14,7 +14,7 @@ use super::aggregate::{
     lower_call,
 };
 use super::integer_ops::{
-    lower_integer_binary, lower_integer_compare, lower_integer_unary,
+    lower_integer_binary, lower_integer_cast, lower_integer_compare, lower_integer_unary,
     lower_trap_if_shift_count_out_of_range, lower_trap_if_signed_division_overflow,
     lower_trap_if_zero,
 };
@@ -247,6 +247,7 @@ fn lower_instruction(
         BackendInstruction::IntegerBinary { .. } => {
             lower_integer_binary(builder, instruction, values)
         }
+        BackendInstruction::IntegerCast { .. } => lower_integer_cast(builder, instruction, values),
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {

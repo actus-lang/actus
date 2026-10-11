@@ -7,6 +7,7 @@ mod declarations;
 mod emission;
 mod failures;
 mod guards;
+mod integer_cast;
 mod integer_ops;
 mod memory;
 mod module;
