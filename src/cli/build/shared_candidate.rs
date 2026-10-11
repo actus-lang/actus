@@ -39,9 +39,7 @@ fn scalar_statement(statement: &Stmt) -> bool {
     match statement {
         Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer),
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
-        Stmt::Expression { expression, .. } => {
-            matches!(expression, Expr::Call { .. }) && scalar_expression(expression)
-        }
+        Stmt::Expression { .. } => false,
         Stmt::If { .. } => false,
         Stmt::Return { value, .. } => value.as_ref().is_none_or(scalar_expression),
         Stmt::Loop(_) => false,
@@ -58,13 +56,24 @@ fn scalar_expression(expression: &Expr) -> bool {
             scalar_expression(expression)
         }
         Expr::Binary { left, operator, right, .. } => {
-            !matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr)
-                && scalar_expression(left)
+            matches!(
+                operator,
+                BinaryOp::Add
+                    | BinaryOp::Subtract
+                    | BinaryOp::Multiply
+                    | BinaryOp::BitwiseAnd
+                    | BinaryOp::BitwiseOr
+                    | BinaryOp::BitwiseXor
+                    | BinaryOp::LessThan
+                    | BinaryOp::LessEquals
+                    | BinaryOp::GreaterThan
+                    | BinaryOp::GreaterEquals
+                    | BinaryOp::Equals
+                    | BinaryOp::NotEquals
+            ) && scalar_expression(left)
                 && scalar_expression(right)
         }
-        Expr::Call { arguments, .. } => {
-            arguments.iter().all(|argument| scalar_expression(&argument.expression))
-        }
+        Expr::Call { .. } => false,
         _ => false,
     }
 }
@@ -86,7 +95,7 @@ mod tests {
 
     #[test]
     fn rejects_constructs_outside_the_scalar_contract_slice() {
-        let source = "verb main() -> Int { drop value; return 0; }";
+        let source = "verb main() -> Int { drop(value); return 0; }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("fixture should parse");
