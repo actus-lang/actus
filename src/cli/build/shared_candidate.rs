@@ -1,12 +1,26 @@
 use crate::ast::{BinaryOp, Block, DispatchMode, Expr, Program, Role, Stmt};
+use std::collections::BTreeMap;
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
+    let returns_value = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) => {
+                Some((verb.name.clone(), verb.return_type.is_some()))
+            }
+            crate::ast::TopLevelDecl::ExternalVerb(verb) => {
+                Some((verb.name.clone(), verb.return_type.is_some()))
+            }
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
             verb.generic_parameters.is_empty()
                 && verb.params.iter().all(scalar_parameter)
                 && verb.return_type.as_ref().is_none_or(|return_type| scalar_type(&return_type.ty))
-                && scalar_block(&verb.body)
+                && scalar_block(&verb.body, &returns_value)
         }
         crate::ast::TopLevelDecl::ExternalVerb(verb) => {
             verb.generic_parameters.is_empty()
@@ -31,29 +45,34 @@ fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
         )
 }
 
-fn scalar_block(block: &Block) -> bool {
-    block.statements.iter().all(scalar_statement)
+fn scalar_block(block: &Block, returns_value: &BTreeMap<String, bool>) -> bool {
+    block.statements.iter().all(|statement| scalar_statement(statement, returns_value))
 }
 
-fn scalar_statement(statement: &Stmt) -> bool {
+fn scalar_statement(statement: &Stmt, returns_value: &BTreeMap<String, bool>) -> bool {
     match statement {
-        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer),
+        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, returns_value),
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
-        Stmt::Expression { .. } => false,
+        Stmt::Expression { expression, .. } => {
+            matches!(expression, Expr::Call { .. })
+                && scalar_statement_call(expression, returns_value)
+        }
         Stmt::If { .. } => false,
-        Stmt::Return { value, .. } => value.as_ref().is_none_or(scalar_expression),
+        Stmt::Return { value, .. } => {
+            value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
+        }
         Stmt::Loop(_) => false,
-        Stmt::Block(block) => scalar_block(block),
+        Stmt::Block(block) => scalar_block(block, returns_value),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::ForRange { .. } | Stmt::ForArray { .. } | Stmt::Drop { .. } => false,
     }
 }
 
-fn scalar_expression(expression: &Expr) -> bool {
+fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
     match expression {
         Expr::Identifier { .. } | Expr::Integer { .. } | Expr::BoolLiteral { .. } => true,
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-            scalar_expression(expression)
+            scalar_expression(expression, returns_value)
         }
         Expr::Binary { left, operator, right, .. } => {
             matches!(
@@ -70,12 +89,25 @@ fn scalar_expression(expression: &Expr) -> bool {
                     | BinaryOp::GreaterEquals
                     | BinaryOp::Equals
                     | BinaryOp::NotEquals
-            ) && scalar_expression(left)
-                && scalar_expression(right)
+            ) && scalar_expression(left, returns_value)
+                && scalar_expression(right, returns_value)
         }
-        Expr::Call { .. } => false,
+        Expr::Call { callee, arguments, .. } => {
+            returns_value.get(callee).copied().unwrap_or(false)
+                && arguments
+                    .iter()
+                    .all(|argument| scalar_expression(&argument.expression, returns_value))
+        }
         _ => false,
     }
+}
+
+fn scalar_statement_call(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+    let Expr::Call { callee, arguments, .. } = expression else {
+        return false;
+    };
+    returns_value.contains_key(callee)
+        && arguments.iter().all(|argument| scalar_expression(&argument.expression, returns_value))
 }
 
 #[cfg(test)]

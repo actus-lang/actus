@@ -716,10 +716,13 @@ emission. This proves shared-contract consumption for the covered scalar slice;
 it does not yet prove complete CLI routing for all language features.
 
 The Cranelift CLI now uses the same shared route for the explicitly eligible
-single-unit, non-generic, straight-line scalar slice. Programs outside that
-contract continue through the established Cranelift lowering until their
-constructs receive shared lowering support; this staged route preserves the
-existing behavior while the remaining semantic surface is migrated.
+single-unit, non-generic scalar slice. The slice includes straight-line scalar
+expressions and calls to declared scalar verbs or external verbs; target-
+annotated declarations are filtered before eligibility and lowering. Programs
+outside that contract continue through the established Cranelift lowering
+until their constructs receive shared lowering support; this staged route
+preserves the existing behavior while the remaining semantic surface is
+migrated.
 
 The LLVM implementation keeps backend responsibilities behind the canonical
 facade and now separates failure-value lowering into `failures.rs` and memory

@@ -153,12 +153,14 @@ fn emit_objects_cranelift(
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
+    let targeted_root =
+        crate::semantic::filter_program_for_target(root.program(), configuration.target());
     if generic_instances.is_empty()
         && object_plan.units().len() == 1
-        && super::shared_candidate::supports_scalar_shared_lowering(root.program())
+        && super::shared_candidate::supports_scalar_shared_lowering(&targeted_root)
     {
         return Ok(vec![super::cranelift_shared::emit_shared_scalar_root(
-            root.program(),
+            &targeted_root,
             root.namespace().symbol_prefix(),
             symbol,
             configuration,
