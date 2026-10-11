@@ -110,10 +110,13 @@ pub enum BackendInstruction {
         condition: super::BackendValueId,
         then_block: super::BackendBlockId,
         else_block: super::BackendBlockId,
+        then_arguments: Vec<super::BackendEdgeArgument>,
+        else_arguments: Vec<super::BackendEdgeArgument>,
         span: SourceSpan,
     },
     Jump {
         target: super::BackendBlockId,
+        arguments: Vec<super::BackendEdgeArgument>,
         span: SourceSpan,
     },
     Fail {

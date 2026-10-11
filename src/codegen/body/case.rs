@@ -30,6 +30,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 condition: matched,
                 then_block: matched_id,
                 else_block,
+                then_arguments: Vec::new(),
+                else_arguments: Vec::new(),
                 span: branch.span,
             });
             let branch_block_start = self.blocks.len();

@@ -162,7 +162,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> BackendBlock {
         if !terminates(instructions.last()) {
             if let Some(target) = fallthrough {
-                instructions.push(BackendInstruction::Jump { target, span });
+                instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
             }
         }
         BackendBlock { parameters: Vec::new(), id, instructions }
@@ -179,7 +179,11 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<BackendBlock, BackendContractError> {
         let nested_id = self.allocate_block();
         let continuation_id = self.allocate_block();
-        instructions.push(BackendInstruction::Jump { target: nested_id, span: nested.span });
+        instructions.push(BackendInstruction::Jump {
+            target: nested_id,
+            arguments: Vec::new(),
+            span: nested.span,
+        });
         let nested_block = self.lower_block(nested_id, nested, Some(continuation_id))?;
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
@@ -202,11 +206,19 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let header_id = self.allocate_block();
         let body_id = self.allocate_block();
         let continuation_id = self.allocate_block();
-        instructions.push(BackendInstruction::Jump { target: header_id, span: nested.span });
+        instructions.push(BackendInstruction::Jump {
+            target: header_id,
+            arguments: Vec::new(),
+            span: nested.span,
+        });
         let header = BackendBlock {
             parameters: Vec::new(),
             id: header_id,
-            instructions: vec![BackendInstruction::Jump { target: body_id, span: nested.span }],
+            instructions: vec![BackendInstruction::Jump {
+                target: body_id,
+                arguments: Vec::new(),
+                span: nested.span,
+            }],
         };
         self.loop_targets.push(LoopTargets { header: header_id, exit: continuation_id });
         self.provider.enter_loop();
@@ -299,7 +311,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         };
         self.provider.emit_loop_cleanup(span, kind.clone(), instructions)?;
         let target = if kind == LoopExitKind::Continue { targets.header } else { targets.exit };
-        instructions.push(BackendInstruction::Jump { target, span });
+        instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
         Ok(())
     }
 
@@ -381,6 +393,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             condition,
             then_block: then_id,
             else_block: else_id,
+            then_arguments: Vec::new(),
+            else_arguments: Vec::new(),
             span,
         });
         let then_block = self.lower_block(then_id, then_branch, Some(continuation_id))?;
@@ -408,7 +422,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
 
 fn ensure_jump(mut block: BackendBlock, target: BackendBlockId, span: SourceSpan) -> BackendBlock {
     if !terminates(block.instructions.last()) {
-        block.instructions.push(BackendInstruction::Jump { target, span });
+        block.instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
     }
     block
 }

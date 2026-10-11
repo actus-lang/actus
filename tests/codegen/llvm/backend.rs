@@ -667,6 +667,8 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
                     condition: BackendValueId(0),
                     then_block: BackendBlockId(1),
                     else_block: BackendBlockId(2),
+                    then_arguments: Vec::new(),
+                    else_arguments: Vec::new(),
                     span: actus::lexer::SourceSpan::new(0, 1),
                 }],
             },
@@ -675,6 +677,7 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
                 id: BackendBlockId(1),
                 instructions: vec![BackendInstruction::Jump {
                     target: BackendBlockId(3),
+                    arguments: Vec::new(),
                     span: actus::lexer::SourceSpan::new(1, 2),
                 }],
             },
@@ -2034,6 +2037,8 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
                     condition: BackendValueId(0),
                     then_block: BackendBlockId(1),
                     else_block: BackendBlockId(2),
+                    then_arguments: Vec::new(),
+                    else_arguments: Vec::new(),
                     span: actus::lexer::SourceSpan::new(0, 1),
                 }],
             },
@@ -2042,6 +2047,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
                 id: BackendBlockId(1),
                 instructions: vec![BackendInstruction::Jump {
                     target: BackendBlockId(3),
+                    arguments: Vec::new(),
                     span: actus::lexer::SourceSpan::new(1, 2),
                 }],
             },

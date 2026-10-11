@@ -820,11 +820,20 @@ fn validates_control_flow_targets_without_a_machine_backend() {
                 id: BackendBlockId(0),
                 instructions: vec![BackendInstruction::Jump {
                     target: BackendBlockId(1),
+                    arguments: vec![BackendEdgeArgument {
+                        value: BackendValueId(4),
+                        ty: BackendValueType::Integer { signed: false, width: 32 },
+                        span: SourceSpan::new(0, 1),
+                    }],
                     span: SourceSpan::new(0, 1),
                 }],
             },
             BackendBlock {
-                parameters: Vec::new(),
+                parameters: vec![BackendBlockParameter {
+                    value: BackendValueId(5),
+                    ty: BackendValueType::Integer { signed: false, width: 32 },
+                    span: SourceSpan::new(0, 1),
+                }],
                 id: BackendBlockId(1),
                 instructions: Vec::new(),
             },
@@ -832,9 +841,20 @@ fn validates_control_flow_targets_without_a_machine_backend() {
     );
     assert!(valid.validate().is_ok());
 
+    let mut mismatch = valid.clone();
+    mismatch.blocks[0].instructions[0] = BackendInstruction::Jump {
+        target: BackendBlockId(1),
+        arguments: Vec::new(),
+        span: SourceSpan::new(0, 1),
+    };
+    assert!(matches!(mismatch.validate(), Err(BackendContractError::InvalidBlockArguments(_))));
+
     let mut invalid = valid;
-    invalid.blocks[0].instructions[0] =
-        BackendInstruction::Jump { target: BackendBlockId(2), span: SourceSpan::new(0, 1) };
+    invalid.blocks[0].instructions[0] = BackendInstruction::Jump {
+        target: BackendBlockId(2),
+        arguments: Vec::new(),
+        span: SourceSpan::new(0, 1),
+    };
     assert_eq!(invalid.validate(), Err(BackendContractError::InvalidBlockReference));
 }
 

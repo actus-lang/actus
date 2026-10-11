@@ -10,7 +10,7 @@ pub(super) fn validate_instructions(
 ) -> Result<(), BackendContractError> {
     for block in blocks {
         for instruction in &block.instructions {
-            validate_instruction(instruction, block_ids)?;
+            validate_instruction(instruction, blocks, block_ids)?;
         }
     }
     Ok(())
@@ -18,8 +18,12 @@ pub(super) fn validate_instructions(
 
 fn validate_instruction(
     instruction: &BackendInstruction,
+    blocks: &[BackendBlock],
     block_ids: &BTreeSet<BackendBlockId>,
 ) -> Result<(), BackendContractError> {
+    if let Some(result) = validate_control_flow(instruction, blocks, block_ids) {
+        return result;
+    }
     match instruction {
         BackendInstruction::Constant { ty, .. }
             if !matches!(
@@ -31,14 +35,6 @@ fn validate_instruction(
         }
         BackendInstruction::Call { callee, .. } if callee.as_str().is_empty() => {
             Err(BackendContractError::InvalidCallSymbol)
-        }
-        BackendInstruction::Branch { then_block, else_block, .. }
-            if !block_ids.contains(then_block) || !block_ids.contains(else_block) =>
-        {
-            Err(BackendContractError::InvalidBlockReference)
-        }
-        BackendInstruction::Jump { target, .. } if !block_ids.contains(target) => {
-            Err(BackendContractError::InvalidBlockReference)
         }
         BackendInstruction::Fail { failure, .. } => super::super::abi::validate_failure(failure),
         BackendInstruction::EnumDiscriminant { layout, .. } => layout.validate(),
@@ -68,6 +64,72 @@ fn validate_instruction(
         }
         _ => Ok(()),
     }
+}
+
+fn validate_control_flow(
+    instruction: &BackendInstruction,
+    blocks: &[BackendBlock],
+    block_ids: &BTreeSet<BackendBlockId>,
+) -> Option<Result<(), BackendContractError>> {
+    match instruction {
+        BackendInstruction::Branch {
+            then_block,
+            else_block,
+            then_arguments,
+            else_arguments,
+            ..
+        } => Some(validate_branch_edges(
+            blocks,
+            block_ids,
+            *then_block,
+            then_arguments,
+            *else_block,
+            else_arguments,
+        )),
+        BackendInstruction::Jump { target, arguments, .. } => {
+            Some(validate_jump_edge(blocks, block_ids, *target, arguments))
+        }
+        _ => None,
+    }
+}
+
+fn validate_branch_edges(
+    blocks: &[BackendBlock],
+    block_ids: &BTreeSet<BackendBlockId>,
+    then_block: BackendBlockId,
+    then_arguments: &[super::BackendEdgeArgument],
+    else_block: BackendBlockId,
+    else_arguments: &[super::BackendEdgeArgument],
+) -> Result<(), BackendContractError> {
+    if !block_ids.contains(&then_block) || !block_ids.contains(&else_block) {
+        return Err(BackendContractError::InvalidBlockReference);
+    }
+    validate_edge(blocks, then_block, then_arguments)?;
+    validate_edge(blocks, else_block, else_arguments)
+}
+
+fn validate_jump_edge(
+    blocks: &[BackendBlock],
+    block_ids: &BTreeSet<BackendBlockId>,
+    target: BackendBlockId,
+    arguments: &[super::BackendEdgeArgument],
+) -> Result<(), BackendContractError> {
+    if !block_ids.contains(&target) {
+        return Err(BackendContractError::InvalidBlockReference);
+    }
+    validate_edge(blocks, target, arguments)
+}
+
+fn validate_edge(
+    blocks: &[BackendBlock],
+    target: super::BackendBlockId,
+    arguments: &[super::BackendEdgeArgument],
+) -> Result<(), BackendContractError> {
+    let block = blocks
+        .iter()
+        .find(|block| block.id == target)
+        .ok_or(BackendContractError::InvalidBlockReference)?;
+    super::validate_edge_arguments(&block.parameters, arguments)
 }
 
 fn validate_aggregate_instruction(
