@@ -32,9 +32,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 else_block,
                 span: branch.span,
             });
+            let branch_block_start = self.blocks.len();
             let body =
                 lower_case_branch_body(self, matched_id, branch, span, subject_value, *mode)?;
-            self.blocks.push(body);
+            self.blocks.insert(branch_block_start, body);
             if let Some(following_id) = following_id {
                 if entry_instructions.is_none() {
                     entry_instructions = Some(std::mem::take(&mut instructions));
@@ -103,9 +104,15 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
     } else {
         Ok(())
     };
+    let nested_block_start = lowering.blocks.len();
     match binding_result.and_then(|_| case_return_block(lowering, id, branch, span)) {
         Ok(mut body) => {
             body.instructions.splice(0..0, body_prefix);
+            lowering.provider.distribute_scope_cleanup(
+                branch.span,
+                &mut lowering.blocks,
+                nested_block_start,
+            )?;
             lowering.provider.exit_scope(branch.span, &mut body.instructions)?;
             Ok(body)
         }
@@ -165,12 +172,14 @@ fn case_return_block<P: BackendExpressionProvider>(
     branch: &crate::ast::CaseBranch,
     span: SourceSpan,
 ) -> Result<BackendBlock, BackendContractError> {
-    let CaseBody::Expression(expression) = &branch.body else {
-        return Err(unsupported(branch.span, "block-bodied enum case branch"));
-    };
-    let block = Block {
-        statements: vec![Stmt::Return { value: Some(*expression.clone()), span }],
-        span: branch.span,
-    };
-    lowering.lower_block(id, &block, None)
+    match &branch.body {
+        CaseBody::Expression(expression) => {
+            let block = Block {
+                statements: vec![Stmt::Return { value: Some(*expression.clone()), span }],
+                span: branch.span,
+            };
+            lowering.lower_block(id, &block, None)
+        }
+        CaseBody::Block(block) => lowering.lower_block(id, block, None),
+    }
 }

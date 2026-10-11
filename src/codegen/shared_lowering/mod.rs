@@ -14,9 +14,9 @@ use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupProvider, BackendCleanupResolvedDescriptor, BackendCleanupResult,
     BackendContractError, BackendExternal, BackendInstruction, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendSignature, BackendSymbolBindings,
-    BackendValueType, SymbolIdentity, lower_parameter, lower_return, lower_verb_signature,
-    lower_verb_with_expressions, lower_verb_with_expressions_as,
+    BackendLayoutProvider, BackendModule, BackendParameter, BackendSignature,
+    BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_parameter, lower_return,
+    lower_verb_signature, lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 struct BuiltinLayouts;
@@ -176,16 +176,56 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
             bindings,
         )?);
     }
-    let module = BackendModule {
-        externals: externals
-            .iter()
-            .zip(external_signatures)
-            .map(|(external, signature)| scalar_external(external, signature, &external_symbols))
-            .collect::<Result<_, _>>()?,
+    let mut module = BackendModule {
+        externals: build_backend_externals(&externals, external_signatures, &external_symbols)?,
         functions,
     };
+    append_buffer_allocate_external(&mut module.externals)?;
     module.validate()?;
     Ok(module)
+}
+
+fn build_backend_externals(
+    externals: &[&ExternalVerbDecl],
+    signatures: Vec<BackendSignature>,
+    symbols: &BTreeMap<String, SymbolIdentity>,
+) -> Result<Vec<BackendExternal>, BackendContractError> {
+    externals
+        .iter()
+        .zip(signatures)
+        .map(|(external, signature)| scalar_external(external, signature, symbols))
+        .collect()
+}
+
+fn append_buffer_allocate_external(
+    externals: &mut Vec<BackendExternal>,
+) -> Result<(), BackendContractError> {
+    if externals
+        .iter()
+        .any(|external| external.symbol.as_str() == crate::runtime::BUFFER_ALLOCATE_SYMBOL)
+    {
+        return Ok(());
+    }
+    externals.push(buffer_allocate_external()?);
+    Ok(())
+}
+
+fn buffer_allocate_external() -> Result<BackendExternal, BackendContractError> {
+    Ok(BackendExternal {
+        symbol: SymbolIdentity::external_raw(crate::runtime::BUFFER_ALLOCATE_SYMBOL)
+            .map_err(|error| unsupported(crate::lexer::SourceSpan::new(0, 0), error.to_string()))?,
+        parameters: vec![BackendParameter {
+            name: "length".to_owned(),
+            role: crate::ast::Role::Erg,
+            ty: BackendValueType::Integer { signed: false, width: 64 },
+            passing: super::BackendPassingMode::Direct,
+        }],
+        return_value: super::BackendReturn {
+            role: Some(crate::ast::Role::Erg),
+            ty: BackendValueType::Pointer,
+            passing: super::BackendReturnMode::Direct,
+        },
+    })
 }
 
 fn scalar_declarations(

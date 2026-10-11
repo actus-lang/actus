@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 mod case;
 mod cast;
 mod cleanup;
+mod literals;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
@@ -125,6 +126,25 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         Ok(())
     }
 
+    fn distribute_scope_cleanup(
+        &mut self,
+        span: SourceSpan,
+        blocks: &mut Vec<super::super::BackendBlock>,
+        start: usize,
+    ) -> Result<(), BackendContractError> {
+        for block in blocks.iter_mut().skip(start) {
+            if matches!(
+                block.instructions.last(),
+                Some(BackendInstruction::Return { .. })
+                    | Some(BackendInstruction::Fail { .. })
+                    | Some(BackendInstruction::Jump { .. })
+            ) {
+                cleanup::emit_scope_cleanup(self, span, &mut block.instructions);
+            }
+        }
+        Ok(())
+    }
+
     fn is_loop_exit(&self, span: SourceSpan) -> bool {
         self.cleanup_plans.iter().any(|plan| {
             matches!(
@@ -241,18 +261,14 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 .find_map(|scope| scope.get(name).copied())
                 .or_else(|| self.parameters.get(name).copied())
                 .ok_or_else(|| unsupported(*span, format!("unknown scalar binding `{name}`"))),
-            Expr::Integer { value, span, .. } => {
+            Expr::Integer { value, suffix, span } => {
                 let value = parse_integer(value).ok_or_else(|| {
                     unsupported(*span, format!("invalid scalar integer literal `{value}`"))
                 })?;
+                let ty = literals::integer_literal_type(suffix.as_deref());
                 let result = self.allocate();
-                instructions.push(BackendInstruction::Constant {
-                    result,
-                    ty: BackendValueType::Integer { signed: true, width: 32 },
-                    value,
-                    span: *span,
-                });
-                self.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
+                instructions.push(BackendInstruction::Constant { result, ty, value, span: *span });
+                self.remember_value(result, ty);
                 Ok(result)
             }
             Expr::BoolLiteral { value, span } => {
@@ -265,6 +281,9 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 });
                 self.remember_value(result, BackendValueType::Bool);
                 Ok(result)
+            }
+            Expr::BufferLiteral { length, span } => {
+                literals::lower_buffer_literal(self, length, *span, instructions)
             }
             Expr::Grouping { expression, .. } => self.lower_expression(expression, instructions),
             Expr::Cast { expression, target, span } => {

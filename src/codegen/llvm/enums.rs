@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildStore, LLVMConstInt, LLVMConstNull,
-    LLVMInt8TypeInContext, LLVMSetAlignment,
+    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
+    LLVMConstNull, LLVMInt8TypeInContext, LLVMSetAlignment,
 };
-use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
-use super::super::{BackendEmitError, BackendEnumLayout, BackendInstruction, BackendValueId};
+use super::super::{
+    BackendEmitError, BackendEnumLayout, BackendInstruction, BackendValueId, BackendValueType,
+};
 
 pub(super) fn emit_enum_discriminant(
     context: LLVMContextRef,
@@ -46,8 +48,16 @@ pub(super) fn emit_enum_payload(
     let temporary = enum_temporary(context, builder, *subject, *layout, values)?;
     let address = enum_field_address(context, builder, temporary, layout.payload_offset)?;
     let llvm_type = super::values::llvm_type(context, *payload_type)?;
-    let value =
-        unsafe { LLVMBuildLoad2(builder, llvm_type, address, b"payload\0".as_ptr().cast()) };
+    let value = if matches!(
+        payload_type,
+        super::super::BackendValueType::Aggregate { .. }
+            | super::super::BackendValueType::Region { .. }
+            | super::super::BackendValueType::Enum { .. }
+    ) {
+        address
+    } else {
+        unsafe { LLVMBuildLoad2(builder, llvm_type, address, b"payload\0".as_ptr().cast()) }
+    };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to load enum payload".to_owned()));
     }
@@ -72,6 +82,48 @@ pub(super) fn emit_enum_construct(
     else {
         return Err(BackendEmitError("LLVM enum constructor instruction expected".to_owned()));
     };
+    let (enum_type, temporary) =
+        initialize_enum_constructor(context, builder, layout, *discriminant)?;
+    let payload_value = values.get(payload).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM enum payload {} is unavailable", payload.0))
+    })?;
+    let payload_address = enum_field_address(context, builder, temporary, layout.payload_offset)?;
+    let _ = super::values::llvm_type(context, *payload_type)?;
+    let Some(payload_layout) = layout.payload else {
+        return Err(BackendEmitError("LLVM enum constructor payload layout is missing".to_owned()));
+    };
+    if matches!(
+        payload_type,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Region { .. }
+            | BackendValueType::Enum { .. }
+    ) {
+        emit_aggregate_payload_copy(
+            context,
+            builder,
+            payload_address,
+            payload_value,
+            payload_layout,
+        )?;
+    } else if unsafe { LLVMBuildStore(builder, payload_value, payload_address) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to store enum constructor payload".to_owned()));
+    }
+    let value = unsafe {
+        LLVMBuildLoad2(builder, enum_type, temporary, b"enum.construct.value\0".as_ptr().cast())
+    };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to load enum constructor value".to_owned()));
+    }
+    values.insert(*result, value);
+    Ok(false)
+}
+
+fn initialize_enum_constructor(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    layout: &BackendEnumLayout,
+    discriminant: u32,
+) -> Result<(LLVMTypeRef, LLVMValueRef), BackendEmitError> {
     let enum_type = super::values::llvm_type(
         context,
         super::super::BackendValueType::Aggregate { layout: layout.layout },
@@ -87,32 +139,35 @@ pub(super) fn emit_enum_construct(
             "LLVM failed to initialize enum constructor value".to_owned(),
         ));
     }
-    let discriminant_address =
-        enum_field_address(context, builder, temporary, layout.discriminant_offset)?;
-    let discriminant_value = unsafe {
-        LLVMConstInt(integer_type(context, layout.discriminant_size)?, u64::from(*discriminant), 0)
+    let address = enum_field_address(context, builder, temporary, layout.discriminant_offset)?;
+    let value = unsafe {
+        LLVMConstInt(integer_type(context, layout.discriminant_size)?, u64::from(discriminant), 0)
     };
-    if unsafe { LLVMBuildStore(builder, discriminant_value, discriminant_address) }.is_null() {
+    if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
         return Err(BackendEmitError(
             "LLVM failed to store enum constructor discriminant".to_owned(),
         ));
     }
-    let payload_value = values.get(payload).copied().ok_or_else(|| {
-        BackendEmitError(format!("LLVM enum payload {} is unavailable", payload.0))
-    })?;
-    let payload_address = enum_field_address(context, builder, temporary, layout.payload_offset)?;
-    let _ = super::values::llvm_type(context, *payload_type)?;
-    if unsafe { LLVMBuildStore(builder, payload_value, payload_address) }.is_null() {
-        return Err(BackendEmitError("LLVM failed to store enum constructor payload".to_owned()));
-    }
-    let value = unsafe {
-        LLVMBuildLoad2(builder, enum_type, temporary, b"enum.construct.value\0".as_ptr().cast())
+    Ok((enum_type, temporary))
+}
+
+fn emit_aggregate_payload_copy(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    destination: LLVMValueRef,
+    source: LLVMValueRef,
+    layout: super::super::BackendLayout,
+) -> Result<(), BackendEmitError> {
+    let size = unsafe {
+        LLVMConstInt(llvm_sys::core::LLVMInt64TypeInContext(context), u64::from(layout.size), 0)
     };
-    if value.is_null() {
-        return Err(BackendEmitError("LLVM failed to load enum constructor value".to_owned()));
+    let copied = unsafe {
+        LLVMBuildMemMove(builder, destination, layout.alignment, source, layout.alignment, size)
+    };
+    if copied.is_null() {
+        return Err(BackendEmitError("LLVM failed to copy enum constructor payload".to_owned()));
     }
-    values.insert(*result, value);
-    Ok(false)
+    Ok(())
 }
 
 fn enum_temporary(

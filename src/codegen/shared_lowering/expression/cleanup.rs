@@ -43,6 +43,7 @@ pub(super) fn emit_scope_cleanup(
         Some(BackendInstruction::Return { .. })
             | Some(BackendInstruction::Fail { .. })
             | Some(BackendInstruction::Jump { .. })
+            | Some(BackendInstruction::Branch { .. })
     );
     let insertion = instructions.len().saturating_sub(usize::from(terminates));
     instructions.splice(insertion..insertion, cleanup);

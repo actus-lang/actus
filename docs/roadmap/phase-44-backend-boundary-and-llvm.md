@@ -844,6 +844,24 @@ the contract rejects misaligned action and descriptor sequences before backend
 emission. This prevents a backend from silently dropping or reordering a
 runtime cleanup operation.
 
+The shared CLI lowering boundary now accepts bounded `Buffer[N]` expressions by
+lowering their length to the declared unsigned ABI width and emitting the
+neutral runtime allocation call. Typed integer literal suffixes are preserved
+through this path, so `u64` Region bridge arguments retain their native width.
+Block-bodied `Result` case branches now lower through the same neutral body
+pipeline, with outer-scope cleanup distributed to nested terminal blocks before
+backend emission. LLVM enum construction and payload extraction now preserve
+the indirect pointer representation required by aggregate and `Region` payloads;
+aggregate payloads are copied into the declared inline storage with the
+validated size and alignment. The hosted `std::region` lifecycle fixture,
+aggregate Region suite, and the complete
+`cargo test --all-targets --all-features -- --test-threads=1` suite pass,
+including LLVM zero-float verification and the 128 KiB bounded bulk fixture.
+Source limits and formatting pass. This is implementation evidence for the
+Region and aggregate portion of the shared pipeline; Gate 44.7.1 remains open
+until the remaining backend-selection, unsupported-diagnostic, freestanding
+parity, metadata, and documentation requirements are completed.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
