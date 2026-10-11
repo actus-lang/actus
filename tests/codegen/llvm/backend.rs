@@ -107,6 +107,133 @@ fn emits_a_neutral_integer_constant_and_returns_it() {
 }
 
 #[test]
+fn emits_neutral_enum_discriminant_and_payload_extraction() {
+    let enum_layout = BackendEnumLayout {
+        layout: BackendLayout { size: 8, alignment: 4 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 4,
+        payload: Some(BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
+    };
+    let enum_type = BackendValueType::Enum { layout: enum_layout };
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "enum_extract").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: vec![BackendParameter {
+            name: "result".to_owned(),
+            role: Role::Erg,
+            ty: enum_type,
+            passing: actus::codegen::BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: integer,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::EnumDiscriminant {
+                    result: BackendValueId(1),
+                    subject: BackendValueId(0),
+                    layout: enum_layout,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::EnumPayload {
+                    result: BackendValueId(2),
+                    subject: BackendValueId(0),
+                    layout: enum_layout,
+                    payload_type: integer,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(2)),
+                    span: actus::lexer::SourceSpan::new(2, 3),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("LLVM should emit neutral enum extraction");
+    assert!(ir.contains("load i32"));
+    assert!(ir.contains("getelementptr i8"));
+}
+
+#[test]
+fn emits_neutral_result_constructor_with_payload() {
+    let enum_layout = BackendEnumLayout {
+        layout: BackendLayout { size: 8, alignment: 4 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 4,
+        payload: Some(BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
+    };
+    let enum_type = BackendValueType::Enum { layout: enum_layout };
+    let integer = BackendValueType::Integer { signed: true, width: 32 };
+    let symbol =
+        SymbolIdentity::new("test", SymbolKind::Verb, "result_construct").expect("valid symbol");
+    let function = BackendFunction {
+        symbol,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: enum_type,
+            passing: BackendReturnMode::ReturnSlot { layout: enum_layout.layout },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            id: BackendBlockId(0),
+            instructions: vec![
+                BackendInstruction::Constant {
+                    result: BackendValueId(0),
+                    ty: integer,
+                    value: 7,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                },
+                BackendInstruction::EnumConstruct {
+                    result: BackendValueId(1),
+                    discriminant: 0,
+                    payload: BackendValueId(0),
+                    layout: enum_layout,
+                    payload_type: integer,
+                    span: actus::lexer::SourceSpan::new(1, 2),
+                },
+                BackendInstruction::Return {
+                    value: Some(BackendValueId(1)),
+                    span: actus::lexer::SourceSpan::new(2, 3),
+                },
+            ],
+        }],
+        cleanup: Vec::new(),
+    };
+    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
+        .expect("LLVM should emit neutral Result construction");
+    assert!(ir.contains("store i32 7"));
+    assert!(ir.contains("ret void"));
+}
+
+#[test]
+fn emits_plain_result_case_from_shared_lowering() {
+    let source = "verb produce() -> Result[Int, Int] { return Result[Int, Int].Ok(7); } verb main() -> Int { erg result = produce(); return case result { Result.Ok(_) => 0, Result.Err(_) => 1, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Result case fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("Result case fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("Result case should lower through the shared contract");
+    let ir = emit_module(&module).expect("LLVM should emit the shared Result case");
+    assert!(ir.contains("br i1"));
+    assert!(ir.contains("getelementptr i8"));
+    assert!(ir.contains("ret i32 0"));
+    assert!(ir.contains("ret i32 1"));
+}
+
+#[test]
 fn emits_checked_runtime_integer_cast_from_shared_contract() {
     let source = "verb identity(erg value: Int) -> u32 { return value as u32; }";
     let (tokens, errors) = scan(source);

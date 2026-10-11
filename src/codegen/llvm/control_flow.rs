@@ -8,6 +8,7 @@ use super::branches::{block_value, emit_branch, emit_jump};
 use super::calls::emit_call;
 use super::cleanup::emit_cleanup;
 use super::declarations::FunctionDeclaration;
+use super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
 use super::failures::emit_failure;
 use super::guards::{
     emit_trap_if_shift_count_out_of_range, emit_trap_if_signed_division_overflow, emit_trap_if_zero,
@@ -153,6 +154,15 @@ fn emit_scalar_instruction(
             emit_integer_compare(builder, instruction, values)
         }
         BackendInstruction::IntegerUnary { .. } => emit_integer_unary(builder, instruction, values),
+        BackendInstruction::EnumDiscriminant { .. } => {
+            emit_enum_discriminant(context, builder, instruction, values)
+        }
+        BackendInstruction::EnumPayload { .. } => {
+            emit_enum_payload(context, builder, instruction, values)
+        }
+        BackendInstruction::EnumConstruct { .. } => {
+            emit_enum_construct(context, builder, instruction, values)
+        }
         _ => return None,
     };
     Some(result)

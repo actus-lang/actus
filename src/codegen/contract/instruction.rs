@@ -56,6 +56,27 @@ pub enum BackendInstruction {
         signed: bool,
         span: SourceSpan,
     },
+    EnumDiscriminant {
+        result: super::BackendValueId,
+        subject: super::BackendValueId,
+        layout: super::BackendEnumLayout,
+        span: SourceSpan,
+    },
+    EnumPayload {
+        result: super::BackendValueId,
+        subject: super::BackendValueId,
+        layout: super::BackendEnumLayout,
+        payload_type: BackendValueType,
+        span: SourceSpan,
+    },
+    EnumConstruct {
+        result: super::BackendValueId,
+        discriminant: u32,
+        payload: super::BackendValueId,
+        layout: super::BackendEnumLayout,
+        payload_type: BackendValueType,
+        span: SourceSpan,
+    },
     IntegerUnary {
         result: super::BackendValueId,
         operation: BackendIntegerUnaryOp,

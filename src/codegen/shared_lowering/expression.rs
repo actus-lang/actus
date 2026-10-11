@@ -1,18 +1,14 @@
-use std::collections::BTreeMap;
-
 use crate::ast::{BinaryOp, Expr, UnaryOp, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
-
+use std::collections::BTreeMap;
 mod cast;
-
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
     BackendValueId, BackendValueType, SymbolIdentity, SymbolKind,
 };
 use super::support::{expression_span, parse_integer, scalar_backend_type, unsupported};
-
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     parameters: BTreeMap<String, BackendValueId>,
@@ -24,7 +20,6 @@ pub(super) struct SharedExpressionProvider<'a> {
     value_types: BTreeMap<BackendValueId, BackendValueType>,
     next_value: u32,
 }
-
 impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
         namespace: &'a str,
@@ -60,17 +55,14 @@ impl<'a> SharedExpressionProvider<'a> {
             next_value: verb.params.len() as u32,
         }
     }
-
-    fn allocate(&mut self) -> BackendValueId {
+    pub(super) fn allocate(&mut self) -> BackendValueId {
         let result = BackendValueId(self.next_value);
         self.next_value += 1;
         result
     }
-
     pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
         self.parameters.get(name).copied()
     }
-
     fn emit_scope_cleanup(&self, span: SourceSpan, instructions: &mut Vec<BackendInstruction>) {
         let returned_value = match instructions.last() {
             Some(BackendInstruction::Return { value, .. }) => *value,
@@ -111,7 +103,6 @@ impl<'a> SharedExpressionProvider<'a> {
         let insertion = instructions.len().saturating_sub(if terminates { 1 } else { 0 });
         instructions.splice(insertion..insertion, cleanup);
     }
-
     fn append_loop_cleanup(
         &self,
         span: SourceSpan,
@@ -143,29 +134,23 @@ impl<'a> SharedExpressionProvider<'a> {
             }
         }
     }
-
     fn binding_value(&self, name: &str) -> Option<BackendValueId> {
         self.local_value(name).or_else(|| self.parameters.get(name).copied())
     }
-
     fn local_value(&self, name: &str) -> Option<BackendValueId> {
         self.locals.iter().rev().find_map(|scope| scope.get(name).copied())
     }
-
-    fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
+    pub(super) fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
         self.value_types.get(&value).copied()
     }
-
-    fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
+    pub(super) fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
         self.value_types.insert(value, ty);
     }
 }
-
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }
-
     fn exit_scope(
         &mut self,
         span: SourceSpan,
@@ -334,11 +319,28 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             Expr::Unary { .. } => self.lower_unary(expression, instructions),
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
             Expr::Call { .. } => self.lower_call(expression, instructions),
+            Expr::MethodCall { .. } => self.lower_method_call(expression, instructions),
             _ => Err(unsupported(
                 expression_span(expression),
                 "expression is outside the scalar shared lowering contract",
             )),
         }
+    }
+
+    fn lower_enum_variant_condition(
+        &mut self,
+        subject: &Expr,
+        variant: &str,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        super::constructors::lower_enum_variant_condition(
+            self,
+            subject,
+            variant,
+            span,
+            instructions,
+        )
     }
 
     fn callee_for(
@@ -367,6 +369,14 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
 }
 
 impl SharedExpressionProvider<'_> {
+    fn lower_method_call(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        super::constructors::lower_method_call(self, expression, instructions)
+    }
+
     fn lower_unary(
         &mut self,
         expression: &Expr,

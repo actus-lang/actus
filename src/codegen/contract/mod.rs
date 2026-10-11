@@ -56,6 +56,7 @@ pub enum BackendValueType {
     Pointer,
     Aggregate { layout: BackendLayout },
     Region { layout: BackendLayout },
+    Enum { layout: BackendEnumLayout },
     NichePointerOption { layout: BackendLayout },
 }
 
@@ -305,7 +306,9 @@ fn validate_return(return_value: &BackendReturn) -> Result<(), BackendContractEr
             match return_value.ty {
                 BackendValueType::Aggregate { layout: value_layout }
                 | BackendValueType::Region { layout: value_layout }
-                    if value_layout == *layout => {}
+                | BackendValueType::Enum {
+                    layout: BackendEnumLayout { layout: value_layout, .. },
+                } if value_layout == *layout => {}
                 _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
             }
         }
@@ -363,6 +366,25 @@ fn validate_instruction(
             Err(BackendContractError::InvalidBlockReference)
         }
         BackendInstruction::Fail { failure, .. } => super::abi::validate_failure(failure),
+        BackendInstruction::EnumDiscriminant { layout, .. } => layout.validate(),
+        BackendInstruction::EnumPayload { layout, payload_type, .. } => {
+            layout.validate()?;
+            validate_value_type(*payload_type)
+        }
+        BackendInstruction::EnumConstruct { discriminant, layout, payload_type, .. } => {
+            layout.validate()?;
+            if layout.niche_pointer || layout.payload.is_none() {
+                return Err(BackendContractError::InvalidEnumLayout(
+                    "enum constructor requires an inline payload",
+                ));
+            }
+            if u64::from(*discriminant) >= (1u64 << (u32::from(layout.discriminant_size) * 8)) {
+                return Err(BackendContractError::InvalidEnumLayout(
+                    "enum constructor discriminant does not fit its field",
+                ));
+            }
+            validate_value_type(*payload_type)
+        }
         BackendInstruction::Cleanup { action, operand, .. } => {
             validate_cleanup_operand(action, *operand)
         }
@@ -430,6 +452,7 @@ fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError>
         BackendValueType::Aggregate { layout }
         | BackendValueType::Region { layout }
         | BackendValueType::NichePointerOption { layout } => layout.validate(),
+        BackendValueType::Enum { layout } => layout.validate(),
         BackendValueType::Unit
         | BackendValueType::Bool
         | BackendValueType::Integer { .. }

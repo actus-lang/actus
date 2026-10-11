@@ -1,14 +1,5 @@
 use std::collections::BTreeMap;
-
 mod cleanup;
-pub(super) use cleanup::LayoutCleanupProvider;
-
-use cranelift_codegen::ir::condcodes::IntCC;
-use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, TrapCode, Type, types};
-use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
-use cranelift_module::{Linkage, Module};
-use cranelift_object::ObjectModule;
-
 use super::aggregate::{
     Declaration, aggregate_fragment_type, declaration, direct_aggregate_types, initialize_values,
     lower_call,
@@ -26,7 +17,12 @@ use crate::codegen::{
 };
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
-
+pub(super) use cleanup::LayoutCleanupProvider;
+use cranelift_codegen::ir::condcodes::IntCC;
+use cranelift_codegen::ir::{AbiParam, Block, InstBuilder, MemFlagsData, TrapCode, Type, types};
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+use cranelift_module::{Linkage, Module};
+use cranelift_object::ObjectModule;
 pub fn emit_contract_module_object(
     backend_module: &BackendModule,
     configuration: &NativeBackendConfiguration,
@@ -40,7 +36,6 @@ pub fn emit_contract_module_object(
     }
     module.finish().emit().map_err(|error| BackendEmitError(error.to_string()))
 }
-
 fn declare_functions(
     module: &mut ObjectModule,
     backend_module: &BackendModule,
@@ -69,7 +64,6 @@ fn declare_functions(
     cleanup::declare_cleanup_bridges(module, backend_module, &mut declarations)?;
     Ok(declarations)
 }
-
 fn signature(
     module: &ObjectModule,
     parameters: &[crate::codegen::BackendParameter],
@@ -126,12 +120,12 @@ fn parameter_types(
             match parameter.ty {
                 BackendValueType::Aggregate { layout: value_layout }
                 | BackendValueType::Region { layout: value_layout }
-                    if value_layout == *layout =>
-                {
-                    Ok(vec![module.isa().pointer_type()])
-                }
+                | BackendValueType::Enum {
+                    layout: crate::codegen::BackendEnumLayout { layout: value_layout, .. },
+                } if value_layout == *layout => Ok(vec![module.isa().pointer_type()]),
                 BackendValueType::Aggregate { .. }
                 | BackendValueType::Region { .. }
+                | BackendValueType::Enum { .. }
                 | BackendValueType::NichePointerOption { .. } => Err(BackendEmitError(
                     "Cranelift aggregate parameter layout does not match passing layout".to_owned(),
                 )),
@@ -159,7 +153,8 @@ fn scalar_type(
         BackendValueType::Integer { .. }
         | BackendValueType::Float { .. }
         | BackendValueType::Aggregate { .. }
-        | BackendValueType::Region { .. } => {
+        | BackendValueType::Region { .. }
+        | BackendValueType::Enum { .. } => {
             return Err(BackendEmitError(
                 "Cranelift neutral contract slice supports scalar values only".to_owned(),
             ));
@@ -258,6 +253,11 @@ fn lower_instruction(
         }
         BackendInstruction::IntegerUnary { .. } => {
             lower_integer_unary(builder, instruction, values)
+        }
+        BackendInstruction::EnumDiscriminant { .. }
+        | BackendInstruction::EnumPayload { .. }
+        | BackendInstruction::EnumConstruct { .. } => {
+            Err(BackendEmitError("Cranelift neutral enum extraction is not implemented".to_owned()))
         }
         BackendInstruction::Call { .. } => {
             lower_call(module, builder, instruction, declarations, values, aggregate_values)

@@ -73,6 +73,7 @@ fn validate_failure_return(
     let return_layout = match function.return_value.ty {
         BackendValueType::Aggregate { layout }
         | BackendValueType::Region { layout }
+        | BackendValueType::Enum { layout: super::super::BackendEnumLayout { layout, .. } }
         | BackendValueType::NichePointerOption { layout } => layout,
         _ => {
             return Err(BackendEmitError(

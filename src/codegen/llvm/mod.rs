@@ -5,6 +5,7 @@ mod context;
 mod control_flow;
 mod declarations;
 mod emission;
+mod enums;
 mod failures;
 mod guards;
 mod integer_cast;

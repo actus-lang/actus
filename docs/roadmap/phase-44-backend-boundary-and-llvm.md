@@ -722,6 +722,25 @@ supporting `Region[Array[...]]` through LLVM requires a complete neutral generic
 lowering, return ABI, and runtime bridge compatibility. A partial layout entry
 must not be used as a workaround.
 
+The first neutral Result slice is now implemented without closing the gate:
+`BackendValueType::Enum` carries validated representation metadata, the shared
+lowering path resolves scalar `Result[T, E]` layouts, and normalized `Ok` and
+`Err` constructors become explicit `EnumConstruct` instructions. LLVM emits
+the discriminant and payload into the declared aggregate representation and
+return slot. Focused regressions cover neutral construction and LLVM IR
+emission. Result case matching, payload binding, aggregate and Region payloads,
+Cranelift parity, and complete CLI execution remain open until their own
+implementation and evidence are present.
+
+The neutral case slice now also lowers plain `Result.Ok` and `Result.Err`
+variant tests into discriminant extraction, integer comparison, explicit branch
+blocks, and scalar return paths. Wildcard payload patterns are accepted without
+creating a binding. The shared regression
+`lowers_plain_result_case_into_neutral_branches` and the LLVM regression
+`emits_plain_result_case_from_shared_lowering` cover this slice. Ownership-mode
+cases, guards, named or bound payloads, aggregate branch values, and Cranelift
+consumption remain open.
+
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
 integer casts as a checked `IntegerCast` instruction carrying both source and

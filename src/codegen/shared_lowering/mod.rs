@@ -2,12 +2,14 @@ use std::collections::BTreeMap;
 
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeName, VerbDecl};
 
+mod constructors;
 mod expression;
 mod support;
 
 use expression::SharedExpressionProvider;
 use support::unsupported;
 
+use super::abi::BackendEnumLayout;
 use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupProvider, BackendCleanupResolvedDescriptor, BackendCleanupResult,
@@ -23,6 +25,12 @@ impl BackendLayoutProvider for BuiltinLayouts {
     fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout> {
         matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
             .then_some(host_pointer_layout())
+    }
+
+    fn enum_layout_for(&self, type_name: &TypeName) -> Option<BackendEnumLayout> {
+        (type_name.name == "Result" && type_name.arguments.len() == 2)
+            .then(|| result_layout(self, type_name.arguments.first()?))
+            .flatten()
     }
 }
 
@@ -70,6 +78,37 @@ impl BackendCleanupProvider for BuiltinLayouts {
 fn host_pointer_layout() -> BackendLayout {
     let pointer_bytes = (usize::BITS / 8) as u32;
     BackendLayout { size: pointer_bytes, alignment: pointer_bytes }
+}
+
+fn result_layout(layouts: &BuiltinLayouts, payload: &TypeName) -> Option<BackendEnumLayout> {
+    let payload = builtin_value_layout(layouts, payload)?;
+    let payload_offset = align_up(4, payload.alignment);
+    let alignment = 4u32.max(payload.alignment);
+    let size = align_up(payload_offset.checked_add(payload.size)?, alignment);
+    Some(BackendEnumLayout {
+        layout: BackendLayout { size, alignment },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset,
+        payload: Some(payload),
+        niche_pointer: false,
+    })
+}
+
+fn builtin_value_layout(layouts: &BuiltinLayouts, type_name: &TypeName) -> Option<BackendLayout> {
+    match type_name.name.as_str() {
+        "Bool" | "u8" | "i8" => Some(BackendLayout { size: 1, alignment: 1 }),
+        "u16" | "i16" => Some(BackendLayout { size: 2, alignment: 2 }),
+        "Int" | "u32" | "i32" => Some(BackendLayout { size: 4, alignment: 4 }),
+        "Usize" | "u64" | "i64" => Some(BackendLayout { size: 8, alignment: 8 }),
+        "Buffer" | "String" | "Arena" | "Region" => Some(host_pointer_layout()),
+        _ => layouts.layout_for(type_name),
+    }
+}
+
+fn align_up(value: u32, alignment: u32) -> u32 {
+    let remainder = value % alignment;
+    if remainder == 0 { value } else { value + alignment - remainder }
 }
 
 #[doc(hidden)]
@@ -346,154 +385,4 @@ fn parameter_cleanup(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        BackendLayout, BackendLayoutProvider, lower_program_to_backend_module_with_layouts,
-    };
-    use crate::ast::TypeName;
-    use crate::codegen::{
-        BackendInstruction, BackendPassingMode, BackendReturnMode, BackendValueType,
-    };
-    use crate::lexer::scan;
-    use crate::parser::parse;
-
-    struct RegionLayouts;
-
-    impl BackendLayoutProvider for RegionLayouts {
-        fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout> {
-            (type_name.name == "Region").then_some(BackendLayout { size: 32, alignment: 8 })
-        }
-    }
-
-    #[test]
-    fn lowers_region_signature_and_cleanup_through_shared_pipeline() {
-        let source = "verb inspect(erg region: Region[u32]) { return; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty(), "lexer errors: {errors:?}");
-        let program = parse(tokens).expect("Region fixture should parse");
-        let module = lower_program_to_backend_module_with_layouts(
-            "actus_root",
-            &program,
-            None,
-            None,
-            &RegionLayouts,
-        )
-        .expect("Region signature should lower through the shared pipeline");
-        let function = &module.functions[0];
-        assert!(matches!(function.parameters[0].ty, BackendValueType::Region { .. }));
-        assert!(matches!(function.parameters[0].passing, BackendPassingMode::Indirect { .. }));
-        assert!(matches!(function.return_value.passing, BackendReturnMode::Direct));
-        assert!(
-            function
-                .cleanup
-                .iter()
-                .flat_map(|plan| plan.resolved_bridges.iter().flatten())
-                .any(|descriptor| descriptor.descriptor.bridge
-                    == super::BackendCleanupBridge::RegionDrop)
-        );
-        assert!(matches!(
-            function.blocks[0].instructions.as_slice(),
-            [BackendInstruction::Cleanup { .. }, BackendInstruction::Return { value: None, .. }]
-        ));
-    }
-
-    #[test]
-    fn lowers_region_call_and_return_through_shared_pipeline() {
-        let source = "verb forward(dat region: Region[u32]) -> Region[u32] { return region; } verb main(dat region: Region[u32]) -> Region[u32] { return forward(region: dat region); }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty(), "lexer errors: {errors:?}");
-        let program = parse(tokens).expect("Region call fixture should parse");
-        let module = lower_program_to_backend_module_with_layouts(
-            "actus_root",
-            &program,
-            None,
-            None,
-            &RegionLayouts,
-        )
-        .expect("Region call should lower through the shared pipeline");
-        let main = module
-            .functions
-            .iter()
-            .find(|function| function.symbol.as_str().ends_with("main"))
-            .expect("main function should be present");
-        assert!(main.blocks.iter().flat_map(|block| block.instructions.iter()).any(
-            |instruction| matches!(
-                instruction,
-                crate::codegen::BackendInstruction::Call { result: Some(_), .. }
-            )
-        ));
-        assert!(
-            main.blocks
-                .iter()
-                .flat_map(|block| block.instructions.iter())
-                .all(|instruction| !matches!(instruction, BackendInstruction::Cleanup { .. }))
-        );
-    }
-
-    #[test]
-    fn lowers_buffer_cleanup_before_shared_return() {
-        let source = "verb inspect(erg buffer: Buffer) { return; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty(), "lexer errors: {errors:?}");
-        let program = parse(tokens).expect("Buffer fixture should parse");
-        let module =
-            super::super::lower_program_to_backend_module("actus_root", &program, None, None)
-                .expect("Buffer cleanup should lower through the shared pipeline");
-        assert!(matches!(
-            module.functions[0].blocks[0].instructions.as_slice(),
-            [BackendInstruction::Cleanup { .. }, BackendInstruction::Return { value: None, .. }]
-        ));
-        assert!(
-            module.functions[0]
-                .cleanup
-                .iter()
-                .flat_map(|plan| { plan.resolved_bridges.iter().flatten() })
-                .any(|descriptor| {
-                    descriptor.descriptor.bridge == super::BackendCleanupBridge::BufferDrop
-                })
-        );
-    }
-
-    #[test]
-    fn lowers_compile_time_integer_casts_as_typed_constants() {
-        let source = "verb main() -> u32 { return 4 as u32; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty(), "lexer errors: {errors:?}");
-        let program = parse(tokens).expect("cast fixture should parse");
-        let module =
-            super::super::lower_program_to_backend_module("actus_root", &program, None, None)
-                .expect("compile-time cast should lower through the shared pipeline");
-        assert!(matches!(
-            module.functions[0].blocks[0].instructions.as_slice(),
-            [
-                BackendInstruction::Constant {
-                    ty: BackendValueType::Integer { signed: false, width: 32 },
-                    ..
-                },
-                BackendInstruction::Return { value: Some(_), .. }
-            ]
-        ));
-    }
-
-    #[test]
-    fn lowers_runtime_integer_casts_with_checked_neutral_instruction() {
-        let source = "verb identity(erg value: Int) -> u32 { return value as u32; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty(), "lexer errors: {errors:?}");
-        let program = parse(tokens).expect("runtime cast fixture should parse");
-        let module =
-            super::super::lower_program_to_backend_module("actus_root", &program, None, None)
-                .expect("runtime cast should lower through the shared contract");
-        assert!(matches!(
-            module.functions[0].blocks[0].instructions.as_slice(),
-            [
-                BackendInstruction::IntegerCast {
-                    source_type: BackendValueType::Integer { signed: true, width: 32 },
-                    target_type: BackendValueType::Integer { signed: false, width: 32 },
-                    ..
-                },
-                BackendInstruction::Return { value: Some(_), .. }
-            ]
-        ));
-    }
-}
+mod tests;

@@ -8,6 +8,8 @@ use super::{
     BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
 };
 
+mod case;
+
 pub trait BackendBodyProvider {
     fn value_for(&self, expression: &Expr) -> Result<BackendValueId, BackendContractError>;
 
@@ -84,6 +86,17 @@ pub trait BackendExpressionProvider {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError>;
 
+    fn lower_enum_variant_condition(
+        &mut self,
+        subject: &Expr,
+        variant: &str,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        let _ = (subject, variant, instructions);
+        Err(unsupported(span, "enum case matching"))
+    }
+
     fn failure_for(
         &mut self,
         _expression: &Expr,
@@ -118,10 +131,10 @@ pub fn lower_verb_body_with_expressions(
     Ok(lowering.blocks)
 }
 
-struct BodyLowering<'a, P> {
-    provider: &'a mut P,
+pub(super) struct BodyLowering<'a, P> {
+    pub(super) provider: &'a mut P,
     next_block: u32,
-    blocks: Vec<BackendBlock>,
+    pub(super) blocks: Vec<BackendBlock>,
     loop_targets: Vec<LoopTargets>,
 }
 
@@ -161,7 +174,7 @@ impl<P: BackendBodyProvider> BackendExpressionProvider for LegacyExpressionProvi
 }
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
-    fn lower_block(
+    pub(super) fn lower_block(
         &mut self,
         id: BackendBlockId,
         block: &Block,
@@ -229,6 +242,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     self.lower_block(continuation_id, &continuation, fallthrough)?;
                 self.blocks.push(continuation_block);
                 return Ok(BackendBlock { id, instructions });
+            }
+            if let Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } = statement {
+                return self.lower_case_return(id, expression, *span, instructions);
             }
             self.lower_statement(statement, &mut instructions)?;
             if terminates(instructions.last()) {
@@ -462,7 +478,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(branches_terminate)
     }
 
-    fn allocate_block(&mut self) -> BackendBlockId {
+    pub(super) fn allocate_block(&mut self) -> BackendBlockId {
         let id = BackendBlockId(self.next_block);
         self.next_block += 1;
         id

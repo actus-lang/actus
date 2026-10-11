@@ -1,5 +1,6 @@
 use crate::ast::{Param, PrimitiveType, ReturnAccess, ReturnType, Role, TypeName, VerbDecl};
 
+use super::abi::BackendEnumLayout;
 use super::{
     BackendBodyProvider, BackendContractError, BackendFunction, BackendLayout, BackendParameter,
     BackendPassingMode, BackendReturn, BackendReturnMode, BackendTargetContext, BackendValueType,
@@ -8,6 +9,10 @@ use super::{
 
 pub trait BackendLayoutProvider {
     fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout>;
+
+    fn enum_layout_for(&self, _type_name: &TypeName) -> Option<BackendEnumLayout> {
+        None
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -173,6 +178,9 @@ fn lower_type(
     };
     if let Some(scalar) = scalar {
         return Ok((scalar, None));
+    }
+    if let Some(layout) = layouts.enum_layout_for(type_name) {
+        return Ok((BackendValueType::Enum { layout }, Some(layout.layout)));
     }
     let layout = layouts.layout_for(type_name).ok_or_else(|| {
         unsupported(
