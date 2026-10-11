@@ -4,9 +4,11 @@ use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeName, VerbDecl};
 
 mod constructors;
 mod expression;
+mod layout;
 mod support;
 
 use expression::SharedExpressionProvider;
+use layout::ProgramLayouts;
 use support::{backend_value_type, unsupported};
 
 use super::abi::BackendEnumLayout;
@@ -126,13 +128,8 @@ pub(crate) fn lower_program_to_backend_module(
     entry_name: Option<&str>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendModule, BackendContractError> {
-    lower_program_to_backend_module_with_layouts(
-        namespace,
-        program,
-        entry_name,
-        bindings,
-        &BuiltinLayouts,
-    )
+    let layouts = ProgramLayouts::new(program);
+    lower_program_to_backend_module_with_layouts(namespace, program, entry_name, bindings, &layouts)
 }
 
 pub(crate) fn lower_program_to_backend_module_with_layouts(

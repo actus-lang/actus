@@ -759,6 +759,17 @@ verifies that the explicit action is removed from the later scope cleanup
 plan. Scalar drops remain valid no-op cleanup operations; custom user-defined
 Drop performance lowering remains outside the shared builtin bridge contract.
 
+The first neutral aggregate-layout slice is now program-backed: the shared
+signature contract derives non-generic user-defined struct size and alignment
+from Actus declarations, recursively handles nested structs, treats `abs` and
+`ins` fields as pointer-width references, and rejects recursive, malformed, or
+overflowing layouts by withholding the unsupported layout. The regression
+`derives_nested_struct_layouts_in_the_neutral_signature_contract` verifies the
+same deterministic layout metadata and indirect aggregate passing mode without
+importing Cranelift or LLVM types. This is layout groundwork only; user-defined
+`Drop` performance discovery, bridge identity, body lowering, and backend
+emission remain open.
+
 Build metadata now has an integration regression,
 `backend_change_invalidates_generated_artifacts`, proving that an artifact
 written under the Cranelift configuration is invalidated when the selected

@@ -43,6 +43,29 @@ fn lowers_result_constructor_with_region_payload_layout() {
 }
 
 #[test]
+fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
+    let source = "struct Inner { erg first: u32, abs view: Buffer, } struct Outer { erg inner: Inner, erg tail: u16, } verb inspect(erg value: Outer) { return; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "struct layout fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("struct layout fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("nested struct signature should lower through the neutral contract");
+    let parameter = &module.functions[0].parameters[0];
+    assert!(matches!(
+        parameter.ty,
+        actus::codegen::BackendValueType::Aggregate {
+            layout: actus::codegen::BackendLayout { size: 24, alignment: 8 }
+        }
+    ));
+    assert!(matches!(
+        parameter.passing,
+        actus::codegen::BackendPassingMode::Indirect {
+            layout: actus::codegen::BackendLayout { size: 24, alignment: 8 }
+        }
+    ));
+}
+
+#[test]
 fn lowers_explicit_scalar_drop_without_backend_cleanup() {
     let source = "verb main() -> Int { erg value = 41; drop(value); return 42; }";
     let (tokens, errors) = actus::lexer::scan(source);
