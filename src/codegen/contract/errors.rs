@@ -15,6 +15,7 @@ pub enum BackendContractError {
     DirectAggregateTypeMismatch,
     InvalidFailureType,
     InvalidMemoryCopy,
+    InvalidAggregateInstruction,
     InvalidAggregateAbi(&'static str),
     InvalidCleanupContract(String),
     InvalidCleanupPlan,
@@ -117,6 +118,9 @@ fn simple_message(error: &BackendContractError) -> Option<&'static str> {
         }
         BackendContractError::InvalidMemoryCopy => {
             "backend memory copy requires a non-zero aligned extent"
+        }
+        BackendContractError::InvalidAggregateInstruction => {
+            "backend aggregate construction has invalid field layout"
         }
         BackendContractError::ReturnSlotTypeMismatch => {
             "backend return slot must match an aggregate return type"

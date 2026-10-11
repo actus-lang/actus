@@ -2,6 +2,7 @@ use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
+mod aggregate;
 mod arithmetic;
 mod case;
 mod cast;
@@ -274,6 +275,9 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             Expr::Binary { .. } => self.lower_binary(expression, instructions),
             Expr::Call { .. } => self.lower_call(expression, instructions),
             Expr::MethodCall { .. } => self.lower_method_call(expression, instructions),
+            Expr::StructLit { .. } => {
+                aggregate::lower_struct_literal_expression(self, expression, instructions)
+            }
             _ => Err(unsupported(
                 expression_span(expression),
                 "expression is outside the scalar shared lowering contract",

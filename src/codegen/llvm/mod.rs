@@ -1,3 +1,4 @@
+mod aggregates;
 mod branches;
 mod calls;
 mod cleanup;

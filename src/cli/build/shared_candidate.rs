@@ -5,35 +5,8 @@ use crate::ast::{
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
-    let unit_enums = program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            crate::ast::TopLevelDecl::Enum(definition)
-                if definition.generic_parameters.is_empty()
-                    && definition
-                        .variants
-                        .iter()
-                        .all(|variant| matches!(variant.payload, EnumPayload::Unit)) =>
-            {
-                Some(definition.name.clone())
-            }
-            _ => None,
-        })
-        .collect::<BTreeSet<_>>();
-    let returns_value = program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            crate::ast::TopLevelDecl::Verb(verb) => {
-                Some((verb.name.clone(), verb.return_type.is_some()))
-            }
-            crate::ast::TopLevelDecl::ExternalVerb(verb) => {
-                Some((verb.name.clone(), verb.return_type.is_some()))
-            }
-            _ => None,
-        })
-        .collect::<BTreeMap<_, _>>();
+    let unit_enums = unit_enums(program);
+    let returns_value = returns_value(program);
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
             verb.generic_parameters.is_empty()
@@ -59,8 +32,63 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
                     .iter()
                     .all(|variant| matches!(variant.payload, EnumPayload::Unit))
         }
+        crate::ast::TopLevelDecl::Struct(definition) => supported_struct(definition),
+        crate::ast::TopLevelDecl::Perform(perform) => supported_perform(perform, program),
         _ => false,
     })
+}
+
+fn unit_enums(program: &Program) -> BTreeSet<String> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Enum(definition)
+                if definition.generic_parameters.is_empty()
+                    && definition
+                        .variants
+                        .iter()
+                        .all(|variant| matches!(variant.payload, EnumPayload::Unit)) =>
+            {
+                Some(definition.name.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn returns_value(program: &Program) -> BTreeMap<String, bool> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Verb(verb) => {
+                Some((verb.name.clone(), verb.return_type.is_some()))
+            }
+            crate::ast::TopLevelDecl::ExternalVerb(verb) => {
+                Some((verb.name.clone(), verb.return_type.is_some()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn supported_struct(definition: &crate::ast::StructDef) -> bool {
+    definition.generic_parameters.is_empty()
+        && definition.fields.iter().all(|field| {
+            matches!(field.role, crate::ast::StructFieldRole::Erg) && scalar_type(&field.ty)
+        })
+}
+
+fn supported_perform(perform: &crate::ast::PerformDecl, program: &Program) -> bool {
+    perform.target.arguments.is_empty()
+        && program.declarations.iter().any(|declaration| {
+            matches!(
+                declaration,
+                crate::ast::TopLevelDecl::Struct(definition)
+                    if definition.name == perform.target.name && supported_struct(definition)
+            )
+        })
 }
 
 fn scalar_parameter(parameter: &crate::ast::Param, unit_enums: &BTreeSet<String>) -> bool {
@@ -199,6 +227,10 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
                 && matches!(method.as_str(), "Ok" | "Err")
                 && arguments.len() == 1
                 && scalar_expression(&arguments[0].expression, returns_value)
+        }
+        Expr::StructLit { name, fields, .. } => {
+            !name.is_empty()
+                && fields.iter().all(|field| scalar_expression(&field.value, returns_value))
         }
         _ => false,
     }

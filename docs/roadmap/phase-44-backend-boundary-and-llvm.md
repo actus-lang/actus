@@ -973,10 +973,15 @@ The real LLVM CLI path now also builds and runs a source unit that declares a
 user-defined `Drop` performance alongside the selected entry verb. The
 regression `llvm_backend_builds_and_runs_a_user_defined_drop_performance`
 verifies manifest backend selection, executable emission, linking, and exit
-status 42. This confirms CLI admission and function emission for the declared
-performance; aggregate owner construction and an executed aggregate cleanup
-call remain separate shared-expression work and are not implied by this
-fixture.
+status 42. The fixture now constructs a scalar-field `Counter` owner, so its
+scope cleanup emits and executes the declared performance bridge. The neutral
+regression `lowers_aggregate_owner_construction_into_scoped_drop_cleanup` and
+the backend regression `both_backends_emit_user_defined_drop_performance_calls`
+cover the same construction and cleanup contract for the neutral module,
+LLVM IR, and Cranelift object paths. This closes only the non-generic
+scalar-field aggregate construction slice; nested aggregate fields, aggregate
+field access and assignment, generic aggregate values, and full ownership
+mutation parity remain open.
 
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute

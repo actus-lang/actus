@@ -1,0 +1,80 @@
+use std::collections::BTreeMap;
+
+use llvm_sys::core::{
+    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
+    LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment,
+};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
+
+use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+
+pub(super) fn emit_aggregate_construct(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::AggregateConstruct { result, layout, fields, .. } = instruction else {
+        return Err(BackendEmitError("LLVM aggregate construction expected".to_owned()));
+    };
+    let aggregate_type =
+        super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
+    let address = unsafe {
+        LLVMBuildAlloca(builder, aggregate_type, b"aggregate.construct\0".as_ptr().cast())
+    };
+    if address.is_null() {
+        return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
+    }
+    unsafe { LLVMSetAlignment(address, layout.alignment) };
+    for field in fields {
+        let value = values.get(&field.value).copied().ok_or_else(|| {
+            BackendEmitError(format!("LLVM aggregate field value {} is unavailable", field.value.0))
+        })?;
+        let destination = field_address(context, builder, address, field.offset)?;
+        if matches!(field.ty, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. })
+        {
+            let size = unsafe {
+                LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(field.layout.size), 0)
+            };
+            let copy = unsafe {
+                LLVMBuildMemMove(
+                    builder,
+                    destination,
+                    field.layout.alignment,
+                    value,
+                    field.layout.alignment,
+                    size,
+                )
+            };
+            if copy.is_null() {
+                return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
+            }
+        } else if unsafe { LLVMBuildStore(builder, value, destination) }.is_null() {
+            return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
+        }
+    }
+    values.insert(*result, address);
+    Ok(false)
+}
+
+fn field_address(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    base: LLVMValueRef,
+    offset: u32,
+) -> Result<LLVMValueRef, BackendEmitError> {
+    let index = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(offset), 0) };
+    let address = unsafe {
+        LLVMBuildGEP2(
+            builder,
+            LLVMInt8TypeInContext(context),
+            base,
+            &index as *const _ as *mut _,
+            1,
+            b"aggregate.field\0".as_ptr().cast(),
+        )
+    };
+    (!address.is_null())
+        .then_some(address)
+        .ok_or_else(|| BackendEmitError("LLVM failed to address aggregate field".to_owned()))
+}

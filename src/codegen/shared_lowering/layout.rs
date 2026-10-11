@@ -4,6 +4,7 @@ use crate::ast::{
     BuiltinType, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName, primitive_type,
 };
 
+use super::super::BackendFieldLayout;
 use super::super::symbols::{SymbolIdentity, SymbolKind};
 use super::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
@@ -263,6 +264,20 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             payload: Some(payload),
             niche_pointer: false,
         })
+    }
+
+    fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
+        let definition = self.structs.get(type_name.name.as_str())?;
+        let mut offset = 0u32;
+        for field in &definition.fields {
+            let layout = self.field_storage_layout(&field.role, &field.ty)?;
+            offset = Self::align_up(offset, layout.alignment)?;
+            if field.name == field_name {
+                return Some(BackendFieldLayout { offset, layout, ty: field.ty.clone() });
+            }
+            offset = offset.checked_add(layout.size)?;
+        }
+        None
     }
 }
 

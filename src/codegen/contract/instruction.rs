@@ -8,6 +8,14 @@ use super::super::symbols::SymbolIdentity;
 use super::{BackendCleanupOperand, BackendFailure, BackendValueType};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendAggregateField {
+    pub offset: u32,
+    pub layout: super::BackendLayout,
+    pub value: super::BackendValueId,
+    pub ty: BackendValueType,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BackendInstruction {
     Constant {
         result: super::BackendValueId,
@@ -130,6 +138,12 @@ pub enum BackendInstruction {
         source: super::BackendValueId,
         size: u32,
         alignment: u32,
+        span: SourceSpan,
+    },
+    AggregateConstruct {
+        result: super::BackendValueId,
+        layout: super::BackendLayout,
+        fields: Vec<BackendAggregateField>,
         span: SourceSpan,
     },
 }

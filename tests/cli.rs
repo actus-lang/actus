@@ -50,7 +50,7 @@ fn llvm_backend_builds_and_runs_a_user_defined_drop_performance() {
     .expect("write LLVM Drop fixture manifest");
     fs::write(
         &input,
-        "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb main() -> Int { return 42; }\n",
+        "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb main() -> Int { erg counter: Counter = Counter { value: 7, }; return 42; }\n",
     )
     .expect("write LLVM Drop fixture source");
 

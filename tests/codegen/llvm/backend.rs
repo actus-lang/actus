@@ -47,7 +47,7 @@ fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
 #[cfg(feature = "cranelift")]
 #[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
-    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect(erg value: Counter) { return; }";
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "Drop performance fixture should lex: {errors:?}");
     let program = parse(tokens).expect("Drop performance fixture should parse");

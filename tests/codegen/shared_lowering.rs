@@ -94,6 +94,38 @@ fn records_user_defined_drop_with_a_neutral_performance_bridge_symbol() {
 }
 
 #[test]
+fn lowers_aggregate_owner_construction_into_scoped_drop_cleanup() {
+    let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb main() -> Int { erg counter: Counter = Counter { value: 7, }; return 42; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "aggregate owner fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("aggregate owner fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("aggregate owner should lower through the neutral contract");
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str() == "main")
+        .expect("entry function should be present");
+    let instructions =
+        main.blocks.iter().flat_map(|block| block.instructions.iter()).collect::<Vec<_>>();
+    assert!(
+        instructions.iter().any(|instruction| matches!(
+            instruction,
+            BackendInstruction::AggregateConstruct { .. }
+        ))
+    );
+    assert!(instructions.iter().any(|instruction| {
+        matches!(
+            instruction,
+            BackendInstruction::Cleanup {
+                operand: Some(operand),
+                ..
+            } if operand.bridge == actus::codegen::BackendCleanupBridge::PerformanceDrop
+        )
+    }));
+}
+
+#[test]
 fn lowers_explicit_scalar_drop_without_backend_cleanup() {
     let source = "verb main() -> Int { erg value = 41; drop(value); return 42; }";
     let (tokens, errors) = actus::lexer::scan(source);

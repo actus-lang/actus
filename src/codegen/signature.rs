@@ -10,9 +10,20 @@ use super::{
 pub trait BackendLayoutProvider {
     fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout>;
 
+    fn field_for(&self, _type_name: &TypeName, _field: &str) -> Option<BackendFieldLayout> {
+        None
+    }
+
     fn enum_layout_for(&self, _type_name: &TypeName) -> Option<BackendEnumLayout> {
         None
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendFieldLayout {
+    pub offset: u32,
+    pub layout: BackendLayout,
+    pub ty: TypeName,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

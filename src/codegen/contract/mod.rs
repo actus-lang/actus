@@ -2,6 +2,7 @@ mod cleanup;
 mod errors;
 mod instruction;
 mod semantic_cleanup;
+mod validation;
 
 use crate::ast::Role;
 use crate::lexer::SourceSpan;
@@ -15,14 +16,13 @@ pub use super::backend::BackendIntegerUnaryOp;
 use super::model::LoweredCleanupInstruction;
 use super::symbols::{SymbolIdentity, SymbolKind};
 
-use cleanup::validate_cleanup_operand;
 pub use cleanup::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupOperand, BackendCleanupProvider,
     BackendCleanupResolvedDescriptor, BackendCleanupResult,
 };
 pub use errors::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
-pub use instruction::BackendInstruction;
+pub use instruction::{BackendAggregateField, BackendInstruction};
 pub use semantic_cleanup::lower_semantic_cleanup_with_provider;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -251,7 +251,7 @@ impl BackendFunction {
         validate_function_symbol(&self.symbol)?;
         validate_signature(&self.parameters, &self.return_value)?;
         let block_ids = validate_blocks(&self.blocks, self.entry)?;
-        validate_instructions(&self.blocks, &block_ids)?;
+        validation::validate_instructions(&self.blocks, &block_ids)?;
         validate_cleanup_plans(&self.cleanup)?;
         Ok(())
     }
@@ -341,78 +341,6 @@ fn validate_blocks(
     Ok(ids)
 }
 
-fn validate_instructions(
-    blocks: &[BackendBlock],
-    block_ids: &BTreeSet<BackendBlockId>,
-) -> Result<(), BackendContractError> {
-    for block in blocks {
-        for instruction in &block.instructions {
-            validate_instruction(instruction, block_ids)?;
-        }
-    }
-    Ok(())
-}
-
-fn validate_instruction(
-    instruction: &BackendInstruction,
-    block_ids: &BTreeSet<BackendBlockId>,
-) -> Result<(), BackendContractError> {
-    match instruction {
-        BackendInstruction::Constant { ty, .. }
-            if !matches!(ty, BackendValueType::Bool | BackendValueType::Integer { .. }) =>
-        {
-            Err(BackendContractError::InvalidValueType)
-        }
-        BackendInstruction::Call { callee, .. } if callee.as_str().is_empty() => {
-            Err(BackendContractError::InvalidCallSymbol)
-        }
-        BackendInstruction::Branch { then_block, else_block, .. }
-            if !block_ids.contains(then_block) || !block_ids.contains(else_block) =>
-        {
-            Err(BackendContractError::InvalidBlockReference)
-        }
-        BackendInstruction::Jump { target, .. } if !block_ids.contains(target) => {
-            Err(BackendContractError::InvalidBlockReference)
-        }
-        BackendInstruction::Fail { failure, .. } => super::abi::validate_failure(failure),
-        BackendInstruction::EnumDiscriminant { layout, .. } => layout.validate(),
-        BackendInstruction::EnumPayload { layout, payload_type, .. } => {
-            layout.validate()?;
-            validate_value_type(*payload_type)
-        }
-        BackendInstruction::EnumPayloadBinding { layout, payload_type, .. } => {
-            layout.validate()?;
-            validate_value_type(*payload_type)
-        }
-        BackendInstruction::EnumConstruct { discriminant, layout, payload_type, .. } => {
-            layout.validate()?;
-            if layout.niche_pointer || layout.payload.is_none() {
-                return Err(BackendContractError::InvalidEnumLayout(
-                    "enum constructor requires an inline payload",
-                ));
-            }
-            if u64::from(*discriminant) >= (1u64 << (u32::from(layout.discriminant_size) * 8)) {
-                return Err(BackendContractError::InvalidEnumLayout(
-                    "enum constructor discriminant does not fit its field",
-                ));
-            }
-            validate_value_type(*payload_type)
-        }
-        BackendInstruction::Cleanup { action, operand, .. } => {
-            validate_cleanup_operand(action, operand.clone())
-        }
-        BackendInstruction::MemoryCopy { size, alignment, .. }
-            if *size == 0
-                || *alignment == 0
-                || !alignment.is_power_of_two()
-                || size % alignment != 0 =>
-        {
-            Err(BackendContractError::InvalidMemoryCopy)
-        }
-        _ => Ok(()),
-    }
-}
-
 fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContractError> {
     if let Some(layout) = parameter.passing.layout() {
         layout.validate()?;
@@ -475,7 +403,7 @@ fn validate_direct_aggregate_type(
     }
 }
 
-fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError> {
+pub(super) fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError> {
     match ty {
         BackendValueType::Integer { width: 0, .. } | BackendValueType::Float { width: 0 } => {
             Err(BackendContractError::InvalidValueType)

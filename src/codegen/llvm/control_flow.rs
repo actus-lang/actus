@@ -4,6 +4,7 @@ use super::super::{
     BackendBlockId, BackendEmitError, BackendFunction, BackendInstruction, BackendValueId,
     BackendValueType,
 };
+use super::aggregates::emit_aggregate_construct;
 use super::branches::{block_value, emit_branch, emit_jump};
 use super::calls::emit_call;
 use super::cleanup::emit_cleanup;
@@ -129,6 +130,9 @@ fn emit_instruction(
         ),
         BackendInstruction::MemoryCopy { destination, source, size, alignment, .. } => {
             emit_memory_copy(context, builder, *destination, *source, *size, *alignment, values)
+        }
+        BackendInstruction::AggregateConstruct { .. } => {
+            emit_aggregate_construct(context, builder, instruction, values)
         }
         _ => unreachable!("scalar instruction was not dispatched"),
     }
