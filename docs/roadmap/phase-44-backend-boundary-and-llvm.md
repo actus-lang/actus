@@ -822,6 +822,16 @@ Buffer-Region-Enum ordering through both generated executables. The remaining
 open work is full aggregate runtime behavior beyond the covered contract and
 complete CLI execution.
 
+Explicit `drop` statements are now admitted by the shared CLI candidate
+boundary. The neutral cleanup contract handles builtin `Buffer` and `Region`
+drops through validated runtime bridges, while scalar drops lower to no
+backend instruction after semantic ownership validation. The external
+regression `lowers_explicit_scalar_drop_without_backend_cleanup` covers the
+scalar no-op contract, and the existing hosted Region parity fixtures cover
+explicit Region cleanup through both native backends. User-defined `Drop`
+performances remain outside this candidate until neutral aggregate layout,
+performance declarations, and performance-call lowering are available.
+
 The neutral lowering boundary now materializes compile-time integer casts as
 typed constants after validating the target range. It also lowers runtime
 integer casts as a checked `IntegerCast` instruction carrying both source and

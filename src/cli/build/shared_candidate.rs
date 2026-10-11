@@ -132,7 +132,8 @@ fn scalar_statement(
         Stmt::Loop(_) => false,
         Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
-        Stmt::ForRange { .. } | Stmt::ForArray { .. } | Stmt::Drop { .. } => false,
+        Stmt::ForRange { .. } | Stmt::ForArray { .. } => false,
+        Stmt::Drop { .. } => true,
     }
 }
 
@@ -290,7 +291,7 @@ mod tests {
 
     #[test]
     fn rejects_constructs_outside_the_scalar_contract_slice() {
-        let source = "verb main() -> Int { drop(value); return 0; }";
+        let source = "verb main() -> Int { loop { break; } return 0; }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("fixture should parse");

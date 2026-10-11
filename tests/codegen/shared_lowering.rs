@@ -43,6 +43,29 @@ fn lowers_result_constructor_with_region_payload_layout() {
 }
 
 #[test]
+fn lowers_explicit_scalar_drop_without_backend_cleanup() {
+    let source = "verb main() -> Int { erg value = 41; drop(value); return 42; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "explicit scalar drop fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("explicit scalar drop fixture should parse");
+    let module = actus::codegen::lower_scalar_program("actus_root", &program, None)
+        .expect("scalar drop should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(
+        instructions
+            .iter()
+            .all(|instruction| { !matches!(instruction, BackendInstruction::Cleanup { .. }) })
+    );
+    assert!(instructions.iter().any(|instruction| {
+        matches!(instruction, BackendInstruction::Return { value: Some(_), .. })
+    }));
+}
+
+#[test]
 fn preserves_distinct_result_payload_types_for_case_bindings() {
     let source = "verb inspect(dat result: Result[Region[u32], Int]) -> Int { return case dat result { Result.Ok(value) => 0, Result.Err(error) => error, }; }";
     let (tokens, errors) = actus::lexer::scan(source);
