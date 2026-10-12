@@ -118,6 +118,30 @@ fn lowers_pointer_valued_borrow_without_allocating_a_second_value() {
 }
 
 #[test]
+fn lowers_pointer_option_constructors_through_the_neutral_contract() {
+    let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return case next { Option.Some(_) => 1, Option.None => 0, }; } verb main() -> Int { erg node = Node { value: 7, next: Option[abs Node].None, }; return sum(node: abs node); }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "pointer Option fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("pointer Option fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("pointer Option constructors should lower through the neutral contract");
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str() == "main")
+        .expect("pointer Option fixture should include main");
+    let instructions =
+        main.blocks.iter().flat_map(|block| block.instructions.iter()).collect::<Vec<_>>();
+    assert_eq!(
+        instructions
+            .iter()
+            .filter(|instruction| matches!(instruction, BackendInstruction::EnumConstruct { layout, .. } if layout.niche_pointer))
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
     let source = "struct Inner { erg first: u32, abs view: Buffer, } struct Outer { erg inner: Inner, erg tail: u16, } verb inspect(erg value: Outer) { return; }";
     let (tokens, errors) = actus::lexer::scan(source);

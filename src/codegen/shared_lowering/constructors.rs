@@ -2,8 +2,8 @@ use crate::ast::{Expr, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::super::{
-    BackendContractError, BackendExpressionProvider, BackendInstruction, BackendIntegerCompareOp,
-    BackendValueId, BackendValueType,
+    BackendContractError, BackendEnumLayout, BackendExpressionProvider, BackendInstruction,
+    BackendIntegerCompareOp, BackendValueId, BackendValueType,
 };
 use super::expression::SharedExpressionProvider;
 use super::support::{expression_span, unsupported};
@@ -22,6 +22,16 @@ pub(super) fn lower_method_call(
     let result_type = parse_type_name(name, *span).ok_or_else(|| {
         unsupported(*span, "Result constructor receiver has an invalid type name")
     })?;
+    if result_type.name == "Option" && result_type.arguments.len() == 1 {
+        return lower_niche_option_constructor(
+            provider,
+            &result_type,
+            method,
+            arguments,
+            *span,
+            instructions,
+        );
+    }
     if result_type.name != "Result" || result_type.arguments.len() != 2 {
         return lower_named_unit_enum(
             provider,
@@ -33,6 +43,54 @@ pub(super) fn lower_method_call(
         );
     }
     lower_result_constructor(provider, &result_type, method, arguments, *span, instructions)
+}
+
+fn lower_niche_option_constructor(
+    provider: &mut SharedExpressionProvider<'_>,
+    option_type: &TypeName,
+    method: &str,
+    arguments: &[crate::ast::Argument],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let layout = provider
+        .enum_layout(option_type)
+        .filter(|layout| layout.niche_pointer)
+        .ok_or_else(|| unsupported(span, "Option payload is not a pointer reference"))?;
+    let (discriminant, payload) = match method {
+        "None" if arguments.is_empty() => (0, None),
+        "Some" if arguments.len() == 1 => {
+            let payload = provider.lower_expression(&arguments[0].expression, instructions)?;
+            (1, Some(payload))
+        }
+        _ => return Err(unsupported(span, "invalid pointer Option constructor")),
+    };
+    let result = provider.allocate();
+    provider.remember_value(result, BackendValueType::NichePointerOption { layout: layout.layout });
+    if let Some(payload) = payload {
+        let payload_type = provider
+            .value_type(payload)
+            .ok_or_else(|| unsupported(span, "Option payload type is unavailable"))?;
+        provider.remember_enum_payload(result, 1, payload_type);
+        instructions.push(BackendInstruction::EnumConstruct {
+            result,
+            discriminant,
+            payload: Some(payload),
+            layout,
+            payload_type: Some(payload_type),
+            span,
+        });
+    } else {
+        instructions.push(BackendInstruction::EnumConstruct {
+            result,
+            discriminant,
+            payload: None,
+            layout,
+            payload_type: None,
+            span,
+        });
+    }
+    Ok(result)
 }
 
 fn lower_result_constructor(
@@ -144,8 +202,20 @@ pub(super) fn lower_enum_variant_condition_value(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let Some(BackendValueType::Enum { layout }) = provider.value_type(subject_value) else {
+    let Some(subject_type) = provider.value_type(subject_value) else {
         return Err(unsupported(span, "enum case subject is not a neutral enum value"));
+    };
+    let layout = match subject_type {
+        BackendValueType::Enum { layout } => layout,
+        BackendValueType::NichePointerOption { layout } => BackendEnumLayout {
+            layout,
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset: 0,
+            payload: None,
+            niche_pointer: true,
+        },
+        _ => return Err(unsupported(span, "enum case subject is not a neutral enum value")),
     };
     let discriminant = match variant {
         "Ok" => 0,

@@ -34,13 +34,35 @@ fn lower_construct(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     return_slot: Option<cranelift_codegen::ir::Value>,
-    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::EnumConstruct { discriminant, payload, layout, payload_type, .. } =
         instruction
     else {
         return Err(BackendEmitError("Cranelift enum constructor instruction expected".to_owned()));
     };
+    if layout.niche_pointer {
+        let value = match payload {
+            Some(payload) => values.get(payload).copied().ok_or_else(|| {
+                BackendEmitError(format!(
+                    "Cranelift niche Option payload {} is unavailable",
+                    payload.0
+                ))
+            })?,
+            None => builder.ins().iconst(module.isa().pointer_type(), 0),
+        };
+        let _ = discriminant;
+        let _ = payload_type;
+        let _ = return_slot;
+        values.insert(
+            match instruction {
+                BackendInstruction::EnumConstruct { result, .. } => *result,
+                _ => unreachable!(),
+            },
+            value,
+        );
+        return Ok(());
+    }
     let slot = return_slot.ok_or_else(|| {
         BackendEmitError("Cranelift enum construction requires a return slot".to_owned())
     })?;
@@ -109,6 +131,18 @@ pub(super) fn lower_discriminant(
             "Cranelift enum discriminant instruction expected".to_owned(),
         ));
     };
+    if layout.niche_pointer {
+        let subject = values.get(subject).copied().ok_or_else(|| {
+            BackendEmitError(format!("Cranelift niche Option {} is unavailable", subject.0))
+        })?;
+        let comparison =
+            builder.ins().icmp_imm_s(cranelift_codegen::ir::condcodes::IntCC::Equal, subject, 0);
+        let one = builder.ins().iconst(types::I32, 1);
+        let zero = builder.ins().iconst(types::I32, 0);
+        let value = builder.ins().select(comparison, zero, one);
+        values.insert(*result, value);
+        return Ok(());
+    }
     let subject = enum_storage_pointer(builder, module.isa().pointer_type(), *subject, values)?;
     let ty = integer_type_for(layout.discriminant_size)?;
     let value =
@@ -138,6 +172,7 @@ pub(super) fn lower_payload(
             let ty = scalar_type(*payload_type)?;
             builder.ins().load(ty, MemFlagsData::new(), subject, layout.payload_offset as i32)
         }
+        BackendValueType::Pointer | BackendValueType::NichePointerOption { .. } => subject,
         BackendValueType::Aggregate { .. }
         | BackendValueType::Region { .. }
         | BackendValueType::Enum { .. } => {

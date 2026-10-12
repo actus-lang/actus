@@ -48,11 +48,15 @@ pub(super) fn enum_payload_types(
     verb.params
         .iter()
         .enumerate()
-        .filter(|(_, parameter)| parameter.ty.name == "Result" && parameter.ty.arguments.len() == 2)
-        .flat_map(|(index, parameter)| {
-            parameter.ty.arguments.iter().enumerate().filter_map(move |(discriminant, payload)| {
+        .filter(|(_, parameter)| {
+            (parameter.ty.name == "Result" && parameter.ty.arguments.len() == 2)
+                || (parameter.ty.name == "Option" && parameter.ty.arguments.len() == 1)
+        })
+        .flat_map(|(parameter_index, parameter)| {
+            parameter.ty.arguments.iter().enumerate().filter_map(move |(index, payload)| {
+                let discriminant = if parameter.ty.name == "Option" { 1 } else { index };
                 backend_value_type(layouts, payload).map(|payload_type| {
-                    ((BackendValueId(index as u32), discriminant as u32), payload_type)
+                    ((BackendValueId(parameter_index as u32), discriminant as u32), payload_type)
                 })
             })
         })

@@ -249,7 +249,17 @@ fn validate_enum_construct(
     payload_type: Option<super::BackendValueType>,
 ) -> Result<(), BackendContractError> {
     layout.validate()?;
-    if layout.niche_pointer || payload_type.is_some() && layout.payload.is_none() {
+    if layout.niche_pointer {
+        if discriminant == 0 && payload_type.is_some()
+            || discriminant == 1 && payload_type.is_none()
+        {
+            return Err(BackendContractError::InvalidEnumLayout(
+                "niche Option constructor payload does not match its variant",
+            ));
+        }
+        return payload_type.map_or(Ok(()), validate_value_type);
+    }
+    if payload_type.is_some() && layout.payload.is_none() {
         return Err(BackendContractError::InvalidEnumLayout(
             "enum constructor payload does not match its layout",
         ));

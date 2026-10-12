@@ -404,8 +404,10 @@ payload offset and layout, and niche-pointer mode. Contract validation rejects
 invalid ranges and mismatched payload metadata. LLVM lowers regular aggregate
 enum failures with integer payloads by constructing the declared byte layout
 and returning it directly or through the declared return slot; the LLVM module
-verifier covers the generated IR. Niche-pointer `Option` lowering remains open
-and is rejected with a stable diagnostic rather than approximated.
+verifier covers the generated IR. Generic pointer-`Option` construction and
+case lowering now use the shared contract and backend emitters; nested `case`
+expressions inside arithmetic remain open and continue to return a stable
+shared-lowering diagnostic.
 Direct aggregate ABI lowering remains open until a target/backend ABI
 descriptor defines register fragments, stack placement, padding, alignment,
 caller/callee lowering, and the matching external C declaration. Aggregate
@@ -487,6 +489,15 @@ that the returned pointer is unchanged. The neutral contract accepts this as a
 niche payload without declaring inline enum storage, while both emitters reject
 non-pointer niche payloads. Direct aggregate register ABI, ownership
 transitions, and runtime cleanup remain outside this evidence.
+The shared lowering path now also recognizes generic `Option[abs T]` and
+`Option[ins T]` constructors, field loads, variant tests, and payload bindings;
+the regression lives in `tests/codegen/shared_lowering.rs` and both LLVM and
+Cranelift emitters consume the same niche-pointer enum instruction contract.
+`examples/arena_tree.act` still cannot be accepted by LLVM because its return
+expression nests `case` expressions inside arithmetic; the current shared body
+lowering supports case control flow only at statement, owner, and top-level
+return boundaries. The exact LLVM diagnostic remains the follow-up boundary,
+not an Option representation failure.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when
 assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
 slot pointer. This is covered by the hosted parity fixture.

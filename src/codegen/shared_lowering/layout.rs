@@ -26,6 +26,8 @@ pub(super) struct ProgramLayouts<'program> {
     pointer_bytes: u32,
 }
 
+include!("layout/options.rs");
+
 impl<'program> ProgramLayouts<'program> {
     pub(super) fn new(program: &'program Program, namespace: &str) -> Self {
         let structs = program
@@ -82,6 +84,9 @@ impl<'program> ProgramLayouts<'program> {
         type_name: &TypeName,
         visiting: &mut Vec<String>,
     ) -> Option<BackendLayout> {
+        if is_niche_pointer_option(type_name) {
+            return Some(self.pointer_layout());
+        }
         if matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String") {
             return Some(self.pointer_layout());
         }
@@ -336,6 +341,9 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         &self,
         type_name: &TypeName,
     ) -> Option<super::super::abi::BackendEnumLayout> {
+        if let Some(layout) = self.niche_option_layout(type_name) {
+            return Some(layout);
+        }
         if type_name.name == "Result" && type_name.arguments.len() == 2 {
             let payload = type_name
                 .arguments
@@ -368,6 +376,9 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     }
 
     fn enum_variant(&self, type_name: &TypeName, variant: &str) -> Option<(u32, bool)> {
+        if let Some(variant) = niche_option_variant(type_name, variant) {
+            return Some(variant);
+        }
         let definition = self.enums.get(type_name.name.as_str())?;
         let (index, definition) = definition
             .variants
@@ -382,6 +393,9 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         layout: super::super::abi::BackendEnumLayout,
         variant: &str,
     ) -> Option<(u32, bool)> {
+        if layout.niche_pointer {
+            return niche_pointer_variant(variant);
+        }
         self.enums.values().find_map(|definition| {
             let type_name = TypeName {
                 name: definition.name.clone(),

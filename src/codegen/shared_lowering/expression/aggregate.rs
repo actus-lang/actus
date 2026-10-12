@@ -40,12 +40,13 @@ pub(super) fn lower_aggregate_expression(
         }
         Expr::FieldAccess { object, field, span } => {
             if let Expr::Identifier { name, .. } = object.as_ref() {
-                let type_name = TypeName {
-                    name: name.clone(),
-                    arguments: Vec::new(),
-                    reference_role: None,
-                    span: *span,
-                };
+                let type_name =
+                    crate::semantic::parse_type_name_key(name, *span).unwrap_or(TypeName {
+                        name: name.clone(),
+                        arguments: Vec::new(),
+                        reference_role: None,
+                        span: *span,
+                    });
                 if provider.enum_variant(&type_name, field).is_some() {
                     return super::super::constructors::lower_named_unit_enum(
                         provider,
@@ -348,11 +349,14 @@ pub(super) fn lower_field_access_expression(
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
-    let ty = if metadata.indirect {
+    let declared_ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+        .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?;
+    let ty = if metadata.indirect
+        && !matches!(declared_ty, BackendValueType::NichePointerOption { .. })
+    {
         BackendValueType::Pointer
     } else {
-        super::super::support::backend_value_type(provider.layouts, &metadata.ty)
-            .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
+        declared_ty
     };
     let result = provider.allocate();
     provider.remember_value(result, ty);

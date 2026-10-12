@@ -100,7 +100,10 @@ fn lower_borrow(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
     let value = lower_expression(provider, expression, instructions)?;
-    if matches!(provider.value_type(value), Some(BackendValueType::Pointer)) {
+    if matches!(
+        provider.value_type(value),
+        Some(BackendValueType::Pointer | BackendValueType::NichePointerOption { .. })
+    ) {
         Ok(value)
     } else {
         Err(unsupported(span, "borrow requires a pointer-valued expression"))

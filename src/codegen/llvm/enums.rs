@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
+use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
-    LLVMConstNull, LLVMInt8TypeInContext, LLVMSetAlignment,
+    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove,
+    LLVMBuildStore, LLVMConstInt, LLVMConstNull, LLVMInt8TypeInContext, LLVMSetAlignment,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
@@ -19,6 +20,9 @@ pub(super) fn emit_enum_discriminant(
     let BackendInstruction::EnumDiscriminant { result, subject, layout, .. } = instruction else {
         return Err(BackendEmitError("LLVM enum discriminant instruction expected".to_owned()));
     };
+    if layout.niche_pointer {
+        return emit_niche_discriminant(context, builder, *result, *subject, *layout, values);
+    }
     let temporary = enum_temporary(context, builder, *subject, *layout, values)?;
     let address = enum_field_address(context, builder, temporary, layout.discriminant_offset)?;
     let discriminant_type = integer_type(context, layout.discriminant_size)?;
@@ -44,6 +48,13 @@ pub(super) fn emit_enum_payload(
         } => (result, subject, layout, payload_type),
         _ => return Err(BackendEmitError("LLVM enum payload instruction expected".to_owned())),
     };
+    if layout.niche_pointer {
+        let subject = values.get(subject).copied().ok_or_else(|| {
+            BackendEmitError(format!("LLVM niche Option {} is unavailable", subject.0))
+        })?;
+        values.insert(*result, subject);
+        return Ok(false);
+    }
     let temporary = enum_temporary(context, builder, *subject, *layout, values)?;
     let address = enum_field_address(context, builder, temporary, layout.payload_offset)?;
     let llvm_type = super::values::llvm_type(context, *payload_type)?;
@@ -80,6 +91,9 @@ pub(super) fn emit_enum_construct(
     else {
         return Err(BackendEmitError("LLVM enum constructor instruction expected".to_owned()));
     };
+    if layout.niche_pointer {
+        return emit_niche_construct(context, *result, payload, *layout, values);
+    }
     let (_enum_type, temporary) =
         initialize_enum_constructor(context, builder, layout, *discriminant)?;
     if let (Some(payload), Some(payload_type), Some(payload_layout)) =
@@ -109,6 +123,68 @@ pub(super) fn emit_enum_construct(
         }
     }
     values.insert(*result, temporary);
+    Ok(false)
+}
+
+fn emit_niche_discriminant(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    result: BackendValueId,
+    subject: BackendValueId,
+    layout: BackendEnumLayout,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let subject = values.get(&subject).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM niche Option {} is unavailable", subject.0))
+    })?;
+    let pointer_type = super::values::llvm_type(
+        context,
+        BackendValueType::NichePointerOption { layout: layout.layout },
+    )?;
+    let null = unsafe { LLVMConstNull(pointer_type) };
+    let is_none = unsafe {
+        LLVMBuildICmp(builder, LLVMIntPredicate::LLVMIntEQ, subject, null, c"option.none".as_ptr())
+    };
+    if is_none.is_null() {
+        return Err(BackendEmitError("LLVM failed to inspect niche Option".to_owned()));
+    }
+    let zero = unsafe { LLVMConstInt(integer_type(context, layout.discriminant_size)?, 0, 0) };
+    let one = unsafe { LLVMConstInt(integer_type(context, layout.discriminant_size)?, 1, 0) };
+    let selected = unsafe {
+        llvm_sys::core::LLVMBuildSelect(
+            builder,
+            is_none,
+            zero,
+            one,
+            c"option.discriminant".as_ptr(),
+        )
+    };
+    if selected.is_null() {
+        return Err(BackendEmitError("LLVM failed to select niche Option discriminant".to_owned()));
+    }
+    values.insert(result, selected);
+    Ok(false)
+}
+
+fn emit_niche_construct(
+    context: LLVMContextRef,
+    result: BackendValueId,
+    payload: &Option<BackendValueId>,
+    layout: BackendEnumLayout,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let value = match payload {
+        Some(payload) => values.get(payload).copied().ok_or_else(|| {
+            BackendEmitError(format!("LLVM niche Option payload {} is unavailable", payload.0))
+        })?,
+        None => unsafe {
+            LLVMConstNull(super::values::llvm_type(
+                context,
+                BackendValueType::NichePointerOption { layout: layout.layout },
+            )?)
+        },
+    };
+    values.insert(result, value);
     Ok(false)
 }
 

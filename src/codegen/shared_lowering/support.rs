@@ -47,6 +47,9 @@ pub(super) fn backend_value_type(
     layouts: &(impl super::super::BackendLayoutProvider + ?Sized),
     type_name: &TypeName,
 ) -> Option<super::super::BackendValueType> {
+    if type_name.reference_role.is_some() {
+        return Some(super::super::BackendValueType::Pointer);
+    }
     if type_name.name == "Bool" {
         return Some(super::super::BackendValueType::Bool);
     }
@@ -61,6 +64,11 @@ pub(super) fn backend_value_type(
         return Some(super::super::BackendValueType::Pointer);
     }
     if let Some(layout) = layouts.enum_layout_for(type_name) {
+        if layout.niche_pointer {
+            return Some(super::super::BackendValueType::NichePointerOption {
+                layout: layout.layout,
+            });
+        }
         return Some(super::super::BackendValueType::Enum { layout });
     }
     Some(super::super::BackendValueType::Aggregate { layout })

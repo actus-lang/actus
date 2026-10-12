@@ -231,6 +231,9 @@ fn lower_type(
         return Ok((scalar, None));
     }
     if let Some(layout) = layouts.enum_layout_for(type_name) {
+        if layout.niche_pointer {
+            return Ok((BackendValueType::NichePointerOption { layout: layout.layout }, None));
+        }
         return Ok((BackendValueType::Enum { layout }, Some(layout.layout)));
     }
     let layout = layouts.layout_for(type_name).ok_or_else(|| {

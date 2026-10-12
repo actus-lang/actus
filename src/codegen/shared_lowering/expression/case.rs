@@ -41,7 +41,9 @@ pub(super) fn bind_enum_variant_payload(
     let discriminant = match variant {
         "Ok" => 0,
         "Err" => 1,
-        _ => return Err(unsupported(span, "unknown Result case variant")),
+        "Some" => 1,
+        "None" => 0,
+        _ => return Err(unsupported(span, "unknown enum case variant")),
     };
     let Some(payload_type) = provider.enum_payload_types.get(&(subject, discriminant)).copied()
     else {
@@ -74,6 +76,16 @@ fn neutral_enum_layout(
         .value_type(subject)
         .and_then(|ty| match ty {
             BackendValueType::Enum { layout } => Some(layout),
+            BackendValueType::NichePointerOption { layout } => {
+                Some(super::super::super::BackendEnumLayout {
+                    layout,
+                    discriminant_offset: 0,
+                    discriminant_size: 4,
+                    payload_offset: 0,
+                    payload: None,
+                    niche_pointer: true,
+                })
+            }
             _ => None,
         })
         .ok_or_else(|| {
