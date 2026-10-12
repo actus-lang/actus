@@ -151,6 +151,21 @@ fn lowers_scalar_aggregate_field_access_into_neutral_load() {
 }
 
 #[test]
+fn preserves_nominal_type_for_aggregate_array_element_field_access() {
+    let source = "struct Point { x: Int, y: Int, } verb main() -> Int { erg points: Array[Point, 2] = Array[Point, 2](); points[1] = Point { x: 19, y: 23, }; return points[1].x + points[1].y; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "aggregate array fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("aggregate array fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("aggregate array field access should lower through the neutral contract");
+    assert!(
+        module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(instruction, BackendInstruction::AggregateFieldLoad { .. })
+        )
+    );
+}
+
+#[test]
 fn lowers_scalar_aggregate_field_assignment_into_neutral_store() {
     let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }";
     let (tokens, errors) = actus::lexer::scan(source);

@@ -50,10 +50,11 @@ pub(super) fn lower_array_element(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let (base, index, aggregate_layout, element_layout, element_type, capacity) =
+    let (base, index, aggregate_layout, element_layout, element_type_name, element_type, capacity) =
         lower_array_element_location(provider, collection, index, span, instructions)?;
     let result = provider.allocate();
     provider.remember_value(result, element_type);
+    provider.remember_nominal_type(result, element_type_name);
     instructions.push(BackendInstruction::ArrayElementLoad {
         result,
         base,
@@ -75,7 +76,7 @@ pub(super) fn lower_array_element_assignment(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
-    let (base, index, aggregate_layout, element_layout, element_type, capacity) =
+    let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
         lower_array_element_location(provider, collection, index, span, instructions)?;
     let value = provider.lower_expression(value, instructions)?;
     if provider.value_type(value) != Some(element_type) {
@@ -103,7 +104,7 @@ pub(super) fn lower_array_element_compound_assignment(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
-    let (base, index, aggregate_layout, element_layout, element_type, capacity) =
+    let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
         lower_array_element_location(provider, collection, index, span, instructions)?;
     let current = provider.allocate();
     provider.remember_value(current, element_type);
@@ -153,6 +154,7 @@ fn lower_array_element_location(
         BackendValueId,
         super::super::super::BackendLayout,
         super::super::super::BackendLayout,
+        TypeName,
         BackendValueType,
         u32,
     ),
@@ -197,7 +199,7 @@ fn lower_array_element_location(
         reason: "fixed-array index is outside the declared capacity".to_owned(),
         span,
     });
-    Ok((base, index, aggregate_layout, element_layout, element_type, capacity))
+    Ok((base, index, aggregate_layout, element_layout, element_type_name, element_type, capacity))
 }
 
 pub(super) fn lower_struct_literal(

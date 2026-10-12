@@ -790,6 +790,14 @@ same deterministic layout metadata and indirect aggregate passing mode without
 importing Cranelift or LLVM types. This is layout groundwork only; user-defined
 `Drop` performance body lowering and backend emission remain open.
 
+This layout slice now also registers named `pack` declarations as their
+validated storage layout, including fixed arrays whose elements are packs. The
+neutral regression `derives_array_layout_from_pack_storage_in_the_neutral_contract`
+verifies the deterministic size and alignment for `Array[Register, 2]`. Pack
+storage construction is therefore represented in the shared layout contract;
+packed bit-field reads and writes remain a separate open instruction-contract
+slice and are not treated as ordinary byte-offset aggregate fields.
+
 The neutral cleanup provider now uses the same program-backed layout source for
 builtin cleanup bridges and nested owned `Buffer` or `Region` field descriptors.
 Field addresses carry the complete root aggregate layout plus checked offset,

@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use crate::ast::{
-    BuiltinType, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName, primitive_type,
+    BuiltinType, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName,
+    primitive_type,
 };
 
 use super::super::BackendFieldLayout;
@@ -19,6 +20,7 @@ use super::{
 /// reference roles and runtime handles, matching the existing neutral ABI.
 pub(super) struct ProgramLayouts<'program> {
     structs: BTreeMap<&'program str, &'program StructDef>,
+    packs: BTreeMap<&'program str, &'program PackDecl>,
     drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
 }
@@ -32,6 +34,14 @@ impl<'program> ProgramLayouts<'program> {
                 TopLevelDecl::Struct(definition) if definition.generic_parameters.is_empty() => {
                     Some((definition.name.as_str(), definition))
                 }
+                _ => None,
+            })
+            .collect();
+        let packs = program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Pack(definition) => Some((definition.name.as_str(), definition)),
                 _ => None,
             })
             .collect();
@@ -53,7 +63,7 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
-        Self { structs, drop_symbols, pointer_bytes: (usize::BITS / 8) as u32 }
+        Self { structs, packs, drop_symbols, pointer_bytes: (usize::BITS / 8) as u32 }
     }
 
     fn type_layout(
@@ -81,6 +91,9 @@ impl<'program> ProgramLayouts<'program> {
         }
         if type_name.name == "Array" {
             return self.array_layout(type_name, visiting);
+        }
+        if let Some(pack) = self.packs.get(type_name.name.as_str()) {
+            return self.type_layout(pack.storage.type_name(), visiting);
         }
         self.struct_layout(&type_name.name, visiting)
     }
@@ -264,6 +277,14 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     }
 
     fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
+        if let Some(pack) = self.packs.get(type_name.name.as_str()) {
+            if field_name != "storage" {
+                return None;
+            }
+            let storage = pack.storage.type_name().clone();
+            let layout = self.type_layout(&storage, &mut Vec::new())?;
+            return Some(BackendFieldLayout { offset: 0, layout, ty: storage });
+        }
         let definition = self.structs.get(type_name.name.as_str())?;
         let mut offset = 0u32;
         for field in &definition.fields {

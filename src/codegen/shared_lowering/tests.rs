@@ -64,6 +64,21 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
 }
 
 #[test]
+fn derives_array_layout_from_pack_storage_in_the_neutral_contract() {
+    let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { return 0; }";
+    let (tokens, errors) = crate::lexer::scan(source);
+    assert!(errors.is_empty(), "pack layout fixture should lex: {errors:?}");
+    let program = crate::parser::parse(tokens).expect("pack layout fixture should parse");
+    let layouts = ProgramLayouts::new(&program, "test");
+    let array = crate::semantic::parse_type_name_key(
+        "Array[Register, 2]",
+        crate::lexer::SourceSpan::new(0, 0),
+    )
+    .expect("pack array type should parse");
+    assert_eq!(layouts.layout_for(&array), Some(BackendLayout { size: 8, alignment: 4 }));
+}
+
+#[test]
 fn lowers_result_constructor_to_neutral_enum_instruction() {
     let source = "verb main() -> Result[Int, Int] { return Result[Int, Int].Ok(7); }";
     let (tokens, errors) = scan(source);
