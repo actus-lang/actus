@@ -154,7 +154,16 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         }
         names.sort();
         names.dedup();
-        let _ = span;
+        if else_branch.is_none() {
+            if let Some(name) = names.first() {
+                return Err(unsupported(
+                    span,
+                    format!(
+                        "scalar assignment for `{name}` requires a local owner in the current lexical scope"
+                    ),
+                ));
+            }
+        }
         Ok(names
             .into_iter()
             .filter_map(|name| {
