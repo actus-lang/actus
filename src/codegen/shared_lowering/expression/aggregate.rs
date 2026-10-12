@@ -50,6 +50,114 @@ pub(super) fn lower_array_element(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
+    let (base, index, aggregate_layout, element_layout, element_type, capacity) =
+        lower_array_element_location(provider, collection, index, span, instructions)?;
+    let result = provider.allocate();
+    provider.remember_value(result, element_type);
+    instructions.push(BackendInstruction::ArrayElementLoad {
+        result,
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type,
+        capacity,
+        span,
+    });
+    Ok(result)
+}
+
+pub(super) fn lower_array_element_assignment(
+    provider: &mut SharedExpressionProvider<'_>,
+    collection: &Expr,
+    index: &Expr,
+    value: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let (base, index, aggregate_layout, element_layout, element_type, capacity) =
+        lower_array_element_location(provider, collection, index, span, instructions)?;
+    let value = provider.lower_expression(value, instructions)?;
+    if provider.value_type(value) != Some(element_type) {
+        return Err(unsupported(span, "array element assignment type mismatch"));
+    }
+    instructions.push(BackendInstruction::ArrayElementStore {
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type,
+        value,
+        capacity,
+        span,
+    });
+    Ok(())
+}
+
+pub(super) fn lower_array_element_compound_assignment(
+    provider: &mut SharedExpressionProvider<'_>,
+    collection: &Expr,
+    index: &Expr,
+    operator: CompoundAssignmentOp,
+    value: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let (base, index, aggregate_layout, element_layout, element_type, capacity) =
+        lower_array_element_location(provider, collection, index, span, instructions)?;
+    let current = provider.allocate();
+    provider.remember_value(current, element_type);
+    instructions.push(BackendInstruction::ArrayElementLoad {
+        result: current,
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type,
+        capacity,
+        span,
+    });
+    let value = provider.lower_expression(value, instructions)?;
+    if provider.value_type(value) != Some(element_type) {
+        return Err(unsupported(span, "array element compound assignment type mismatch"));
+    }
+    let result = provider.lower_integer_binary(
+        compound_operation(operator),
+        current,
+        value,
+        span,
+        instructions,
+    )?;
+    instructions.push(BackendInstruction::ArrayElementStore {
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type,
+        value: result,
+        capacity,
+        span,
+    });
+    Ok(())
+}
+
+fn lower_array_element_location(
+    provider: &mut SharedExpressionProvider<'_>,
+    collection: &Expr,
+    index: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<
+    (
+        BackendValueId,
+        BackendValueId,
+        super::super::super::BackendLayout,
+        super::super::super::BackendLayout,
+        BackendValueType,
+        u32,
+    ),
+    BackendContractError,
+> {
     let base = provider.lower_expression(collection, instructions)?;
     let index = provider.lower_expression(index, instructions)?;
     let type_name = provider
@@ -83,77 +191,7 @@ pub(super) fn lower_array_element(
     if !matches!(provider.value_type(index), Some(BackendValueType::Integer { .. })) {
         return Err(unsupported(span, "array index must be an integer"));
     }
-    let result = provider.allocate();
-    provider.remember_value(result, element_type);
-    instructions.push(BackendInstruction::ArrayElementLoad {
-        result,
-        base,
-        index,
-        aggregate_layout,
-        element_layout,
-        element_type,
-        capacity,
-        span,
-    });
-    Ok(result)
-}
-
-pub(super) fn lower_array_element_assignment(
-    provider: &mut SharedExpressionProvider<'_>,
-    collection: &Expr,
-    index: &Expr,
-    value: &Expr,
-    span: SourceSpan,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<(), BackendContractError> {
-    let base = provider.lower_expression(collection, instructions)?;
-    let index = provider.lower_expression(index, instructions)?;
-    let type_name = provider
-        .nominal_type(base)
-        .cloned()
-        .ok_or_else(|| unsupported(span, "array base has no nominal type"))?;
-    if type_name.name != "Array" || type_name.arguments.len() != 2 {
-        return Err(unsupported(span, "array element assignment requires a fixed array"));
-    }
-    let element_type_name = type_name.arguments[0].clone();
-    let capacity = type_name.arguments[1]
-        .name
-        .parse::<u32>()
-        .map_err(|_| unsupported(span, "array capacity is not a concrete integer"))?;
-    let aggregate_layout = provider
-        .layouts
-        .layout_for(&type_name)
-        .ok_or_else(|| unsupported(span, "array base has no neutral layout"))?;
-    let element_layout = provider
-        .layouts
-        .layout_for(&element_type_name)
-        .ok_or_else(|| unsupported(span, "array element has no neutral layout"))?;
-    let element_type =
-        super::super::support::backend_value_type(provider.layouts, &element_type_name)
-            .ok_or_else(|| unsupported(span, "array element has no backend type"))?;
-    if element_layout.size == 0
-        || u64::from(element_layout.size) * u64::from(capacity) != u64::from(aggregate_layout.size)
-    {
-        return Err(unsupported(span, "array element layout does not match capacity"));
-    }
-    if !matches!(provider.value_type(index), Some(BackendValueType::Integer { .. })) {
-        return Err(unsupported(span, "array index must be an integer"));
-    }
-    let value = provider.lower_expression(value, instructions)?;
-    if provider.value_type(value) != Some(element_type) {
-        return Err(unsupported(span, "array element assignment type mismatch"));
-    }
-    instructions.push(BackendInstruction::ArrayElementStore {
-        base,
-        index,
-        aggregate_layout,
-        element_layout,
-        element_type,
-        value,
-        capacity,
-        span,
-    });
-    Ok(())
+    Ok((base, index, aggregate_layout, element_layout, element_type, capacity))
 }
 
 pub(super) fn lower_struct_literal(

@@ -160,6 +160,18 @@ pub trait BackendExpressionProvider {
         Err(unsupported(span, "aggregate field compound assignment"))
     }
 
+    fn compound_assign_index(
+        &mut self,
+        _target: &Expr,
+        _index: &Expr,
+        _operator: CompoundAssignmentOp,
+        _value: &Expr,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "fixed-array element compound assignment"))
+    }
+
     fn lower_integer_binary(
         &mut self,
         _operation: BackendIntegerBinaryOp,

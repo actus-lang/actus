@@ -186,7 +186,7 @@ fn scalar_statement(
             scalar_assignment_place(target, context) && scalar_expression(value, context)
         }
         Stmt::CompoundAssignment { target, value, .. } if allow_assignment => {
-            scalar_place(target) && scalar_expression(value, context)
+            scalar_assignment_place(target, context) && scalar_expression(value, context)
         }
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
         Stmt::Expression { expression, .. } => {

@@ -1076,6 +1076,74 @@ fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_store() {
 
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
+fn cranelift_backend_builds_and_runs_a_shared_fixed_array_element_compound_store() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-array-compound-store-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }\n",
+    )
+    .expect("write Cranelift fixed-array compound store fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift fixed-array compound store fixture");
+    assert!(status.success());
+    let status =
+        Command::new(&output).status().expect("run Cranelift fixed-array compound store fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_compound_store() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-llvm-array-compound-store-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }\n",
+    )
+    .expect("write LLVM fixed-array compound store fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build LLVM fixed-array compound store fixture");
+    assert!(status.success());
+    let status =
+        Command::new(&output).status().expect("run LLVM fixed-array compound store fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
 fn cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
     let root = std::env::temp_dir()
         .join(format!("actus-cli-cranelift-struct-mutation-{}", std::process::id()));
