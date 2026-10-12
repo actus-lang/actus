@@ -149,6 +149,22 @@ pub enum BackendInstruction {
         alignment: u32,
         span: SourceSpan,
     },
+    ArenaConstruct {
+        result: super::BackendValueId,
+        capacity: u32,
+        pointer_width: u8,
+        span: SourceSpan,
+    },
+    ArenaPlace {
+        result: super::BackendValueId,
+        arena: super::BackendValueId,
+        value: super::BackendValueId,
+        capacity: u32,
+        value_layout: super::BackendLayout,
+        alignment: u32,
+        pointer_width: u8,
+        span: SourceSpan,
+    },
     AggregateConstruct {
         result: super::BackendValueId,
         layout: super::BackendLayout,

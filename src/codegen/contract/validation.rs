@@ -60,6 +60,9 @@ fn validate_instruction(
         {
             Err(BackendContractError::InvalidMemoryCopy)
         }
+        BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
+            validate_arena_instruction(instruction)
+        }
         BackendInstruction::AggregateConstruct { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. }
@@ -67,6 +70,33 @@ fn validate_instruction(
             validate_aggregate_instruction(instruction)
         }
         _ => Ok(()),
+    }
+}
+
+fn validate_arena_instruction(
+    instruction: &BackendInstruction,
+) -> Result<(), BackendContractError> {
+    match instruction {
+        BackendInstruction::ArenaConstruct { capacity, pointer_width, .. }
+            if *capacity == 0 || !matches!(pointer_width, 4 | 8) =>
+        {
+            Err(BackendContractError::InvalidLayout(
+                "arena construction requires non-zero capacity and a 32- or 64-bit pointer",
+            ))
+        }
+        BackendInstruction::ArenaPlace {
+            capacity, value_layout, alignment, pointer_width, ..
+        } if *capacity == 0
+            || *alignment == 0
+            || !alignment.is_power_of_two()
+            || *alignment != value_layout.alignment
+            || !matches!(pointer_width, 4 | 8) =>
+        {
+            Err(BackendContractError::InvalidLayout("arena placement metadata is invalid"))
+        }
+        BackendInstruction::ArenaPlace { value_layout, .. } => value_layout.validate(),
+        BackendInstruction::ArenaConstruct { .. } => Ok(()),
+        _ => Err(BackendContractError::InvalidLayout("arena instruction expected")),
     }
 }
 

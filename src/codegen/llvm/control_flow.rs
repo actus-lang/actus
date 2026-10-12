@@ -162,6 +162,15 @@ fn emit_non_control_instruction(
     declarations: &BTreeMap<String, FunctionDeclaration>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
+    if is_aggregate_instruction(instruction) {
+        return super::aggregates::emit_aggregate_instruction(
+            context,
+            builder,
+            pointer_width,
+            instruction,
+            values,
+        );
+    }
     match instruction {
         BackendInstruction::Return { value, .. } => {
             emit_return(builder, function, declaration, *value, values)?;
@@ -191,19 +200,25 @@ fn emit_non_control_instruction(
         BackendInstruction::MemoryCopy { .. } => {
             emit_memory_copy_instruction(context, builder, instruction, values)
         }
-        BackendInstruction::AggregateConstruct { .. }
-        | BackendInstruction::AggregateFieldLoad { .. }
-        | BackendInstruction::PackedFieldLoad { .. }
-        | BackendInstruction::PackedFieldStore { .. }
-        | BackendInstruction::ArrayElementLoad { .. }
-        | BackendInstruction::ArrayElementStore { .. } => {
-            super::aggregates::emit_aggregate_instruction(context, builder, instruction, values)
-        }
         BackendInstruction::AggregateFieldStore { .. } => {
             super::aggregates::emit_aggregate_field_store(context, builder, instruction, values)
         }
         _ => unreachable!("scalar instruction was not dispatched"),
     }
+}
+
+fn is_aggregate_instruction(instruction: &BackendInstruction) -> bool {
+    matches!(
+        instruction,
+        BackendInstruction::AggregateConstruct { .. }
+            | BackendInstruction::AggregateFieldLoad { .. }
+            | BackendInstruction::PackedFieldLoad { .. }
+            | BackendInstruction::PackedFieldStore { .. }
+            | BackendInstruction::ArenaConstruct { .. }
+            | BackendInstruction::ArenaPlace { .. }
+            | BackendInstruction::ArrayElementLoad { .. }
+            | BackendInstruction::ArrayElementStore { .. }
+    )
 }
 
 fn emit_control_transfer(

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 mod aggregate;
+mod arena;
 mod cleanup;
 mod dispatch;
 mod enums;

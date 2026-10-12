@@ -3,6 +3,7 @@ use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
 mod aggregate;
+mod arena;
 mod arithmetic;
 mod calls;
 mod case;
@@ -123,6 +124,9 @@ impl SharedExpressionProvider<'_> {
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError> {
+        if arena::is_place_call(self, expression) {
+            return arena::lower_place(self, expression, instructions);
+        }
         super::constructors::lower_method_call(self, expression, instructions)
     }
 

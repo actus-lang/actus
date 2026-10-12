@@ -126,6 +126,30 @@ fn lowers_aggregate_owner_construction_into_scoped_drop_cleanup() {
 }
 
 #[test]
+fn lowers_arena_constructor_and_placement_into_neutral_instructions() {
+    let source = "struct Point { x: Int, y: Int, } verb main() -> Int { erg arena: Arena[64] = Arena[64](); erg point = arena.place(value: Point { x: 20, y: 22, }); return point.x + point.y; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "arena fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("arena fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("arena constructor and placement should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::ArenaConstruct { capacity: 64, .. }
+    )));
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::ArenaPlace { capacity: 64, value_layout, .. }
+            if value_layout.size == 8 && value_layout.alignment == 4
+    )));
+}
+
+#[test]
 fn lowers_scalar_aggregate_field_access_into_neutral_load() {
     let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return counter.value + 1; }";
     let (tokens, errors) = actus::lexer::scan(source);

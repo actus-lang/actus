@@ -1,4 +1,5 @@
 mod aggregates;
+mod arena;
 mod arrays;
 mod branches;
 mod calls;

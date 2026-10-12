@@ -7,7 +7,7 @@ use cranelift_object::ObjectModule;
 
 use super::super::aggregate::{Declaration, lower_call};
 use super::super::native::BackendEmitError;
-use super::{aggregate, cleanup, enums, returns};
+use super::{aggregate, arena, cleanup, enums, returns};
 use crate::codegen::{BackendFunction, BackendInstruction, BackendValueId};
 
 type ValueMap = BTreeMap<BackendValueId, cranelift_codegen::ir::Value>;
@@ -36,6 +36,9 @@ pub(super) fn lower_instruction(
         | BackendInstruction::IntegerUnary { .. }
         | BackendInstruction::MemoryCopy { .. } => {
             lower_scalar(module, builder, instruction, values)
+        }
+        BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
+            arena::lower(module, builder, instruction, values)
         }
         BackendInstruction::EnumDiscriminant { .. }
         | BackendInstruction::EnumPayload { .. }

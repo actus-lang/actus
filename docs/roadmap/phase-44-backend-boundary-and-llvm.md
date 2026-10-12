@@ -806,8 +806,18 @@ through the shared `PackedFieldLoad` and `PackedFieldStore` contract. The
 regression `both_backends_consume_shared_array_pack_bit_fields` verifies LLVM
 IR emission and Cranelift object emission for an array-backed little-endian
 `u1` field. A separate hosted fixture also builds and executes the same source
-with LLVM and returns the updated field value. Big-endian packed emission and
-unit-return call lowering remain separate open slices.
+with LLVM and returns the updated field value. Unit-return calls are lowered as
+statement-level calls with no fabricated result; a focused hosted LLVM fixture
+verifies that contract. Arena construction and bounded placement are now also
+represented by neutral `ArenaConstruct` and `ArenaPlace` instructions. Both
+backend emitters allocate bounded arena storage, maintain the in-arena offset,
+check aligned capacity before placement, and copy fixed-size aggregate values
+into the selected location. The neutral regression
+`lowers_arena_constructor_and_placement_into_neutral_instructions` and the
+hosted LLVM regression
+`llvm_backend_builds_and_runs_phase18_arrays_and_packs_example` cover this
+slice together with arrays, indexed mutation, and packed fields. Big-endian
+packed emission remains a separate open slice.
 
 The neutral cleanup provider now uses the same program-backed layout source for
 builtin cleanup bridges and nested owned `Buffer` or `Region` field descriptors.

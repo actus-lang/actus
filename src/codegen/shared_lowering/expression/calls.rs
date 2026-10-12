@@ -51,6 +51,9 @@ pub(super) fn lower_call(
     if arguments.is_empty() && callee.starts_with("Array[") {
         return lower_array_constructor(provider, callee, *span, instructions);
     }
+    if arguments.is_empty() && callee.starts_with("Arena[") {
+        return super::arena::lower_constructor(provider, callee, *span, instructions);
+    }
     let arguments = arguments
         .iter()
         .map(|argument| provider.lower_expression(&argument.expression, instructions))

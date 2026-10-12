@@ -72,6 +72,38 @@ fn llvm_backend_builds_and_runs_array_pack_bit_fields() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn llvm_backend_builds_and_runs_phase18_arrays_and_packs_example() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-phase18-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create LLVM Phase 18 fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-phase18-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM Phase 18 fixture manifest");
+    let source = format!("{}/examples/phase18_arrays_and_packs.act", env!("CARGO_MANIFEST_DIR"));
+    fs::copy(source, &input).expect("copy Phase 18 source fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--strict".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM Phase 18 fixture");
+    assert_eq!(status.code(), Some(92));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn llvm_backend_builds_and_runs_a_user_defined_drop_performance() {
     let root = std::env::temp_dir().join(format!("actus-cli-llvm-drop-{}", std::process::id()));
     let input = root.join("main.act");
