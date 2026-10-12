@@ -1,3 +1,5 @@
+mod wide;
+
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
@@ -40,7 +42,7 @@ pub(super) fn emit_packed_field_load(
         BackendEmitError(format!("LLVM packed field base {} is unavailable", base.0))
     })?;
     if storage_layout.size > 8 {
-        return super::packed_wide::emit_wide_packed_field_load(
+        return wide::emit_wide_packed_field_load(
             context,
             builder,
             base,
@@ -94,7 +96,7 @@ pub(super) fn emit_packed_field_store(
         BackendEmitError(format!("LLVM packed field base {} is unavailable", base.0))
     })?;
     if storage_layout.size > 8 {
-        return super::packed_wide::emit_wide_packed_field_store(
+        return wide::emit_wide_packed_field_store(
             context,
             builder,
             base,

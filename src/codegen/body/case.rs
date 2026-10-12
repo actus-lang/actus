@@ -48,13 +48,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let mut current_id = id;
         let mut entry_instructions = None;
         for (index, branch) in branches.iter().enumerate() {
-            ensure_case_branch_supported(branch)?;
-            let matched_id = self.allocate_block();
-            let is_last = index + 1 == branches.len();
-            let following_id = (!is_last).then(|| self.allocate_block());
+            let (is_last, (matched_id, following_id, else_block)) =
+                self.prepare_case_branch(index, branches.len(), branch)?;
             let (subject_value, matched) =
                 lower_case_condition(self, subject, branch, is_last, &mut instructions)?;
-            let else_block = following_id.unwrap_or_else(|| self.allocate_block());
             instructions.push(BackendInstruction::Branch {
                 condition: matched,
                 then_block: matched_id,
@@ -63,9 +60,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 else_arguments: Vec::new(),
                 span: branch.span,
             });
-            let branch_block_start = self.blocks.len();
-            let body = lower_case_branch_body(
-                self,
+            self.insert_case_branch_body(
                 matched_id,
                 branch,
                 span,
@@ -73,7 +68,6 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 *mode,
                 fallthrough,
             )?;
-            self.blocks.insert(branch_block_start, body);
             if let Some(following_id) = following_id {
                 if entry_instructions.is_none() {
                     entry_instructions = Some(std::mem::take(&mut instructions));
@@ -87,18 +81,76 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 }
                 current_id = following_id;
             } else {
-                self.blocks.push(BackendBlock {
-                    parameters: Vec::new(),
-                    id: else_block,
-                    instructions: vec![BackendInstruction::Trap {
-                        reason: "non-exhaustive enum case".to_owned(),
-                        span,
-                    }],
-                });
-                return finish_case_blocks(self, id, current_id, instructions, entry_instructions);
+                return self.finish_case_branch(
+                    id,
+                    current_id,
+                    else_block,
+                    span,
+                    instructions,
+                    entry_instructions,
+                );
             }
         }
         Err(unsupported(span, "empty enum case"))
+    }
+
+    fn prepare_case_branch(
+        &mut self,
+        index: usize,
+        branch_count: usize,
+        branch: &crate::ast::CaseBranch,
+    ) -> Result<
+        (bool, (BackendBlockId, Option<BackendBlockId>, BackendBlockId)),
+        BackendContractError,
+    > {
+        ensure_case_branch_supported(branch)?;
+        let is_last = index + 1 == branch_count;
+        Ok((is_last, self.allocate_case_branch_blocks(is_last)))
+    }
+
+    fn finish_case_branch(
+        &mut self,
+        entry: BackendBlockId,
+        current: BackendBlockId,
+        else_block: BackendBlockId,
+        span: SourceSpan,
+        instructions: Vec<BackendInstruction>,
+        entry_instructions: Option<Vec<BackendInstruction>>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        self.blocks.push(BackendBlock {
+            parameters: Vec::new(),
+            id: else_block,
+            instructions: vec![BackendInstruction::Trap {
+                reason: "non-exhaustive enum case".to_owned(),
+                span,
+            }],
+        });
+        finish_case_blocks(self, entry, current, instructions, entry_instructions)
+    }
+
+    fn allocate_case_branch_blocks(
+        &mut self,
+        is_last: bool,
+    ) -> (BackendBlockId, Option<BackendBlockId>, BackendBlockId) {
+        let matched_id = self.allocate_block();
+        let following_id = (!is_last).then(|| self.allocate_block());
+        let else_block = following_id.unwrap_or_else(|| self.allocate_block());
+        (matched_id, following_id, else_block)
+    }
+
+    fn insert_case_branch_body(
+        &mut self,
+        id: BackendBlockId,
+        branch: &crate::ast::CaseBranch,
+        span: SourceSpan,
+        subject: BackendValueId,
+        mode: CaseMode,
+        fallthrough: Option<BackendBlockId>,
+    ) -> Result<(), BackendContractError> {
+        let branch_block_start = self.blocks.len();
+        let body = lower_case_branch_body(self, id, branch, span, subject, mode, fallthrough)?;
+        self.blocks.insert(branch_block_start, body);
+        Ok(())
     }
 }
 

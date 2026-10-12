@@ -14,8 +14,9 @@ use super::guards::{
     emit_trap_if_array_index_out_of_bounds, emit_trap_if_shift_count_out_of_range,
     emit_trap_if_signed_division_overflow, emit_trap_if_zero,
 };
-use super::integer_cast::emit_integer_cast;
-use super::integer_ops::{emit_integer_binary, emit_integer_compare, emit_integer_unary};
+use super::integer::{
+    emit_integer_binary, emit_integer_cast, emit_integer_compare, emit_integer_unary,
+};
 use super::memory::emit_memory_copy;
 use super::returns::emit_return;
 use llvm_sys::core::{

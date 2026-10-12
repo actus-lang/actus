@@ -9,13 +9,13 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
-use super::super::{
+use super::super::super::{
     BackendEmitError, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
     BackendIntegerUnaryOp, BackendValueId,
 };
 use llvm_sys::core::{LLVMConstAllOnes, LLVMConstNull};
 
-pub(super) fn emit_integer_binary(
+pub(in crate::codegen::llvm) fn emit_integer_binary(
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
@@ -30,7 +30,7 @@ pub(super) fn emit_integer_binary(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM binary right operand {} is unavailable", right.0))
     })?;
-    let signed = matches!(ty, super::super::BackendValueType::Integer { signed: true, .. });
+    let signed = matches!(ty, super::super::super::BackendValueType::Integer { signed: true, .. });
     let (left, right) = normalize_integer_pair(builder, left, right, signed)?;
     let value = build_integer_binary(builder, *operation, *ty, left, right);
     if value.is_null() {
@@ -43,7 +43,7 @@ pub(super) fn emit_integer_binary(
 fn build_integer_binary(
     builder: LLVMBuilderRef,
     operation: BackendIntegerBinaryOp,
-    ty: super::super::BackendValueType,
+    ty: super::super::super::BackendValueType,
     left: LLVMValueRef,
     right: LLVMValueRef,
 ) -> LLVMValueRef {
@@ -58,53 +58,101 @@ fn build_integer_binary(
             BackendIntegerBinaryOp::Multiply => {
                 LLVMBuildMul(builder, left, right, c"actus.mul".as_ptr())
             }
-            BackendIntegerBinaryOp::Divide
-                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
+            BackendIntegerBinaryOp::Divide | BackendIntegerBinaryOp::Remainder
+                if matches!(
+                    ty,
+                    super::super::super::BackendValueType::Integer { signed: true, .. }
+                ) =>
             {
-                LLVMBuildSDiv(builder, left, right, c"actus.sdiv".as_ptr())
+                build_signed_division_or_remainder(builder, operation, left, right)
             }
-            BackendIntegerBinaryOp::Divide => {
-                LLVMBuildUDiv(builder, left, right, c"actus.udiv".as_ptr())
-            }
-            BackendIntegerBinaryOp::Remainder
-                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
-            {
-                LLVMBuildSRem(builder, left, right, c"actus.srem".as_ptr())
-            }
-            BackendIntegerBinaryOp::Remainder => {
-                LLVMBuildURem(builder, left, right, c"actus.urem".as_ptr())
+            BackendIntegerBinaryOp::Divide | BackendIntegerBinaryOp::Remainder => {
+                build_unsigned_division_or_remainder(builder, operation, left, right)
             }
             BackendIntegerBinaryOp::ShiftLeft => {
                 LLVMBuildShl(builder, left, right, c"actus.shl".as_ptr())
             }
             BackendIntegerBinaryOp::ShiftRight
-                if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
+                if matches!(
+                    ty,
+                    super::super::super::BackendValueType::Integer { signed: true, .. }
+                ) =>
             {
                 LLVMBuildAShr(builder, left, right, c"actus.ashr".as_ptr())
             }
             BackendIntegerBinaryOp::ShiftRight => {
                 LLVMBuildLShr(builder, left, right, c"actus.lshr".as_ptr())
             }
-            BackendIntegerBinaryOp::BitwiseAnd => {
+            BackendIntegerBinaryOp::BitwiseAnd
+            | BackendIntegerBinaryOp::BitwiseOr
+            | BackendIntegerBinaryOp::BitwiseXor
+            | BackendIntegerBinaryOp::LogicalAnd
+            | BackendIntegerBinaryOp::LogicalOr => build_bitwise(builder, operation, left, right),
+        }
+    }
+}
+
+fn build_bitwise(
+    builder: LLVMBuilderRef,
+    operation: BackendIntegerBinaryOp,
+    left: LLVMValueRef,
+    right: LLVMValueRef,
+) -> LLVMValueRef {
+    unsafe {
+        match operation {
+            BackendIntegerBinaryOp::BitwiseAnd | BackendIntegerBinaryOp::LogicalAnd => {
                 LLVMBuildAnd(builder, left, right, c"actus.and".as_ptr())
             }
-            BackendIntegerBinaryOp::BitwiseOr => {
+            BackendIntegerBinaryOp::BitwiseOr | BackendIntegerBinaryOp::LogicalOr => {
                 LLVMBuildOr(builder, left, right, c"actus.or".as_ptr())
             }
             BackendIntegerBinaryOp::BitwiseXor => {
                 LLVMBuildXor(builder, left, right, c"actus.xor".as_ptr())
             }
-            BackendIntegerBinaryOp::LogicalAnd => {
-                LLVMBuildAnd(builder, left, right, c"actus.logical_and".as_ptr())
-            }
-            BackendIntegerBinaryOp::LogicalOr => {
-                LLVMBuildOr(builder, left, right, c"actus.logical_or".as_ptr())
-            }
+            _ => unreachable!(),
         }
     }
 }
 
-pub(super) fn emit_integer_compare(
+fn build_signed_division_or_remainder(
+    builder: LLVMBuilderRef,
+    operation: BackendIntegerBinaryOp,
+    left: LLVMValueRef,
+    right: LLVMValueRef,
+) -> LLVMValueRef {
+    unsafe {
+        match operation {
+            BackendIntegerBinaryOp::Divide => {
+                LLVMBuildSDiv(builder, left, right, c"actus.sdiv".as_ptr())
+            }
+            BackendIntegerBinaryOp::Remainder => {
+                LLVMBuildSRem(builder, left, right, c"actus.srem".as_ptr())
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn build_unsigned_division_or_remainder(
+    builder: LLVMBuilderRef,
+    operation: BackendIntegerBinaryOp,
+    left: LLVMValueRef,
+    right: LLVMValueRef,
+) -> LLVMValueRef {
+    unsafe {
+        match operation {
+            BackendIntegerBinaryOp::Divide => {
+                LLVMBuildUDiv(builder, left, right, c"actus.udiv".as_ptr())
+            }
+            BackendIntegerBinaryOp::Remainder => {
+                LLVMBuildURem(builder, left, right, c"actus.urem".as_ptr())
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub(in crate::codegen::llvm) fn emit_integer_compare(
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
@@ -173,7 +221,7 @@ fn normalize_integer_pair(
     }
 }
 
-pub(super) fn emit_integer_unary(
+pub(in crate::codegen::llvm) fn emit_integer_unary(
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,

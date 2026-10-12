@@ -146,24 +146,47 @@ fn record_runtime_pointer_result(
     call: LLVMValueRef,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
-    let enum_drop =
-        result_context.declarations.get(crate::runtime::ENUM_DROP_SYMBOL).copied().ok_or_else(
-            || BackendEmitError("LLVM runtime result cleanup bridge is unavailable".to_owned()),
-        )?;
-    let slot_name = CString::new(format!("runtime.result{}", result.0))
-        .map_err(|_| BackendEmitError("LLVM runtime result name contains NUL".to_owned()))?;
+    let (size, alignment) = runtime_result_layout(declaration)?;
+    let value = allocate_runtime_result(result_context, declaration, result)?;
+    copy_runtime_result(result_context, value, call, size, alignment)?;
+    release_runtime_result(result_context, call, size)?;
+    values.insert(result, value);
+    Ok(())
+}
+
+fn runtime_result_layout(declaration: FunctionDeclaration) -> Result<(u32, u32), BackendEmitError> {
     let size = declaration.runtime_return_size.ok_or_else(|| {
         BackendEmitError("LLVM runtime result has no known storage size".to_owned())
     })?;
     let alignment = declaration
         .return_alignment
         .ok_or_else(|| BackendEmitError("LLVM runtime result has no known alignment".to_owned()))?;
+    Ok((size, alignment))
+}
+
+fn allocate_runtime_result(
+    result_context: &CallResultContext<'_>,
+    declaration: FunctionDeclaration,
+    result: BackendValueId,
+) -> Result<LLVMValueRef, BackendEmitError> {
+    let slot_name = CString::new(format!("runtime.result{}", result.0))
+        .map_err(|_| BackendEmitError("LLVM runtime result name contains NUL".to_owned()))?;
     let value = unsafe {
         LLVMBuildAlloca(result_context.builder, declaration.return_type, slot_name.as_ptr())
     };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate runtime result copy".to_owned()));
     }
+    Ok(value)
+}
+
+fn copy_runtime_result(
+    result_context: &CallResultContext<'_>,
+    value: LLVMValueRef,
+    call: LLVMValueRef,
+    size: u32,
+    alignment: u32,
+) -> Result<(), BackendEmitError> {
     unsafe { LLVMSetAlignment(value, alignment) };
     let copied = unsafe {
         LLVMBuildMemMove(
@@ -179,9 +202,20 @@ fn record_runtime_pointer_result(
             ),
         )
     };
-    if copied.is_null() {
-        return Err(BackendEmitError("LLVM failed to copy runtime result".to_owned()));
-    }
+    (!copied.is_null())
+        .then_some(())
+        .ok_or_else(|| BackendEmitError("LLVM failed to copy runtime result".to_owned()))
+}
+
+fn release_runtime_result(
+    result_context: &CallResultContext<'_>,
+    call: LLVMValueRef,
+    size: u32,
+) -> Result<(), BackendEmitError> {
+    let enum_drop =
+        result_context.declarations.get(crate::runtime::ENUM_DROP_SYMBOL).copied().ok_or_else(
+            || BackendEmitError("LLVM runtime result cleanup bridge is unavailable".to_owned()),
+        )?;
     let integer_type = unsafe { llvm_sys::core::LLVMInt64TypeInContext(result_context.context) };
     let mut arguments = [call, unsafe { LLVMConstInt(integer_type, u64::from(size), 0) }];
     let cleanup = unsafe {
@@ -194,9 +228,7 @@ fn record_runtime_pointer_result(
             c"".as_ptr(),
         )
     };
-    if cleanup.is_null() {
-        return Err(BackendEmitError("LLVM failed to release runtime result".to_owned()));
-    }
-    values.insert(result, value);
-    Ok(())
+    (!cleanup.is_null())
+        .then_some(())
+        .ok_or_else(|| BackendEmitError("LLVM failed to release runtime result".to_owned()))
 }

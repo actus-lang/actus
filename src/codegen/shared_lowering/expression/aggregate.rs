@@ -214,21 +214,7 @@ fn lower_array_element_location_from_values(
     ),
     BackendContractError,
 > {
-    let type_name = provider
-        .nominal_type(base)
-        .cloned()
-        .ok_or_else(|| unsupported(span, "array base has no nominal type"))?;
-    if type_name.name != "Array" || type_name.arguments.len() != 2 {
-        return Err(unsupported(
-            span,
-            format!("array element access requires a fixed array (found `{}`)", type_name.name),
-        ));
-    }
-    let element_type_name = type_name.arguments[0].clone();
-    let capacity = type_name.arguments[1]
-        .name
-        .parse::<u32>()
-        .map_err(|_| unsupported(span, "array capacity is not a concrete integer"))?;
+    let (type_name, element_type_name, capacity) = array_metadata(provider, base, span)?;
     let aggregate_layout = provider
         .layouts
         .layout_for(&type_name)
@@ -255,6 +241,28 @@ fn lower_array_element_location_from_values(
         span,
     });
     Ok((base, index, aggregate_layout, element_layout, element_type_name, element_type, capacity))
+}
+
+fn array_metadata(
+    provider: &SharedExpressionProvider<'_>,
+    base: BackendValueId,
+    span: SourceSpan,
+) -> Result<(TypeName, TypeName, u32), BackendContractError> {
+    let type_name = provider
+        .nominal_type(base)
+        .cloned()
+        .ok_or_else(|| unsupported(span, "array base has no nominal type"))?;
+    if type_name.name != "Array" || type_name.arguments.len() != 2 {
+        return Err(unsupported(
+            span,
+            format!("array element access requires a fixed array (found `{}`)", type_name.name),
+        ));
+    }
+    let capacity = type_name.arguments[1]
+        .name
+        .parse::<u32>()
+        .map_err(|_| unsupported(span, "array capacity is not a concrete integer"))?;
+    Ok((type_name.clone(), type_name.arguments[0].clone(), capacity))
 }
 
 pub(super) fn lower_struct_literal(
@@ -314,24 +322,7 @@ pub(super) fn lower_field_access_expression(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
     let base = provider.lower_expression(object, instructions)?;
-    let type_name = provider.nominal_type(base).cloned().or_else(|| {
-        provider
-            .value_type(base)
-            .and_then(|value_type| match value_type {
-                BackendValueType::Aggregate { layout } => Some(layout),
-                _ => None,
-            })
-            .and_then(|layout| provider.layouts.type_for_layout(layout))
-    });
-    let type_name = type_name.ok_or_else(|| {
-        unsupported(
-            span,
-            format!(
-                "aggregate field access has no nominal type (value type: {:?})",
-                provider.value_type(base)
-            ),
-        )
-    })?;
+    let type_name = field_type_name(provider, base, span)?;
     let aggregate_layout = provider
         .layouts
         .layout_for(&type_name)
@@ -371,6 +362,31 @@ pub(super) fn lower_field_access_expression(
         span,
     });
     Ok(result)
+}
+
+fn field_type_name(
+    provider: &SharedExpressionProvider<'_>,
+    base: BackendValueId,
+    span: SourceSpan,
+) -> Result<TypeName, BackendContractError> {
+    provider
+        .nominal_type(base)
+        .cloned()
+        .or_else(|| {
+            provider.value_type(base).and_then(|value_type| match value_type {
+                BackendValueType::Aggregate { layout } => provider.layouts.type_for_layout(layout),
+                _ => None,
+            })
+        })
+        .ok_or_else(|| {
+            unsupported(
+                span,
+                format!(
+                    "aggregate field access has no nominal type (value type: {:?})",
+                    provider.value_type(base)
+                ),
+            )
+        })
 }
 
 pub(super) fn lower_field_assignment(
@@ -428,97 +444,4 @@ pub(super) fn lower_field_assignment(
     Ok(())
 }
 
-pub(super) fn lower_field_compound_assignment(
-    provider: &mut SharedExpressionProvider<'_>,
-    object: &Expr,
-    field: &str,
-    operator: CompoundAssignmentOp,
-    value: &Expr,
-    span: SourceSpan,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<(), BackendContractError> {
-    let base = provider.lower_expression(object, instructions)?;
-    let type_name = provider.nominal_type(base).cloned().ok_or_else(|| {
-        unsupported(span, "aggregate field compound assignment has no nominal type")
-    })?;
-    let aggregate_layout = provider
-        .layouts
-        .layout_for(&type_name)
-        .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
-    if provider.layouts.packed_field_for(&type_name, field).is_some() {
-        return packed::lower_field_compound_assignment(
-            provider,
-            base,
-            &type_name,
-            field,
-            operator,
-            value,
-            aggregate_layout,
-            span,
-            instructions,
-        );
-    }
-    lower_plain_field_compound_assignment(
-        provider,
-        base,
-        &type_name,
-        field,
-        operator,
-        value,
-        aggregate_layout,
-        span,
-        instructions,
-    )
-}
-
-fn lower_plain_field_compound_assignment(
-    provider: &mut SharedExpressionProvider<'_>,
-    base: BackendValueId,
-    type_name: &TypeName,
-    field: &str,
-    operator: CompoundAssignmentOp,
-    value: &Expr,
-    aggregate_layout: super::super::super::BackendLayout,
-    span: SourceSpan,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<(), BackendContractError> {
-    let metadata = provider.layouts.field_for(type_name, field).ok_or_else(|| {
-        unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
-    })?;
-    let ty = if metadata.indirect {
-        BackendValueType::Pointer
-    } else {
-        super::super::support::backend_value_type(provider.layouts, &metadata.ty)
-            .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
-    };
-    let current = provider.allocate();
-    provider.remember_value(current, ty);
-    instructions.push(BackendInstruction::AggregateFieldLoad {
-        result: current,
-        base,
-        aggregate_layout,
-        offset: metadata.offset,
-        field_layout: metadata.layout,
-        ty,
-        span,
-    });
-    let value = provider.lower_expression(value, instructions)?;
-    let value_ty = provider
-        .value_type(value)
-        .ok_or_else(|| unsupported(span, "aggregate field value type is unavailable"))?;
-    if value_ty != ty {
-        return Err(unsupported(span, "aggregate field compound assignment type mismatch"));
-    }
-    let operation = compound_operation(operator);
-    let result = provider.lower_integer_binary(operation, current, value, span, instructions)?;
-    instructions.push(BackendInstruction::AggregateFieldStore {
-        base,
-        aggregate_layout,
-        offset: metadata.offset,
-        field_layout: metadata.layout,
-        value: result,
-        ty,
-        span,
-    });
-    Ok(())
-}
+include!("aggregate/field_compound.rs");

@@ -7,9 +7,9 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
-use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
 
-pub(super) fn emit_integer_cast(
+pub(in crate::codegen::llvm) fn emit_integer_cast(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
     function: LLVMValueRef,
