@@ -79,6 +79,25 @@ fn derives_array_layout_from_pack_storage_in_the_neutral_contract() {
 }
 
 #[test]
+fn exposes_pack_bit_field_metadata_to_the_neutral_contract() {
+    let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { return 0; }";
+    let (tokens, errors) = crate::lexer::scan(source);
+    assert!(errors.is_empty(), "pack field fixture should lex: {errors:?}");
+    let program = crate::parser::parse(tokens).expect("pack field fixture should parse");
+    let layouts = ProgramLayouts::new(&program, "test");
+    let register =
+        crate::semantic::parse_type_name_key("Register", crate::lexer::SourceSpan::new(0, 0))
+            .expect("pack type should parse");
+    let field = layouts
+        .packed_field_for(&register, "enabled")
+        .expect("packed field metadata should be available");
+    assert_eq!(field.storage, BackendLayout { size: 4, alignment: 4 });
+    assert_eq!(field.bit_offset, 0);
+    assert_eq!(field.width, 1);
+    assert!(!field.big_endian);
+}
+
+#[test]
 fn lowers_result_constructor_to_neutral_enum_instruction() {
     let source = "verb main() -> Result[Int, Int] { return Result[Int, Int].Ok(7); }";
     let (tokens, errors) = scan(source);

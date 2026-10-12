@@ -797,6 +797,12 @@ verifies the deterministic size and alignment for `Array[Register, 2]`. Pack
 storage construction is therefore represented in the shared layout contract;
 packed bit-field reads and writes remain a separate open instruction-contract
 slice and are not treated as ordinary byte-offset aggregate fields.
+The next contract slice now exposes validated packed-field metadata
+(`bit_offset`, `width`, storage layout, and endianness) through the neutral
+layout provider. The regression
+`exposes_pack_bit_field_metadata_to_the_neutral_contract` verifies the metadata
+for a little-endian `u1` field. Backend bit extraction and update instructions
+remain open until both emitters consume this metadata.
 
 The neutral cleanup provider now uses the same program-backed layout source for
 builtin cleanup bridges and nested owned `Buffer` or `Region` field descriptors.

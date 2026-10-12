@@ -14,6 +14,14 @@ pub trait BackendLayoutProvider {
         None
     }
 
+    fn packed_field_for(
+        &self,
+        _type_name: &TypeName,
+        _field: &str,
+    ) -> Option<BackendPackedFieldLayout> {
+        None
+    }
+
     fn enum_layout_for(&self, _type_name: &TypeName) -> Option<BackendEnumLayout> {
         None
     }
@@ -23,6 +31,15 @@ pub trait BackendLayoutProvider {
 pub struct BackendFieldLayout {
     pub offset: u32,
     pub layout: BackendLayout,
+    pub ty: TypeName,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendPackedFieldLayout {
+    pub storage: BackendLayout,
+    pub bit_offset: u16,
+    pub width: u8,
+    pub big_endian: bool,
     pub ty: TypeName,
 }
 

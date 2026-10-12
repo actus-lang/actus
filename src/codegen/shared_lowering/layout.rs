@@ -276,6 +276,32 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         })
     }
 
+    fn packed_field_for(
+        &self,
+        type_name: &TypeName,
+        field_name: &str,
+    ) -> Option<super::super::BackendPackedFieldLayout> {
+        let pack = self.packs.get(type_name.name.as_str())?;
+        let field = pack.fields.iter().find(|field| field.name == field_name)?;
+        let primitive = if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
+            &field.ty.arguments[0]
+        } else {
+            &field.ty
+        };
+        let width = match primitive_type(&primitive.name)? {
+            crate::ast::PrimitiveType::Integer { width, .. } => width,
+            _ => return None,
+        };
+        let storage = self.type_layout(pack.storage.type_name(), &mut Vec::new())?;
+        Some(super::super::BackendPackedFieldLayout {
+            storage,
+            bit_offset: field.offset,
+            width,
+            big_endian: matches!(pack.endianness, crate::ast::LayoutEndianness::Big),
+            ty: field.ty.clone(),
+        })
+    }
+
     fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
         if let Some(pack) = self.packs.get(type_name.name.as_str()) {
             if field_name != "storage" {
