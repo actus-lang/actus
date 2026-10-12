@@ -27,21 +27,16 @@ pub(super) fn lower_expression(
             Ok(result)
         }
         Expr::BoolLiteral { value, span } => {
-            let result = provider.allocate();
-            instructions.push(BackendInstruction::Constant {
-                result,
-                ty: BackendValueType::Bool,
-                value: u64::from(*value),
-                span: *span,
-            });
-            provider.remember_value(result, BackendValueType::Bool);
-            Ok(result)
+            lower_bool_literal(provider, *value, *span, instructions)
         }
         Expr::StringLiteral { value, span } => lower_string(provider, value, *span, instructions),
         Expr::BufferLiteral { length, span } => {
             super::literals::lower_buffer_literal(provider, length, *span, instructions)
         }
         Expr::Grouping { expression, .. } => lower_expression(provider, expression, instructions),
+        Expr::Borrow { expression, span } => {
+            lower_borrow(provider, expression, *span, instructions)
+        }
         Expr::Cast { expression, target, span } => {
             if matches!(expression.as_ref(), Expr::Integer { .. }) {
                 provider.lower_constant_cast(expression, target, *span, instructions)
@@ -79,6 +74,37 @@ fn lower_string(
     }
     instructions.push(BackendInstruction::StringLiteral { result, value: value.to_owned(), span });
     Ok(result)
+}
+
+fn lower_bool_literal(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: bool,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let result = provider.allocate();
+    instructions.push(BackendInstruction::Constant {
+        result,
+        ty: BackendValueType::Bool,
+        value: u64::from(value),
+        span,
+    });
+    provider.remember_value(result, BackendValueType::Bool);
+    Ok(result)
+}
+
+fn lower_borrow(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let value = lower_expression(provider, expression, instructions)?;
+    if matches!(provider.value_type(value), Some(BackendValueType::Pointer)) {
+        Ok(value)
+    } else {
+        Err(unsupported(span, "borrow requires a pointer-valued expression"))
+    }
 }
 
 fn lower_same_result_try(

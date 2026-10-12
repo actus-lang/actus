@@ -96,6 +96,28 @@ fn lowers_string_literal_to_a_pointer_instruction() {
 }
 
 #[test]
+fn lowers_pointer_valued_borrow_without_allocating_a_second_value() {
+    let source = "verb main() -> Int { erg buffer: Buffer = Buffer[4]; { abs view = ref buffer; } return 0; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "borrow fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("borrow fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("pointer-valued borrow should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        instructions
+            .iter()
+            .filter(|instruction| matches!(instruction, BackendInstruction::Call { .. }))
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
     let source = "struct Inner { erg first: u32, abs view: Buffer, } struct Outer { erg inner: Inner, erg tail: u16, } verb inspect(erg value: Outer) { return; }";
     let (tokens, errors) = actus::lexer::scan(source);
