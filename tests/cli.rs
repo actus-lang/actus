@@ -1207,6 +1207,39 @@ fn cranelift_backend_builds_and_runs_a_shared_fixed_array_element_compound_store
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_coerces_case_branch_values_to_the_merge_type() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-cranelift-case-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() -> Int { erg left: u8 = 13; erg right: u8 = 5; erg value = case (left < right) || (left <= right) { true => 1, _ => 0, }; return value; }\n",
+    )
+    .expect("write Cranelift case merge fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift case merge fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run Cranelift case merge fixture");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_compound_store() {

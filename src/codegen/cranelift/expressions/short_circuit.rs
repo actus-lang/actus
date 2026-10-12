@@ -5,6 +5,7 @@ use crate::ast::{BinaryOp, Expr};
 
 use super::super::calls::CallLoweringContext;
 use super::super::native::BackendEmitError;
+use super::coerce_to_ir_type;
 use super::operations::lower_expression_with_context;
 
 pub(super) fn lower_short_circuit(
@@ -41,6 +42,7 @@ pub(super) fn lower_short_circuit(
 
     function.switch_to_block(right_block);
     let right = lower_expression_with_context(function, right_expression, context)?;
+    let right = coerce_to_ir_type(function, right, value_type);
     let right_argument = BlockArg::Value(right);
     function.ins().jump(merge, [&right_argument]);
     function.seal_block(right_block);

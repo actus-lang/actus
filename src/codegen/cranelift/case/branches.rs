@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::CaseBody;
 
-use super::super::expressions::lower_expression;
+use super::super::expressions::{coerce_to_ir_type, lower_expression};
 use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::context::CaseLoweringContext;
@@ -79,7 +79,16 @@ fn emit_case_branch(
         context,
         value_producing,
     )?;
-    finish_case_branch(function, branch_value, branch, matched, merge, bindings, context);
+    finish_case_branch(
+        function,
+        branch_value,
+        branch,
+        matched,
+        merge,
+        bindings,
+        result_type,
+        context,
+    )?;
     Ok(())
 }
 
@@ -90,8 +99,9 @@ fn finish_case_branch(
     matched: cranelift_codegen::ir::Block,
     merge: cranelift_codegen::ir::Block,
     bindings: &[&String],
+    result_type: NativeType,
     context: &CaseLoweringContext<'_, '_>,
-) {
+) -> Result<(), BackendEmitError> {
     if let Some((branch_value, branch_locals)) = branch_value {
         let mut arguments = bindings
             .iter()
@@ -107,12 +117,15 @@ fn finish_case_branch(
             })
             .map(cranelift_codegen::ir::BlockArg::Value)
             .collect::<Vec<_>>();
+        let branch_value =
+            coerce_to_ir_type(function, branch_value, context.layouts.ir_type(result_type)?);
         arguments.push(cranelift_codegen::ir::BlockArg::Value(branch_value));
         function.ins().jump(merge, &arguments);
     }
     if branch.guard.is_none() {
         function.seal_block(matched);
     }
+    Ok(())
 }
 
 fn branch_condition(
