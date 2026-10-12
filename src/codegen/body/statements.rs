@@ -24,6 +24,10 @@ pub(super) fn lower_expression_statement(
             provider.lower_expression(expression, instructions).map(|_| ())?;
             return Ok(());
         }
+        if provider.call_produces_value(callee) {
+            provider.lower_expression(expression, instructions).map(|_| ())?;
+            return Ok(());
+        }
         let arguments = arguments
             .iter()
             .map(|argument| provider.lower_expression(&argument.expression, instructions))

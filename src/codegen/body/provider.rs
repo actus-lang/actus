@@ -236,4 +236,8 @@ pub trait BackendExpressionProvider {
         callee: &str,
         span: SourceSpan,
     ) -> Result<SymbolIdentity, BackendContractError>;
+
+    fn call_produces_value(&self, _callee: &str) -> bool {
+        false
+    }
 }

@@ -3,6 +3,7 @@ use std::ffi::CString;
 
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
+    LLVMPointerTypeInContext,
 };
 use llvm_sys::prelude::{
     LLVMBasicBlockRef, LLVMBuilderRef, LLVMContextRef, LLVMModuleRef, LLVMValueRef,
@@ -194,7 +195,12 @@ fn create_phi(
     builder: LLVMBuilderRef,
     parameter: &BackendBlockParameter,
 ) -> Result<(BackendValueId, LLVMValueRef), BackendEmitError> {
-    let ty = super::values::llvm_type(context, parameter.ty)?;
+    let ty = match parameter.ty {
+        BackendValueType::Aggregate { .. } | BackendValueType::Enum { .. } => unsafe {
+            LLVMPointerTypeInContext(context, 0)
+        },
+        _ => super::values::llvm_type(context, parameter.ty)?,
+    };
     let name = CString::new(format!("block_param_{}", parameter.value.0))
         .map_err(|_| BackendEmitError("LLVM block parameter name contains NUL".to_owned()))?;
     let value = unsafe { llvm_sys::core::LLVMBuildPhi(builder, ty, name.as_ptr()) };

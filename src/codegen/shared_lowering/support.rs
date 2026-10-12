@@ -4,10 +4,13 @@ use crate::lexer::SourceSpan;
 use super::super::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
 
 pub(super) fn parse_integer(value: &str) -> Option<u64> {
-    value
+    let (negative, digits) =
+        value.strip_prefix('-').map_or((false, value), |digits| (true, digits));
+    let magnitude = digits
         .strip_prefix("0x")
         .map(|hex| u64::from_str_radix(hex, 16).ok())
-        .unwrap_or_else(|| value.parse().ok())
+        .unwrap_or_else(|| digits.parse().ok())?;
+    Some(if negative { 0u64.wrapping_sub(magnitude) } else { magnitude })
 }
 
 pub(super) fn scalar_integer_type(type_name: &TypeName) -> Option<(bool, u8)> {

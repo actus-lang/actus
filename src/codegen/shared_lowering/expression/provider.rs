@@ -229,6 +229,10 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         calls::callee_for(self, callee, span)
     }
 
+    fn call_produces_value(&self, callee: &str) -> bool {
+        self.return_types.get(callee).is_some_and(Option::is_some)
+    }
+
     fn lower_array_element(
         &mut self,
         collection: &Expr,
