@@ -69,7 +69,11 @@ pub(super) fn lower_place(
         ));
     }
     let result = provider.allocate();
-    provider.remember_value(result, value_type);
+    // Arena placement returns an address into the arena. The placed value's
+    // nominal type is retained separately for field resolution, while the
+    // backend value itself is a pointer and must be stored as one when it is
+    // embedded in another aggregate.
+    provider.remember_value(result, BackendValueType::Pointer);
     provider.remember_nominal_type(result, value_name);
     instructions.push(BackendInstruction::ArenaPlace {
         result,

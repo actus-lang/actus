@@ -309,7 +309,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             }
             let storage = pack.storage.type_name().clone();
             let layout = self.type_layout(&storage, &mut Vec::new())?;
-            return Some(BackendFieldLayout { offset: 0, layout, ty: storage });
+            return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
         }
         let definition = self.structs.get(type_name.name.as_str())?;
         let mut offset = 0u32;
@@ -317,7 +317,12 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             let layout = self.field_storage_layout(&field.role, &field.ty)?;
             offset = Self::align_up(offset, layout.alignment)?;
             if field.name == field_name {
-                return Some(BackendFieldLayout { offset, layout, ty: field.ty.clone() });
+                return Some(BackendFieldLayout {
+                    offset,
+                    layout,
+                    ty: field.ty.clone(),
+                    indirect: matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins),
+                });
             }
             offset = offset.checked_add(layout.size)?;
         }

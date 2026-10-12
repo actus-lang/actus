@@ -50,6 +50,7 @@ pub struct LoweredLoopUnwindPlan {
     pub scopes: Vec<LoweredCleanupPlan>,
 }
 
+#[cfg(feature = "cranelift")]
 pub(super) struct LoweredCleanupSchedule {
     scopes: Vec<LoweredCleanupPlan>,
     returns: Vec<LoweredUnwindPlan>,
@@ -57,6 +58,7 @@ pub(super) struct LoweredCleanupSchedule {
     resolved_plans: Vec<crate::codegen::BackendCleanupPlan>,
 }
 
+#[cfg(feature = "cranelift")]
 impl LoweredCleanupSchedule {
     pub(super) fn from_model(model: &SemanticModel) -> Self {
         Self {

@@ -32,6 +32,7 @@ pub struct BackendFieldLayout {
     pub offset: u32,
     pub layout: BackendLayout,
     pub ty: TypeName,
+    pub indirect: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -58,7 +58,7 @@ fn build_region_object(root: &std::path::Path) -> Vec<u8> {
     fs::read(output).expect("read generated Region object")
 }
 
-#[cfg(all(not(target_os = "macos"), feature = "llvm"))]
+#[cfg(all(not(target_os = "macos"), feature = "cranelift", feature = "llvm"))]
 fn write_freestanding_region_fixture(root: &std::path::Path, backend: &str) {
     let source_root = root.join("src");
     fs::create_dir_all(&source_root)
@@ -77,7 +77,7 @@ fn write_freestanding_region_fixture(root: &std::path::Path, backend: &str) {
     .expect("freestanding parity source should be written");
 }
 
-#[cfg(all(not(target_os = "macos"), feature = "llvm"))]
+#[cfg(all(not(target_os = "macos"), feature = "cranelift", feature = "llvm"))]
 fn freestanding_undefined_symbols(object_bytes: &[u8]) -> Vec<String> {
     let file = object::File::parse(object_bytes).expect("freestanding parity object should parse");
     let mut symbols = file
@@ -151,7 +151,7 @@ fn hosted_std_region_operations_build_and_run() {
     let _ = fs::remove_dir_all(root);
 }
 
-#[cfg(all(not(target_os = "macos"), feature = "llvm"))]
+#[cfg(all(not(target_os = "macos"), feature = "cranelift", feature = "llvm"))]
 #[test]
 fn freestanding_region_objects_have_compatible_backend_runtime_symbols() {
     let cranelift_root =

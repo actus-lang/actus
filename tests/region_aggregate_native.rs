@@ -59,7 +59,7 @@ fn build_object(root: &std::path::Path) -> Vec<u8> {
     fs::read(output).expect("Region object should be readable")
 }
 
-#[cfg(all(unix, feature = "llvm"))]
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 fn build_and_run_with_backend(
     root: &std::path::Path,
     source: &str,
@@ -111,7 +111,7 @@ verb main() -> Int {
     let _ = fs::remove_dir_all(root);
 }
 
-#[cfg(all(unix, feature = "llvm"))]
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn aggregate_region_lifecycle_has_matching_hosted_backend_results() {
     let source = r#"import std::region;

@@ -56,3 +56,8 @@ required-features = ["llvm"]
 name = "codegen"
 path = "tests/codegen.rs"
 required-features = ["cranelift"]
+
+[[test]]
+name = "applications"
+path = "tests/applications.rs"
+required-features = ["cranelift"]

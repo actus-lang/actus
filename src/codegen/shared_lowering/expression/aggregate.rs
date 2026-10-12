@@ -286,10 +286,17 @@ pub(super) fn lower_field_access_expression(
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
-    let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
-        .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?;
+    let ty = if metadata.indirect {
+        BackendValueType::Pointer
+    } else {
+        super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+            .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
+    };
     let result = provider.allocate();
     provider.remember_value(result, ty);
+    if provider.layouts.layout_for(&metadata.ty).is_some() {
+        provider.remember_nominal_type(result, metadata.ty.clone());
+    }
     instructions.push(BackendInstruction::AggregateFieldLoad {
         result,
         base,
@@ -330,8 +337,12 @@ pub(super) fn lower_field_assignment(
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
     let value = provider.lower_expression(value, instructions)?;
-    let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
-        .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?;
+    let ty = if metadata.indirect {
+        BackendValueType::Pointer
+    } else {
+        super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+            .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
+    };
     let value_ty = provider
         .value_type(value)
         .ok_or_else(|| unsupported(span, "aggregate field value type is unavailable"))?;
@@ -410,8 +421,12 @@ fn lower_plain_field_compound_assignment(
     let metadata = provider.layouts.field_for(type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
-    let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
-        .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?;
+    let ty = if metadata.indirect {
+        BackendValueType::Pointer
+    } else {
+        super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+            .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
+    };
     let current = provider.allocate();
     provider.remember_value(current, ty);
     instructions.push(BackendInstruction::AggregateFieldLoad {

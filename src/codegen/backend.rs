@@ -53,7 +53,7 @@ impl Default for BackendKind {
 
         #[cfg(all(not(feature = "cranelift"), feature = "llvm"))]
         {
-            return Self::Llvm;
+            Self::Llvm
         }
 
         #[cfg(not(any(feature = "cranelift", feature = "llvm")))]
@@ -114,7 +114,12 @@ mod tests {
     #[test]
     fn backend_selection_is_independent_from_target_selection() {
         let target = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
-        assert_eq!(BackendKind::Cranelift.validate_target(&target), Ok(()));
+        let cranelift_result = BackendKind::Cranelift.validate_target(&target);
+        if cfg!(feature = "cranelift") {
+            assert_eq!(cranelift_result, Ok(()));
+        } else {
+            assert!(matches!(cranelift_result, Err(BackendTargetError::Unavailable { .. })));
+        }
         assert_eq!(BackendKind::Llvm.name(), "llvm");
     }
 

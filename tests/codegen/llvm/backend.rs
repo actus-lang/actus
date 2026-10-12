@@ -7,16 +7,21 @@ use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendCaseMode, BackendCleanupArgument,
-    BackendCleanupBridge, BackendCleanupOperand, BackendCleanupResolvedDescriptor,
-    BackendCleanupResult, BackendEdgeArgument, BackendEnumLayout, BackendExternal, BackendFailure,
-    BackendFunction, BackendInstruction, BackendLayout, BackendModule, BackendParameter,
-    BackendReturn, BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction,
-    SymbolIdentity, SymbolKind, lower_scalar_program,
+    BackendCleanupBridge, BackendCleanupOperand, BackendCleanupResult, BackendEdgeArgument,
+    BackendEnumLayout, BackendExternal, BackendFailure, BackendFunction, BackendInstruction,
+    BackendLayout, BackendModule, BackendParameter, BackendReturn, BackendReturnMode,
+    BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
+    lower_scalar_program,
 };
-use actus::configuration::{CompilerConfiguration, NativeBackendConfiguration};
+use actus::configuration::CompilerConfiguration;
+#[cfg(feature = "cranelift")]
+use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
 use object::{Object, ObjectSection, ObjectSymbol};
+
+#[cfg(feature = "cranelift")]
+use actus::codegen::BackendCleanupResolvedDescriptor;
 
 #[cfg(target_os = "linux")]
 use std::fs;
@@ -91,16 +96,19 @@ fn both_backends_emit_user_defined_drop_performance_calls() {
     assert!(llvm_ir.contains("define void @actus_root__performance_drop__Drop_Counter"));
     assert!(llvm_ir.contains("call void @actus_root__performance_drop__Drop_Counter"));
 
-    let target = actus::target::TargetSpec::host().expect("host target should parse");
-    let configuration = NativeBackendConfiguration::default();
-    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
-        .expect("Cranelift should emit the user-defined Drop call");
-    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-    assert!(
-        object
-            .symbols()
-            .any(|symbol| symbol.name() == Ok("actus_root__performance_drop__Drop_Counter"))
-    );
+    #[cfg(feature = "cranelift")]
+    {
+        let target = actus::target::TargetSpec::host().expect("host target should parse");
+        let configuration = NativeBackendConfiguration::default();
+        let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+            .expect("Cranelift should emit the user-defined Drop call");
+        let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+        assert!(
+            object
+                .symbols()
+                .any(|symbol| symbol.name() == Ok("actus_root__performance_drop__Drop_Counter"))
+        );
+    }
 }
 
 #[test]

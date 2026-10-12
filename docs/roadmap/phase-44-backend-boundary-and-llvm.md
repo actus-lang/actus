@@ -1282,6 +1282,23 @@ the corresponding backend through the shared semantic pipeline.
 - [ ] Close this phase only when every claim has reproducible evidence and the
       original Cranelift checkpoint remains recoverable.
 
+The neutral aggregate layout now records whether a struct field is stored
+indirectly for `abs` and `ins` fields. Shared field lowering emits a pointer
+value for those fields and preserves the field's nominal type separately, so
+nested arena references can be resolved without treating an address as an
+inline aggregate. Arena placement likewise records its result as a pointer
+while retaining the placed aggregate's nominal type. The LLVM-only and
+all-feature `arena_graph` fixtures both pass, as do the 47 LLVM backend
+contract tests, the 40 Cranelift application tests, the 95 Cranelift codegen
+tests, architecture conformance, strict Clippy, and source-limit checks.
+
+The full LLVM-only integration matrix is still open. The current run reports
+23 failing integration targets, including nested case/body lowering, generic
+aggregate layout, Buffer and IO module linking, array and pack lowering,
+Option and enum representation, return-slot and void-call ABI behavior, and
+runtime failure paths. These failures remain recorded as implementation work;
+they do not close Gate 44.7.1 and no related checkbox is marked complete.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.
