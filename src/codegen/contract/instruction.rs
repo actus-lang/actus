@@ -23,6 +23,11 @@ pub enum BackendInstruction {
         value: u64,
         span: SourceSpan,
     },
+    StringLiteral {
+        result: super::BackendValueId,
+        value: String,
+        span: SourceSpan,
+    },
     IntegerBinary {
         result: super::BackendValueId,
         operation: BackendIntegerBinaryOp,

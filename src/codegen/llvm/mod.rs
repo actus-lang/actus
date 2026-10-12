@@ -12,6 +12,7 @@ mod enums;
 mod failures;
 mod guards;
 mod integer;
+mod literals;
 mod memory;
 mod module;
 mod object;

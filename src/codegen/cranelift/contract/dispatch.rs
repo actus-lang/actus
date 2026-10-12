@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use cranelift_codegen::ir::{Block, InstBuilder, TrapCode};
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
+use cranelift_module::{DataDescription, Linkage};
 use cranelift_object::ObjectModule;
 
 use super::super::aggregate::{Declaration, lower_call};
@@ -113,6 +114,9 @@ fn lower_scalar(
         BackendInstruction::Constant { .. } => {
             super::lower_constant(module, builder, instruction, values)
         }
+        BackendInstruction::StringLiteral { result, value, .. } => {
+            lower_string_literal(module, builder, *result, value, values)
+        }
         BackendInstruction::IntegerBinary { .. } => {
             super::lower_integer_binary(builder, instruction, values)
         }
@@ -136,6 +140,28 @@ fn lower_scalar(
         }
         _ => Err(BackendEmitError("Cranelift scalar instruction expected".to_owned())),
     }
+}
+
+fn lower_string_literal(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    result: BackendValueId,
+    value: &str,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let symbol = format!("actus.string.{}", result.0);
+    let data_id = module
+        .declare_data(&symbol, Linkage::Local, false, false)
+        .map_err(|error| BackendEmitError(error.to_string()))?;
+    let mut description = DataDescription::new();
+    description.define(format!("{value}\0").into_bytes().into_boxed_slice());
+    module
+        .define_data(data_id, &description)
+        .map_err(|error| BackendEmitError(error.to_string()))?;
+    let global = module.declare_data_in_func(data_id, builder.func);
+    let pointer = builder.ins().symbol_value(module.isa().pointer_type(), global);
+    values.insert(result, pointer);
+    Ok(())
 }
 
 fn lower_termination(

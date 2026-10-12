@@ -37,6 +37,7 @@ pub(super) fn lower_expression(
             provider.remember_value(result, BackendValueType::Bool);
             Ok(result)
         }
+        Expr::StringLiteral { value, span } => lower_string(provider, value, *span, instructions),
         Expr::BufferLiteral { length, span } => {
             super::literals::lower_buffer_literal(provider, length, *span, instructions)
         }
@@ -63,6 +64,21 @@ pub(super) fn lower_expression(
             "expression is outside the scalar shared lowering contract",
         )),
     }
+}
+
+fn lower_string(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: &str,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let result = provider.allocate();
+    provider.remember_value(result, BackendValueType::Pointer);
+    if let Some(type_name) = crate::semantic::parse_type_name_key("String", span) {
+        provider.remember_nominal_type(result, type_name);
+    }
+    instructions.push(BackendInstruction::StringLiteral { result, value: value.to_owned(), span });
+    Ok(result)
 }
 
 fn lower_same_result_try(

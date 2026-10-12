@@ -33,6 +33,7 @@ fn validate_instruction(
         {
             Err(BackendContractError::InvalidValueType)
         }
+        BackendInstruction::StringLiteral { .. } => Ok(()),
         BackendInstruction::Call { callee, .. } if callee.as_str().is_empty() => {
             Err(BackendContractError::InvalidCallSymbol)
         }

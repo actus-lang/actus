@@ -17,6 +17,7 @@ use super::guards::{
 use super::integer::{
     emit_integer_binary, emit_integer_cast, emit_integer_compare, emit_integer_unary,
 };
+use super::literals::emit_string_literal;
 use super::memory::emit_memory_copy;
 use super::returns::emit_return;
 use llvm_sys::core::{
@@ -139,6 +140,7 @@ fn ordered_blocks(function: &BackendFunction) -> Vec<&super::super::BackendBlock
 fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId> {
     match instruction {
         BackendInstruction::Constant { result, .. }
+        | BackendInstruction::StringLiteral { result, .. }
         | BackendInstruction::IntegerBinary { result, .. }
         | BackendInstruction::IntegerCast { result, .. }
         | BackendInstruction::IntegerCompare { result, .. }
@@ -200,6 +202,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
             operand.iter().map(|item| item.value).collect()
         }
         BackendInstruction::Constant { .. }
+        | BackendInstruction::StringLiteral { .. }
         | BackendInstruction::ArenaConstruct { .. }
         | BackendInstruction::Fail { .. }
         | BackendInstruction::Trap { .. } => Vec::new(),
@@ -414,6 +417,9 @@ fn emit_scalar_instruction(
     let result = match instruction {
         BackendInstruction::Constant { result, ty, value, .. } => {
             emit_constant(context, *result, *ty, *value, values)
+        }
+        BackendInstruction::StringLiteral { result, value, .. } => {
+            emit_string_literal(builder, *result, value, values)
         }
         BackendInstruction::IntegerBinary { .. } => {
             emit_integer_binary(builder, instruction, values)
