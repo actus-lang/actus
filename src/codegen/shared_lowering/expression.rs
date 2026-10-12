@@ -44,6 +44,14 @@ pub(super) struct SharedExpressionProvider<'a> {
     next_value: u32,
     loop_depth: usize,
 }
+
+pub(super) fn lower_unit_call(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    calls::lower_unit_call(provider, expression, instructions)
+}
 impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
         namespace: &'a str,
@@ -155,6 +163,10 @@ impl<'a> SharedExpressionProvider<'a> {
 include!("expression/provider.rs");
 
 impl SharedExpressionProvider<'_> {
+    pub(super) fn call_returns_unit(&self, callee: &str) -> bool {
+        self.return_types.get(callee).is_some_and(Option::is_none)
+    }
+
     fn lower_method_call(
         &mut self,
         expression: &Expr,

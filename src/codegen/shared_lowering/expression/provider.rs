@@ -233,6 +233,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.return_types.get(callee).is_some_and(Option::is_some)
     }
 
+
     fn lower_array_element(
         &mut self,
         collection: &Expr,

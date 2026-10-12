@@ -248,7 +248,7 @@ fn validate_enum_construct(
     payload_type: Option<super::BackendValueType>,
 ) -> Result<(), BackendContractError> {
     layout.validate()?;
-    if layout.niche_pointer || payload_type.is_some() != layout.payload.is_some() {
+    if layout.niche_pointer || payload_type.is_some() && layout.payload.is_none() {
         return Err(BackendContractError::InvalidEnumLayout(
             "enum constructor payload does not match its layout",
         ));

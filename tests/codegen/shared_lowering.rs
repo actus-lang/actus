@@ -43,6 +43,35 @@ fn lowers_result_constructor_with_region_payload_layout() {
 }
 
 #[test]
+fn lowers_unit_result_constructor_with_shared_payload_layout() {
+    let source = "verb complete() -> Void { return; } verb main() -> Result[Void, String] { return Result[Void, String].Ok(complete()); }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "unit Result fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("unit Result fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("unit Result constructor should lower through the neutral contract");
+    let instructions = module.functions[1]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(matches!(
+        instructions.as_slice(),
+        [
+            BackendInstruction::Call { result: None, .. },
+            BackendInstruction::EnumConstruct {
+                discriminant: 0,
+                payload: None,
+                payload_type: None,
+                layout: actus::codegen::BackendEnumLayout { payload: Some(_), .. },
+                ..
+            },
+            BackendInstruction::Return { value: Some(_), .. }
+        ]
+    ));
+}
+
+#[test]
 fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
     let source = "struct Inner { erg first: u32, abs view: Buffer, } struct Outer { erg inner: Inner, erg tail: u16, } verb inspect(erg value: Outer) { return; }";
     let (tokens, errors) = actus::lexer::scan(source);

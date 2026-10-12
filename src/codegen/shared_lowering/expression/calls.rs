@@ -92,6 +92,27 @@ pub(super) fn lower_call(
     })
 }
 
+pub(super) fn lower_unit_call(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let Expr::Call { callee, arguments, span } = expression else {
+        return Err(super::super::support::unsupported(
+            expression_span(expression),
+            "unit call expected",
+        ));
+    };
+    let arguments = lower_arguments(provider, arguments, instructions)?;
+    instructions.push(BackendInstruction::Call {
+        callee: provider.callee_for(callee, *span)?,
+        arguments,
+        result: None,
+        span: *span,
+    });
+    Ok(())
+}
+
 fn lower_arguments(
     provider: &mut SharedExpressionProvider<'_>,
     arguments: &[crate::ast::Argument],

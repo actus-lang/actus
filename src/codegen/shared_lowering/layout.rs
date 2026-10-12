@@ -337,18 +337,30 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         type_name: &TypeName,
     ) -> Option<super::super::abi::BackendEnumLayout> {
         if type_name.name == "Result" && type_name.arguments.len() == 2 {
-            let payload = self.type_layout(type_name.arguments.first()?, &mut Vec::new())?;
-            let payload_offset = Self::align_up(4, payload.alignment)?;
-            let alignment = 4u32.max(payload.alignment);
+            let payload = type_name
+                .arguments
+                .iter()
+                .filter(|argument| argument.name != "Void")
+                .filter_map(|argument| self.type_layout(argument, &mut Vec::new()))
+                .max_by_key(|layout| (layout.size, layout.alignment));
+            let payload_offset = match payload.as_ref() {
+                Some(layout) => Self::align_up(4, layout.alignment)?,
+                None => 4,
+            };
+            let alignment = payload.as_ref().map_or(4, |layout| 4u32.max(layout.alignment));
             return Some(super::super::abi::BackendEnumLayout {
                 layout: BackendLayout {
-                    size: Self::align_up(payload_offset.checked_add(payload.size)?, alignment)?,
+                    size: Self::align_up(
+                        payload_offset
+                            .checked_add(payload.as_ref().map_or(0, |layout| layout.size))?,
+                        alignment,
+                    )?,
                     alignment,
                 },
                 discriminant_offset: 0,
                 discriminant_size: 4,
                 payload_offset,
-                payload: Some(payload),
+                payload,
                 niche_pointer: false,
             });
         }
