@@ -102,6 +102,13 @@ fn lower_lowered_array_element_compound_assignment(
         span,
     });
     let value = provider.lower_expression(value, instructions)?;
+    let value = super::state::coerce_value_to_type(
+        provider,
+        value,
+        Some(element_type),
+        span,
+        instructions,
+    )?;
     if provider.value_type(value) != Some(element_type) {
         return Err(unsupported(span, "array element compound assignment type mismatch"));
     }

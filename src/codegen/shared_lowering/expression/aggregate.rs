@@ -131,6 +131,13 @@ pub(super) fn lower_array_element_assignment(
             instructions,
         )?;
     let value = provider.lower_expression(value, instructions)?;
+    let value = super::state::coerce_value_to_type(
+        provider,
+        value,
+        Some(element_type),
+        span,
+        instructions,
+    )?;
     if provider.value_type(value) != Some(element_type) {
         return Err(unsupported(span, "array element assignment type mismatch"));
     }
@@ -416,13 +423,14 @@ pub(super) fn lower_field_assignment(
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
-    let value = provider.lower_expression(value, instructions)?;
     let ty = if metadata.indirect {
         BackendValueType::Pointer
     } else {
         super::super::support::backend_value_type(provider.layouts, &metadata.ty)
             .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
     };
+    let value = provider.lower_expression(value, instructions)?;
+    let value = super::state::coerce_value_to_type(provider, value, Some(ty), span, instructions)?;
     let value_ty = provider
         .value_type(value)
         .ok_or_else(|| unsupported(span, "aggregate field value type is unavailable"))?;

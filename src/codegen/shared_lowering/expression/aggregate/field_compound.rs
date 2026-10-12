@@ -58,6 +58,13 @@ fn lower_plain_field_compound_assignment(
         span,
     });
     let value = provider.lower_expression(value, instructions)?;
+    let value = super::state::coerce_value_to_type(
+        provider,
+        value,
+        Some(ty),
+        span,
+        instructions,
+    )?;
     let value_ty = provider
         .value_type(value)
         .ok_or_else(|| unsupported(span, "aggregate field value type is unavailable"))?;
