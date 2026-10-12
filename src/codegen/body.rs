@@ -119,6 +119,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     | Stmt::ForArray { .. }
                     | Stmt::Block(_)
                     | Stmt::If { .. }
+                    | Stmt::OwnerDecl { initializer: Expr::If { .. }, .. }
                     | Stmt::Return { value: Some(Expr::If { .. }), .. }
                     | Stmt::Return { value: Some(Expr::Case { .. }), .. }
                     | Stmt::Expression { expression: Expr::Case { .. }, .. }

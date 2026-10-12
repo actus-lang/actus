@@ -30,6 +30,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } => {
                 self.lower_case_return(id, expression, *span, instructions).map(Some)
             }
+            Stmt::OwnerDecl { initializer: Expr::If { .. }, .. } => self
+                .lower_if_owner_statement(id, block, index, statement, fallthrough, instructions)
+                .map(Some),
             Stmt::Return { value: Some(expression @ Expr::If { .. }), span } => {
                 self.lower_if_return(id, expression, *span, instructions).map(Some)
             }
