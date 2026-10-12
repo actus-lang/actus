@@ -662,7 +662,7 @@ the same fixture through LLVM and Cranelift object emission.
 - [x] Route bounded range iteration through the shared loop contract, including
       carried owner values, typed loop block parameters, typed back-edge
       arguments, and hosted CLI fixtures for both backends.
-- [ ] Route fixed-array iteration through the shared loop contract and add its
+- [x] Route fixed-array iteration through the shared loop contract and add its
       hosted CLI fixtures for both backends.
 - [ ] Preserve the complete current Cranelift lowering behavior while adding
       the shared path; no backend-specific semantic rewrite or duplicate
@@ -1061,8 +1061,21 @@ parameters and edge arguments. Loop-carried owner values are preserved across
 the header, body, increment, and continuation blocks; the codegen contract
 tests validate both side-effect-free and carried-owner loops. Hosted CLI
 fixtures build and execute the same carried-owner range program through both
-Cranelift and LLVM and return the expected result. Fixed-array iteration
-remains under the same boundary and is still open.
+Cranelift and LLVM and return the expected result.
+
+Fixed-array iteration now uses the same neutral loop contract. Shared lowering
+preserves the declared `Array[T, N]` nominal type, validates the concrete
+capacity and recursive element layout, lowers `Array[T, N]()` to a bounded
+zero-initialized aggregate, and emits typed element loads for the loop body.
+The hosted CLI fixtures
+`cranelift_backend_builds_and_runs_a_shared_fixed_array_loop` and
+`llvm_backend_builds_and_runs_a_shared_fixed_array_loop` compile the identical
+source through the selected backend and execute it with exit status `0`.
+The focused acceptance evidence is `cargo test --test cli --all-features
+fixed_array_loop -- --test-threads=1`; the neutral and backend suites also
+pass with 44 and 46 tests respectively. The broader backend-pipeline gate
+remains open until its remaining semantic lowering, unsupported-operation,
+configuration, reproducibility, and documentation requirements are complete.
 
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute

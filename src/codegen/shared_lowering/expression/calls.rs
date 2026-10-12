@@ -48,6 +48,9 @@ pub(super) fn lower_call(
     if let Some(value) = super::layout::lower_intrinsic(provider, callee, *span, instructions)? {
         return Ok(value);
     }
+    if arguments.is_empty() && callee.starts_with("Array[") {
+        return lower_array_constructor(provider, callee, *span, instructions);
+    }
     let arguments = arguments
         .iter()
         .map(|argument| provider.lower_expression(&argument.expression, instructions))
@@ -73,4 +76,54 @@ pub(super) fn lower_call(
     result.ok_or_else(|| {
         super::super::support::unsupported(*span, "unit call cannot produce a value")
     })
+}
+
+fn lower_array_constructor(
+    provider: &mut SharedExpressionProvider<'_>,
+    callee: &str,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let type_name = crate::semantic::parse_type_name_key(callee, span).ok_or_else(|| {
+        super::super::support::unsupported(span, "malformed fixed-array constructor")
+    })?;
+    if type_name.name != "Array" || type_name.arguments.len() != 2 {
+        return Err(super::super::support::unsupported(
+            span,
+            "fixed-array constructor requires Array[T, N]",
+        ));
+    }
+    let capacity = type_name.arguments[1]
+        .name
+        .parse::<u32>()
+        .map_err(|_| super::super::support::unsupported(span, "array capacity is not concrete"))?;
+    if capacity == 0 {
+        return Err(super::super::support::unsupported(
+            span,
+            "fixed-array capacity must be non-zero",
+        ));
+    }
+    let layout = provider
+        .layouts
+        .layout_for(&type_name)
+        .ok_or_else(|| super::super::support::unsupported(span, "array has no neutral layout"))?;
+    let element_layout = provider.layouts.layout_for(&type_name.arguments[0]).ok_or_else(|| {
+        super::super::support::unsupported(span, "array element has no neutral layout")
+    })?;
+    if u64::from(element_layout.size) * u64::from(capacity) != u64::from(layout.size) {
+        return Err(super::super::support::unsupported(
+            span,
+            "array layout does not match capacity",
+        ));
+    }
+    let result = provider.allocate();
+    provider.remember_value(result, super::super::super::BackendValueType::Aggregate { layout });
+    provider.remember_nominal_type(result, type_name);
+    instructions.push(BackendInstruction::AggregateConstruct {
+        result,
+        layout,
+        fields: Vec::new(),
+        span,
+    });
+    Ok(result)
 }

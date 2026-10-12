@@ -25,6 +25,7 @@ pub(super) fn lower_aggregate_construct(
         alignment.trailing_zeros() as u8,
     ));
     let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+    zero_initialize_aggregate(module, builder, address, *layout);
     for field in fields {
         let value = values.get(&field.value).copied().ok_or_else(|| {
             BackendEmitError(format!(
@@ -64,6 +65,22 @@ pub(super) fn lower_aggregate_construct(
     }
     values.insert(*result, address);
     Ok(())
+}
+
+fn zero_initialize_aggregate(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    layout: crate::codegen::BackendLayout,
+) {
+    builder.emit_small_memset(
+        module.isa().frontend_config(),
+        address,
+        0u8,
+        u64::from(layout.size),
+        layout.alignment.trailing_zeros() as u8,
+        MemFlagsData::new(),
+    );
 }
 
 pub(super) fn lower_aggregate_field_load(

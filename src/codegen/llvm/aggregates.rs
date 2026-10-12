@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMul, LLVMBuildStore,
-    LLVMBuildZExt, LLVMConstInt, LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment,
+    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMemSet,
+    LLVMBuildMul, LLVMBuildStore, LLVMBuildZExt, LLVMConstInt, LLVMInt8TypeInContext,
+    LLVMInt64TypeInContext, LLVMSetAlignment,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
@@ -25,6 +26,11 @@ pub(super) fn emit_aggregate_construct(
         return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
     }
     unsafe { LLVMSetAlignment(address, layout.alignment) };
+    let zero = unsafe { LLVMConstInt(LLVMInt8TypeInContext(context), 0, 0) };
+    let size = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+    if unsafe { LLVMBuildMemSet(builder, address, zero, size, layout.alignment) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to zero-initialize aggregate value".to_owned()));
+    }
     for field in fields {
         let value = values.get(&field.value).copied().ok_or_else(|| {
             BackendEmitError(format!("LLVM aggregate field value {} is unavailable", field.value.0))

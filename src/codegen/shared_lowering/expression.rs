@@ -237,6 +237,12 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         let value = state::coerce_owner_value(self, value, declared_type, span, instructions)?;
+        if let Some(declared_type) =
+            declared_type.and_then(|name| crate::semantic::parse_type_name_key(name, span))
+            && self.layouts.layout_for(&declared_type).is_some()
+        {
+            self.remember_nominal_type(value, declared_type);
+        }
         let Some(scope) = self.locals.last_mut() else {
             return Err(unsupported(span, "scalar owner declaration has no active lexical scope"));
         };
