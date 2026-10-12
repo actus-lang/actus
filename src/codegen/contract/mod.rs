@@ -80,7 +80,7 @@ impl BackendLayout {
         if self.alignment == 0 || !self.alignment.is_power_of_two() {
             return Err(BackendContractError::InvalidLayout("alignment must be a power of two"));
         }
-        if self.size % self.alignment != 0 {
+        if !self.size.is_multiple_of(self.alignment) {
             return Err(BackendContractError::InvalidLayout(
                 "aggregate size must be aligned to its declared alignment",
             ));

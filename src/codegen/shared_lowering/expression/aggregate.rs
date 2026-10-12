@@ -1,3 +1,7 @@
+// Aggregate helpers return the complete neutral location contract.
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
 use crate::ast::{CompoundAssignmentOp, Expr, StructFieldInit, TypeName};
 use crate::lexer::SourceSpan;
 
@@ -379,7 +383,7 @@ pub(super) fn lower_field_compound_assignment(
             instructions,
         );
     }
-    return lower_plain_field_compound_assignment(
+    lower_plain_field_compound_assignment(
         provider,
         base,
         &type_name,
@@ -389,7 +393,7 @@ pub(super) fn lower_field_compound_assignment(
         aggregate_layout,
         span,
         instructions,
-    );
+    )
 }
 
 fn lower_plain_field_compound_assignment(
@@ -403,7 +407,7 @@ fn lower_plain_field_compound_assignment(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
-    let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
+    let metadata = provider.layouts.field_for(type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
     let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)

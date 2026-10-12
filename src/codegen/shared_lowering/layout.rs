@@ -63,7 +63,7 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
-        Self { structs, packs, drop_symbols, pointer_bytes: (usize::BITS / 8) as u32 }
+        Self { structs, packs, drop_symbols, pointer_bytes: usize::BITS / 8 }
     }
 
     fn type_layout(

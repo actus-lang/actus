@@ -1,3 +1,7 @@
+// Structured loop lowering carries the explicit block, binding, and edge state
+// required to preserve Actus control-flow contracts.
+#![allow(clippy::too_many_arguments)]
+
 use super::super::body_contract::unsupported;
 use super::super::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
@@ -433,10 +437,10 @@ fn replace_jump_arguments(
 ) -> BackendBlock {
     if let Some(BackendInstruction::Jump { target: actual, arguments: current, .. }) =
         block.instructions.last_mut()
+        && *actual == target
+        && current.is_empty()
     {
-        if *actual == target && current.is_empty() {
-            *current = edge_arguments;
-        }
+        *current = edge_arguments;
     }
     block
 }

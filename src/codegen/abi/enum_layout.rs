@@ -39,7 +39,7 @@ impl BackendEnumLayout {
                     "payload range exceeds enum layout",
                 ));
             }
-            if self.payload_offset % payload.alignment != 0 {
+            if !self.payload_offset.is_multiple_of(payload.alignment) {
                 return Err(BackendContractError::InvalidEnumLayout(
                     "payload offset must satisfy payload alignment",
                 ));

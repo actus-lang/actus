@@ -216,9 +216,11 @@ fn lower_type(
             format!("no neutral layout is registered for `{}`", type_name.name),
         )
     })?;
-    let ty = (type_name.name == "Region")
-        .then_some(BackendValueType::Region { layout })
-        .unwrap_or(BackendValueType::Aggregate { layout });
+    let ty = if type_name.name == "Region" {
+        BackendValueType::Region { layout }
+    } else {
+        BackendValueType::Aggregate { layout }
+    };
     Ok((ty, Some(layout)))
 }
 

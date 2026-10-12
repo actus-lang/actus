@@ -1,3 +1,6 @@
+// Packed aggregate updates receive the complete LLVM lowering context explicitly.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{

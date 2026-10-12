@@ -118,17 +118,15 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     | Stmt::Block(_)
                     | Stmt::If { .. }
                     | Stmt::Return { value: Some(Expr::Case { .. }), .. }
-            ) {
-                if let Some(result) = self.lower_structured_statement(
-                    id,
-                    block,
-                    index,
-                    statement,
-                    fallthrough,
-                    std::mem::take(&mut instructions),
-                )? {
-                    return Ok(result);
-                }
+            ) && let Some(result) = self.lower_structured_statement(
+                id,
+                block,
+                index,
+                statement,
+                fallthrough,
+                std::mem::take(&mut instructions),
+            )? {
+                return Ok(result);
             }
             self.lower_statement(statement, &mut instructions)?;
             if terminates(instructions.last()) {
@@ -192,10 +190,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         fallthrough: Option<BackendBlockId>,
         mut instructions: Vec<BackendInstruction>,
     ) -> BackendBlock {
-        if !terminates(instructions.last()) {
-            if let Some(target) = fallthrough {
-                instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
-            }
+        if !terminates(instructions.last())
+            && let Some(target) = fallthrough
+        {
+            instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
         }
         BackendBlock { parameters: Vec::new(), id, instructions }
     }

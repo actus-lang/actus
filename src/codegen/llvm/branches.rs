@@ -1,3 +1,6 @@
+// Branch emission receives the complete LLVM lowering context explicitly.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{LLVMAddIncoming, LLVMBuildBr, LLVMBuildCondBr, LLVMGetInsertBlock};

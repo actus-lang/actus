@@ -1,3 +1,6 @@
+// Aggregate emission returns the native value maps needed by later lowering.
+#![allow(clippy::type_complexity)]
+
 use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::{Block, InstBuilder, Type};

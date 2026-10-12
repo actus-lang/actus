@@ -1,3 +1,6 @@
+// Call result recording receives the complete LLVM lowering context explicitly.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 use std::ffi::CString;
 

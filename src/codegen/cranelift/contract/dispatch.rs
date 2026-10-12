@@ -1,3 +1,6 @@
+// Dispatch receives the complete native lowering context explicitly.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::{Block, InstBuilder, TrapCode};

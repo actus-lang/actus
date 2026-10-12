@@ -1,3 +1,6 @@
+// Block emission receives the complete native lowering context explicitly.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 mod aggregate;
 mod arena;

@@ -22,9 +22,8 @@ pub(super) fn emit_enum_discriminant(
     let temporary = enum_temporary(context, builder, *subject, *layout, values)?;
     let address = enum_field_address(context, builder, temporary, layout.discriminant_offset)?;
     let discriminant_type = integer_type(context, layout.discriminant_size)?;
-    let value = unsafe {
-        LLVMBuildLoad2(builder, discriminant_type, address, b"discriminant\0".as_ptr().cast())
-    };
+    let value =
+        unsafe { LLVMBuildLoad2(builder, discriminant_type, address, c"discriminant".as_ptr()) };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to load enum discriminant".to_owned()));
     }
@@ -55,7 +54,7 @@ pub(super) fn emit_enum_payload(
     ) {
         address
     } else {
-        unsafe { LLVMBuildLoad2(builder, llvm_type, address, b"payload\0".as_ptr().cast()) }
+        unsafe { LLVMBuildLoad2(builder, llvm_type, address, c"payload".as_ptr()) }
     };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to load enum payload".to_owned()));
@@ -102,9 +101,8 @@ pub(super) fn emit_enum_construct(
     } else if unsafe { LLVMBuildStore(builder, payload_value, payload_address) }.is_null() {
         return Err(BackendEmitError("LLVM failed to store enum constructor payload".to_owned()));
     }
-    let value = unsafe {
-        LLVMBuildLoad2(builder, enum_type, temporary, b"enum.construct.value\0".as_ptr().cast())
-    };
+    let value =
+        unsafe { LLVMBuildLoad2(builder, enum_type, temporary, c"enum.construct.value".as_ptr()) };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to load enum constructor value".to_owned()));
     }
@@ -122,8 +120,7 @@ fn initialize_enum_constructor(
         context,
         super::super::BackendValueType::Aggregate { layout: layout.layout },
     )?;
-    let temporary =
-        unsafe { LLVMBuildAlloca(builder, enum_type, b"enum.construct\0".as_ptr().cast()) };
+    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"enum.construct".as_ptr()) };
     if temporary.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate enum constructor value".to_owned()));
     }
@@ -179,7 +176,7 @@ fn enum_temporary(
         context,
         super::super::BackendValueType::Aggregate { layout: layout.layout },
     )?;
-    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, b"enum.value\0".as_ptr().cast()) };
+    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"enum.value".as_ptr()) };
     if temporary.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate enum temporary".to_owned()));
     }
@@ -205,7 +202,7 @@ fn enum_field_address(
             temporary,
             &index as *const _ as *mut _,
             1,
-            b"enum.field\0".as_ptr().cast(),
+            c"enum.field".as_ptr(),
         )
     };
     (!address.is_null())

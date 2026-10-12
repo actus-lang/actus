@@ -31,7 +31,7 @@ pub(super) fn emit_trap_if_zero(
             LLVMIntPredicate::LLVMIntNE,
             value,
             zero,
-            b"actus.divisor.nonzero\0".as_ptr().cast(),
+            c"actus.divisor.nonzero".as_ptr(),
         )
     };
     if condition.is_null() {
@@ -92,15 +92,8 @@ fn emit_llvm_trap(
         let mut parameter_types = [LLVMInt32TypeInContext(context)];
         let trap_type =
             LLVMFunctionType(LLVMInt32TypeInContext(context), parameter_types.as_mut_ptr(), 1, 0);
-        if LLVMBuildCall2(
-            builder,
-            trap_type,
-            trap,
-            arguments.as_mut_ptr(),
-            1,
-            b"\0".as_ptr().cast(),
-        )
-        .is_null()
+        if LLVMBuildCall2(builder, trap_type, trap, arguments.as_mut_ptr(), 1, c"".as_ptr())
+            .is_null()
         {
             return Err(BackendEmitError("LLVM failed to emit raise call".to_owned()));
         }
@@ -132,7 +125,7 @@ pub(super) fn emit_trap_if_shift_count_out_of_range(
             LLVMIntPredicate::LLVMIntULT,
             count,
             limit,
-            b"actus.shift.valid\0".as_ptr().cast(),
+            c"actus.shift.valid".as_ptr(),
         )
     };
     if condition.is_null() {
@@ -179,7 +172,7 @@ pub(super) fn emit_trap_if_array_index_out_of_bounds(
             LLVMIntPredicate::LLVMIntULT,
             index,
             limit,
-            b"actus.array.index.valid\0".as_ptr().cast(),
+            c"actus.array.index.valid".as_ptr(),
         )
     };
     if condition.is_null() {
@@ -220,7 +213,7 @@ pub(super) fn emit_trap_if_signed_division_overflow(
             LLVMIntPredicate::LLVMIntEQ,
             left,
             minimum,
-            b"actus.div.min\0".as_ptr().cast(),
+            c"actus.div.min".as_ptr(),
         )
     };
     let minus_one_match = unsafe {
@@ -229,16 +222,11 @@ pub(super) fn emit_trap_if_signed_division_overflow(
             LLVMIntPredicate::LLVMIntEQ,
             right,
             minus_one,
-            b"actus.div.negone\0".as_ptr().cast(),
+            c"actus.div.negone".as_ptr(),
         )
     };
     let overflow = unsafe {
-        LLVMBuildAnd(
-            builder,
-            minimum_match,
-            minus_one_match,
-            b"actus.div.overflow\0".as_ptr().cast(),
-        )
+        LLVMBuildAnd(builder, minimum_match, minus_one_match, c"actus.div.overflow".as_ptr())
     };
     if minimum_match.is_null() || minus_one_match.is_null() || overflow.is_null() {
         return Err(BackendEmitError("LLVM failed to emit signed-division guard".to_owned()));

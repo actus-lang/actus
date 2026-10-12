@@ -11,12 +11,11 @@ pub(super) fn array_bindings(verb: &crate::ast::VerbDecl) -> BTreeSet<String> {
         .map(|parameter| parameter.name.clone())
         .collect();
     for statement in &verb.body.statements {
-        if let Stmt::OwnerDecl { name, ty: Some(ty), .. } = statement {
-            if crate::semantic::parse_type_name_key(ty, crate::lexer::SourceSpan::new(0, 0))
+        if let Stmt::OwnerDecl { name, ty: Some(ty), .. } = statement
+            && crate::semantic::parse_type_name_key(ty, crate::lexer::SourceSpan::new(0, 0))
                 .is_some_and(|type_name| fixed_array_type(&type_name))
-            {
-                bindings.insert(name.clone());
-            }
+        {
+            bindings.insert(name.clone());
         }
     }
     bindings

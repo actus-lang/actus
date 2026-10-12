@@ -136,11 +136,7 @@ fn append_runtime_inputs(arguments: &mut Vec<OsString>, configuration: &Compiler
     {
         arguments.push(runtime_archive.as_os_str().to_os_string());
         arguments.extend(
-            configuration
-                .linker_flavor()
-                .runtime_library_arguments()
-                .iter()
-                .map(|argument| OsString::from(argument)),
+            configuration.linker_flavor().runtime_library_arguments().iter().map(OsString::from),
         );
     }
 }

@@ -1,3 +1,6 @@
+// Packed expression lowering receives the complete neutral lowering context.
+#![allow(clippy::too_many_arguments)]
+
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendIntegerBinaryOp, BackendValueId,
     BackendValueType,

@@ -47,49 +47,49 @@ fn build_integer_binary(
     unsafe {
         match operation {
             BackendIntegerBinaryOp::Add => {
-                LLVMBuildAdd(builder, left, right, b"actus.add\0".as_ptr().cast())
+                LLVMBuildAdd(builder, left, right, c"actus.add".as_ptr())
             }
             BackendIntegerBinaryOp::Subtract => {
-                LLVMBuildSub(builder, left, right, b"actus.sub\0".as_ptr().cast())
+                LLVMBuildSub(builder, left, right, c"actus.sub".as_ptr())
             }
             BackendIntegerBinaryOp::Multiply => {
-                LLVMBuildMul(builder, left, right, b"actus.mul\0".as_ptr().cast())
+                LLVMBuildMul(builder, left, right, c"actus.mul".as_ptr())
             }
             BackendIntegerBinaryOp::Divide
                 if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
             {
-                LLVMBuildSDiv(builder, left, right, b"actus.sdiv\0".as_ptr().cast())
+                LLVMBuildSDiv(builder, left, right, c"actus.sdiv".as_ptr())
             }
             BackendIntegerBinaryOp::Divide => {
-                LLVMBuildUDiv(builder, left, right, b"actus.udiv\0".as_ptr().cast())
+                LLVMBuildUDiv(builder, left, right, c"actus.udiv".as_ptr())
             }
             BackendIntegerBinaryOp::Remainder
                 if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
             {
-                LLVMBuildSRem(builder, left, right, b"actus.srem\0".as_ptr().cast())
+                LLVMBuildSRem(builder, left, right, c"actus.srem".as_ptr())
             }
             BackendIntegerBinaryOp::Remainder => {
-                LLVMBuildURem(builder, left, right, b"actus.urem\0".as_ptr().cast())
+                LLVMBuildURem(builder, left, right, c"actus.urem".as_ptr())
             }
             BackendIntegerBinaryOp::ShiftLeft => {
-                LLVMBuildShl(builder, left, right, b"actus.shl\0".as_ptr().cast())
+                LLVMBuildShl(builder, left, right, c"actus.shl".as_ptr())
             }
             BackendIntegerBinaryOp::ShiftRight
                 if matches!(ty, super::super::BackendValueType::Integer { signed: true, .. }) =>
             {
-                LLVMBuildAShr(builder, left, right, b"actus.ashr\0".as_ptr().cast())
+                LLVMBuildAShr(builder, left, right, c"actus.ashr".as_ptr())
             }
             BackendIntegerBinaryOp::ShiftRight => {
-                LLVMBuildLShr(builder, left, right, b"actus.lshr\0".as_ptr().cast())
+                LLVMBuildLShr(builder, left, right, c"actus.lshr".as_ptr())
             }
             BackendIntegerBinaryOp::BitwiseAnd => {
-                LLVMBuildAnd(builder, left, right, b"actus.and\0".as_ptr().cast())
+                LLVMBuildAnd(builder, left, right, c"actus.and".as_ptr())
             }
             BackendIntegerBinaryOp::BitwiseOr => {
-                LLVMBuildOr(builder, left, right, b"actus.or\0".as_ptr().cast())
+                LLVMBuildOr(builder, left, right, c"actus.or".as_ptr())
             }
             BackendIntegerBinaryOp::BitwiseXor => {
-                LLVMBuildXor(builder, left, right, b"actus.xor\0".as_ptr().cast())
+                LLVMBuildXor(builder, left, right, c"actus.xor".as_ptr())
             }
         }
     }
@@ -123,9 +123,8 @@ pub(super) fn emit_integer_compare(
         (BackendIntegerCompareOp::GreaterThan, false) => LLVMIntPredicate::LLVMIntUGT,
         (BackendIntegerCompareOp::GreaterEquals, false) => LLVMIntPredicate::LLVMIntUGE,
     };
-    let value = unsafe {
-        LLVMBuildICmp(builder, predicate, left, right, b"actus.compare\0".as_ptr().cast())
-    };
+    let value =
+        unsafe { LLVMBuildICmp(builder, predicate, left, right, c"actus.compare".as_ptr()) };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer comparison".to_owned()));
     }
@@ -148,7 +147,7 @@ pub(super) fn emit_integer_unary(
         match operation {
             BackendIntegerUnaryOp::Negate => {
                 let zero = LLVMConstNull(LLVMTypeOf(operand));
-                LLVMBuildSub(builder, zero, operand, b"actus.negate\0".as_ptr().cast())
+                LLVMBuildSub(builder, zero, operand, c"actus.negate".as_ptr())
             }
             BackendIntegerUnaryOp::LogicalNot => {
                 let zero = LLVMConstNull(LLVMTypeOf(operand));
@@ -157,12 +156,12 @@ pub(super) fn emit_integer_unary(
                     LLVMIntPredicate::LLVMIntEQ,
                     operand,
                     zero,
-                    b"actus.logical_not\0".as_ptr().cast(),
+                    c"actus.logical_not".as_ptr(),
                 )
             }
             BackendIntegerUnaryOp::BitwiseNot => {
                 let all_ones = LLVMConstAllOnes(LLVMTypeOf(operand));
-                LLVMBuildXor(builder, operand, all_ones, b"actus.bitwise_not\0".as_ptr().cast())
+                LLVMBuildXor(builder, operand, all_ones, c"actus.bitwise_not".as_ptr())
             }
         }
     };

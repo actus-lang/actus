@@ -94,7 +94,7 @@ fn allocate_failure_storage(
     enum_type: llvm_sys::prelude::LLVMTypeRef,
     layout: BackendLayout,
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, b"failure\0".as_ptr().cast()) };
+    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"failure".as_ptr()) };
     if temporary.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate typed failure value".to_owned()));
     }
@@ -163,9 +163,7 @@ fn load_failure(
     enum_type: llvm_sys::prelude::LLVMTypeRef,
     temporary: LLVMValueRef,
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let value = unsafe {
-        LLVMBuildLoad2(builder, enum_type, temporary, b"failure.value\0".as_ptr().cast())
-    };
+    let value = unsafe { LLVMBuildLoad2(builder, enum_type, temporary, c"failure.value".as_ptr()) };
     (!value.is_null())
         .then_some(value)
         .ok_or_else(|| BackendEmitError("LLVM failed to load typed failure value".to_owned()))
@@ -224,7 +222,7 @@ fn validate_integer_payload(
         ));
     }
     let width = unsafe { LLVMGetIntTypeWidth(LLVMTypeOf(payload)) };
-    let bytes = u32::from(width.div_ceil(8));
+    let bytes = width.div_ceil(8);
     if bytes > layout.size {
         return Err(BackendEmitError(
             "LLVM typed failure payload exceeds its declared layout".to_owned(),

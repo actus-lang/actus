@@ -55,9 +55,9 @@ fn widen_value(
     }
     let value = unsafe {
         if signed {
-            LLVMBuildSExt(builder, value, i64_type(context), b"actus.cast.sext\0".as_ptr().cast())
+            LLVMBuildSExt(builder, value, i64_type(context), c"actus.cast.sext".as_ptr())
         } else {
-            LLVMBuildZExt(builder, value, i64_type(context), b"actus.cast.zext\0".as_ptr().cast())
+            LLVMBuildZExt(builder, value, i64_type(context), c"actus.cast.zext".as_ptr())
         }
     };
     (!value.is_null())
@@ -87,7 +87,7 @@ fn validity(
                 LLVMIntPredicate::LLVMIntSGE,
                 value,
                 zero,
-                b"actus.cast.lower\0".as_ptr().cast(),
+                c"actus.cast.lower".as_ptr(),
             )
         }
     } else {
@@ -97,8 +97,7 @@ fn validity(
     if lower.is_null() || upper.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer cast bounds".to_owned()));
     }
-    let valid =
-        unsafe { LLVMBuildAnd(builder, lower, upper, b"actus.cast.valid\0".as_ptr().cast()) };
+    let valid = unsafe { LLVMBuildAnd(builder, lower, upper, c"actus.cast.valid".as_ptr()) };
     (!valid.is_null())
         .then_some(valid)
         .ok_or_else(|| BackendEmitError("LLVM failed to combine integer cast bounds".to_owned()))
@@ -128,7 +127,7 @@ fn upper_bound(
             if source_signed { LLVMIntPredicate::LLVMIntSLE } else { LLVMIntPredicate::LLVMIntULE },
             value,
             LLVMConstInt(i64_type(context), maximum as u64, 0),
-            b"actus.cast.upper\0".as_ptr().cast(),
+            c"actus.cast.upper".as_ptr(),
         )
     }
 }
@@ -146,12 +145,7 @@ fn convert_value(
         return Ok(value);
     }
     let converted = unsafe {
-        LLVMBuildTrunc(
-            builder,
-            value,
-            integer_type(context, width),
-            b"actus.cast.trunc\0".as_ptr().cast(),
-        )
+        LLVMBuildTrunc(builder, value, integer_type(context, width), c"actus.cast.trunc".as_ptr())
     };
     (!converted.is_null())
         .then_some(converted)

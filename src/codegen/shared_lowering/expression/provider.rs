@@ -143,18 +143,16 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             self.locals[scope_index].insert(name.to_owned(), value);
             return Ok(());
         }
-        if self.loop_depth > 0 {
-            if let Some(scope_index) = self
+        if self.loop_depth > 0 && let Some(scope_index) = self
                 .locals
                 .iter()
                 .enumerate()
                 .rev()
                 .skip(1)
                 .find_map(|(index, scope)| scope.contains_key(name).then_some(index))
-            {
-                self.locals[scope_index].insert(name.to_owned(), value);
-                return Ok(());
-            }
+        {
+            self.locals[scope_index].insert(name.to_owned(), value);
+            return Ok(());
         }
         if self.locals.len() == 1 && self.parameters.contains_key(name) {
             self.parameters.insert(name.to_owned(), value);

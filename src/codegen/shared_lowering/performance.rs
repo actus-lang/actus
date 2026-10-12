@@ -1,3 +1,6 @@
+// Performance lowering receives the complete neutral backend context.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 
 use crate::ast::{PerformDecl, VerbDecl};

@@ -1,3 +1,6 @@
+// Shared lowering receives explicit compiler contracts from both backends.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 
 use crate::ast::{ExternalVerbDecl, PerformDecl, Program, TopLevelDecl, TypeName, VerbDecl};

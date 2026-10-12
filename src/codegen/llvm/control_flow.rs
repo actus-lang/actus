@@ -1,3 +1,6 @@
+// Control-flow emission receives the complete LLVM lowering context explicitly.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::BTreeMap;
 
 use super::super::{

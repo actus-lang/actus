@@ -299,7 +299,7 @@ fn validate_aggregate_field_load(
             | super::BackendValueType::Enum { .. }
     );
     if unsupported_type
-        || offset % field_layout.alignment != 0
+        || !offset.is_multiple_of(field_layout.alignment)
         || offset > aggregate_layout.size
         || field_layout.size > aggregate_layout.size - offset
     {
@@ -325,7 +325,7 @@ fn validate_aggregate_field_store(
             | super::BackendValueType::Enum { .. }
     );
     if unsupported_type
-        || offset % field_layout.alignment != 0
+        || !offset.is_multiple_of(field_layout.alignment)
         || offset > aggregate_layout.size
         || field_layout.size > aggregate_layout.size - offset
     {

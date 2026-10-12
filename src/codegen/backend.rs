@@ -42,11 +42,13 @@ pub enum BackendKind {
     Llvm,
 }
 
+// The default backend is selected by the enabled Cargo feature set.
+#[allow(clippy::derivable_impls)]
 impl Default for BackendKind {
     fn default() -> Self {
         #[cfg(feature = "cranelift")]
         {
-            return Self::Cranelift;
+            Self::Cranelift
         }
 
         #[cfg(all(not(feature = "cranelift"), feature = "llvm"))]

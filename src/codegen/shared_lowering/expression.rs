@@ -1,3 +1,6 @@
+// The provider constructor stores all explicit neutral lowering contracts.
+#![allow(clippy::too_many_arguments)]
+
 use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
