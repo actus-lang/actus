@@ -1,5 +1,6 @@
 use super::body_contract::{
-    statement_span, terminates, terminates_without_continuation, unsupported, unsupported_name,
+    ensure_jump, statement_span, terminates, terminates_without_continuation, unsupported,
+    unsupported_name,
 };
 use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendEdgeArgument, BackendFailure,
@@ -11,7 +12,9 @@ use crate::semantic::LoopExitKind;
 mod case;
 mod loops;
 mod provider;
+mod statements;
 pub use provider::{BackendBodyProvider, BackendExpressionProvider};
+use statements::lower_expression_statement;
 
 pub fn lower_verb_body(
     verb: &VerbDecl,
@@ -300,23 +303,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                         .push(BackendInstruction::Return { value: Some(value), span: *span });
                 }
             }
-            Stmt::Expression {
-                expression: Expr::Call { callee, arguments, span },
-                span: stmt_span,
-            } => {
-                let arguments = arguments
-                    .iter()
-                    .map(|argument| {
-                        self.provider.lower_expression(&argument.expression, instructions)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let callee = self.provider.callee_for(callee, *span)?;
-                instructions.push(BackendInstruction::Call {
-                    callee,
-                    arguments,
-                    result: None,
-                    span: *stmt_span,
-                });
+            Stmt::Expression { expression, span } => {
+                lower_expression_statement(self.provider, expression, *span, instructions)?;
             }
             Stmt::Break { span } | Stmt::Continue { span } => {
                 self.lower_loop_control(statement, *span, instructions)?;
@@ -490,11 +478,4 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.next_block += 1;
         id
     }
-}
-
-fn ensure_jump(mut block: BackendBlock, target: BackendBlockId, span: SourceSpan) -> BackendBlock {
-    if !terminates(block.instructions.last()) {
-        block.instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
-    }
-    block
 }

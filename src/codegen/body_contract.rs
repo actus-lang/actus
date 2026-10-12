@@ -24,6 +24,17 @@ pub(super) fn terminates_without_continuation(
     }
 }
 
+pub(super) fn ensure_jump(
+    mut block: super::BackendBlock,
+    target: super::BackendBlockId,
+    span: SourceSpan,
+) -> super::BackendBlock {
+    if !terminates(block.instructions.last()) {
+        block.instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
+    }
+    block
+}
+
 pub(super) fn statement_span(statement: &Stmt) -> SourceSpan {
     match statement {
         Stmt::OwnerDecl { span, .. }

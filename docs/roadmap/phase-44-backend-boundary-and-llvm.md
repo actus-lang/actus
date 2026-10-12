@@ -1201,6 +1201,14 @@ link integration boundary. The remaining `region` example failure is a
 separate scalar-contract diagnostic and is not marked as resolved by this
 control-flow slice.
 
+The shared CLI contract now lowers the `print` intrinsic to the typed hosted
+runtime bridges `actus_print_int`, `actus_print_string`, and
+`actus_print_buffer_stdout`, with corresponding neutral external declarations.
+The LLVM CLI regression `llvm_backend_builds_and_runs_shared_print_runtime_bridge`
+builds and executes a program containing `print(42)` and verifies exit status
+42. This establishes the hosted integer print bridge; the remaining standard
+library console intrinsics and freestanding provider coverage stay open.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

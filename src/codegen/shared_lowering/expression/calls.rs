@@ -3,7 +3,7 @@ use super::super::super::{
 };
 use super::super::support::expression_span;
 use super::SharedExpressionProvider;
-use crate::ast::Expr;
+use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 use crate::codegen::{SymbolIdentity, SymbolKind};
 use crate::lexer::SourceSpan;
 
@@ -55,6 +55,9 @@ pub(super) fn lower_call(
         .iter()
         .map(|argument| provider.lower_expression(&argument.expression, instructions))
         .collect::<Result<Vec<_>, _>>()?;
+    if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print) {
+        return lower_print_call(provider, arguments, *span, instructions);
+    }
     let result_type = provider.return_types.get(callee).copied().flatten();
     let result = result_type.map(|_| provider.allocate());
     if let (Some(result), Some(result_type)) = (result, result_type) {
@@ -76,6 +79,34 @@ pub(super) fn lower_call(
     result.ok_or_else(|| {
         super::super::support::unsupported(*span, "unit call cannot produce a value")
     })
+}
+
+fn lower_print_call(
+    provider: &mut SharedExpressionProvider<'_>,
+    arguments: Vec<BackendValueId>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let [value] = arguments.as_slice() else {
+        return Err(super::super::support::unsupported(span, "print requires one value"));
+    };
+    let symbol = match provider.value_type(*value) {
+        Some(crate::codegen::BackendValueType::Integer { .. }) => crate::runtime::PRINT_INT_SYMBOL,
+        Some(crate::codegen::BackendValueType::Pointer)
+            if provider.nominal_type(*value).is_some_and(|ty| ty.name == "Buffer") =>
+        {
+            crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL
+        }
+        Some(crate::codegen::BackendValueType::Pointer) => crate::runtime::PRINT_STRING_SYMBOL,
+        _ => return Err(super::super::support::unsupported(span, "print value type")),
+    };
+    let callee = SymbolIdentity::external_raw(symbol)
+        .map_err(|error| super::super::support::unsupported(span, error.to_string()))?;
+    let result = provider.allocate();
+    let ty = crate::codegen::BackendValueType::Integer { signed: true, width: 32 };
+    provider.remember_value(result, ty);
+    instructions.push(BackendInstruction::Call { callee, arguments, result: Some(result), span });
+    Ok(result)
 }
 
 fn lower_array_constructor(

@@ -720,6 +720,39 @@ fn llvm_backend_builds_and_runs_shared_scalar_control_flow() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn llvm_backend_builds_and_runs_shared_print_runtime_bridge() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-print-{}", std::process::id()));
+    let input = root.join("src/main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(root.join("src")).expect("create LLVM print fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-print-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM print fixture manifest");
+    fs::write(&input, "verb main() -> Int { print(42); return 42; }\n")
+        .expect("write LLVM print fixture source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM print fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn llvm_backend_builds_and_runs_scalar_assignment_through_shared_lowering() {
     let root =
         std::env::temp_dir().join(format!("actus-cli-llvm-assignment-{}", std::process::id()));

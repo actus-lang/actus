@@ -53,6 +53,9 @@ pub(super) fn lower_buffer_literal(
     };
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Pointer);
+    if let Some(type_name) = crate::semantic::parse_type_name_key("Buffer", span) {
+        provider.remember_nominal_type(result, type_name);
+    }
     instructions.push(BackendInstruction::Call {
         callee: SymbolIdentity::external_raw(crate::runtime::BUFFER_ALLOCATE_SYMBOL)
             .map_err(|error| unsupported(span, error.to_string()))?,

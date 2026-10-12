@@ -77,8 +77,41 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
         functions,
     };
     append_buffer_allocate_external(&mut module.externals)?;
+    append_print_externals(&mut module.externals)?;
     module.validate()?;
     Ok(module)
+}
+
+fn append_print_externals(
+    externals: &mut Vec<BackendExternal>,
+) -> Result<(), BackendContractError> {
+    for (symbol, ty) in [
+        (crate::runtime::PRINT_INT_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
+        (crate::runtime::PRINT_STRING_SYMBOL, BackendValueType::Pointer),
+        (crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL, BackendValueType::Pointer),
+    ] {
+        if externals.iter().any(|external| external.symbol.as_str() == symbol) {
+            continue;
+        }
+        externals.push(BackendExternal {
+            symbol: SymbolIdentity::external_raw(symbol).map_err(|error| {
+                unsupported(crate::lexer::SourceSpan::new(0, 0), error.to_string())
+            })?,
+            parameters: vec![BackendParameter {
+                name: "value".to_owned(),
+                role: crate::ast::Role::Erg,
+                ty,
+                passing: super::BackendPassingMode::Direct,
+            }],
+            return_value: super::BackendReturn {
+                role: None,
+                ty: BackendValueType::Integer { signed: true, width: 32 },
+                passing: super::BackendReturnMode::Direct,
+            },
+            runtime_pointer_return: false,
+        });
+    }
+    Ok(())
 }
 
 pub(super) struct SharedDeclarations<'program> {
