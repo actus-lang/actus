@@ -8,6 +8,7 @@ mod calls;
 mod case;
 mod cast;
 mod cleanup;
+mod dispatch;
 mod drop;
 mod layout;
 mod literals;
@@ -17,7 +18,7 @@ use super::super::{
     BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
     BackendValueId, BackendValueType, SymbolIdentity,
 };
-use super::support::{expression_span, parse_integer, unsupported};
+use super::support::{expression_span, unsupported};
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     layouts: &'a dyn super::super::BackendLayoutProvider,
@@ -81,6 +82,13 @@ impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
         self.parameters.get(name).copied()
     }
+    pub(super) fn binding_value(&self, name: &str) -> Option<BackendValueId> {
+        self.locals
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name).copied())
+            .or_else(|| self.parameters.get(name).copied())
+    }
     pub(super) fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
         self.value_types.get(&value).copied()
     }
@@ -109,6 +117,27 @@ impl<'a> SharedExpressionProvider<'a> {
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn supports_range_loops(&self) -> bool {
         true
+    }
+
+    fn supports_array_loops(&self) -> bool {
+        true
+    }
+
+    fn array_capacity(
+        &self,
+        value: BackendValueId,
+        span: SourceSpan,
+    ) -> Result<u32, BackendContractError> {
+        let Some(type_name) = self.nominal_type(value) else {
+            return Err(unsupported(span, "array loop collection has no nominal type"));
+        };
+        if type_name.name != "Array" || type_name.arguments.len() != 2 {
+            return Err(unsupported(span, "array loop requires a fixed array collection"));
+        }
+        type_name.arguments[1]
+            .name
+            .parse::<u32>()
+            .map_err(|_| unsupported(span, "array capacity is not a concrete integer"))
     }
 
     fn enter_loop(&mut self) {
@@ -268,58 +297,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError> {
-        match expression {
-            Expr::Identifier { name, span } => self
-                .locals
-                .iter()
-                .rev()
-                .find_map(|scope| scope.get(name).copied())
-                .or_else(|| self.parameters.get(name).copied())
-                .ok_or_else(|| unsupported(*span, format!("unknown scalar binding `{name}`"))),
-            Expr::Integer { value, suffix, span } => {
-                let value = parse_integer(value).ok_or_else(|| {
-                    unsupported(*span, format!("invalid scalar integer literal `{value}`"))
-                })?;
-                let ty = literals::integer_literal_type(suffix.as_deref());
-                let result = self.allocate();
-                instructions.push(BackendInstruction::Constant { result, ty, value, span: *span });
-                self.remember_value(result, ty);
-                Ok(result)
-            }
-            Expr::BoolLiteral { value, span } => {
-                let result = self.allocate();
-                instructions.push(BackendInstruction::Constant {
-                    result,
-                    ty: BackendValueType::Bool,
-                    value: u64::from(*value),
-                    span: *span,
-                });
-                self.remember_value(result, BackendValueType::Bool);
-                Ok(result)
-            }
-            Expr::BufferLiteral { length, span } => {
-                literals::lower_buffer_literal(self, length, *span, instructions)
-            }
-            Expr::Grouping { expression, .. } => self.lower_expression(expression, instructions),
-            Expr::Cast { expression, target, span } => {
-                if matches!(expression.as_ref(), Expr::Integer { .. }) {
-                    self.lower_constant_cast(expression, target, *span, instructions)
-                } else {
-                    self.lower_runtime_cast(expression, target, *span, instructions)
-                }
-            }
-            Expr::Unary { .. } => self.lower_unary(expression, instructions),
-            Expr::Binary { .. } => self.lower_binary(expression, instructions),
-            Expr::Call { .. } => calls::lower_call(self, expression, instructions),
-            Expr::MethodCall { .. } => self.lower_method_call(expression, instructions),
-            Expr::StructLit { .. } | Expr::FieldAccess { .. } => {
-                aggregate::lower_aggregate_expression(self, expression, instructions)
-            }
-            _ => Err(unsupported(
-                expression_span(expression),
-                "expression is outside the scalar shared lowering contract",
-            )),
-        }
+        dispatch::lower_expression(self, expression, instructions)
     }
 
     fn coerce_return_value(
@@ -360,6 +338,16 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
     ) -> Result<SymbolIdentity, BackendContractError> {
         calls::callee_for(self, callee, span)
+    }
+
+    fn lower_array_element(
+        &mut self,
+        collection: &Expr,
+        index: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        aggregate::lower_array_element(self, collection, index, span, instructions)
     }
 
     fn assign_field(

@@ -59,7 +59,8 @@ fn validate_instruction(
         }
         BackendInstruction::AggregateConstruct { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
-        | BackendInstruction::AggregateFieldStore { .. } => {
+        | BackendInstruction::AggregateFieldStore { .. }
+        | BackendInstruction::ArrayElementLoad { .. } => {
             validate_aggregate_instruction(instruction)
         }
         _ => Ok(()),
@@ -153,8 +154,38 @@ fn validate_aggregate_instruction(
             ty,
             ..
         } => validate_aggregate_field_store(*aggregate_layout, *offset, *field_layout, *ty),
+        BackendInstruction::ArrayElementLoad {
+            aggregate_layout,
+            element_layout,
+            element_type,
+            capacity,
+            ..
+        } => validate_array_element_load(
+            *aggregate_layout,
+            *element_layout,
+            *element_type,
+            *capacity,
+        ),
         _ => Ok(()),
     }
+}
+
+fn validate_array_element_load(
+    aggregate_layout: super::BackendLayout,
+    element_layout: super::BackendLayout,
+    element_type: super::BackendValueType,
+    capacity: u32,
+) -> Result<(), BackendContractError> {
+    aggregate_layout.validate()?;
+    element_layout.validate()?;
+    if capacity == 0
+        || u64::from(element_layout.size) * u64::from(capacity) != u64::from(aggregate_layout.size)
+    {
+        return Err(BackendContractError::InvalidLayout(
+            "array element load does not match aggregate capacity",
+        ));
+    }
+    validate_value_type(element_type)
 }
 
 fn validate_enum_construct(

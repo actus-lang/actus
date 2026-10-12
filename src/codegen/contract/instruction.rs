@@ -167,4 +167,14 @@ pub enum BackendInstruction {
         ty: BackendValueType,
         span: SourceSpan,
     },
+    ArrayElementLoad {
+        result: super::BackendValueId,
+        base: super::BackendValueId,
+        index: super::BackendValueId,
+        aggregate_layout: super::BackendLayout,
+        element_layout: super::BackendLayout,
+        element_type: BackendValueType,
+        capacity: u32,
+        span: SourceSpan,
+    },
 }

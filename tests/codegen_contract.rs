@@ -1401,6 +1401,27 @@ fn lowers_range_loop_with_a_carried_owner() {
 }
 
 #[test]
+fn lowers_fixed_array_iteration_with_a_carried_owner_and_index_load() {
+    let source = "verb inspect(abs values: Array[u32, 4]) -> Int { erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "array fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("array fixture should parse");
+    let module = lower_scalar_program("test", &program, Some("inspect"))
+        .expect("fixed-array iteration should lower through the neutral contract");
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("inspect"))
+        .expect("inspect function should be present");
+    assert!(function.blocks.iter().any(|block| {
+        block.instructions.iter().any(|instruction| {
+            matches!(instruction, BackendInstruction::ArrayElementLoad { capacity: 4, .. })
+        })
+    }));
+    module.validate().expect("fixed-array loop contract should validate");
+}
+
+#[test]
 fn validates_loop_edge_argument_shape_before_backend_lowering() {
     let span = SourceSpan::new(10, 18);
     let parameters = [BackendBlockParameter {

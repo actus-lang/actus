@@ -109,6 +109,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 statement,
                 Stmt::Loop(_)
                     | Stmt::ForRange { .. }
+                    | Stmt::ForArray { .. }
                     | Stmt::Block(_)
                     | Stmt::If { .. }
                     | Stmt::Return { value: Some(Expr::Case { .. }), .. }
@@ -145,19 +146,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::Loop(nested) => self
                 .lower_loop_statement(id, block, index, nested, fallthrough, instructions)
                 .map(Some),
-            Stmt::ForRange { binding, start, end, body, span } => self
-                .lower_for_range_statement(
-                    id,
-                    block,
-                    index,
-                    binding,
-                    start,
-                    end,
-                    body,
-                    *span,
-                    fallthrough,
-                    instructions,
-                )
+            Stmt::ForRange { .. } | Stmt::ForArray { .. } => self
+                .lower_for_statement(id, block, index, statement, fallthrough, instructions)
                 .map(Some),
             Stmt::Block(nested) => self
                 .lower_nested_block_statement(id, block, index, nested, fallthrough, instructions)

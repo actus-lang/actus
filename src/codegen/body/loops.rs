@@ -8,6 +8,80 @@ use crate::ast::{Block, Expr, ForBinding, IfBranch, Place, Stmt};
 use crate::lexer::SourceSpan;
 
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
+    pub(super) fn lower_for_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        statement: &Stmt,
+        fallthrough: Option<BackendBlockId>,
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        match statement {
+            Stmt::ForRange { binding, start, end, body, span } => self.lower_for_range_statement(
+                id,
+                block,
+                index,
+                binding,
+                start,
+                end,
+                body,
+                *span,
+                fallthrough,
+                instructions,
+            ),
+            Stmt::ForArray { binding, collection, body, span } => self.lower_for_array_statement(
+                id,
+                block,
+                index,
+                binding,
+                collection,
+                body,
+                *span,
+                fallthrough,
+                instructions,
+            ),
+            _ => Err(unsupported(SourceSpan::new(0, 0), "for loop")),
+        }
+    }
+
+    pub(super) fn lower_for_array_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        binding: &ForBinding,
+        collection: &Expr,
+        body: &Block,
+        span: SourceSpan,
+        fallthrough: Option<BackendBlockId>,
+        mut instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        if !self.provider.supports_array_loops() {
+            return Err(unsupported(span, "array loop"));
+        }
+        if !matches!(collection, Expr::Identifier { .. }) {
+            return Err(unsupported(span, "array loop collection must be an identifier"));
+        }
+        let collection_value = self.provider.lower_expression(collection, &mut instructions)?;
+        let capacity = self.provider.array_capacity(collection_value, span)?;
+        let start = Expr::Integer { value: "0".to_owned(), suffix: Some("u32".to_owned()), span };
+        let end =
+            Expr::Integer { value: capacity.to_string(), suffix: Some("u32".to_owned()), span };
+        self.lower_for_range_statement(
+            id,
+            block,
+            index,
+            binding,
+            &start,
+            &end,
+            body,
+            span,
+            fallthrough,
+            instructions,
+        )
+    }
+
     pub(super) fn lower_for_range_statement(
         &mut self,
         id: BackendBlockId,

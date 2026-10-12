@@ -36,8 +36,66 @@ pub(super) fn lower_aggregate_expression(
         Expr::FieldAccess { object, field, span } => {
             lower_field_access_expression(provider, object, field, *span, instructions)
         }
+        Expr::Index { target, index, span } => {
+            lower_array_element(provider, target, index, *span, instructions)
+        }
         _ => Err(unsupported(expression_span(expression), "aggregate expression expected")),
     }
+}
+
+pub(super) fn lower_array_element(
+    provider: &mut SharedExpressionProvider<'_>,
+    collection: &Expr,
+    index: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let base = provider.lower_expression(collection, instructions)?;
+    let index = provider.lower_expression(index, instructions)?;
+    let type_name = provider
+        .nominal_type(base)
+        .cloned()
+        .ok_or_else(|| unsupported(span, "array base has no nominal type"))?;
+    if type_name.name != "Array" || type_name.arguments.len() != 2 {
+        return Err(unsupported(span, "array element access requires a fixed array"));
+    }
+    let element_type_name = type_name.arguments[0].clone();
+    let capacity = type_name.arguments[1]
+        .name
+        .parse::<u32>()
+        .map_err(|_| unsupported(span, "array capacity is not a concrete integer"))?;
+    let aggregate_layout = provider
+        .layouts
+        .layout_for(&type_name)
+        .ok_or_else(|| unsupported(span, "array base has no neutral layout"))?;
+    let element_layout = provider
+        .layouts
+        .layout_for(&element_type_name)
+        .ok_or_else(|| unsupported(span, "array element has no neutral layout"))?;
+    let element_type =
+        super::super::support::backend_value_type(provider.layouts, &element_type_name)
+            .ok_or_else(|| unsupported(span, "array element has no backend type"))?;
+    if element_layout.size == 0
+        || u64::from(element_layout.size) * u64::from(capacity) != u64::from(aggregate_layout.size)
+    {
+        return Err(unsupported(span, "array element layout does not match capacity"));
+    }
+    if !matches!(provider.value_type(index), Some(BackendValueType::Integer { .. })) {
+        return Err(unsupported(span, "array index must be an integer"));
+    }
+    let result = provider.allocate();
+    provider.remember_value(result, element_type);
+    instructions.push(BackendInstruction::ArrayElementLoad {
+        result,
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type,
+        capacity,
+        span,
+    });
+    Ok(result)
 }
 
 pub(super) fn lower_struct_literal(

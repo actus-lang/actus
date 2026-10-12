@@ -1,0 +1,61 @@
+use super::super::super::{
+    BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
+};
+use super::super::support::{expression_span, parse_integer, unsupported};
+use super::SharedExpressionProvider;
+use crate::ast::Expr;
+
+pub(super) fn lower_expression(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    match expression {
+        Expr::Identifier { name, span } => provider
+            .binding_value(name)
+            .ok_or_else(|| unsupported(*span, format!("unknown scalar binding `{name}`"))),
+        Expr::Integer { value, suffix, span } => {
+            let value = parse_integer(value).ok_or_else(|| {
+                unsupported(*span, format!("invalid scalar integer literal `{value}`"))
+            })?;
+            let ty = super::literals::integer_literal_type(suffix.as_deref());
+            let result = provider.allocate();
+            instructions.push(BackendInstruction::Constant { result, ty, value, span: *span });
+            provider.remember_value(result, ty);
+            Ok(result)
+        }
+        Expr::BoolLiteral { value, span } => {
+            let result = provider.allocate();
+            instructions.push(BackendInstruction::Constant {
+                result,
+                ty: BackendValueType::Bool,
+                value: u64::from(*value),
+                span: *span,
+            });
+            provider.remember_value(result, BackendValueType::Bool);
+            Ok(result)
+        }
+        Expr::BufferLiteral { length, span } => {
+            super::literals::lower_buffer_literal(provider, length, *span, instructions)
+        }
+        Expr::Grouping { expression, .. } => lower_expression(provider, expression, instructions),
+        Expr::Cast { expression, target, span } => {
+            if matches!(expression.as_ref(), Expr::Integer { .. }) {
+                provider.lower_constant_cast(expression, target, *span, instructions)
+            } else {
+                provider.lower_runtime_cast(expression, target, *span, instructions)
+            }
+        }
+        Expr::Unary { .. } => provider.lower_unary(expression, instructions),
+        Expr::Binary { .. } => provider.lower_binary(expression, instructions),
+        Expr::Call { .. } => super::calls::lower_call(provider, expression, instructions),
+        Expr::MethodCall { .. } => provider.lower_method_call(expression, instructions),
+        Expr::StructLit { .. } | Expr::FieldAccess { .. } | Expr::Index { .. } => {
+            super::aggregate::lower_aggregate_expression(provider, expression, instructions)
+        }
+        _ => Err(unsupported(
+            expression_span(expression),
+            "expression is outside the scalar shared lowering contract",
+        )),
+    }
+}

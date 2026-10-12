@@ -46,6 +46,27 @@ fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
 
 #[cfg(feature = "cranelift")]
 #[test]
+fn both_backends_consume_shared_fixed_array_iteration() {
+    let source = "verb inspect(abs values: Array[u32, 4]) -> Int { erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "fixed-array fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("fixed-array fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("inspect"))
+        .expect("fixed-array iteration should lower through the shared contract");
+
+    let llvm_ir = emit_module(&module).expect("LLVM should consume fixed-array iteration");
+    assert!(llvm_ir.contains("array.element.load"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should consume fixed-array iteration");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";
     let (tokens, errors) = scan(source);

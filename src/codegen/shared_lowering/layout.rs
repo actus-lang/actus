@@ -237,10 +237,7 @@ impl<'program> ProgramLayouts<'program> {
 
 impl BackendLayoutProvider for ProgramLayouts<'_> {
     fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout> {
-        if matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String") {
-            return Some(self.pointer_layout());
-        }
-        self.struct_layout(&type_name.name, &mut Vec::new())
+        self.type_layout(type_name, &mut Vec::new())
     }
 
     fn enum_layout_for(

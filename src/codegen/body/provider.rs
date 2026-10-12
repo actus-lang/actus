@@ -33,6 +33,18 @@ pub trait BackendExpressionProvider {
         false
     }
 
+    fn supports_array_loops(&self) -> bool {
+        false
+    }
+
+    fn array_capacity(
+        &self,
+        _value: BackendValueId,
+        span: SourceSpan,
+    ) -> Result<u32, BackendContractError> {
+        Err(unsupported(span, "fixed-array iteration"))
+    }
+
     fn value_type(&self, _value: BackendValueId) -> Option<BackendValueType> {
         None
     }
@@ -42,6 +54,16 @@ pub trait BackendExpressionProvider {
     }
 
     fn set_binding_value(&mut self, _name: &str, _value: BackendValueId) {}
+
+    fn lower_array_element(
+        &mut self,
+        _collection: &Expr,
+        _index: &Expr,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        Err(unsupported(span, "fixed-array element access"))
+    }
 
     fn enter_scope(&mut self, _span: SourceSpan) {}
 

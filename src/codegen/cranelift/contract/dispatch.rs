@@ -63,7 +63,8 @@ pub(super) fn lower_instruction(
         }
         BackendInstruction::AggregateConstruct { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
-        | BackendInstruction::AggregateFieldStore { .. } => {
+        | BackendInstruction::AggregateFieldStore { .. }
+        | BackendInstruction::ArrayElementLoad { .. } => {
             aggregate::lower_aggregate_instruction(module, builder, instruction, values)
         }
     }
