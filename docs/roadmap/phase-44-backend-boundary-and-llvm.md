@@ -1122,6 +1122,16 @@ covers literal-index reads only; array stores, dynamic indexing,
 indexed loan arguments, and the remaining
 semantic-to-backend migration stay outside this slice.
 
+Fixed-array literal-index reads from `Array[T, N]` parameters now use the same
+shared candidate contract as local fixed-array reads. The classifier regression
+`accepts_fixed_array_parameter_reads_in_the_shared_contract` and the hosted
+fixtures `cranelift_backend_builds_and_runs_a_shared_fixed_array_parameter_read`
+and `llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_read` compile
+and execute the identical parameter-passing source through both selected
+backends. This validates the current nominal aggregate parameter ABI slice;
+array mutation, dynamic indexing, indexed loan arguments, and the remaining
+semantic-to-backend migration stay outside this slice.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

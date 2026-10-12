@@ -109,7 +109,7 @@ fn supported_perform(perform: &crate::ast::PerformDecl, program: &Program) -> bo
 fn scalar_parameter(parameter: &crate::ast::Param, unit_enums: &BTreeSet<String>) -> bool {
     matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
-        && scalar_or_result_type(&parameter.ty, unit_enums)
+        && (scalar_or_result_type(&parameter.ty, unit_enums) || fixed_array_type(&parameter.ty))
 }
 
 fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
@@ -454,6 +454,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("direct array index fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_fixed_array_parameter_reads_in_the_shared_contract() {
+        let source = "verb read(abs values: Array[u32, 4]) -> Int { return values[2u32] as Int; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return read(values: abs values); }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("fixed-array parameter fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 
