@@ -1011,6 +1011,70 @@ fn llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_read() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-struct-mutation-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n",
+    )
+    .expect("write Cranelift scalar-struct mutation fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift scalar-struct mutation fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-struct-mutation-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n",
+    )
+    .expect("write LLVM scalar-struct mutation fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run LLVM scalar-struct mutation fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_scalar_aggregate_field_access() {

@@ -85,6 +85,15 @@ fn accepts_scalar_struct_parameter_reads_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_scalar_struct_parameter_mutation_in_the_shared_contract() {
+    let source = "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("scalar-struct mutation fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_block_bodied_result_cases_in_the_shared_contract() {
     let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Err(_) => { return 0; }, Result.Ok(value) => { return value + 1; }, }; }";
     let (tokens, errors) = scan(source);

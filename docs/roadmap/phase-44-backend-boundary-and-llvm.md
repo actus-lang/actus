@@ -1142,6 +1142,18 @@ backends. The slice covers read-only scalar fields in non-generic value
 structs; ownership-bearing fields, mutable indexed stores, generic structs, and
 the remaining semantic-to-backend migration stay outside this slice.
 
+Exclusive mutable loans of scalar-field-only value structs are now covered at
+the same call boundary. The classifier regression
+`accepts_scalar_struct_parameter_mutation_in_the_shared_contract` and the
+hosted fixtures
+`cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation`
+and `llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation`
+compile and execute an `ins Counter` mutation through both selected backends.
+The fixture validates field compound assignment, aggregate loan passing, and
+the caller's post-call read; nested ownership fields, indexed stores, generic
+structs, and the remaining semantic-to-backend migration stay outside this
+slice.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
