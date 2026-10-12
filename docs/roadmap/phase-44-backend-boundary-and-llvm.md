@@ -1191,6 +1191,16 @@ both backends. This slice covers integer literals and simple integer bindings
 for local arrays; indexed parameter mutation, compound index expressions, and
 aggregate element values remain outside it.
 
+Shared conditional lowering now preserves a fallthrough continuation block
+when both branches reach that block through an explicit jump. The neutral
+regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`
+validates the block identity before backend emission. This removes the prior
+`unknown block` failure from the LLVM CLI path for
+`examples/phase19_scalar_ergonomics.act`; that example now reaches its runtime
+link integration boundary. The remaining `region` example failure is a
+separate scalar-contract diagnostic and is not marked as resolved by this
+control-flow slice.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

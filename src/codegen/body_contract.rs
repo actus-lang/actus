@@ -14,6 +14,16 @@ pub(super) fn terminates(instruction: Option<&BackendInstruction>) -> bool {
     )
 }
 
+pub(super) fn terminates_without_continuation(
+    instruction: Option<&BackendInstruction>,
+    continuation: super::BackendBlockId,
+) -> bool {
+    match instruction {
+        Some(BackendInstruction::Jump { target, .. }) if *target == continuation => false,
+        other => terminates(other),
+    }
+}
+
 pub(super) fn statement_span(statement: &Stmt) -> SourceSpan {
     match statement {
         Stmt::OwnerDecl { span, .. }

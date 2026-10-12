@@ -1,4 +1,6 @@
-use super::body_contract::{statement_span, terminates, unsupported, unsupported_name};
+use super::body_contract::{
+    statement_span, terminates, terminates_without_continuation, unsupported, unsupported_name,
+};
 use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendEdgeArgument, BackendFailure,
     BackendInstruction, BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
@@ -466,7 +468,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             span,
         });
         let then_block = self.lower_block(then_id, then_branch, Some(continuation_id))?;
-        let then_terminates = terminates(then_block.instructions.last());
+        let then_terminates =
+            terminates_without_continuation(then_block.instructions.last(), continuation_id);
         self.blocks.push(then_block);
         let else_block = match else_branch {
             None => BackendBlock { parameters: Vec::new(), id: else_id, instructions: Vec::new() },
@@ -476,7 +479,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             Some(IfBranch::ElseIf(_)) => return Err(unsupported(span, "else-if expression")),
         };
         let else_block = ensure_jump(else_block, continuation_id, span);
-        let branches_terminate = then_terminates && terminates(else_block.instructions.last());
+        let branches_terminate = then_terminates
+            && terminates_without_continuation(else_block.instructions.last(), continuation_id);
         self.blocks.push(else_block);
         Ok(branches_terminate)
     }

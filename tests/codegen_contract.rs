@@ -1226,6 +1226,45 @@ fn lowers_if_control_flow_with_explicit_value_provider() {
 }
 
 #[test]
+fn preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::If {
+            condition: Expr::BoolLiteral { value: true, span: SourceSpan::new(0, 4) },
+            then_branch: Block {
+                statements: vec![Stmt::Expression {
+                    expression: Expr::Call {
+                        callee: "emit".to_owned(),
+                        arguments: Vec::new(),
+                        span: SourceSpan::new(5, 9),
+                    },
+                    span: SourceSpan::new(5, 9),
+                }],
+                span: SourceSpan::new(5, 9),
+            },
+            else_branch: Some(actus::ast::IfBranch::Block(Block {
+                statements: vec![Stmt::Expression {
+                    expression: Expr::Call {
+                        callee: "emit".to_owned(),
+                        arguments: Vec::new(),
+                        span: SourceSpan::new(10, 14),
+                    },
+                    span: SourceSpan::new(10, 14),
+                }],
+                span: SourceSpan::new(10, 14),
+            })),
+            span: SourceSpan::new(0, 14),
+        }],
+        span: SourceSpan::new(0, 14),
+    };
+
+    let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("if should lower");
+    let function = unit_function(Vec::new(), blocks);
+    assert!(function.validate().is_ok());
+    assert!(function.blocks.iter().any(|block| block.id == BackendBlockId(1)));
+}
+
+#[test]
 fn integrates_signature_and_body_into_a_valid_neutral_function() {
     let mut verb = verb_with_signature();
     verb.body = Block {
