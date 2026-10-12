@@ -10,6 +10,9 @@ use super::super::native::BackendEmitError;
 use super::{aggregate, cleanup, enums, returns};
 use crate::codegen::{BackendFunction, BackendInstruction, BackendValueId};
 
+type ValueMap = BTreeMap<BackendValueId, cranelift_codegen::ir::Value>;
+type AggregateValueMap = BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>;
+
 pub(super) fn lower_instruction(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -17,8 +20,8 @@ pub(super) fn lower_instruction(
     declarations: &BTreeMap<String, Declaration>,
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
     return_slot: Option<cranelift_codegen::ir::Value>,
-    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-    aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+    values: &mut ValueMap,
+    aggregate_values: &mut AggregateValueMap,
     function: &BackendFunction,
 ) -> Result<(), BackendEmitError> {
     match instruction {
@@ -28,8 +31,10 @@ pub(super) fn lower_instruction(
         | BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
+        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
         | BackendInstruction::IntegerCompare { .. }
-        | BackendInstruction::IntegerUnary { .. } => {
+        | BackendInstruction::IntegerUnary { .. }
+        | BackendInstruction::MemoryCopy { .. } => {
             lower_scalar(module, builder, instruction, values)
         }
         BackendInstruction::EnumDiscriminant { .. }
@@ -41,10 +46,9 @@ pub(super) fn lower_instruction(
         BackendInstruction::Call { .. } => {
             lower_call(module, builder, instruction, declarations, values, aggregate_values)
         }
-        BackendInstruction::Branch { .. } => {
-            super::lower_branch(builder, instruction, blocks, values)
+        BackendInstruction::Branch { .. } | BackendInstruction::Jump { .. } => {
+            cf(builder, instruction, blocks, values)
         }
-        BackendInstruction::Jump { .. } => super::lower_jump(builder, instruction, blocks, values),
         BackendInstruction::Return { .. }
         | BackendInstruction::Fail { .. }
         | BackendInstruction::Trap { .. }
@@ -58,9 +62,6 @@ pub(super) fn lower_instruction(
             aggregate_values,
             function,
         ),
-        BackendInstruction::MemoryCopy { .. } => {
-            super::lower_memory_copy(module, builder, instruction, values)
-        }
         BackendInstruction::AggregateConstruct { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. }
@@ -70,6 +71,22 @@ pub(super) fn lower_instruction(
         }
     }
 }
+
+fn cf(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
+    values: &mut ValueMap,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::Branch { .. } => {
+            super::lower_branch(builder, instruction, blocks, values)
+        }
+        BackendInstruction::Jump { .. } => super::lower_jump(builder, instruction, blocks, values),
+        _ => Err(BackendEmitError("Cranelift control-flow instruction expected".to_owned())),
+    }
+}
+
 fn lower_scalar(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -88,7 +105,8 @@ fn lower_scalar(
         }
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
-        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+        | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
+        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
             super::lower_guard(builder, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
@@ -96,6 +114,9 @@ fn lower_scalar(
         }
         BackendInstruction::IntegerUnary { .. } => {
             super::lower_integer_unary(builder, instruction, values)
+        }
+        BackendInstruction::MemoryCopy { .. } => {
+            super::lower_memory_copy(module, builder, instruction, values)
         }
         _ => Err(BackendEmitError("Cranelift scalar instruction expected".to_owned())),
     }

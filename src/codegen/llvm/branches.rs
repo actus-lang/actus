@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use llvm_sys::core::{LLVMAddIncoming, LLVMBuildBr, LLVMBuildCondBr};
+use llvm_sys::core::{LLVMAddIncoming, LLVMBuildBr, LLVMBuildCondBr, LLVMGetInsertBlock};
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
 use super::super::{BackendBlockId, BackendEmitError, BackendInstruction, BackendValueId};
@@ -14,7 +14,7 @@ pub(super) fn emit_branch(
     else_id: BackendBlockId,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     block_parameters: &BlockParameters,
-    current_block: BackendBlockId,
+    _current_block: BackendBlockId,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::Branch { then_arguments, else_arguments, .. } = instruction else {
@@ -25,8 +25,12 @@ pub(super) fn emit_branch(
     })?;
     let then_block = block_value(blocks, then_id)?;
     let else_block = block_value(blocks, else_id)?;
-    add_incoming(blocks, block_parameters, then_id, then_arguments, current_block, values)?;
-    add_incoming(blocks, block_parameters, else_id, else_arguments, current_block, values)?;
+    let source = unsafe { LLVMGetInsertBlock(builder) };
+    if source.is_null() {
+        return Err(BackendEmitError("LLVM branch has no insertion block".to_owned()));
+    }
+    add_incoming(block_parameters, then_id, then_arguments, source, values)?;
+    add_incoming(block_parameters, else_id, else_arguments, source, values)?;
     unsafe { LLVMBuildCondBr(builder, condition, then_block, else_block) };
     Ok(())
 }
@@ -37,24 +41,27 @@ pub(super) fn emit_jump(
     target_id: BackendBlockId,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     block_parameters: &BlockParameters,
-    current_block: BackendBlockId,
+    _current_block: BackendBlockId,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::Jump { arguments, .. } = instruction else {
         return Err(BackendEmitError("LLVM jump instruction expected".to_owned()));
     };
     let target = block_value(blocks, target_id)?;
-    add_incoming(blocks, block_parameters, target_id, arguments, current_block, values)?;
+    let source = unsafe { LLVMGetInsertBlock(builder) };
+    if source.is_null() {
+        return Err(BackendEmitError("LLVM jump has no insertion block".to_owned()));
+    }
+    add_incoming(block_parameters, target_id, arguments, source, values)?;
     unsafe { LLVMBuildBr(builder, target) };
     Ok(())
 }
 
 fn add_incoming(
-    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     block_parameters: &BlockParameters,
     target: BackendBlockId,
     arguments: &[super::super::BackendEdgeArgument],
-    source: BackendBlockId,
+    source: LLVMBasicBlockRef,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
     let parameters = block_parameters.get(&target).map(Vec::as_slice).unwrap_or(&[]);
@@ -64,7 +71,6 @@ fn add_incoming(
             target.0
         )));
     }
-    let source = block_value(blocks, source)?;
     for ((_, phi), argument) in parameters.iter().zip(arguments) {
         let value = values.get(&argument.value).copied().ok_or_else(|| {
             BackendEmitError(format!(

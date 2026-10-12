@@ -1144,6 +1144,140 @@ fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_compound_store() {
 
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
+fn cranelift_backend_builds_and_runs_a_shared_dynamic_fixed_array_index() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-array-dynamic-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; } verb main() -> Int { return read(index: abs 2u32); }\n",
+    )
+    .expect("write Cranelift dynamic fixed-array fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift dynamic fixed-array fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run Cranelift dynamic fixed-array fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_index() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-array-dynamic-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; } verb main() -> Int { return read(index: abs 2u32); }\n",
+    )
+    .expect("write LLVM dynamic fixed-array fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build LLVM dynamic fixed-array fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run LLVM dynamic fixed-array fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_traps_on_a_shared_dynamic_fixed_array_index_out_of_bounds() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-cranelift-array-oob-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[index] as Int; } verb main() -> Int { return read(index: abs 4u32); }\n",
+    )
+    .expect("write Cranelift array bounds fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift array bounds fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run Cranelift array bounds fixture");
+    assert!(!status.success());
+    assert!(status.code().is_none(), "array bounds failure should be a native trap");
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_traps_on_a_shared_dynamic_fixed_array_index_out_of_bounds() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-array-oob-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[index] as Int; } verb main() -> Int { return read(index: abs 4u32); }\n",
+    )
+    .expect("write LLVM array bounds fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is UTF-8"),
+            input.to_str().expect("input path is UTF-8"),
+        ])
+        .status()
+        .expect("build LLVM array bounds fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run LLVM array bounds fixture");
+    assert!(!status.success());
+    assert!(status.code().is_none(), "array bounds failure should be a native trap");
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
 fn cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
     let root = std::env::temp_dir()
         .join(format!("actus-cli-cranelift-struct-mutation-{}", std::process::id()));

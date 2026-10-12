@@ -7,8 +7,8 @@ mod returns;
 use super::aggregate::{Declaration, declaration, direct_aggregate_types, initialize_values};
 use super::integer_ops::{
     lower_integer_binary, lower_integer_cast, lower_integer_compare, lower_integer_unary,
-    lower_trap_if_shift_count_out_of_range, lower_trap_if_signed_division_overflow,
-    lower_trap_if_zero,
+    lower_trap_if_array_index_out_of_bounds, lower_trap_if_shift_count_out_of_range,
+    lower_trap_if_signed_division_overflow, lower_trap_if_zero,
 };
 use super::native::BackendEmitError;
 use super::object::create_module;
@@ -348,6 +348,9 @@ pub(super) fn lower_guard(
         }
         BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
             lower_trap_if_shift_count_out_of_range(builder, instruction, values)
+        }
+        BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
+            lower_trap_if_array_index_out_of_bounds(builder, instruction, values)
         }
         _ => Err(BackendEmitError("Cranelift guard instruction is not supported".to_owned())),
     }

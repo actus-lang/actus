@@ -36,6 +36,9 @@ fn validate_instruction(
         BackendInstruction::Call { callee, .. } if callee.as_str().is_empty() => {
             Err(BackendContractError::InvalidCallSymbol)
         }
+        BackendInstruction::TrapIfArrayIndexOutOfBounds { capacity, .. } if *capacity == 0 => {
+            Err(BackendContractError::InvalidLayout("array index guard requires non-zero capacity"))
+        }
         BackendInstruction::Fail { failure, .. } => super::super::abi::validate_failure(failure),
         BackendInstruction::EnumDiscriminant { layout, .. } => layout.validate(),
         BackendInstruction::EnumPayload { layout, payload_type, .. }

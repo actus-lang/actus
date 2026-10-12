@@ -65,8 +65,8 @@ pub(super) fn fixed_array_type(type_name: &crate::ast::TypeName) -> bool {
         })
 }
 
-pub(super) fn fixed_array_literal_index(expression: &Expr) -> bool {
-    matches!(expression, Expr::Integer { .. })
+pub(super) fn fixed_array_index_expression(expression: &Expr) -> bool {
+    matches!(expression, Expr::Integer { .. } | Expr::Identifier { .. })
 }
 
 fn scalar_type_size(type_name: &crate::ast::TypeName) -> Option<u32> {

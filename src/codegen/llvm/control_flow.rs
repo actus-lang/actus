@@ -11,7 +11,8 @@ use super::declarations::FunctionDeclaration;
 use super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
 use super::failures::emit_failure;
 use super::guards::{
-    emit_trap_if_shift_count_out_of_range, emit_trap_if_signed_division_overflow, emit_trap_if_zero,
+    emit_trap_if_array_index_out_of_bounds, emit_trap_if_shift_count_out_of_range,
+    emit_trap_if_signed_division_overflow, emit_trap_if_zero,
 };
 use super::integer_cast::emit_integer_cast;
 use super::integer_ops::{emit_integer_binary, emit_integer_compare, emit_integer_unary};
@@ -274,7 +275,8 @@ fn emit_scalar_instruction(
         }
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
-        | BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
+        | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
+        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
             emit_guard(context, builder, function, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
@@ -314,6 +316,9 @@ fn emit_guard(
         }
         BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
             emit_trap_if_shift_count_out_of_range(context, builder, function, instruction, values)
+        }
+        BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
+            emit_trap_if_array_index_out_of_bounds(context, builder, function, instruction, values)
         }
         _ => Err(BackendEmitError("LLVM guard instruction is not supported".to_owned())),
     }

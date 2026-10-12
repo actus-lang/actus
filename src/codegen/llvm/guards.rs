@@ -2,8 +2,10 @@ use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCondBr, LLVMBuildICmp,
-    LLVMBuildUnreachable, LLVMConstInt, LLVMConstNull, LLVMPositionBuilderAtEnd, LLVMTypeOf,
+    LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr,
+    LLVMBuildICmp, LLVMBuildUnreachable, LLVMConstInt, LLVMConstNull, LLVMFunctionType,
+    LLVMGetGlobalParent, LLVMGetNamedFunction, LLVMInt32TypeInContext, LLVMPositionBuilderAtEnd,
+    LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -57,6 +59,58 @@ pub(super) fn emit_trap_if_zero(
     Ok(false)
 }
 
+fn emit_llvm_trap(
+    context: llvm_sys::prelude::LLVMContextRef,
+    function: LLVMValueRef,
+    builder: LLVMBuilderRef,
+) -> Result<(), BackendEmitError> {
+    unsafe {
+        let module = LLVMGetGlobalParent(function);
+        if module.is_null() {
+            return Err(BackendEmitError("LLVM trap function has no parent module".to_owned()));
+        }
+        let name = b"raise\0";
+        let trap = {
+            let existing = LLVMGetNamedFunction(module, name.as_ptr().cast());
+            if existing.is_null() {
+                let mut parameter_types = [LLVMInt32TypeInContext(context)];
+                let trap_type = LLVMFunctionType(
+                    LLVMInt32TypeInContext(context),
+                    parameter_types.as_mut_ptr(),
+                    1,
+                    0,
+                );
+                LLVMAddFunction(module, name.as_ptr().cast(), trap_type)
+            } else {
+                existing
+            }
+        };
+        if trap.is_null() {
+            return Err(BackendEmitError("LLVM failed to declare raise function".to_owned()));
+        }
+        let mut arguments = [LLVMConstInt(LLVMInt32TypeInContext(context), 4, 0)];
+        let mut parameter_types = [LLVMInt32TypeInContext(context)];
+        let trap_type =
+            LLVMFunctionType(LLVMInt32TypeInContext(context), parameter_types.as_mut_ptr(), 1, 0);
+        if LLVMBuildCall2(
+            builder,
+            trap_type,
+            trap,
+            arguments.as_mut_ptr(),
+            1,
+            b"\0".as_ptr().cast(),
+        )
+        .is_null()
+        {
+            return Err(BackendEmitError("LLVM failed to emit raise call".to_owned()));
+        }
+        if LLVMBuildUnreachable(builder).is_null() {
+            return Err(BackendEmitError("LLVM failed to terminate trap block".to_owned()));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn emit_trap_if_shift_count_out_of_range(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
@@ -100,7 +154,44 @@ pub(super) fn emit_trap_if_shift_count_out_of_range(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        LLVMBuildUnreachable(builder);
+        emit_llvm_trap(context, function, builder)?;
+        LLVMPositionBuilderAtEnd(builder, ok_block);
+    }
+    Ok(false)
+}
+
+pub(super) fn emit_trap_if_array_index_out_of_bounds(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: LLVMValueRef,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::TrapIfArrayIndexOutOfBounds { index, capacity, span, .. } = instruction
+    else {
+        return Err(BackendEmitError("LLVM array-index guard expected".to_owned()));
+    };
+    let index = guard_value(values, *index, "array-index value")?;
+    let limit = unsafe { LLVMConstInt(LLVMTypeOf(index), u64::from(*capacity), 0) };
+    let condition = unsafe {
+        LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntULT,
+            index,
+            limit,
+            b"actus.array.index.valid\0".as_ptr().cast(),
+        )
+    };
+    if condition.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit array-index guard".to_owned()));
+    }
+    let (ok_block, trap_block) = append_guard_blocks(context, function, "array.index", *span)?;
+    if unsafe { LLVMBuildCondBr(builder, condition, ok_block, trap_block) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit array-index guard branch".to_owned()));
+    }
+    unsafe {
+        LLVMPositionBuilderAtEnd(builder, trap_block);
+        emit_llvm_trap(context, function, builder)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)
@@ -158,7 +249,7 @@ pub(super) fn emit_trap_if_signed_division_overflow(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        LLVMBuildUnreachable(builder);
+        emit_llvm_trap(context, function, builder)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)

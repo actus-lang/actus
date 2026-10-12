@@ -85,6 +85,15 @@ fn accepts_fixed_array_element_compound_stores_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_dynamic_fixed_array_indices_in_the_shared_contract() {
+    let source = "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; } verb main() -> Int { return read(index: abs 2u32); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("dynamic fixed-array fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn keeps_exclusive_array_parameter_stores_on_the_legacy_route() {
     let source = "verb mutate(ins values: Array[Int, 2]) { values[1] = 41; } verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); mutate(values: ins values); return values[1] + 1; }";
     let (tokens, errors) = scan(source);

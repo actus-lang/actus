@@ -200,6 +200,32 @@ pub(super) fn lower_trap_if_shift_count_out_of_range(
     Ok(())
 }
 
+pub(super) fn lower_trap_if_array_index_out_of_bounds(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::TrapIfArrayIndexOutOfBounds { index, capacity, .. } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift array-index guard expected".to_owned()));
+    };
+    let index = values.get(index).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift array-index value {} is unavailable", index.0))
+    })?;
+    let index_type = builder.func.dfg.value_type(index);
+    let limit = builder.ins().iconst(index_type, i64::from(*capacity));
+    let valid = builder.ins().icmp(IntCC::UnsignedLessThan, index, limit);
+    let ok_block = builder.create_block();
+    let trap_block = builder.create_block();
+    builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
+    builder.switch_to_block(trap_block);
+    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    builder.seal_block(trap_block);
+    builder.switch_to_block(ok_block);
+    builder.seal_block(ok_block);
+    Ok(())
+}
+
 pub(super) fn lower_trap_if_signed_division_overflow(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,

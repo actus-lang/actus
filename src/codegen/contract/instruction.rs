@@ -56,6 +56,12 @@ pub enum BackendInstruction {
         reason: String,
         span: SourceSpan,
     },
+    TrapIfArrayIndexOutOfBounds {
+        index: super::BackendValueId,
+        capacity: u32,
+        reason: String,
+        span: SourceSpan,
+    },
     IntegerCompare {
         result: super::BackendValueId,
         operation: BackendIntegerCompareOp,

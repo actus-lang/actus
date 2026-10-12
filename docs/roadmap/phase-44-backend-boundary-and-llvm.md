@@ -1179,6 +1179,18 @@ operation, and element store as one validated sequence. Indexed compound
 assignment on parameters, dynamic indexing, and aggregate element values stay
 outside this slice.
 
+Dynamic integer indices for local fixed arrays now pass through the shared
+contract with an explicit `TrapIfArrayIndexOutOfBounds` instruction emitted
+before every element load or store. The classifier regression
+`accepts_dynamic_fixed_array_indices_in_the_shared_contract` and the hosted
+Cranelift/LLVM fixtures
+`cranelift_backend_builds_and_runs_a_shared_dynamic_fixed_array_index` and
+`llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_index` verify the
+valid path. The corresponding out-of-bounds fixtures verify a native trap on
+both backends. This slice covers integer literals and simple integer bindings
+for local arrays; indexed parameter mutation, compound index expressions, and
+aggregate element values remain outside it.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod shared_candidate_arrays;
 
 use shared_candidate_arrays::{
-    array_bindings, fixed_array_expression, fixed_array_literal_index, fixed_array_type,
+    array_bindings, fixed_array_expression, fixed_array_index_expression, fixed_array_type,
     local_array_bindings,
 };
 
@@ -250,7 +250,7 @@ fn scalar_assignment_place(place: &Place, context: &CandidateContext<'_>) -> boo
             place,
             Place::Index { target, index, .. }
                 if local_array_expression(&target.to_expr(), context)
-                    && fixed_array_literal_index(index)
+                    && fixed_array_index_expression(index)
         )
 }
 
@@ -290,7 +290,7 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         }
         Expr::FieldAccess { object, .. } => scalar_expression(object, context),
         Expr::Index { target, index, .. } => {
-            fixed_array_expression(target, context) && fixed_array_literal_index(index)
+            fixed_array_expression(target, context) && fixed_array_index_expression(index)
         }
         _ => false,
     }

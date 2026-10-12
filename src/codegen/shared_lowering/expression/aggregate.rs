@@ -191,6 +191,12 @@ fn lower_array_element_location(
     if !matches!(provider.value_type(index), Some(BackendValueType::Integer { .. })) {
         return Err(unsupported(span, "array index must be an integer"));
     }
+    instructions.push(BackendInstruction::TrapIfArrayIndexOutOfBounds {
+        index,
+        capacity,
+        reason: "fixed-array index is outside the declared capacity".to_owned(),
+        span,
+    });
     Ok((base, index, aggregate_layout, element_layout, element_type, capacity))
 }
 
