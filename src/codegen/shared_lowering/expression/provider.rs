@@ -143,7 +143,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             self.locals[scope_index].insert(name.to_owned(), value);
             return Ok(());
         }
-        if self.loop_depth > 0 && let Some(scope_index) = self
+        if let Some(scope_index) = self
                 .locals
                 .iter()
                 .enumerate()
@@ -284,7 +284,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        aggregate::lower_array_element_compound_assignment(
+        array_ops::lower_array_element_compound_assignment(
             self,
             target,
             index,

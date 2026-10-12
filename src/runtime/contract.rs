@@ -63,6 +63,8 @@ pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.
 pub const BUFFER_BYTE_AT_SYMBOL: &str = "actus_buffer_byte_at";
+/// Stable runtime symbol for checked mutable-buffer byte access.
+pub const BUFFER_BYTE_SET_SYMBOL: &str = "actus_buffer_byte_set";
 /// Stable runtime symbol for allocation-free CRC32 over a validated buffer range.
 pub const BUFFER_CRC32_SYMBOL: &str = "actus_buffer_crc32";
 pub const BUFFER_CRC32_MATCHES_SYMBOL: &str = "actus_buffer_crc32_matches";

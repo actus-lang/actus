@@ -38,7 +38,7 @@ pub use console::{
 };
 pub use contract::{
     ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS,
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_BYTE_AT_SYMBOL,
+    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_BYTE_AT_SYMBOL, BUFFER_BYTE_SET_SYMBOL,
     BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL,
     BUFFER_RESERVE_SYMBOL, BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, BUFFERED_WRITE_STDOUT_SYMBOL,
     ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL, FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL,
@@ -98,7 +98,7 @@ pub use serialization::{
     validate_fixed_frame,
 };
 pub use stream::{
-    actus_buffer_byte_at, actus_buffer_length, actus_buffer_validate_utf8,
+    actus_buffer_byte_at, actus_buffer_byte_set, actus_buffer_length, actus_buffer_validate_utf8,
     actus_buffered_write_stdout, actus_cursor_flush, actus_cursor_read, actus_cursor_seek,
     actus_cursor_write, actus_flush_buffered_stdout, actus_write_buffer_stdout,
 };

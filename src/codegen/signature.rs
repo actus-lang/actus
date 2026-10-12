@@ -179,8 +179,11 @@ pub(crate) fn lower_return(
         });
     };
     let (ty, layout) = lower_type(&return_type.ty, layouts)?;
-    let passing =
-        layout.map_or(BackendReturnMode::Direct, |layout| BackendReturnMode::ReturnSlot { layout });
+    let passing = if is_opaque_runtime_type(&return_type.ty) {
+        BackendReturnMode::Direct
+    } else {
+        layout.map_or(BackendReturnMode::Direct, |layout| BackendReturnMode::ReturnSlot { layout })
+    };
     let role = Some(match return_type.access {
         ReturnAccess::Owned => Role::Erg,
         ReturnAccess::Abs => Role::Abs,
@@ -192,6 +195,9 @@ fn lower_type(
     type_name: &TypeName,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<(BackendValueType, Option<BackendLayout>), BackendContractError> {
+    if is_opaque_runtime_type(type_name) {
+        return Ok((BackendValueType::Pointer, layouts.layout_for(type_name)));
+    }
     let scalar = match type_name.name.as_str() {
         "Bool" => Some(BackendValueType::Bool),
         "Int" => Some(BackendValueType::Integer { signed: true, width: 32 }),
@@ -223,6 +229,10 @@ fn lower_type(
         BackendValueType::Aggregate { layout }
     };
     Ok((ty, Some(layout)))
+}
+
+fn is_opaque_runtime_type(type_name: &TypeName) -> bool {
+    matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String")
 }
 
 fn passing_for(

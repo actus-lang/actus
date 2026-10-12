@@ -165,6 +165,28 @@ pub unsafe extern "C" fn actus_buffer_byte_at(handle: BufferHandle, index: i32) 
     unsafe { buffer.data.add(index).read() }.into()
 }
 
+/// Writes one byte into a valid buffer slot, returning zero on success.
+///
+/// # Safety
+///
+/// `handle` must be null or point to a live buffer returned by the allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_buffer_byte_set(handle: BufferHandle, index: i32, byte: u8) -> i32 {
+    if handle.is_null() || index < 0 {
+        return ABI_STATUS_FAILURE;
+    }
+    let buffer = unsafe { &mut *handle };
+    if buffer.length > buffer.capacity || (buffer.length > 0 && buffer.data.is_null()) {
+        return ABI_STATUS_FAILURE;
+    }
+    let index = index as usize;
+    if index >= buffer.length {
+        return ABI_STATUS_END_OF_STREAM;
+    }
+    unsafe { buffer.data.add(index).write(byte) };
+    ABI_STATUS_SUCCESS
+}
+
 /// Returns zero when a buffer contains valid UTF-8, or -1 otherwise.
 ///
 /// # Safety

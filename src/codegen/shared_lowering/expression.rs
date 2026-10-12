@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 mod aggregate;
 mod arena;
 mod arithmetic;
+mod array_ops;
+mod buffer;
 mod calls;
 mod case;
 mod cast;

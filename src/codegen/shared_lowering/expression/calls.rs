@@ -54,10 +54,18 @@ pub(super) fn lower_call(
     if arguments.is_empty() && callee.starts_with("Arena[") {
         return super::arena::lower_constructor(provider, callee, *span, instructions);
     }
-    let arguments = arguments
-        .iter()
-        .map(|argument| provider.lower_expression(&argument.expression, instructions))
-        .collect::<Result<Vec<_>, _>>()?;
+    let arguments = lower_arguments(provider, arguments, instructions)?;
+    if let Some((symbol, result_type)) = runtime_intrinsic(callee) {
+        return lower_runtime_call(
+            provider,
+            callee,
+            symbol,
+            result_type,
+            arguments,
+            *span,
+            instructions,
+        );
+    }
     if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print) {
         return lower_print_call(provider, arguments, *span, instructions);
     }
@@ -82,6 +90,86 @@ pub(super) fn lower_call(
     result.ok_or_else(|| {
         super::super::support::unsupported(*span, "unit call cannot produce a value")
     })
+}
+
+fn lower_arguments(
+    provider: &mut SharedExpressionProvider<'_>,
+    arguments: &[crate::ast::Argument],
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<Vec<BackendValueId>, BackendContractError> {
+    arguments
+        .iter()
+        .map(|argument| provider.lower_expression(&argument.expression, instructions))
+        .collect()
+}
+
+fn lower_runtime_call(
+    provider: &mut SharedExpressionProvider<'_>,
+    callee: &str,
+    symbol: &str,
+    result_type: crate::codegen::BackendValueType,
+    arguments: Vec<BackendValueId>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let arguments = normalize_runtime_arguments(provider, callee, arguments, span, instructions)?;
+    let result = provider.allocate();
+    provider.remember_value(result, result_type);
+    instructions.push(BackendInstruction::Call {
+        callee: SymbolIdentity::external_raw(symbol)
+            .map_err(|error| super::super::support::unsupported(span, error.to_string()))?,
+        arguments,
+        result: Some(result),
+        span,
+    });
+    Ok(result)
+}
+
+fn normalize_runtime_arguments(
+    provider: &mut SharedExpressionProvider<'_>,
+    callee: &str,
+    mut arguments: Vec<BackendValueId>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<Vec<BackendValueId>, BackendContractError> {
+    if lookup_call_intrinsic(callee) != Some(IntrinsicKind::Append) {
+        return Ok(arguments);
+    }
+    let byte = arguments
+        .get(1)
+        .copied()
+        .ok_or_else(|| super::super::support::unsupported(span, "append requires a byte"))?;
+    let source_type = provider.value_type(byte).ok_or_else(|| {
+        super::super::support::unsupported(span, "append byte type is unavailable")
+    })?;
+    let target_type = crate::codegen::BackendValueType::Integer { signed: false, width: 8 };
+    if source_type != target_type {
+        let converted = provider.allocate();
+        provider.remember_value(converted, target_type);
+        instructions.push(BackendInstruction::IntegerCast {
+            result: converted,
+            source: byte,
+            source_type,
+            target_type,
+            span,
+        });
+        arguments[1] = converted;
+    }
+    Ok(arguments)
+}
+
+fn runtime_intrinsic(callee: &str) -> Option<(&'static str, crate::codegen::BackendValueType)> {
+    match lookup_call_intrinsic(callee) {
+        Some(IntrinsicKind::Append) => Some((
+            crate::runtime::BUFFER_APPEND_SYMBOL,
+            crate::codegen::BackendValueType::Integer { signed: false, width: 8 },
+        )),
+        Some(IntrinsicKind::BufferLength) => Some((
+            crate::runtime::BUFFER_LENGTH_SYMBOL,
+            crate::codegen::BackendValueType::Integer { signed: true, width: 32 },
+        )),
+        _ => None,
+    }
 }
 
 fn lower_print_call(

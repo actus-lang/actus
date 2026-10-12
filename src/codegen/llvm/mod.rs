@@ -17,6 +17,7 @@ mod memory;
 mod module;
 mod object;
 mod packed;
+mod packed_wide;
 mod returns;
 mod values;
 mod verification;

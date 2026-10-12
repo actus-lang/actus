@@ -9,6 +9,7 @@ mod constructors;
 mod expression;
 mod layout;
 mod performance;
+mod runtime_externals;
 mod support;
 
 use expression::SharedExpressionProvider;
@@ -80,6 +81,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
         functions,
     };
     append_buffer_allocate_external(&mut module.externals)?;
+    runtime_externals::append_buffer_runtime_externals(&mut module.externals)?;
     append_print_externals(&mut module.externals)?;
     module.validate()?;
     Ok(module)

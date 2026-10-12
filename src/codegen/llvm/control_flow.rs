@@ -1,6 +1,3 @@
-// Control-flow emission receives the complete LLVM lowering context explicitly.
-#![allow(clippy::too_many_arguments)]
-
 use std::collections::BTreeMap;
 
 use super::super::{
@@ -28,6 +25,18 @@ use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
 pub(super) type BlockParameters = BTreeMap<BackendBlockId, Vec<(BackendValueId, LLVMValueRef)>>;
 
+struct InstructionContext<'a> {
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    pointer_width: u8,
+    function: &'a BackendFunction,
+    declaration: FunctionDeclaration,
+    declarations: &'a BTreeMap<String, FunctionDeclaration>,
+    blocks: &'a BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
+    block_parameters: &'a BlockParameters,
+    values: &'a mut BTreeMap<BackendValueId, LLVMValueRef>,
+}
+
 pub(super) fn emit_blocks(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
@@ -51,17 +60,18 @@ pub(super) fn emit_blocks(
                 ));
             }
             terminated = emit_instruction(
-                context,
-                builder,
-                pointer_width,
-                function,
-                declaration,
+                &mut InstructionContext {
+                    context,
+                    builder,
+                    pointer_width,
+                    function,
+                    declaration,
+                    declarations,
+                    blocks,
+                    block_parameters: &block_parameters,
+                    values: &mut values,
+                },
                 instruction,
-                declarations,
-                blocks,
-                &block_parameters,
-                block.id,
-                &mut values,
             )?;
         }
         if !terminated {
@@ -88,125 +98,139 @@ fn parameter_values(declaration: FunctionDeclaration) -> BTreeMap<BackendValueId
 }
 
 fn emit_instruction(
-    context: llvm_sys::prelude::LLVMContextRef,
-    builder: LLVMBuilderRef,
-    pointer_width: u8,
-    function: &BackendFunction,
-    declaration: FunctionDeclaration,
+    context: &mut InstructionContext<'_>,
     instruction: &BackendInstruction,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
-    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
-    block_parameters: &BlockParameters,
-    current_block: BackendBlockId,
-    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    if let Some(result) =
-        emit_scalar_instruction(context, builder, declaration.value, instruction, values)
-    {
+    if let Some(result) = emit_scalar_instruction(
+        context.context,
+        context.builder,
+        context.declaration.value,
+        instruction,
+        context.values,
+    ) {
         return result;
     }
-    emit_non_scalar_instruction(
-        context,
-        builder,
-        pointer_width,
-        function,
-        declaration,
-        instruction,
-        declarations,
-        blocks,
-        block_parameters,
-        current_block,
-        values,
-    )
+    emit_non_scalar_instruction(context, instruction)
 }
 
 fn emit_non_scalar_instruction(
-    context: llvm_sys::prelude::LLVMContextRef,
-    builder: LLVMBuilderRef,
-    pointer_width: u8,
-    function: &BackendFunction,
-    declaration: FunctionDeclaration,
+    context: &mut InstructionContext<'_>,
     instruction: &BackendInstruction,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
-    blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
-    block_parameters: &BlockParameters,
-    current_block: BackendBlockId,
-    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     if let Some(result) = emit_control_transfer(
-        builder,
+        context.builder,
         instruction,
-        blocks,
-        block_parameters,
-        current_block,
-        values,
+        context.blocks,
+        context.block_parameters,
+        context.values,
     )? {
         return Ok(result);
     }
-    emit_non_control_instruction(
-        context,
-        builder,
-        pointer_width,
-        function,
-        declaration,
-        instruction,
-        declarations,
-        values,
-    )
+    emit_non_control_instruction(context, instruction)
 }
 
 fn emit_non_control_instruction(
-    context: llvm_sys::prelude::LLVMContextRef,
-    builder: LLVMBuilderRef,
-    pointer_width: u8,
-    function: &BackendFunction,
-    declaration: FunctionDeclaration,
+    context: &mut InstructionContext<'_>,
     instruction: &BackendInstruction,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
-    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     if is_aggregate_instruction(instruction) {
         return super::aggregates::emit_aggregate_instruction(
-            context,
-            builder,
-            pointer_width,
+            context.context,
+            context.builder,
+            context.pointer_width,
             instruction,
-            values,
+            context.values,
         );
     }
     match instruction {
+        BackendInstruction::Return { .. }
+        | BackendInstruction::Call { .. }
+        | BackendInstruction::Trap { .. }
+        | BackendInstruction::Fail { .. } => emit_terminal_instruction(context, instruction),
+        BackendInstruction::Cleanup { .. }
+        | BackendInstruction::MemoryCopy { .. }
+        | BackendInstruction::AggregateFieldStore { .. } => {
+            emit_runtime_instruction(context, instruction)
+        }
+        _ => unreachable!("scalar instruction was not dispatched"),
+    }
+}
+
+fn emit_terminal_instruction(
+    context: &mut InstructionContext<'_>,
+    instruction: &BackendInstruction,
+) -> Result<bool, BackendEmitError> {
+    match instruction {
         BackendInstruction::Return { value, .. } => {
-            emit_return(builder, function, declaration, *value, values)?;
+            emit_return(
+                context.builder,
+                context.function,
+                context.declaration,
+                *value,
+                context.values,
+            )?;
             Ok(true)
         }
         BackendInstruction::Call { callee, arguments, result, .. } => {
-            emit_call(context, builder, callee.as_str(), arguments, *result, declarations, values)?;
+            emit_call(
+                context.context,
+                context.builder,
+                callee.as_str(),
+                arguments,
+                *result,
+                context.declarations,
+                context.values,
+            )?;
             Ok(false)
         }
         BackendInstruction::Trap { .. } => {
-            unsafe { LLVMBuildUnreachable(builder) };
+            unsafe { LLVMBuildUnreachable(context.builder) };
             Ok(true)
         }
         BackendInstruction::Fail { failure, .. } => {
-            emit_failure(context, builder, function, declaration, failure, values)?;
+            emit_failure(
+                context.context,
+                context.builder,
+                context.function,
+                context.declaration,
+                failure,
+                context.values,
+            )?;
             Ok(true)
         }
+        _ => Err(BackendEmitError("LLVM terminal instruction expected".to_owned())),
+    }
+}
+
+fn emit_runtime_instruction(
+    context: &mut InstructionContext<'_>,
+    instruction: &BackendInstruction,
+) -> Result<bool, BackendEmitError> {
+    match instruction {
         BackendInstruction::Cleanup { action, operand, .. } => emit_cleanup(
-            context,
-            builder,
-            pointer_width,
+            context.context,
+            context.builder,
+            context.pointer_width,
             action,
             operand.clone(),
-            declarations,
-            values,
+            context.declarations,
+            context.values,
         ),
-        BackendInstruction::MemoryCopy { .. } => {
-            emit_memory_copy_instruction(context, builder, instruction, values)
-        }
+        BackendInstruction::MemoryCopy { .. } => emit_memory_copy_instruction(
+            context.context,
+            context.builder,
+            instruction,
+            context.values,
+        ),
         BackendInstruction::AggregateFieldStore { .. } => {
-            super::aggregates::emit_aggregate_field_store(context, builder, instruction, values)
+            super::aggregates::emit_aggregate_field_store(
+                context.context,
+                context.builder,
+                instruction,
+                context.values,
+            )
         }
-        _ => unreachable!("scalar instruction was not dispatched"),
+        _ => Err(BackendEmitError("LLVM runtime instruction expected".to_owned())),
     }
 }
 
@@ -229,34 +253,15 @@ fn emit_control_transfer(
     instruction: &BackendInstruction,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
     block_parameters: &BlockParameters,
-    current_block: BackendBlockId,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<Option<bool>, BackendEmitError> {
     match instruction {
-        BackendInstruction::Branch { condition, then_block, else_block, .. } => {
-            emit_branch(
-                builder,
-                instruction,
-                *condition,
-                *then_block,
-                *else_block,
-                blocks,
-                block_parameters,
-                current_block,
-                values,
-            )?;
+        BackendInstruction::Branch { .. } => {
+            emit_branch(builder, instruction, blocks, block_parameters, values)?;
             Ok(Some(true))
         }
-        BackendInstruction::Jump { target, .. } => {
-            emit_jump(
-                builder,
-                instruction,
-                *target,
-                blocks,
-                block_parameters,
-                current_block,
-                values,
-            )?;
+        BackendInstruction::Jump { .. } => {
+            emit_jump(builder, instruction, blocks, block_parameters, values)?;
             Ok(Some(true))
         }
         _ => Ok(None),

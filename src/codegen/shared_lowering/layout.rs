@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use crate::ast::{
-    BuiltinType, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl, TypeName,
-    primitive_type,
+    BuiltinType, EnumDef, EnumPayload, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl,
+    TypeName, primitive_type,
 };
 
 use super::super::BackendFieldLayout;
@@ -20,6 +20,7 @@ use super::{
 /// reference roles and runtime handles, matching the existing neutral ABI.
 pub(super) struct ProgramLayouts<'program> {
     structs: BTreeMap<&'program str, &'program StructDef>,
+    enums: BTreeMap<&'program str, &'program EnumDef>,
     packs: BTreeMap<&'program str, &'program PackDecl>,
     drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
@@ -45,6 +46,16 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
+        let enums = program
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                TopLevelDecl::Enum(definition) if definition.generic_parameters.is_empty() => {
+                    Some((definition.name.as_str(), definition))
+                }
+                _ => None,
+            })
+            .collect();
         let drop_symbols = program
             .declarations
             .iter()
@@ -63,7 +74,7 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
-        Self { structs, packs, drop_symbols, pointer_bytes: usize::BITS / 8 }
+        Self { structs, enums, packs, drop_symbols, pointer_bytes: usize::BITS / 8 }
     }
 
     fn type_layout(
@@ -91,6 +102,11 @@ impl<'program> ProgramLayouts<'program> {
         }
         if type_name.name == "Array" {
             return self.array_layout(type_name, visiting);
+        }
+        if self.enums.contains_key(type_name.name.as_str()) {
+            return self
+                .named_enum_layout(type_name.name.as_str(), visiting)
+                .map(|layout| layout.layout);
         }
         if let Some(pack) = self.packs.get(type_name.name.as_str()) {
             return self.type_layout(pack.storage.type_name(), visiting);
@@ -136,6 +152,69 @@ impl<'program> ProgramLayouts<'program> {
             size: Self::align_up(size, element.alignment)?,
             alignment: element.alignment,
         })
+    }
+
+    fn named_enum_layout(
+        &self,
+        name: &str,
+        visiting: &mut Vec<String>,
+    ) -> Option<super::super::abi::BackendEnumLayout> {
+        if visiting.iter().any(|candidate| candidate == name) {
+            return None;
+        }
+        let definition = self.enums.get(name)?;
+        visiting.push(name.to_owned());
+        let mut payload: Option<BackendLayout> = None;
+        for variant in &definition.variants {
+            let variant_payload = match &variant.payload {
+                EnumPayload::Unit => None,
+                EnumPayload::Tuple(types) => self.sequence_layout(types, visiting),
+                EnumPayload::Struct(fields) => self.sequence_layout(
+                    &fields.iter().map(|field| field.ty.clone()).collect::<Vec<_>>(),
+                    visiting,
+                ),
+            };
+            if let Some(candidate) = variant_payload {
+                payload = Some(match payload {
+                    Some(current) if current.size >= candidate.size => current,
+                    _ => candidate,
+                });
+            }
+        }
+        visiting.pop();
+        let payload_offset = match payload {
+            Some(layout) => Self::align_up(4, layout.alignment)?,
+            None => 4,
+        };
+        let alignment = payload.map_or(4, |layout| 4u32.max(layout.alignment));
+        let size = Self::align_up(
+            payload_offset.checked_add(payload.map_or(0, |layout| layout.size))?,
+            alignment,
+        )?;
+        Some(super::super::abi::BackendEnumLayout {
+            layout: BackendLayout { size, alignment },
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset,
+            payload,
+            niche_pointer: false,
+        })
+    }
+
+    fn sequence_layout(
+        &self,
+        types: &[TypeName],
+        visiting: &mut Vec<String>,
+    ) -> Option<BackendLayout> {
+        let mut size = 0u32;
+        let mut alignment = 1u32;
+        for type_name in types {
+            let field = self.type_layout(type_name, visiting)?;
+            size = Self::align_up(size, field.alignment)?;
+            size = size.checked_add(field.size)?;
+            alignment = alignment.max(field.alignment);
+        }
+        Some(BackendLayout { size: Self::align_up(size, alignment)?, alignment })
     }
 
     fn pointer_layout(&self) -> BackendLayout {
@@ -257,23 +336,23 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         &self,
         type_name: &TypeName,
     ) -> Option<super::super::abi::BackendEnumLayout> {
-        if type_name.name != "Result" || type_name.arguments.len() != 2 {
-            return None;
+        if type_name.name == "Result" && type_name.arguments.len() == 2 {
+            let payload = self.type_layout(type_name.arguments.first()?, &mut Vec::new())?;
+            let payload_offset = Self::align_up(4, payload.alignment)?;
+            let alignment = 4u32.max(payload.alignment);
+            return Some(super::super::abi::BackendEnumLayout {
+                layout: BackendLayout {
+                    size: Self::align_up(payload_offset.checked_add(payload.size)?, alignment)?,
+                    alignment,
+                },
+                discriminant_offset: 0,
+                discriminant_size: 4,
+                payload_offset,
+                payload: Some(payload),
+                niche_pointer: false,
+            });
         }
-        let payload = self.type_layout(type_name.arguments.first()?, &mut Vec::new())?;
-        let payload_offset = Self::align_up(4, payload.alignment)?;
-        let alignment = 4u32.max(payload.alignment);
-        Some(super::super::abi::BackendEnumLayout {
-            layout: BackendLayout {
-                size: Self::align_up(payload_offset.checked_add(payload.size)?, alignment)?,
-                alignment,
-            },
-            discriminant_offset: 0,
-            discriminant_size: 4,
-            payload_offset,
-            payload: Some(payload),
-            niche_pointer: false,
-        })
+        self.named_enum_layout(type_name.name.as_str(), &mut Vec::new())
     }
 
     fn packed_field_for(

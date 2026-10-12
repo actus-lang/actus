@@ -38,8 +38,11 @@ fn aggregate_type(
     context: LLVMContextRef,
     layout: BackendLayout,
 ) -> Result<LLVMTypeRef, BackendEmitError> {
+    if layout.alignment == 1 {
+        let byte = unsafe { LLVMInt8TypeInContext(context) };
+        return Ok(unsafe { LLVMArrayType2(byte, u64::from(layout.size)) });
+    }
     let element = match layout.alignment {
-        1 => unsafe { LLVMInt8TypeInContext(context) },
         2 => unsafe { LLVMInt16TypeInContext(context) },
         4 => unsafe { LLVMInt32TypeInContext(context) },
         8 => unsafe { LLVMInt64TypeInContext(context) },

@@ -15,7 +15,17 @@ pub(super) fn lower_expression_statement(
             "expression statement",
         ));
     };
-    if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print) {
+    if lookup_call_intrinsic(callee).is_some_and(|kind| {
+        matches!(
+            kind,
+            IntrinsicKind::Append
+                | IntrinsicKind::BufferLength
+                | IntrinsicKind::Crc32
+                | IntrinsicKind::Crc32Matches
+                | IntrinsicKind::ValidateFixedFrame
+                | IntrinsicKind::Print
+        )
+    }) {
         provider.lower_expression(expression, instructions).map(|_| ())
     } else {
         let arguments = arguments

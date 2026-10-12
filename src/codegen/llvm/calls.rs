@@ -1,6 +1,3 @@
-// Call result recording receives the complete LLVM lowering context explicitly.
-#![allow(clippy::too_many_arguments)]
-
 use std::collections::BTreeMap;
 use std::ffi::CString;
 
@@ -9,6 +6,12 @@ use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendValueId};
 use super::declarations::FunctionDeclaration;
+
+struct CallResultContext<'a> {
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    declarations: &'a BTreeMap<String, FunctionDeclaration>,
+}
 
 pub(super) fn emit_call(
     context: llvm_sys::prelude::LLVMContextRef,
@@ -28,14 +31,12 @@ pub(super) fn emit_call(
     let return_slot = prepare_return_slot(builder, declaration, result, &mut arguments)?;
     let call = build_call(builder, declaration, result, &mut arguments)?;
     record_call_result(
-        context,
+        CallResultContext { context, builder, declarations },
         declaration,
         result,
         return_slot,
         call,
         values,
-        builder,
-        declarations,
     )
 }
 
@@ -114,33 +115,24 @@ fn build_call(
 }
 
 fn record_call_result(
-    context: llvm_sys::prelude::LLVMContextRef,
+    result_context: CallResultContext<'_>,
     declaration: FunctionDeclaration,
     result: Option<BackendValueId>,
     return_slot: Option<LLVMValueRef>,
     call: LLVMValueRef,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
-    builder: LLVMBuilderRef,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
 ) -> Result<(), BackendEmitError> {
     let Some(result) = result else { return Ok(()) };
     if declaration.runtime_pointer_return {
-        record_runtime_pointer_result(
-            context,
-            builder,
-            declaration,
-            result,
-            call,
-            values,
-            declarations,
-        )?;
+        record_runtime_pointer_result(&result_context, declaration, result, call, values)?;
         return Ok(());
     }
     if let Some(slot) = return_slot {
         let name = CString::new(format!("result{}", result.0))
             .map_err(|_| BackendEmitError("LLVM result name contains NUL".to_owned()))?;
-        let value =
-            unsafe { LLVMBuildLoad2(builder, declaration.return_type, slot, name.as_ptr()) };
+        let value = unsafe {
+            LLVMBuildLoad2(result_context.builder, declaration.return_type, slot, name.as_ptr())
+        };
         if value.is_null() {
             return Err(BackendEmitError("LLVM failed to load return slot".to_owned()));
         }
@@ -154,33 +146,32 @@ fn record_call_result(
 }
 
 fn record_runtime_pointer_result(
-    context: llvm_sys::prelude::LLVMContextRef,
-    builder: LLVMBuilderRef,
+    result_context: &CallResultContext<'_>,
     declaration: FunctionDeclaration,
     result: BackendValueId,
     call: LLVMValueRef,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
 ) -> Result<(), BackendEmitError> {
     let enum_drop =
-        declarations.get(crate::runtime::ENUM_DROP_SYMBOL).copied().ok_or_else(|| {
-            BackendEmitError("LLVM runtime result cleanup bridge is unavailable".to_owned())
-        })?;
+        result_context.declarations.get(crate::runtime::ENUM_DROP_SYMBOL).copied().ok_or_else(
+            || BackendEmitError("LLVM runtime result cleanup bridge is unavailable".to_owned()),
+        )?;
     let slot_name = CString::new(format!("runtime.result{}", result.0))
         .map_err(|_| BackendEmitError("LLVM runtime result name contains NUL".to_owned()))?;
-    let value =
-        unsafe { LLVMBuildLoad2(builder, declaration.return_type, call, slot_name.as_ptr()) };
+    let value = unsafe {
+        LLVMBuildLoad2(result_context.builder, declaration.return_type, call, slot_name.as_ptr())
+    };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to load runtime result".to_owned()));
     }
     let size = declaration.runtime_return_size.ok_or_else(|| {
         BackendEmitError("LLVM runtime result has no known storage size".to_owned())
     })?;
-    let integer_type = unsafe { llvm_sys::core::LLVMInt64TypeInContext(context) };
+    let integer_type = unsafe { llvm_sys::core::LLVMInt64TypeInContext(result_context.context) };
     let mut arguments = [call, unsafe { LLVMConstInt(integer_type, u64::from(size), 0) }];
     let cleanup = unsafe {
         LLVMBuildCall2(
-            builder,
+            result_context.builder,
             enum_drop.function_type,
             enum_drop.value,
             arguments.as_mut_ptr(),

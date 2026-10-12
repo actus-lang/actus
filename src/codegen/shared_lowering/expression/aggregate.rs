@@ -55,8 +55,19 @@ pub(super) fn lower_array_element(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
+    let base = provider.lower_expression(collection, instructions)?;
+    if provider.nominal_type(base).is_some_and(|type_name| type_name.name == "Buffer") {
+        return super::buffer::lower_buffer_element_from_base(
+            provider,
+            base,
+            index,
+            span,
+            instructions,
+        );
+    }
+    let index = provider.lower_expression(index, instructions)?;
     let (base, index, aggregate_layout, element_layout, element_type_name, element_type, capacity) =
-        lower_array_element_location(provider, collection, index, span, instructions)?;
+        lower_array_element_location_from_values(provider, base, index, span, instructions)?;
     let result = provider.allocate();
     provider.remember_value(result, element_type);
     provider.remember_nominal_type(result, element_type_name);
@@ -81,8 +92,26 @@ pub(super) fn lower_array_element_assignment(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
+    let base_value = provider.lower_expression(collection, instructions)?;
+    if provider.nominal_type(base_value).is_some_and(|type_name| type_name.name == "Buffer") {
+        return super::buffer::lower_buffer_element_assignment_from_base(
+            provider,
+            base_value,
+            index,
+            value,
+            span,
+            instructions,
+        );
+    }
+    let lowered_index = provider.lower_expression(index, instructions)?;
     let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
-        lower_array_element_location(provider, collection, index, span, instructions)?;
+        lower_array_element_location_from_values(
+            provider,
+            base_value,
+            lowered_index,
+            span,
+            instructions,
+        )?;
     let value = provider.lower_expression(value, instructions)?;
     if provider.value_type(value) != Some(element_type) {
         return Err(unsupported(span, "array element assignment type mismatch"));
@@ -100,54 +129,33 @@ pub(super) fn lower_array_element_assignment(
     Ok(())
 }
 
-pub(super) fn lower_array_element_compound_assignment(
-    provider: &mut SharedExpressionProvider<'_>,
-    collection: &Expr,
-    index: &Expr,
-    operator: CompoundAssignmentOp,
-    value: &Expr,
-    span: SourceSpan,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<(), BackendContractError> {
-    let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
-        lower_array_element_location(provider, collection, index, span, instructions)?;
-    let current = provider.allocate();
-    provider.remember_value(current, element_type);
-    instructions.push(BackendInstruction::ArrayElementLoad {
-        result: current,
-        base,
-        index,
-        aggregate_layout,
-        element_layout,
-        element_type,
-        capacity,
-        span,
-    });
-    let value = provider.lower_expression(value, instructions)?;
-    if provider.value_type(value) != Some(element_type) {
-        return Err(unsupported(span, "array element compound assignment type mismatch"));
+fn compound_operation(operator: CompoundAssignmentOp) -> BackendIntegerBinaryOp {
+    match operator {
+        CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
+        CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
+        CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
+        CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
+        CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
+        CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
+        CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
+        CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
+        CompoundAssignmentOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
+        CompoundAssignmentOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
     }
-    let result = provider.lower_integer_binary(
-        compound_operation(operator),
-        current,
-        value,
-        span,
-        instructions,
-    )?;
-    instructions.push(BackendInstruction::ArrayElementStore {
-        base,
-        index,
-        aggregate_layout,
-        element_layout,
-        element_type,
-        value: result,
-        capacity,
-        span,
-    });
-    Ok(())
 }
 
-fn lower_array_element_location(
+pub(super) fn lower_struct_literal_expression(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let Expr::StructLit { name, type_arguments, fields, span } = expression else {
+        return Err(unsupported(expression_span(expression), "struct literal expected"));
+    };
+    lower_struct_literal(provider, name, type_arguments, fields, *span, instructions)
+}
+
+pub(super) fn lower_array_element_location(
     provider: &mut SharedExpressionProvider<'_>,
     collection: &Expr,
     index: &Expr,
@@ -167,6 +175,27 @@ fn lower_array_element_location(
 > {
     let base = provider.lower_expression(collection, instructions)?;
     let index = provider.lower_expression(index, instructions)?;
+    lower_array_element_location_from_values(provider, base, index, span, instructions)
+}
+
+fn lower_array_element_location_from_values(
+    provider: &mut SharedExpressionProvider<'_>,
+    base: BackendValueId,
+    index: BackendValueId,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<
+    (
+        BackendValueId,
+        BackendValueId,
+        super::super::super::BackendLayout,
+        super::super::super::BackendLayout,
+        TypeName,
+        BackendValueType,
+        u32,
+    ),
+    BackendContractError,
+> {
     let type_name = provider
         .nominal_type(base)
         .cloned()
@@ -457,30 +486,4 @@ fn lower_plain_field_compound_assignment(
         span,
     });
     Ok(())
-}
-
-fn compound_operation(operator: CompoundAssignmentOp) -> BackendIntegerBinaryOp {
-    match operator {
-        CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
-        CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
-        CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
-        CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
-        CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
-        CompoundAssignmentOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
-        CompoundAssignmentOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
-        CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
-        CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
-        CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
-    }
-}
-
-pub(super) fn lower_struct_literal_expression(
-    provider: &mut SharedExpressionProvider<'_>,
-    expression: &Expr,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<BackendValueId, BackendContractError> {
-    let Expr::StructLit { name, type_arguments, fields, span } = expression else {
-        return Err(unsupported(expression_span(expression), "struct literal expected"));
-    };
-    lower_struct_literal(provider, name, type_arguments, fields, *span, instructions)
 }

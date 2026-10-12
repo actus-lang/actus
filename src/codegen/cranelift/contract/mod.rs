@@ -122,6 +122,7 @@ fn parameter_types(
         | BackendPassingMode::RuntimeBridge { layout } => {
             layout.validate().map_err(|error| BackendEmitError(error.to_string()))?;
             match parameter.ty {
+                BackendValueType::Pointer => Ok(vec![module.isa().pointer_type()]),
                 BackendValueType::Aggregate { layout: value_layout }
                 | BackendValueType::Region { layout: value_layout }
                 | BackendValueType::Enum {
