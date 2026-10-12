@@ -1072,6 +1072,16 @@ tests validate both side-effect-free and carried-owner loops. Hosted CLI
 fixtures build and execute the same carried-owner range program through both
 Cranelift and LLVM and return the expected result.
 
+The CLI shared-candidate classifier now admits the bounded range-loop slice
+when the bounds and binding are integer expressions and the body uses only the
+already-supported scalar loop operations. The classifier regression
+`accepts_bounded_range_iteration_in_the_shared_contract` and the hosted
+Cranelift and LLVM fixtures `cranelift_backend_builds_and_runs_a_shared_range_loop`
+and `llvm_backend_builds_and_runs_a_shared_range_loop` verify that this source
+is accepted by the shared route and executes with the same result. Branch
+mutation remains rejected by the classifier until a branch-merge value
+contract exists.
+
 Fixed-array iteration now uses the same neutral loop contract. Shared lowering
 preserves the declared `Array[T, N]` nominal type, validates the concrete
 capacity and recursive element layout, lowers `Array[T, N]()` to a bounded

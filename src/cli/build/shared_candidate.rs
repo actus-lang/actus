@@ -160,7 +160,12 @@ fn scalar_statement(
         Stmt::Loop(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
-        Stmt::ForRange { .. } => false,
+        Stmt::ForRange { binding, start, end, body, .. } => {
+            integer_binding(binding)
+                && scalar_expression(start, returns_value)
+                && scalar_expression(end, returns_value)
+                && range_loop_block(body, returns_value, unit_enums)
+        }
         Stmt::ForArray { binding, collection, body, .. } => {
             integer_binding(binding)
                 && scalar_expression(collection, returns_value)
@@ -291,6 +296,34 @@ fn array_loop_block(
         }
         Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
         Stmt::ForRange { .. } => false,
+    })
+}
+
+fn range_loop_block(
+    block: &Block,
+    returns_value: &BTreeMap<String, bool>,
+    unit_enums: &BTreeSet<String>,
+) -> bool {
+    block.statements.iter().all(|statement| match statement {
+        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, returns_value),
+        Stmt::Assignment { target, value, .. } | Stmt::CompoundAssignment { target, value, .. } => {
+            scalar_place(target) && scalar_expression(value, returns_value)
+        }
+        Stmt::Return { value, .. } => {
+            value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
+        }
+        Stmt::Expression { expression, .. } => scalar_statement_call(expression, returns_value),
+        Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) => {
+            scalar_statement(statement, returns_value, true, unit_enums)
+        }
+        Stmt::ForRange { binding, start, end, body, .. } => {
+            integer_binding(binding)
+                && scalar_expression(start, returns_value)
+                && scalar_expression(end, returns_value)
+                && range_loop_block(body, returns_value, unit_enums)
+        }
+        Stmt::ForArray { .. } => false,
+        Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
     })
 }
 
@@ -442,12 +475,20 @@ mod tests {
     }
 
     #[test]
-    fn rejects_constructs_outside_the_scalar_contract_slice() {
-        let source =
-            "verb main() -> Int { for erg index: u32 in 0u32 .. 1u32 { break; } return 0; }";
+    fn accepts_bounded_range_iteration_in_the_shared_contract() {
+        let source = "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { total += index; } return total as Int; }";
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
-        let program = parse(tokens).expect("fixture should parse");
+        let program = parse(tokens).expect("range fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn rejects_branch_mutation_outside_the_shared_contract_slice() {
+        let source = "verb main() -> Int { erg value: u32 = 0u32; if true { value = 1u32; } return value as Int; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("branch mutation fixture should parse");
         assert!(!supports_scalar_shared_lowering(&program));
     }
 }
